@@ -418,7 +418,7 @@ requirements:
     canonical: docs/specifications/wire.md#req-052
     status: draft
     implementation: landed
-    packages: [openehr/serialize/canjson, openehr/rm, openehr/rm/typereg, openehr/internal/refused, openehr/aom/aom14, testkit/corpus, testkit/fixtures, testkit/wireequiv, testkit/expectedform]
+    packages: [openehr/serialize/canjson, openehr/rm, openehr/rm/typereg, openehr/internal/refused, openehr/internal/xmlunmatched, openehr/aom/aom14, testkit/corpus, testkit/fixtures, testkit/wireequiv, testkit/expectedform]
     probes: [PROBE-030, PROBE-031, PROBE-038, PROBE-105]
     tests:
       - internal/bmmgen/render_interval_bound_test.go
@@ -472,6 +472,8 @@ requirements:
       - openehr/serialize/canjson/unmatched_test.go
       - openehr/serialize/canjson/valuefree_test.go
       - openehr/serialize/canxml/interval_open_side_test.go
+      - openehr/serialize/canxml/primitive_error_test.go
+      - openehr/serialize/canxml/typed_nil_bound_test.go
       - openehr/serialize/canxml/unmatched_test.go
       - openehr/serialize/canxml/valuefree_test.go
       - openehr/serialize/internal/poly/poly_test.go
@@ -614,22 +616,28 @@ requirements:
     implementation: landed
     packages:
       - openehr/serialize/canxml
+      - openehr/internal/xmlunmatched
       - openehr/rm
       - openehr/aom/aom14
       - testkit/corpus
       - testkit/fixtures
+      - internal/bmmgen
+      - resources/its-xml
     probes: [PROBE-033, PROBE-034, PROBE-105]
     tests:
       - internal/bmmgen/render_interval_bound_test.go
+      - internal/bmmgen/render_xmlmar_order_test.go
       - internal/rmaccess/interval_test.go
       - openehr/aom/aom14/interval_open_side_test.go
       - openehr/rm/character_text_test.go
       - openehr/rm/interval_bound_test.go
+      - openehr/serialize/canxml/child_order_test.go
       - openehr/serialize/canxml/crossformat_test.go
       - openehr/serialize/canxml/decode_test.go
       - openehr/serialize/canxml/interval_flag_defaults_test.go
       - openehr/serialize/canxml/interval_open_side_test.go
       - openehr/serialize/canxml/oneroot_test.go
+      - openehr/serialize/canxml/primitive_error_test.go
       - openehr/serialize/canxml/roundtrip_test.go
       - openehr/serialize/canxml/unmatched_test.go
       - testkit/conformance/crossformat/census_test.go
@@ -2320,6 +2328,7 @@ requirements:
       - internal/rmjsonwalk/root_test.go
       - internal/rmjsonwalk/walk_test.go
       - openehr/serialize/canjson/unmatched_test.go
+      - openehr/serialize/canxml/primitive_error_test.go
       - openehr/serialize/canxml/unmatched_test.go
       - openehr/serialize/simplified/composer_test.go
       - openehr/serialize/simplified/composition_name_test.go

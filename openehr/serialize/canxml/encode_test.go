@@ -31,8 +31,8 @@ func TestMarshalDVQuantityNoXSITypeAtRoot(t *testing.T) {
 }
 
 // TestMarshalDVQuantityChildOrder asserts that mandatory child
-// elements are emitted in BMM property declaration order (the order
-// the generator emits struct fields).
+// elements are emitted in the order of the DV_QUANTITY ITS-XML schema
+// sequence, which puts magnitude before units.
 func TestMarshalDVQuantityChildOrder(t *testing.T) {
 	q := &rm.DVQuantity{Magnitude: 80.5, Units: "kg"}
 	got, err := canxml.Marshal(q)
@@ -46,7 +46,7 @@ func TestMarshalDVQuantityChildOrder(t *testing.T) {
 		t.Fatalf("missing mandatory child elements in: %s", s)
 	}
 	if mi >= ui {
-		t.Errorf("BMM order violated: magnitude must precede units in:\n%s", s)
+		t.Errorf("schema order violated: magnitude must precede units in:\n%s", s)
 	}
 }
 

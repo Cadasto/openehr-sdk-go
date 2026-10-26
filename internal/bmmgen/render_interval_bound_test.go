@@ -775,7 +775,9 @@ func TestREQ169IntervalFlaggedRefusals(t *testing.T) {
 // TestREQ169IntervalFlagHelpersSettleOpenFlagsFirst pins the shared default
 // (REQ-169) in the generated interval file: the open flags take their
 // defaults before the included flags, which read them, so an included default
-// follows its side's final open flag whatever the member order.
+// follows its side's final open flag whatever the member order. The XML flag
+// decoder reads its text through xmlunmatched.DecodeText, so a flag that is no
+// boolean fails as a primitive element's text fails (REQ-056).
 func TestREQ169IntervalFlagHelpersSettleOpenFlagsFirst(t *testing.T) {
 	plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
 	if err != nil {
@@ -788,7 +790,7 @@ func TestREQ169IntervalFlagHelpersSettleOpenFlagsFirst(t *testing.T) {
 	src := string(body)
 	for _, want := range []string{
 		"type intervalFlagsSeen struct", "type intervalFlagJSON struct", "func (f intervalFlagJSON) UnmarshalJSONFrom(",
-		"func decodeIntervalFlagXML(", "text = strings.TrimSpace(text)",
+		"func decodeIntervalFlagXML(", "return xmlunmatched.DecodeText(dec, start, func(text string) error {", "text = strings.TrimSpace(text)",
 		"type intervalBoundJSON struct", "func (f intervalBoundJSON) UnmarshalJSONFrom(",
 		"func intervalBoundHeldByValue[T any](*T) bool", "func errIntervalClosedSide(side string) error",
 	} {

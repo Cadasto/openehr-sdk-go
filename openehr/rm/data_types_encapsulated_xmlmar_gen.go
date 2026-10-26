@@ -19,9 +19,10 @@ func (d *DVMultimedia) BMMName() string { return "DV_MULTIMEDIA" }
 
 // MarshalXML emits canonical openEHR XML for DVMultimedia. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -75,13 +76,13 @@ func (d *DVMultimedia) MarshalXML(_e *xml.Encoder, _start xml.StartElement) erro
 			return err
 		}
 	}
+	if err := _e.EncodeElement(d.Size, xml.StartElement{Name: xml.Name{Local: "size"}}); err != nil {
+		return err
+	}
 	if d.Thumbnail != nil {
 		if err := _e.EncodeElement(d.Thumbnail, xml.StartElement{Name: xml.Name{Local: "thumbnail"}}); err != nil {
 			return err
 		}
-	}
-	if err := _e.EncodeElement(d.Size, xml.StartElement{Name: xml.Name{Local: "size"}}); err != nil {
-		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err
@@ -96,9 +97,10 @@ func (d *DVParsable) BMMName() string { return "DV_PARSABLE" }
 
 // MarshalXML emits canonical openEHR XML for DVParsable. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.

@@ -80,6 +80,10 @@ func (d *DVCount) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 					return _err
 				}
 			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
+			}
 		case xml.EndElement:
 			return nil
 		}
@@ -155,6 +159,10 @@ func (d *DVInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 					return _err
 				}
 			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
+			}
 		case xml.EndElement:
 			if _err := _seen.settle(intervalBoundHeldByValue(&d.Lower), &d.LowerIncluded, &d.LowerUnbounded, &d.UpperIncluded, &d.UpperUnbounded); _err != nil {
 				return fmt.Errorf("%w: DV_INTERVAL: %w", canxml.ErrInvalidShape, _err)
@@ -215,6 +223,10 @@ func (d *DVOrdinal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
+			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
 			}
 		case xml.EndElement:
 			return nil
@@ -301,6 +313,10 @@ func (d *DVProportion) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
+			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
 			}
 		case xml.EndElement:
 			return nil
@@ -396,6 +412,10 @@ func (d *DVQuantity) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 					return _err
 				}
 			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
+			}
 		case xml.EndElement:
 			return nil
 		}
@@ -454,6 +474,10 @@ func (d *DVScale) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 					return _err
 				}
 			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
+			}
 		case xml.EndElement:
 			return nil
 		}
@@ -495,6 +519,10 @@ func (r *ReferenceRange[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
+			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
 			}
 		case xml.EndElement:
 			return nil

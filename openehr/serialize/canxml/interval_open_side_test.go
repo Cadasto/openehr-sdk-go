@@ -30,9 +30,12 @@ func TestREQ056OpenIntervalSideEmptyBound(t *testing.T) {
 	when := rm.DVDateTime{Value: "2026-10-01T08:00:00Z"}
 	var nilQuantity *rm.DVQuantity
 
-	// Every interval class shares this element order: the bounds first, then
-	// the flags.
-	all := []string{"lower", "upper", "lower_unbounded", "upper_unbounded", "lower_included", "upper_included"}
+	// Each class writes its ITS-XML schema sequence. DV_INTERVAL declares the
+	// bounds first, then the flags; BASE Interval declares only the flags, so
+	// Proper_interval and Point_interval write the bounds after them, where
+	// IntervalOfInteger and its siblings put them.
+	dvAll := []string{"lower", "upper", "lower_included", "upper_included", "lower_unbounded", "upper_unbounded"}
+	intervalAll := []string{"lower_included", "upper_included", "lower_unbounded", "upper_unbounded", "lower", "upper"}
 
 	cases := []struct {
 		name  string
@@ -45,91 +48,91 @@ func TestREQ056OpenIntervalSideEmptyBound(t *testing.T) {
 		{
 			name:  "DV_QUANTITY, open upper side, empty bound omitted",
 			value: &rm.DVInterval[rm.DVQuantity]{Lower: q, LowerIncluded: true, UpperUnbounded: true},
-			want:  childrenWithout(all, "upper"),
+			want:  childrenWithout(dvAll, "upper"),
 			fresh: func() any { return &rm.DVInterval[rm.DVQuantity]{} },
 		},
 		{
 			name:  "DV_QUANTITY, open lower side, empty bound omitted",
 			value: &rm.DVInterval[rm.DVQuantity]{LowerUnbounded: true, Upper: q, UpperIncluded: true},
-			want:  childrenWithout(all, "lower"),
+			want:  childrenWithout(dvAll, "lower"),
 			fresh: func() any { return &rm.DVInterval[rm.DVQuantity]{} },
 		},
 		{
 			name:  "DV_QUANTITY, both sides open, both empty bounds omitted",
 			value: &rm.DVInterval[rm.DVQuantity]{LowerUnbounded: true, UpperUnbounded: true},
-			want:  childrenWithout(all, "lower", "upper"),
+			want:  childrenWithout(dvAll, "lower", "upper"),
 			fresh: func() any { return &rm.DVInterval[rm.DVQuantity]{} },
 		},
 		{
 			name:  "DV_COUNT, open upper side, empty bound omitted",
 			value: &rm.DVInterval[rm.DVCount]{Lower: count, LowerIncluded: true, UpperUnbounded: true},
-			want:  childrenWithout(all, "upper"),
+			want:  childrenWithout(dvAll, "upper"),
 			fresh: func() any { return &rm.DVInterval[rm.DVCount]{} },
 		},
 		{
 			name:  "DV_COUNT, open lower side, empty bound omitted",
 			value: &rm.DVInterval[rm.DVCount]{LowerUnbounded: true, Upper: count},
-			want:  childrenWithout(all, "lower"),
+			want:  childrenWithout(dvAll, "lower"),
 			fresh: func() any { return &rm.DVInterval[rm.DVCount]{} },
 		},
 		{
 			name:  "DV_DATE_TIME, open upper side, empty bound omitted",
 			value: &rm.DVInterval[rm.DVDateTime]{Lower: when, LowerIncluded: true, UpperUnbounded: true},
-			want:  childrenWithout(all, "upper"),
+			want:  childrenWithout(dvAll, "upper"),
 			fresh: func() any { return &rm.DVInterval[rm.DVDateTime]{} },
 		},
 		{
 			name:  "DV_DATE_TIME, open lower side, empty bound omitted",
 			value: &rm.DVInterval[rm.DVDateTime]{LowerUnbounded: true, Upper: when},
-			want:  childrenWithout(all, "lower"),
+			want:  childrenWithout(dvAll, "lower"),
 			fresh: func() any { return &rm.DVInterval[rm.DVDateTime]{} },
 		},
 		{
 			name:  "non-empty bound beside its own open flag is kept",
 			value: &rm.DVInterval[rm.DVQuantity]{Lower: q, LowerUnbounded: true, Upper: q, UpperUnbounded: true},
-			want:  all,
+			want:  dvAll,
 			fresh: func() any { return &rm.DVInterval[rm.DVQuantity]{} },
 		},
 		{
 			name:  "zero DV_COUNT on a bounded side is a real bound and is kept",
 			value: &rm.DVInterval[rm.DVCount]{Lower: rm.DVCount{}, LowerIncluded: true, Upper: count},
-			want:  all,
+			want:  dvAll,
 			fresh: func() any { return &rm.DVInterval[rm.DVCount]{} },
 		},
 		{
 			name:  "Proper_interval of DV_COUNT, open upper side, empty bound omitted",
 			value: &rm.ProperInterval[rm.DVCount]{Lower: count, UpperUnbounded: true},
-			want:  childrenWithout(all, "upper"),
+			want:  childrenWithout(intervalAll, "upper"),
 			fresh: func() any { return &rm.ProperInterval[rm.DVCount]{} },
 		},
 		{
 			name:  "Proper_interval of DV_COUNT, open lower side, empty bound omitted",
 			value: &rm.ProperInterval[rm.DVCount]{LowerUnbounded: true, Upper: count},
-			want:  childrenWithout(all, "lower"),
+			want:  childrenWithout(intervalAll, "lower"),
 			fresh: func() any { return &rm.ProperInterval[rm.DVCount]{} },
 		},
 		{
 			name:  "Proper_interval of an Integer, open upper side, zero bound omitted",
 			value: &rm.ProperInterval[rm.Integer]{Lower: 1, UpperUnbounded: true},
-			want:  childrenWithout(all, "upper"),
+			want:  childrenWithout(intervalAll, "upper"),
 			fresh: func() any { return &rm.ProperInterval[rm.Integer]{} },
 		},
 		{
 			name:  "Proper_interval of a Go int, open lower side, zero bound omitted",
 			value: &rm.ProperInterval[int]{LowerUnbounded: true, Upper: 1},
-			want:  childrenWithout(all, "lower"),
+			want:  childrenWithout(intervalAll, "lower"),
 			fresh: func() any { return &rm.ProperInterval[int]{} },
 		},
 		{
 			name:  "Proper_interval of a Go float32, open upper side, zero bound omitted",
 			value: &rm.ProperInterval[float32]{Lower: 1.5, UpperUnbounded: true},
-			want:  childrenWithout(all, "upper"),
+			want:  childrenWithout(intervalAll, "upper"),
 			fresh: func() any { return &rm.ProperInterval[float32]{} },
 		},
 		{
 			name:  "Point_interval of DV_QUANTITY, open upper side, empty bound omitted",
 			value: &rm.PointInterval[rm.DVQuantity]{Lower: q, UpperUnbounded: true},
-			want:  childrenWithout(all, "upper"),
+			want:  childrenWithout(intervalAll, "upper"),
 			fresh: func() any { return &rm.PointInterval[rm.DVQuantity]{} },
 		},
 		// The typed Point_interval and Proper_interval carry the same rule as
@@ -138,43 +141,43 @@ func TestREQ056OpenIntervalSideEmptyBound(t *testing.T) {
 		{
 			name:  "Point_interval of DV_QUANTITY, open lower side, empty bound omitted",
 			value: &rm.PointInterval[rm.DVQuantity]{LowerUnbounded: true, Upper: q},
-			want:  childrenWithout(all, "lower"),
+			want:  childrenWithout(intervalAll, "lower"),
 			fresh: func() any { return &rm.PointInterval[rm.DVQuantity]{} },
 		},
 		{
 			name:  "Point_interval of DV_QUANTITY, both sides open, both empty bounds omitted",
 			value: &rm.PointInterval[rm.DVQuantity]{LowerUnbounded: true, UpperUnbounded: true},
-			want:  childrenWithout(all, "lower", "upper"),
+			want:  childrenWithout(intervalAll, "lower", "upper"),
 			fresh: func() any { return &rm.PointInterval[rm.DVQuantity]{} },
 		},
 		{
 			name:  "Point_interval of DV_QUANTITY, bounded sides keep both bounds",
 			value: &rm.PointInterval[rm.DVQuantity]{Lower: q, Upper: q},
-			want:  all,
+			want:  intervalAll,
 			fresh: func() any { return &rm.PointInterval[rm.DVQuantity]{} },
 		},
 		{
 			name:  "Proper_interval of DV_QUANTITY, open upper side, empty bound omitted",
 			value: &rm.ProperInterval[rm.DVQuantity]{Lower: q, UpperUnbounded: true},
-			want:  childrenWithout(all, "upper"),
+			want:  childrenWithout(intervalAll, "upper"),
 			fresh: func() any { return &rm.ProperInterval[rm.DVQuantity]{} },
 		},
 		{
 			name:  "Proper_interval of DV_QUANTITY, open lower side, empty bound omitted",
 			value: &rm.ProperInterval[rm.DVQuantity]{LowerUnbounded: true, Upper: q},
-			want:  childrenWithout(all, "lower"),
+			want:  childrenWithout(intervalAll, "lower"),
 			fresh: func() any { return &rm.ProperInterval[rm.DVQuantity]{} },
 		},
 		{
 			name:  "Proper_interval of DV_QUANTITY, both sides open, both empty bounds omitted",
 			value: &rm.ProperInterval[rm.DVQuantity]{LowerUnbounded: true, UpperUnbounded: true},
-			want:  childrenWithout(all, "lower", "upper"),
+			want:  childrenWithout(intervalAll, "lower", "upper"),
 			fresh: func() any { return &rm.ProperInterval[rm.DVQuantity]{} },
 		},
 		{
 			name:  "Proper_interval of DV_QUANTITY, bounded sides keep both bounds",
 			value: &rm.ProperInterval[rm.DVQuantity]{Lower: q, Upper: q},
-			want:  all,
+			want:  intervalAll,
 			fresh: func() any { return &rm.ProperInterval[rm.DVQuantity]{} },
 		},
 		// Regression pins: the encoders already left out a nil or typed-nil
@@ -183,17 +186,17 @@ func TestREQ056OpenIntervalSideEmptyBound(t *testing.T) {
 		{
 			name:  "interface-typed bound, nil on an open side, omitted",
 			value: &rm.DVInterval[rm.DVOrdered]{Lower: &q, UpperUnbounded: true},
-			want:  childrenWithout(all, "upper"),
+			want:  childrenWithout(dvAll, "upper"),
 		},
 		{
 			name:  "interface-typed bound, typed nil on an open side, omitted",
 			value: &rm.DVInterval[rm.DVOrdered]{Lower: nilQuantity, LowerUnbounded: true, Upper: &q},
-			want:  childrenWithout(all, "lower"),
+			want:  childrenWithout(dvAll, "lower"),
 		},
 		{
 			name:  "interface-typed bound, all-zero concrete on an open side, kept",
 			value: &rm.DVInterval[rm.DVOrdered]{Lower: rm.DVQuantity{}, LowerUnbounded: true, Upper: &q},
-			want:  all,
+			want:  dvAll,
 		},
 	}
 
@@ -228,7 +231,8 @@ func TestREQ056OpenIntervalSideEmptyBound(t *testing.T) {
 // set only on the embedded Interval is never emitted and never opens a side.
 func TestREQ056PointIntervalOuterFlagsWin(t *testing.T) {
 	q := rm.DVQuantity{Magnitude: 5, Units: "mmol/L"}
-	all := []string{"lower", "upper", "lower_unbounded", "upper_unbounded", "lower_included", "upper_included"}
+	// The ITS-XML schema order of BASE Interval: the flags, then the bounds.
+	all := []string{"lower_included", "upper_included", "lower_unbounded", "upper_unbounded", "lower", "upper"}
 	allFalse := map[string]string{"lower_unbounded": "false", "upper_unbounded": "false", "lower_included": "false", "upper_included": "false"}
 
 	cases := []struct {

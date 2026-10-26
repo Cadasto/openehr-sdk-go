@@ -52,26 +52,34 @@ func (c decoderConfig) tracked() bool {
 // decodes as, other than namespace declarations and attributes in the XML
 // Schema instance namespace (`xsi:type`, `xsi:schemaLocation`, `xsi:nil`,
 // …); an element in a namespace other than the openEHR one (see
-// [ErrNamespace]), the root element aside; and an element whose content this codec does not model:
-// a `Hash` member, a BMM `Any` member (the AOM 1.4 `assumed_value` and
-// `EXPR_LEAF.item`), and a member whose Go type has no decoder of its own
-// (see the package documentation). A bare `type` attribute is unmatched
-// except where dispatch reads it as the discriminator. It applies at any
-// depth: inside a polymorphic slot, an interval bound, a primitive element or
-// an AOM 1.4 value too.
+// [ErrNamespace]), the root element aside; text other than XML whitespace
+// directly inside an element whose content is elements, such as an RM
+// object's, a CDATA section included; and an element whose content this
+// codec does not model: a `Hash` member, a BMM `Any` member (the AOM 1.4
+// `assumed_value` and `EXPR_LEAF.item`), and a member whose Go type has no
+// decoder of its own (see the package documentation). A bare `type`
+// attribute is unmatched except where dispatch reads it as the
+// discriminator. It applies at any depth: inside a polymorphic slot, an
+// interval bound, a primitive element or an AOM 1.4 value too. The text of
+// a primitive element, such as `magnitude`, is its value and is read, and
+// XML whitespace (spaces, tabs, carriage returns and line feeds) between
+// elements is never unmatched, so an indented document decodes as a compact
+// one does.
 //
 // By default the decoder ignores unmatched content: the value it returns
 // holds the rest of the input and none of it. With this option fn receives
 // each item, once, in the order it appears in the input, and the value
 // returned is the same as without the option. An unmatched element is one
-// item, whatever it holds.
+// item, whatever it holds, and the text of an element is one item, however
+// many runs of text it holds.
 //
 // fn gets the item's path from the root of the value: one `/name[n]` segment
 // per element, where name is the element's local name and n its position
 // among the earlier siblings of the same name plus one, counting from 1; an
-// attribute adds a last `/@name` segment. For example
-// "/composition[1]/content[2]/x-note[1]" or "/composition[1]/@x-flag". The
-// path carries names only, never a value from the input. fn runs during the
+// attribute adds a last `/@name` segment, and text a last `/text()` segment.
+// For example "/composition[1]/content[2]/x-note[1]",
+// "/composition[1]/@x-flag" or "/ehr_status[1]/subject[1]/text()". The path
+// carries names only, never a value from the input. fn runs during the
 // decode, on the caller's goroutine.
 //
 // A nil fn is the same as leaving the option out. Combined with
@@ -82,9 +90,10 @@ func WithUnmatched(fn func(path string)) DecoderOption {
 }
 
 // WithStrict refuses the decode at its first unmatched item (see
-// [WithUnmatched] for what is unmatched and for the form of its path). The
-// error wraps [ErrUnknownElement] and names the item's path from the root of
-// the value; it carries none of the item's value. An element in a foreign
+// [WithUnmatched] for what is unmatched, text in an element whose content is
+// elements among it, and for the form of its path). The error wraps
+// [ErrUnknownElement] and names the item's path from the root of the value;
+// it carries none of the item's value or text. An element in a foreign
 // namespace also wraps [ErrNamespace]. The value v points to is unspecified
 // after the refusal.
 //
@@ -147,12 +156,21 @@ func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 }
 
 // Decode reads the next XML element from the stream and stores it
-// in v. Errors follow the same classification as [Unmarshal].
+// in v. Errors follow the same classification as [Unmarshal], with one
+// difference: a Decoder given neither [WithUnmatched] nor [WithStrict] reads
+// the stream once and does not follow the path of the elements it reads, so
+// the [DecodeError] for the text of a primitive element that does not decode
+// as its type names the element alone, such as "/is_queryable", inside the
+// envelope of each polymorphic slot it sits in. A Decoder given either
+// option returns it on its own, with the element's path from the root of the
+// value, as [Unmarshal] does.
 //
 // Decode reads no further than the end of that element, so whatever
 // follows it, another element included, is left for the next call. A
-// stream may hold many values, one after another. [Unmarshal], which is
-// given a whole document, is the call that holds it to one root element.
+// stream may hold many values, one after another, and Decode skips what
+// precedes each one, as encoding/xml does. [Unmarshal], which is given a
+// whole document, is the call that holds it to one root element and checks
+// what comes before and after it.
 func (d *Decoder) Decode(v any) error {
 	if d.trk == nil {
 		return d.dec.Decode(v)
@@ -176,32 +194,67 @@ func (d *Decoder) RelaxedTypeDispatch() bool { return d.cfg.relaxedTypeDispatch 
 // [UnmarshalXML] methods the BMM generator emits; each consults
 // [typereg.Default] to resolve `xsi:type` discriminators.
 //
-// data is one document, so it holds one root element. Comments,
-// processing instructions and whitespace may follow the root, as XML
-// allows. Another element, or text other than whitespace, after the root
-// is not well-formed XML, and the decode refuses it in every mode, with
-// or without [WithUnmatched] or [WithStrict]: it is malformed input, not
-// unmatched content. The error wraps [ErrInvalidShape] and carries none
-// of the content after the root. A root that fails to decode fails as
-// itself, and the decode does not read on.
+// data is one document, so it holds one root element. Before the root it
+// may hold the XML declaration, comments, processing instructions,
+// whitespace and one document type declaration, after a UTF-8 byte order
+// mark at the very start; comments, processing instructions and whitespace
+// may follow the root, as XML allows. Anything else before or after the
+// root, such as an element or text other than whitespace, is not
+// well-formed XML, and the decode refuses it in every mode, with or without
+// [WithUnmatched] or [WithStrict]: it is malformed input, not unmatched
+// content. The error wraps [ErrInvalidShape] and carries none of that
+// content. A root that fails to decode fails as itself, and the decode does
+// not read on.
 //
 // Returns [DecodeError] wrapping a typereg sentinel
 // ([typereg.ErrMissingType] / ErrUnknownType / ErrTypeMismatch) at
 // polymorphic failures, and [ErrInvalidShape] (wrapped) for an
-// `xmi:type` discriminator failure and for content after the root.
+// `xmi:type` discriminator failure and for content before or after the
+// root.
 // Other XML syntax errors are not classified: they come back unchanged
 // from encoding/xml, so an errors.Is against [ErrInvalidShape] does not
 // match a truncated root or a syntax error inside it.
+//
+// The text of a primitive element that does not decode as its type, such
+// as a boolean written `maybe` or a whole number written `2.5`, fails in
+// every mode with a [DecodeError] on its own, outside any slot envelope,
+// whose Path is the element's path from the root of the value, such as
+// "/ehr_status[1]/is_queryable[1]", in the form [WithUnmatched] uses. It
+// wraps [ErrInvalidShape] and keeps the conversion's own error, such as a
+// *strconv.NumError, reachable through unwrapping; its text carries none of
+// the element's. Given no option, Unmarshal finds that path by decoding
+// data a second time once the first decode has failed so, which a decode
+// that succeeds never does.
 //
 // Content the decode does not read is ignored by default. [WithUnmatched]
 // reports each such item and [WithStrict] refuses the first, wrapping
 // [ErrUnknownElement].
 func Unmarshal(data []byte, v any, opts ...DecoderOption) error {
+	if err := checkProlog(data); err != nil {
+		return err
+	}
 	d := NewDecoder(bytes.NewReader(data), opts...)
 	if err := d.Decode(v); err != nil {
+		if d.trk == nil && xmlunmatched.IsPrimitiveFailure(err) {
+			return locate(data, v, err)
+		}
 		return err
 	}
 	return d.end()
+}
+
+// locate decodes data into v once more after a decode without options failed
+// with err, a primitive failure that names the element alone. The second
+// decode reads through a tracker that follows the open elements and applies
+// no policy, so it fails at the same element and names it by its path from
+// the root of the value. locate returns that error, or err should the second
+// decode not fail.
+func locate(data []byte, v any, err error) error {
+	t := xmlunmatched.NewTracker(nil, false)
+	if located := t.Decode(t.NewDecoder(bytes.NewReader(data)), v); located != nil {
+		return located
+	}
+	return err
 }
 
 // end reads the rest of the document after the root element. Comments,
@@ -233,6 +286,72 @@ func (d *Decoder) end() error {
 // errAfterRoot is the refusal of content after the root element.
 func errAfterRoot() error {
 	return fmt.Errorf("%w: content after the root element", ErrInvalidShape)
+}
+
+// utf8BOM is the UTF-8 byte order mark, which a document may start with as
+// its encoding signature.
+var utf8BOM = []byte("\ufeff")
+
+// checkProlog reads data up to its first element, the root, apart from the
+// decode, which cannot see what encoding/xml skips there. A UTF-8 byte order
+// mark at the very start, the XML declaration and other processing
+// instructions, comments, whitespace and one document type declaration
+// pass. Anything else, other text or markup, a second document type
+// declaration or an end element, is refused: the error wraps
+// [ErrInvalidShape] and names none of it. A token encoding/xml cannot read,
+// and data that holds no element, are left to the decode, which fails on
+// them as it would without this check. Data that opens with its root after
+// whitespace, as the encoder writes it, costs no tokenizing.
+func checkProlog(data []byte) error {
+	data = bytes.TrimPrefix(data, utf8BOM)
+	if rootFirst(data) {
+		return nil
+	}
+	d := xml.NewDecoder(bytes.NewReader(data))
+	doctype := false
+	for {
+		tok, err := d.RawToken()
+		if err != nil {
+			return nil
+		}
+		switch t := tok.(type) {
+		case xml.StartElement:
+			return nil
+		case xml.ProcInst, xml.Comment:
+			continue
+		case xml.CharData:
+			if isXMLSpace(t) {
+				continue
+			}
+		case xml.Directive:
+			if !doctype && isDoctype(t) {
+				doctype = true
+				continue
+			}
+		}
+		return errBeforeRoot()
+	}
+}
+
+// rootFirst reports whether data opens with a start element after XML
+// whitespace, so that nothing else comes before its root: its first markup
+// is neither a processing instruction, a comment, a declaration nor an end
+// element.
+func rootFirst(data []byte) bool {
+	head := bytes.TrimLeft(data, " \t\r\n")
+	return len(head) > 1 && head[0] == '<' && head[1] != '?' && head[1] != '!' && head[1] != '/'
+}
+
+// errBeforeRoot is the refusal of content before the root element.
+func errBeforeRoot() error {
+	return fmt.Errorf("%w: content before the root element", ErrInvalidShape)
+}
+
+// isDoctype reports whether d, the text of a `<!…>` directive, is a document
+// type declaration: `DOCTYPE` and XML whitespace before the name.
+func isDoctype(d xml.Directive) bool {
+	rest, ok := bytes.CutPrefix(d, []byte("DOCTYPE"))
+	return ok && len(rest) > 0 && isXMLSpace(rest[:1])
 }
 
 // isXMLSpace reports whether text holds XML whitespace only: spaces, tabs,

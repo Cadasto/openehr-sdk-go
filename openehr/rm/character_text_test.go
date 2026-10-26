@@ -150,10 +150,8 @@ func TestCharacterXMLViaTermMapping(t *testing.T) {
 				t.Fatalf("Unmarshal(%s) = nil error, want a refusal; match = %q", doc, string(tm.Match))
 			}
 			// The XML path carries no typereg.ErrInvalidShape: that sentinel's
-			// own text names canonical JSON, and canxml classifies nothing at
-			// element level — it returns encoding/xml's errors unchanged and
-			// reserves canxml.ErrInvalidShape for xmi:type rejection and for a
-			// nil / non-xml.Marshaler root.
+			// own text names canonical JSON. canxml wraps the refusal in its
+			// own DecodeError and canxml.ErrInvalidShape instead.
 			if errors.Is(err, typereg.ErrInvalidShape) {
 				t.Errorf("err = %v; the canonical-JSON shape sentinel must not classify an XML element failure", err)
 			}

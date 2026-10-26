@@ -18,9 +18,10 @@ func (c *Composition) BMMName() string { return "COMPOSITION" }
 
 // MarshalXML emits canonical openEHR XML for Composition. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -66,13 +67,13 @@ func (c *Composition) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 	if err := _e.EncodeElement(&c.Category, xml.StartElement{Name: xml.Name{Local: "category"}}); err != nil {
 		return err
 	}
-	if c.Context != nil {
-		if err := _e.EncodeElement(c.Context, xml.StartElement{Name: xml.Name{Local: "context"}}); err != nil {
+	if c.Composer != nil {
+		if err := canxml.EncodePoly(_e, "composer", c.Composer); err != nil {
 			return err
 		}
 	}
-	if c.Composer != nil {
-		if err := canxml.EncodePoly(_e, "composer", c.Composer); err != nil {
+	if c.Context != nil {
+		if err := _e.EncodeElement(c.Context, xml.StartElement{Name: xml.Name{Local: "context"}}); err != nil {
 			return err
 		}
 	}
@@ -97,9 +98,10 @@ func (e *EventContext) BMMName() string { return "EVENT_CONTEXT" }
 
 // MarshalXML emits canonical openEHR XML for EventContext. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.

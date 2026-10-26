@@ -20,10 +20,12 @@ import (
 )
 
 // The member order of an AOM 1.4 constraint interval on the wire. JSON follows
-// the Go struct declaration; XML follows the BMM property order, bounds first.
+// the Go struct declaration; XML follows the ITS-XML schema sequence, the four
+// flags of BASE Interval first and the bounds after them, as IntervalOfInteger
+// declares them.
 var (
 	intervalJSONMembers = []string{"lower", "lower_included", "lower_unbounded", "upper", "upper_included", "upper_unbounded"}
-	intervalXMLElements = []string{"lower", "upper", "lower_unbounded", "upper_unbounded", "lower_included", "upper_included"}
+	intervalXMLElements = []string{"lower_included", "upper_included", "lower_unbounded", "upper_unbounded", "lower", "upper"}
 )
 
 // without returns names minus the listed ones, order kept.
@@ -124,7 +126,7 @@ func TestREQ052AOM14OccurrencesOpenSideJSON(t *testing.T) {
 }
 
 // TestREQ056AOM14OccurrencesOpenSideXML pins the REQ-056 reading for the same
-// interval in canonical XML: snake_case element names in BMM property order,
+// interval in canonical XML: snake_case element names in schema order,
 // an open side's empty bound ABSENT, and the output decodes back to the same
 // interval.
 func TestREQ056AOM14OccurrencesOpenSideXML(t *testing.T) {
@@ -215,7 +217,7 @@ func TestREQ052REQ056AOM14IntervalHolders(t *testing.T) {
 			}
 			elements := xmlChildNames(t, xs, tc.member)
 			if want := without(intervalXMLElements, "upper"); !slices.Equal(elements, want) {
-				t.Errorf("%s XML elements = %v, want %v (snake_case, BMM order, no `upper`)\nwire: %s", tc.member, elements, want, xs)
+				t.Errorf("%s XML elements = %v, want %v (snake_case, schema order, no `upper`)\nwire: %s", tc.member, elements, want, xs)
 			}
 			backXML := tc.fresh()
 			if err := canxml.Unmarshal(xs, backXML); err != nil {
@@ -303,7 +305,7 @@ func TestREQ052AOM14CorpusIntervalsJSON(t *testing.T) {
 }
 
 // TestREQ056AOM14CorpusIntervalsXML is the same walk for canonical XML: the
-// encoder writes snake_case elements in BMM property order, leaves out an open
+// encoder writes snake_case elements in schema order, leaves out an open
 // side's bound, and its output decodes back to the interval the corpus states.
 func TestREQ056AOM14CorpusIntervalsXML(t *testing.T) {
 	var bad problems
@@ -325,7 +327,7 @@ func TestREQ056AOM14CorpusIntervalsXML(t *testing.T) {
 			drop = append(drop, "upper")
 		}
 		if got, want := xmlChildNames(t, xs, "occurrences"), without(intervalXMLElements, drop...); !slices.Equal(got, want) {
-			bad.add("XML elements are not snake_case in BMM order without the open bounds", ci.name+": "+string(xs))
+			bad.add("XML elements are not snake_case in schema order without the open bounds", ci.name+": "+string(xs))
 		}
 		back := &aom14.CComplexObject{}
 		if err := canxml.Unmarshal(xs, back); err != nil {

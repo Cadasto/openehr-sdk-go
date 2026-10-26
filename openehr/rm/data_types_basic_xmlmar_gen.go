@@ -18,9 +18,10 @@ func (d *DVBoolean) BMMName() string { return "DV_BOOLEAN" }
 
 // MarshalXML emits canonical openEHR XML for DVBoolean. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -47,9 +48,10 @@ func (d *DVIdentifier) BMMName() string { return "DV_IDENTIFIER" }
 
 // MarshalXML emits canonical openEHR XML for DVIdentifier. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -91,9 +93,10 @@ func (d *DVState) BMMName() string { return "DV_STATE" }
 
 // MarshalXML emits canonical openEHR XML for DVState. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.

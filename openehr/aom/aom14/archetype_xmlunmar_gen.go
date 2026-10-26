@@ -108,6 +108,10 @@ func (a *Archetype) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 					return _err
 				}
 			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
+			}
 		case xml.EndElement:
 			return nil
 		}

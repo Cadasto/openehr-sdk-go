@@ -18,9 +18,10 @@ func (a *Assertion) BMMName() string { return "ASSERTION" }
 
 // MarshalXML emits canonical openEHR XML for Assertion. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -64,9 +65,10 @@ func (a *AssertionVariable) BMMName() string { return "ASSERTION_VARIABLE" }
 
 // MarshalXML emits canonical openEHR XML for AssertionVariable. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -96,9 +98,10 @@ func (e *ExprBinaryOperator) BMMName() string { return "EXPR_BINARY_OPERATOR" }
 
 // MarshalXML emits canonical openEHR XML for ExprBinaryOperator. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -109,16 +112,16 @@ func (e *ExprBinaryOperator) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if e.PrecedenceOverridden != nil {
-		if err := _e.EncodeElement(*e.PrecedenceOverridden, xml.StartElement{Name: xml.Name{Local: "precedence_overridden"}}); err != nil {
-			return err
-		}
+	if err := _e.EncodeElement(e.Type, xml.StartElement{Name: xml.Name{Local: "type"}}); err != nil {
+		return err
 	}
 	if err := _e.EncodeElement(&e.Operator, xml.StartElement{Name: xml.Name{Local: "operator"}}); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(e.Type, xml.StartElement{Name: xml.Name{Local: "type"}}); err != nil {
-		return err
+	if e.PrecedenceOverridden != nil {
+		if err := _e.EncodeElement(*e.PrecedenceOverridden, xml.StartElement{Name: xml.Name{Local: "precedence_overridden"}}); err != nil {
+			return err
+		}
 	}
 	if e.LeftOperand != nil {
 		if err := canxml.EncodePoly(_e, "left_operand", e.LeftOperand); err != nil {
@@ -143,9 +146,10 @@ func (e *ExprLeaf) BMMName() string { return "EXPR_LEAF" }
 
 // MarshalXML emits canonical openEHR XML for ExprLeaf. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -159,10 +163,10 @@ func (e *ExprLeaf) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeElement(e.Type, xml.StartElement{Name: xml.Name{Local: "type"}}); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(e.ReferenceType, xml.StartElement{Name: xml.Name{Local: "reference_type"}}); err != nil {
+	if err := _e.EncodeElement(e.Item, xml.StartElement{Name: xml.Name{Local: "item"}}); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(e.Item, xml.StartElement{Name: xml.Name{Local: "item"}}); err != nil {
+	if err := _e.EncodeElement(e.ReferenceType, xml.StartElement{Name: xml.Name{Local: "reference_type"}}); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
@@ -178,9 +182,10 @@ func (e *ExprUnaryOperator) BMMName() string { return "EXPR_UNARY_OPERATOR" }
 
 // MarshalXML emits canonical openEHR XML for ExprUnaryOperator. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -191,16 +196,16 @@ func (e *ExprUnaryOperator) MarshalXML(_e *xml.Encoder, _start xml.StartElement)
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if e.PrecedenceOverridden != nil {
-		if err := _e.EncodeElement(*e.PrecedenceOverridden, xml.StartElement{Name: xml.Name{Local: "precedence_overridden"}}); err != nil {
-			return err
-		}
+	if err := _e.EncodeElement(e.Type, xml.StartElement{Name: xml.Name{Local: "type"}}); err != nil {
+		return err
 	}
 	if err := _e.EncodeElement(&e.Operator, xml.StartElement{Name: xml.Name{Local: "operator"}}); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(e.Type, xml.StartElement{Name: xml.Name{Local: "type"}}); err != nil {
-		return err
+	if e.PrecedenceOverridden != nil {
+		if err := _e.EncodeElement(*e.PrecedenceOverridden, xml.StartElement{Name: xml.Name{Local: "precedence_overridden"}}); err != nil {
+			return err
+		}
 	}
 	if e.Operand != nil {
 		if err := canxml.EncodePoly(_e, "operand", e.Operand); err != nil {

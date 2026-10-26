@@ -56,6 +56,10 @@ func (c *Contribution) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 					return _err
 				}
 			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
+			}
 		case xml.EndElement:
 			return nil
 		}
@@ -109,6 +113,10 @@ func (i *ImportedVersion[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
+			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
 			}
 		case xml.EndElement:
 			return nil
@@ -192,6 +200,10 @@ func (o *OriginalVersion[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 					return _err
 				}
 			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
+			}
 		case xml.EndElement:
 			return nil
 		}
@@ -237,6 +249,10 @@ func (v *VersionedObject[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
+			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
 			}
 		case xml.EndElement:
 			return nil

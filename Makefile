@@ -68,7 +68,7 @@ HELP_FOOTER    = Before a pull request: make ci · docs site: make docs-serve (h
 
 ##= REQ=094 | the requirement spec-context bundles
 ##= ARGS='-base URL -deployment NAME ...' | probe-record flags
-##= ITS_REST_REF= TERMINOLOGY_REF= ... | pin a Vendor sync (FLAT_CONFORMANCE_REF too)
+##= ITS_REST_REF= TERMINOLOGY_REF= ... | pin a Vendor sync (ITS_XML_REF, FLAT_CONFORMANCE_REF too)
 ##= DOCS_SYNC=docs-sync-offline | build the docs site from the cached brand files
 
 .PHONY: help doctor go-version build-dev build-antlr \
@@ -76,7 +76,8 @@ HELP_FOOTER    = Before a pull request: make ci · docs site: make docs-serve (h
         fmt fmt-check vet lint mod-tidy \
         test test-race \
         codegen termgen aqlgen spec-generate \
-        its-rest-sync its-rest-drift flat-sync flat-drift crossformat-sync \
+        its-rest-sync its-rest-drift its-xml-sync its-xml-drift \
+        flat-sync flat-drift crossformat-sync \
         terminology-sync terminology-drift \
         mod-tidy-check codegen-check termgen-check aqlgen-check flat-check crossformat-check terminology-check \
         spec-check sdd-check ci \
@@ -151,7 +152,7 @@ test-race: ## Run the unit tests under the race detector
 ##@ Generate
 
 codegen: ## Regenerate RM and AOM 1.4 from the pinned BMM
-	@$(GO) run ./cmd/bmmgen -resources ./resources/bmm -out .
+	@$(GO) run ./cmd/bmmgen -resources ./resources/bmm -its-xml ./resources/its-xml -out .
 
 termgen: ## Regenerate openehr/terminology from the pinned XML
 	@$(GO) run ./cmd/termgen -resources ./resources/terminology -out .
@@ -172,6 +173,12 @@ its-rest-sync: ## Vendor the ITS-REST OpenAPI specs (network; ITS_REST_REF)
 
 its-rest-drift: ## Verify the ITS-REST specs; report upstream drift (network)
 	@./scripts/sync-its-rest-specs.sh check
+
+its-xml-sync: ## Vendor the ITS-XML schemas (network; ITS_XML_REF)
+	@./scripts/sync-its-xml-schemas.sh sync
+
+its-xml-drift: ## Verify the ITS-XML schemas; report upstream drift (network)
+	@./scripts/sync-its-xml-schemas.sh check
 
 flat-sync: ## Vendor the EHRbase FLAT conformance corpus (network)
 	@./scripts/sync-flat-conformance.sh sync
@@ -196,7 +203,7 @@ mod-tidy-check: ## Fail if go mod tidy would change go.mod or go.sum
 	@if test -f go.sum; then git diff --exit-code go.sum; fi
 
 codegen-check: ## Fail if the generated RM and AOM drift from the BMM
-	@$(GO) run ./cmd/bmmgen -resources ./resources/bmm -out . -verify
+	@$(GO) run ./cmd/bmmgen -resources ./resources/bmm -its-xml ./resources/its-xml -out . -verify
 
 termgen-check: ## Fail if openehr/terminology drifts from its XML
 	@$(GO) run ./cmd/termgen -resources ./resources/terminology -out . -verify

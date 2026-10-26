@@ -40,6 +40,10 @@ func (i *ISO8601Timezone) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElemen
 					return _err
 				}
 			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
+			}
 		case xml.EndElement:
 			return nil
 		}
@@ -71,6 +75,10 @@ func (t *TimeDefinitions) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElemen
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
+			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
 			}
 		case xml.EndElement:
 			return nil

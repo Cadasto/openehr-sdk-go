@@ -53,6 +53,13 @@ type Target struct {
 	// "github.com/cadasto/openehr-sdk-go/openehr/rm/typereg". The
 	// _type discriminator strings are disjoint between the two models.
 	RegistryImport string
+	// ITSXMLSchemaSets lists the ITS-XML schema sets the target's XML
+	// encoders take their child order from, each by the root files of its
+	// closure: [path.Match] patterns relative to the ITS-XML directory. A
+	// class is looked up in the sets in this order; the first is the
+	// target's own. Empty leaves the encoders in the generator's property
+	// order.
+	ITSXMLSchemaSets [][]string
 }
 
 // TargetRM is the RM generation target.
@@ -65,6 +72,7 @@ var TargetRM = Target{
 	ExternalQualifier:  "",
 	ExternalImport:     "",
 	RegistryImport:     "github.com/cadasto/openehr-sdk-go/openehr/rm/typereg",
+	ITSXMLSchemaSets:   [][]string{itsXMLRMRoots, itsXMLAMRoots},
 }
 
 // TargetAOM14 is the AOM 1.4 generation target. Emits to
@@ -81,6 +89,7 @@ var TargetAOM14 = Target{
 	ExternalQualifier:  "rm",
 	ExternalImport:     "github.com/cadasto/openehr-sdk-go/openehr/rm",
 	RegistryImport:     "github.com/cadasto/openehr-sdk-go/openehr/rm/typereg",
+	ITSXMLSchemaSets:   [][]string{itsXMLAMRoots, itsXMLRMRoots},
 }
 
 // DefaultTargets is the set of targets emitted when the CLI is invoked

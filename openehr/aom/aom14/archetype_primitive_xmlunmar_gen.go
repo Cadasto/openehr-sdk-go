@@ -55,6 +55,10 @@ func (c *CBoolean) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 					return _err
 				}
 			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
+			}
 		case xml.EndElement:
 			return nil
 		}
@@ -110,6 +114,10 @@ func (c *CDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
+			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
 			}
 		case xml.EndElement:
 			return nil
@@ -196,6 +204,10 @@ func (c *CDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
+			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
 			}
 		case xml.EndElement:
 			return nil
@@ -289,6 +301,10 @@ func (c *CDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 					return _err
 				}
 			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
+			}
 		case xml.EndElement:
 			return nil
 		}
@@ -339,6 +355,10 @@ func (c *CInteger) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 					return _err
 				}
 			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
+			}
 		case xml.EndElement:
 			return nil
 		}
@@ -388,6 +408,10 @@ func (c *CReal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
+			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
 			}
 		case xml.EndElement:
 			return nil
@@ -442,6 +466,10 @@ func (c *CString) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
+			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
 			}
 		case xml.EndElement:
 			return nil
@@ -510,6 +538,10 @@ func (c *CTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
+			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
 			}
 		case xml.EndElement:
 			return nil
