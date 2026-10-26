@@ -6,7 +6,7 @@
 
 A first-party **Go SDK for openEHR** — `github.com/cadasto/openehr-sdk-go`, MIT. **openEHR-first**: openEHR REST `1.1.0`, the Reference Model, AQL, ADL 1.4 OPT, and SMART-on-openEHR auth are the normative scope. Cadasto-platform extras (Datamap, MPI, Extra API, Admin, Care) ship in the same module for v1, behind a clean `cadasto/` cut line so later extraction is a subtree move, not a rewrite.
 
-Go `1.27.x`, module floor `1.27.0` ([REQ-002](docs/specifications/packaging.md#req-002--go-version)). **Early implementation, pre-1.0** — status per REQ in [REQ.md](docs/specifications/REQ.md), open work in [docs/roadmap.md](docs/roadmap.md).
+Go `1.27.x`, module floor `1.27.0` ([REQ-002](docs/specifications/packaging.md#req-002--go-version)). **Pre-1.0**: a minor release can change the public API ([releases.md § Pre-1.0](docs/releases.md#pre-10)). Status per REQ in [REQ.md](docs/specifications/REQ.md), open work in [docs/roadmap.md](docs/roadmap.md).
 
 ## Source of truth
 
@@ -25,7 +25,7 @@ Reading order — the specialized docs are **canonical**; defer to them rather t
 | 2 | [docs/architecture.md](docs/architecture.md) | Design narrative — package organization, dependencies, integration, mermaid diagrams |
 | 3 | [docs/ai-workflow.md](docs/ai-workflow.md) | **AI conventions** — the working loop, recommended plugins/skills, openEHR ground-truth lookups, hooks |
 | 4 | [docs/adr/](docs/adr/) | Closed architectural decisions |
-| 5 | [docs/plans/](docs/plans/) + [docs/roadmap.md](docs/roadmap.md) + [docs/backlog.md](docs/backlog.md) | Implementation plans, the open-work roadmap, and merged PRs' leftover suggestions (leads to verify, carried in at close-out by `/sdd-close` or later by `/sdd-triage --backlog` on `main`) |
+| 5 | [docs/plans/](docs/plans/) + [docs/roadmap.md](docs/roadmap.md) + [docs/backlog.md](docs/backlog.md) | Implementation plans, the open-work roadmap, and merged branches' leftover defects and suggestions (leads to verify before acting) |
 | 6 | [CHANGELOG.md](CHANGELOG.md) + [docs/releases.md](docs/releases.md) | Release log and version policy |
 | 7 | [CONTRIBUTING.md](CONTRIBUTING.md) + [SECURITY.md](SECURITY.md) | Contributor flow and vulnerability reporting |
 | 8 | [LICENSING.md](LICENSING.md) | MIT grant plus in-tree third-party inventory |
@@ -84,9 +84,11 @@ Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev
 | BMM codegen verify | `make codegen-check` |
 | AQL parser codegen verify | `make aqlgen-check` — fails if `openehr/aql/parse/gen/` drifts from the `active/` grammar (needs Docker, not a host JRE); regenerate with `make aqlgen` |
 | Spec traceability | `make spec-check` |
+| Full gate report | `make sdd-check` — the SDD gate with every warning (`make spec-check` prints only the verdict) |
 | Regenerate spec indexes | `make spec-generate`: the map's `tests:` lists from the tests' REQ citations, the REQ.md registry from `traceability.yaml` |
 | Spec context bundle | `make spec-context REQ=NNN` — registry row + traceability + canonical excerpt + strands |
 | Probe status | `make probe-status` — each PROBE's status and whether its test file exists |
+| Live CDR (opt-in, not in `make ci`) | `make probe-record ARGS=…` records a cassette; `make cdr-crosscheck` checks generated documents against live CDRs. Environment variables are in [ci.md](docs/ci.md) |
 | FLAT corpus integrity | `make flat-check` — offline `sha256` of the vendored EHRbase FLAT corpus (PROBE-086's input); `make flat-drift` adds a network drift report (dev helper, not a gate) |
 | Build Docker dev image | `make build-dev` (when host Go is missing, or for `make test-race` on a host without a C compiler; rebuild an image made before the dev stage gained gcc) |
 | Docs site | `make docs-check` builds the site from `pages/` and asserts its output; `make docs-serve` previews it. The docs-theme brand layer is pinned by commit + sha256 in `sources.json` (bump recipe in its `$comment`) |
@@ -97,7 +99,7 @@ Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev
 - `make probe-status` prints `MISSING` for any probe covered inline or in a sibling's file. That is the filename heuristic, **not** drift — `make spec-check` is the real gate.
 - **`make ci` cannot complete without Docker:** `test` → `aqlgen-check` → `build-antlr` always needs it. Everything else uses Docker only when host tooling is missing (host Go `1.27.x`; a host `golangci-lint` **built with Go 1.27**; for `make test-race`, a host C compiler; routing in [ci.md](docs/ci.md)).
   Without Docker, run `fmt-check`, `vet`, `spec-check`, `flat-check`, `build` and `go test ./... -count=1`, and let PR CI be the gate.
-- After `git worktree remove`, run `golangci-lint cache clean`; otherwise lint reports phantom issues under the removed `.worktrees/` path.
+- Worktrees go under the gitignored `.worktrees/`. After `git worktree remove`, run `golangci-lint cache clean`; otherwise lint reports phantom issues under the removed `.worktrees/` path.
 - **Public docs never name downstream consuming projects.** Describe what a consumer needs, not who the consumer is.
 - **Release cut** follows [releases.md § Tag checklist](docs/releases.md#tag-checklist) and commits straight to `main`, no branch or PR. The same commit moves the `go get …@vX.Y.Z` pin in `README.md`, `docs/quick-start.md`, `pages/install.md` and `pages/index.md`; `make docs-check` fails until all four match the newest `## [X.Y.Z]` heading in `CHANGELOG.md`.
 
