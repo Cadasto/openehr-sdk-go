@@ -63,6 +63,16 @@
 // list. The report is the whole policy: a missing member is never a decode
 // error, and a decode that does not ask pays nothing for it.
 //
+// # Whole documents
+//
+// [Unmarshal] decodes one whole document, through a tracker or none: it
+// holds the input to one root element, refusing other content before and
+// after it as malformed input, and names a primitive failure by its path
+// from the root either way, decoding the input again when nothing tracked
+// the first decode. canxml.Unmarshal calls it with the tracker its options
+// build, or none, so that a caller of this package that needs no option
+// decodes a document by the same rule.
+//
 // # Primitive failures
 //
 // The text of a primitive element that does not decode as its type is a

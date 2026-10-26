@@ -1,9 +1,7 @@
 package canxml
 
 import (
-	"bytes"
 	"encoding/xml"
-	"errors"
 	"fmt"
 	"io"
 
@@ -44,6 +42,15 @@ func newDecoderConfig(opts []DecoderOption) decoderConfig {
 // tracked reports whether the decode reports or refuses unmatched content.
 func (c decoderConfig) tracked() bool {
 	return c.unmatched != nil || c.strict
+}
+
+// tracker returns the tracker of a decode with c's options, and nil for a
+// decode that needs none, which reads as encoding/xml does.
+func (c decoderConfig) tracker() *xmlunmatched.Tracker {
+	if !c.tracked() {
+		return nil
+	}
+	return xmlunmatched.NewTracker(c.unmatched, c.strict)
 }
 
 // WithUnmatched passes every unmatched item of the input to fn while the
@@ -148,10 +155,10 @@ type Decoder struct {
 // [WithStrict] reports is relative to the value being decoded.
 func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 	cfg := newDecoderConfig(opts)
-	if !cfg.tracked() {
+	t := cfg.tracker()
+	if t == nil {
 		return &Decoder{dec: xml.NewDecoder(r), cfg: cfg}
 	}
-	t := xmlunmatched.NewTracker(cfg.unmatched, cfg.strict)
 	return &Decoder{dec: t.NewDecoder(r), cfg: cfg, trk: t}
 }
 
@@ -230,134 +237,7 @@ func (d *Decoder) RelaxedTypeDispatch() bool { return d.cfg.relaxedTypeDispatch 
 // reports each such item and [WithStrict] refuses the first, wrapping
 // [ErrUnknownElement].
 func Unmarshal(data []byte, v any, opts ...DecoderOption) error {
-	if err := checkProlog(data); err != nil {
-		return err
-	}
-	d := NewDecoder(bytes.NewReader(data), opts...)
-	if err := d.Decode(v); err != nil {
-		if d.trk == nil && xmlunmatched.IsPrimitiveFailure(err) {
-			return locate(data, v, err)
-		}
-		return err
-	}
-	return d.end()
-}
-
-// locate decodes data into v once more after a decode without options failed
-// with err, a primitive failure that names the element alone. The second
-// decode reads through a tracker that follows the open elements and applies
-// no policy, so it fails at the same element and names it by its path from
-// the root of the value. locate returns that error, or err should the second
-// decode not fail.
-func locate(data []byte, v any, err error) error {
-	t := xmlunmatched.NewTracker(nil, false)
-	if located := t.Decode(t.NewDecoder(bytes.NewReader(data)), v); located != nil {
-		return located
-	}
-	return err
-}
-
-// end reads the rest of the document after the root element. Comments,
-// processing instructions and whitespace pass. Anything else, an element,
-// other text, a document type declaration or a token encoding/xml cannot
-// read, is refused: the error wraps [ErrInvalidShape] and names none of
-// it.
-func (d *Decoder) end() error {
-	for {
-		tok, err := d.dec.Token()
-		if errors.Is(err, io.EOF) {
-			return nil
-		}
-		if err != nil {
-			return errAfterRoot()
-		}
-		switch t := tok.(type) {
-		case xml.Comment, xml.ProcInst:
-			continue
-		case xml.CharData:
-			if isXMLSpace(t) {
-				continue
-			}
-		}
-		return errAfterRoot()
-	}
-}
-
-// errAfterRoot is the refusal of content after the root element.
-func errAfterRoot() error {
-	return fmt.Errorf("%w: content after the root element", ErrInvalidShape)
-}
-
-// utf8BOM is the UTF-8 byte order mark, which a document may start with as
-// its encoding signature.
-var utf8BOM = []byte("\ufeff")
-
-// checkProlog reads data up to its first element, the root, apart from the
-// decode, which cannot see what encoding/xml skips there. A UTF-8 byte order
-// mark at the very start, the XML declaration and other processing
-// instructions, comments, whitespace and one document type declaration
-// pass. Anything else, other text or markup, a second document type
-// declaration or an end element, is refused: the error wraps
-// [ErrInvalidShape] and names none of it. A token encoding/xml cannot read,
-// and data that holds no element, are left to the decode, which fails on
-// them as it would without this check. Data that opens with its root after
-// whitespace, as the encoder writes it, costs no tokenizing.
-func checkProlog(data []byte) error {
-	data = bytes.TrimPrefix(data, utf8BOM)
-	if rootFirst(data) {
-		return nil
-	}
-	d := xml.NewDecoder(bytes.NewReader(data))
-	doctype := false
-	for {
-		tok, err := d.RawToken()
-		if err != nil {
-			return nil
-		}
-		switch t := tok.(type) {
-		case xml.StartElement:
-			return nil
-		case xml.ProcInst, xml.Comment:
-			continue
-		case xml.CharData:
-			if isXMLSpace(t) {
-				continue
-			}
-		case xml.Directive:
-			if !doctype && isDoctype(t) {
-				doctype = true
-				continue
-			}
-		}
-		return errBeforeRoot()
-	}
-}
-
-// rootFirst reports whether data opens with a start element after XML
-// whitespace, so that nothing else comes before its root: its first markup
-// is neither a processing instruction, a comment, a declaration nor an end
-// element.
-func rootFirst(data []byte) bool {
-	head := bytes.TrimLeft(data, " \t\r\n")
-	return len(head) > 1 && head[0] == '<' && head[1] != '?' && head[1] != '!' && head[1] != '/'
-}
-
-// errBeforeRoot is the refusal of content before the root element.
-func errBeforeRoot() error {
-	return fmt.Errorf("%w: content before the root element", ErrInvalidShape)
-}
-
-// isDoctype reports whether d, the text of a `<!…>` directive, is a document
-// type declaration: `DOCTYPE` and XML whitespace before the name.
-func isDoctype(d xml.Directive) bool {
-	rest, ok := bytes.CutPrefix(d, []byte("DOCTYPE"))
-	return ok && len(rest) > 0 && isXMLSpace(rest[:1])
-}
-
-// isXMLSpace reports whether text holds XML whitespace only: spaces, tabs,
-// carriage returns and line feeds.
-func isXMLSpace(text []byte) bool {
-	return len(bytes.Trim(text, " \t\r\n")) == 0
+	return xmlunmatched.Unmarshal(data, v, newDecoderConfig(opts).tracker())
 }
 
 // XSITypeOf scans a start element's attribute list and returns the
