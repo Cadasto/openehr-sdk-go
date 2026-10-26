@@ -1,0 +1,5 @@
+# Vendored upstream files are pinned by the sha256 of their exact bytes
+# (MANIFEST.txt, make *-check). Never let git rewrite their line endings,
+# whatever core.autocrlf a contributor runs with.
+resources/** -text
+testkit/corpus/** -text

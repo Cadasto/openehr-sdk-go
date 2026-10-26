@@ -22,8 +22,9 @@ The generator reads only the element sequences. These schemas declare
   roots, transitively, and vendors each file it reaches. Every file keeps its upstream path under
   this directory, so each `schemaLocation` still resolves here.
 - **Pin + integrity:** the exact upstream commit and a per-file `sha256` are recorded in
-  [`MANIFEST.txt`](MANIFEST.txt). Regenerate with `make its-xml-sync`; verify with
-  `make its-xml-drift` (see [the sync script](../../scripts/sync-its-xml-schemas.sh)).
+  [`MANIFEST.txt`](MANIFEST.txt). Regenerate with `make its-xml-sync`; verify offline with
+  `make its-xml-check`, which `make ci` runs, or with `make its-xml-drift`, which also reports
+  upstream drift (see [the sync script](../../scripts/sync-its-xml-schemas.sh)).
 
 ## Files
 
@@ -57,6 +58,7 @@ Two inclusions are worth knowing when reading the files:
 ```bash
 make its-xml-sync                              # fetch from master, rewrite MANIFEST.txt
 ITS_XML_REF=Release-2.0.0v2 make its-xml-sync  # pin a tag / branch / commit instead
+make its-xml-check                             # verify local copies only (offline; in make ci)
 make its-xml-drift                             # verify local copies + report if upstream advanced
 ```
 

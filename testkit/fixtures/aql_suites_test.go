@@ -45,17 +45,13 @@ func TestAQLSuitesRootHoldsPinnedCorpus_PROBE107_REQ160(t *testing.T) {
 				"(re-run scripts/ingest-robot-aql.sh; never edit a pin)", key)
 		}
 	}
-	// The pin records the commit the ingest read, which is the script's
-	// EXPECTED_COMMIT: a pin edited by hand, or a re-pin that moved one of the
-	// two without the other, names another.
-	script := readText(t, filepath.Join(fixtures.CorpusRoot(), "..", "..", "scripts", "ingest-robot-aql.sh"))
-	lines := expectedCommitRE.FindAllString(script, -1)
-	if len(lines) != 1 {
-		t.Fatalf("scripts/ingest-robot-aql.sh has %d EXPECTED_COMMIT lines, want 1", len(lines))
-	}
-	want := strings.TrimPrefix(lines[0], "EXPECTED_COMMIT=")
-	if pin["commit"] != want {
-		t.Errorf("suite pin commit = %q, want the ingest's EXPECTED_COMMIT %q "+
+	// The pin records the commit the ingest read, which is the
+	// ehrbase/integration-tests line of UPSTREAM_PINS.txt: a pin edited by
+	// hand, or a re-pin that moved one of the two without the other, names
+	// another.
+	want := upstreamPin(readText(t, filepath.Join(fixtures.CorpusRoot(), "UPSTREAM_PINS.txt")), "ehrbase/integration-tests")
+	if want == "" || pin["commit"] != want {
+		t.Errorf("suite pin commit = %q, want the UPSTREAM_PINS.txt pin %q "+
 			"(re-run scripts/ingest-robot-aql.sh; never edit a pin)", pin["commit"], want)
 	}
 	if !strings.Contains(pin["source_tree"], "/tree/"+want+"/") {
@@ -302,7 +298,7 @@ func TestIngestRobotAQLSuiteCorpusReRunAndRePin_PROBE107_REQ160(t *testing.T) {
 		h.git(t, up, "rm", "-q", "tests/robot/"+rel)
 	}
 	repinned := h.commitAll(t, up)
-	h.pinScript(t, sdk, repinned)
+	h.pin(t, sdk, repinned)
 	if out, err := h.ingest(t, sdk, up, ""); err != nil {
 		t.Fatalf("ingest after the re-pin: %v\n%s", err, out)
 	}
@@ -413,6 +409,11 @@ func TestIngestRobotAQLRefusesBeforeWriting_PROBE107_REQ160(t *testing.T) {
 			name: "pinned commit by an abbreviated name",
 			pin:  func(head string) string { return head[:12] },
 			want: "is not a commit in the clone",
+		},
+		{
+			name: "no pin line for the repository",
+			pin:  func(string) string { return "" },
+			want: "no ehrbase/integration-tests pin",
 		},
 		{name: "absolute local path remote", change: setOrigin("/srv/mirrors/integration-tests"), want: "not a github.com repository URL"},
 		{name: "relative local path remote", change: setOrigin("../integration-tests"), want: "not a github.com repository URL"},
@@ -550,7 +551,7 @@ func TestIngestRobotAQLRefusesBeforeWriting_PROBE107_REQ160(t *testing.T) {
 			if tc.pin != nil {
 				pin = tc.pin(pin)
 			}
-			h.pinScript(t, sdk, pin)
+			h.pin(t, sdk, pin)
 			out, err := h.ingest(t, sdk, up, tc.robotRoot, tc.env...)
 			if err == nil {
 				t.Fatalf("ingest succeeded; want a refusal naming %q\n%s", tc.want, out)
@@ -636,12 +637,8 @@ const (
 	fromCSV = fieldsAndResults + "/from/combinations/from_simple_and_or.csv"
 )
 
-var (
-	// expectedCommitRE matches the ingest script's pinned commit.
-	expectedCommitRE = regexp.MustCompile(`(?m)^EXPECTED_COMMIT=[0-9a-f]+$`)
-	// recordedRE matches a pin's recording date line.
-	recordedRE = regexp.MustCompile(`(?m)^recorded_utc: .*$`)
-)
+// recordedRE matches a pin's recording date line.
+var recordedRE = regexp.MustCompile(`(?m)^recorded_utc: .*$`)
 
 // aqlIngest runs scripts/ingest-robot-aql.sh in scratch trees.
 type aqlIngest struct {
@@ -713,23 +710,21 @@ func (h *aqlIngest) newUpstream(t *testing.T) (root, head string) {
 }
 
 // newSDK returns a scratch tree laid out like this repository, holding only
-// the ingest script pinned to commit.
+// the ingest script and an UPSTREAM_PINS.txt that pins the upstream to commit.
 func (h *aqlIngest) newSDK(t *testing.T, commit string) string {
 	t.Helper()
 	sdk := t.TempDir()
-	h.pinScript(t, sdk, commit)
+	writeText(t, filepath.Join(sdk, "scripts", "ingest-robot-aql.sh"), string(h.script))
+	h.pin(t, sdk, commit)
 	return sdk
 }
 
-// pinScript writes the ingest script into sdk with EXPECTED_COMMIT set to
-// commit.
-func (h *aqlIngest) pinScript(t *testing.T, sdk, commit string) {
+// pin writes sdk's UPSTREAM_PINS.txt with the ehrbase/integration-tests line
+// naming commit; an empty commit leaves the line without one.
+func (h *aqlIngest) pin(t *testing.T, sdk, commit string) {
 	t.Helper()
-	if n := len(expectedCommitRE.FindAll(h.script, -1)); n != 1 {
-		t.Fatalf("scripts/ingest-robot-aql.sh has %d EXPECTED_COMMIT lines, want 1", n)
-	}
-	pinned := expectedCommitRE.ReplaceAllLiteral(h.script, []byte("EXPECTED_COMMIT="+commit))
-	writeText(t, filepath.Join(sdk, "scripts", "ingest-robot-aql.sh"), string(pinned))
+	writeText(t, filepath.Join(sdk, "testkit", "corpus", "UPSTREAM_PINS.txt"),
+		"# scratch pins\nehrbase/integration-tests main "+commit+"\n")
 }
 
 // ingest runs the script in sdk against the clone up, with env added to its

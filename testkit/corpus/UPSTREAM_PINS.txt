@@ -1,0 +1,21 @@
+# Upstream pins of the EHRbase corpora under testkit/corpus/.
+#
+# One commit per upstream repository. Every script that vendors from one of
+# these repositories reads its commit here, so every file copied from a
+# repository comes from the same commit. `make corpus-pins-check`, part of
+# `make ci`, fails when a corpus provenance file records another commit;
+# `make corpus-pins-drift` compares each pin with the head of its branch.
+#
+# Re-pin: change the commit on one line, re-run every vendoring script that
+# reads it, and commit the refreshed corpora together.
+#   ehrbase/openEHR_SDK        make flat-sync; make crossformat-sync
+#   ehrbase/integration-tests  scripts/ingest-robot-fixtures.sh;
+#                              scripts/ingest-robot-aql.sh; make crossformat-sync
+# The files vendored by hand from openEHR_SDK (rm/, the template triplets,
+# webtemplate/) have no script: THIRD_PARTY_LICENSES.md names this pin as
+# theirs, so check them against the new commit too.
+#
+# Edited by hand; fields are separated by spaces.
+# repository                 branch   commit
+ehrbase/openEHR_SDK          develop  8a5dae6fd82a5f0aa23b25681a13df79bfc21d2b
+ehrbase/integration-tests    main     d7f11bf41966f453aecc8fe688da4c4d27f14dc4

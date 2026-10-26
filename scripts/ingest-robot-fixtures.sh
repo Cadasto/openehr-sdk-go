@@ -3,6 +3,14 @@
 # required and has no default: it points at the upstream
 # tests/robot/_resources/test_data_sets directory of an ehrbase/integration-tests
 # clone.
+#
+# The files are copied from the clone's working tree, so the clone must be
+# checked out at the ehrbase/integration-tests commit that
+# testkit/corpus/UPSTREAM_PINS.txt pins, with no local change under ROBOT_ROOT;
+# the script refuses before it copies anything otherwise. That commit is the
+# one every corpus vendored from the repository shares, and the script records
+# it in testkit/corpus/ROBOT_SOURCE.txt. It is a provenance pin, not a per-file
+# sha256 lock: the fixtures are curated and renamed on the way in.
 set -euo pipefail
 
 if [[ -z "${ROBOT_ROOT:-}" ]]; then
@@ -15,6 +23,28 @@ CAS="$(cd "$(dirname "$0")/.." && pwd)/testkit/corpus"
 
 if [[ ! -d "$ROBOT" ]]; then
   echo "robot data not found at $ROBOT" >&2
+  exit 1
+fi
+
+readonly SRC_REPO="ehrbase/integration-tests"
+PIN=$(awk -v r="$SRC_REPO" '!/^[[:space:]]*#/ && $1 == r { print $3; exit }' "$CAS/UPSTREAM_PINS.txt" 2>/dev/null || true)
+if [[ ! "$PIN" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "no full commit for $SRC_REPO in $CAS/UPSTREAM_PINS.txt" >&2
+  exit 1
+fi
+src_root=$(git -C "$ROBOT" rev-parse --show-toplevel 2>/dev/null || true)
+if [[ -z "$src_root" ]]; then
+  echo "$ROBOT is not inside a git checkout — refusing to vendor without provenance" >&2
+  exit 1
+fi
+src_sha=$(git -C "$src_root" rev-parse HEAD)
+if [[ "$src_sha" != "$PIN" ]]; then
+  echo "the clone $src_root is at $src_sha; the pin is $PIN" >&2
+  echo "check out the pin, or update testkit/corpus/UPSTREAM_PINS.txt when re-pinning" >&2
+  exit 1
+fi
+if [[ -n "$(git -C "$ROBOT" status --porcelain -- .)" ]]; then
+  echo "$ROBOT has local changes; the copies would not be the pinned bytes" >&2
   exit 1
 fi
 
@@ -133,32 +163,30 @@ while IFS= read -r -d '' f; do
 done < <(find "$ROBOT/contributions" -name '*.json' -print0)
 
 # Record the upstream source commit so the curated fixtures carry provenance.
-# Best-effort: the Robot data is copied and renamed by hand, so unlike
+# The Robot data is copied and renamed by hand, so unlike
 # flat-conformance/MANIFEST.txt this pins ONLY the source commit the ingest
-# read from — it is not a per-file sha256 lock.
-src_root=$(git -C "$ROBOT" rev-parse --show-toplevel 2>/dev/null || true)
-if [[ -n "$src_root" ]]; then
-  src_sha=$(git -C "$src_root" rev-parse HEAD 2>/dev/null || echo unknown)
-  src_date=$(git -C "$src_root" log -1 --format=%cI 2>/dev/null || echo unknown)
-  src_remote=$(git -C "$src_root" config --get remote.origin.url 2>/dev/null \
-    | sed -E 's#^(git@github.com:|https://github.com/)##; s#\.git$##' || true)
-  src_rel=${ROBOT#"$src_root/"}
-  {
-    echo "# EHRbase Robot integration-test data — source provenance pin"
-    echo "# Written by scripts/ingest-robot-fixtures.sh. Best-effort: the curated"
-    echo "# fixtures are copied and renamed by hand, so this pins only the upstream"
-    echo "# commit the ingest read from — NOT a per-file sha256 lock."
-    echo "source_repo: ${src_remote:-unknown}"
-    echo "source_path: ${src_rel:-unknown}"
-    echo "commit: ${src_sha}"
-    echo "commit_date: ${src_date}"
-    echo "recorded_utc: $(date -u +%Y-%m-%d)"
-    echo "source_tree: https://github.com/${src_remote:-ehrbase/integration-tests}/tree/${src_sha}/${src_rel}"
-    echo "license: Apache-2.0 (see THIRD_PARTY_LICENSES.md)"
-  } > "$CAS/ROBOT_SOURCE.txt"
-  echo "recorded source pin ${src_remote:-?}@${src_sha:0:12} -> $CAS/ROBOT_SOURCE.txt"
-else
-  echo "WARNING: $ROBOT is not a git checkout; ROBOT_SOURCE.txt not updated" >&2
+# read from — it is not a per-file sha256 lock. recorded_utc is kept while the
+# commit is unchanged, so a re-run at the pin rewrites an identical file.
+src_date=$(git -C "$src_root" show -s --format=%cI "$PIN")
+src_rel=$(git -C "$ROBOT" rev-parse --show-prefix)
+src_rel=${src_rel%/}
+recorded=""
+if [[ -f "$CAS/ROBOT_SOURCE.txt" ]] && grep -qx "commit: $PIN" "$CAS/ROBOT_SOURCE.txt"; then
+  recorded=$(sed -n 's/^recorded_utc: //p' "$CAS/ROBOT_SOURCE.txt" | head -n 1)
 fi
+{
+  echo "# EHRbase Robot integration-test data — source provenance pin"
+  echo "# Written by scripts/ingest-robot-fixtures.sh from the commit"
+  echo "# UPSTREAM_PINS.txt pins. The curated fixtures are copied and renamed by"
+  echo "# hand, so this pins only the upstream commit — NOT a per-file sha256 lock."
+  echo "source_repo: ${SRC_REPO}"
+  echo "source_path: ${src_rel}"
+  echo "commit: ${PIN}"
+  echo "commit_date: ${src_date}"
+  echo "recorded_utc: ${recorded:-$(date -u +%Y-%m-%d)}"
+  echo "source_tree: https://github.com/${SRC_REPO}/tree/${PIN}/${src_rel}"
+  echo "license: Apache-2.0 (see THIRD_PARTY_LICENSES.md)"
+} > "$CAS/ROBOT_SOURCE.txt"
+echo "recorded source pin ${SRC_REPO}@${PIN:0:12} -> $CAS/ROBOT_SOURCE.txt"
 
 echo "ingested robot fixtures into $CAS"

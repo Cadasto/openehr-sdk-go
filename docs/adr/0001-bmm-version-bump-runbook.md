@@ -11,6 +11,7 @@ date: 2026-05-16
 - **Status:** Accepted, 2026-05-16.
 - **Supersedes:** —
 - **Superseded by:** —
+- **Amended:** steps 1 and 9, 2026-10-26 (the schemas are fetched and removed by `make bmm-sync`, pinned in `resources/bmm/MANIFEST.txt`).
 - **Tracks:** part of the BMM code generator delivery (drift bot and version-bump runbook).
 - **Requirements:** [REQ-041](../specifications/bmm-conformance.md#req-041--pinned-bmm-sources) (the pinned BMM sources a version bump moves).
 
@@ -31,7 +32,7 @@ A BMM version bump follows the numbered procedure below. CI enforces the determi
 
 ### Procedure
 
-1. **Stage the new BMM file alongside the old.** Drop `openehr_rm_1.2.1.bmm.json` next to `openehr_rm_1.2.0.bmm.json`. **Do not overwrite** the old file in the same commit — the diff must show the rename as a paired add/remove.
+1. **Stage the new BMM file alongside the old.** Add its upstream path to `SRC_PATHS` in [`scripts/sync-bmm.sh`](../../scripts/sync-bmm.sh), beside the old one, and run `BMM_REF=master make bmm-sync`: it fetches `openehr_rm_1.2.1.bmm.json` next to `openehr_rm_1.2.0.bmm.json` from `openEHR/specifications-ITS-BMM` and records both in `resources/bmm/MANIFEST.txt`. **Do not overwrite** the old file in the same commit — the diff must show the rename as a paired add/remove.
 
 2. **Regenerate.** Run:
 
@@ -67,7 +68,7 @@ A BMM version bump follows the numbered procedure below. CI enforces the determi
 
 8. **Propose the CHANGELOG bullet in the PR body.** [`CHANGELOG.md`](../../CHANGELOG.md) follows the rule in [`AGENTS.md § Code style and conventions`](../../AGENTS.md#code-style-and-conventions) and is not edited in the bump PR, so the PR body carries the one-line bullet for the maintainer to fold in. The `bmmdiff -suggest-changelog` output is a good starting point, but a human reviews it; it favours brevity over editorial polish. Keep the bullet **short and high-level**: one line, one artefact class.
 
-9. **Remove the old BMM file in the same commit.** Never leave both versions in `resources/bmm/` — the SDK pins exactly one version per schema id at a time. The paired add/remove makes the rename reviewable.
+9. **Remove the old BMM file in the same commit.** Drop its path from `SRC_PATHS` and re-run `make bmm-sync`, which deletes the file and rewrites the manifest. Never leave both versions in `resources/bmm/` — the SDK pins exactly one version per schema id at a time. The paired add/remove makes the rename reviewable.
 
 10. **Audit narrow-interface accessors** (REQ-052 / PROBE-038). If `bmmdiff -suggest-changelog` reports an Added class whose `ancestors` chain includes any of `DV_TEXT`, `DV_URI`, `AUDIT_DETAILS`, `PARTY_IDENTIFIED`, or `OBJECT_REF`, the generator's field-lift picks the new subtype up automatically — but two non-generated files need explicit updates:
 

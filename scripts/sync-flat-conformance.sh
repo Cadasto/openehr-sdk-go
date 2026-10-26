@@ -18,17 +18,19 @@
 # testkit/corpus/THIRD_PARTY_LICENSES.md.
 #
 # Subcommands:
-#   sync     Download the OPT + every conformance FLAT body at
-#            FLAT_CONFORMANCE_REF (default: develop), write them under
-#            testkit/corpus/flat-conformance/, and regenerate MANIFEST.txt
-#            (pinned commit + per-file sha256). Removes vendored fixtures no
-#            longer present upstream.
+#   sync     Download the OPT + every conformance FLAT body at the
+#            ehrbase/openEHR_SDK commit testkit/corpus/UPSTREAM_PINS.txt pins
+#            (one commit for every corpus vendored from that repository),
+#            write them under testkit/corpus/flat-conformance/, and regenerate
+#            MANIFEST.txt (pinned commit + per-file sha256). Removes vendored
+#            fixtures no longer present upstream.
 #   ingest   Alias for sync (first-time population).
 #   check    Verify the vendored copies are intact and current:
 #              1. offline — recompute sha256 and compare to MANIFEST
 #                 (detects local edits / corruption); fails on mismatch.
 #              2. online (best-effort) — compare the pinned commit to the
-#                 current upstream HEAD and report if a sync is due. Skipped
+#                 head of the branch UPSTREAM_PINS.txt names and report if a
+#                 re-pin is due. Skipped
 #                 with a note when offline or when curl/jq are unavailable;
 #                 never fails the command.
 #   verify   Step 1 only — offline integrity, no network, no curl/jq (needs
@@ -37,14 +39,12 @@
 #            the build even though the corpus is not yet consumed by a probe.
 #
 # Environment:
-#   FLAT_CONFORMANCE_REF   upstream git ref to pin (branch / tag / sha).
-#                          Default: develop.
 #   GITHUB_TOKEN           optional; raises the unauthenticated GitHub API
 #                          rate limit.
 #
-# Reproducibility: `sync` resolves the ref to a concrete commit sha and
-# downloads every file at that sha, so two syncs of the same ref are
-# byte-identical. The resolved sha is recorded in MANIFEST.txt.
+# Reproducibility: `sync` downloads every file at the pinned commit, so two
+# syncs at one pin are byte-identical, and keeps fetched_utc while the commit
+# is unchanged. To move the pin, edit UPSTREAM_PINS.txt, not this script.
 set -euo pipefail
 
 readonly REPO="ehrbase/openEHR_SDK"
@@ -52,11 +52,11 @@ readonly TESTDATA="test-data/src/main/resources"
 readonly FLAT_PATH="$TESTDATA/composition/flat/simSDT/conformance"
 readonly OPT_PATH="$TESTDATA/operationaltemplate"
 readonly OPT_NAME="conformance_ehrbase.de.v0.opt"
-readonly REF="${FLAT_CONFORMANCE_REF:-develop}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 readonly DEST="$ROOT/testkit/corpus/flat-conformance"
 readonly MANIFEST="$DEST/MANIFEST.txt"
+readonly PINS="$ROOT/testkit/corpus/UPSTREAM_PINS.txt"
 
 # --- helpers ---------------------------------------------------------------
 
@@ -83,6 +83,12 @@ sha256_of() {
   else
     shasum -a 256 "$1" | cut -d' ' -f1
   fi
+}
+
+# pin_field <n> — print field n of the $REPO line of UPSTREAM_PINS.txt
+# (2 = the tracked branch, 3 = the pinned commit).
+pin_field() {
+  awk -v r="$REPO" -v i="$1" '!/^[[:space:]]*#/ && $1 == r { print $i; exit }' "$PINS" 2>/dev/null || true
 }
 
 # resolve_commit <ref> — print the concrete commit sha for a ref.
@@ -128,10 +134,10 @@ cmd_sync() {
   require_tools
   mkdir -p "$DEST/templates" "$DEST/compositions"
 
-  echo "Resolving $REPO@$REF ..."
   local commit
-  commit="$(resolve_commit "$REF")"
-  echo "Pinned commit: $commit"
+  commit="$(pin_field 3)"
+  [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || die "no full commit for $REPO in testkit/corpus/UPSTREAM_PINS.txt"
+  echo "Pinned commit (UPSTREAM_PINS.txt): $commit"
 
   local names
   names="$(list_flat "$commit")"
@@ -157,6 +163,14 @@ cmd_sync() {
     fi
   done
 
+  # Keep fetched_utc while the commit is unchanged, so a re-sync at the pin
+  # rewrites a byte-identical manifest; only a re-pin moves it.
+  local fetched=""
+  if [[ -f "$MANIFEST" ]] && grep -qx "commit: $commit" "$MANIFEST"; then
+    fetched="$(sed -n 's/^fetched_utc: //p' "$MANIFEST" | head -n 1)"
+  fi
+  [[ -n "$fetched" ]] || fetched="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
   # Regenerate the manifest (provenance + per-file integrity hashes). Hash
   # paths are relative to $DEST so `sha256sum -c` runs from there.
   {
@@ -165,9 +179,9 @@ cmd_sync() {
     echo "source_repo: $REPO"
     echo "source_opt: $OPT_PATH/$OPT_NAME"
     echo "source_flat: $FLAT_PATH"
-    echo "ref: $REF"
+    echo "pin: testkit/corpus/UPSTREAM_PINS.txt"
     echo "commit: $commit"
-    echo "fetched_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "fetched_utc: $fetched"
     echo "source_tree: https://github.com/$REPO/tree/$commit/$FLAT_PATH"
     echo "license: Apache-2.0 (see ../THIRD_PARTY_LICENSES.md)"
     echo "#"
@@ -238,14 +252,17 @@ cmd_check() {
     echo "(curl/jq unavailable — skipped upstream staleness check)"
     return 0
   fi
-  local pinned upstream
+  local pinned branch upstream
   pinned="$(grep -E '^commit: ' "$MANIFEST" | awk '{print $2}')"
-  if upstream="$(resolve_commit "$REF" 2>/dev/null)"; then
+  branch="$(pin_field 2)"
+  if [[ -z "$branch" ]]; then
+    echo "(no $REPO line in UPSTREAM_PINS.txt — skipped upstream staleness check)"
+  elif upstream="$(resolve_commit "$branch" 2>/dev/null)"; then
     if [[ "$pinned" != "$upstream" ]]; then
-      echo "Upstream $REPO@$REF advanced: ${pinned:0:12} -> ${upstream:0:12}"
-      echo "Run 'make flat-sync' to update the vendored corpus."
+      echo "Upstream $REPO@$branch advanced: ${pinned:0:12} -> ${upstream:0:12}"
+      echo "Re-pin in testkit/corpus/UPSTREAM_PINS.txt, then re-run every script it lists."
     else
-      echo "Up to date with $REPO@$REF (${pinned:0:12})."
+      echo "Up to date with $REPO@$branch (${pinned:0:12})."
     fi
   else
     echo "(offline — skipped upstream staleness check)"
@@ -258,7 +275,9 @@ main() {
     check) cmd_check ;;
     verify) cmd_check offline ;;
     "" | -h | --help)
-      sed -n '2,48p' "$0" | sed 's/^# \{0,1\}//'
+      # Print the header comment: every line after the shebang up to the
+      # first line that is not a comment.
+      awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$0"
       ;;
     *) die "unknown subcommand '$1' (want: sync | ingest | check | verify)" ;;
   esac

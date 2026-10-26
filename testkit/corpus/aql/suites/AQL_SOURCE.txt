@@ -6,8 +6,8 @@
 # source_path, so that commit fully determines their bytes.
 source_repo: ehrbase/integration-tests
 source_path: tests/robot
-commit: b4625fc28d6785c05adfd6db26339b4bb2272e06
-commit_date: 2026-08-24T13:05:04+03:00
-recorded_utc: 2026-10-17
-source_tree: https://github.com/ehrbase/integration-tests/tree/b4625fc28d6785c05adfd6db26339b4bb2272e06/tests/robot
+commit: d7f11bf41966f453aecc8fe688da4c4d27f14dc4
+commit_date: 2026-10-26T16:52:03+01:00
+recorded_utc: 2026-10-26
+source_tree: https://github.com/ehrbase/integration-tests/tree/d7f11bf41966f453aecc8fe688da4c4d27f14dc4/tests/robot
 license: Apache-2.0 (see ../../THIRD_PARTY_LICENSES.md)

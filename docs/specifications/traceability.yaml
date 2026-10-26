@@ -304,6 +304,7 @@ requirements:
     tests:
       - internal/bmmgen/aom14_test.go
       - internal/bmmgen/container_bounds_test.go
+      - internal/bmmgen/pin_scripts_test.go
       - internal/bmmgen/plan_test.go
       - internal/bmmgen/render_interface_test.go
       - internal/bmmgen/render_mandatory_tag_test.go

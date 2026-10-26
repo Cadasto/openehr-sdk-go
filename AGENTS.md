@@ -81,7 +81,7 @@ Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev
 | Format / check | `make fmt` / `make fmt-check` |
 | Vet / lint | `make vet` / `make lint` |
 | Unit / race tests | `make test` / `make test-race` |
-| BMM codegen verify | `make codegen-check` |
+| BMM codegen verify | `make codegen-check`; `make bmm-check` verifies the pinned schemas' `sha256` (offline), `make bmm-drift` reports ITS-BMM changes |
 | AQL parser codegen verify | `make aqlgen-check` — fails if `openehr/aql/parse/gen/` drifts from the `active/` grammar (needs Docker, not a host JRE); regenerate with `make aqlgen` |
 | Spec traceability | `make spec-check` |
 | Full gate report | `make sdd-check` — the SDD gate with every warning (`make spec-check` prints only the verdict) |
@@ -89,7 +89,7 @@ Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev
 | Spec context bundle | `make spec-context REQ=NNN` — registry row + traceability + canonical excerpt + strands |
 | Probe status | `make probe-status` — each PROBE's status and whether its test file exists |
 | Live CDR (opt-in, not in `make ci`) | `make probe-record ARGS=…` records a cassette; `make cdr-crosscheck` checks generated documents against live CDRs. Environment variables are in [ci.md](docs/ci.md) |
-| FLAT corpus integrity | `make flat-check` — offline `sha256` of the vendored EHRbase FLAT corpus (PROBE-086's input); `make flat-drift` adds a network drift report (dev helper, not a gate) |
+| FLAT corpus integrity | `make flat-check` — offline `sha256` of the vendored EHRbase FLAT corpus (PROBE-086's input); `make flat-drift` adds a network drift report (dev helper, not a gate). `make corpus-pins-check` holds every EHRbase corpus to the one commit per repository in `testkit/corpus/UPSTREAM_PINS.txt` |
 | Build Docker dev image | `make build-dev` (when host Go is missing, or for `make test-race` on a host without a C compiler; rebuild an image made before the dev stage gained gcc) |
 | Docs site | `make docs-check` builds the site from `pages/` and asserts its output; `make docs-serve` previews it. The docs-theme brand layer is pinned by commit + sha256 in `sources.json` (bump recipe in its `$comment`) |
 
@@ -122,7 +122,9 @@ Rationale and the wider picture: [architecture.md § Dependencies](docs/architec
 
 Use the openEHR MCP skills before guessing RM paths, terminology codes, or ITS-JSON shapes — see [ai-workflow.md § openEHR ground truth](docs/ai-workflow.md#openehr-ground-truth-mcp--skills). The openEHR conformance probe suite is the source of truth for wire-level semantics; the openEHR spec is authoritative for class invariants.
 
-**REST API schema.** For any endpoint path, request/response body, header, or status code, read the vendored OpenAPI pin in [`resources/its-rest/`](resources/its-rest/README.md) (`*-validation.openapi.yaml`) rather than guessing — it is the machine-readable contract. Refresh/verify with `make its-rest-sync` / `make its-rest-drift`. EHRbase-specific deployment extensions that a call still uses (for example `PurgeTemplates`) are documented on that call and in REQ-099, not by a second OpenAPI pin. In-tree third-party licences are inventoried in [`LICENSING.md`](LICENSING.md).
+**REST API schema.** For any endpoint path, request/response body, header, or status code, read the vendored OpenAPI pin in [`resources/its-rest/`](resources/its-rest/README.md) (`*-validation.openapi.yaml`) rather than guessing — it is the machine-readable contract. Refresh/verify with `make its-rest-sync` / `make its-rest-drift`. EHRbase-specific deployment extensions that a call still uses (for example `PurgeTemplates`) are documented on that call and in REQ-099, not by a second OpenAPI pin.
+
+**XML schema.** For a canonical XML or AOM 1.4 element, attribute or type, read the pinned ITS-XML schemas in [`resources/its-xml/`](resources/its-xml/README.md), which the code generator reads for each class's child-element order; they declare the `v2` namespace where the SDK writes `v1`. In-tree third-party licences are inventoried in [`LICENSING.md`](LICENSING.md).
 
 ## Do not touch (yet)
 

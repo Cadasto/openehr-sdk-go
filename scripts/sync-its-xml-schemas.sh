@@ -25,6 +25,8 @@
 #            regenerate MANIFEST.txt (pinned commit + per-file sha256).
 #            Removes vendored files the new closure no longer reaches.
 #   ingest   Alias for sync (first-time population).
+#   verify   Step 1 of check alone, with no network: `make its-xml-check`
+#            runs it in `make ci`.
 #   check    Verify the vendored copies are intact and current:
 #              1. offline: recompute each sha256 and compare it to the
 #                 manifest (detects local edits and corruption); fails on
@@ -272,7 +274,7 @@ cmd_sync() {
   echo "Synced $(wc -l <<<"$closure" | tr -d ' ') schema(s) to resources/its-xml/ (commit ${commit:0:12})"
 }
 
-cmd_check() {
+cmd_verify() {
   [[ -f "$MANIFEST" ]] || die "no MANIFEST.txt; run 'make its-xml-sync' first"
 
   # 1. Offline integrity: local files must match the manifest hashes.
@@ -311,10 +313,15 @@ cmd_check() {
     die "integrity check failed; run 'make its-xml-sync' to refresh"
   fi
   echo "Integrity OK ($(wc -l <<<"$listed" | tr -d ' ') schema(s))."
+}
+
+cmd_check() {
+  cmd_verify
 
   # 2. Online staleness (best-effort; never fails the command).
   require_tools
-  local pinned upstream
+  local listed pinned upstream
+  listed="$(hash_block | awk '{ print $2 }')"
   pinned="$(awk '/^commit: /{ print $2; exit }' "$MANIFEST")"
   if ! upstream="$(resolve_commit "$REF" 2>/dev/null)"; then
     echo "(offline: skipped the upstream staleness check)"
@@ -347,11 +354,12 @@ cmd_check() {
 main() {
   case "${1:-}" in
     sync | ingest) cmd_sync ;;
+    verify) cmd_verify ;;
     check) cmd_check ;;
     "" | -h | --help)
       awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$0"
       ;;
-    *) die "unknown subcommand '$1' (want: sync | ingest | check)" ;;
+    *) die "unknown subcommand '$1' (want: sync | ingest | verify | check)" ;;
   esac
 }
 

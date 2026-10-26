@@ -8,6 +8,8 @@ Vendored fixture documents for codec, validation, and probe tests: OPTs, composi
 
 ```
 corpus/
+  UPSTREAM_PINS.txt                   # one commit per EHRbase upstream repository
+  ROBOT_SOURCE.txt                    # commit the curated Robot fixtures came from
   templates/{template-id}.opt
   compositions/{template-id}.json
   compositions/{template-id}.xml      # when vendored
@@ -55,6 +57,15 @@ which also regenerates `EXCLUDED.txt`.
 `crossformat/` is a third pinned subtree; do not hand-edit it either. See
 [Cross-format sets](#cross-format-sets) below.
 
+Every corpus vendored from one EHRbase repository comes from one commit, the
+line [`UPSTREAM_PINS.txt`](UPSTREAM_PINS.txt) holds for that repository; the
+vendoring scripts read it, so none carries a pin of its own. `make
+corpus-pins-check`, part of `make ci`, fails when a provenance file
+(`flat-conformance/MANIFEST.txt`, `crossformat/MANIFEST.txt`,
+`aql/suites/AQL_SOURCE.txt`, `ROBOT_SOURCE.txt`) records another commit, and
+`make corpus-pins-drift` reports how far each pin is behind its branch. To
+re-pin, change the line and re-run every script the file lists for it.
+
 Resolve paths via [`testkit/fixtures`](../fixtures/) (`TemplateOpt`, `CompositionJSON`, `CompositionXML`, `RMJSON`, `RMXML`, `SubmissionJSON`, `WebTemplateOpt`, `WebTemplateReference`, `AQLSuitesRoot`, `ListCrossFormatSets`).
 
 Composition JSON uses template ids **without** `::{uuid}` suffixes.
@@ -65,24 +76,24 @@ Composition JSON uses template ids **without** `::{uuid}` suffixes.
 
 Each directory under [`crossformat/`](crossformat/) is one upstream composition given in two or more of canonical JSON, canonical XML, FLAT and STRUCTURED, with the OPT of its template. They are the input to PROBE-105. Both upstreams are Apache-2.0 (see [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md)).
 
-| Set | Template id | Formats | Source | Pin |
-|---|---|---|---|---|
-| `alternative_events` | `AlternativeEvents` | JSON, FLAT | openEHR_SDK | `8a5dae6f` |
-| `consult_record` | `EHRN-ABDM-OPConsultRecord.v2.0` | JSON, XML, FLAT, STRUCTURED | integration-tests | `fcb3ac4b` |
-| `corona` | `Corona_Anamnese` | JSON, FLAT, STRUCTURED | openEHR_SDK | `8a5dae6f` |
-| `ehrn_abdm` | `EHRN-ABDM-OPConsultRecord.v2.0` | JSON, FLAT | openEHR_SDK | `8a5dae6f` |
-| `family_history` | `family_history` | JSON, XML | integration-tests | `fcb3ac4b` |
-| `multi_list` | `Multi_list` | FLAT, STRUCTURED | openEHR_SDK | `8a5dae6f` |
-| `multi_occurrence` | `ehrbase_multi_occurrence.de.v1` | JSON, FLAT | openEHR_SDK | `8a5dae6f` |
-| `nested` | `nested.en.v1` | XML, FLAT | integration-tests | `fcb3ac4b` |
-| `persistent_minimal` | `persistent_minimal.en.v1` | XML, FLAT | integration-tests | `fcb3ac4b` |
-| `test_all_types` | `test_all_types.en.v1` | JSON, FLAT | openEHR_SDK | `8a5dae6f` |
+| Set | Template id | Formats | Source |
+|---|---|---|---|
+| `alternative_events` | `AlternativeEvents` | JSON, FLAT | openEHR_SDK |
+| `consult_record` | `EHRN-ABDM-OPConsultRecord.v2.0` | JSON, XML, FLAT, STRUCTURED | integration-tests |
+| `corona` | `Corona_Anamnese` | JSON, FLAT, STRUCTURED | openEHR_SDK |
+| `ehrn_abdm` | `EHRN-ABDM-OPConsultRecord.v2.0` | JSON, FLAT | openEHR_SDK |
+| `family_history` | `family_history` | JSON, XML | integration-tests |
+| `multi_list` | `Multi_list` | FLAT, STRUCTURED | openEHR_SDK |
+| `multi_occurrence` | `ehrbase_multi_occurrence.de.v1` | JSON, FLAT | openEHR_SDK |
+| `nested` | `nested.en.v1` | XML, FLAT | integration-tests |
+| `persistent_minimal` | `persistent_minimal.en.v1` | XML, FLAT | integration-tests |
+| `test_all_types` | `test_all_types.en.v1` | JSON, FLAT | openEHR_SDK |
 
 JSON and XML here are the canonical formats. Inside a set the files have fixed names: `template.opt`, `canonical.json`, `canonical.xml`, `flat.json` and `structured.json`. Three sets have no `template.opt`, because their OPT is already vendored in this tree byte for byte. `corona` uses `webtemplate/Corona_Anamnese.opt`, `nested` uses `templates/nested.en.v1.opt` and `persistent_minimal` uses `templates/persistent_minimal.en.v1.opt`; the manifest records each pointer and its `sha256`. `consult_record` and `ehrn_abdm` share a template id but not an OPT: the two upstreams carry different copies of it, and each set keeps its own.
 
 Only files that describe the same instance form a set. The Robot canonical JSON for `nested` and `persistent_minimal`, and the Robot FLAT and STRUCTURED for `family_history`, are other instances of those templates, so they are not vendored.
 
-[`crossformat/MANIFEST.txt`](crossformat/MANIFEST.txt) records both pins, and for every file its source, upstream path and `sha256`. To refresh, check out the pinned commits in local clones of both upstreams, point `CROSSFORMAT_SDK_CLONE` and `CROSSFORMAT_ROBOT_CLONE` at them, and run `make crossformat-sync`. It refuses a clone that is not at its pin. `make crossformat-check` checks the vendored bytes offline. The tests in [`crossformat_test.go`](../fixtures/crossformat_test.go) check the same integrity under `make ci`. Resolve the sets with [`fixtures.ListCrossFormatSets`](../fixtures/crossformat.go).
+Each set is at its source's commit in [`UPSTREAM_PINS.txt`](UPSTREAM_PINS.txt). [`crossformat/MANIFEST.txt`](crossformat/MANIFEST.txt) records both commits, and for every file its source, upstream path and `sha256`. To refresh, check out those commits in local clones of both upstreams, point `CROSSFORMAT_SDK_CLONE` and `CROSSFORMAT_ROBOT_CLONE` at them, and run `make crossformat-sync`. It refuses a clone that is not at its pin. `make crossformat-check` checks the vendored bytes offline. The tests in [`crossformat_test.go`](../fixtures/crossformat_test.go) check the same integrity under `make ci`. Resolve the sets with [`fixtures.ListCrossFormatSets`](../fixtures/crossformat.go).
 
 ## Index by vendor
 
@@ -121,7 +132,7 @@ Two OPTs in this table are not CODE24's. `alternative_types.en.v1` is byte-ident
 
 ### ehrbase (openEHR_SDK)
 
-**License:** Apache 2.0 — [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) (RM / template-triplet pin `8a5dae6fd82a5f0aa23b25681a13df79bfc21d2b`, 2026-09-28; WebTemplate + FLAT pin `e57511c6aca27ed501d31d663762c37c3491e74e`).
+**License:** Apache 2.0 — [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) (pin `8a5dae6fd82a5f0aa23b25681a13df79bfc21d2b`, the `ehrbase/openEHR_SDK` line of [`UPSTREAM_PINS.txt`](UPSTREAM_PINS.txt)).
 
 **RM-only** (`rm/`, no OPT):
 
