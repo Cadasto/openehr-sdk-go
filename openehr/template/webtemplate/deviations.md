@@ -29,20 +29,26 @@ failure, not a deviation.
   EVENT_CONTEXT, the ENTRY types, the EVENT variants (INTERVAL_EVENT adds
   `math_function` / `width`), INSTRUCTION (`narrative` / `expiry_time`), and
   ACTIVITY (`timing` / `action_archetype_id`) — the INSTRUCTION/ACTIVITY sets
-  landed with REQ-116 Phase 4, measured on the corona golden. Still not emitted,
-  both on ACTION: `ism_transition` (the larger set — the reference emits
-  `current_state` / `transition` / `careflow_step` leaves) and `time`. Neither is
-  synthesized here, so the upstream FLAT corpus's keys for both fall into
-  PROBE-086's `path not in web template` bucket
-  ([SKIPPED.md](../../../testkit/conformance/webtemplate/SKIPPED.md)). `time` is
-  unemitted only at this layer — `rmpath` resolves `ACTION.time` (REQ-121), so
-  synthesizing the leaf is all that is missing. Where the ACTION archetype itself
-  constrains `ism_transition[atNNNN]` nodes, the builder emits those archetyped nodes (the corpus template's `transition` and
-  `transition2`, each with `current_state` / `careflow_step` leaves), and the FLAT
-  codec round-trips them, matching each transition by its careflow step (REQ-121).
-  The reference spells one in-context `ism_transition` there instead, so the corpus
-  body's `…/ism_transition/…` keys stay refused on decode. *(Deferred: extend parity
-  with a fixture exercising a full ACTION.)*
+  landed with REQ-116 Phase 4, measured on the corona golden. On ACTION, an
+  in-context `ism_transition` node is emitted only where the ACTION archetype
+  constrains no `ISM_TRANSITION` (the `minimal_action_2` corpus template), and it
+  holds `current_state` only, with `|code` / `|value` inputs and `min` 0, where the
+  reference also emits `transition` / `careflow_step` leaves and a `_reason`
+  family; FLAT decode refuses those (REQ-170). No vendored reference fixture pins
+  an ACTION node, so its names (`Ism_transition`, `Current_state`), its `min` and
+  its place after the ENTRY leaves follow this builder's in-context conventions
+  rather than a golden. Still not emitted on ACTION: `time`, so the upstream
+  FLAT corpus's keys for it fall into PROBE-086's `path not in web template`
+  bucket ([SKIPPED.md](../../../testkit/conformance/webtemplate/SKIPPED.md)).
+  `time` is unemitted only at this layer — `rmpath` resolves `ACTION.time`
+  (REQ-121), so synthesizing the leaf is all that is missing. Where the ACTION
+  archetype itself constrains `ism_transition[atNNNN]` nodes, the builder emits
+  those archetyped nodes (the corpus template's `transition` and `transition2`,
+  each with `current_state` / `careflow_step` leaves) and no in-context node, and
+  the FLAT codec round-trips them, matching each transition by its careflow step
+  (REQ-121). The reference spells one in-context `ism_transition` there instead,
+  so the corpus body's `…/ism_transition/…` keys stay refused on decode.
+  *(Deferred: extend parity with a fixture exercising a full ACTION.)*
 - **`localizedName` / localized maps** — emitted for the compiled template's single
   document language only. The compiled bridge resolves every language to the
   document-language term, so no per-language override options are offered — they

@@ -1733,11 +1733,12 @@ func inContextCite(attr string) string {
 // third out-of-scope class covers `transition` and `reason`):
 //
 //   - a `current_state`, `transition` or `careflow_step` leaf, with any suffix,
-//     under an ISM transition node: the reference's in-context `ism_transition`
-//     node, which this SDK's Web Template does not project, or an archetyped
-//     `ism_transition[atNNNN]` node that has no child of that id (the Web
-//     Template models `current_state` and `careflow_step` there, never
-//     `transition`);
+//     under an ISM transition node that has no child of that id: the
+//     reference's in-context `ism_transition` node, which this SDK's Web
+//     Template projects, with `current_state` alone, only for an ACTION whose
+//     template constrains no ISM transition, or an archetyped
+//     `ism_transition[atNNNN]` node (the Web Template models `current_state`
+//     and `careflow_step` there, never `transition`);
 //   - a `_reason` family under either node;
 //   - the ACTION's own `time` leaf, with any suffix;
 //   - an INTERVAL_EVENT's `math_function`, `width` or `sample_count`, and an
@@ -1810,8 +1811,9 @@ func inContextKey(wt *webtemplate.WebTemplate, key string, pk parsedKey, ambiguo
 }
 
 // ismAttrKey judges the key below the ISM transition segment segs[i], whose Web
-// Template node is ism (nil for the reference's in-context node): an
-// ISM_TRANSITION leaf the node does not model, or a `_reason` family.
+// Template node is ism (nil for the reference's in-context node where the Web
+// Template has none): an ISM_TRANSITION leaf the node does not model, or a
+// `_reason` family.
 func ismAttrKey(key string, segs []flatSeg, i int, ism *webtemplate.Node) (named, attr string, ok bool) {
 	rest := segs[i+1:]
 	switch {
