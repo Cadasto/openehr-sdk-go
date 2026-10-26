@@ -11,9 +11,9 @@ date: 2026-05-16
 - **Status:** Accepted, 2026-05-16.
 - **Supersedes:** —
 - **Superseded by:** —
-- **Amended:** D4, 2026-10-01 (the `P_BMM_INTERFACE` shape). D8, 2026-10-11 (the interval classes' boundary-flag logic). D9 added, 2026-10-12 (canonical-XML unmatched content).
+- **Amended:** D4, 2026-10-01 (the `P_BMM_INTERFACE` shape). D8, 2026-10-11 (the interval classes' boundary-flag logic). D9 added, 2026-10-12 (canonical-XML unmatched content). D10 added, 2026-10-26 (canonical-XML child order from the ITS-XML schemas).
 - **Tracks:** the BMM code generator, landed on `main` in commit [b89aa589](https://github.com/Cadasto/openehr-sdk-go/commit/b89aa589).
-- **Requirements:** [REQ-043](../specifications/bmm-conformance.md#mapping-rules) (the P_BMM to Go mapping rules the generator applies).
+- **Requirements:** [REQ-043](../specifications/bmm-conformance.md#mapping-rules) (the P_BMM to Go mapping rules the generator applies); [REQ-056](../specifications/wire.md#req-056) (the canonical-XML child order D10 supplies).
 
 ## Context
 
@@ -76,6 +76,12 @@ The invariant D8 asserts: **no per-type JSON codec logic is generated into `open
 Canonical XML decodes through a generated `UnmarshalXML` per class, and [REQ-170](../specifications/wire.md#req-170--unmatched-content-on-decode) asks the codec's entry points for options that report or refuse unmatched content. `encoding/xml` passes such a method only the `*xml.Decoder` and the start element, so no option can reach the generated code as an argument.
 
 The generated decoders therefore read nothing they do not model themselves. On entry each hands its element's attributes, and in its fallback arm every child it does not read (an unknown element, an element in a foreign namespace, a `Hash` member, the content of a BMM `Any` member, a member whose type has no decoder of its own), to helpers in the internal package `openehr/internal/xmlunmatched`. A primitive leaf and a member typed by a generic parameter decode through the same package. When a caller sets an option, `canxml` builds the decoder through that package, which tracks the open elements and registers the decoder with the decode's own policy for the length of each value. Without an option, each helper finds no registration and does exactly what `encoding/xml` would. The helpers stay off `canxml`'s public API: `canxml` exposes only the options and re-exports the sentinels. The generator refuses no class for this; every class-typed arm goes either to a decoder the generator emitted or to the helpers, which its test checks.
+
+### D10 — The generated XML encoders take their child order from the ITS-XML schemas
+
+In canonical XML, element order is part of a document's identity ([REQ-056](../specifications/wire.md#req-056)), and a reader that validates against the openEHR ITS-XML schemas refuses children that leave their type's `xs:sequence`. The BMM gives no such order. Each class declares its own properties, and the merged property list the generator builds (D2, D4) puts them in an order the schemas do not follow: OBSERVATION's `protocol` came before LOCATABLE's `name`. On 2026-10-26, 48 of the 123 classes the encoders write were out of the schemas' order.
+
+The generator therefore reads a second pinned input beside `resources/bmm/`: the ITS-XML schemas vendored under `resources/its-xml/`, RM and BASE Release-1.1.0, and AM Release-1.4 for the AOM 1.4 classes. For each class it takes the schema type of the same name, or of its nearest ancestor when the schema has none, with that type's `xs:extension` bases, the bases' sequences first, and it emits the class's children in that order. A property the schema does not declare follows the declared ones, in the generator's own order, so no property is dropped: one a later release added, such as `EHR.tags`, or an interval's bounds, which the schema declares only on its `IntervalOf…` subtypes. The decoders keep matching children by name in any order. A test holds every generated encoder to the vendored schemas, and `make codegen-check` holds the generated files to the generator.
 
 ## Consequences
 
