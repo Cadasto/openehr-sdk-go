@@ -12,6 +12,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
@@ -657,4 +658,139 @@ func TestREQ073_PlaintextServiceWarningOnFetchAndRenewalOnly(t *testing.T) { // 
 	if n := warnings(); n != 2 {
 		t.Errorf("after a 304 renewal, %d warning(s) for %s, want 2", n, field)
 	}
+}
+
+// responseHeader builds the header of a discovery response from name, value
+// pairs; a name given twice adds a second field line.
+func responseHeader(pairs ...string) http.Header {
+	h := http.Header{}
+	for i := 0; i+1 < len(pairs); i += 2 {
+		h.Add(pairs[i], pairs[i+1])
+	}
+	return h
+}
+
+// TestREQ071_DeclaredTTL pins REQ-071's declared TTL, read as RFC 9111 reads
+// a freshness lifetime: Cache-Control no-store or no-cache gives a TTL of 0,
+// else a max-age of delta-seconds gives that many seconds, else Expires gives
+// its time minus Date's, or minus the resolution time without a usable Date,
+// and a past or invalid Expires gives 0. Only a response that declares none
+// of these gets the default. A TTL of 0 expires the catalog at once and is
+// never the zero time, which would mean it never expires.
+func TestREQ071_DeclaredTTL(t *testing.T) { // REQ-071
+	t.Parallel()
+	now := time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC)
+	const fallback = 15 * time.Minute
+	httpDate := func(d time.Duration) string { return now.Add(d).Format(http.TimeFormat) }
+	maxLifetime := time.Duration(1<<31) * time.Second // RFC 9111 §1.2.2
+	tests := []struct {
+		name     string
+		header   http.Header
+		fallback time.Duration
+		want     time.Time
+	}{
+		{name: "nothing declared", header: responseHeader(), fallback: fallback, want: now.Add(fallback)},
+		{name: "nothing declared, no default", header: responseHeader(), want: time.Time{}},
+		{name: "unrelated directives only", header: responseHeader("Cache-Control", "public, must-revalidate"), fallback: fallback, want: now.Add(fallback)},
+
+		{name: "no-store", header: responseHeader("Cache-Control", "no-store"), fallback: fallback, want: now},
+		{name: "no-cache", header: responseHeader("Cache-Control", "no-cache"), fallback: fallback, want: now},
+		{name: "no-store in upper case", header: responseHeader("Cache-Control", "NO-STORE"), fallback: fallback, want: now},
+		{name: "no-cache after max-age in the list", header: responseHeader("Cache-Control", "max-age=600, No-Cache"), fallback: fallback, want: now},
+		{name: "no-store on a second field line", header: responseHeader("Cache-Control", "max-age=600", "Cache-Control", "no-store"), fallback: fallback, want: now},
+		{name: "qualified no-cache", header: responseHeader("Cache-Control", `no-cache="Set-Cookie"`), fallback: fallback, want: now},
+		{name: "no-store under no default is not the zero time", header: responseHeader("Cache-Control", "no-store"), want: now},
+		{name: "no-store beats a future Expires", header: responseHeader("Cache-Control", "no-store", "Expires", httpDate(time.Hour)), fallback: fallback, want: now},
+		{name: "a directive that only starts with no-store", header: responseHeader("Cache-Control", "no-store-please"), fallback: fallback, want: now.Add(fallback)},
+
+		{name: "max-age", header: responseHeader("Cache-Control", "max-age=600"), fallback: fallback, want: now.Add(600 * time.Second)},
+		{name: "max-age in upper case among others", header: responseHeader("Cache-Control", "public, MAX-AGE=600"), fallback: fallback, want: now.Add(600 * time.Second)},
+		{name: "max-age as a quoted string", header: responseHeader("Cache-Control", `max-age="600"`), fallback: fallback, want: now.Add(600 * time.Second)},
+		{name: "max-age=0", header: responseHeader("Cache-Control", "max-age=0"), fallback: fallback, want: now},
+		{name: "max-age=0 under no default", header: responseHeader("Cache-Control", "max-age=0"), want: now},
+		{name: "max-age with a unit is ignored", header: responseHeader("Cache-Control", "max-age=5m"), fallback: fallback, want: now.Add(fallback)},
+		{name: "negative max-age is ignored", header: responseHeader("Cache-Control", "max-age=-1"), fallback: fallback, want: now.Add(fallback)},
+		{name: "fractional max-age is ignored", header: responseHeader("Cache-Control", "max-age=1.5"), fallback: fallback, want: now.Add(fallback)},
+		{name: "signed max-age is ignored", header: responseHeader("Cache-Control", "max-age=+60"), fallback: fallback, want: now.Add(fallback)},
+		{name: "empty max-age is ignored", header: responseHeader("Cache-Control", "max-age="), fallback: fallback, want: now.Add(fallback)},
+		{name: "max-age without a value is ignored", header: responseHeader("Cache-Control", "max-age"), fallback: fallback, want: now.Add(fallback)},
+		{name: "huge max-age is capped at 2^31 seconds", header: responseHeader("Cache-Control", "max-age=99999999999999999999999"), fallback: fallback, want: now.Add(maxLifetime)},
+		{name: "first valid max-age wins", header: responseHeader("Cache-Control", "max-age=5m, max-age=60, max-age=120"), fallback: fallback, want: now.Add(60 * time.Second)},
+		{name: "max-age beats Expires", header: responseHeader("Cache-Control", "max-age=600", "Expires", httpDate(-time.Hour)), fallback: fallback, want: now.Add(600 * time.Second)},
+		{name: "an invalid max-age falls through to Expires", header: responseHeader("Cache-Control", "max-age=5m", "Expires", httpDate(time.Hour)), fallback: fallback, want: now.Add(time.Hour)},
+
+		{name: "Expires without Date", header: responseHeader("Expires", httpDate(time.Hour)), fallback: fallback, want: now.Add(time.Hour)},
+		{name: "Expires in the RFC 850 form", header: responseHeader("Expires", now.Add(time.Hour).Format("Monday, 02-Jan-06 15:04:05 GMT")), fallback: fallback, want: now.Add(time.Hour)},
+		{name: "Expires against a Date ahead of the local clock", header: responseHeader("Date", httpDate(10*time.Minute), "Expires", httpDate(70*time.Minute)), fallback: fallback, want: now.Add(time.Hour)},
+		{name: "Expires against an invalid Date", header: responseHeader("Date", "yesterday", "Expires", httpDate(time.Hour)), fallback: fallback, want: now.Add(time.Hour)},
+		{name: "Expires in the past", header: responseHeader("Expires", httpDate(-time.Hour)), fallback: fallback, want: now},
+		{name: "Expires equal to Date", header: responseHeader("Date", httpDate(0), "Expires", httpDate(0)), fallback: fallback, want: now},
+		{name: "Expires of 0 is in the past", header: responseHeader("Expires", "0"), fallback: fallback, want: now},
+		{name: "empty Expires is in the past", header: responseHeader("Expires", ""), fallback: fallback, want: now},
+		{name: "past Expires under no default is not the zero time", header: responseHeader("Expires", httpDate(-time.Hour)), want: now},
+		{name: "Expires far ahead is capped at 2^31 seconds", header: responseHeader("Expires", "Fri, 31 Dec 9999 23:59:59 GMT"), fallback: fallback, want: now.Add(maxLifetime)},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := discovery.ComputeExpiry(tc.header, tc.fallback, now)
+			if !got.Equal(tc.want) || got.IsZero() != tc.want.IsZero() {
+				t.Errorf("computeExpiry(%v, %v, now) = %v, want %v (now = %v)", tc.header, tc.fallback, got, tc.want, now)
+			}
+		})
+	}
+}
+
+// TestREQ071_NoStoreIsFetchedAgainOnNextResolve pins REQ-071's declared TTL
+// at the resolver: a response with Cache-Control no-store is stale as soon as
+// it is cached, so each later Resolve fetches the document again, with no
+// time passing in between. The fetch is conditional on the stored ETag, and a
+// 304 that declares no-store renews the catalog for no time either.
+func TestREQ071_NoStoreIsFetchedAgainOnNextResolve(t *testing.T) { // REQ-071
+	synctest.Test(t, func(t *testing.T) {
+		const etag = `"v1"`
+		var mu sync.Mutex
+		var ifNoneMatch []string
+		srv := httptest.NewTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != smartDocPath {
+				http.NotFound(w, r)
+				return
+			}
+			mu.Lock()
+			ifNoneMatch = append(ifNoneMatch, r.Header.Get("If-None-Match"))
+			mu.Unlock()
+			w.Header().Set("Cache-Control", "no-store")
+			w.Header().Set("ETag", etag)
+			if r.Header.Get("If-None-Match") == etag {
+				w.WriteHeader(http.StatusNotModified)
+				return
+			}
+			_, _ = io.WriteString(w, documentWith(firstAPIBaseURL, map[string]string{"token_endpoint": "https://auth.example.com/token"}))
+		}))
+		res, err := discovery.NewResolver(nil, discovery.WithHTTPClient(srv.Client()), discovery.WithAllowInsecure(), discovery.WithLogger(slog.New(slog.DiscardHandler)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		baseURL := srv.URL + platformPath
+
+		first, err := res.Resolve(t.Context(), baseURL)
+		if err != nil {
+			t.Fatalf("Resolve(%q) error = %v", baseURL, err)
+		}
+		if first.ExpiresAt.IsZero() || !first.ExpiresAt.Equal(first.ResolvedAt) {
+			t.Errorf("catalog from a no-store response: ExpiresAt = %v, ResolvedAt = %v, want them equal and not zero", first.ExpiresAt, first.ResolvedAt)
+		}
+		for range 2 {
+			if _, err := res.Resolve(t.Context(), baseURL); err != nil {
+				t.Fatalf("Resolve(%q) again error = %v", baseURL, err)
+			}
+		}
+
+		mu.Lock()
+		got := slices.Clone(ifNoneMatch)
+		mu.Unlock()
+		if want := []string{"", etag, etag}; !slices.Equal(got, want) {
+			t.Errorf("If-None-Match of the SMART requests = %q, want %q: three Resolve calls, each a fetch, the later two conditional", got, want)
+		}
+	})
 }
