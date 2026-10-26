@@ -92,13 +92,19 @@ func (c decodeConfig) tracked() bool {
 // RM-mandatory attributes the formats omit (HISTORY.origin, EVENT.time,
 // ENTRY language/encoding/subject, EVENT_CONTEXT.setting, …) are completed
 // from ctx defaults and RM conventions; these are synthesised defaults, not
-// recovered data. The decoded composition then validates against the OPT,
-// provided ctx/time is present when the template carries HISTORY/EVENT
+// recovered data. An empty structure (an ITEM_TREE or ITEM_LIST with no
+// items, say) that the template requires and allows to stay empty has no key
+// in the formats, so decode adds it back, empty, under a parent the body
+// rebuilt, with the type, node id and name the template gives it. It is
+// synthesised too, and decode adds none where the template asks the
+// structure for a member. The decoded composition then validates against the
+// OPT, provided ctx/time is present when the template carries HISTORY/EVENT
 // nodes (their mandatory origin/time have no other source; see
 // deviations.md).
 //
-// Without this option decode omits names and defaults: the round-trip stays
-// format-idempotent but the result is not canonically complete.
+// Without this option decode omits names, defaults and empty structures:
+// the round-trip stays format-idempotent but the result is not canonically
+// complete.
 func WithTemplate(c *templatecompile.Compiled) Option {
 	return func(cfg *decodeConfig) { cfg.template = c }
 }

@@ -521,6 +521,7 @@ requirements:
       - openehr/serialize/simplified/composition_name_test.go
       - openehr/serialize/simplified/context_test.go
       - openehr/serialize/simplified/datatypes_test.go
+      - openehr/serialize/simplified/empty_structure_test.go
       - openehr/serialize/simplified/fit_test.go
       - openehr/serialize/simplified/flat_decode_test.go
       - openehr/serialize/simplified/flat_encode_test.go

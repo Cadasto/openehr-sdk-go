@@ -23,6 +23,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
+	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
@@ -284,10 +285,13 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 	if err := applyContext(compJSON, ci, composerJSON); err != nil {
 		return nil, err
 	}
-	// Conformant mode (a template was supplied, so tmpl is non-nil): fill the
-	// RM-mandatory attributes the formats do not carry, from ctx defaults + RM
+	// Conformant mode (a template was supplied, so tmpl is non-nil): every key
+	// is placed, so each rebuilt node gets the required structures with no
+	// member the formats have no key for (REQ-053); then the RM-mandatory
+	// attributes the formats do not carry are filled, from ctx defaults + RM
 	// conventions, so the decoded composition is OPT-validatable.
 	if tmpl != nil {
+		rebuildEmptyStructures(compJSON, tmpl)
 		completeRequired(compJSON, ci)
 	}
 	// Both modes: archetype_details has no FLAT key, and the Web Template
@@ -2169,6 +2173,37 @@ type templateIndex struct {
 	// single-valued attribute, say, which share a path: the template then gives
 	// no single answer.
 	rmTypes map[string]string
+	// structures maps the bare path of a node to the empty structures decode
+	// may rebuild under it ([emptyStructure]). A path whose nodes disagree on
+	// them has no entry: the template then gives no single answer.
+	structures map[string][]emptyStructure
+	// structureRoute holds the bare path of every node on the way to a key of
+	// structures, that key included, so the rebuild walk enters no other node.
+	structureRoute map[string]bool
+}
+
+// emptyStructure is a structure decode rebuilds with no member, under a
+// rebuilt node that lacks it, as the generator writes it: an ITEM_STRUCTURE
+// object that holds its type, its node id and a name, and nothing else. The
+// formats have no key for a structure with no member, so its node is never
+// rebuilt from the body.
+//
+// The template gives one where a single-valued attribute of a node allows
+// only children that agree, on the RM type and the node id, and that are
+// each a concrete ITEM_STRUCTURE the template lets hold no member
+// ([holdsNoMember]). A slot and an archetype root give none: the node they
+// stand for is not the template's alone to name.
+type emptyStructure struct {
+	// attr is the single-valued attribute that holds the structure, and path
+	// the structure's bare path, whose name in the index the structure takes.
+	attr, path string
+	// rmType is the structure's concrete ITEM_STRUCTURE subtype, and nodeID its
+	// archetype_node_id.
+	rmType, nodeID string
+	// required is set where the template's existence requires attr. Where it
+	// does not, decode rebuilds the structure only where the RM requires attr
+	// of the rebuilt node's class, as the validator reads it.
+	required bool
 }
 
 // name returns the LOCATABLE name the template gives the node at path, or "".
@@ -2215,14 +2250,29 @@ func (x *templateIndex) addRMType(path, rmType string) {
 // PROBE-086 adapter work owns. Siblings sharing a bare path with distinct RM
 // types leave the type alias with no answer.
 //
+// The empty structures each node may get ([emptyStructure]) are indexed under
+// the bare path alone, the one the rebuild walk composes. Nodes at one bare
+// path that disagree on them, alternatives or siblings that narrow one
+// archetype differently, leave the path with none, since decode cannot tell
+// which of them a rebuilt node stands for ([dropDisagreeingStructures]).
+//
 // The walk reads the compiled template in place, through the module-internal
 // readers that do not copy a node's attributes, an attribute's children or a
 // term's items. A compiled template carries one set of terms, in its default
 // language, so the rubric is in that language.
 func buildTemplateIndex(c *templatecompile.Compiled) *templateIndex {
-	x := &templateIndex{names: make(map[string]string), rmTypes: make(map[string]string)}
+	x := &templateIndex{
+		names:      make(map[string]string),
+		rmTypes:    make(map[string]string),
+		structures: make(map[string][]emptyStructure),
+	}
 	var walk func(n *templatecompile.CompiledNode)
 	walk = func(n *templatecompile.CompiledNode) {
+		if s := emptyStructuresOf(n); len(s) > 0 {
+			if bare := bareAQLPath(n.AQLPath()); x.structures[bare] == nil {
+				x.structures[bare] = s
+			}
+		}
 		if id := n.NodeID(); id != "" {
 			path := n.AQLPath()
 			bare := bareAQLPath(path)
@@ -2256,8 +2306,200 @@ func buildTemplateIndex(c *templatecompile.Compiled) *templateIndex {
 	}
 	if root := c.Root(); root != nil {
 		walk(root)
+		dropDisagreeingStructures(root, x.structures)
+	}
+	x.structureRoute = make(map[string]bool)
+	for p := range x.structures {
+		for i := 1; i <= len(p); i++ {
+			if i == len(p) || p[i] == '/' {
+				x.structureRoute[p[:i]] = true
+			}
+		}
 	}
 	return x
+}
+
+// dropDisagreeingStructures removes from structures each bare path at which
+// two nodes of the template below root, the root included, disagree on the
+// empty structures they give ([emptyStructuresOf]): a node that gives none
+// there disagrees with one that gives some.
+func dropDisagreeingStructures(root *templatecompile.CompiledNode, structures map[string][]emptyStructure) {
+	if len(structures) == 0 {
+		return
+	}
+	var walk func(n *templatecompile.CompiledNode)
+	walk = func(n *templatecompile.CompiledNode) {
+		bare := bareAQLPath(n.AQLPath())
+		if s, ok := structures[bare]; ok && !slices.Equal(s, emptyStructuresOf(n)) {
+			delete(structures, bare)
+		}
+		for _, a := range tcimpl.NodeAttributes(n) {
+			for _, ch := range tcimpl.ChildNodes(a) {
+				walk(ch)
+			}
+		}
+	}
+	walk(root)
+}
+
+// emptyStructuresOf returns, in attribute order, the empty structures the
+// template gives the node n ([emptyStructure]), one per single-valued
+// attribute at most.
+func emptyStructuresOf(n *templatecompile.CompiledNode) []emptyStructure {
+	var out []emptyStructure
+	for _, a := range tcimpl.NodeAttributes(n) {
+		if a.Cardinality() == template.Multiple {
+			continue
+		}
+		children := tcimpl.AllowedChildNodes(a)
+		if len(children) == 0 {
+			continue
+		}
+		first := children[0]
+		if slices.ContainsFunc(children, func(c *templatecompile.CompiledNode) bool {
+			return c.RMTypeName() != first.RMTypeName() || c.NodeID() != first.NodeID() || !isEmptyStructure(c)
+		}) {
+			continue
+		}
+		out = append(out, emptyStructure{
+			attr:     a.Name(),
+			path:     bareAQLPath(first.AQLPath()),
+			rmType:   first.RMTypeName(),
+			nodeID:   first.NodeID(),
+			required: tcimpl.LowerAtLeastOne(a.Existence()),
+		})
+	}
+	return out
+}
+
+// isEmptyStructure reports whether decode can rebuild the template node c as
+// a structure with no member: c is no slot and no archetype root, is of a
+// concrete ITEM_STRUCTURE subtype, and holds no member the template or the RM
+// requires ([holdsNoMember]). A node with no node id has no name in the index,
+// so [rebuildEmptyStructures] leaves it out.
+func isEmptyStructure(c *templatecompile.CompiledNode) bool {
+	if c.IsSlot() || c.ArchetypeID() != "" {
+		return false
+	}
+	if conforms, _ := tcimpl.ClassConformsTo(c.RMTypeName(), "ITEM_STRUCTURE"); !conforms {
+		return false
+	}
+	h, ok := rminfo.Default.(rminfo.Hierarchy)
+	if !ok {
+		return false
+	}
+	if abstract, _ := h.IsAbstract(c.RMTypeName()); abstract {
+		return false
+	}
+	return holdsNoMember(c)
+}
+
+// holdsNoMember reports whether the template node c, an ITEM_STRUCTURE,
+// validates with no member, as the validator reads it (clinical-modeling.md,
+// An existence lower bound alone asks for no member). The RM requires none of
+// its attributes but its name and node id, which the rebuilt structure
+// carries. The template requires none of the others: no single-valued one by
+// its existence, no list by its existence together with a member it asks for
+// ([tcimpl.AsksForMember]), and no list it leaves optional by its existence
+// by a child that asks a list with no item for a member
+// ([tcimpl.MandatoryListChildren]). The validator also lets an RM rule that
+// keeps a list non-empty once present ask for a member, but the floor keeps
+// no list of an ITEM_STRUCTURE so ([rminfo.NonEmptyLists]).
+func holdsNoMember(c *templatecompile.CompiledNode) bool {
+	for _, attr := range rminfo.Default.RequiredAttributes(bmmtype.Class(c.RMTypeName())) {
+		if !carriedByEmptyStructure(attr) {
+			return false
+		}
+	}
+	for _, a := range tcimpl.NodeAttributes(c) {
+		if carriedByEmptyStructure(a.Name()) || a.NotInRM() {
+			continue
+		}
+		existence := tcimpl.LowerAtLeastOne(a.Existence())
+		switch {
+		case a.Cardinality() != template.Multiple:
+			if existence {
+				return false
+			}
+		case existence:
+			if tcimpl.AsksForMember(a) {
+				return false
+			}
+		default:
+			for range tcimpl.MandatoryListChildren(a) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// carriedByEmptyStructure reports whether attr is one a rebuilt empty
+// structure carries: its archetype_node_id and its name.
+func carriedByEmptyStructure(attr string) bool {
+	return attr == "archetype_node_id" || attr == "name"
+}
+
+// rebuildEmptyStructures gives each node decode rebuilt the empty structures
+// the template gives it ([emptyStructure]) that it lacks, where the template's
+// existence or the RM requires the attribute that holds one: the formats have
+// no key for a structure with no member, so a body whose template requires
+// one never spells it. Each structure gets its type, its node id and the name
+// the template index gives its path; one whose path has no name, a node with
+// no node id say, is not rebuilt. The walk composes each node's bare path as
+// walkAQL does, a predicate only on a list member, and enters only the nodes
+// on the way to one the template gives structures (structureRoute). The root
+// is entered with an empty path, which no key has: a COMPOSITION holds no
+// ITEM_STRUCTURE. It never builds a parent node, a member or a value: only a
+// structure under a node the body rebuilt.
+func rebuildEmptyStructures(compJSON map[string]any, tmpl *templateIndex) {
+	if len(tmpl.structures) == 0 {
+		return
+	}
+	var walk func(node map[string]any, path []byte)
+	walk = func(node map[string]any, path []byte) {
+		base := len(path)
+		for _, s := range tmpl.structures[string(path)] {
+			if _, has := node[s.attr]; has || (!s.required && !rmRequires(node, s.attr)) {
+				continue
+			}
+			if name := tmpl.name(s.path); name != "" {
+				node[s.attr] = map[string]any{
+					"_type":             s.rmType,
+					"archetype_node_id": s.nodeID,
+					"name":              textJSON(name),
+				}
+			}
+		}
+		for attr, v := range node {
+			switch x := v.(type) {
+			case map[string]any:
+				path = append(append(path[:base], '/'), attr...)
+				if tmpl.structureRoute[string(path)] {
+					walk(x, path)
+				}
+			case []any:
+				for _, e := range x {
+					m, ok := e.(map[string]any)
+					if !ok {
+						continue
+					}
+					path = appendMemberPath(path[:base], attr, m)
+					if tmpl.structureRoute[string(path)] {
+						walk(m, path)
+					}
+				}
+			}
+		}
+	}
+	walk(compJSON, make([]byte, 0, 256))
+}
+
+// rmRequires reports whether the RM requires attr of node's class, as the
+// validator reads it, from the value's class.
+func rmRequires(node map[string]any, attr string) bool {
+	t, _ := node["_type"].(string)
+	return slices.Contains(rminfo.Default.RequiredAttributes(bmmtype.Class(t)), attr)
 }
 
 // checkNoPhantoms walks the rebuilt tree and rejects any container element that
