@@ -29,9 +29,9 @@ How AI assistants (Claude Code, Cursor, Copilot, Codex, …) work in this repo. 
 - Reviewer brief: load them before reviewing and cite the rule a finding rests on.
 - A reviewer seat that already exists (the SDD subagent-driven loop's own reviewer) applies the skills itself instead of spawning `go-reviewer`.
 
-Pair with the gopls-lsp plugin for code intelligence (defs/refs/rename/vulncheck). The plugin is there so you run the deterministic tool instead of working a rule out by hand.
+Pair with the gopls-lsp plugin for code intelligence (defs/refs/rename/vulncheck). The plugin is there so you run the deterministic tool instead of working a rule out by hand. The LSP tool sees only the session's starting folder, so from a worktree run `gopls` in the shell instead: `cd .worktrees/<branch> && gopls references <file>:<line>:<col>` (also `definition` and `implementation`).
 
-For code exploration, call-chain tracing, and impact analysis, query the codebase-memory-mcp knowledge graph (or the `codebase-memory` skill) before grepping the whole tree: `search_graph` (find functions / types / routes), `trace_path` (call chains and data flow), `get_code_snippet` (exact symbol source), `get_architecture` (structure overview). Run `index_repository` once if the project isn't indexed yet. Use it to answer "who calls this?" before a refactor, or to map an unfamiliar subsystem.
+The codebase-memory-mcp knowledge graph (or the `codebase-memory` skill) indexes the main checkout, not `.worktrees/`, so use it for structural questions about `main`: the architecture overview (`get_architecture`), hotspots, files that change together, and the callers of a distinctive name (`search_graph`, `trace_path`, `get_code_snippet`). It matches calls by bare name, so a common name such as `Run` or `Write` gives false callers. On a branch, `gopls` answers symbol questions. Run `index_repository` once if the project isn't indexed yet.
 
 ## openEHR ground truth (MCP / skills)
 
@@ -68,7 +68,7 @@ The full editing rules (idiomatic surface, the `cadasto/` boundary contract, and
 - **One orchestrator, bounded workers.** The main session orchestrates, on the strongest model available. It reads what binds, briefs and dispatches workers, gates each task, adjudicates spec questions, opens the PR, runs triage and closes out.
 - **The orchestrator does not write product code**, except for a task that cannot be made self-contained. That task is done in-session, and the PR body says so.
 - **A brief is self-contained.** It holds the task, what it cites, the clauses it must satisfy (quoted), the files it may touch, the verification command, en-route findings, the skills to load (§ Recommended tooling), and no subagents.
-- **Code index:** codebase-memory-mcp (§ Recommended tooling). Workers query it first and fall back to `grep` for literals and prose; the brief repeats the name.
+- **Code index:** for Go symbol questions (where it is defined, who uses it, who implements it), workers run `gopls definition|references|implementation <file>:<line>:<col>` from inside the worktree, plus `go doc` and `go list`; `grep` covers literals and prose, and the brief repeats this. The codebase-memory-mcp graph indexes the main checkout, not `.worktrees/`, so it answers only questions about `main` (§ Recommended tooling).
 - **Workers do not spawn workers.** Tasks run in sequence on the branch; a parallel wave (large tasks, disjoint files) shares it, each worker committing only its own files.
 - **Completion is accounted for.** A worker that dies is re-dispatched, or the gap is named. A task is not done because a dispatch ended.
 - **Findings state is read from the findings file (§ Review), never remembered.**
