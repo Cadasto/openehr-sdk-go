@@ -312,6 +312,7 @@ requirements:
       - internal/bmmgen/render_rminfo_hierarchy_test.go
       - internal/bmmgen/render_test.go
       - internal/bmmgen/sim_bump_test.go
+      - internal/bmmgen/sync_bmm_script_test.go
       - openehr/rm/rminfo/hierarchy_test.go
       - openehr/rm/rminfo/probe_094_test.go
 
