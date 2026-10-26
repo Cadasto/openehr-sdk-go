@@ -3,9 +3,17 @@ package xmlunmatched
 import "reflect"
 
 // The reflection in this file never chooses a Go type from the document. It
-// allocates the pointer a pointer to a pointer leaves nil, as encoding/xml
-// does before it decodes, so that the pointer-receiver UnmarshalText method of
-// what it points to can be reached and its refusal marked.
+// tells a typed-nil pointer from a value, and it allocates the pointer a
+// pointer to a pointer leaves nil, as encoding/xml does before it decodes, so
+// that the pointer-receiver UnmarshalText method of what it points to can be
+// reached and its refusal marked.
+
+// isNilPointer reports whether v holds a nil pointer of some type: an
+// interface value that is not nil itself, yet points to nothing.
+func isNilPointer(v any) bool {
+	rv := reflect.ValueOf(v)
+	return rv.Kind() == reflect.Pointer && rv.IsNil()
+}
 
 // pointee returns *v when v is a non-nil pointer to a pointer, after
 // allocating *v when it is nil, as encoding/xml allocates a nil pointer it

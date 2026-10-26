@@ -811,10 +811,11 @@ func untrackedFailure(start *xml.StartElement, v any, err error) error {
 //
 //   - T is an interface type, such as the `any` of ORIGINAL_VERSION<any> or
 //     the DV_ORDERED of BASE Interval<DV_ORDERED>: the member is a
-//     polymorphic slot. An empty one decodes through dispatch, the canxml
-//     polymorphic dispatch on `xsi:type` the generated code passes in, so a
-//     missing or unknown `xsi:type` fails as at any polymorphic slot. One
-//     that already holds a value is decoded into ([decodeInterface]).
+//     polymorphic slot. An empty one, nil or holding a nil pointer of some
+//     type, decodes through dispatch, the canxml polymorphic dispatch on
+//     `xsi:type` the generated code passes in, so a missing or unknown
+//     `xsi:type` fails as at any polymorphic slot. One that already holds a
+//     value is decoded into ([decodeInterface]).
 //   - T is a pointer to a type with an UnmarshalXML method: encoding/xml
 //     allocates it and that method checks its own content.
 //   - Any other T, a primitive, a pointer to a TextUnmarshaler or a type
@@ -826,7 +827,7 @@ func DecodeParam[T any](dec *xml.Decoder, start *xml.StartElement, v *T, dispatc
 	var zero T
 	switch any(zero).(type) {
 	case nil:
-		if held := any(*v); held != nil {
+		if held := any(*v); held != nil && !isNilPointer(held) {
 			return decodeInterface(dec, start, v, held)
 		}
 		got, err := dispatch(dec, *start)
