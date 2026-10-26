@@ -15,8 +15,9 @@ import (
 // keep it off by default and send it only from a client built with
 // transport.WithCadastoSpecVersionHeader(true)". Setting the version with
 // transport.WithSpecVersion is not enough: a client built without the opt-in,
-// or with the opt-in turned off, sends no such header. The opted-in client is
-// the control that shows the server sees the header when it is sent.
+// or with the opt-in turned off, sends no such header, and neither does an
+// opted-in client with no version to send. The opted-in client with a version
+// is the control that shows the server sees the header when it is sent.
 func TestCadastoSpecVersionHeaderOnlyWhenOptedIn(t *testing.T) { // REQ-050
 	const header = "Cadasto-OpenEhr-Spec-Version"
 	cases := []struct {
@@ -33,6 +34,10 @@ func TestCadastoSpecVersionHeaderOnlyWhenOptedIn(t *testing.T) { // REQ-050
 		{
 			name: "spec version with the opt-in off",
 			opts: []transport.Option{transport.WithSpecVersion("1.1.0"), transport.WithCadastoSpecVersionHeader(false)},
+		},
+		{
+			name: "the opt-in on without a spec version",
+			opts: []transport.Option{transport.WithCadastoSpecVersionHeader(true)},
 		},
 		{
 			name: "spec version with the opt-in on",
