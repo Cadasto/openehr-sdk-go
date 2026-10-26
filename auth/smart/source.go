@@ -48,6 +48,10 @@ const (
 	// refresh token the server has rotated is installed and reported; this
 	// bounds it instead.
 	refreshTimeout = 30 * time.Second
+	// firstBackoff is how long the source holds back the next refresh after
+	// the first transient failure in a row, while it serves the held access
+	// token. Each further failure doubles it.
+	firstBackoff = time.Second
 )
 
 // clientAssertionKey holds the asymmetric credential for private_key_jwt
@@ -406,6 +410,12 @@ type Source struct {
 	// forceRefresh makes the held access token count as stale until new
 	// tokens replace it. Reauth sets it; setTokensLocked clears it.
 	forceRefresh bool
+	// retryAt is when Token may send a refresh again after a transient
+	// failure left the held access token to be served, never after its
+	// ExpiresAt; zero when no backoff holds. backoff is how long the next
+	// such failure holds the refresh back. setTokensLocked resets both.
+	retryAt time.Time
+	backoff time.Duration
 	// session counts the times a code exchange or SetTokens installed
 	// tokens or Revoke cleared them. A refresh records it when it starts
 	// and discards its result when it has changed by the time the refresh
@@ -518,12 +528,32 @@ func reportRecovering(report func()) {
 }
 
 // setTokensLocked replaces the held tokens. New tokens are not the ones a
-// Reauth asked to replace, so it also ends a forced refresh. The caller
-// holds s.mu.
+// Reauth asked to replace, so it also ends a forced refresh, and they end
+// the backoff of the tokens they replace. The caller holds s.mu.
 func (s *Source) setTokensLocked(access auth.Token, refresh string) {
 	s.cur = access
 	s.refresh = refresh
 	s.forceRefresh = false
+	s.retryAt = time.Time{}
+	s.backoff = 0
+}
+
+// backOffLocked records a refresh that failed transiently. While the held
+// access token is not yet past its ExpiresAt, and Reauth has not marked it
+// for refresh, it holds Token's next refresh back until the backoff ends,
+// never later than that ExpiresAt, doubles the backoff for the next failure
+// in a row, and reports true: the token is to be served in place of the
+// failure. The caller holds s.mu.
+func (s *Source) backOffLocked() bool {
+	now := time.Now()
+	left := s.cur.ExpiresAt.Sub(now)
+	if s.forceRefresh || left <= 0 {
+		return false
+	}
+	wait := min(cmp.Or(s.backoff, firstBackoff), left)
+	s.retryAt = now.Add(wait)
+	s.backoff = 2 * wait
+	return true
 }
 
 // withHeldScope returns prev, the session's last token response, with the
@@ -589,6 +619,12 @@ type tokenExchange struct {
 	// the session while the refresh ran, so its result was discarded and the
 	// callers waiting on it try again. It is written before done is closed.
 	superseded bool
+	// held is the access token the refresh's callers get in place of err,
+	// except a forced caller (Reauth, RefreshIfNeeded), when serveHeld
+	// reports that the refresh failed transiently while held was still
+	// valid. Both are written before done is closed.
+	held      auth.Token
+	serveHeld bool
 	// retry reports that the refresh has no result for the callers waiting
 	// on it, because it panicked. The refresh does not end with the context
 	// of the call that started it, so that call giving up does not set it. A
@@ -1106,9 +1142,30 @@ func (s *Source) SetTokens(access auth.Token, refresh string) {
 // refresh has already returned, the panic is raised again on the refresh's
 // goroutine once the waiting calls are released, so it ends the program as
 // any unrecovered panic in a goroutine does.
+//
+// A refresh that fails without being terminal (a server or network error, a
+// timeout, an answer the source cannot read, or an ID token it refuses)
+// keeps both tokens. While the held access token is not yet past its
+// ExpiresAt, Token then returns that token without an error, and sends no
+// new refresh until a backoff ends: one second after the first such
+// failure, twice as long after each further failure in a row, and never
+// later than that ExpiresAt. Until then Token returns the held token without
+// a request. A successful refresh, a code exchange, [Source.SetTokens] or
+// [Source.Revoke] ends the backoff. Past ExpiresAt the failure is returned,
+// matching [auth.ErrRefreshFailed], and each call tries the refresh again. A
+// token that [Source.Reauth] marked for refresh is not served in place of a
+// failure. The calls waiting on a refresh get the same outcome, the held
+// token included; [Source.RefreshIfNeeded] and Reauth get the failure.
 func (s *Source) Token(ctx context.Context) (auth.Token, error) {
+	return s.token(ctx, false)
+}
+
+// token is Token. forced reports a call by Reauth or RefreshIfNeeded, which
+// refreshes during a backoff and gets the failure of a refresh that Token
+// would answer with the held token.
+func (s *Source) token(ctx context.Context, forced bool) (auth.Token, error) {
 	for {
-		tok, retry, err := s.tryToken(ctx)
+		tok, retry, err := s.tryToken(ctx, forced)
 		if !retry {
 			return tok, err
 		}
@@ -1124,12 +1181,14 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 // or waited on left it no result, because the session changed or because
 // the refresh panicked, so the caller tries again against the current
 // tokens.
-func (s *Source) tryToken(ctx context.Context) (tok auth.Token, retry bool, err error) {
+func (s *Source) tryToken(ctx context.Context, forced bool) (tok auth.Token, retry bool, err error) {
 	if err := ctx.Err(); err != nil {
 		return auth.Token{}, false, err
 	}
 	s.mu.Lock()
-	if !s.staleLocked() {
+	if !s.staleLocked() || (!forced && !s.forceRefresh && time.Now().Before(s.retryAt)) {
+		// The token is fresh, or a transient failure left it to be served
+		// until the backoff ends, which is no later than its ExpiresAt.
 		t := s.cur
 		s.mu.Unlock()
 		return t, false, nil
@@ -1154,7 +1213,8 @@ func (s *Source) tryToken(ctx context.Context) (tok auth.Token, retry bool, err 
 			}
 			return auth.Token{}, true, nil
 		default:
-			return ex.token, false, ex.err
+			tok, err := ex.outcome(forced)
+			return tok, false, err
 		}
 	}
 	refreshTok := s.refresh
@@ -1186,7 +1246,18 @@ func (s *Source) tryToken(ctx context.Context) (tok auth.Token, retry bool, err 
 	s.inflight = ex
 	s.mu.Unlock()
 
-	return s.leadRefresh(ctx, ex, refreshTok, cur, binding)
+	return s.leadRefresh(ctx, ex, refreshTok, cur, binding, forced)
+}
+
+// outcome returns what a caller of the refresh ex stands for gets: the held
+// access token in place of a transient failure that left it to be served,
+// unless forced reports a call by Reauth or RefreshIfNeeded, and otherwise
+// the refresh's own token and error.
+func (ex *tokenExchange) outcome(forced bool) (auth.Token, error) {
+	if ex.serveHeld && !forced {
+		return ex.held, nil
+	}
+	return ex.token, ex.err
 }
 
 // leadRefresh starts the refresh ex stands for on a goroutine of its own and
@@ -1199,7 +1270,7 @@ func (s *Source) tryToken(ctx context.Context) (tok auth.Token, retry bool, err 
 // token-change hook itself. Otherwise the change is reported here, after
 // the waiters have their token, so a hook that panics does so in this call.
 // A panic in the refresh while this call waits is raised here again.
-func (s *Source) leadRefresh(ctx context.Context, ex *tokenExchange, refreshTok string, cur auth.Token, binding *idTokenBinding) (auth.Token, bool, error) {
+func (s *Source) leadRefresh(ctx context.Context, ex *tokenExchange, refreshTok string, cur auth.Token, binding *idTokenBinding, forced bool) (auth.Token, bool, error) {
 	go s.runRefresh(ctx, ex, refreshTok, cur, binding)
 	select {
 	case <-ex.done:
@@ -1224,7 +1295,8 @@ func (s *Source) leadRefresh(ctx context.Context, ex *tokenExchange, refreshTok 
 	// The waiters have their token; the change is reported after them, in
 	// the order it was installed whatever the hook does meanwhile.
 	s.deliverChanges()
-	return ex.token, false, ex.err
+	tok, err := ex.outcome(forced)
+	return tok, false, err
 }
 
 // runRefresh runs the refresh ex stands for, installs its result and
@@ -1337,25 +1409,28 @@ func (s *Source) installLocked(ctx context.Context, ex *tokenExchange, cur, tok 
 			s.idBinding = bindingOf(refreshedTR.IDTokenClaims)
 		}
 		s.queueChangeLocked(ctx, TokenChange{Access: tok, RefreshToken: refreshTok, Response: s.lastTR})
-	} else {
+	} else if exErr, ok := errors.AsType[*auth.ExchangeError](err); ok && exErr.Terminal() {
 		// On a terminal failure clear the refresh token and the cached access
 		// token so that subsequent Token() calls deterministically return
-		// ErrReauthRequired without issuing another doomed POST. On transient
-		// failures (5xx, network, ctx) retain both so callers may retry
-		// (REQ-063).
-		ex2, ok := errors.AsType[*auth.ExchangeError](err)
-		if ok && ex2.Terminal() {
-			s.setTokensLocked(auth.Token{}, "")
-			err = &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: err}
-		}
+		// ErrReauthRequired without issuing another doomed POST (REQ-063).
+		s.setTokensLocked(auth.Token{}, "")
+		err = &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: err}
+	} else if s.backOffLocked() {
+		// A transient failure (5xx, network, timeout) keeps both tokens. The
+		// held access token is still valid, so it is served in place of the
+		// failure until the backoff ends (REQ-063).
+		ex.held = s.cur
+		ex.serveHeld = true
 	}
 	return tok, err
 }
 
 // RefreshIfNeeded refreshes the access token only when it is within the
 // configured threshold (i.e. stale) and a refresh token is present. It is a
-// no-op returning nil when the current token is still fresh. On failure it
-// returns the same error contract as Token.
+// no-op returning nil when the current token is still fresh. It refreshes
+// even while a backoff after a transient failure holds [Source.Token] back,
+// and returns the refresh's failure where Token would return the held token;
+// its errors are otherwise those of Token.
 func (s *Source) RefreshIfNeeded(ctx context.Context) error {
 	s.mu.Lock()
 	if !s.staleLocked() || s.refresh == "" {
@@ -1363,7 +1438,7 @@ func (s *Source) RefreshIfNeeded(ctx context.Context) error {
 		return nil
 	}
 	s.mu.Unlock()
-	_, err := s.Token(ctx)
+	_, err := s.token(ctx, true)
 	return err
 }
 
@@ -1376,8 +1451,10 @@ func (s *Source) RefreshIfNeeded(ctx context.Context) error {
 // ErrReauthRequired.
 //
 // Any other failed refresh (a server or network error, or an ID token the
-// source refuses) keeps both the access token and the refresh token, and the
-// access token stays stale, so the next [Source.Token] call tries the
+// source refuses) is returned and keeps both the access token and the
+// refresh token. Reauth refreshes even while a backoff after an earlier
+// transient failure holds [Source.Token] back. The access token stays stale
+// and is not served in place of a failure, so the next Token call tries the
 // refresh again. New tokens, from a refresh, a code exchange or
 // [Source.SetTokens], end the forced refresh.
 //
@@ -1403,7 +1480,7 @@ func (s *Source) Reauth(ctx context.Context) error {
 	// refresh leaves the source as it was.
 	s.forceRefresh = true
 	s.mu.Unlock()
-	_, err := s.Token(ctx)
+	_, err := s.token(ctx, true)
 	return err
 }
 

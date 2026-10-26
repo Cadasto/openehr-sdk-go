@@ -28,7 +28,9 @@ func expiredAccess(value string) auth.Token {
 }
 
 // exchangeSession completes a launch on src whose ID token names sub, so
-// the source holds a verified ID token, then marks the access token stale.
+// the source holds a verified ID token, then marks the access token expired,
+// so the next Token call refreshes and returns the refresh's failure rather
+// than the held token.
 func exchangeSession(t *testing.T, p *oidcProvider, src *smart.Source, sub string) smart.TokenResponse {
 	t.Helper()
 	req, err := src.BeginAuthorization("")
@@ -42,7 +44,7 @@ func exchangeSession(t *testing.T, p *oidcProvider, src *smart.Source, sub strin
 	if err != nil {
 		t.Fatalf("ExchangeAuthorizationCode() error = %v, want success", err)
 	}
-	src.SetTokens(staleAccess("at-1"), "rt-1")
+	src.SetTokens(expiredAccess("at-1"), "rt-1")
 	return tr
 }
 
@@ -148,7 +150,7 @@ func TestRefreshIDTokenWithoutJWKS(t *testing.T) { // REQ-064
 	ep := p.endpoints()
 	ep.JWKSURI = nil
 	src := p.source(t, ep)
-	src.SetTokens(staleAccess("at-1"), "rt-1")
+	src.SetTokens(expiredAccess("at-1"), "rt-1")
 	p.setBody(tokenBody(t, "at-2", "rt-2", p.sign(t, refreshClaims("user-1"))))
 
 	_, err := src.Token(t.Context())
@@ -172,7 +174,7 @@ func TestRefreshBindsToFirstVerifiedIDToken(t *testing.T) { // REQ-064
 		t.Fatalf("first refresh: Token() error = %v, want success", err)
 	}
 
-	src.SetTokens(staleAccess("at-2"), "rt-2")
+	src.SetTokens(expiredAccess("at-2"), "rt-2")
 	p.setBody(tokenBody(t, "at-3", "rt-3", p.sign(t, refreshClaims("user-8"))))
 	if _, err := src.Token(t.Context()); !errors.Is(err, auth.ErrJWKSValidationFailed) {
 		t.Fatalf("second refresh naming another subject: Token() error = %v, want auth.ErrJWKSValidationFailed", err)
@@ -234,7 +236,7 @@ func TestRefreshKeepsTheRedeemedRefreshToken(t *testing.T) { // REQ-063 REQ-064
 }
 
 // exchangeWithAudience completes a launch on src whose ID token for user-1
-// carries aud, then marks the access token stale.
+// carries aud, then marks the access token expired, as exchangeSession does.
 func exchangeWithAudience(t *testing.T, p *oidcProvider, src *smart.Source, aud any) {
 	t.Helper()
 	req, err := src.BeginAuthorization("")
@@ -247,7 +249,7 @@ func exchangeWithAudience(t *testing.T, p *oidcProvider, src *smart.Source, aud 
 	if _, _, err := src.ExchangeAuthorizationCode(t.Context(), "code-1", req.State, req); err != nil {
 		t.Fatalf("ExchangeAuthorizationCode() error = %v, want success", err)
 	}
-	src.SetTokens(staleAccess("at-1"), "rt-1")
+	src.SetTokens(expiredAccess("at-1"), "rt-1")
 }
 
 // TestRefreshComparesAudiencesAsASet pins REQ-064: a refreshed ID token must
@@ -309,7 +311,7 @@ func TestRefreshIDTokenKeySetOutage(t *testing.T) { // REQ-064
 			ep := p.endpoints()
 			ep.JWKSURI = discovery.MustParseURL(tc.jwksURI(p))
 			src := p.source(t, ep)
-			held := staleAccess("at-1")
+			held := expiredAccess("at-1")
 			src.SetTokens(held, "rt-1")
 			p.setBody(tokenBody(t, "at-2", "rt-2", p.sign(t, refreshClaims("user-1"))))
 

@@ -781,7 +781,9 @@ func TestRevokeEndsTheSessionIdentity(t *testing.T) { // REQ-167 REQ-064
 					t.Fatalf("Revoke() error = %v, want %v", err, tc.wantErr)
 				}
 			}
-			src.SetTokens(staleAccess("at-9"), "rt-9")
+			// Expired, so a refused refresh is returned rather than met by
+			// serving the held token.
+			src.SetTokens(expiredAccess("at-9"), "rt-9")
 			p.setBody(tokenBody(t, "at-10", "rt-10", p.sign(t, refreshClaims("user-2"))))
 			tok, err := src.Token(t.Context())
 			switch {

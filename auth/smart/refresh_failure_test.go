@@ -55,7 +55,8 @@ func okResponse(r *http.Request, body io.Reader) *http.Response {
 // refresh that fails without a usable token response, because the request
 // is never answered or because a 2xx answer carries no token, is a refresh
 // failure and not a token-exchange failure. Such a failure is transient: the
-// source keeps its access and refresh tokens, and the next Token call tries
+// source keeps its access and refresh tokens. The held access token is past
+// its ExpiresAt, so Token returns the failure, and the next Token call tries
 // the refresh again instead of asking for re-authentication.
 func TestREQ063_TransientRefreshFailureMatchesErrRefreshFailed(t *testing.T) { // REQ-063
 	t.Parallel()
@@ -105,7 +106,7 @@ func TestREQ063_TransientRefreshFailureMatchesErrRefreshFailed(t *testing.T) { /
 			if err != nil {
 				t.Fatalf("newSource: %v", err)
 			}
-			held := staleAccess("at-0")
+			held := expiredAccess("at-0")
 			src.SetTokens(held, "rt-0")
 
 			_, err = src.Token(t.Context())
