@@ -8,6 +8,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.41.0] - 2026-10-26
+
+Forty-first `v0.x` minor: template validation and the OPT parser check what a live CDR cross-check showed they missed, the instance generator writes documents EHRbase and FerroEHR accept, and the composition and EHR_STATUS clients read a record's version history. **Breaking:** `ValidateComposition` and the strict OPT parse refuse inputs they passed, `Generate` refuses more templates, and `composition.Repository` and `ehrstatus.Repository` each gain five methods.
+
+### Added
+
+- **`composition` and `ehrstatus` read a record's version history: the versioned object, its revision history, and a version, latest, at a time or by id (REQ-174, PROBE-109).** A logically deleted version reads with no payload.
+- **The OPT parser reads open string lists, quantity property units and ADL 1.4 temporal patterns and ranges (REQ-100, REQ-103, REQ-034).** `terminology.QuantityPropertyByCode` and `QuantityProperties` look up the openEHR property-unit table.
+- **`make cdr-crosscheck` checks generated documents and the CDRs' own examples against live CDRs, opt-in through environment variables (REQ-082).**
+
+### Changed
+
+- **Breaking: template validation and the strict OPT parse are tighter (REQ-102, REQ-103, REQ-100).** Quantity property units, temporal patterns and ranges, attributes the RM class lacks, sibling occupancy and the RM's non-empty lists are now checked.
+- **Breaking: the instance generator writes what EHRbase and FerroEHR accept (REQ-107).** `Large` writes every use of an archetype, entries and parties carry no uid the template does not ask for, and more templates draw `ErrConstraintUnsatisfiable` or `ErrArchetypeIDMissing`.
+- **Breaking: `composition.Repository` and `ehrstatus.Repository` gain the five version reads (REQ-174).** A type implementing either interface must add them.
+- **Every `version_at_time` the SDK sends keeps its fraction of a second, in UTC (REQ-174).** A time whose UTC year RFC 3339 cannot write fails with `transport.ErrInvalidConfig` before the request.
+- **Auth dependency upgraded to `go-jose/v4` v4.1.6.** A routine upstream release for the `auth/` and `smart/` layers, with no SDK API change.
+
 ## [0.40.0] - 2026-10-25
 
 Fortieth `v0.x` minor: the composition client writes and reads canonical XML, FLAT and STRUCTURED as well as canonical JSON. **Breaking:** `composition.Repository.Get` takes a trailing `...GetOption`, so a type that implements the interface must add it.
