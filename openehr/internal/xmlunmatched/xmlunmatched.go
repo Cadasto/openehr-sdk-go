@@ -39,11 +39,12 @@
 //     whose text they convert themselves, such as an interval boundary flag,
 //     [DecodeBase64] for an Octet list, and [DecodeParam] for a member typed
 //     by an open generic parameter. The hand-written TERMINOLOGY_CODE
-//     decoder calls the same helpers, and [CheckUnmatchedTextBefore] for
-//     text it keeps until a child shows that the text is not its value.
-//     canxml calls [DiscriminatorRead] where its dispatch reads a bare
-//     `type`. Each helper looks the decoder up; an untracked decode finds
-//     nothing and behaves as encoding/xml does, but for one thing.
+//     decoder calls the same helpers, [CheckUnmatchedTextBefore] for text
+//     it keeps until a child shows that the text is not its value, and
+//     [SkipUnmatchedAfter] and [ApplyHeld] for an unmatched child after
+//     that text. canxml calls [DiscriminatorRead] where its dispatch reads a
+//     bare `type`. Each helper looks the decoder up; an untracked decode
+//     finds nothing and behaves as encoding/xml does, but for one thing.
 //
 // # Primitive failures
 //
@@ -756,6 +757,66 @@ func CheckUnmatchedTextBefore(dec *xml.Decoder, text []byte) error {
 		return nil
 	}
 	return t.text(len(t.open)-1, text)
+}
+
+// Held holds the unmatched elements a decoder skipped after text it keeps for
+// [CheckUnmatchedTextBefore], while it cannot yet tell whether that text is
+// unmatched too. The text comes first in document order, so the policy for
+// the elements waits for the text's own. The zero value holds nothing.
+type Held struct {
+	items []heldItem
+}
+
+// heldItem is one unmatched element a [Held] holds: its path from the root of
+// the value, and whether it lies in a foreign namespace.
+type heldItem struct {
+	path    string
+	foreign bool
+}
+
+// SkipUnmatchedAfter skips the element start opens, which the decoder does
+// not read, as [SkipUnmatched] does. text is the text the decoder read
+// directly inside the enclosing element before start and keeps, for
+// [CheckUnmatchedTextBefore] or as that element's value. start must be the
+// token the decoder read last.
+//
+// Text other than XML whitespace may yet prove unmatched once a later child
+// opens, and it comes before the element in document order. So a tracked
+// decode then holds the element in h instead of reporting or refusing it at
+// once, and [ApplyHeld] applies the policy later. Beside whitespace only,
+// the element is reported or refused at once, as by [SkipUnmatched].
+func SkipUnmatchedAfter(dec *xml.Decoder, start xml.StartElement, text []byte, h *Held) error {
+	if t := trackerOf(dec); t != nil {
+		if !isXMLSpace(text) {
+			h.items = append(h.items, heldItem{path: t.path(), foreign: isForeign(start.Name)})
+		} else if err := t.unmatched(t.path(), isForeign(start.Name)); err != nil {
+			return err
+		}
+	}
+	return dec.Skip()
+}
+
+// ApplyHeld applies the decode's policy for unmatched content to the elements
+// h holds, in document order, as [SkipUnmatched] would have, and empties h. A
+// decoder calls it once the text before them has been checked by
+// [CheckUnmatchedTextBefore], or has proved to be the value of the element
+// that holds it, at the latest as that element closes.
+func ApplyHeld(dec *xml.Decoder, h *Held) error {
+	if len(h.items) == 0 {
+		return nil
+	}
+	items := h.items
+	h.items = nil
+	t := trackerOf(dec)
+	if t == nil {
+		return nil
+	}
+	for _, it := range items {
+		if err := t.unmatched(it.path, it.foreign); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // DecodeElement decodes the element start opens into v, as

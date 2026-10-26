@@ -1289,6 +1289,8 @@ func TestREQ170_XMLTerminologyIDTextBesideValue(t *testing.T) {
 		name  string
 		id    string
 		paths []string
+		// foreign marks a first item in a foreign namespace.
+		foreign bool
 	}{
 		{name: "text before the value child", id: xmlPlanted + value, paths: []string{textPath}},
 		{name: "text after the value child", id: value + xmlPlanted, paths: []string{textPath}},
@@ -1304,6 +1306,10 @@ func TestREQ170_XMLTerminologyIDTextBesideValue(t *testing.T) {
 			id:   xmlPlanted + `<x-foo/><value x-attr="` + xmlPlanted + `">ISO_639-1</value>`, paths: []string{textPath, fooPath, attrPath},
 		},
 		{name: "text beside an unmatched child and no value child is the identifier", id: `ISO_639-1<x-foo/>`, paths: []string{fooPath}},
+		{
+			name: "text beside a foreign child and no value child is the identifier",
+			id:   `ISO_639-1<x:x-foo xmlns:x="urn:example:x"/>`, paths: []string{fooPath}, foreign: true,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			in := archetype(tc.id)
@@ -1331,7 +1337,7 @@ func TestREQ170_XMLTerminologyIDTextBesideValue(t *testing.T) {
 				}
 				return
 			}
-			assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, tc.paths[0], false)
+			assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, tc.paths[0], tc.foreign)
 		})
 	}
 }
