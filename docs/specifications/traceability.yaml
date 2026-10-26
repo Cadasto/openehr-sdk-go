@@ -473,6 +473,7 @@ requirements:
       - openehr/serialize/canjson/valuefree_test.go
       - openehr/serialize/canxml/interval_open_side_test.go
       - openehr/serialize/canxml/primitive_error_test.go
+      - openehr/serialize/canxml/typed_nil_bound_test.go
       - openehr/serialize/canxml/unmatched_test.go
       - openehr/serialize/canxml/valuefree_test.go
       - openehr/serialize/internal/poly/poly_test.go
