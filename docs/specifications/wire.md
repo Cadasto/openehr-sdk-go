@@ -535,7 +535,7 @@ The statuses map to sentinels by [REQ-093](transport.md#req-093--openehr-error-e
 
 - The latest `version_uid` a `412` carries in its `ETag`, and the one a `409` from the Composition or demographic delete carries there (`409_COMPOSITION_with_uid_based_id`, `409_PERSON_with_uid_based_id` in the vendored pin), **MUST** stay reachable beside the error through the returned `VersionMetadata`.
 - The Composition delete and the demographic delete take no `If-Match`: the `version_uid` in the path is the preceding version, so the SDK **MUST NOT** require or send one for either.
-- A PUT and the Directory delete take an `If-Match`, sent quoted as `If-Match: "<preceding_version_uid>"`. The SDK **MUST** refuse an empty one with `transport.ErrInvalidConfig` before it issues any request.
+- A PUT against a versioned resource **MUST** send its `If-Match` quoted, as `If-Match: "<preceding_version_uid>"`, the canonical form per the openEHR REST envelope. The Directory delete also takes an `If-Match`, sent the same way. The SDK **MUST** refuse an empty `If-Match` on either with `transport.ErrInvalidConfig` before it issues any request.
 
 ETag handling on reads is symmetric: the SDK **MUST** capture `ETag` from a response and expose it on the typed return value. The value the caller sends on the next PUT is the `VersionUID` from the version-identifier rule below, which is that `ETag` only when the rule selects it.
 
