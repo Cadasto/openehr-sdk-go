@@ -565,6 +565,8 @@ requirements:
       - testkit/conformance/webtemplate/runner_test.go
       - testkit/fixtures/crossformat_test.go
       - testkit/probes/serialize/probe_076_simplified_round_trip.go
+      - testkit/probes/serialize/probe_076_skeleton_internal_test.go
+      - testkit/probes/serialize/probe_076_skeleton_test.go
       - testkit/probes/serialize/probe_086_upstream_flat_parity.go
       - testkit/probes/serialize/probe_089_underscore_round_trip.go
       - testkit/probes/serialize/probe_105_cross_format_parity.go
