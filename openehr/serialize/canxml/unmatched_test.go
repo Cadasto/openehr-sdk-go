@@ -46,17 +46,21 @@ const xmlExt = "{{ext}}"
 // ucNS declares the openEHR default namespace and the XSI prefix.
 const ucNS = `xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"`
 
-// xmlItem is one extension item: an element, or an attribute when attr is
-// set, named name and sitting at path.
+// xmlItem is one extension item: an element, an attribute when attr is set,
+// or a run of text when text is set, named name and sitting at path.
 type xmlItem struct {
 	name string
 	attr bool
+	text bool
 	path string
 }
 
-// el and at build the extension items of a case.
+// el, at and tx build the extension items of a case. A text item sits in an
+// element whose content is elements, and its path is that element's path
+// with a last `/text()` segment.
 func el(name, path string) xmlItem { return xmlItem{name: name, path: path} }
 func at(name, path string) xmlItem { return xmlItem{name: name, attr: true, path: path} }
+func tx(path string) xmlItem       { return xmlItem{name: "text()", text: true, path: path} }
 
 // xmlCase is one input carrying extension items. tmpl holds one xmlExt per
 // item, in the same order, and the placeholders appear in document order, so
@@ -75,7 +79,7 @@ type xmlCase struct {
 // false, removes them: the stripped input is what the extended one must
 // decode to. An attribute carries xmlPlanted as its value; an element carries
 // it as text and inside a child element, so an unmatched element is one item
-// whatever it holds.
+// whatever it holds; a text item is xmlPlanted itself.
 func (c xmlCase) render(t *testing.T, withExt bool) []byte {
 	t.Helper()
 	parts := strings.Split(c.tmpl, xmlExt)
@@ -88,10 +92,12 @@ func (c xmlCase) render(t *testing.T, withExt bool) []byte {
 		if i == len(c.items) || !withExt {
 			continue
 		}
-		it := c.items[i]
-		if it.attr {
+		switch it := c.items[i]; {
+		case it.attr:
 			b.WriteString(" " + it.name + "=" + strconv.Quote(xmlPlanted))
-		} else {
+		case it.text:
+			b.WriteString(xmlPlanted)
+		default:
 			b.WriteString("<" + it.name + ">" + xmlPlanted + "<x-inner>" + xmlPlanted + "</x-inner></" + it.name + ">")
 		}
 	}
@@ -120,7 +126,8 @@ const (
 // to its declared parent, on and inside primitive elements, in an interval,
 // its boundary flag and its bound (a by-value bound and one that is itself a
 // polymorphic slot), and in an AOM 1.4 value, its constraint intervals and
-// their primitive bound. One case repeats element names to pin `name[n]`.
+// their primitive bound. One case repeats element names to pin `name[n]`. Two
+// more put text in elements whose content is elements, RM and AOM 1.4.
 func xmlCases() []xmlCase {
 	p := "/composition[1]"
 	entry := p + "/content[1]"
@@ -215,6 +222,51 @@ func xmlCases() []xmlCase {
 			},
 			into:        func() any { return new(rm.ItemTree) },
 			sharedNames: true,
+		},
+		{
+			// Text other than whitespace directly inside an element whose
+			// content is elements: the root, a narrow slot that falls back to
+			// its declared parent, a by-value and a pointer member, a
+			// polymorphic slot, an interval and its bound.
+			name: "text in element content",
+			tmpl: `<ehr_status ` + ucNS + ` archetype_node_id="openEHR-EHR-EHR_STATUS.generic.v1">` + xmlExt +
+				`<name>` + xmlExt + xText + `</name>` +
+				`<archetype_details>` + xmlExt + `<archetype_id><value>openEHR-EHR-EHR_STATUS.generic.v1</value></archetype_id>` +
+				`<rm_version>1.1.0</rm_version></archetype_details>` +
+				`<subject>` + xmlExt + `</subject><is_queryable>true</is_queryable><is_modifiable>true</is_modifiable>` +
+				`<other_details xsi:type="ITEM_TREE" archetype_node_id="at0001"><name>` + xText + `</name>` +
+				`<items xsi:type="ELEMENT" archetype_node_id="at0002"><name>` + xText + `</name>` + xmlExt +
+				`<value xsi:type="DV_COUNT"><magnitude>3</magnitude><normal_range>` + xmlExt +
+				`<lower xsi:type="DV_COUNT">` + xmlExt + `<magnitude>1</magnitude></lower>` +
+				`<upper xsi:type="DV_COUNT"><magnitude>5</magnitude></upper>` +
+				`</normal_range></value></items></other_details></ehr_status>`,
+			items: []xmlItem{
+				tx("/ehr_status[1]/text()"),
+				tx("/ehr_status[1]/name[1]/text()"),
+				tx("/ehr_status[1]/archetype_details[1]/text()"),
+				tx("/ehr_status[1]/subject[1]/text()"),
+				tx("/ehr_status[1]/other_details[1]/items[1]/text()"),
+				tx("/ehr_status[1]/other_details[1]/items[1]/value[1]/normal_range[1]/text()"),
+				tx("/ehr_status[1]/other_details[1]/items[1]/value[1]/normal_range[1]/lower[1]/text()"),
+			},
+			into: func() any { return new(rm.EHRStatus) },
+		},
+		{
+			// AOM 1.4: the hand-written TERMINOLOGY_CODE decoder, a
+			// C_COMPLEX_OBJECT and its `occurrences`, the abstract BASE
+			// Interval.
+			name: "text in AOM 1.4 element content",
+			tmpl: `<archetype ` + ucNS + `><concept>at0000</concept><original_language>` + xmlExt +
+				`<terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></original_language>` +
+				`<definition>` + xmlExt + `<rm_type_name>OBSERVATION</rm_type_name><occurrences>` + xmlExt +
+				`<lower>1</lower><upper>1</upper><lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded>` +
+				`</occurrences><node_id>at0000</node_id></definition></archetype>`,
+			items: []xmlItem{
+				tx("/archetype[1]/original_language[1]/text()"),
+				tx("/archetype[1]/definition[1]/text()"),
+				tx("/archetype[1]/definition[1]/occurrences[1]/text()"),
+			},
+			into: func() any { return new(aom14.Archetype) },
 		},
 	}
 }
@@ -357,6 +409,120 @@ func TestREQ170_XMLStrictRefusesEachItemKind(t *testing.T) {
 				assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, it.path, false)
 			})
 		}
+	}
+}
+
+// TestREQ170_XMLTextInElementContent pins text other than whitespace in an
+// element whose content is elements as unmatched content. The
+// reproduction: in a minimal EHR_STATUS that canxml.Marshal writes, text
+// after `<archetype_details>` or inside `<subject></subject>` is refused
+// under strict, named by the element's path with a last `text()` segment and
+// never by the text. An element is one item however many runs of text it
+// holds, a CDATA section among them. XML whitespace (space, tab, CR, LF),
+// written plainly or in a CDATA section, never counts, so an indented
+// document decodes under strict; other white space, such as a no-break
+// space, is text.
+func TestREQ170_XMLTextInElementContent(t *testing.T) {
+	st := &rm.EHRStatus{
+		ArchetypeNodeID:  "openEHR-EHR-EHR_STATUS.generic.v1",
+		Name:             &rm.DVText{Value: "EHR Status"},
+		ArchetypeDetails: &rm.Archetyped{ArchetypeID: rm.ArchetypeID{Value: "openEHR-EHR-EHR_STATUS.generic.v1"}, RMVersion: "1.1.0"},
+		IsModifiable:     true,
+		IsQueryable:      true,
+	}
+	doc, err := canxml.Marshal(st)
+	if err != nil {
+		t.Fatalf("canxml.Marshal(EHR_STATUS) = %v", err)
+	}
+	want := new(rm.EHRStatus)
+	if err := canxml.Unmarshal(doc, want, canxml.WithStrict()); err != nil {
+		t.Fatalf("canxml.Unmarshal(own output, WithStrict) = %v; want nil", err)
+	}
+	// insert returns doc with each text put right after its tag.
+	insert := func(t *testing.T, tagText ...string) []byte {
+		t.Helper()
+		out := string(doc)
+		for i := 0; i < len(tagText); i += 2 {
+			tag, text := tagText[i], tagText[i+1]
+			if !strings.Contains(out, tag) {
+				t.Fatalf("canxml.Marshal wrote\n%s\nwith no %s to put text after", doc, tag)
+			}
+			out = strings.Replace(out, tag, tag+text, 1)
+		}
+		return []byte(out)
+	}
+
+	t.Run("issue reproduction", func(t *testing.T) {
+		for _, tc := range []struct{ tag, path string }{
+			{"<archetype_details>", "/ehr_status[1]/archetype_details[1]/text()"},
+			{"<subject>", "/ehr_status[1]/subject[1]/text()"},
+		} {
+			err := canxml.Unmarshal(insert(t, tc.tag, xmlPlanted), new(rm.EHRStatus), canxml.WithStrict())
+			assertXMLStrictRefusal(t, "canxml.Unmarshal(text after "+tc.tag+", WithStrict)", err, tc.path, false)
+		}
+	})
+
+	t.Run("one item per element", func(t *testing.T) {
+		in := insert(t,
+			"<archetype_details>", xmlPlanted,
+			"</archetype_id>", "<![CDATA["+xmlPlanted+"]]>",
+			"</rm_version>", xmlPlanted,
+			"<subject>", "<![CDATA["+xmlPlanted+"]]>")
+		wantPaths := []string{"/ehr_status[1]/archetype_details[1]/text()", "/ehr_status[1]/subject[1]/text()"}
+		got := new(rm.EHRStatus)
+		if err := canxml.Unmarshal(in, got); err != nil {
+			t.Fatalf("canxml.Unmarshal = %v; want nil: unmatched content is ignored by default", err)
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("canxml.Unmarshal decoded\n%#v\nwant the value of the input without its text\n%#v", got, want)
+		}
+		got2, paths, err := unmarshalCollecting(func() any { return new(rm.EHRStatus) }, in)
+		if err != nil {
+			t.Fatalf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
+		}
+		if !slices.Equal(paths, wantPaths) {
+			t.Errorf("WithUnmatched reported %q; want %q: one item per element, however many runs of text", paths, wantPaths)
+		}
+		if !reflect.DeepEqual(got2, want) {
+			t.Errorf("canxml.Unmarshal(WithUnmatched) decoded\n%#v\nwant\n%#v", got2, want)
+		}
+		err = canxml.Unmarshal(in, new(rm.EHRStatus), canxml.WithStrict())
+		assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, wantPaths[0], false)
+	})
+
+	t.Run("a CDATA section on its own", func(t *testing.T) {
+		in := insert(t, "<subject>", "<![CDATA["+xmlPlanted+"]]>")
+		err := canxml.Unmarshal(in, new(rm.EHRStatus), canxml.WithStrict())
+		assertXMLStrictRefusal(t, "canxml.Unmarshal(CDATA in <subject>, WithStrict)", err, "/ehr_status[1]/subject[1]/text()", false)
+	})
+
+	t.Run("a no-break space is text", func(t *testing.T) {
+		in := insert(t, "<subject>", "\u00a0")
+		err := canxml.Unmarshal(in, new(rm.EHRStatus), canxml.WithStrict())
+		assertXMLStrictRefusal(t, "canxml.Unmarshal(U+00A0 in <subject>, WithStrict)", err, "/ehr_status[1]/subject[1]/text()", false)
+	})
+
+	indented, err := canxml.MarshalIndent(st, "", "\t")
+	if err != nil {
+		t.Fatalf("canxml.MarshalIndent(EHR_STATUS) = %v", err)
+	}
+	for name, in := range map[string][]byte{
+		"whitespace":           insert(t, "<archetype_details>", " \t\r\n", "<subject>", "\n\t \r\n"),
+		"whitespace in CDATA":  insert(t, "<archetype_details>", "<![CDATA[ \t\r\n]]>", "<subject>", "\n<![CDATA[\t]]>\n"),
+		"an indented document": indented,
+	} {
+		t.Run(name+" never counts", func(t *testing.T) {
+			got, paths, err := unmarshalCollecting(func() any { return new(rm.EHRStatus) }, in, canxml.WithStrict())
+			if err != nil {
+				t.Fatalf("canxml.Unmarshal(%q, WithStrict) = %v; want nil: XML whitespace is not unmatched", in, err)
+			}
+			if len(paths) != 0 {
+				t.Errorf("WithUnmatched reported %q; want nothing", paths)
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("canxml.Unmarshal decoded\n%#v\nwant\n%#v", got, want)
+			}
+		})
 	}
 }
 
@@ -1431,9 +1597,9 @@ func TestREQ170_XMLStrictNeverRefusesAbsentContent(t *testing.T) {
 
 // TestREQ170_XMLRegisteredTypeCensus decodes, for every registered library
 // type (RM and AOM 1.4) with an UnmarshalXML method, an element carrying its
-// `xsi:type`, one extension attribute and one extension element, and
-// requires the report to name exactly those two. It is the control that no
-// generated decoder skips unmatched content unreported.
+// `xsi:type`, one extension attribute, one extension element and text around
+// it, and requires the report to name exactly those three. It is the control
+// that no generated decoder skips unmatched content unreported.
 func TestREQ170_XMLRegisteredTypeCensus(t *testing.T) {
 	const libraryPrefix = "github.com/cadasto/openehr-sdk-go/openehr/"
 	checked := 0
@@ -1451,14 +1617,15 @@ func TestREQ170_XMLRegisteredTypeCensus(t *testing.T) {
 			continue // a test fixture registered elsewhere; not a shipped type
 		}
 		checked++
-		in := `<x ` + ucNS + ` xsi:type="` + name + `" x-attr="` + xmlPlanted + `"><x-census>` + xmlPlanted + `</x-census></x>`
+		in := `<x ` + ucNS + ` xsi:type="` + name + `" x-attr="` + xmlPlanted + `">` + xmlPlanted +
+			`<x-census>` + xmlPlanted + `</x-census>` + xmlPlanted + `</x>`
 		var got []string
 		err := canxml.Unmarshal([]byte(in), v, canxml.WithUnmatched(func(p string) { got = append(got, p) }))
 		if err != nil {
 			t.Errorf("%s: canxml.Unmarshal(%s, WithUnmatched) = %v; want nil", name, in, err)
 			continue
 		}
-		if want := []string{"/x[1]/@x-attr", "/x[1]/x-census[1]"}; !slices.Equal(got, want) {
+		if want := []string{"/x[1]/@x-attr", "/x[1]/text()", "/x[1]/x-census[1]"}; !slices.Equal(got, want) {
 			t.Errorf("%s: WithUnmatched reported %q; want %q", name, got, want)
 		}
 	}
