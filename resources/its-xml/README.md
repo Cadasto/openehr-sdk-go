@@ -61,7 +61,9 @@ make its-xml-drift                             # verify local copies + report if
 ```
 
 A version bump is an explicit, reviewable commit: diff the schemas and `MANIFEST.txt`. Never edit
-a vendored schema by hand; re-sync instead.
+a vendored schema by hand; re-sync instead. After a re-pin, re-run `make codegen`, so the generated
+XML encoders follow the new sequences, and commit what it changes with the bump: `make codegen-check`
+fails until the generated files match the schemas.
 
 ## Licence
 

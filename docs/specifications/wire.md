@@ -204,7 +204,7 @@ Canonical XML applies to the same RM surface as canonical JSON: Composition, EHR
 
 Canonical ordering for XML is its own deterministic profile, set out in the bullets below. Unlike canonical JSON, whose member order is not a contract ([§ REQ-052](#req-052)), element order is part of an XML document's identity, so the encoder **MUST** emit in the fixed order below:
 
-- Child elements follow **BMM property declaration order** (same order code generation emits struct fields).
+- Child elements **MUST** follow the `xs:sequence` that the openEHR ITS-XML schemas give the class's type, the elements of the type it extends first: RM and BASE Release-1.1.0 for an RM class, AM Release-1.4 for an AOM 1.4 class. A reader that validates against those schemas then accepts the order of the elements they declare. A class the schemas do not name takes the type of its nearest ancestor. A property the schemas do not declare comes after the declared ones; `EHR.tags`, which a later RM release added, is one. [ADR 0002 D10](../adr/0002-bmm-codegen-decisions.md#d10--the-generated-xml-encoders-take-their-child-order-from-the-its-xml-schemas) sets out the lookup, and where a property goes when only one of the two schema sets declares it. Decode accepts child elements in any order.
 - `xsi:type` is the **first attribute** on every encoded concrete RM value where a polymorphic site is being resolved; the encoder emits it on every concrete value boundary (deterministic profile), the decoder requires it at polymorphic sites. `canxml.WithRelaxedTypeDispatch` is accepted for parity with canonical JSON's option but does not relax this yet: a polymorphic site with no discriminator fails with `typereg.ErrMissingType` whatever the option.
 - An interval element that omits a boundary flag decodes by [§ REQ-169](#req-169--interval-boundary-flag-defaults). The ITS-XML schema (`BaseTypes.xsd`, type `Interval`) makes `lower_included` and `upper_included` optional (`minOccurs="0"`) and the two `*_unbounded` flags mandatory, so a schema-valid document may leave the included flags out.
 - An element or attribute that matches no RM attribute is unmatched content, and so is an element in a foreign namespace ([§ REQ-170](#req-170--unmatched-content-on-decode)).
@@ -221,6 +221,10 @@ Canonical ordering for XML is its own deterministic profile, set out in the bull
 XML is a second-class format on the wire today (REST 1.1.0 is JSON-first), but several integration scenarios pin to XML for legacy reasons. The SDK supports it without forcing it.
 
 Golden canonical-XML inputs for codec and PROBE-033 live under `testkit/corpus/compositions/` and `testkit/corpus/rm/` (same layout as REQ-052; see [Vendored fixtures](conformance.md#vendored-fixtures-testkitcorpus)).
+
+**Acceptance:**
+
+- `canxml.Marshal` of an `ORIGINAL_VERSION` with every element set writes its children in the order `contribution`, `commit_audit`, `signature`, `uid`, `data`, `preceding_version_uid`, `other_input_version_uids`, `attestations`, `lifecycle_state`; an `OBSERVATION` writes the `LOCATABLE` elements first and `protocol` after `subject`; and every generated encoder writes the elements its class's ITS-XML schema type declares in that type's sequence.
 
 ## Interval boundary flags
 

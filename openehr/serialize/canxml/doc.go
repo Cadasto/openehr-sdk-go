@@ -44,8 +44,13 @@
 //   - Element local names are snake_case BMM property/class names
 //     (identical to canjson JSON keys; e.g. `dv_quantity`,
 //     `magnitude_status`).
-//   - Child elements follow BMM property declaration order, the
-//     same order the generator emits struct fields.
+//   - Child elements follow the `xs:sequence` of the class's type in
+//     the openEHR ITS-XML schemas (RM and BASE Release-1.1.0, AM
+//     Release-1.4), or of its nearest ancestor's type when the schemas
+//     have none, with the elements of the type it extends first. A
+//     property the schemas do not declare, one a later release added
+//     such as `EHR.tags`, comes after the declared ones. The decoder
+//     accepts children in any order.
 //   - Nil-pointer optional fields and empty containers with
 //     `cardinality.lower == 0` are emitted as absent (no element).
 //     Both absent and an empty self-closing element are accepted on
