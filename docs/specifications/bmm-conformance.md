@@ -212,7 +212,7 @@ A name reporting an absence reason **MUST** report not-known on every `Lookup` a
 
 ## Mapping rules
 
-**Implements:** REQ-041 (the retired REQ-043 points here)
+**Implements:** REQ-041
 
 How each P_BMM construct becomes Go code.
 

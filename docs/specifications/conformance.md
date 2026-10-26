@@ -20,8 +20,6 @@ Each probe has a stable `PROBE-NNN` ID, one catalogue entry here, and a pass/fai
 
 ## Conformance scope
 
-**Implements:** REQ-080
-
 ### REQ-080 — openEHR wire conformance
 
 **Retired.** Its test-writing rules moved to [development-process.md § Writing a probe](../development-process.md#writing-a-probe), and the round-trip comparison it restated is [wire.md § REQ-052](wire.md#req-052)'s. The identifier is never reused.

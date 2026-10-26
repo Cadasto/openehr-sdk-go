@@ -1,10 +1,10 @@
 package constraints_test
 
-// pure_imports_test.go: REQ-103. clinical-modeling.md § Validate contract
-// (under § REQ-103) rules that validators MUST be pure functions with no
-// I/O, and § Building-block independence that the package MUST import only
-// the standard library and internal/iso8601, which MUST itself import only
-// the standard library. Nothing at a call site shows that a validator stays
+// pure_imports_test.go: REQ-103 and REQ-013. clinical-modeling.md § Validate
+// contract (under § REQ-103) rules that validators MUST be pure functions with
+// no I/O, and module-layout.md § REQ-013's table that the package imports only
+// the standard library and internal/iso8601, which itself imports only the
+// standard library. Nothing at a call site shows that a validator stays
 // in memory, so this reads the package's non-test Go files, and those of each
 // package of this module it may import, and holds every import to a list of
 // packages that do no I/O. "os", "io", "net", "reflect" and the rest
