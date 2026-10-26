@@ -35,27 +35,29 @@
 //     goes unread: [CheckUnmatchedAttrs] on entry, [LocalName] for the name
 //     they switch on, [SkipUnmatched] in the arm for an element they do not
 //     read, [CheckUnmatchedText] for text between the elements they read,
-//     [DecodeElement] for an element decoded as text, [DecodeBase64] for an
-//     Octet list, and [DecodeParam] for a member typed by an open generic
-//     parameter. The hand-written TERMINOLOGY_CODE decoder calls the same
-//     helpers, and [CheckUnmatchedTextBefore] for text it keeps until a child
-//     shows that the text is not its value. canxml calls [DiscriminatorRead]
-//     where its dispatch reads a bare `type`. Each helper looks the decoder
-//     up; an untracked decode finds nothing and behaves as encoding/xml
-//     does, but for one thing.
+//     [DecodeElement] for an element decoded as text, [DecodeText] for one
+//     whose text they convert themselves, such as an interval boundary flag,
+//     [DecodeBase64] for an Octet list, and [DecodeParam] for a member typed
+//     by an open generic parameter. The hand-written TERMINOLOGY_CODE
+//     decoder calls the same helpers, and [CheckUnmatchedTextBefore] for
+//     text it keeps until a child shows that the text is not its value.
+//     canxml calls [DiscriminatorRead] where its dispatch reads a bare
+//     `type`. Each helper looks the decoder up; an untracked decode finds
+//     nothing and behaves as encoding/xml does, but for one thing.
 //
 // # Primitive failures
 //
 // The text of a primitive element that does not decode as its type is a
-// primitive failure, in every decode: [DecodeElement], [DecodeParam] and
-// [DecodeBase64] return a *typereg.DecodeError whose cause wraps
-// [ErrInvalidShape] and the conversion's own error, never the bare error
-// encoding/xml or a TextUnmarshaler gives, whose text may quote the value. A
-// tracked decode names the element by its path from the root of the value
-// and [Tracker.Decode] returns the failure on its own; an untracked decode
-// names the element alone, and the failure travels out inside the dispatch
-// envelopes it passes through. [IsPrimitiveFailure] tells such a failure
-// apart, so canxml can decode the input again, tracked, to find the path.
+// primitive failure, in every decode: [DecodeElement], [DecodeParam],
+// [DecodeText] and [DecodeBase64] return a *typereg.DecodeError whose cause
+// wraps [ErrInvalidShape] and the conversion's own error, never the bare
+// error encoding/xml or a TextUnmarshaler gives, whose text may quote the
+// value. A tracked decode names the element by its path from the root of
+// the value and [Tracker.Decode] returns the failure on its own; an
+// untracked decode names the element alone, and the failure travels out
+// inside the dispatch envelopes it passes through. [IsPrimitiveFailure] tells
+// such a failure apart, so canxml can decode the input again, tracked, to
+// find the path.
 package xmlunmatched
 
 import (
@@ -865,16 +867,17 @@ func decodeInterface(dec *xml.Decoder, start *xml.StartElement, v, held any) err
 	return nil
 }
 
-// DecodeBase64 decodes the element start opens, an `xs:base64Binary` value
-// such as DV_MULTIMEDIA's `data` and `integrity_check`, into v. The element's
-// text is read as [DecodeElement] reads a primitive's, so a tracked decode
-// reports an attribute or child element on it. XML whitespace inside the
-// text is ignored, as the XML Schema type allows. An empty element leaves v
-// nil, as an empty byte field reads in canonical JSON. A text that is no
-// standard, padded base64 fails as a primitive's text fails in
-// [DecodeElement]: the cause names the offset of the first bad byte, never
-// the text.
-func DecodeBase64(dec *xml.Decoder, start *xml.StartElement, v *[]byte) error {
+// DecodeText reads the text of the element start opens, as [DecodeElement]
+// reads a string, and hands it to convert, which reads the text as the
+// element's value. start must be the token the decoder read last.
+//
+// A tracked decode reports an attribute or child element on the element, as
+// for any primitive. convert's refusal is a primitive failure, as in
+// [DecodeElement]: a *typereg.DecodeError whose cause wraps [ErrInvalidShape]
+// and convert's own error, and whose text carries none of the element's, so
+// convert's error may quote the text. A tracked decode names the element by
+// its path from the root of the value; an untracked one by its name alone.
+func DecodeText(dec *xml.Decoder, start *xml.StartElement, convert func(text string) error) error {
 	t := trackerOf(dec)
 	var at place
 	if t != nil {
@@ -884,18 +887,35 @@ func DecodeBase64(dec *xml.Decoder, start *xml.StartElement, v *[]byte) error {
 	if err := DecodeElement(dec, start, &text); err != nil {
 		return err
 	}
-	b, err := base64.StdEncoding.DecodeString(strings.Map(dropXMLSpace, text))
-	if err != nil {
+	if err := convert(text); err != nil {
 		if t != nil {
 			return t.fail(t.closedPath(at), err)
 		}
 		return primitiveFailure("/"+start.Name.Local, err)
 	}
-	if len(b) == 0 {
-		b = nil
-	}
-	*v = b
 	return nil
+}
+
+// DecodeBase64 decodes the element start opens, an `xs:base64Binary` value
+// such as DV_MULTIMEDIA's `data` and `integrity_check`, into v. The element's
+// text is read as [DecodeText] reads it, so a tracked decode reports an
+// attribute or child element on it. XML whitespace inside the text is
+// ignored, as the XML Schema type allows. An empty element leaves v nil, as
+// an empty byte field reads in canonical JSON. A text that is no standard,
+// padded base64 fails as a primitive's text fails in [DecodeElement]: the
+// cause names the offset of the first bad byte, never the text.
+func DecodeBase64(dec *xml.Decoder, start *xml.StartElement, v *[]byte) error {
+	return DecodeText(dec, start, func(text string) error {
+		b, err := base64.StdEncoding.DecodeString(strings.Map(dropXMLSpace, text))
+		if err != nil {
+			return err
+		}
+		if len(b) == 0 {
+			b = nil
+		}
+		*v = b
+		return nil
+	})
 }
 
 // dropXMLSpace maps the four XML whitespace characters to -1, which drops
