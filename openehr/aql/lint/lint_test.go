@@ -104,7 +104,7 @@ func TestLintUnknownAlias(t *testing.T) {
 	}
 }
 
-// TestLintOrderBySelectAlias pins the REQ-117 lint acceptance: an ORDER BY key
+// TestLintOrderBySelectAlias pins the REQ-109 lint acceptance: an ORDER BY key
 // that names no FROM/CONTAINS alias is resolved against the SELECT `AS`
 // aliases before aql_unknown_alias is raised. FROM is consulted first, and an
 // AS alias labels a projected column — never a path root — so a key carrying a
@@ -158,7 +158,7 @@ func TestLintOrderBySelectAlias(t *testing.T) {
 }
 
 // TestLintSelectAliasDoesNotBindClass pins the namespace separation behind
-// "FROM wins" (REQ-117): a SELECT `AS` alias resolves an ORDER BY key but
+// "FROM wins" (REQ-109): a SELECT `AS` alias resolves an ORDER BY key but
 // never enters the class-binding map, so Layer 3 cannot anchor a path to it.
 func TestLintSelectAliasDoesNotBindClass(t *testing.T) {
 	md := lint.Extract(mustParse(
@@ -174,7 +174,7 @@ func TestLintSelectAliasDoesNotBindClass(t *testing.T) {
 	}
 }
 
-// TestLintBooleanComparisonOperand pins the second REQ-117 lint acceptance: a
+// TestLintBooleanComparisonOperand pins the second REQ-109 lint acceptance: a
 // boolean literal as a comparison operand is a literal, not a path. The SDK
 // lexer lexes `true` / `false` as IDENTIFIER (the IDENTIFIER rule precedes
 // BOOLEAN), so the operand used to reach the alias check as a pseudo-path and
@@ -206,7 +206,7 @@ func TestLintBooleanComparisonOperand(t *testing.T) {
 	}
 }
 
-// TestLintSelectBooleanKeywordLiteral extends the REQ-117 boolean-literal
+// TestLintSelectBooleanKeywordLiteral extends the REQ-109 boolean-literal
 // acceptance to the SELECT column position: `SELECT true` is a projected
 // literal, not a path rooted at a pseudo-alias, so it draws no
 // aql_unknown_alias. A keyword carrying a path tail is a real path and keeps
@@ -514,8 +514,8 @@ func TestLintNilDocument(t *testing.T) {
 // modifier: openEHR QUERY Release-1.1.0 §4.4.3 deprecates it in favour of
 // `LIMIT` with `ORDER BY` and announces its removal, so a query carrying one
 // gets a Warning — advisory, not a rejection, because the construct is still
-// legal AQL and the SDK parses and emits it faithfully (REQ-118).
-// REQ-118 · REQ-109
+// legal AQL and the SDK parses and emits it faithfully (REQ-113).
+// REQ-109
 func TestLintDeprecatedTop(t *testing.T) {
 	for _, in := range []string{
 		"SELECT TOP 5 e/ehr_id/value FROM EHR e",
@@ -545,8 +545,8 @@ func TestLintDeprecatedTop(t *testing.T) {
 // outright — "It is not allowed to use TOP while also using LIMIT clause in the
 // same query" (QUERY Release-1.1.0 §4.4.3). The parser and the emitter carry
 // both faithfully; the lint gate is where the prohibition is reported, and it
-// makes the result not-OK (REQ-118).
-// REQ-118 · REQ-109
+// makes the result not-OK (REQ-109).
+// REQ-109
 func TestLintTopWithLimit(t *testing.T) {
 	const in = "SELECT TOP 5 e/ehr_id/value FROM EHR e LIMIT 10 OFFSET 2"
 	res := lint.LintString(in, nil)
@@ -566,7 +566,7 @@ func TestLintTopWithLimit(t *testing.T) {
 // TestLintNoTopClauseRaisesNeitherCode is the negative control: neither code
 // may fire on a query that carries no TOP, including one using the LIMIT
 // channel the spec recommends instead.
-// REQ-118 · REQ-109
+// REQ-109
 func TestLintNoTopClauseRaisesNeitherCode(t *testing.T) {
 	for _, in := range []string{
 		"SELECT e/ehr_id/value FROM EHR e",
@@ -582,12 +582,12 @@ func TestLintNoTopClauseRaisesNeitherCode(t *testing.T) {
 }
 
 // TestLintTopWithUnrepresentableCount pins the split between PRESENCE and
-// REPRESENTABILITY (REQ-118). A `TOP` count outside Go `int` leaves
+// REPRESENTABILITY (REQ-109). A `TOP` count outside Go `int` leaves
 // parse.Document.Top nil — nothing is truncated into a bound — but the query
 // still USED the deprecated construct, and still pairs it with a LIMIT the spec
 // forbids. Keying the checks on the decoded bound silenced both findings for
 // exactly this query; they key on Document.HasTop instead.
-// REQ-118 · REQ-109
+// REQ-109
 func TestLintTopWithUnrepresentableCount(t *testing.T) {
 	const oor = "SELECT TOP 99999999999999999999 e/ehr_id/value FROM EHR e LIMIT 10"
 	res := lint.LintString(oor, nil)
@@ -615,7 +615,7 @@ func TestLintTopWithUnrepresentableCount(t *testing.T) {
 }
 
 // TestLintTopWithUnrepresentableCountAndEnvelopeFetch is the envelope-channel
-// half of TestLintTopWithUnrepresentableCount, and it is what makes REQ-118's
+// half of TestLintTopWithUnrepresentableCount, and it is what makes REQ-109's
 // presence-keying MUST binding on ALL THREE TOP codes rather than on the two
 // in-text ones alone.
 //
@@ -628,7 +628,7 @@ func TestLintTopWithUnrepresentableCount(t *testing.T) {
 // silence it for exactly the query that must not lint clean: a deprecated
 // clause, an unusable count, AND a row limit the openEHR Query API's common
 // parameters say cannot be combined with AQL-top.
-// REQ-118 · REQ-109 · PROBE-028
+// REQ-109 · PROBE-028
 func TestLintTopWithUnrepresentableCountAndEnvelopeFetch(t *testing.T) {
 	const oor = "SELECT TOP 99999999999999999999 e/ehr_id/value FROM EHR e"
 	q := aql.NewQuery(oor)
@@ -678,8 +678,8 @@ func TestLintTopWithUnrepresentableCountAndEnvelopeFetch(t *testing.T) {
 // OTHER row-limit channel: the openEHR Query API's common parameters state
 // that `fetch` "cannot be combined with AQL-top". The builder already refuses
 // to construct the pairing; the linter closes the read side, which is where a
-// query the SDK did not author meets a modern caller's envelope (REQ-118).
-// REQ-118 · REQ-109
+// query the SDK did not author meets a modern caller's envelope (REQ-109).
+// REQ-109
 func TestLintTopWithEnvelopeFetch(t *testing.T) {
 	q := aql.NewQuery("SELECT TOP 5 e/ehr_id/value FROM EHR e")
 	q.Fetch = 20
@@ -711,7 +711,7 @@ func TestLintTopWithEnvelopeFetch(t *testing.T) {
 // envelope channel can be absent or not a row LIMIT. `offset` carries no
 // exclusion in the Query API's common parameters — only `fetch` does — so an
 // offset-only envelope must not fire the code.
-// REQ-118 · REQ-109
+// REQ-109
 func TestLintTopWithoutEnvelopeFetch(t *testing.T) {
 	const in = "SELECT TOP 5 e/ehr_id/value FROM EHR e"
 	zeroFetch := aql.NewQuery(in)
@@ -741,7 +741,7 @@ func TestLintTopWithoutEnvelopeFetch(t *testing.T) {
 
 // TestLintEnvelopeFetchWithoutTop is the other half of the pair: the envelope's
 // row limit is the recommended channel, so it must raise nothing on its own.
-// REQ-118 · REQ-109
+// REQ-109
 func TestLintEnvelopeFetchWithoutTop(t *testing.T) {
 	q := aql.NewQuery("SELECT e/ehr_id/value FROM EHR e")
 	q.Fetch = 20
@@ -752,13 +752,13 @@ func TestLintEnvelopeFetchWithoutTop(t *testing.T) {
 }
 
 // TestLintTopWithLimitUnchangedByEnvelope is the additivity guard (REQ-161
-// § Additivity applied to a REQ-118 code): adding aql_top_with_fetch must not
+// § Additivity applied to a REQ-109 TOP code): adding aql_top_with_fetch must not
 // move aql_deprecated_top / aql_top_with_limit. The in-text pairing keeps its
 // exact multiset with no envelope and with an offset-only one, and when the
 // new code DOES fire it is appended after them — Result.Issues is documented
 // to be in a deterministic order, so where a code lands is part of the
 // contract.
-// REQ-118 · REQ-109
+// REQ-109
 func TestLintTopWithLimitUnchangedByEnvelope(t *testing.T) {
 	const in = "SELECT TOP 5 e/ehr_id/value FROM EHR e LIMIT 10 OFFSET 2"
 	base := lint.LintString(in, nil)

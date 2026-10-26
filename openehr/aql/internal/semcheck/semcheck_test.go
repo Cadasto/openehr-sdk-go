@@ -253,7 +253,7 @@ func TestOperandDecision(t *testing.T) {
 
 // TestRoleAssignment pins the role-assignment rule ([semcheck.Role.Next]) —
 // the contract that keeps the read-side and write-side adapters reporting the
-// same multiset (REQ-162 § Contract).
+// same multiset (REQ-161 § Builder adapter).
 //
 // The load-bearing row is StepJunction from RoleRoot: a junction is boolean
 // grouping, not a containment step, so its operands occupy the SAME position
@@ -447,7 +447,7 @@ func TestArchetypeDecision(t *testing.T) {
 // `strings.CutPrefix(c.archetypeID, "$")`). Without this gate inside
 // Archetype, a $param would fail rm.ParseArchetypeID and manufacture an
 // aql_unknown_rm_class the read side (which skips $param before ever calling
-// Archetype) never emits — exactly the REQ-162 § Contract multiset
+// Archetype) never emits — exactly the REQ-161 § Builder adapter multiset
 // divergence this row exists to catch.
 func TestArchetypeSkipsParamPredicates(t *testing.T) {
 	t.Parallel()

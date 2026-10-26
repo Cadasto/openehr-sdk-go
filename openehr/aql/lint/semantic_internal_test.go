@@ -186,7 +186,7 @@ func TestWalkJunctionNeverBecomesPredecessor(t *testing.T) {
 	}
 }
 
-// TestWalkTracksChainTailAcrossFlattenedSiblings pins REQ-162's read/write
+// TestWalkTracksChainTailAcrossFlattenedSiblings pins REQ-161's read/write
 // "no drift" structurally, for the one containment shape [lint.LintString]
 // can never itself reach: a class node whose Children hold TWO OR MORE
 // entries (the flattened spelling, [parse.Containment.Children]'s own doc)
@@ -252,7 +252,7 @@ func TestWalkTracksChainTailAcrossFlattenedSiblings(t *testing.T) {
 	slices.Sort(writeCodes)
 
 	if !slices.Equal(readCodes, writeCodes) {
-		t.Fatalf("read codes = %v, write codes = %v, want equal (REQ-162 read/write parity)", readCodes, writeCodes)
+		t.Fatalf("read codes = %v, write codes = %v, want equal (REQ-161 read/write parity)", readCodes, writeCodes)
 	}
 	// Non-vacuity, pinned to the exact expected shape rather than just
 	// cross-engine equality (which a shared latent bug could satisfy

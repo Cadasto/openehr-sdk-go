@@ -3,7 +3,7 @@ package aql_test
 // REQ-119 · PROBE-090
 //
 // value_test.go covers the value-position guards REQ-119 adds to the write side
-// of the REQ-117 catalogue: the URI operand (the one position with no quoting to
+// of the REQ-113 catalogue: the URI operand (the one position with no quoting to
 // hide behind), the reserved-word function names, the pointer shapes that
 // bypassed validation entirely, and the total value equality that replaced `==`
 // when the vocabulary gained slice fields.
@@ -18,7 +18,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
 )
 
-// TestMatchesURIRefusesUnspellableOperand — REQ-117. `MATCHES {uri}` emits its
+// TestMatchesURIRefusesUnspellableOperand — REQ-119. `MATCHES {uri}` emits its
 // operand verbatim because the grammar's URI token is unquoted, so a `}` ends
 // the operand early and the remainder becomes more query.
 //
@@ -291,7 +291,7 @@ func TestPointerShapedValuesAreValidated(t *testing.T) {
 	}
 }
 
-// TestEqualValues — REQ-117 made PathValue and FuncCall uncomparable by adding
+// TestEqualValues — REQ-113: PathValue and FuncCall are uncomparable because they carry
 // slice fields, so `==` panics on them and on any WhereExpr holding one.
 // EqualValues is the total replacement.
 func TestEqualValues(t *testing.T) {

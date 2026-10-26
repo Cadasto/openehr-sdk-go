@@ -231,7 +231,7 @@ func TestValidateAQLWithTypeRelation_DoesNotReachPortabilityCodes(t *testing.T) 
 	}
 }
 
-// The REQ-118 TOP codes are live at the validation seam, not only in the lint
+// The REQ-109 TOP codes are live at the validation seam, not only in the lint
 // building block: ValidateAQL passes the caller's aql.Query into
 // lint.LintString unconditionally, so the envelope's row limit is visible to
 // the pass on the path most consumers actually gate CI on. This is the
@@ -239,7 +239,7 @@ func TestValidateAQLWithTypeRelation_DoesNotReachPortabilityCodes(t *testing.T) 
 // openEHR Query API's common parameters exclude ("`fetch` cannot be combined
 // with AQL-top"), so it bridges as an Error-severity Issue and flips
 // Result.OK.
-// REQ-118 · REQ-109 · PROBE-028
+// REQ-109 · PROBE-028
 func TestValidateAQL_TopWithEnvelopeFetch(t *testing.T) {
 	q := aql.NewQuery("SELECT TOP 5 e/ehr_id/value FROM EHR e")
 	q.Fetch = 20
@@ -279,7 +279,7 @@ func TestValidateAQL_TopWithEnvelopeFetch(t *testing.T) {
 // parameters exclude `fetch` from combining with AQL-top and say nothing of
 // `offset`, which the SDK deliberately leaves undiagnosed on the read side.
 // Only the aql_deprecated_top Warning survives, so the Result stays OK.
-// REQ-118 · REQ-109 · PROBE-028
+// REQ-109 · PROBE-028
 func TestValidateAQL_TopWithoutEnvelopeFetch(t *testing.T) {
 	const in = "SELECT TOP 5 e/ehr_id/value FROM EHR e"
 

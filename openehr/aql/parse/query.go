@@ -393,7 +393,7 @@ func (q *Query) Emit() (string, error) {
 	if q.Select.Distinct {
 		sb.WriteString("DISTINCT ")
 	}
-	// REQ-118: the deprecated `TOP n [FORWARD|BACKWARD]` row limit sits
+	// REQ-113: the deprecated `TOP n [FORWARD|BACKWARD]` row limit sits
 	// between DISTINCT and the projection list (grammar: `SELECT DISTINCT?
 	// top? selectExpr …`). A negative count could only emit text the parser
 	// rejects — the `top` production admits no sign.
@@ -415,7 +415,7 @@ func (q *Query) Emit() (string, error) {
 	switch {
 	// Items lead: a mixed `SELECT *, col` carries the star as a
 	// [StarExpr] item, so the list is authoritative whenever it is
-	// populated (REQ-117). The bare `SELECT *` form has no items.
+	// populated (REQ-113). The bare `SELECT *` form has no items.
 	case len(q.Select.Items) == 0 && q.Select.Star:
 		sb.WriteByte('*')
 	case len(q.Select.Items) == 0:
@@ -445,7 +445,7 @@ func (q *Query) Emit() (string, error) {
 	}
 	// A junction root and a single root are mutually exclusive: the
 	// grammar has no `(A OR B) CONTAINS C` form, so emitting both would
-	// produce text the parser rejects (REQ-117).
+	// produce text the parser rejects (REQ-119).
 	//
 	// Keyed on ANY data in Root rather than on a class being present, because
 	// beside a junction [emitClassExpr] is never called for the root at all:
@@ -466,7 +466,7 @@ func (q *Query) Emit() (string, error) {
 	}
 	sb.WriteString(" FROM ")
 	if q.From.Junction != nil {
-		// REQ-117: a junction AT the root needs no grouping parentheses —
+		// REQ-113: a junction AT the root needs no grouping parentheses —
 		// nothing encloses it. Nested junctions keep the parentheses
 		// emitContainment writes for them.
 		sb.WriteString(emitContainmentOperands(*q.From.Junction))
@@ -776,10 +776,10 @@ func emitSelectExpr(e SelectExpr) (string, error) {
 		}
 		return v.Raw, nil
 	case StarExpr:
-		// REQ-117: an explicit star item inside a mixed projection list.
+		// REQ-113: an explicit star item inside a mixed projection list.
 		return "*", nil
 	case LiteralExpr:
-		// REQ-117: a primitive / parameter literal projection, rendered
+		// REQ-113: a primitive / parameter literal projection, rendered
 		// through the shared value emitter so escaping matches WHERE.
 		if v.Value == nil {
 			return "", fmt.Errorf("%w: SELECT literal with nil value", aql.ErrInvalidQuery)
@@ -924,7 +924,7 @@ func duplicateAlias(from FromClause) string {
 		}
 		return ""
 	}
-	// REQ-117: a FROM-root junction binds its aliases too.
+	// REQ-113: a FROM-root junction binds its aliases too.
 	if dup := walk(from.Junction); dup != "" {
 		return dup
 	}
@@ -935,7 +935,7 @@ func duplicateAlias(from FromClause) string {
 // that [emitContainment] would otherwise render as text the SDK's own parser
 // rejects, or nil when the tree is emittable.
 //
-// It is the read-side mirror of [aql.Containment.validateTree] (REQ-117,
+// It is the read-side mirror of [aql.Containment.validateTree] (REQ-163,
 // REQ-119) and refuses the same two things:
 //
 //   - An INCOMPLETE class node. A node that is neither a junction (operands, no
@@ -1259,7 +1259,7 @@ func checkClassOperands(c ClassExpr) error {
 }
 
 // isContainmentJunction reports whether a node is a pure boolean
-// grouping — operands only, no class of its own (REQ-117).
+// grouping — operands only, no class of its own (REQ-113).
 //
 // [ClassExpr.Version] counts as a class exactly as it does in checkComplete
 // above and in [emitClassExpr], which treats it as authoritative and ignores
@@ -1272,7 +1272,7 @@ func isContainmentJunction(c Containment) bool {
 }
 
 // emitContainmentOperands renders a junction node's operands joined by its
-// keyword, WITHOUT enclosing parentheses (REQ-117). The FROM root uses it
+// keyword, WITHOUT enclosing parentheses (REQ-113). The FROM root uses it
 // directly; [emitContainment] wraps the result for a nested junction.
 //
 // An operand is parenthesised only where the grouping is load-bearing:

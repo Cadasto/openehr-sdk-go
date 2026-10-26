@@ -27,7 +27,7 @@ import (
 
 // hugeInt is beyond Go's int on every platform the module supports, so the
 // value vocabulary cannot represent it. This is the ONE drop class a legal
-// query reaches (REQ-119 § Amends REQ-117).
+// query reaches (REQ-113 § Catalogue and residual).
 const hugeInt = "99999999999999999999999999"
 
 // dropCase is one legal query carrying a construct the AST cannot hold.
@@ -259,7 +259,7 @@ func TestUnmodelledConstructIsUnreachableByALegalQuery(t *testing.T) {
 		for _, d := range doc.Dropped() {
 			if d.Kind == parse.KindUnmodelledConstruct {
 				t.Errorf("%s: recorded KindUnmodelledConstruct %v; the catalogue "+
-					"covers the whole grammar profile (REQ-117), so a legal "+
+					"covers the whole grammar profile (REQ-113), so a legal "+
 					"query must not reach a defensive arm", tc.name, d)
 			}
 		}

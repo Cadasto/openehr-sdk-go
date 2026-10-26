@@ -332,7 +332,7 @@ type RealValue struct {
 // A fractional part is appended when 'f' produces none, so the text always
 // re-lexes as the grammar's `REAL : DIGIT* '.' DIGIT+` rather than as
 // `INTEGER : DIGIT+`. Without it a real is not a fixed point of the
-// parse/emit round trip (REQ-117): a whole-valued real silently returns as an
+// parse/emit round trip (REQ-113): a whole-valued real silently returns as an
 // [IntValue], and a real too large for int64 — 1e20 renders as
 // `100000000000000000000` — comes back as an out-of-range INTEGER, so the
 // emitted text is refused with [ErrIncompleteAST] on re-parse.

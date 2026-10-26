@@ -285,13 +285,13 @@ type ast struct {
 	offset    int
 	limit     int
 	// limitInline / offsetInline are the opt-in IN-TEXT paging operands
-	// (REQ-117), emitted after ORDER BY. Nil means the clause is absent —
+	// (REQ-163), emitted after ORDER BY. Nil means the clause is absent —
 	// distinct from the envelope's zero, so `LIMIT 0` stays expressible.
 	// Concrete shapes are [IntValue] and [ParamValue], the grammar's
 	// `limitValue : INTEGER | PARAMETER`.
 	limitInline  Value
 	offsetInline Value
-	// top is the opt-in DEPRECATED `SELECT TOP n` row limit (REQ-118). Nil
+	// top is the opt-in DEPRECATED `SELECT TOP n` row limit (REQ-163). Nil
 	// means the clause is absent — distinct from `TOP 0`, which is a real
 	// bound. It joins the in-text row-limit channel for the exclusivity
 	// rule in validatePaging.
@@ -351,7 +351,7 @@ func (a *ast) build() (Query, error) {
 				"emitting would silently re-direct it to ASC", ErrInvalidQuery, t.dir)
 		}
 	}
-	// REQ-117: a containment term is a whole expression (chain, negation,
+	// REQ-163: a containment term is a whole expression (chain, negation,
 	// junction), so alias uniqueness and the class-completeness rule are
 	// checked over the entire tree. Repeated Contains / NotContains calls emit
 	// as ONE chain, so the junction-placement rule spans them as well.
@@ -381,9 +381,9 @@ func (a *ast) build() (Query, error) {
 	sb.WriteString(a.from.alias)
 
 	for _, c := range a.contains {
-		// REQ-117: the connector carries the term's negation, and emit
+		// REQ-163: the connector carries the term's negation, and emit
 		// renders the whole containment expression (chain / junction) —
-		// a single class emits the pre-REQ-117 bytes unchanged.
+		// a single class still emits as a plain CONTAINS chain.
 		sb.WriteString(c.connector())
 		sb.WriteString(c.emit())
 	}
@@ -427,7 +427,7 @@ func (a *ast) build() (Query, error) {
 	}
 
 	// Paging: by default OFFSET / LIMIT are carried in the request envelope
-	// (Query.Offset / Query.Fetch), not the AQL string. REQ-117 adds the
+	// (Query.Offset / Query.Fetch), not the AQL string. REQ-163 adds the
 	// opt-in in-text channel, emitted here after ORDER BY in clause order
 	// (grammar: `LIMIT limitValue (OFFSET limitValue)?`); validatePaging has
 	// already refused a query that sets both channels.
@@ -452,7 +452,7 @@ func (a *ast) build() (Query, error) {
 	return Query{Q: sb.String(), Offset: a.offset, Fetch: a.limit, Parameters: maps.Clone(a.params)}, nil
 }
 
-// validatePaging enforces the REQ-117 paging rules: the in-text channel and
+// validatePaging enforces the REQ-163 paging rules: the in-text channel and
 // the request envelope are never silently combined, the grammar admits OFFSET
 // only after LIMIT, and an in-text operand must be a non-negative integer or
 // a named parameter (`limitValue : INTEGER | PARAMETER`).
@@ -474,7 +474,7 @@ func (a *ast) validatePaging() error {
 	return validateLimitValue("OFFSET", a.offsetInline)
 }
 
-// validateTop enforces the REQ-118 rules for the deprecated `SELECT TOP`
+// validateTop enforces the REQ-163 rules for the deprecated `SELECT TOP`
 // clause: openEHR QUERY Release-1.1.0 § 4.4.3 forbids `TOP` together with
 // `LIMIT`, and a TOP is itself an in-text row bound, so it is exclusive with
 // BOTH row-limit channels. The count must be representable in the grammar's

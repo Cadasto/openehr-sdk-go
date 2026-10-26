@@ -99,7 +99,7 @@ func TestParseClausePresence(t *testing.T) {
 	}
 }
 
-// TestParseSelectAliases pins REQ-117: the flat view records the SELECT `AS`
+// TestParseSelectAliases pins REQ-109: the flat view records the SELECT `AS`
 // aliases in document order so the lint layer can resolve an ORDER BY key
 // against them once FROM/CONTAINS has had its turn. Projection items without
 // an AS clause contribute nothing.

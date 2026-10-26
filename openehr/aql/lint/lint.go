@@ -249,7 +249,7 @@ func Lint(doc *parse.Document, opts *Options) Result {
 	issues := []Issue{}
 
 	// opts.Query reaches the shape group too: the TOP check needs the request
-	// envelope to see the second row-limit channel (REQ-118). A nil Query
+	// envelope to see the second row-limit channel (REQ-109). A nil Query
 	// leaves that channel invisible, exactly as it gates the parameter checks.
 	issues = append(issues, shapeIssues(doc, md, opts.Query)...)
 	// The Layer-2 semantic group (REQ-161) is unconditional: unlike Compiled
@@ -288,7 +288,7 @@ func shapeIssues(doc *parse.Document, md Metadata, q *aql.Query) []Issue {
 	var issues []Issue
 
 	// aql_unknown_alias — every identified path's root alias MUST bind to a
-	// class in FROM / CONTAINS. REQ-117: an ORDER BY key that binds nothing
+	// class in FROM / CONTAINS. REQ-109: an ORDER BY key that binds nothing
 	// there is resolved against the SELECT `AS` aliases before the issue is
 	// raised. FROM/CONTAINS is consulted first, so a SELECT alias reusing a
 	// bound alias never shadows the class binding.
@@ -340,7 +340,7 @@ func shapeIssues(doc *parse.Document, md Metadata, q *aql.Query) []Issue {
 }
 
 // topIssues reports the deprecated `SELECT TOP` modifier and the two row-bound
-// pairings the openEHR specifications forbid outright (REQ-118): `TOP` with the
+// pairings the openEHR specifications forbid outright (REQ-109): `TOP` with the
 // in-text `LIMIT` clause (QUERY Release-1.1.0 § 4.4.3) and `TOP` with the
 // request envelope's row limit (the Query API common parameters).
 //
@@ -398,7 +398,7 @@ func topIssues(doc *parse.Document, q *aql.Query) []Issue {
 }
 
 // namesSelectAlias reports whether p is an ORDER BY key naming one of the
-// SELECT `AS` aliases (REQ-117). Only a BARE identifier qualifies: an AS alias
+// SELECT `AS` aliases (REQ-109). Only a BARE identifier qualifies: an AS alias
 // labels a projected column, not a path root, so `ORDER BY score/magnitude`
 // (or a predicated key) stays aql_unknown_alias. The fallback is scoped to
 // ORDER BY — a SELECT alias is not a SELECT or WHERE operand root.

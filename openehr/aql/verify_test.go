@@ -11,7 +11,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/lint"
 )
 
-// The five REQ-161 containment codes REQ-162 § Contract scopes the builder
+// The five REQ-161 containment codes REQ-161 § Builder adapter scopes the builder
 // verification to. Spelled here rather than imported: openehr/aql/internal/semcheck
 // is internal to this subtree and reachable from a test in this package, but an
 // external caller dispatches on these literals, so the test asserts what a
@@ -25,7 +25,7 @@ const (
 )
 
 // The three REQ-161 PORTABILITY codes, which are read-side advisories only —
-// REQ-162 § Contract scopes read/write parity to the containment codes above,
+// REQ-161 § Builder adapter scopes read/write parity to the containment codes above,
 // and PROBE-097 § parity says so explicitly. The builder verification must
 // never emit one.
 var portabilityCodes = []string{
@@ -35,7 +35,7 @@ var portabilityCodes = []string{
 }
 
 // findingCodes is the sorted code multiset of fs — order-irrelevant, duplicates
-// counted, which is the comparison REQ-162 § Contract's parity clause is stated
+// counted, which is the comparison REQ-161 § Builder adapter's parity clause is stated
 // in.
 func findingCodes(fs []contain.Finding) []string {
 	out := make([]string, 0, len(fs))
@@ -46,7 +46,7 @@ func findingCodes(fs []contain.Finding) []string {
 	return out
 }
 
-// TestFindingCarriesOnlyCodeAndDetail pins REQ-162 § Contract's field
+// TestFindingCarriesOnlyCodeAndDetail pins REQ-161 § Builder adapter's field
 // classification structurally: a builder tree has no source text to point into,
 // so a finding carries a value-free Code and a value-bearing Detail — and no
 // Span, Path, or severity. A field added to [contain.Finding] fails here, which
@@ -60,11 +60,11 @@ func TestFindingCarriesOnlyCodeAndDetail(t *testing.T) {
 		got = append(got, f.Name)
 	}
 	if want := []string{"Code", "Detail"}; !slices.Equal(got, want) {
-		t.Errorf("contain.Finding fields = %v, want exactly %v (REQ-162 § Contract: no Span, Path, or severity)", got, want)
+		t.Errorf("contain.Finding fields = %v, want exactly %v (REQ-161 § Builder adapter: no Span, Path, or severity)", got, want)
 	}
 }
 
-// TestVerifyContainmentRaisesEachCode is REQ-162 § Contract's catalogue arm:
+// TestVerifyContainmentRaisesEachCode is REQ-161 § Builder adapter's catalogue arm:
 // each of the FIVE containment codes is raised from a builder-constructed query
 // carrying exactly that defect, and nothing else is.
 //
@@ -130,7 +130,7 @@ func TestVerifyContainmentRaisesEachCode(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			b := tc.build()
-			// The defect never blocks construction (REQ-162 § Contract).
+			// The defect never blocks construction (REQ-161 § Builder adapter).
 			if _, err := b.Build(); err != nil {
 				t.Fatalf("Build() = %v, want nil — an RM defect must not become a Build error", err)
 			}
@@ -140,7 +140,7 @@ func TestVerifyContainmentRaisesEachCode(t *testing.T) {
 			}
 			for _, want := range tc.details {
 				if !strings.Contains(fs[0].Detail, want) {
-					t.Errorf("Detail = %q, want it to quote %q (value-bearing per REQ-162 § Contract)", fs[0].Detail, want)
+					t.Errorf("Detail = %q, want it to quote %q (value-bearing per REQ-161 § Builder adapter)", fs[0].Detail, want)
 				}
 			}
 		})
@@ -316,7 +316,7 @@ func TestVerifyContainmentEmptyClassNodeStaysTransparent(t *testing.T) {
 }
 
 // TestVerifyContainmentNeverEmitsPortabilityCodes pins the five-not-eight scope
-// of REQ-162 § Contract (PROBE-097 § parity): the three REQ-161 portability
+// of REQ-161 § Builder adapter (PROBE-097 § parity): the three REQ-161 portability
 // advisories are read-side only. The queries below are exactly the shapes that
 // raise them on the read side — a bare VERSION, an unreferenced
 // VERSIONED_COMPOSITION, and an AND junction with two projected operands — so
@@ -383,7 +383,7 @@ func TestVerifyContainmentNeverEmitsPortabilityCodes(t *testing.T) {
 			// The contract: the write side raises none of the three.
 			for _, f := range b.VerifyContainment(nil) {
 				if slices.Contains(portabilityCodes, f.Code) {
-					t.Errorf("write side emitted the read-side-only code %s (REQ-162 § Contract scopes it to lint)", f.Code)
+					t.Errorf("write side emitted the read-side-only code %s (REQ-161 § Builder adapter scopes it to lint)", f.Code)
 				}
 			}
 		})
@@ -391,7 +391,7 @@ func TestVerifyContainmentNeverEmitsPortabilityCodes(t *testing.T) {
 }
 
 // TestVerifyContainmentNilRelationIsDefault pins the signature's nil contract
-// (REQ-162): nil means the REQ-160 default relation. Nil DISABLES nothing — the
+// (REQ-161 § Builder adapter): nil means the REQ-160 default relation. Nil DISABLES nothing — the
 // method has no "off" value, unlike lint's Options.Compiled / Options.Query.
 func TestVerifyContainmentNilRelationIsDefault(t *testing.T) {
 	t.Parallel()
@@ -550,7 +550,7 @@ func TestVerifyContainmentZeroRelation(t *testing.T) {
 	}
 }
 
-// TestVerifyContainmentHonoursOverlayRelation is the dialect arm of REQ-162's
+// TestVerifyContainmentHonoursOverlayRelation is the dialect arm of the REQ-161 builder adapter's
 // relation parameter: a deployment whose overlay genuinely admits a containment
 // the pinned RM does not gets no false finding, for an Error verdict and for an
 // unknown class alike (REQ-160 § Extensibility). Without this the parameter
@@ -597,8 +597,8 @@ func TestVerifyContainmentHonoursOverlayRelation(t *testing.T) {
 }
 
 // TestBuildUnchangedByImpossibleContainment is the permissiveness contract of
-// REQ-162 § Contract, pinned: a query carrying a Never pair still builds without
-// error and emits BYTE-IDENTICALLY to the pre-REQ-162 SDK. The expected strings
+// REQ-161 § Builder adapter, pinned: a query carrying a Never pair still builds without
+// error and emits BYTE-IDENTICALLY to the SDK before builder verification. The expected strings
 // were captured by running the builder at HEAD 089e387 — the commit before
 // verify.go existed — not written from expectation.
 //
@@ -651,7 +651,7 @@ func TestBuildUnchangedByImpossibleContainment(t *testing.T) {
 			b := tc.build()
 			q, err := b.Build()
 			if err != nil {
-				t.Fatalf("Build() = %v, want nil (REQ-162 § Contract: the validation set is unchanged)", err)
+				t.Fatalf("Build() = %v, want nil (REQ-161 § Builder adapter: the validation set is unchanged)", err)
 			}
 			if q.Q != tc.want {
 				t.Errorf("emitted\n  %q\nwant\n  %q", q.Q, tc.want)
@@ -669,11 +669,11 @@ func TestBuildUnchangedByImpossibleContainment(t *testing.T) {
 	}
 }
 
-// TestVerificationNeverRunsImplicitly pins the other half of REQ-162
-// § Contract's Build clause: verification is opt-in, so nothing an existing code
+// TestVerificationNeverRunsImplicitly pins the other half of REQ-161
+// § Builder adapter's Build clause: verification is opt-in, so nothing an existing code
 // path does can trigger it, and calling it changes nothing.
 //
-// Build is the only path a pre-REQ-162 caller has; it returns a [aql.Query],
+// Build is the only path a caller without verification has; it returns a [aql.Query],
 // whose fields carry AQL text and paging — there is no channel a finding could
 // arrive on even if one were produced. What is observable, and asserted here, is
 // that Build stays error-free and byte-stable across an explicit verification,
@@ -707,7 +707,7 @@ func TestVerificationNeverRunsImplicitly(t *testing.T) {
 }
 
 // TestVerifyContainmentJunctionsAndNegation pins the containment-algebra
-// traversal REQ-162 § Contract requires the write side to walk: junction
+// traversal REQ-161 § Builder adapter requires the write side to walk: junction
 // operands are checked against the junction's ENCLOSING parent, mixed AND/OR
 // nesting recurses, and NOT CONTAINS is checked IDENTICALLY to CONTAINS —
 // possibility does not care about the sign (REQ-161 § Checks).

@@ -521,7 +521,7 @@ func TestNotContainsIsCheckedIdentically(t *testing.T) {
 // [parse.Containment] has no parent pointer, so the parent has to be threaded
 // down the recursion; these rows are what fails if it stops being. The mixed
 // AND/OR row is the load-bearing one: same-operator junctions arrive
-// pre-flattened (REQ-117) but mixed nesting does NOT, so the inner operands
+// pre-flattened (REQ-113) but mixed nesting does NOT, so the inner operands
 // must still resolve to the outer COMPOSITION rather than to the AND node
 // between them.
 func TestJunctionOperandsUseEnclosingParent(t *testing.T) {
@@ -1202,7 +1202,7 @@ func TestVersionedObjectUnknownClassStaysSilent(t *testing.T) {
 //
 // The "pre-flattened N-ary AND" row is named for what it actually exercises:
 // [parse]'s extractor splices a same-operator child's Children into its
-// parent (REQ-117), so `(OBSERVATION a AND (OBSERVATION b AND OBSERVATION
+// parent (REQ-113), so `(OBSERVATION a AND (OBSERVATION b AND OBSERVATION
 // c2))` arrives as ONE three-child AND junction — behaviourally identical to
 // the three-projected-aliases row above it — never as a genuinely nested AND
 // node. [andFrontier]'s own recursive AND-in-AND branch is therefore

@@ -186,7 +186,7 @@ func (w *segmentWalker) walk(p parse.IdentifiedPath) pathShape {
 	// second guard: an absent key yields the ZERO class expression, whose empty
 	// RMType no class universe contains. So an unbound alias
 	// (aql_unknown_alias) and an ORDER BY key naming a SELECT `AS` alias
-	// (REQ-117 — an AS alias labels a column, it roots no class) stop here
+	// (REQ-109 — an AS alias labels a column, it roots no class) stop here
 	// exactly as a class the pin does not know (aql_unknown_rm_class) does. In
 	// every case the path stays unjudged rather than judged against a guess:
 	// each of those defects has its own code, and this group adds nothing to it.

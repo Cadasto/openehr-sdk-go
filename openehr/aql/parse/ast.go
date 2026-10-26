@@ -87,7 +87,7 @@ func spanAt(node any) Span {
 	// typed — a typed nil would satisfy the interface cases below and panic
 	// inside the accessor, and a diagnostics helper must not be able to
 	// panic. The reflect call is a typed-nil check, one of the classes of
-	// reflection idiom.md § Generics policy (REQ-024) allows in library code.
+	// reflection the idiom rules (idiom.md) allow in library code.
 	if node == nil {
 		return Span{}
 	}
@@ -277,7 +277,7 @@ func (e *extractor) EnterVersionClassExpr(c *gen.VersionClassExprContext) {
 }
 
 func (e *extractor) EnterIdentifiedPath(c *gen.IdentifiedPathContext) {
-	// REQ-117: a bare `true` / `false` in a value position is a literal, not a
+	// REQ-109: a bare `true` / `false` in a value position is a literal, not a
 	// path — the SDK lexer hands it to this listener as an IDENTIFIER-only
 	// identifiedPath. Skipping it keeps the flat lint view from reporting a
 	// spurious aql_unknown_alias for a grammar-admitted, server-executable
@@ -326,7 +326,7 @@ func (e *extractor) EnterIdentifiedPath(c *gen.IdentifiedPathContext) {
 //
 // An ORDER BY key is deliberately NOT included: `orderByExpr` admits only an
 // identifiedPath, the [OrderTerm] AST carries no literal alternative, and
-// ordering by a constant is not a shape the REQ-117 catalogue models — so
+// ordering by a constant is not a shape the REQ-113 catalogue models — so
 // `ORDER BY true` stays a path and keeps its alias check.
 func isKeywordLiteral(c *gen.IdentifiedPathContext) bool {
 	if _, ok := bareKeywordLiteral(c); !ok {

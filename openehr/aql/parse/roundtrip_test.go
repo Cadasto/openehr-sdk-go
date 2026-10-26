@@ -70,7 +70,7 @@ func TestRoundTripIdempotent(t *testing.T) {
 		{"limit_param", "SELECT e FROM EHR e LIMIT $rows"},
 		{"limit_offset_param", "SELECT e FROM EHR e LIMIT $rows OFFSET $skip"},
 
-		// REQ-117 catalogue closures (PROBE-087): shapes that used to
+		// REQ-113 catalogue closures (PROBE-087): shapes that used to
 		// surface aql.ErrIncompleteAST now round-trip.
 		{"select_literal_int", "SELECT 1, e/ehr_id/value FROM EHR e"},
 		{"select_literal_string_alias", "SELECT 'urgent' AS label FROM EHR e"},
@@ -120,7 +120,7 @@ func TestRoundTripIdempotent(t *testing.T) {
 		{"from_root_junction_negated_chain", "SELECT c1 FROM COMPOSITION c1 OR (COMPOSITION c2 NOT CONTAINS SECTION s)"},
 		{"contains_nested_junction_grouped", "SELECT c FROM EHR e CONTAINS ((COMPOSITION c OR SECTION s) AND OBSERVATION o)"},
 
-		// REQ-118: the deprecated `SELECT TOP` row limit, in every shape the
+		// REQ-113: the deprecated `SELECT TOP` row limit, in every shape the
 		// `top : TOP INTEGER direction=(FORWARD|BACKWARD)?` production admits,
 		// including the §4.4.3-forbidden TOP+LIMIT combination — which the
 		// parser and emitter carry faithfully and the lint gate diagnoses.
@@ -133,7 +133,7 @@ func TestRoundTripIdempotent(t *testing.T) {
 		{"select_top_zero", "SELECT TOP 0 c/uid/value FROM COMPOSITION c"},
 		{"select_top_with_limit", "SELECT TOP 5 c/uid/value FROM COMPOSITION c LIMIT 10 OFFSET 2"},
 		{"select_top_order_by", "SELECT TOP 5 BACKWARD c/uid/value FROM COMPOSITION c ORDER BY c/uid/value DESC"},
-		// REQ-118: a non-canonical literal — the AST carries the canonical
+		// REQ-113: a non-canonical literal — the AST carries the canonical
 		// value AND the source text, and emission renders the canonical form,
 		// so the SECOND emit is the fixed point (emit1 != input here).
 		{"select_literal_non_canonical", `SELECT 1.50, "dq", 001 FROM EHR e`},
@@ -186,7 +186,7 @@ func TestRoundTripPreservesCanonicalInput(t *testing.T) {
 		"SELECT v FROM EHR e CONTAINS VERSION v[all_versions]",
 		"SELECT e FROM EHR e LIMIT $rows OFFSET $skip",
 
-		// REQ-117 catalogue closures (PROBE-087).
+		// REQ-113 catalogue closures (PROBE-087).
 		"SELECT 1, e/ehr_id/value FROM EHR e",
 		"SELECT 'urgent' AS label FROM EHR e",
 		"SELECT *, c/uid/value FROM EHR e CONTAINS COMPOSITION c",
@@ -214,12 +214,12 @@ func TestRoundTripPreservesCanonicalInput(t *testing.T) {
 		"SELECT false FROM EHR e",
 		"SELECT true, e/ehr_id/value FROM EHR e",
 		// ORDER BY resolving against a SELECT AS alias — the parse→emit tie to
-		// the REQ-109/REQ-117 lint acceptance (an AS alias is a legal ORDER BY
+		// the REQ-109 lint acceptance (an AS alias is a legal ORDER BY
 		// key and survives the round trip unchanged).
 		"SELECT e/time_created AS score FROM EHR e ORDER BY score DESC",
 		"SELECT o/data[at0001]/value/magnitude AS score FROM EHR e CONTAINS OBSERVATION o ORDER BY score ASC",
 
-		// REQ-118: canonical `TOP` forms — upper-cased keywords, direction
+		// REQ-163: canonical `TOP` forms — upper-cased keywords, direction
 		// present only when written, emitted between DISTINCT and the
 		// projection list.
 		"SELECT TOP 5 c/uid/value FROM COMPOSITION c",
@@ -247,7 +247,7 @@ func TestRoundTripPreservesCanonicalInput(t *testing.T) {
 	}
 }
 
-// TestFormerCatalogueGapsModelled pins the REQ-117 catalogue closures:
+// TestFormerCatalogueGapsModelled pins the REQ-113 catalogue closures:
 // every input below used to surface aql.ErrIncompleteAST from the v1
 // extractor. ParseQuery MUST now model it without a gap, Emit MUST render
 // it, and the emission MUST be a fixed point (the PROBE-080 property
@@ -274,7 +274,7 @@ func TestFormerCatalogueGapsModelled(t *testing.T) {
 				t.Fatalf("Parse(%q): %v", tc.in, err)
 			}
 			if qerr := doc.QueryErr(); qerr != nil {
-				t.Fatalf("QueryErr(%q) = %v, want nil (shape is in catalogue per REQ-117)", tc.in, qerr)
+				t.Fatalf("QueryErr(%q) = %v, want nil (shape is in catalogue per REQ-113)", tc.in, qerr)
 			}
 			emit1, err := doc.Query().Emit()
 			if err != nil {
@@ -296,12 +296,12 @@ func TestFormerCatalogueGapsModelled(t *testing.T) {
 }
 
 // TestTopClauseGapClosed is the REPLACEMENT for the retired
-// TestParseQuerySurfacesTopClauseGap: REQ-118 moved the deprecated `top`
-// production INTO the catalogue, so each input below — every one of which used
+// TestParseQuerySurfacesTopClauseGap: REQ-113 carries the deprecated `top`
+// production IN the catalogue, so each input below — every one of which used
 // to surface aql.ErrIncompleteAST — must now parse clean, carry the bound, and
 // emit as a fixed point. The retired test asserted the opposite; the row limit
 // is still never dropped, it is now carried instead of refused.
-// REQ-118 · PROBE-087
+// REQ-113 · PROBE-087
 func TestTopClauseGapClosed(t *testing.T) {
 	for _, in := range []string{
 		"SELECT TOP 5 c/uid/value FROM COMPOSITION c",
@@ -315,7 +315,7 @@ func TestTopClauseGapClosed(t *testing.T) {
 				t.Fatalf("Parse(%q): %v", in, err)
 			}
 			if qerr := doc.QueryErr(); qerr != nil {
-				t.Fatalf("QueryErr(%q) = %v, want nil (the top clause is in catalogue per REQ-118)", in, qerr)
+				t.Fatalf("QueryErr(%q) = %v, want nil (the top clause is in catalogue per REQ-113)", in, qerr)
 			}
 			q := doc.Query()
 			if q.Select.Top == nil {
@@ -342,9 +342,9 @@ func TestTopClauseGapClosed(t *testing.T) {
 
 // TestParseQueryTopClauseOutOfRange pins a TOP count outside Go `int` as the
 // RESIDUAL unrepresentable-numeric refusal rather than a top-specific one
-// (REQ-118): the bound is refused loudly at parse and on Emit, never truncated
+// (REQ-113): the bound is refused loudly at parse and on Emit, never truncated
 // — a truncated row limit is silent data loss whichever clause carries it.
-// REQ-118 · PROBE-087
+// REQ-113 · PROBE-087
 func TestParseQueryTopClauseOutOfRange(t *testing.T) {
 	const in = "SELECT TOP 99999999999999999999 c/uid/value FROM COMPOSITION c"
 	q, err := parse.ParseQuery(in)
@@ -366,10 +366,10 @@ func TestParseQueryTopClauseOutOfRange(t *testing.T) {
 }
 
 // TestEmitUnrenderableTopClause pins the emitter's guards on a hand-built AST
-// (REQ-118): the `top` production admits no sign, and a direction outside the
+// (REQ-119): the `top` production admits no sign, and a direction outside the
 // vocabulary renders as nothing at all — which would emit an UNDIRECTED bound,
 // a silent loss. Both refuse, mirroring [aql.Builder]'s build-time guards.
-// REQ-118
+// REQ-119
 func TestEmitUnrenderableTopClause(t *testing.T) {
 	for name, top := range map[string]*aql.TopClause{
 		"negative count":    {N: -1},
@@ -391,7 +391,7 @@ func TestEmitUnrenderableTopClause(t *testing.T) {
 }
 
 // TestParseQuerySurfacesIncompleteAST pins the RESIDUAL catalogue gap after
-// REQ-117: a numeric literal that cannot be represented in the AST
+// REQ-113: a numeric literal that cannot be represented in the AST
 // (LIMIT / OFFSET beyond Go `int`, integer VALUE beyond int64, REAL /
 // scientific REAL beyond float64) still surfaces aql.ErrIncompleteAST on
 // ParseQuery and still refuses to render on Emit, rather than silently
@@ -410,7 +410,7 @@ func TestParseQuerySurfacesIncompleteAST(t *testing.T) {
 		{"comparison_literal_overflow", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x > 99999999999999999999", "out of range"},
 		{"matches_literal_overflow", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x MATCHES {99999999999999999999}", "out of range"},
 		// Real-valued literals beyond float64: same residual 1 class as
-		// integer overflow — refuse, never degrade to +Inf (REQ-117 /
+		// integer overflow — refuse, never degrade to +Inf (REQ-113 /
 		// PROBE-087). `1e400` lexes as SCI_INTEGER (REAL needs a dot;
 		// SCI_REAL is `1.0e400`); all three token shapes share one
 		// conversion, and each is named here so the arm cannot be split
@@ -521,7 +521,7 @@ func TestEmitDuplicateAlias(t *testing.T) {
 // TestEmitFromRootAndJunction guards a hand-built AST that sets BOTH a
 // single FROM root and a root junction: the grammar has no
 // `(A OR B) CONTAINS C` form, so the emitter refuses rather than produce
-// text the parser rejects (REQ-117).
+// text the parser rejects (REQ-119).
 // PROBE-087
 func TestEmitFromRootAndJunction(t *testing.T) {
 	q := &parse.Query{

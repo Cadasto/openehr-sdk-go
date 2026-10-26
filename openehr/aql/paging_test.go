@@ -1,6 +1,6 @@
 package aql_test
 
-// paging_test.go pins the REQ-117 in-text paging channel: `LIMIT n [OFFSET m]`
+// paging_test.go pins the REQ-163 in-text paging channel: `LIMIT n [OFFSET m]`
 // emitted into the AQL string after ORDER BY (the grammar's
 // `LIMIT limitValue (OFFSET limitValue)?`), opt-in and mutually exclusive with
 // the envelope channel (Query.Fetch / Query.Offset).
@@ -17,7 +17,7 @@ import (
 
 // TestInlinePagingEmission tables the canonical in-text paging forms and
 // their clause position — after ORDER BY, LIMIT before OFFSET.
-// REQ-117
+// REQ-163
 func TestInlinePagingEmission(t *testing.T) {
 	tests := []struct {
 		name string
@@ -84,9 +84,9 @@ func TestInlinePagingEmission(t *testing.T) {
 	}
 }
 
-// TestEnvelopePagingStillOmitsClause locks the pre-REQ-117 default: the
+// TestEnvelopePagingStillOmitsClause locks the envelope default: the
 // envelope channel emits no LIMIT / OFFSET into the string.
-// REQ-117
+// REQ-163
 func TestEnvelopePagingStillOmitsClause(t *testing.T) {
 	q, err := aql.NewBuilder().Select(aql.Col("e/ehr_id/value")).From("EHR", "e").
 		Limit(20).Offset(10).Build()
@@ -105,7 +105,7 @@ func TestEnvelopePagingStillOmitsClause(t *testing.T) {
 // are never silently combined, an in-text OFFSET without a LIMIT is
 // grammar-invalid, and an operand the grammar's `limitValue` cannot carry is
 // refused at build time.
-// REQ-117
+// REQ-163
 func TestInlinePagingRefusals(t *testing.T) {
 	base := func() *aql.Builder {
 		return aql.NewBuilder().Select(aql.Col("e/ehr_id/value")).From("EHR", "e")
@@ -144,12 +144,12 @@ func TestInlinePagingRefusals(t *testing.T) {
 
 // TestSelectTopEmission tables the canonical `SELECT TOP` forms and their
 // clause position — between DISTINCT and the projection list, keywords
-// upper-cased, direction present only when set (REQ-118).
+// upper-cased, direction present only when set (REQ-163).
 //
 // The construct is deprecated by openEHR QUERY Release-1.1.0 §4.4.3; the
 // builder can still write it because the SDK must be able to author the
 // deprecated shape for a corpus, a migration, or a round-trip fixture.
-// REQ-118 · PROBE-088
+// REQ-163 · PROBE-088
 func TestSelectTopEmission(t *testing.T) {
 	tests := []struct {
 		name string
@@ -211,7 +211,7 @@ func TestSelectTopEmission(t *testing.T) {
 // a TOP is itself an in-text row bound — so it is exclusive with BOTH row-limit
 // channels, exactly as the two existing channels are with each other. A
 // negative count is unrepresentable in the `top` production.
-// REQ-118 · PROBE-088
+// REQ-163 · PROBE-088
 func TestSelectTopRefusals(t *testing.T) {
 	base := func() *aql.Builder {
 		return aql.NewBuilder().Select(aql.Col("e/ehr_id/value")).From("EHR", "e")
@@ -241,7 +241,7 @@ func TestSelectTopRefusals(t *testing.T) {
 // TestSelectTopRoundTripsThroughParse ties the write side to the read side: a
 // builder-emitted TOP must parse back into the shared carrier with the same
 // count and direction, so neither half can drift alone.
-// REQ-118 · PROBE-087 · PROBE-088
+// REQ-163 · REQ-113 · PROBE-087 · PROBE-088
 func TestSelectTopRoundTripsThroughParse(t *testing.T) {
 	for _, dir := range []aql.TopDir{aql.TopDirUnspecified, aql.TopForward, aql.TopBackward} {
 		t.Run(dir.String(), func(t *testing.T) {

@@ -3,7 +3,7 @@ package parse_test
 // REQ-119 · PROBE-090
 //
 // literal_roundtrip_test.go pins the value-position literal contracts of the
-// REQ-117 fixed-point property that the corpus in roundtrip_test.go could not
+// REQ-113 fixed-point property that the corpus in roundtrip_test.go could not
 // reach: the corpus is written in canonical form, so it never contained a
 // string carrying a quote or a backslash, nor a real whose decimal rendering
 // carries no fractional part. Both spellings emitted text this SDK's own
@@ -47,7 +47,7 @@ func whereRoundTrip(t *testing.T, v aql.Value) (string, aql.Value) {
 	return pred, cmp.Val
 }
 
-// TestStringLiteralEscapesRoundTrip — REQ-117. A string literal MUST emit as
+// TestStringLiteralEscapesRoundTrip — REQ-119. A string literal MUST emit as
 // the grammar's STRING token and MUST decode back to the same Go string.
 //
 // The SQL-style `”` doubling the emitter used to produce is not an AQL
@@ -410,7 +410,7 @@ func TestEveryValueKindRoundTripsToAnEqualValue(t *testing.T) {
 	}
 }
 
-// TestRealLiteralStaysReal — REQ-117. A real MUST emit text that re-lexes as
+// TestRealLiteralStaysReal — REQ-119. A real MUST emit text that re-lexes as
 // the grammar's REAL, not its INTEGER.
 //
 // `strconv.FormatFloat(…, 'f', …)` drops the fractional part of a whole value,
@@ -462,7 +462,7 @@ func TestNonFiniteRealRefused(t *testing.T) {
 	}
 }
 
-// TestIntLiteralRangeBoundaries — REQ-117 residual 1 refuses an INTEGER
+// TestIntLiteralRangeBoundaries — the REQ-113 residual refuses an INTEGER
 // "beyond int64". math.MinInt64 is exactly representable, so refusing it was
 // the guard overreaching: the extractor parsed the magnitude before applying
 // the sign, and int64's range is asymmetric.

@@ -170,7 +170,7 @@ func (v *containVerifier) chain(parent semcheck.Operand, role semcheck.Role, cha
 //
 // role is the position this node occupies. A junction's operands INHERIT the
 // junction's role — [semcheck.Role.Next] owns that rule so the read-side
-// adapter cannot pick a different answer (REQ-162 § Contract); assigning it
+// adapter cannot pick a different answer (REQ-161 § Builder adapter); assigning it
 // from tree shape here is exactly the parity break the shared engine exists to
 // prevent. On today's write side the inheritance is not yet DISTINGUISHABLE
 // from labelling a junction's operands contained: the builder has no FROM-root

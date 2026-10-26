@@ -80,7 +80,7 @@ func TestExtractPaths(t *testing.T) {
 	}
 }
 
-// TestExtractPathsSkipsBooleanKeywordOperand pins REQ-117: a bare
+// TestExtractPathsSkipsBooleanKeywordOperand pins REQ-109: a bare
 // `true` / `false` in a comparison-terminal position is a boolean literal, not
 // a path, even though the SDK lexer hands it to the flat extractor as an
 // IDENTIFIER-only identifiedPath (the IDENTIFIER rule precedes BOOLEAN in
