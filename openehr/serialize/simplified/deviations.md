@@ -329,8 +329,25 @@ partially or silently accepted.
   `start_time` and `subject` becomes `PARTY_SELF`. **Qualifier:** `EVENT.time` and
   `HISTORY.origin` have no source other than `ctx/time` — a payload without `ctx/time`
   decodes successfully but does not validate when the template carries HISTORY/EVENT nodes
-  (pinned by `names_test.go`). Without `WithTemplate`, decode omits names and defaults
-  entirely (format-idempotent only). **One completion is visible on re-encode** (since
+  (pinned by `names_test.go`). **A required structure with no member is rebuilt too**
+  (since 2026-10-26, issue 311). Where a rebuilt node lacks a single-valued attribute that
+  the template's existence, or the RM, requires of it, and the template gives there one
+  concrete `ITEM_STRUCTURE` it lets hold no member (or alternatives that agree on its
+  subtype and node id), decode adds that structure as the generator writes it: subtype,
+  node id and template name, no member. Until then the `vital_signs` blood-pressure event
+  `state` and observation `protocol`, and the event `data` of `sdk_crosscheck_structure.v1`
+  and `cluster-slot.ehrbase.org.v0`, came back absent from a round trip of their skeletons,
+  which then failed `ValidateComposition` with `required`. It is a **synthesised empty structure**, not recovered data: FLAT has no key
+  for a structure with no member, so decode cannot tell a body whose composition held one
+  from a body that left it out. Decode builds no parent node, member or value for it,
+  nothing for a slot or an archetype root, nothing where the template nodes sharing the
+  parent's path disagree on it, and nothing where the template asks the structure for a
+  member (the body then lacks data, and `required` is the right report).
+  A structure with no member that nothing requires is still dropped. Pinned by
+  `TestREQ053WithTemplateRebuildsEmptyRequiredStructure` and
+  `TestREQ053EmptyStructureRebuildRules`. Without `WithTemplate`, decode omits names,
+  defaults and empty structures entirely (format-idempotent only). **One completion is
+  visible on re-encode** (since
   2026-08-05, the amended REQ-053): the synthesised `EVENT_CONTEXT.setting` default
   (`238 other care`) re-encodes as `ctx/setting\|code` + `\|value` like any populated
   setting, so a `WithTemplate` decode of a body that carried no setting re-encodes with
@@ -358,7 +375,9 @@ partially or silently accepted.
   **minus that instance**, because the format simply has no spelling for "an instance
   with no values". The fourth of the four narrowings listed at the top of this file;
   the other three are the folded structural wrappers, `archetype_details` and an ACTION
-  transition's `transition` and `reason`.
+  transition's `transition` and `reason`. A required single-valued structure with no
+  member is no repeat instance: a `WithTemplate` decode rebuilds it (the entry above),
+  while an empty repeat instance stays lost in both decode modes.
 
 - **`ITEM_TREE` vs `ITEM_LIST` on OPT-free decode** — the Web Template collapses
   `ITEM_STRUCTURE` nodes, so FLAT and STRUCTURED carry no structure's concrete subtype.
