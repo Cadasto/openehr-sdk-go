@@ -231,6 +231,56 @@ func TestUploadTemplateBOMPrefixedXMLFallsBackToLocation(t *testing.T) {
 	}
 }
 
+// TestUploadTemplateStripsLeadingBOM pins the request-side BOM strip: an OPT
+// saved with a UTF-8 byte-order mark reaches the server without it (EHRbase
+// refuses a BOM with "Content is not allowed in prolog"), a body that is only
+// a BOM is refused like an empty one before any request is sent, and a body
+// without a BOM is sent byte for byte. Delete the strip and the BOM cases fail.
+func TestUploadTemplateStripsLeadingBOM(t *testing.T) {
+	bom := []byte{0xEF, 0xBB, 0xBF}
+	xml := []byte(`<?xml version="1.0"?><template/>`)
+	tests := []struct {
+		name         string
+		body         []byte
+		wantSent     []byte // nil when no request may be sent
+		wantErrIsCfg bool
+	}{
+		{name: "BOM-prefixed body loses the BOM", body: append(slices.Clone(bom), xml...), wantSent: xml},
+		{name: "BOM-only body is refused as empty", body: slices.Clone(bom), wantErrIsCfg: true},
+		{name: "body without BOM is sent unchanged", body: slices.Clone(xml), wantSent: xml},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var requests atomic.Int32
+			var received []byte
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				requests.Add(1)
+				received, _ = io.ReadAll(r.Body)
+				w.Header().Set("Location", "/openehr/v1/definition/template/adl1.4/body_weight.v1")
+				w.WriteHeader(http.StatusCreated)
+			}))
+			defer srv.Close()
+
+			_, _, err := definition.UploadTemplate(t.Context(), newClient(t, srv), definition.FormatADL14, bytes.NewReader(tc.body))
+			if tc.wantErrIsCfg {
+				if !errors.Is(err, transport.ErrInvalidConfig) {
+					t.Errorf("UploadTemplate(%q) err = %v, want transport.ErrInvalidConfig", tc.body, err)
+				}
+				if n := requests.Load(); n != 0 {
+					t.Errorf("UploadTemplate(%q) sent %d request(s), want none", tc.body, n)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("UploadTemplate(%q) = %v, want nil error", tc.body, err)
+			}
+			if !bytes.Equal(received, tc.wantSent) {
+				t.Errorf("UploadTemplate(%q) sent body %q, want %q", tc.body, received, tc.wantSent)
+			}
+		})
+	}
+}
+
 // TestUploadTemplateEmptyBodyNoLocationErrors pins the empty-id guard: a 201
 // with no decodable body AND no Location header cannot name the template, so
 // the upload MUST NOT return a metadata record with an empty TemplateID and a
