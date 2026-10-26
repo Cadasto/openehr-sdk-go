@@ -724,13 +724,17 @@ func probe109RevisionHistory(versionUIDs ...string) string {
 	return `{"_type":"REVISION_HISTORY","items":[` + strings.Join(items, ",") + `]}`
 }
 
-// probe109Version is a complete ORIGINAL_VERSION whose uid is uid and whose
-// data is the raw JSON data. probe109DeletedVersion is the one without data.
+// probe109Version is a complete (code 532) ORIGINAL_VERSION whose uid is uid
+// and whose data is the raw JSON data, or that carries no data when data is
+// empty. probe109DeletedVersion is the deleted one without data.
 func probe109Version(uid, data string) string {
-	return `{"_type":"ORIGINAL_VERSION","uid":{"_type":"OBJECT_VERSION_ID","value":"` + uid + `"},` +
+	v := `{"_type":"ORIGINAL_VERSION","uid":{"_type":"OBJECT_VERSION_ID","value":"` + uid + `"},` +
 		`"lifecycle_state":{"_type":"DV_CODED_TEXT","value":"complete","defining_code":{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"openehr"},"code_string":"532"}},` +
-		`"commit_audit":` + probe109AuditJSON + `,"contribution":` + probe109ContributionJSON +
-		`,"data":` + data + `}`
+		`"commit_audit":` + probe109AuditJSON + `,"contribution":` + probe109ContributionJSON
+	if data != "" {
+		v += `,"data":` + data
+	}
+	return v + `}`
 }
 
 // probe109DeletedVersion is the ORIGINAL_VERSION of a logical deletion whose
@@ -924,12 +928,13 @@ func TestProbe109OtherLeafRowsJudgeTheRequestOnly(t *testing.T) {
 	}
 }
 
-// TestProbe109PassesAVersionWithoutData pins PROBE-109 (REQ-174): a version
-// that carries no data is the RM's logical deletion, which a version read
-// returns as no payload and no error, so the probe passes it. Each case
-// serves the deletion on one of the six version reads; the served count
-// shows the deletion reached the read, so a plant that matched nothing
-// cannot pass for it.
+// TestProbe109PassesAVersionWithoutData pins PROBE-109 (REQ-174): a deleted
+// version (lifecycle state 523) that carries no data is the RM's logical
+// deletion, which a version read returns as no payload and no error, so the
+// probe passes it. A version that is not deleted and carries no data still
+// fails; see the plants. Each case serves the deletion on one of the six
+// version reads; the served count shows the deletion reached the read, so a
+// plant that matched nothing cannot pass for it.
 func TestProbe109PassesAVersionWithoutData(t *testing.T) {
 	compositionDeleted := probe109DeletedVersion(string(updatedVUID))
 	statusDeleted := probe109DeletedVersion(string(probe109StatusVersionUID))
@@ -1106,6 +1111,19 @@ func TestProbe109VersionedObjectReadsFlagsPlants(t *testing.T) {
 			name:       "EHR_STATUS version whose data is a COMPOSITION",
 			plant:      probe109Plant{on: probe109Match{path: probe109VS + "/version", atTime: true}, body: probe109Version(string(probe109StatusVersionUID), bareCompositionBody)},
 			wantDetail: "ehrstatus.GetVersionAtTime failed: transport: decode GET ",
+		},
+		{
+			// Only a deleted version may carry no data: a complete one
+			// without data is what a leaf that drops the data it was served
+			// returns, so the probe fails it.
+			name:       "composition version that is not deleted carries no data",
+			plant:      probe109Plant{on: probe109Match{path: probe109VC + "/version"}, body: probe109Version(string(updatedVUID), "")},
+			wantDetail: `composition.GetVersion: the version is not deleted (lifecycle "532") but carried no COMPOSITION`,
+		},
+		{
+			name:       "EHR_STATUS version that is not deleted carries no data",
+			plant:      probe109Plant{on: probe109Match{path: probe109VS + "/version/" + string(probe109StatusVersionUID)}, body: probe109Version(string(probe109StatusVersionUID), "")},
+			wantDetail: `ehrstatus.GetVersionByID: the version is not deleted (lifecycle "532") but carried no EHR_STATUS`,
 		},
 		{
 			name:       "a versioned-object read fails",

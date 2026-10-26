@@ -39,10 +39,12 @@ type Probe109Inputs struct {
 	// composition read by a Ref with a time.
 	CompositionVOID openehrclient.VersionedObjectID
 	// CompositionVersionUID is a version of CompositionVOID, answered with an
-	// ORIGINAL_VERSION whose data, when it has any, is a COMPOSITION.
+	// ORIGINAL_VERSION whose data is a COMPOSITION, or that carries none
+	// when it is deleted.
 	CompositionVersionUID openehrclient.VersionUID
 	// StatusVersionUID is a version of EHRID's EHR_STATUS, answered with an
-	// ORIGINAL_VERSION whose data, when it has any, is an EHR_STATUS.
+	// ORIGINAL_VERSION whose data is an EHR_STATUS, or that carries none
+	// when it is deleted.
 	StatusVersionUID openehrclient.VersionUID
 	// ImportedVersionUID is a version id that both families' by-id reads
 	// answer with an IMPORTED_VERSION.
@@ -85,9 +87,11 @@ type probe109Read struct {
 // under the client's base path with Accept: application/json, and decode its
 // 200 body. A version read's data, when present, decodes to the family's
 // type, a COMPOSITION or an EHR_STATUS: the leaf refuses any other, and that
-// read error fails the probe. A version with no data is the RM's logical
-// deletion; it reads as no payload, and the probe does not fail it. The
-// version-at-time reads take the pin's example time carried to
+// read error fails the probe. A version may carry no data only when its
+// lifecycle state is deleted (code 523), the RM's logical deletion: it reads
+// as no payload, and the probe passes it. Any other version that reads with
+// no payload fails the probe, so a leaf that drops the data it was served
+// fails too. The version-at-time reads take the pin's example time carried to
 // nanoseconds and must send exactly 2015-01-20T18:30:22.765432101Z, so a
 // value cut to milliseconds fails; every other read must send no
 // version_at_time. A by-id read answered with an IMPORTED_VERSION must fail
@@ -294,8 +298,15 @@ func probe109CheckRequest(req *http.Request, rd probe109Read) string {
 	return ""
 }
 
+// probe109Deleted is the lifecycle state code of a deleted version, the RM's
+// logical deletion: the one version that may carry no data. It is a literal
+// rather than the SDK's own constant, so a constant that drifts fails the
+// probe instead of agreeing with itself.
+const probe109Deleted = "523"
+
 // probe109CompositionVersion judges a composition version read's result. A
-// nil Composition is a logical deletion and passes. The leaf's decode
+// nil Composition passes only on a deleted version; on any other it is data
+// the leaf dropped or the server left out, and fails. The leaf's decode
 // refuses data of another type, so that case arrives as err.
 func probe109CompositionVersion(v *composition.Version, _ *openehrclient.VersionMetadata, err error) (string, error) {
 	switch {
@@ -303,12 +314,15 @@ func probe109CompositionVersion(v *composition.Version, _ *openehrclient.Version
 		return "", err
 	case v == nil || v.UID.Value == "":
 		return "the body did not decode to an ORIGINAL_VERSION with a uid", nil
+	case v.Composition == nil && v.LifecycleState.DefiningCode.CodeString != probe109Deleted:
+		return fmt.Sprintf("the version is not deleted (lifecycle %q) but carried no COMPOSITION", v.LifecycleState.DefiningCode.CodeString), nil
 	}
 	return "", nil
 }
 
 // probe109StatusVersion judges an EHR_STATUS version read's result. A nil
-// Status is a logical deletion and passes. The leaf's decode refuses data
+// Status passes only on a deleted version; on any other it is data the leaf
+// dropped or the server left out, and fails. The leaf's decode refuses data
 // of another type, so that case arrives as err.
 func probe109StatusVersion(v *ehrstatus.Version, _ *openehrclient.VersionMetadata, err error) (string, error) {
 	switch {
@@ -316,6 +330,8 @@ func probe109StatusVersion(v *ehrstatus.Version, _ *openehrclient.VersionMetadat
 		return "", err
 	case v == nil || v.UID.Value == "":
 		return "the body did not decode to an ORIGINAL_VERSION with a uid", nil
+	case v.Status == nil && v.LifecycleState.DefiningCode.CodeString != probe109Deleted:
+		return fmt.Sprintf("the version is not deleted (lifecycle %q) but carried no EHR_STATUS", v.LifecycleState.DefiningCode.CodeString), nil
 	}
 	return "", nil
 }
