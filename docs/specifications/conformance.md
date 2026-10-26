@@ -280,7 +280,7 @@ The HL7 Inferno **SMART App Launch Test Kit STU2.2 _Client_** suite serves as an
 - **Preconditions:** Reference deployment that validates AQL against templates.
 - **Wire assertion:** The typed builders cannot emit syntactically invalid AQL (structural guarantee). Execution of a query referencing a non-existent path returns the backend's AQL error envelope; the SDK maps it to `*query.AQLError`, which satisfies `errors.Is(err, aql.ErrPathResolution)`. A **501** response maps to `*query.AQLError` satisfying `errors.Is(err, aql.ErrEngineCapability)` and never `aql.ErrPathResolution`: the capability gap is read from the status alone, with an envelope or bare, never from message text (REQ-055).
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Implemented (Sandbox) — the error mapping is tested against synthesised backend responses: a path-resolution envelope, and a 501 capability gap with an envelope and bare. Cassette and Live ratification wait for a reference deployment.
+- **Status:** Implemented (Sandbox) — the error mapping is tested against synthesised backend responses: a path-resolution envelope, and a 501 capability gap with an envelope and bare. Cassette and Live ratification wait for a reference deployment. A scenario recording of three EHRbase 2.36.0 query refusals (`error-envelopes.har`) is replayed by its own test, outside the runner: each surfaces as `*query.AQLError` and none as a capability gap, but the unknown-attribute refusal (`400`, "Unknown attribute: …") is not classified as `aql.ErrPathResolution`, so that half stays unratified.
 - **Satisfies:** REQ-055.
 
 #### PROBE-028 — AQL lint stability
@@ -697,7 +697,7 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 - **Preconditions:** Cassette of a real 400 error envelope.
 - **Wire assertion:** `errors.As(err, &wire)` succeeds; `wire.OpenEHR.Message`, `wire.OpenEHR.Code` are set from the envelope; `wire.RawBody` preserves the raw bytes.
 - **Modes:** Sandbox, Cassette.
-- **Status:** Draft.
+- **Status:** Draft. A scenario recording of real EHRbase 2.36.0 refusals (`error-envelopes.har`) is replayed by its own test, outside the runner, so it is not yet this probe's Cassette mode: the `400` envelope's `message` decodes and `RawBody` keeps the bytes, but that envelope carries no `code`, so the `OpenEHR.Code` half is not witnessed.
 
 #### PROBE-069 — `Idempotency-Key` header round-trip
 

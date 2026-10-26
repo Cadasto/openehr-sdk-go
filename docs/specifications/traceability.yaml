@@ -602,6 +602,7 @@ requirements:
       - openehr/aql/projection_test.go
       - openehr/aql/value_test.go
       - openehr/client/query/query_test.go
+      - testkit/probe/cassette_errors_test.go
       - testkit/probes/aql/probe_020_builder_stability.go
       - testkit/probes/aql/probes_test.go
       - testkit/probes/query/probe_078_verb_aware_scoping.go
@@ -983,6 +984,7 @@ requirements:
       - sandbox/independence_test.go
       - sandbox/roundtrip_test.go
       - sandbox/script_test.go
+      - testkit/probe/cassette_errors_test.go
       - testkit/probe/cassette_test.go
       - testkit/probe/har_test.go
       - testkit/probe/live_test.go
@@ -1072,6 +1074,7 @@ requirements:
       - openehr/rm/character_test.go
       - openehr/rm/real_test.go
       - openehr/validation/rmfloor_party_proxy_test.go
+      - testkit/probe/cassette_errors_test.go
       - testkit/probe/har_test.go
       - testkit/probe/record_test.go
       - testkit/probe/run_test.go

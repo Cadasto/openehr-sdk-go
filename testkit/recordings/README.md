@@ -10,9 +10,10 @@ than `true` is discarded, not replayed ([ValidateHAR](../probe/har.go)).
 | File | Capture | Recapture |
 |---|---|---|
 | [ehr-create.har](ehr-create.har) | Live EHRbase 2.35.1 `POST /ehr` (STRAND-11 evidence, byte-identical to [`docs/plans/strand-11-evidence/ehr-create.har`](../../docs/plans/strand-11-evidence/ehr-create.har)) | hand-captured before the harness existed; no `-scenario` covers it |
-| [ehr-lifecycle.har](ehr-lifecycle.har) | Live EHRbase 2.35.1 `POST /ehr`, then `GET` and `HEAD` the created id (the create-then-read path) | `-scenario ehr-lifecycle` |
+| [ehr-lifecycle.har](ehr-lifecycle.har) | Live EHRbase 2.36.0 `POST /ehr`, then `GET` and `HEAD` the created id (the create-then-read path) | `-scenario ehr-lifecycle` |
 | [ehr-status.har](ehr-status.har) | Live EHRbase 2.36.0 `POST /ehr` with a fixed initial EHR_STATUS, then `GET` that status | `-scenario ehr-status` |
 | [composition-minimal.har](composition-minimal.har) | Live EHRbase 2.36.0 `POST /ehr`, upload the fixture OPT under a per-capture template id (`sdk_cassette_comp_cee0ccd903be449d94dc4919055ff8aa.v1` in this recording), `POST` a composition, then `GET` the version the save returned | `-scenario composition-minimal` |
+| [error-envelopes.har](error-envelopes.har) | Live EHRbase 2.36.0 `GET` of an EHR id it does not hold (`404`), then three ad-hoc queries it refuses with `400`: one that does not parse, one naming an unknown COMPOSITION attribute, one selecting an EHR attribute that does not exist | `-scenario error-envelopes` |
 | [stored-query.har](stored-query.har) | Live EHRbase 2.36.0 `POST /ehr`, `PUT` a fixed stored query, then `POST` its execution | `-scenario stored-query` |
 
 Replay through [`probe.NewReplayer`](../probe/replay.go).
