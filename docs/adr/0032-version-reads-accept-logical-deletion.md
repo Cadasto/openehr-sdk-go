@@ -23,7 +23,7 @@ date: 2026-10-26
 
 **What the SDK does.** The version reads of [§ REQ-174](../specifications/wire.md#req-174--versioned-object-reads) decode a version whose `data` is absent as a version with no payload and no error. That accepts a body the pin's schema excludes, and [§ REQ-095](../specifications/wire.md#req-095) makes every such departure a keyed exception with a decision behind it.
 
-**Why this needs a decision.** Following the pin would make every logically deleted version unreadable through the SDK when the server follows the RM: the revision history names the version, and reading it would fail.
+**Why this needs a decision.** Following the pin would make every logically deleted version unreadable through the SDK when the server follows the RM: the revision history names the version, and reading it would fail. A narrower reading, accepting absent `data` only when the lifecycle state is `deleted`, would still refuse a version whose identifier, audit and lifecycle state can be read, so the reads leave that check to the caller and to the conformance probe.
 
 ## Decision
 
@@ -35,7 +35,8 @@ The exception is tied to the pin's current text. It lapses when the pin makes `d
 
 - A caller reads a deleted version's identifier, lifecycle state, commit audit and contribution, and finds no payload; the lifecycle state tells a deletion from a server that dropped the data.
 - A body that carries `data` is read exactly as before; the exception only widens what the reads accept.
-- The PROBE-109 conformance probe does not treat a version without `data` as a failure.
+- The cost: a server that drops the `data` of a version that is not deleted reads as no payload too, so a caller who needs the payload checks the lifecycle state.
+- The PROBE-109 conformance probe passes a version without `data` only when its lifecycle state is `deleted`, so a leaf or a server that drops the data of any other version still fails it.
 
 ## Traceability
 
