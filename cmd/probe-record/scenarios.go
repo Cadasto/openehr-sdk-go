@@ -70,13 +70,20 @@ const (
 // ad-hoc queries it refuses. Each call must be refused, or the capture
 // fails rather than record a success in their place.
 func captureErrorEnvelopes(ctx context.Context, c *transport.Client) error {
-	if _, _, err := ehr.Get(ctx, c, ehr.EHRID(cassetteUnknownEHRID)); !errors.Is(err, transport.ErrNotFound) {
-		return fmt.Errorf("get an unknown EHR: got %v, want a 404 refusal", err)
+	_, _, err := ehr.Get(ctx, c, ehr.EHRID(cassetteUnknownEHRID))
+	if err == nil {
+		return errors.New("get an unknown EHR: answered, want a 404 refusal")
+	}
+	if !errors.Is(err, transport.ErrNotFound) {
+		return fmt.Errorf("get an unknown EHR: want a 404 refusal: %w", err)
 	}
 	for _, q := range []string{cassetteMalformedAQL, cassetteUnknownAttributeAQL, cassetteUnsupportedPathAQL} {
 		_, _, err := query.ExecuteString(ctx, c, q, nil)
+		if err == nil {
+			return fmt.Errorf("execute %q: answered, want a 4xx refusal", q)
+		}
 		if we, ok := errors.AsType[*transport.WireError](err); !ok || we == nil || we.StatusCode/100 != 4 {
-			return fmt.Errorf("execute %q: got %v, want a 4xx refusal", q, err)
+			return fmt.Errorf("execute %q: want a 4xx refusal: %w", q, err)
 		}
 	}
 	return nil
