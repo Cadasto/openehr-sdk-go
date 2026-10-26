@@ -263,7 +263,7 @@ The resolver parses and surfaces the following SMART authorization-server metada
 | `token_endpoint_auth_methods_supported` | `TokenEndpointAuthMethodsSupported []string` | Client-auth method list; feeds the `auth/smart` method cross-check and the `auth/clientcreds.NewFromCatalog` check (REQ-068) |
 | `token_endpoint_auth_signing_alg_values_supported` | `TokenEndpointAuthSigningAlgValuesSupported []string` | Client-assertion (client-auth) JWS alg list; checked by `auth/smart` and `auth/clientcreds.NewFromCatalog` (REQ-068) |
 | `authorization_response_iss_parameter_supported` | `AuthorizationResponseIssParameterSupported bool` | RFC 9207 §3; when true, `CompleteAuthorization` refuses a callback without `iss` (REQ-061) |
-| `id_token_signing_alg_values_supported` | `IDTokenSigningAlgValuesSupported []string` | Selects the **ID-token verify allowlist** — pass it to `smart.WithIDTokenSigningAlgs` so `ValidateIDToken` constrains accepted signature algorithms (RS256/RS384/ES256/ES384) (REQ-062, REQ-064; see [auth.md](auth.md#req-062--jwks-rotation)) |
+| `id_token_signing_alg_values_supported` | `IDTokenSigningAlgValuesSupported []string` | Selects the **ID-token verify allowlist** — pass it to `smart.WithIDTokenSigningAlgs` so `ValidateIDToken` constrains accepted signature algorithms (RS256/RS384/ES256/ES384); see [auth.md § REQ-062](auth.md#req-062--jwks-rotation) and REQ-064 |
 
 These fields are **consumed**, not merely surfaced:
 
