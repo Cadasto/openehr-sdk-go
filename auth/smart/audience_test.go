@@ -44,8 +44,8 @@ func authorizeQuery(t *testing.T, src *smart.Source) url.Values {
 // a catalog sends the Platform base URL as aud, not the OpenID Connect
 // issuer, when the caller sets no audience. The catalog's two URLs differ,
 // as they do when a separate identity provider signs the tokens.
-// REQ-061, REQ-065
-func TestNewFromCatalogDefaultsAudienceToBaseURL(t *testing.T) { // REQ-061 REQ-065
+// REQ-061
+func TestNewFromCatalogDefaultsAudienceToBaseURL(t *testing.T) { // REQ-061
 	const (
 		baseURL = "https://platform.example/openehr"
 		issuer  = "https://idp.example/realms/clinic"
