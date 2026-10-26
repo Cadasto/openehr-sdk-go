@@ -507,10 +507,15 @@ partially or silently accepted.
 ## Conformance
 
 **PROBE-076** (landed) exercises the codec over the vendored EHRbase `Test_dv_*` corpus
-(OPT + canonical composition) — 24 pass, 1 skip. It asserts **round-trip idempotence**
+(OPT + canonical composition) — 25 pass, 0 skip. It asserts **round-trip idempotence**
 (FLAT/STRUCTURED/interconversion) **and OPT-conformance**: when the source composition is
 itself OPT-valid, a `WithTemplate` decode must also validate against the OPT. The conformance
 leg catches dropped/mistyped leaves that idempotence alone (a symmetric omission) would miss.
+Its **skeleton leg** builds the `instance.Required` and `instance.Medium` skeletons of every
+COMPOSITION OPT in the corpus (64 templates, 128 pairs) and requires each to validate again
+after a FLAT and a STRUCTURED round trip under `WithTemplate` and `WithStrict`, except two
+named exclusions: the reused-sibling encode refusal (§ Archetype-reuse siblings below) and
+the coded name a template leaves open (§ `LOCATABLE.name` on decode, registered format limit).
 It does **not** compare emitted FLAT/STRUCTURED against vendored upstream simplified
 output — that comparison is **PROBE-086** (Implemented, Sandbox): its harness at
 `testkit/conformance/webtemplate/` round-trips the corpus vendored at
