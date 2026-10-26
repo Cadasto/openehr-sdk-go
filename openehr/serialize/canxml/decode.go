@@ -16,8 +16,9 @@ const NSXMI = "http://www.omg.org/XMI"
 
 // DecoderOption configures a decode, through [Unmarshal] or a [Decoder].
 // [WithUnmatched] and [WithStrict] say what happens to content the decode
-// does not read. [WithRelaxedTypeDispatch] names relaxed polymorphic
-// dispatch; it is accepted but not yet enforced, so dispatch stays strict.
+// does not read; [WithMissing] reports the members the input leaves out.
+// [WithRelaxedTypeDispatch] names relaxed polymorphic dispatch; it is
+// accepted but not yet enforced, so dispatch stays strict.
 type DecoderOption func(*decoderConfig)
 
 // decoderConfig holds the option-driven state of a decode. Kept unexported so
@@ -26,6 +27,7 @@ type decoderConfig struct {
 	relaxedTypeDispatch bool
 	unmatched           func(path string)
 	strict              bool
+	missing             func(pointer string)
 }
 
 // newDecoderConfig applies opts in order, skipping a nil option.
@@ -39,9 +41,11 @@ func newDecoderConfig(opts []DecoderOption) decoderConfig {
 	return c
 }
 
-// tracked reports whether the decode reports or refuses unmatched content.
+// tracked reports whether the decode reports or refuses unmatched content,
+// or reports missing members: each needs the decode to follow the elements
+// it reads.
 func (c decoderConfig) tracked() bool {
-	return c.unmatched != nil || c.strict
+	return c.unmatched != nil || c.strict || c.missing != nil
 }
 
 // tracker returns the tracker of a decode with c's options, and nil for a
@@ -50,7 +54,9 @@ func (c decoderConfig) tracker() *xmlunmatched.Tracker {
 	if !c.tracked() {
 		return nil
 	}
-	return xmlunmatched.NewTracker(c.unmatched, c.strict)
+	t := xmlunmatched.NewTracker(c.unmatched, c.strict)
+	t.ReportMissing(c.missing)
+	return t
 }
 
 // WithUnmatched passes every unmatched item of the input to fn while the
@@ -105,7 +111,8 @@ func WithUnmatched(fn func(path string)) DecoderOption {
 // after the refusal.
 //
 // Strict covers unmatched content only. An absent element is never refused,
-// mandatory or not, and neither is a boundary flag an interval leaves out.
+// mandatory or not ([WithMissing] reports a mandatory one), and neither is
+// a boundary flag an interval leaves out.
 // An unknown `xsi:type` fails in every mode (see [DecodeError]). The decode
 // reads the input as a stream, so strict returns the first problem in
 // document order: an unmatched item before an unknown `xsi:type` refuses the
@@ -146,13 +153,14 @@ type Decoder struct {
 	dec *xml.Decoder
 	cfg decoderConfig
 	// trk is the decoder's tracker when an option reports or refuses
-	// unmatched content, and nil otherwise.
+	// unmatched content or reports missing members, and nil otherwise.
 	trk *xmlunmatched.Tracker
 }
 
 // NewDecoder returns a [Decoder] that reads canonical-XML from r. The
 // options apply to every value it decodes; a path that [WithUnmatched] or
-// [WithStrict] reports is relative to the value being decoded.
+// [WithStrict] reports, and a pointer that [WithMissing] reports, is
+// relative to the value being decoded.
 func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 	cfg := newDecoderConfig(opts)
 	t := cfg.tracker()
@@ -164,13 +172,13 @@ func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 
 // Decode reads the next XML element from the stream and stores it
 // in v. Errors follow the same classification as [Unmarshal], with one
-// difference: a Decoder given neither [WithUnmatched] nor [WithStrict] reads
-// the stream once and does not follow the path of the elements it reads, so
-// the [DecodeError] for the text of a primitive element that does not decode
-// as its type names the element alone, such as "/is_queryable", inside the
-// envelope of each polymorphic slot it sits in. A Decoder given either
-// option returns it on its own, with the element's path from the root of the
-// value, as [Unmarshal] does.
+// difference: a Decoder given none of [WithUnmatched], [WithStrict] and
+// [WithMissing] reads the stream once and does not follow the path of the
+// elements it reads, so the [DecodeError] for the text of a primitive
+// element that does not decode as its type names the element alone, such as
+// "/is_queryable", inside the envelope of each polymorphic slot it sits in.
+// A Decoder given any of them returns it on its own, with the element's
+// path from the root of the value, as [Unmarshal] does.
 //
 // Decode reads no further than the end of that element, so whatever
 // follows it, another element included, is left for the next call. A
@@ -208,8 +216,8 @@ func (d *Decoder) RelaxedTypeDispatch() bool { return d.cfg.relaxedTypeDispatch 
 // may follow the root, as XML allows. Anything else before or after the
 // root, such as an element or text other than whitespace, is not
 // well-formed XML, and the decode refuses it in every mode, with or without
-// [WithUnmatched] or [WithStrict]: it is malformed input, not unmatched
-// content. The error wraps [ErrInvalidShape] and carries none of that
+// [WithUnmatched], [WithStrict] or [WithMissing]: it is malformed input, not
+// unmatched content. The error wraps [ErrInvalidShape] and carries none of that
 // content. A root that fails to decode fails as itself, and the decode does
 // not read on.
 //
@@ -235,7 +243,10 @@ func (d *Decoder) RelaxedTypeDispatch() bool { return d.cfg.relaxedTypeDispatch 
 //
 // Content the decode does not read is ignored by default. [WithUnmatched]
 // reports each such item and [WithStrict] refuses the first, wrapping
-// [ErrUnknownElement].
+// [ErrUnknownElement]. A mandatory member the input leaves out is decoded
+// as its zero value by default, and [WithMissing] reports each one, by its
+// JSON Pointer in the canonical-JSON form of the instance; no mode refuses
+// one.
 func Unmarshal(data []byte, v any, opts ...DecoderOption) error {
 	return xmlunmatched.Unmarshal(data, v, newDecoderConfig(opts).tracker())
 }
