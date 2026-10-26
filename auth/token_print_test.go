@@ -172,3 +172,16 @@ func TestREQ060_TokenJSONUnchanged(t *testing.T) { // REQ-060
 		t.Errorf("json round trip = %#v, want %#v", plainToken(back), plainToken(tok))
 	}
 }
+
+// TestREQ060_StaticTokenSourcePrintsNoCredential pins REQ-060: the token
+// source auth.StaticTokenSource returns holds its token in an unexported
+// field, which fmt prints without calling the token's methods, so the source
+// prints the token's String text itself, with any fmt verb.
+func TestREQ060_StaticTokenSourcePrintsNoCredential(t *testing.T) { // REQ-060
+	t.Parallel()
+	const secret = "STATIC-TOKEN-s3cr3t"
+	ts := auth.StaticTokenSource(auth.Token{Value: secret, Type: auth.TokenTypeBearer})
+	for _, p := range printProblems(ts, []string{secret}, []string{redactedMarker, "Bearer"}) {
+		t.Error(p)
+	}
+}

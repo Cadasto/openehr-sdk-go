@@ -84,6 +84,19 @@ func (s staticTokenSource) Token(ctx context.Context) (Token, error) {
 	return s.t, nil
 }
 
+// String describes s by the text of [Token.String] for its token. fmt reads
+// the unexported field t without calling the token's methods, so without
+// String and Format a printed source would show the token's Value.
+func (s staticTokenSource) String() string {
+	return "auth.StaticTokenSource(" + s.t.String() + ")"
+}
+
+// GoString returns the text of String.
+func (s staticTokenSource) GoString() string { return s.String() }
+
+// Format writes the text of String for every fmt verb it is called for.
+func (s staticTokenSource) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, s.String()) }
+
 // AnonymousTokenSource returns a TokenSource that yields a zero-value
 // Token. transport/ treats a zero Token as "do not emit an Authorization
 // header", which makes it the standard way to send an unauthenticated
