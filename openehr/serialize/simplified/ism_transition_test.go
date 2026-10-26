@@ -303,12 +303,12 @@ func TestActionIsmTransitionTwoNodesRefused(t *testing.T) {
 // JSON handed to canjson — in either decode mode.
 func TestIsmTransitionCanonicalJSONCarriesOnlyRMMembers(t *testing.T) {
 	wt, compiled := conformanceWT(t)
-	for name, names := range map[string]map[string]string{
+	for name, tmpl := range map[string]*templateIndex{
 		"without a template": nil,
-		"with a template":    buildNameIndex(compiled),
+		"with a template":    buildTemplateIndex(compiled),
 	} {
 		t.Run(name, func(t *testing.T) {
-			compJSON, err := decodeFlat(rmattrBody(ismTransitionKeys("transition", "524", "at0005")), wt, names, nil)
+			compJSON, err := decodeFlat(rmattrBody(ismTransitionKeys("transition", "524", "at0005")), wt, tmpl, nil)
 			if err != nil {
 				t.Fatalf("decodeFlat: %v", err)
 			}

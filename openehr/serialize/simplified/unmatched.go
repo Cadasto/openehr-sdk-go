@@ -102,12 +102,12 @@ var errNothingMatched = errors.New("simplified: every key of the group is unmatc
 // stopEarly ends the loop after a first pass that found unmatched keys and
 // read the whole body without failing: every unmatched key is then known, and
 // a strict decode refuses whatever the next pass would make of the rest.
-func decodeFlatIgnoring(flat map[string]any, wt *webtemplate.WebTemplate, names map[string]string, stopEarly bool) (map[string]any, []string, error) {
+func decodeFlatIgnoring(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *templateIndex, stopEarly bool) (map[string]any, []string, error) {
 	var unmatched []string
 	body := flat
 	for {
 		sink := &unmatchedSink{}
-		compJSON, err := decodeFlat(passInput(body), wt, names, sink)
+		compJSON, err := decodeFlat(passInput(body), wt, tmpl, sink)
 		if len(sink.keys) == 0 || (stopEarly && err == nil) {
 			return compJSON, append(unmatched, sink.keys...), err
 		}

@@ -26,7 +26,7 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 | alternative_events | flat-canonical | compared 115, missing 8, extra 4, altered 13, excluded 4 |
 | consult_record | json-xml | compared 150, missing 0, extra 0, altered 0, excluded 0 |
 | consult_record | canonical-flat | compared 26, missing 1, extra 6, altered 0, excluded 0 |
-| consult_record | flat-canonical | compared 150, missing 34, extra 27, altered 15, excluded 4 |
+| consult_record | flat-canonical | compared 150, missing 7, extra 0, altered 6, excluded 4 |
 | consult_record | flat-structured | compared 40, missing 12, extra 5, altered 0, excluded 0 |
 | consult_record | structured-flat | compared 29, missing 0, extra 1, altered 0, excluded 1 |
 | corona | canonical-flat | refused |
@@ -34,18 +34,18 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 | corona | flat-structured | compared 113, missing 0, extra 0, altered 0, excluded 0 |
 | corona | structured-flat | compared 10, missing 0, extra 0, altered 0, excluded 94 |
 | ehrn_abdm | canonical-flat | compared 31, missing 1, extra 1, altered 0, excluded 0 |
-| ehrn_abdm | flat-canonical | compared 150, missing 33, extra 27, altered 13, excluded 1 |
+| ehrn_abdm | flat-canonical | compared 150, missing 6, extra 0, altered 4, excluded 1 |
 | family_history | json-xml | compared 95, missing 0, extra 0, altered 0, excluded 0 |
 | multi_list | flat-structured | compared 50, missing 0, extra 0, altered 0, excluded 0 |
 | multi_list | structured-flat | compared 41, missing 0, extra 0, altered 0, excluded 0 |
 | multi_occurrence | canonical-flat | compared 45, missing 0, extra 0, altered 5, excluded 0 |
 | multi_occurrence | flat-canonical | compared 249, missing 0, extra 8, altered 9, excluded 0 |
 | nested | canonical-flat | compared 19, missing 3, extra 9, altered 0, excluded 0 |
-| nested | flat-canonical | compared 156, missing 78, extra 48, altered 11, excluded 0 |
+| nested | flat-canonical | compared 156, missing 34, extra 4, altered 8, excluded 0 |
 | persistent_minimal | canonical-flat | compared 11, missing 0, extra 1, altered 1, excluded 0 |
 | persistent_minimal | flat-canonical | compared 72, missing 2, extra 0, altered 5, excluded 0 |
 | test_all_types | canonical-flat | compared 83, missing 8, extra 6, altered 11, excluded 0 |
-| test_all_types | flat-canonical | compared 423, missing 347, extra 332, altered 15, excluded 11 |
+| test_all_types | flat-canonical | compared 423, missing 51, extra 36, altered 40, excluded 11 |
 
 ## alternative_events
 
@@ -62,7 +62,7 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 ### flat-canonical
 
 - Outcome: compared 115, missing 8, extra 4, altered 13, excluded 4
-- Reason: INTERVAL_EVENT attributes: decode refuses math_function and width in every mode (the 4 excluded keys), so the interval event loses both and decodes as a POINT_EVENT. Sibling order: FLAT carries no order between the birth_en and any_event_en events; decode lists them in the sorted order of their FLAT keys, any_event_en before birth_en, the canonical lists Birth first, so the leaves of all three events compare at shifted positions. HISTORY.origin: the FLAT has no origin key and decode fills it from the context start time (openehr/serialize/simplified/deviations.md), where the canonical sets it to the Birth time. RM-FLOOR archetype_details: the canonical OBSERVATION has none, decode adds it (4 extra leaves), and rm_version is 1.2.0 against 1.0.4.
+- Reason: INTERVAL_EVENT attributes: decode refuses math_function and width in every mode (the 4 excluded keys), so the interval event loses both and decodes as a POINT_EVENT. Sibling order: FLAT carries no order between the birth_en and any_event_en events; decode lists them in template order (openehr/serialize/simplified/deviations.md), any_event_en before birth_en, the canonical lists Birth first, so the leaves of all three events compare at shifted positions. HISTORY.origin: the FLAT has no origin key and decode fills it from the context start time (openehr/serialize/simplified/deviations.md), where the canonical sets it to the Birth time. RM-FLOOR archetype_details: the canonical OBSERVATION has none, decode adds it (4 extra leaves), and rm_version is 1.2.0 against 1.0.4.
 - Missing (8):
   - `/content/0/data/events/2/math_function/_type`
   - `/content/0/data/events/2/math_function/defining_code/_type`
@@ -114,41 +114,23 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 
 ### flat-canonical
 
-- Outcome: compared 150, missing 34, extra 27, altered 15, excluded 4
-- Reason: The 4 excluded keys are ctx/time and ctx/setting, refused, and ctx/location and created/date_time_value, reported as unmatched content, as follows. UPSTREAM consult_record ctx conflict: the FLAT gives ctx/time and context/start_time different values, decode refuses the pair and the harness removes ctx/time; the start time left agrees with the canonical. ctx/setting: the FLAT writes ctx/setting as bare text, the setting without the |code and |value the codec reads it as, which decode refuses in every mode as a missing required suffix (REQ-170); the harness removes it, so decode fills the default 238 other care against the canonical 228 primary medical care. ctx/location: the codec does not read ctx/location (it reads context/_location, ADR 0016), so the location is missing. Choice element: decode does not read media_file/created/date_time_value (the SDK spells it created). Sibling order: FLAT carries no order between the document_attachment items; decode lists the media_file cluster first, the canonical lists it last, so the item leaves compare at shifted positions. RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (3 leaves).
-- Missing (34, first 10 shown):
-  - `/content/0/data/items/0/value/_type`
-  - `/content/0/data/items/0/value/value`
-  - `/content/0/data/items/1/value/defining_code/_type`
-  - `/content/0/data/items/1/value/defining_code/code_string`
-  - `/content/0/data/items/1/value/defining_code/terminology_id/_type`
-  - `/content/0/data/items/1/value/defining_code/terminology_id/value`
-  - `/content/0/data/items/2/archetype_details/_type`
-  - `/content/0/data/items/2/archetype_details/archetype_id/_type`
-  - `/content/0/data/items/2/archetype_details/archetype_id/value`
-  - `/content/0/data/items/2/archetype_details/rm_version`
-- Extra (27, first 10 shown):
-  - `/content/0/data/items/0/archetype_details/_type`
-  - `/content/0/data/items/0/archetype_details/archetype_id/_type`
-  - `/content/0/data/items/0/archetype_details/archetype_id/value`
-  - `/content/0/data/items/0/archetype_details/rm_version`
-  - `/content/0/data/items/0/items/0/_type`
-  - `/content/0/data/items/0/items/0/archetype_node_id`
-  - `/content/0/data/items/0/items/0/name/_type`
-  - `/content/0/data/items/0/items/0/name/value`
-  - `/content/0/data/items/0/items/0/value/_type`
-  - `/content/0/data/items/0/items/0/value/data`
-- Altered (15, first 10 shown):
+- Outcome: compared 150, missing 7, extra 0, altered 6, excluded 4
+- Reason: The 4 excluded keys are ctx/time and ctx/setting, refused, and ctx/location and created/date_time_value, reported as unmatched content, as follows. UPSTREAM consult_record ctx conflict: the FLAT gives ctx/time and context/start_time different values, decode refuses the pair and the harness removes ctx/time; the start time left agrees with the canonical. ctx/setting: the FLAT writes ctx/setting as bare text, the setting without the |code and |value the codec reads it as, which decode refuses in every mode as a missing required suffix (REQ-170); the harness removes it, so decode fills the default 238 other care against the canonical 228 primary medical care. ctx/location: the codec does not read ctx/location (it reads context/_location, ADR 0016), so the location is missing. Choice element: decode does not read media_file/created/date_time_value (the SDK spells it created), so the media_file cluster lacks its created element (6 leaves). RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (4 leaves).
+- Missing (7):
+  - `/content/0/data/items/2/items/2/_type`
+  - `/content/0/data/items/2/items/2/archetype_node_id`
+  - `/content/0/data/items/2/items/2/name/_type`
+  - `/content/0/data/items/2/items/2/name/value`
+  - `/content/0/data/items/2/items/2/value/_type`
+  - `/content/0/data/items/2/items/2/value/value`
+  - `/context/location`
+- Altered (6):
   - `/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
   - `/content/0/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
-  - `/content/0/data/items/0/_type`: reference `"ELEMENT"`, ours `"CLUSTER"`
-  - `/content/0/data/items/0/archetype_node_id`: reference `"at0005"`, ours `"openEHR-EHR-CLUSTER.media_file.v1"`
-  - `/content/0/data/items/0/name/value`: reference `"Name"`, ours `"Media file"`
-  - `/content/0/data/items/1/archetype_node_id`: reference `"at0008"`, ours `"at0005"`
-  - `/content/0/data/items/1/name/value`: reference `"Status"`, ours `"Name"`
-  - `/content/0/data/items/1/value/_type`: reference `"DV_CODED_TEXT"`, ours `"DV_TEXT"`
-  - `/content/0/data/items/1/value/value`: reference `"final"`, ours `"OP consult record"`
-  - `/content/0/data/items/2/_type`: reference `"CLUSTER"`, ours `"ELEMENT"`
+  - `/content/0/data/items/2/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
+  - `/context/other_context/items/0/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
+  - `/context/setting/defining_code/code_string`: reference `"228"`, ours `"238"`
+  - `/context/setting/value`: reference `"primary medical care"`, ours `"other care"`
 - Reducing decode removed 4 keys from the upstream FLAT:
   - 2: `reported as unmatched content`
   - 1: `simplified: path not in web template: conflicting spellings of <key>: "<key>" gives "2023-06-02T12:50:00Z", "opconsultation/context/start_time" gives "2022-02-03T04:05:06"; remove one`
@@ -246,41 +228,20 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 
 ### flat-canonical
 
-- Outcome: compared 150, missing 33, extra 27, altered 13, excluded 1
-- Reason: The excluded key is created/date_time_value, reported as unmatched content, as follows. Choice element: decode does not read media_file/created/date_time_value (the SDK spells it created). Sibling order: FLAT carries no order between the document_attachment items; decode lists the media_file cluster first, the canonical lists it last, so the item leaves compare at shifted positions. RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (3 leaves).
-- Missing (33, first 10 shown):
-  - `/content/0/data/items/0/value/_type`
-  - `/content/0/data/items/0/value/value`
-  - `/content/0/data/items/1/value/defining_code/_type`
-  - `/content/0/data/items/1/value/defining_code/code_string`
-  - `/content/0/data/items/1/value/defining_code/terminology_id/_type`
-  - `/content/0/data/items/1/value/defining_code/terminology_id/value`
-  - `/content/0/data/items/2/archetype_details/_type`
-  - `/content/0/data/items/2/archetype_details/archetype_id/_type`
-  - `/content/0/data/items/2/archetype_details/archetype_id/value`
-  - `/content/0/data/items/2/archetype_details/rm_version`
-- Extra (27, first 10 shown):
-  - `/content/0/data/items/0/archetype_details/_type`
-  - `/content/0/data/items/0/archetype_details/archetype_id/_type`
-  - `/content/0/data/items/0/archetype_details/archetype_id/value`
-  - `/content/0/data/items/0/archetype_details/rm_version`
-  - `/content/0/data/items/0/items/0/_type`
-  - `/content/0/data/items/0/items/0/archetype_node_id`
-  - `/content/0/data/items/0/items/0/name/_type`
-  - `/content/0/data/items/0/items/0/name/value`
-  - `/content/0/data/items/0/items/0/value/_type`
-  - `/content/0/data/items/0/items/0/value/data`
-- Altered (13, first 10 shown):
+- Outcome: compared 150, missing 6, extra 0, altered 4, excluded 1
+- Reason: The excluded key is created/date_time_value, reported as unmatched content, as follows. Choice element: decode does not read media_file/created/date_time_value (the SDK spells it created), so the media_file cluster lacks its created element (6 leaves). RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (4 leaves).
+- Missing (6):
+  - `/content/0/data/items/2/items/2/_type`
+  - `/content/0/data/items/2/items/2/archetype_node_id`
+  - `/content/0/data/items/2/items/2/name/_type`
+  - `/content/0/data/items/2/items/2/name/value`
+  - `/content/0/data/items/2/items/2/value/_type`
+  - `/content/0/data/items/2/items/2/value/value`
+- Altered (4):
   - `/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
   - `/content/0/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
-  - `/content/0/data/items/0/_type`: reference `"ELEMENT"`, ours `"CLUSTER"`
-  - `/content/0/data/items/0/archetype_node_id`: reference `"at0005"`, ours `"openEHR-EHR-CLUSTER.media_file.v1"`
-  - `/content/0/data/items/0/name/value`: reference `"Name"`, ours `"Media file"`
-  - `/content/0/data/items/1/archetype_node_id`: reference `"at0008"`, ours `"at0005"`
-  - `/content/0/data/items/1/name/value`: reference `"Status"`, ours `"Name"`
-  - `/content/0/data/items/1/value/_type`: reference `"DV_CODED_TEXT"`, ours `"DV_TEXT"`
-  - `/content/0/data/items/1/value/value`: reference `"final"`, ours `"OP consult record"`
-  - `/content/0/data/items/2/_type`: reference `"CLUSTER"`, ours `"ELEMENT"`
+  - `/content/0/data/items/2/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
+  - `/context/other_context/items/0/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
 - Reducing decode removed 1 key from the upstream FLAT:
   - 1: `reported as unmatched content`
 
@@ -360,41 +321,33 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 
 ### flat-canonical
 
-- Outcome: compared 156, missing 78, extra 48, altered 11, excluded 0
-- Reason: party reference type: the upstream FLAT writes no composer|type, so decode gives the composer's reference the type PARTY against the canonical's PERSON. Upstream FLAT omissions: the FLAT carries no context (start time, setting, participation) and no ACTIVITY action_archetype_id, so the decoded composition has no context and an empty action_archetype_id. Sibling order: FLAT carries no order between the ordinal ELEMENT and the nested CLUSTER of the activity description; decode lists the CLUSTER first, the canonical lists it second, so their leaves compare at shifted positions, and the ordinal decodes in the local terminology its |code form implies. RM-FLOOR archetype_details: the canonical SECTION has none and decode adds it (4 extra leaves), the canonical carries template_id on inner archetype roots where decode adds it on the root only, and rm_version is 1.2.0 against 1.0.2.
-- Missing (78, first 10 shown):
+- Outcome: compared 156, missing 34, extra 4, altered 8, excluded 0
+- Reason: party reference type: the upstream FLAT writes no composer|type, so decode gives the composer's reference the type PARTY against the canonical's PERSON. Upstream FLAT omissions: the FLAT carries no context (start time, setting, participation) and no ACTIVITY action_archetype_id, so the decoded composition has no context and an empty action_archetype_id. DV_ORDINAL terminology: the ordinal decodes in the local terminology its |code form implies, against the canonical's com.cabolabs.openehr.opt. RM-FLOOR archetype_details: the canonical SECTION has none and decode adds it (4 extra leaves), the canonical carries template_id on inner archetype roots where decode adds it on the root only, and rm_version is 1.2.0 against 1.0.2.
+- Missing (34, first 10 shown):
   - `/content/0/items/0/activities/0/description/archetype_details/template_id/_type`
   - `/content/0/items/0/activities/0/description/archetype_details/template_id/value`
-  - `/content/0/items/0/activities/0/description/items/0/value/_type`
-  - `/content/0/items/0/activities/0/description/items/0/value/symbol/_type`
-  - `/content/0/items/0/activities/0/description/items/0/value/symbol/defining_code/_type`
-  - `/content/0/items/0/activities/0/description/items/0/value/symbol/defining_code/code_string`
-  - `/content/0/items/0/activities/0/description/items/0/value/symbol/defining_code/terminology_id/_type`
-  - `/content/0/items/0/activities/0/description/items/0/value/symbol/defining_code/terminology_id/value`
-  - `/content/0/items/0/activities/0/description/items/0/value/symbol/value`
-  - `/content/0/items/0/activities/0/description/items/0/value/value`
-- Extra (48, first 10 shown):
+  - `/content/0/items/0/activities/0/description/items/1/archetype_details/template_id/_type`
+  - `/content/0/items/0/activities/0/description/items/1/archetype_details/template_id/value`
+  - `/content/0/items/0/activities/0/description/items/1/items/2/archetype_details/template_id/_type`
+  - `/content/0/items/0/activities/0/description/items/1/items/2/archetype_details/template_id/value`
+  - `/content/0/items/0/archetype_details/template_id/_type`
+  - `/content/0/items/0/archetype_details/template_id/value`
+  - `/context/_type`
+  - `/context/participations/0/_type`
+- Extra (4):
   - `/content/0/archetype_details/_type`
   - `/content/0/archetype_details/archetype_id/_type`
   - `/content/0/archetype_details/archetype_id/value`
   - `/content/0/archetype_details/rm_version`
-  - `/content/0/items/0/activities/0/description/items/0/archetype_details/_type`
-  - `/content/0/items/0/activities/0/description/items/0/archetype_details/archetype_id/_type`
-  - `/content/0/items/0/activities/0/description/items/0/archetype_details/archetype_id/value`
-  - `/content/0/items/0/activities/0/description/items/0/archetype_details/rm_version`
-  - `/content/0/items/0/activities/0/description/items/0/items/0/_type`
-  - `/content/0/items/0/activities/0/description/items/0/items/0/archetype_node_id`
-- Altered (11, first 10 shown):
+- Altered (8):
   - `/archetype_details/rm_version`: reference `"1.0.2"`, ours `"1.2.0"`
   - `/composer/external_ref/type`: reference `"PERSON"`, ours `"PARTY"`
   - `/content/0/items/0/activities/0/action_archetype_id`: reference `"openEHR-EHR-ACTION\\.sample_action\\.v1"`, ours `""`
   - `/content/0/items/0/activities/0/description/archetype_details/rm_version`: reference `"1.0.2"`, ours `"1.2.0"`
-  - `/content/0/items/0/activities/0/description/items/0/_type`: reference `"ELEMENT"`, ours `"CLUSTER"`
-  - `/content/0/items/0/activities/0/description/items/0/archetype_node_id`: reference `"at0002"`, ours `"openEHR-EHR-CLUSTER.nested.v1"`
-  - `/content/0/items/0/activities/0/description/items/0/name/value`: reference `"ordinal"`, ours `"Nested"`
-  - `/content/0/items/0/activities/0/description/items/1/_type`: reference `"CLUSTER"`, ours `"ELEMENT"`
-  - `/content/0/items/0/activities/0/description/items/1/archetype_node_id`: reference `"openEHR-EHR-CLUSTER.nested.v1"`, ours `"at0002"`
-  - `/content/0/items/0/activities/0/description/items/1/name/value`: reference `"Nested"`, ours `"ordinal"`
+  - `/content/0/items/0/activities/0/description/items/0/value/symbol/defining_code/terminology_id/value`: reference `"com.cabolabs.openehr.opt"`, ours `"local"`
+  - `/content/0/items/0/activities/0/description/items/1/archetype_details/rm_version`: reference `"1.0.2"`, ours `"1.2.0"`
+  - `/content/0/items/0/activities/0/description/items/1/items/2/archetype_details/rm_version`: reference `"1.0.2"`, ours `"1.2.0"`
+  - `/content/0/items/0/archetype_details/rm_version`: reference `"1.0.2"`, ours `"1.2.0"`
 
 ## persistent_minimal
 
@@ -457,41 +410,41 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 
 ### flat-canonical
 
-- Outcome: compared 423, missing 347, extra 332, altered 15, excluded 11
-- Reason: The 11 excluded keys are the section_3 ACTION's in-context ism_transition/current_state (3) and time (1) and the identifier keys (4), refused, and choice/quantity_value|magnitude and |unit (2) and the bare proportion_any (1), reported as unmatched content, as follows. Web Template projection: decode refuses the ACTION's in-context ism_transition and time in every mode as RM data it would otherwise drop or replace (REQ-170), so the decoded ACTION has an empty current_state (3 leaves) and the context start time as its time. party reference type: the upstream FLAT writes no composer|type, so decode gives the composer's reference the type PARTY against the canonical's PERSON. DV_IDENTIFIER: the FLAT writes the id as the bare value, and decode refuses the four identifier keys as missing the required |id, so the identifier element is missing. Choice element: decode does not read choice/quantity_value (the SDK spells it choice), so the choice element is missing. DV_PROPORTION: decode reports the bare proportion_any, the derived magnitude, as unmatched content, and reads |type 1.0 as the Integer 1 (wire.md § Floating-point precision). Upstream conversion differences: a DV_URI and the proportion's precision only the canonical carries, and duration_any (P1Y2M10DT2H30M against PT30M). Upstream date and time spelling: the canonical writes dates in the basic format (20190114) and date-times with a comma and +00:00, the FLAT in the extended format with a full stop and Z (9 leaves). HISTORY.origin: the FLAT has no origin key and decode fills it from the context start time (openehr/serialize/simplified/deviations.md), where the canonical sets it otherwise. ITEM_TREE vs ITEM_LIST: decode builds the INSTRUCTION activity's description as an ITEM_TREE, the canonical has the ITEM_LIST the OPT constrains (openehr/serialize/simplified/deviations.md). Sibling order: FLAT carries no order between siblings, and decode lists them in the sorted order of their FLAT keys, so the content entries (EVALUATION, SECTION, OBSERVATION against the canonical's OBSERVATION, EVALUATION, SECTION), the OBSERVATION's and the EVALUATION's elements, and section_3's ACTION and INSTRUCTION compare at shifted positions; this accounts for most of the missing, extra and altered leaves. RM-FLOOR archetype_details: the canonical SECTION and the ACTION's description CLUSTER have none, decode adds them (8 extra leaves), and rm_version is 1.2.0 against 1.0.2 and 1.0.4.
-- Missing (347, first 10 shown):
-  - `/content/0/data/events/0/_type`
-  - `/content/0/data/events/0/archetype_node_id`
-  - `/content/0/data/events/0/data/_type`
-  - `/content/0/data/events/0/data/archetype_node_id`
-  - `/content/0/data/events/0/data/items/0/_type`
-  - `/content/0/data/events/0/data/items/0/archetype_node_id`
-  - `/content/0/data/events/0/data/items/0/name/_type`
-  - `/content/0/data/events/0/data/items/0/name/value`
-  - `/content/0/data/events/0/data/items/0/value/_type`
-  - `/content/0/data/events/0/data/items/0/value/value`
-- Extra (332, first 10 shown):
-  - `/content/0/data/items/0/_type`
-  - `/content/0/data/items/0/archetype_node_id`
-  - `/content/0/data/items/0/items/0/_type`
-  - `/content/0/data/items/0/items/0/archetype_node_id`
-  - `/content/0/data/items/0/items/0/items/0/_type`
-  - `/content/0/data/items/0/items/0/items/0/archetype_node_id`
-  - `/content/0/data/items/0/items/0/items/0/items/0/_type`
-  - `/content/0/data/items/0/items/0/items/0/items/0/archetype_node_id`
-  - `/content/0/data/items/0/items/0/items/0/items/0/name/_type`
-  - `/content/0/data/items/0/items/0/items/0/items/0/name/value`
-- Altered (15, first 10 shown):
+- Outcome: compared 423, missing 51, extra 36, altered 40, excluded 11
+- Reason: The 11 excluded keys are the section_3 ACTION's in-context ism_transition/current_state (3) and time (1) and the identifier keys (4), refused, and choice/quantity_value|magnitude and |unit (2) and the bare proportion_any (1), reported as unmatched content, as follows. Web Template projection: decode refuses the ACTION's in-context ism_transition and time in every mode as RM data it would otherwise drop or replace (REQ-170), so the decoded ACTION has an empty current_state (3 leaves) and the context start time as its time. party reference type: the upstream FLAT writes no composer|type, so decode gives the composer's reference the type PARTY against the canonical's PERSON. DV_IDENTIFIER: the FLAT writes the id as the bare value, and decode refuses the four identifier keys as missing the required |id, so the identifier element is missing. Choice element: decode does not read choice/quantity_value (the SDK spells it choice), so the choice element is missing. DV_PROPORTION: decode reports the bare proportion_any, the derived magnitude, as unmatched content, and reads |type 1.0 as the Integer 1 (wire.md § Floating-point precision). Upstream conversion differences: a DV_URI and the proportion's precision only the canonical carries, and duration_any (P1Y2M10DT2H30M against PT30M). Upstream date and time spelling: the canonical writes dates in the basic format (20190114) and date-times with a comma and +00:00, the FLAT in the extended format with a full stop and Z (7 leaves). HISTORY.origin: the FLAT has no origin key and decode fills it from the context start time (openehr/serialize/simplified/deviations.md), where the canonical sets it otherwise. Shifted positions: the elements decode lacks move their later siblings up, the identifier in the OBSERVATION and the DV_URI and the choice element in the EVALUATION, so the OBSERVATION's proportion and the EVALUATION's intervals and cluster compare against the canonical's next element; this accounts for most of the missing, extra and altered leaves. RM-FLOOR archetype_details: the canonical SECTION and the ACTION's description CLUSTER have none, decode adds them (8 extra leaves), and rm_version is 1.2.0 against 1.0.2 and 1.0.4.
+- Missing (51, first 10 shown):
+  - `/content/0/data/events/0/data/items/14/value/assigner`
+  - `/content/0/data/events/0/data/items/14/value/id`
+  - `/content/0/data/events/0/data/items/14/value/issuer`
+  - `/content/0/data/events/0/data/items/15/_type`
+  - `/content/0/data/events/0/data/items/15/archetype_node_id`
+  - `/content/0/data/events/0/data/items/15/name/_type`
+  - `/content/0/data/events/0/data/items/15/name/value`
+  - `/content/0/data/events/0/data/items/15/value/_type`
+  - `/content/0/data/events/0/data/items/15/value/denominator`
+  - `/content/0/data/events/0/data/items/15/value/numerator`
+- Extra (36, first 10 shown):
+  - `/content/0/data/events/0/data/items/14/value/denominator`
+  - `/content/0/data/events/0/data/items/14/value/numerator`
+  - `/content/1/data/items/0/value/lower/_type`
+  - `/content/1/data/items/0/value/lower/magnitude`
+  - `/content/1/data/items/0/value/lower_included`
+  - `/content/1/data/items/0/value/lower_unbounded`
+  - `/content/1/data/items/0/value/upper/_type`
+  - `/content/1/data/items/0/value/upper/magnitude`
+  - `/content/1/data/items/0/value/upper_included`
+  - `/content/1/data/items/0/value/upper_unbounded`
+- Altered (40, first 10 shown):
   - `/archetype_details/rm_version`: reference `"1.0.2"`, ours `"1.2.0"`
   - `/composer/external_ref/type`: reference `"PERSON"`, ours `"PARTY"`
-  - `/content/0/_type`: reference `"OBSERVATION"`, ours `"EVALUATION"`
-  - `/content/0/archetype_details/archetype_id/value`: reference `"openEHR-EHR-OBSERVATION.test_all_types.v1"`, ours `"openEHR-EHR-EVALUATION.test_all_types.v1"`
   - `/content/0/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
-  - `/content/0/archetype_node_id`: reference `"openEHR-EHR-OBSERVATION.test_all_types.v1"`, ours `"openEHR-EHR-EVALUATION.test_all_types.v1"`
-  - `/content/0/data/_type`: reference `"HISTORY"`, ours `"ITEM_TREE"`
-  - `/content/0/data/name/value`: reference `"Event Series"`, ours `"Arbol"`
-  - `/content/1/_type`: reference `"EVALUATION"`, ours `"SECTION"`
-  - `/content/1/archetype_details/archetype_id/value`: reference `"openEHR-EHR-EVALUATION.test_all_types.v1"`, ours `"openEHR-EHR-SECTION.test_all_types.v1"`
+  - `/content/0/data/events/0/data/items/11/value/value`: reference `"P1Y2M10DT2H30M"`, ours `"PT30M"`
+  - `/content/0/data/events/0/data/items/14/archetype_node_id`: reference `"at0021"`, ours `"at0022"`
+  - `/content/0/data/events/0/data/items/14/name/value`: reference `"identifier"`, ours `"proportion any"`
+  - `/content/0/data/events/0/data/items/14/value/_type`: reference `"DV_IDENTIFIER"`, ours `"DV_PROPORTION"`
+  - `/content/0/data/events/0/data/items/14/value/type`: reference `"LOCALID"`, ours `1`
+  - `/content/0/data/events/0/data/items/5/value/value`: reference `"20190114"`, ours `"2019-01-14"`
+  - `/content/0/data/events/0/data/items/6/value/value`: reference `"2019-01-28T21:22:49,426+00:00"`, ours `"2019-01-28T21:22:49.426Z"`
 - Reducing decode removed 11 keys from the upstream FLAT:
   - 4: `simplified: decode "<key>": simplified: unsupported datatype: DV_IDENTIFIER missing required |id`
   - 3: `reported as unmatched content`

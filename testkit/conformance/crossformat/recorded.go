@@ -187,9 +187,9 @@ var Recorded = map[string]map[Leg]Record{
 			Reason: "INTERVAL_EVENT attributes: decode refuses math_function and width in every mode (the 4 " +
 				"excluded keys), so the interval event loses both and decodes as a POINT_EVENT. Sibling order: FLAT " +
 				"carries no order " +
-				"between the birth_en and any_event_en events; decode lists them in the sorted order of their FLAT " +
-				"keys, any_event_en before birth_en, the canonical lists Birth first, so the leaves of all three " +
-				"events compare at shifted positions. HISTORY.origin: the " +
+				"between the birth_en and any_event_en events; decode lists them in template order " +
+				"(openehr/serialize/simplified/deviations.md), any_event_en before birth_en, the canonical lists " +
+				"Birth first, so the leaves of all three events compare at shifted positions. HISTORY.origin: the " +
 				"FLAT has no origin key and decode fills it from the context start time (openehr/serialize/simplified/deviations.md), where the " +
 				"canonical sets it to the Birth time. RM-FLOOR archetype_details: the canonical OBSERVATION has none, " +
 				"decode adds it (4 extra leaves), and rm_version is 1.2.0 against 1.0.4.",
@@ -206,7 +206,7 @@ var Recorded = map[string]map[Leg]Record{
 				"them on document_attachment and FLAT encode writes them (4 keys).",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 150, Missing: 34, Extra: 27, Altered: 15, Excluded: 4},
+			Outcome: Outcome{Compared: 150, Missing: 7, Altered: 6, Excluded: 4},
 			Reason: "The 4 excluded keys are ctx/time and ctx/setting, refused, " +
 				"and ctx/location and created/date_time_value, reported as unmatched content, as " +
 				"follows. UPSTREAM consult_record ctx conflict: the " +
@@ -217,10 +217,8 @@ var Recorded = map[string]map[Leg]Record{
 				"so decode fills the default 238 other care against the canonical 228 primary medical care. " +
 				"ctx/location: the codec does not read ctx/location (it reads context/_location, ADR 0016), so the " +
 				"location is missing. Choice element: decode does not read media_file/created/date_time_value " +
-				"(the SDK spells it created). Sibling order: FLAT " +
-				"carries no order between the document_attachment items; decode lists the media_file cluster first, " +
-				"the canonical lists it last, so the item leaves compare at shifted positions. RM-FLOOR " +
-				"archetype_details: rm_version is 1.2.0 against 1.0.4 (3 leaves).",
+				"(the SDK spells it created), so the media_file cluster lacks its created element (6 leaves). " +
+				"RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (4 leaves).",
 		},
 		LegFlatStructured: {
 			Outcome: Outcome{Compared: 40, Missing: 12, Extra: 5},
@@ -265,12 +263,11 @@ var Recorded = map[string]map[Leg]Record{
 				"spells the value created/date_time_value, the SDK's Web Template keeps one value leaf, created.",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 150, Missing: 33, Extra: 27, Altered: 13, Excluded: 1},
+			Outcome: Outcome{Compared: 150, Missing: 6, Altered: 4, Excluded: 1},
 			Reason: "The excluded key is created/date_time_value, reported as unmatched content, as follows. " +
 				"Choice element: decode does not read media_file/created/date_time_value (the SDK " +
-				"spells it created). Sibling order: FLAT carries no order between the document_attachment items; decode lists " +
-				"the media_file cluster first, the canonical lists it last, so the item leaves compare at shifted " +
-				"positions. RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (3 leaves).",
+				"spells it created), so the media_file cluster lacks its created element (6 leaves). RM-FLOOR " +
+				"archetype_details: rm_version is 1.2.0 against 1.0.4 (4 leaves).",
 		},
 	},
 	"family_history": {
@@ -307,14 +304,13 @@ var Recorded = map[string]map[Leg]Record{
 				"ACTIVITY action_archetype_id that the canonical XML holds, and FLAT encode writes both.",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 156, Missing: 78, Extra: 48, Altered: 11},
+			Outcome: Outcome{Compared: 156, Missing: 34, Extra: 4, Altered: 8},
 			Reason: "party reference type: the upstream FLAT writes no composer|type, so decode gives the " +
 				"composer's reference the type PARTY against the canonical's PERSON. Upstream FLAT " +
 				"omissions: the FLAT carries no context (start time, setting, participation) and no ACTIVITY action_archetype_id, so the decoded " +
-				"composition has no context and an empty action_archetype_id. Sibling order: FLAT carries no order " +
-				"between the ordinal ELEMENT and the nested CLUSTER of the activity description; decode lists the " +
-				"CLUSTER first, the canonical lists it second, so their leaves compare at shifted positions, and the " +
-				"ordinal decodes in the local terminology its |code form implies. RM-FLOOR archetype_details: the " +
+				"composition has no context and an empty action_archetype_id. DV_ORDINAL terminology: the " +
+				"ordinal decodes in the local terminology its |code form implies, against the canonical's " +
+				"com.cabolabs.openehr.opt. RM-FLOOR archetype_details: the " +
 				"canonical SECTION has none and decode adds it (4 extra leaves), the canonical carries template_id " +
 				"on inner archetype roots where decode adds it on the root only, and rm_version is 1.2.0 against " +
 				"1.0.2.",
@@ -359,7 +355,7 @@ var Recorded = map[string]map[Leg]Record{
 				"and proportion type spellings above.",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 423, Missing: 347, Extra: 332, Altered: 15, Excluded: 11},
+			Outcome: Outcome{Compared: 423, Missing: 51, Extra: 36, Altered: 40, Excluded: 11},
 			Reason: "The 11 excluded keys are the section_3 ACTION's in-context ism_transition/current_state (3) " +
 				"and time (1) and the identifier keys (4), refused, and " +
 				"choice/quantity_value|magnitude and |unit (2) and the bare proportion_any (1), reported as " +
@@ -375,16 +371,14 @@ var Recorded = map[string]map[Leg]Record{
 				"§ Floating-point precision). Upstream conversion differences: a DV_URI and the proportion's " +
 				"precision only the canonical carries, and duration_any (P1Y2M10DT2H30M against PT30M). Upstream " +
 				"date and time spelling: the canonical writes dates in the basic format (20190114) and date-times " +
-				"with a comma and +00:00, the FLAT in the extended format with a full stop and Z (9 leaves). " +
+				"with a comma and +00:00, the FLAT in the extended format with a full stop and Z (7 leaves). " +
 				"HISTORY.origin: the FLAT has no origin key and decode fills it from the context start time " +
-				"(openehr/serialize/simplified/deviations.md), where the canonical sets it otherwise. ITEM_TREE vs " +
-				"ITEM_LIST: decode builds the INSTRUCTION activity's description as an ITEM_TREE, the canonical " +
-				"has the ITEM_LIST the OPT constrains (openehr/serialize/simplified/deviations.md). Sibling order: " +
-				"FLAT carries no order between siblings, and decode lists them in the sorted order of their FLAT " +
-				"keys, so the content entries (EVALUATION, SECTION, OBSERVATION against the canonical's " +
-				"OBSERVATION, EVALUATION, SECTION), the OBSERVATION's and the EVALUATION's elements, and " +
-				"section_3's ACTION and INSTRUCTION compare at shifted positions; this accounts for most of the " +
-				"missing, extra and altered leaves. RM-FLOOR archetype_details: the canonical SECTION and the " +
+				"(openehr/serialize/simplified/deviations.md), where the canonical sets it otherwise. Shifted " +
+				"positions: the elements decode lacks move their later siblings up, the identifier in the " +
+				"OBSERVATION and the DV_URI and the choice element in the EVALUATION, so the OBSERVATION's " +
+				"proportion and the EVALUATION's intervals and cluster compare against the canonical's next " +
+				"element; this accounts for most of the missing, extra and altered leaves. RM-FLOOR " +
+				"archetype_details: the canonical SECTION and the " +
 				"ACTION's description CLUSTER have none, decode adds them (8 extra leaves), and rm_version is " +
 				"1.2.0 against 1.0.2 and 1.0.4.",
 		},
