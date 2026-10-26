@@ -547,3 +547,140 @@ func TestREQ170InContextIsmTransitionNodeRefusesUnmodelledKeys(t *testing.T) {
 		})
 	}
 }
+
+// ismStateTerminologyShapes are the two spellings of a current state that names
+// no terminology: no `|terminology` key, and a null one, which REQ-053 reads as
+// absent.
+var ismStateTerminologyShapes = []struct {
+	name  string
+	shape func(keys map[string]any, termKey string)
+}{
+	{name: "absent", shape: func(m map[string]any, k string) { delete(m, k) }},
+	{name: "null", shape: func(m map[string]any, k string) { m[k] = nil }},
+}
+
+// TestREQ053InContextIsmCurrentStateImpliesOpenehr — REQ-053, REQ-106. The
+// in-context `current_state` leaf advertises `|code` and `|value` inputs only,
+// as the reference does, so a body that follows them names no terminology.
+// ISM_TRANSITION's Current_state_valid admits the openEHR terminology alone, so
+// decode reads that current state as `openehr`, in every mode and in both
+// formats, and the WithTemplate decode validates. Without the implied
+// terminology the decoded CODE_PHRASE had no terminology_id, which validation
+// reported as `required`.
+func TestREQ053InContextIsmCurrentStateImpliesOpenehr(t *testing.T) {
+	wt, compiled := minimalActionWT(t)
+	const termKey = minimalIsm + "/current_state|terminology"
+	for _, sh := range ismStateTerminologyShapes {
+		keys := maps.Clone(referenceCurrentState)
+		sh.shape(keys, termKey)
+		flat := mustJSON(t, minimalActionBody(keys))
+		structured, err := FlatToStructured(flat)
+		if err != nil {
+			t.Fatalf("FlatToStructured (%s): %v", sh.name, err)
+		}
+		for format, decode := range map[string]func([]byte, *webtemplate.WebTemplate, ...Option) (*rm.Composition, error){
+			"FLAT": UnmarshalFlat, "STRUCTURED": UnmarshalStructured,
+		} {
+			body := flat
+			if format == "STRUCTURED" {
+				body = structured
+			}
+			for mode, opts := range map[string][]Option{
+				"default":                 nil,
+				"WithStrict":              {WithStrict()},
+				"WithTemplate+WithStrict": {WithTemplate(compiled), WithStrict()},
+			} {
+				t.Run(sh.name+"/"+format+"/"+mode, func(t *testing.T) {
+					comp, err := decode(body, wt, opts...)
+					if err != nil {
+						t.Fatalf("Unmarshal %s (%s): %v", format, mode, err)
+					}
+					a, ok := comp.Content[0].(*rm.Action)
+					if !ok {
+						t.Fatalf("content[0] = %T, want *rm.Action", comp.Content[0])
+					}
+					got := a.IsmTransition.CurrentState
+					if got.DefiningCode.TerminologyID.Value != "openehr" || got.DefiningCode.CodeString != "532" || got.Value != "completed" {
+						t.Errorf("Unmarshal %s (%s) current_state = %+v, want openehr::532|completed", format, mode, got)
+					}
+					if mode == "WithTemplate+WithStrict" {
+						for _, is := range validation.ValidateComposition(comp, compiled).Issues {
+							t.Errorf("decoded composition: %s at %s: %s", is.Code, is.Path, is.Detail)
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
+// TestREQ053ArchetypedIsmCurrentStateImpliesOpenehr — REQ-053. The same reading
+// holds at the archetyped `ism_transition[atNNNN]` nodes, with and without the
+// compiled template: a current state that names no terminology decodes as
+// `openehr`, and re-encodes with `|terminology: "openehr"`.
+func TestREQ053ArchetypedIsmCurrentStateImpliesOpenehr(t *testing.T) {
+	wt, compiled := conformanceWT(t)
+	for _, tc := range []struct{ node, state, step string }{
+		{node: "transition", state: "524", step: "at0005"},
+		{node: "transition2", state: "532", step: "at0006"},
+	} {
+		termKey := rmattrAction + "/" + tc.node + "/current_state|terminology"
+		for _, sh := range ismStateTerminologyShapes {
+			for mode, opts := range map[string][]Option{
+				"default":      nil,
+				"WithTemplate": {WithTemplate(compiled)},
+			} {
+				t.Run(tc.node+"/"+sh.name+"/"+mode, func(t *testing.T) {
+					keys := ismTransitionKeys(tc.node, tc.state, tc.step)
+					sh.shape(keys, termKey)
+					comp, err := UnmarshalFlat(mustJSON(t, rmattrBody(keys)), wt, opts...)
+					if err != nil {
+						t.Fatalf("UnmarshalFlat (%s): %v", mode, err)
+					}
+					got := firstAction(t, comp).IsmTransition.CurrentState
+					if got.DefiningCode.TerminologyID.Value != "openehr" || got.DefiningCode.CodeString != tc.state {
+						t.Errorf("UnmarshalFlat (%s) current_state = %+v, want openehr::%s", mode, got, tc.state)
+					}
+					if re := reencodeRMAttr(t, wt, comp); re[termKey] != "openehr" {
+						t.Errorf("re-encode of %s = %#v, want \"openehr\"", termKey, re[termKey])
+					}
+				})
+			}
+		}
+	}
+}
+
+// TestREQ053IsmCurrentStateTerminologyReadAsWritten — REQ-053. A current state
+// that names a terminology keeps it, even one Current_state_valid does not
+// admit: decode implies `openehr` only where the body names none, and leaves
+// a wrong one for validation to report.
+func TestREQ053IsmCurrentStateTerminologyReadAsWritten(t *testing.T) {
+	t.Run("in-context", func(t *testing.T) {
+		wt, compiled := minimalActionWT(t)
+		keys := maps.Clone(referenceCurrentState)
+		keys[minimalIsm+"/current_state|terminology"] = "local"
+		comp, err := UnmarshalFlat(mustJSON(t, minimalActionBody(keys)), wt, WithTemplate(compiled), WithStrict())
+		if err != nil {
+			t.Fatalf("UnmarshalFlat: %v", err)
+		}
+		a, ok := comp.Content[0].(*rm.Action)
+		if !ok {
+			t.Fatalf("content[0] = %T, want *rm.Action", comp.Content[0])
+		}
+		if got := a.IsmTransition.CurrentState.DefiningCode.TerminologyID.Value; got != "local" {
+			t.Errorf("current_state terminology = %q, want %q as written", got, "local")
+		}
+		if issues := validation.ValidateComposition(comp, compiled).Issues; len(issues) == 0 {
+			t.Error("ValidateComposition reports no issue for a current_state coded in `local`, want one")
+		}
+	})
+	t.Run("archetyped", func(t *testing.T) {
+		wt, _ := conformanceWT(t)
+		keys := ismTransitionKeys("transition2", "532", "at0006")
+		keys[rmattrAction+"/transition2/current_state|terminology"] = "local"
+		got := firstAction(t, decodeRMAttr(t, wt, rmattrBody(keys))).IsmTransition.CurrentState
+		if got.DefiningCode.TerminologyID.Value != "local" {
+			t.Errorf("current_state terminology = %q, want %q as written", got.DefiningCode.TerminologyID.Value, "local")
+		}
+	})
+}
