@@ -1390,3 +1390,164 @@ func TestParseQueryConstructedLiteralHasNoSourceText(t *testing.T) {
 		t.Errorf("Emit = %q, want SELECT 1 FROM EHR e", out)
 	}
 }
+
+// TestParseQueryFunctionCallSourceText pins a projected call's SOURCE TEXT as
+// written (REQ-113). With no AS alias the openEHR result schema names the
+// column by its expression text, and rebuilding that text from Name and Args
+// gives the upper-cased name and canonical spacing, which is neither what the
+// client wrote nor how a path or literal column is named. Emission stays
+// canonical (REQ-119): Raw is read-side fidelity only.
+// REQ-113 · REQ-119 · PROBE-087
+func TestParseQueryFunctionCallSourceText(t *testing.T) {
+	const from = " FROM EHR e CONTAINS COMPOSITION c CONTAINS OBSERVATION o"
+	cases := map[string]struct {
+		sel      string // the projection, written between SELECT and FROM
+		wantRaw  string
+		wantName string
+		wantEmit string // the canonical projection
+		// A nested call among Args, checked when innerRaw is set.
+		innerRaw  string
+		innerName string
+	}{
+		"function_interior_spacing": {
+			sel: "length( c/name/value )", wantRaw: "length( c/name/value )",
+			wantName: "LENGTH", wantEmit: "LENGTH(c/name/value)",
+		},
+		"count_star": {
+			sel: "count( * )", wantRaw: "count( * )",
+			wantName: "COUNT", wantEmit: "COUNT(*)",
+		},
+		"count_distinct": {
+			sel: "count( DISTINCT c/uid/value )", wantRaw: "count( DISTINCT c/uid/value )",
+			wantName: "COUNT", wantEmit: "COUNT(DISTINCT c/uid/value)",
+		},
+		"lower_case_aggregate": {
+			sel: "max(o/x)", wantRaw: "max(o/x)",
+			wantName: "MAX", wantEmit: "MAX(o/x)",
+		},
+		// The terminologyFunction arm of `functionCall`: no `name` token, a
+		// fixed arity of three STRING arguments.
+		"terminology": {
+			sel:      "terminology( 'expand' , 'hl7.org/fhir/4.0', 'url=x')",
+			wantRaw:  "terminology( 'expand' , 'hl7.org/fhir/4.0', 'url=x')",
+			wantName: "TERMINOLOGY", wantEmit: "TERMINOLOGY('expand', 'hl7.org/fhir/4.0', 'url=x')",
+		},
+		// The span is read from the character stream, so a line break and
+		// the indentation after it survive.
+		"line_break": {
+			sel: "length(\n\tc/name/value\n)", wantRaw: "length(\n\tc/name/value\n)",
+			wantName: "LENGTH", wantEmit: "LENGTH(c/name/value)",
+		},
+		// The alias belongs to `selectExpr`, not to the call.
+		"aliased": {
+			sel: "count(*) AS n", wantRaw: "count(*)",
+			wantName: "COUNT", wantEmit: "COUNT(*) AS n",
+		},
+		"nested_call": {
+			sel: "concat( 'a', length( c/name/value ) )", wantRaw: "concat( 'a', length( c/name/value ) )",
+			wantName: "CONCAT", wantEmit: "CONCAT('a', LENGTH(c/name/value))",
+			innerRaw: "length( c/name/value )", innerName: "LENGTH",
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			in := "SELECT " + tc.sel + from
+			q, err := parse.ParseQuery(in)
+			if err != nil {
+				t.Fatalf("ParseQuery(%q): %v", in, err)
+			}
+			fc, ok := q.Select.Items[0].Expr.(parse.FunctionCall)
+			if !ok {
+				t.Fatalf("Select.Items[0].Expr = %T, want parse.FunctionCall", q.Select.Items[0].Expr)
+			}
+			if fc.Raw != tc.wantRaw {
+				t.Errorf("FunctionCall.Raw = %q, want %q (source text as written)", fc.Raw, tc.wantRaw)
+			}
+			if fc.Name != tc.wantName {
+				t.Errorf("FunctionCall.Name = %q, want %q", fc.Name, tc.wantName)
+			}
+			if tc.innerRaw != "" {
+				var inner *parse.FunctionCall
+				for _, a := range fc.Args {
+					if call, isCall := a.(parse.FunctionCall); isCall {
+						inner = &call
+						break
+					}
+				}
+				if inner == nil {
+					t.Fatalf("FunctionCall.Args = %#v, want a nested parse.FunctionCall", fc.Args)
+				}
+				if inner.Raw != tc.innerRaw {
+					t.Errorf("nested FunctionCall.Raw = %q, want %q", inner.Raw, tc.innerRaw)
+				}
+				if inner.Name != tc.innerName {
+					t.Errorf("nested FunctionCall.Name = %q, want %q", inner.Name, tc.innerName)
+				}
+			}
+			out, err := q.Emit()
+			if err != nil {
+				t.Fatalf("Emit: %v", err)
+			}
+			if want := "SELECT " + tc.wantEmit + from; out != want {
+				t.Errorf("Emit = %q, want the canonical %q", out, want)
+			}
+		})
+	}
+}
+
+// TestParseQueryConstructedFunctionCallHasNoSourceText pins the contract's
+// other half: Raw is populated by the parser only, so a call a caller builds
+// has none, and emission does not need it.
+// REQ-113 · REQ-119
+func TestParseQueryConstructedFunctionCallHasNoSourceText(t *testing.T) {
+	call := parse.FunctionCall{Name: "COUNT", Star: true}
+	if call.Raw != "" {
+		t.Errorf("constructed FunctionCall.Raw = %q, want empty", call.Raw)
+	}
+	q := &parse.Query{
+		Select: parse.SelectClause{Items: []parse.SelectItem{{Expr: call}}},
+		From:   parse.FromClause{Root: parse.ClassExpr{RMType: "EHR", Alias: "e"}},
+	}
+	out, err := q.Emit()
+	if err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+	if out != "SELECT COUNT(*) FROM EHR e" {
+		t.Errorf("Emit = %q, want SELECT COUNT(*) FROM EHR e", out)
+	}
+}
+
+// TestParseQueryFunctionCallSourceTextNeverEmitted pins that emission renders
+// a call from its parts and never reads Raw: a parsed call whose Raw, and its
+// nested call's Raw, are overwritten still emits the canonical text. The
+// overwrites are well-formed AQL, so an emitter that read Raw would re-parse
+// cleanly and substitute a different query rather than fail.
+// REQ-113 · REQ-119
+func TestParseQueryFunctionCallSourceTextNeverEmitted(t *testing.T) {
+	const in = "SELECT concat( 'a', length( c/name/value ) ) FROM EHR e CONTAINS COMPOSITION c"
+	q, err := parse.ParseQuery(in)
+	if err != nil {
+		t.Fatalf("ParseQuery(%q): %v", in, err)
+	}
+	outer, ok := q.Select.Items[0].Expr.(parse.FunctionCall)
+	if !ok {
+		t.Fatalf("Select.Items[0].Expr = %T, want parse.FunctionCall", q.Select.Items[0].Expr)
+	}
+	inner, ok := outer.Args[1].(parse.FunctionCall)
+	if !ok {
+		t.Fatalf("Args[1] = %T, want parse.FunctionCall", outer.Args[1])
+	}
+	inner.Raw = "lower( c/uid/value )"
+	outer.Args[1] = inner
+	outer.Raw = "upper( 'b' )"
+	q.Select.Items[0].Expr = outer
+
+	out, err := q.Emit()
+	if err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+	const want = "SELECT CONCAT('a', LENGTH(c/name/value)) FROM EHR e CONTAINS COMPOSITION c"
+	if out != want {
+		t.Errorf("Emit = %q, want the canonical %q (Raw must never be emitted)", out, want)
+	}
+}
