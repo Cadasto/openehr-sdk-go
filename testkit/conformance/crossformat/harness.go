@@ -552,8 +552,8 @@ func compareLeaves(ref, ours map[string]string) LegResult {
 // to each scalar, empty object and empty array, mapped to that value's JSON
 // text. Numbers keep their literal text, so 1 and 1.0 differ and an integer
 // past 2^53 compares exactly. Member order does not matter; array element
-// order does. This is the semantic comparison REQ-080 asks for, never a byte
-// comparison of the documents.
+// order does. This is the comparison by value REQ-052 gives a round trip, never
+// a byte comparison of the documents.
 func leaves(doc []byte) (map[string]string, error) {
 	dec := json.NewDecoder(bytes.NewReader(doc))
 	dec.UseNumber()

@@ -1,7 +1,7 @@
 package webtemplate
 
 // Tests for the exported reducing decode that PROBE-105 shares with PROBE-086
-// (REQ-080): the two context modes, and the typed error a decode the loop
+// (REQ-053): the two context modes, and the typed error a decode the loop
 // cannot reduce comes back as.
 
 import (

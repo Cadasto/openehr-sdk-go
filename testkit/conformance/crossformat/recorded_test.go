@@ -1,8 +1,8 @@
 package crossformat_test
 
-// Tests for the recorded outcomes of PROBE-105 (REQ-080): the rules every
-// record obeys, how a measured outcome is matched against its record, and the
-// mismatch lines the probe reports.
+// Tests for the recorded outcomes of PROBE-105 (REQ-052, REQ-053, REQ-056):
+// the rules every record obeys, how a measured outcome is matched against its
+// record, and the mismatch lines the probe reports.
 
 import (
 	"slices"

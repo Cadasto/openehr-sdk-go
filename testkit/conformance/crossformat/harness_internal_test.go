@@ -1,9 +1,9 @@
 package crossformat
 
-// Unit tests for the harness's comparison helpers (PROBE-105, REQ-080). The
-// corpus run proves the pipeline end to end, but it cannot show that a leaf
-// comparison is semantic rather than byte-wise, or that metadata is held out of
-// both FLAT sides: these tests pin each of those on its own.
+// Unit tests for the harness's comparison helpers (PROBE-105; REQ-052,
+// REQ-053). The corpus run proves the pipeline end to end, but it cannot show
+// that a leaf comparison is semantic rather than byte-wise, or that metadata is
+// held out of both FLAT sides: these tests pin each of those on its own.
 
 import (
 	"bytes"
@@ -21,9 +21,9 @@ import (
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
-// TestProbe105Leaves pins the leaf form REQ-080 asks for: a semantic
-// comparison, insensitive to member order, exact on number spelling and
-// array position, with empty containers as leaves of their own.
+// TestProbe105Leaves pins the leaf form of the comparison by value REQ-052
+// gives a round trip: insensitive to member order, exact on number spelling
+// and array position, with empty containers as leaves of their own.
 func TestProbe105Leaves(t *testing.T) {
 	tests := []struct {
 		name string

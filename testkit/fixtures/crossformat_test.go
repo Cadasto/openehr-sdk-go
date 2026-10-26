@@ -15,10 +15,10 @@ import (
 	"testing"
 )
 
-// The cross-format corpus is the input to PROBE-105 (REQ-080). Its
-// MANIFEST.txt must record, per file, the source repository, commit,
-// upstream path and sha256, and the tests below check its integrity offline
-// under `make ci`. Each check is a function over a corpus root so that the
+// The cross-format corpus is the input to PROBE-105 (REQ-052, REQ-053,
+// REQ-056). Its MANIFEST.txt must record, per file, the source repository,
+// commit, upstream path and sha256, and the tests below check its integrity
+// offline under `make ci`. Each check is a function over a corpus root so that the
 // scratch-corpus tests further down can show it turns red when the property
 // it guards is broken.
 

@@ -23,7 +23,7 @@ var census = flag.Bool("census", false, "print the corpus conformance census ins
 // below, so a gap closing shows up as a deliberate edit here and a gap
 // *opening* fails the test.
 //
-// REQ-080: PROBE-086 is a wire-level assertion; each corpus body decodes and
+// REQ-053: PROBE-086 is a wire-level assertion; each corpus body decodes and
 // re-encodes to the same keys and values.
 func TestUpstreamFlatParity(t *testing.T) {
 	target, err := conformance.NewTarget()
