@@ -327,7 +327,7 @@ cmd_check() {
     for f in "${SRC_PATHS[@]}"; do
       [[ "$(dirname "$f")" == "$dir" ]] || continue
       name="$(basename "$f")"
-      ours="$(git hash-object "$DEST/$name")"
+      ours="$(git hash-object --no-filters "$DEST/$name")"
       theirs="$(jq -r --arg n "$name" '.[] | select(.name == $n) | .sha' <<<"$listing")"
       if [[ -z "$theirs" ]]; then
         echo "  GONE upstream: $f"
