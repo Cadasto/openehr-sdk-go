@@ -2321,6 +2321,7 @@ requirements:
     tests:
       - internal/bmmgen/render_interval_bound_test.go
       - openehr/rm/interval_closed_test.go
+      - openehr/rm/missing_members_test.go
       - openehr/serialize/canjson/interval_flag_defaults_test.go
       - openehr/serialize/canjson/interval_unbounded_bound_test.go
       - openehr/serialize/canjson/roundtrip_test.go
@@ -2494,3 +2495,8 @@ requirements:
     implementation: planned
     packages: [openehr/serialize/canjson, openehr/serialize/canxml, internal/rmjsonwalk, openehr/internal/xmlunmatched, internal/bmmgen, openehr/rm, openehr/aom/aom14, openehr/validation]
     probes: [PROBE-110, PROBE-081]
+    tests:
+      - internal/bmmgen/render_xmlunmar_class_test.go
+      - openehr/internal/xmlunmatched/missing_internal_test.go
+      - openehr/rm/missing_members_test.go
+      - openehr/serialize/canjson/missing_test.go

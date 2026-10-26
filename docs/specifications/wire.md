@@ -327,7 +327,7 @@ Every decoder of canonical JSON ([§ REQ-052](#req-052)) and canonical XML ([§ 
 | Format | A missing member |
 |---|---|
 | canonical JSON | the object has no member of that name, or holds `null` there |
-| canonical XML | the element has no child element of that name, and no XML attribute of that name where the ITS-XML schema carries the attribute as one (`archetype_node_id`); or the child it has carries `xsi:nil="true"`; or the child is a primitive element whose text is empty or whitespace only, which carries no value, as [§ REQ-169](#req-169--interval-boundary-flag-defaults) reads an empty flag element |
+| canonical XML | the element has no child element of that name, and no XML attribute of that name where the ITS-XML schema carries the attribute as one (`archetype_node_id`); or the child it has carries `xsi:nil` set (`true` or `1`); or the child is a primitive element whose text is empty or whitespace only, which carries no value, as [§ REQ-169](#req-169--interval-boundary-flag-defaults) reads an empty flag element |
 
 Three kinds of attribute are never missing: one no serialization carries, the set [clinical-modeling.md § REQ-112 *Driver*](clinical-modeling.md#driver) leaves out (every function the model computes, and RESOURCE_DESCRIPTION `parent_resource`); the four interval boundary flags, which § REQ-169 gives a value when absent; and `_type` and `xsi:type`, which name no attribute. A present member is never missing, whatever it holds: an empty string, a zero, an empty list or object, a bare `{"_type":"PARTY_SELF"}` and a `Hash` or `Any` element canonical XML does not model are present, and the RM rules judge them ([clinical-modeling.md § REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)).
 
@@ -342,7 +342,7 @@ Three kinds of attribute are never missing: one no serialization carries, the se
 **Acceptance:**
 
 - A canonical-JSON COMPOSITION whose `DV_QUANTITY` leaves out `magnitude`, whose `DV_COUNT` leaves out `magnitude`, whose `DV_BOOLEAN` leaves out `value`, whose `DV_PROPORTION` leaves out `denominator`, whose `DV_ORDINAL` leaves out `symbol` and whose ENTRY leaves out `language`, each at its own depth, and an EHR_STATUS that leaves out `subject`, decode by default with no error; the report option receives each member's pointer once, and the decode returns the same value as the default.
-- A member sent as `null` in canonical JSON, and one sent with `xsi:nil="true"` or as an empty primitive element in canonical XML, is reported like an absent one.
+- A member sent as `null` in canonical JSON, and one sent with `xsi:nil="true"` or as an empty primitive element in canonical XML, is reported like an absent one, and nothing inside it is reported.
 - The canonical-XML form of each instance above reports the same pointers as its canonical-JSON form.
 - A present member is not reported: a bare `PARTY_SELF`, an empty `units`, a `magnitude` of 0, an empty `items` list, an `archetype_node_id` written as an XML attribute.
 - An absent interval boundary flag, an absent function-valued attribute such as EVENT `offset`, and an absent RESOURCE_DESCRIPTION `parent_resource` are not reported.
