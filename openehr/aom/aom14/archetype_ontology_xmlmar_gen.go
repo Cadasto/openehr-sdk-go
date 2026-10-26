@@ -18,9 +18,10 @@ func (a *ArchetypeOntology) BMMName() string { return "ARCHETYPE_ONTOLOGY" }
 
 // MarshalXML emits canonical openEHR XML for ArchetypeOntology. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -70,9 +71,10 @@ func (a *ArchetypeTerm) BMMName() string { return "ARCHETYPE_TERM" }
 
 // MarshalXML emits canonical openEHR XML for ArchetypeTerm. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -83,13 +85,13 @@ func (a *ArchetypeTerm) MarshalXML(_e *xml.Encoder, _start xml.StartElement) err
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(a.Code, xml.StartElement{Name: xml.Name{Local: "code"}}); err != nil {
-		return err
-	}
 	if a.Items != nil {
 		if err := _e.EncodeElement(a.Items, xml.StartElement{Name: xml.Name{Local: "items"}}); err != nil {
 			return err
 		}
+	}
+	if err := _e.EncodeElement(a.Code, xml.StartElement{Name: xml.Name{Local: "code"}}); err != nil {
+		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err

@@ -1,7 +1,9 @@
 // Package bmmgen is the BMM-driven code generator for the SDK.
 //
 // It reads the pinned BMM files in resources/bmm/ via openehr/bmm and
-// emits Go source under one or more target output directories. Per
+// emits Go source under one or more target output directories. The
+// canonical-XML encoders also take their child order from the ITS-XML
+// schemas vendored in resources/its-xml/, since the BMM gives none. Per
 // target it writes:
 //
 //   - one <package>_gen.go per BMM top-level package, with its
@@ -83,6 +85,11 @@ type Options struct {
 	// ResourcesDir is the path to the directory containing the pinned
 	// `*.bmm.json` files. Required.
 	ResourcesDir string
+	// ITSXMLDir is the directory of the vendored ITS-XML schemas, whose
+	// element sequences give the XML encoders their child order (see
+	// [Target.ITSXMLSchemaSets]). Empty means the `its-xml` directory beside
+	// ResourcesDir, which is resources/its-xml in this repository.
+	ITSXMLDir string
 	// OutDir is the module root the generator writes into. The
 	// generator writes "<OutDir>/<Target.OutSubDir>/<file>_gen.go".
 	OutDir string
@@ -172,11 +179,16 @@ func Run(opts Options) (*Result, error) {
 		targets[0].RootID = opts.RootID
 	}
 
+	if opts.ITSXMLDir == "" {
+		opts.ITSXMLDir = filepath.Join(filepath.Dir(filepath.Clean(opts.ResourcesDir)), "its-xml")
+	}
+
 	resolver := wrappedResolver{root: opts.ResourcesDir}
+	schemas := &itsXMLSchemas{dir: opts.ITSXMLDir}
 	result := &Result{}
 
 	for _, t := range targets {
-		tr, err := runTarget(opts, t, resolver, result)
+		tr, err := runTarget(opts, t, resolver, schemas, result)
 		if err != nil {
 			return result, err
 		}
@@ -187,7 +199,7 @@ func Run(opts Options) (*Result, error) {
 
 // runTarget generates (or verifies) one target. Returns the
 // per-target diagnostic counters and appends to the global Result.
-func runTarget(opts Options, t Target, resolver wrappedResolver, result *Result) (TargetResult, error) {
+func runTarget(opts Options, t Target, resolver wrappedResolver, schemas *itsXMLSchemas, result *Result) (TargetResult, error) {
 	tr := TargetResult{Target: t}
 	plan, err := BuildPlanForTarget(context.Background(), t, resolver)
 	if err != nil {
@@ -201,6 +213,11 @@ func runTarget(opts Options, t Target, resolver wrappedResolver, result *Result)
 	}
 	if err := checkFixedNameCollisions(plan); err != nil {
 		return tr, err
+	}
+	if len(t.ITSXMLSchemaSets) > 0 {
+		if plan.xmlOrder, err = schemas.orderFor(t.ITSXMLSchemaSets); err != nil {
+			return tr, fmt.Errorf("bmmgen: %w", err)
+		}
 	}
 	for _, f := range plan.Files {
 		if !safeFileBase(f.FileBase) {

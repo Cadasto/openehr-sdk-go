@@ -13,9 +13,10 @@ import (
 
 // MarshalXML emits canonical openEHR XML for Interval. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -29,6 +30,18 @@ func (i *Interval[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
+	if err := _e.EncodeElement(i.LowerIncluded, xml.StartElement{Name: xml.Name{Local: "lower_included"}}); err != nil {
+		return err
+	}
+	if err := _e.EncodeElement(i.UpperIncluded, xml.StartElement{Name: xml.Name{Local: "upper_included"}}); err != nil {
+		return err
+	}
+	if err := _e.EncodeElement(i.LowerUnbounded, xml.StartElement{Name: xml.Name{Local: "lower_unbounded"}}); err != nil {
+		return err
+	}
+	if err := _e.EncodeElement(i.UpperUnbounded, xml.StartElement{Name: xml.Name{Local: "upper_unbounded"}}); err != nil {
+		return err
+	}
 	if !omitIntervalBound(i.LowerUnbounded, i.Lower) {
 		if err := _e.EncodeElement(&i.Lower, xml.StartElement{Name: xml.Name{Local: "lower"}}); err != nil {
 			return err
@@ -38,18 +51,6 @@ func (i *Interval[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 		if err := _e.EncodeElement(&i.Upper, xml.StartElement{Name: xml.Name{Local: "upper"}}); err != nil {
 			return err
 		}
-	}
-	if err := _e.EncodeElement(i.LowerUnbounded, xml.StartElement{Name: xml.Name{Local: "lower_unbounded"}}); err != nil {
-		return err
-	}
-	if err := _e.EncodeElement(i.UpperUnbounded, xml.StartElement{Name: xml.Name{Local: "upper_unbounded"}}); err != nil {
-		return err
-	}
-	if err := _e.EncodeElement(i.LowerIncluded, xml.StartElement{Name: xml.Name{Local: "lower_included"}}); err != nil {
-		return err
-	}
-	if err := _e.EncodeElement(i.UpperIncluded, xml.StartElement{Name: xml.Name{Local: "upper_included"}}); err != nil {
-		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err
@@ -64,9 +65,10 @@ func (p *PointInterval[T]) BMMName() string { return "Point_interval" }
 
 // MarshalXML emits canonical openEHR XML for PointInterval. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -80,6 +82,18 @@ func (p *PointInterval[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) 
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
+	if err := _e.EncodeElement(p.LowerIncluded, xml.StartElement{Name: xml.Name{Local: "lower_included"}}); err != nil {
+		return err
+	}
+	if err := _e.EncodeElement(p.UpperIncluded, xml.StartElement{Name: xml.Name{Local: "upper_included"}}); err != nil {
+		return err
+	}
+	if err := _e.EncodeElement(p.LowerUnbounded, xml.StartElement{Name: xml.Name{Local: "lower_unbounded"}}); err != nil {
+		return err
+	}
+	if err := _e.EncodeElement(p.UpperUnbounded, xml.StartElement{Name: xml.Name{Local: "upper_unbounded"}}); err != nil {
+		return err
+	}
 	if !omitIntervalBound(p.LowerUnbounded, p.Lower) {
 		if err := _e.EncodeElement(&p.Lower, xml.StartElement{Name: xml.Name{Local: "lower"}}); err != nil {
 			return err
@@ -89,18 +103,6 @@ func (p *PointInterval[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) 
 		if err := _e.EncodeElement(&p.Upper, xml.StartElement{Name: xml.Name{Local: "upper"}}); err != nil {
 			return err
 		}
-	}
-	if err := _e.EncodeElement(p.LowerUnbounded, xml.StartElement{Name: xml.Name{Local: "lower_unbounded"}}); err != nil {
-		return err
-	}
-	if err := _e.EncodeElement(p.UpperUnbounded, xml.StartElement{Name: xml.Name{Local: "upper_unbounded"}}); err != nil {
-		return err
-	}
-	if err := _e.EncodeElement(p.LowerIncluded, xml.StartElement{Name: xml.Name{Local: "lower_included"}}); err != nil {
-		return err
-	}
-	if err := _e.EncodeElement(p.UpperIncluded, xml.StartElement{Name: xml.Name{Local: "upper_included"}}); err != nil {
-		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err
@@ -115,9 +117,10 @@ func (p *ProperInterval[T]) BMMName() string { return "Proper_interval" }
 
 // MarshalXML emits canonical openEHR XML for ProperInterval. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -131,6 +134,18 @@ func (p *ProperInterval[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement)
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
+	if err := _e.EncodeElement(p.LowerIncluded, xml.StartElement{Name: xml.Name{Local: "lower_included"}}); err != nil {
+		return err
+	}
+	if err := _e.EncodeElement(p.UpperIncluded, xml.StartElement{Name: xml.Name{Local: "upper_included"}}); err != nil {
+		return err
+	}
+	if err := _e.EncodeElement(p.LowerUnbounded, xml.StartElement{Name: xml.Name{Local: "lower_unbounded"}}); err != nil {
+		return err
+	}
+	if err := _e.EncodeElement(p.UpperUnbounded, xml.StartElement{Name: xml.Name{Local: "upper_unbounded"}}); err != nil {
+		return err
+	}
 	if !omitIntervalBound(p.LowerUnbounded, p.Lower) {
 		if err := _e.EncodeElement(&p.Lower, xml.StartElement{Name: xml.Name{Local: "lower"}}); err != nil {
 			return err
@@ -140,18 +155,6 @@ func (p *ProperInterval[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement)
 		if err := _e.EncodeElement(&p.Upper, xml.StartElement{Name: xml.Name{Local: "upper"}}); err != nil {
 			return err
 		}
-	}
-	if err := _e.EncodeElement(p.LowerUnbounded, xml.StartElement{Name: xml.Name{Local: "lower_unbounded"}}); err != nil {
-		return err
-	}
-	if err := _e.EncodeElement(p.UpperUnbounded, xml.StartElement{Name: xml.Name{Local: "upper_unbounded"}}); err != nil {
-		return err
-	}
-	if err := _e.EncodeElement(p.LowerIncluded, xml.StartElement{Name: xml.Name{Local: "lower_included"}}); err != nil {
-		return err
-	}
-	if err := _e.EncodeElement(p.UpperIncluded, xml.StartElement{Name: xml.Name{Local: "upper_included"}}); err != nil {
-		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err

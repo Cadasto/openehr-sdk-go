@@ -152,7 +152,7 @@ test-race: ## Run the unit tests under the race detector
 ##@ Generate
 
 codegen: ## Regenerate RM and AOM 1.4 from the pinned BMM
-	@$(GO) run ./cmd/bmmgen -resources ./resources/bmm -out .
+	@$(GO) run ./cmd/bmmgen -resources ./resources/bmm -its-xml ./resources/its-xml -out .
 
 termgen: ## Regenerate openehr/terminology from the pinned XML
 	@$(GO) run ./cmd/termgen -resources ./resources/terminology -out .
@@ -203,7 +203,7 @@ mod-tidy-check: ## Fail if go mod tidy would change go.mod or go.sum
 	@if test -f go.sum; then git diff --exit-code go.sum; fi
 
 codegen-check: ## Fail if the generated RM and AOM drift from the BMM
-	@$(GO) run ./cmd/bmmgen -resources ./resources/bmm -out . -verify
+	@$(GO) run ./cmd/bmmgen -resources ./resources/bmm -its-xml ./resources/its-xml -out . -verify
 
 termgen-check: ## Fail if openehr/terminology drifts from its XML
 	@$(GO) run ./cmd/termgen -resources ./resources/terminology -out . -verify

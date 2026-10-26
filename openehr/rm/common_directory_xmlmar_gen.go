@@ -18,9 +18,10 @@ func (f *Folder) BMMName() string { return "FOLDER" }
 
 // MarshalXML emits canonical openEHR XML for Folder. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -57,16 +58,16 @@ func (f *Folder) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 			return err
 		}
 	}
+	for _idx := range f.Folders {
+		if err := _e.EncodeElement(&f.Folders[_idx], xml.StartElement{Name: xml.Name{Local: "folders"}}); err != nil {
+			return err
+		}
+	}
 	for _, _item := range f.Items {
 		if _item == nil {
 			continue
 		}
 		if err := canxml.EncodePoly(_e, "items", _item); err != nil {
-			return err
-		}
-	}
-	for _idx := range f.Folders {
-		if err := _e.EncodeElement(&f.Folders[_idx], xml.StartElement{Name: xml.Name{Local: "folders"}}); err != nil {
 			return err
 		}
 	}
@@ -88,9 +89,10 @@ func (v *VersionedFolder) BMMName() string { return "VERSIONED_FOLDER" }
 
 // MarshalXML emits canonical openEHR XML for VersionedFolder. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.

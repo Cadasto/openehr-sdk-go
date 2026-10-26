@@ -18,9 +18,10 @@ func (c *Cluster) BMMName() string { return "CLUSTER" }
 
 // MarshalXML emits canonical openEHR XML for Cluster. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -78,9 +79,10 @@ func (e *Element) BMMName() string { return "ELEMENT" }
 
 // MarshalXML emits canonical openEHR XML for Element. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -117,13 +119,13 @@ func (e *Element) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 			return err
 		}
 	}
-	if e.NullFlavour != nil {
-		if err := _e.EncodeElement(e.NullFlavour, xml.StartElement{Name: xml.Name{Local: "null_flavour"}}); err != nil {
+	if e.Value != nil {
+		if err := canxml.EncodePoly(_e, "value", e.Value); err != nil {
 			return err
 		}
 	}
-	if e.Value != nil {
-		if err := canxml.EncodePoly(_e, "value", e.Value); err != nil {
+	if e.NullFlavour != nil {
+		if err := _e.EncodeElement(e.NullFlavour, xml.StartElement{Name: xml.Name{Local: "null_flavour"}}); err != nil {
 			return err
 		}
 	}

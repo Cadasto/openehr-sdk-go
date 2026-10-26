@@ -32,10 +32,14 @@ import (
 //  2. `func (c *C) MarshalXML(e *xml.Encoder, start xml.StartElement) error`
 //     writes the canonical-XML representation. Element local name
 //     defaults to the snake-cased BMM class name when the parent did
-//     not set one. Child elements follow BMM property declaration
-//     order (identical to the JSON ordering). Nil-pointer optionals
-//     and empty containers are omitted. Polymorphic descendants
-//     receive `xsi:type` via [canxml.EncodePoly].
+//     not set one. Child elements follow the `xs:sequence` of the
+//     class's ITS-XML schema type, or of its nearest ancestor's, with
+//     the extension bases' elements first; a property the schema does
+//     not declare follows, in the generator's property order. A plan
+//     built without the schemas, as a test may build one, keeps the
+//     generator's property order. Nil-pointer optionals and empty
+//     containers are omitted. Polymorphic descendants receive
+//     `xsi:type` via [canxml.EncodePoly].
 //
 // An Octet list (DV_MULTIMEDIA's `data` and `integrity_check`, Go []byte) is
 // one element of standard base64 text, the `xs:base64Binary` the ITS-XML
@@ -65,7 +69,11 @@ func RenderMarshalXMLFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		classFields[pc.BMMName] = fields
+		ordered, err := xmlChildFields(plan, pc, fields)
+		if err != nil {
+			return nil, err
+		}
+		classFields[pc.BMMName] = ordered
 	}
 
 	var body bytes.Buffer
@@ -156,9 +164,16 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 	// MarshalXML method.
 	fmt.Fprintf(&b, "// MarshalXML emits canonical openEHR XML for %s. The default\n", pc.GoName)
 	b.WriteString("// element local name is the snake-cased BMM class name when the\n")
-	b.WriteString("// parent did not set one. Child elements follow BMM property\n")
-	b.WriteString("// declaration order; nil-pointer optionals and empty containers are\n")
-	b.WriteString("// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.\n")
+	if plan.xmlOrder != nil {
+		b.WriteString("// parent did not set one. Child elements follow the ITS-XML schema\n")
+		b.WriteString("// sequence of the class, then any property the schema does not\n")
+		b.WriteString("// declare; nil-pointer optionals and empty containers are omitted.\n")
+		b.WriteString("// Polymorphic descendants are emitted via canxml.EncodePoly.\n")
+	} else {
+		b.WriteString("// parent did not set one. Child elements follow BMM property\n")
+		b.WriteString("// declaration order; nil-pointer optionals and empty containers are\n")
+		b.WriteString("// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.\n")
+	}
 	b.WriteString("// Properties typed as XML attributes per the openEHR ITS-XML XSDs\n")
 	b.WriteString("// (currently `archetype_node_id`) are appended to start.Attr before\n")
 	b.WriteString("// the start token is written.\n")

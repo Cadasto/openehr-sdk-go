@@ -1,6 +1,7 @@
 package bmmgen
 
 import (
+	"cmp"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -316,4 +317,146 @@ func (s *xsdSet) appendParticle(out []string, n *xsdNode, groups []string) ([]st
 	default:
 		return nil, fmt.Errorf("its-xml: unexpected xs:%s in a content model", n.XMLName.Local)
 	}
+}
+
+// xmlChildOrder gives one target's XML encoders their child order, from the
+// ITS-XML schema sets in the target's lookup order.
+type xmlChildOrder struct {
+	sets []*xsdSet
+}
+
+// itsXMLSchemas reads each schema set once per generator run: the targets
+// share the two sets, in different lookup orders.
+type itsXMLSchemas struct {
+	dir  string
+	sets map[string]*xsdSet
+}
+
+// orderFor returns the child order for a target that names the schema sets
+// in roots, each a list of root patterns, in lookup order.
+func (s *itsXMLSchemas) orderFor(roots [][]string) (*xmlChildOrder, error) {
+	order := &xmlChildOrder{}
+	var root *os.Root
+	defer func() {
+		if root != nil {
+			_ = root.Close() // read-only handle
+		}
+	}()
+	for _, patterns := range roots {
+		key := strings.Join(patterns, "\n")
+		set, ok := s.sets[key]
+		if !ok {
+			if root == nil {
+				r, err := os.OpenRoot(s.dir)
+				if err != nil {
+					return nil, fmt.Errorf("its-xml: %w", err)
+				}
+				root = r
+			}
+			loaded, err := loadXSDSet(root, patterns)
+			if err != nil {
+				return nil, err
+			}
+			if s.sets == nil {
+				s.sets = make(map[string]*xsdSet)
+			}
+			s.sets[key] = loaded
+			set = loaded
+		}
+		order.sets = append(order.sets, set)
+	}
+	return order, nil
+}
+
+// sequenceFor returns the element names whose order class's encoder takes
+// from the schemas. The class takes the type of its own name, or of its
+// nearest ancestor, from the first set that declares one; the type's
+// extension bases come first. When another set declares a type of the same
+// name, each element only that set declares is placed right after the
+// nearest earlier element both declare. A nil result means no set declares
+// the class or an ancestor.
+func (o *xmlChildOrder) sequenceFor(plan *Plan, class string) ([]string, error) {
+	lineage := nearestLineage(plan, class)
+	for i, set := range o.sets {
+		for _, name := range lineage {
+			if !set.has(name) {
+				continue
+			}
+			seq, err := set.sequence(name)
+			if err != nil {
+				return nil, err
+			}
+			for j, other := range o.sets {
+				if j == i || !other.has(name) {
+					continue
+				}
+				otherSeq, err := other.sequence(name)
+				if err != nil {
+					return nil, err
+				}
+				seq = placeOtherOnly(seq, otherSeq)
+			}
+			return seq, nil
+		}
+	}
+	return nil, nil
+}
+
+// nearestLineage returns class and every class it descends from, nearest
+// first: its parents in declaration order, then theirs. A generic ancestor
+// is named without its type arguments.
+func nearestLineage(plan *Plan, class string) []string {
+	out := []string{class}
+	for i := 0; i < len(out); i++ {
+		c, ok := declaredClass(plan, out[i])
+		if !ok {
+			continue
+		}
+		for _, anc := range c.Ancestors() {
+			anc, _, _ = strings.Cut(anc, "<")
+			if !slices.Contains(out, anc) {
+				out = append(out, anc)
+			}
+		}
+	}
+	return out
+}
+
+// placeOtherOnly returns own with each name only other declares inserted
+// right after the nearest earlier name of other that is already placed, or
+// first when there is none. Names keep other's order among themselves.
+func placeOtherOnly(own, other []string) []string {
+	out := slices.Clone(own)
+	pos := 0
+	for _, name := range other {
+		if i := slices.Index(out, name); i >= 0 {
+			pos = i + 1
+			continue
+		}
+		out = slices.Insert(out, pos, name)
+		pos++
+	}
+	return out
+}
+
+// xmlChildFields returns fields in the order pc's XML encoder writes them:
+// the ones its schema sequence names in that order, then the rest in the
+// order given. Without schemas the order given stands.
+func xmlChildFields(plan *Plan, pc *PlannedClass, fields []emittedField) ([]emittedField, error) {
+	if plan.xmlOrder == nil {
+		return fields, nil
+	}
+	seq, err := plan.xmlOrder.sequenceFor(plan, pc.BMMName)
+	if err != nil {
+		return nil, fmt.Errorf("bmmgen: XML child order of %s: %w", pc.BMMName, err)
+	}
+	rank := func(f emittedField) int {
+		if i := slices.Index(seq, f.Prop.PropertyName()); i >= 0 {
+			return i
+		}
+		return len(seq)
+	}
+	out := slices.Clone(fields)
+	slices.SortStableFunc(out, func(a, b emittedField) int { return cmp.Compare(rank(a), rank(b)) })
+	return out, nil
 }

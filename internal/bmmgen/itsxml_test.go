@@ -216,3 +216,19 @@ func TestXSDSequenceRefuses(t *testing.T) {
 		}
 	}
 }
+
+// TestRunRefusesMissingITSXML pins that a run whose ITS-XML directory holds
+// no schemas fails, rather than write the XML encoders in the generator's
+// property order.
+func TestRunRefusesMissingITSXML(t *testing.T) {
+	_, err := Run(Options{
+		ResourcesDir:  testResources,
+		ITSXMLDir:     t.TempDir(),
+		OutDir:        t.TempDir(),
+		Targets:       []Target{TargetRM},
+		SkipInventory: true,
+	})
+	if err == nil || !strings.Contains(err.Error(), "no schema matches") {
+		t.Errorf("Run with an empty ITS-XML directory = %v, want an error naming the unmatched schema roots", err)
+	}
+}

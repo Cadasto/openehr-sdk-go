@@ -18,9 +18,10 @@ func (a *Archetype) BMMName() string { return "ARCHETYPE" }
 
 // MarshalXML emits canonical openEHR XML for Archetype. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -34,18 +35,13 @@ func (a *Archetype) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeElement(&a.OriginalLanguage, xml.StartElement{Name: xml.Name{Local: "original_language"}}); err != nil {
 		return err
 	}
-	if a.Description != nil {
-		if err := _e.EncodeElement(a.Description, xml.StartElement{Name: xml.Name{Local: "description"}}); err != nil {
-			return err
-		}
-	}
 	if a.IsControlled != nil {
 		if err := _e.EncodeElement(*a.IsControlled, xml.StartElement{Name: xml.Name{Local: "is_controlled"}}); err != nil {
 			return err
 		}
 	}
-	if a.Annotations != nil {
-		if err := _e.EncodeElement(a.Annotations, xml.StartElement{Name: xml.Name{Local: "annotations"}}); err != nil {
+	if a.Description != nil {
+		if err := _e.EncodeElement(a.Description, xml.StartElement{Name: xml.Name{Local: "description"}}); err != nil {
 			return err
 		}
 	}
@@ -54,22 +50,16 @@ func (a *Archetype) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&a.Definition, xml.StartElement{Name: xml.Name{Local: "definition"}}); err != nil {
-		return err
-	}
-	if err := _e.EncodeElement(&a.Ontology, xml.StartElement{Name: xml.Name{Local: "ontology"}}); err != nil {
-		return err
-	}
-	if a.AdlVersion != nil {
-		if err := _e.EncodeElement(*a.AdlVersion, xml.StartElement{Name: xml.Name{Local: "adl_version"}}); err != nil {
+	if a.UID != nil {
+		if err := _e.EncodeElement(a.UID, xml.StartElement{Name: xml.Name{Local: "uid"}}); err != nil {
 			return err
 		}
 	}
 	if err := _e.EncodeElement(&a.ArchetypeID, xml.StartElement{Name: xml.Name{Local: "archetype_id"}}); err != nil {
 		return err
 	}
-	if a.UID != nil {
-		if err := _e.EncodeElement(a.UID, xml.StartElement{Name: xml.Name{Local: "uid"}}); err != nil {
+	if a.AdlVersion != nil {
+		if err := _e.EncodeElement(*a.AdlVersion, xml.StartElement{Name: xml.Name{Local: "adl_version"}}); err != nil {
 			return err
 		}
 	}
@@ -81,8 +71,19 @@ func (a *Archetype) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 			return err
 		}
 	}
+	if err := _e.EncodeElement(&a.Definition, xml.StartElement{Name: xml.Name{Local: "definition"}}); err != nil {
+		return err
+	}
 	for _idx := range a.Invariants {
 		if err := _e.EncodeElement(&a.Invariants[_idx], xml.StartElement{Name: xml.Name{Local: "invariants"}}); err != nil {
+			return err
+		}
+	}
+	if err := _e.EncodeElement(&a.Ontology, xml.StartElement{Name: xml.Name{Local: "ontology"}}); err != nil {
+		return err
+	}
+	if a.Annotations != nil {
+		if err := _e.EncodeElement(a.Annotations, xml.StartElement{Name: xml.Name{Local: "annotations"}}); err != nil {
 			return err
 		}
 	}
