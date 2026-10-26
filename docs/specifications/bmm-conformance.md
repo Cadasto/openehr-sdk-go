@@ -8,7 +8,7 @@ kind: specification
 
 The SDK's domain types (Reference Model, Archetype Object Model, base + language + terminology types) are **derived from openEHR BMM schemas** pinned in [`../resources/bmm/`](../../resources/bmm). This document is the normative contract between those BMM inputs and the Go code in `openehr/rm/`, `openehr/aom/aom14/`, and related packages.
 
-Covers REQ-041 through REQ-049.
+Covers REQ-041, REQ-045, REQ-046 and REQ-048; the retired REQ-042, REQ-043, REQ-044 and REQ-047 are prose under REQ-041, and the retired REQ-049 is part of REQ-048.
 
 ## The BMM substrate
 
@@ -31,41 +31,33 @@ Pinned schemas live in [`../resources/bmm/`](../../resources/bmm):
 
 ### REQ-041 — Pinned BMM sources
 
-The SDK **MUST** treat the BMM files in `resources/bmm/` as the canonical source of truth for the openEHR domain model. Domain-model code (concrete RM types, RM interfaces, AOM types, primitive aliases, type registry entries) **MUST** be derivable from these files alone — no out-of-band information about openEHR types may be embedded in hand-written code.
+The BMM files in `resources/bmm/` are the source of truth for the openEHR domain model. The generated RM and AOM 1.4 types, their primitive mappings and their type registry entries **MUST** correspond to the classes and properties of the pinned BMM files, mapped by [§ Mapping rules](#mapping-rules) and [§ Primitive type mapping](#primitive-type-mapping); hand-written code embeds no out-of-band information about openEHR types.
 
-- **Covered by:** [`../resources/bmm/README.md`](../../resources/bmm/README.md)
-- **Lives in:** `resources/bmm/*.bmm.json`
-- **Sibling pin:** the openEHR Terminology vocabulary is pinned the same way under `resources/terminology/` — see [REQ-034](rm-modeling.md#openehr-terminology-vocabulary-req-034).
+How the SDK keeps that correspondence:
+
+- **Generated, reproducibly.** An in-tree generator (`internal/bmmgen`, run by `cmd/bmmgen`) generates `openehr/rm/`, `openehr/rm/typereg/`, `openehr/rm/rminfo/` and `openehr/aom/aom14/` from the **primary** BMM files in the table above. It is reproducible: two runs over the same inputs give byte-identical output.
+- **Drift-checked.** The build gate re-runs the generator and fails when the working tree differs from its output, which is the mechanical guarantee against a hand edit silently diverging from the BMM.
+- **Scope.** The generator skips the BMM package `org.openehr.rm.ehr_extract` and its sub-packages, and the deferred BMM files (`am 2.4.0`, `lang 1.1.0`, `term 3.1.0`) are not its inputs in v1.
+- **Generated and hand-written files stay apart.** A generated file carries the standard generated-code header ([§ Generator output conventions](#generator-output-conventions)) and is never edited by hand. Hand-written code in a BMM-derived package lives in its own files, documented in a `doc.go` or named by the `<file>_ext.go` convention; it consumes the generated types, never redefines a generated type or method, and never weakens or overrides an invariant the BMM declares. A hand-written package can hold a generated `*_gen.go` file that the drift check covers like any other output, such as the generated attribute access in `internal/rmaccess` and the invariant inventory in `openehr/validation`, which a hand-kept `invariants.json` classifies.
+- **The BMM wins.** Where a BMM file declares a class, property or cardinality that contradicts a statement elsewhere in the openEHR specifications, the SDK follows the BMM. The BMM is the computable form the openEHR ecosystem uses for validation, AQL path typing and tooling, so diverging from it would make archetype validation disagree with templates compiled from it, and it is the form the openEHR Foundation actively maintains while spec prose lags. A suspected bug in a BMM file is raised upstream, in the openEHR specifications repository, rather than worked around in the SDK. A deviation from the mapping rules takes an ADR and an update to [§ Mapping rules](#mapping-rules).
+
+The openEHR Terminology vocabulary is pinned the same way under `resources/terminology/` ([rm-modeling.md § REQ-034](rm-modeling.md#openehr-terminology-vocabulary-req-034)).
 
 ### REQ-042 — Generated code, drift-detected
 
-The packages `openehr/rm/`, `openehr/rm/typereg/`, and `openehr/aom/aom14/` **MUST** be generated from the **primary** BMM files (see table above) by an in-tree generator (`internal/bmmgen` / `cmd/bmmgen`). The generator **MUST** be reproducible: running it on the same inputs twice **MUST** produce byte-identical output.
-
-The generator **MUST** skip the BMM package `org.openehr.rm.ehr_extract` (and its sub-packages) for v1 — deferred per scope decision. Deferred BMM files (`am 2.4.0`, `lang 1.1.0`, `term 3.1.0`) are **not** generator inputs in v1.
-
-The CI pipeline **MUST** include a "drift check" step that re-runs the generator and fails the build if the working tree diverges from the regenerated output. This is the mechanical guarantee against hand-edits silently diverging from the BMM.
-
-Hand-written files (in `openehr/serialize`, `openehr/validation`, `openehr/template/<parser>`, `openehr/bmm/`, etc.) **MAY** consume the generated types but **MUST NOT** be regenerated. A hand-written package may hold a generated `*_gen.go` file beside them, which the drift check covers like any other output: `internal/rmaccess/access_gen.go`, the attribute access, beside the hand-written `access.go` and `presence.go`; and `openehr/validation/inventory_gen.go`, the invariant inventory, classified by the hand-kept `openehr/validation/invariants.json`. The generator's output and hand-written code live in clearly separated files (see § Generator output conventions below).
-
-- **Lives in:** `internal/bmmgen/`, `cmd/bmmgen/`, generated files under `openehr/rm/`, `openehr/rm/typereg/`, `openehr/rm/rminfo/`, `openehr/aom/aom14/`, `internal/rmaccess/` (`access_gen.go`) and `openehr/validation/` (`inventory_gen.go`)
+**Retired.** Generation and its drift check are now prose under [REQ-041](#req-041--pinned-bmm-sources). The identifier is never reused.
 
 ### REQ-043 — Mapping rules: P_BMM → Go
 
-The generator **MUST** apply the mapping rules in [§ Mapping rules](#mapping-rules) below for every concept in the BMM input. Deviations require an ADR and a corresponding update to this section.
+**Retired.** The mapping rules now bind through [REQ-041](#req-041--pinned-bmm-sources) and live in [§ Mapping rules](#mapping-rules). The identifier is never reused.
 
 ### REQ-044 — Hand-written extensions are isolated
 
-Hand-written code is permitted in BMM-derived packages — but **MUST** be in **separate files** clearly marked as non-generated. Generated files **MUST** carry the standard Go header `// Code generated by bmmgen; DO NOT EDIT.` and **MUST NOT** be modified by hand.
-
-A non-generated file in `openehr/rm/` (e.g. helper functions over the generated types, codec hooks) is allowed if and only if:
-
-- Its existence is documented in a `doc.go` or a `<file>_ext.go` naming convention.
-- It does not redefine a generated type or method.
-- It does not weaken or override invariants that the BMM declares.
+**Retired.** The separation of generated and hand-written files is now prose under [REQ-041](#req-041--pinned-bmm-sources). The identifier is never reused.
 
 ### REQ-045 — BMM loader is a building block
 
-A `openehr/bmm/` package **MUST** exist as a public, building-block loader for BMM schemas (REQ-013). Consumers — validators, archetype tools, custom code generators, BMM-aware diff tools — **MUST** be able to import `openehr/bmm/` without instantiating `transport/`, `auth/`, or any HTTP machinery. `openehr/bmm`, and every package it imports through a chain of this module's and the standard library's packages, **MUST NOT** import `net/http` or a package under it, so no HTTP machinery arrives through a standard-library package such as `expvar` or `net/rpc`; the chain stops at a package of another module, the standard library's vendored copies included (`TestBMMForbiddenImports`).
+`openehr/bmm/` **MUST** be a public loader for BMM schemas that a consumer — a validator, an archetype tool, a custom code generator, a BMM-aware diff tool — can import without `transport/`, `auth/` or any HTTP machinery. Its import rule is in the table of [module-layout.md § REQ-013](module-layout.md#req-013--building-block-independence).
 
 The loader exposes:
 
@@ -94,41 +86,36 @@ The SDK **MUST** map openEHR primitive types to Go types per the table in [§ Pr
 
 ### REQ-047 — BMM-spec divergence resolution
 
-If the BMM file declares a class, property, or cardinality that contradicts a normative statement elsewhere in the openEHR specification, the **BMM file wins** for SDK conformance purposes. Reasoning:
-
-- The BMM is the computable form the openEHR ecosystem uses for validation, AQL path typing, and tooling. If the SDK diverges from the BMM, archetype validation produces false positives/negatives against templates compiled from the BMM.
-- The BMM is the form the openEHR Foundation actively maintains; spec prose lags.
-
-If a divergence is suspected to indicate a bug in the BMM file, the SDK **MUST** still follow the BMM and **MUST** raise the issue upstream (openEHR specifications repo) rather than work around it in the SDK.
+**Retired.** The rule that the BMM wins over spec prose is now prose under [REQ-041](#req-041--pinned-bmm-sources). The identifier is never reused.
 
 ### REQ-048 — RM meta-model introspection surface
 
 The SDK **MUST** expose the pinned Reference Model's **class graph** — not only the per-class attribute shape it already answers — as a **compiled-in** introspection surface, so that a consumer reasoning about the RM rather than about one template (AQL class-expression expansion and `CONTAINS` conformance, polymorphic slot fit, validation walkers, BMM-faithful re-serialisation and schema diffing) does not have to re-reduce the pinned BMM for itself.
 
-The surface **MUST** be generated from the **primary** RM BMM file under [REQ-042](#req-042--generated-code-drift-detected)'s discipline, **MUST NOT** load, parse, or resolve a BMM schema at runtime, and the own non-test files of its package, `openehr/rm/rminfo`, **MUST** import only the standard library: a compiled-in table needs nothing else, and an import of this module's packages, `openehr/bmm` most pointedly, would turn it back into a runtime reduction (`TestRMInfoImportsAreStdlibOnly`). Both prohibitions are this requirement's, extending [ADR 0005](../adr/0005-compiled-template-foundation.md) C1 from the attribute tables to the class graph; REQ-042 is cited for the emission and drift rules, not restated.
+The surface is generated from the **primary** RM BMM file by the generator of [REQ-041](#req-041--pinned-bmm-sources), and it loads, parses and resolves no BMM schema at runtime. Its package, `openehr/rm/rminfo`, keeps to the import rule [module-layout.md § REQ-013](module-layout.md#req-013--building-block-independence) gives it: a compiled-in table needs nothing else, and an import of this module's packages, `openehr/bmm` most pointedly, would turn it back into a runtime reduction. This extends [ADR 0005](../adr/0005-compiled-template-foundation.md) C1 from the attribute tables to the whole emitted class universe.
 
 #### The class universe
 
-The surface's **class universe** **MUST** be the classes the **RM generation target** emits from the BMM's `class_definitions` — which spans the primary RM schema *and* the BASE classes it includes, since REQ-042 emits both into `openehr/rm/` — minus enumerations and minus the foundation typing classes that target skips as typing constraints rather than data. Deriving the universe from the generation target rather than from a list written here is deliberate: a hand-kept list would rot against the pinned schemas, and the equality is exactly what [PROBE-094](conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm) checks.
+The surface's **class universe** **MUST** be the classes the **RM generation target** emits from the BMM's `class_definitions` — which spans the primary RM schema *and* the BASE classes it includes, since the target emits both into `openehr/rm/` — minus enumerations and minus the foundation typing classes that target skips as typing constraints rather than data. Deriving the universe from the generation target rather than from a list written here is deliberate: a hand-kept list would rot against the pinned schemas, and the equality is exactly what [PROBE-094](conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm) checks.
 
 Two exclusions sit *outside* that rule rather than inside it, and conflating them with it would misdescribe the surface:
 
-- The `org.openehr.rm.ehr_extract` package never reaches emission at all (REQ-042), so it is excluded upstream of the universe.
-- The `primitive_types` entries of [§ Primitive type mapping](#primitive-type-mapping) **MUST NOT** be in the universe, **even where the target does emit a Go type for them** — `Cardinality`, `Interval`, `Multiplicity_interval`, `Terminology_code` and `Terminology_term` are emitted as Go values, and are still out. They are values the RM *uses*, not RM classes to reason *about*. "Not in the universe" therefore means *this surface does not model the class*, which is **not** the same as *no Go type exists for it*.
+- The `org.openehr.rm.ehr_extract` package never reaches emission at all ([REQ-041](#req-041--pinned-bmm-sources)), so it is excluded upstream of the universe.
+- The `primitive_types` entries of [§ Primitive type mapping](#primitive-type-mapping) are not in the universe, **even where the target does emit a Go type for them** — `Cardinality`, `Interval`, `Multiplicity_interval`, `Terminology_code` and `Terminology_term` are emitted as Go values, and are still out. They are values the RM *uses*, not RM classes to reason *about*. "Not in the universe" therefore means *this surface does not model the class*, which is **not** the same as *no Go type exists for it*.
 
-The universe **MUST** therefore include the classes that carry no attributes of their own or inherited, and so appear in no attribute table — the abstract bases `DATA_VALUE` and `PATHABLE`, the `support` terminology/measurement access and service classes, and the definition-constant holders. A class the generation target emits but the universe omits cannot be asked about at all, and a descendant expansion rooted at an abstract class is unanswerable while that class is absent: that gap is what this requirement closes.
+The universe therefore includes the classes that carry no attributes of their own or inherited, and so appear in no attribute table — the abstract bases `DATA_VALUE` and `PATHABLE`, the `support` terminology/measurement access and service classes, and the definition-constant holders. A class the generation target emits but the universe omitted could not be asked about at all, and a descendant expansion rooted at an abstract class would be unanswerable while that class was absent.
 
-The **class-graph** answers — immediate parents, transitive ancestors, conformance, concrete descendants — **MUST** be closed over that universe: every class name they return **MUST** itself be in it. A BMM ancestor outside the universe **MUST NOT** be reported, and a class whose every BMM ancestor lies outside it is a **root**.
+The **class-graph** answers — immediate parents, transitive ancestors, conformance, concrete descendants — **MUST** be closed over that universe without losing an RM edge: every class name they return is itself in it, a BMM ancestor outside it is never reported, and a class whose every BMM ancestor lies outside it is a **root**.
 
 The **attribute declaration site** is deliberately **not** closed, because it belongs to the attribute layer rather than to the graph. It **MUST** name the BMM class that actually declares the attribute, and that class can lie outside the universe when the attribute is inherited from an excluded `primitive_types` entry. On the pinned RM the only such site is `Interval`, which declares the bounds attributes `DV_INTERVAL`, `Point_interval` and `Proper_interval` carry; clamping those to the carrying class would report six attributes as locally declared by three classes that declare none of them, which is the very loss this question exists to prevent. The flattened attribute lookup already behaves this way — it reports primitives and generic parameters (`String`, `Integer`, `T`) as attribute types — so the split is consistent: **the attribute layer is faithful to the BMM, the class graph is navigable.** A caller handed an out-of-universe site can tell, because every class-graph question about that name reports not-known.
 
-What that filter removes is exactly the excluded kinds, not RM structure: the [§ Primitive type mapping](#primitive-type-mapping) entries that appear as BMM ancestors — `Any`, `Ordered`, `Interval`, `Iso8601_type` and the four `Iso8601_*` value types — plus the `PROPORTION_KIND` enumeration. The two lists are the same list, which is why the universe rule and the filter cannot drift apart. It **MUST NOT** cost an RM edge, and the closure **MUST** be asserted rather than assumed: every class that names one of those also names an RM ancestor beside it, and an RM edge lost to the filter would silently shrink every descendant expansion above it. Four classes have no in-universe ancestor left and are therefore roots — `PATHABLE` (its only ancestor is `Any`), `Point_interval` and `Proper_interval` (`Interval`), and `Iso8601_timezone` (`Iso8601_type`). Each loses a foundation edge, none an RM information-model edge; a fifth **MUST** be treated as a defect rather than a new root, since it would mean an RM class had lost its RM parent.
+What the closing filter removes is exactly the excluded kinds, not RM structure: the [§ Primitive type mapping](#primitive-type-mapping) entries that appear as BMM ancestors — `Any`, `Ordered`, `Interval`, `Iso8601_type` and the four `Iso8601_*` value types — plus the `PROPORTION_KIND` enumeration. The two lists are the same list, which is why the universe rule and the filter cannot drift apart. Every class that names one of those also names an RM ancestor beside it, and that is asserted rather than assumed, since an RM edge lost to the filter would silently shrink every descendant expansion above it. Four classes have no in-universe ancestor left and are therefore roots — `PATHABLE` (its only ancestor is `Any`), `Point_interval` and `Proper_interval` (`Interval`), and `Iso8601_timezone` (`Iso8601_type`). Each loses a foundation edge, none an RM information-model edge; a fifth would be a defect rather than a new root, since it would mean an RM class had lost its RM parent.
 
-#### The questions the surface MUST answer
+#### The questions the surface answers
 
-For a class in the universe:
+For a class in the universe, the surface **MUST** answer:
 
-- **Abstractness** — the pinned BMM's own `is_abstract` flag, so a caller can tell that naming the class denotes its concrete descendants rather than one instantiable class. It is the BMM's answer and **MUST NOT** be second-guessed (REQ-047); see [§ Abstract is the BMM's flag, not a storability verdict](#abstract-is-the-bmms-flag-not-a-storability-verdict) below for what it therefore does *not* answer.
+- **Abstractness** — the pinned BMM's own `is_abstract` flag, so a caller can tell that naming the class denotes its concrete descendants rather than one instantiable class; see [§ Abstract is the BMM's flag, not a storability verdict](#abstract-is-the-bmms-flag-not-a-storability-verdict) below for what it therefore does *not* answer.
 - **Immediate parents**, in BMM declaration order — the faithful edge set. A transitive closure erases it, and a re-serialiser or schema differ cannot recover it.
 - **Transitive ancestors** — every ancestor class, deterministically ordered.
 - **Conformance** — whether one class is, or descends from, another.
@@ -137,28 +124,28 @@ For a class in the universe:
 
 #### The flattened attribute tables stay flattened
 
-The per-class attribute tables are inheritance-**flattened** and **MUST** stay so: they answer the inheritance-*resolved* question the REQ-112 validation floor and the REQ-111 compiled template depend on. The declaration site is **additive** — it recovers what the fold erases — and **MUST NOT** be obtained by narrowing any table to own-only declarations.
+The per-class attribute tables are inheritance-**flattened** and **MUST** stay so: they answer the inheritance-*resolved* question the REQ-112 validation floor and the REQ-111 compiled template depend on. The declaration site is **additive** — it recovers what the fold erases — rather than a narrowing of any table to own-only declarations.
 
 The declaration site **MUST** agree with the fold that produced those tables. Observably, for an attribute a class carries:
 
-- the class named **MUST** be that class or one of its BMM ancestors — the **unfiltered** ancestor chain, since the site may lie outside the universe (§ The class universe above);
-- the named class's own BMM declaration **MUST** carry the attribute;
-- when the named class is **in** the universe, the attribute's reported type, required flag, and container flag **MUST** equal the ones that class reports. When it is outside, no such row exists and the BMM declaration itself is the reference.
+- the class named is that class or one of its BMM ancestors — the **unfiltered** ancestor chain, since the site may lie outside the universe (§ The class universe above);
+- the named class's own BMM declaration carries the attribute;
+- when the named class is **in** the universe, the attribute's reported type, required flag, and container flag equal the ones that class reports. When it is outside, no such row exists and the BMM declaration itself is the reference.
 
 Two answers to "where does this attribute come from" would be the same defect as the erasure this recovers from.
 
 #### The attribute tables are complete against the BMM
 
-Per class, the shipped attribute-name set **MUST** equal the effective property set — own plus inherited — of the same class in the pinned BMM: an attribute the generator silently declines to translate is a defect, not a gap to be discovered later. A known drop is admissible only as a **named exemption pin**, and this clause is the pin rule's normative home: each pin **MUST** cite an open research strand, and the pinned drop **MUST NOT** be folded in ahead of that strand's resolution. Exactly one exemption exists today — `Iso8601_timezone.value`, the pre-existing emission gap open as [STRAND-13](research-strands.md#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped). The equality, and the pin list held two-sidedly (an unpinned drop fails; a stale pin whose drop has since been fixed fails too), are what [PROBE-094](conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm) arm (d) asserts.
+Per class, the shipped attribute-name set **MUST** equal the effective property set — own plus inherited — of the same class in the pinned BMM: an attribute the generator silently declines to translate is a defect, not a gap to be discovered later. A known drop is admissible only as a **named exemption pin**, which cites an open research strand, and the pinned drop is not folded in ahead of that strand's resolution. Exactly one exemption exists — `Iso8601_timezone.value`, the emission gap open as [STRAND-13](research-strands.md#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped). The equality, and the pin list held two-sidedly (an unpinned drop fails; a stale pin whose drop has since been fixed fails too), are what [PROBE-094](conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm) arm (d) asserts.
 
 #### Abstract is the BMM's flag, not a storability verdict
 
-`is_abstract` in the pinned BMM answers "does the model forbid instantiating this class". It is **not** the same question as "can a stored instance carry this name as `_type`", and this surface **MUST NOT** conflate them. Two consequences bind:
+`is_abstract` in the pinned BMM answers "does the model forbid instantiating this class". It is **not** the same question as "can a stored instance carry this name as `_type`", and this surface does not conflate them:
 
-- The surface **MUST** report the BMM's flag verbatim, even where the BMM's answer looks wrong. Six classes the universe admits — `MEASUREMENT_SERVICE`, `TERMINOLOGY_SERVICE`, `CODE_SET_ACCESS`, `TERMINOLOGY_ACCESS`, `OPENEHR_CODE_SET_IDENTIFIERS`, `OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS` — carry no `is_abstract` flag and are reported non-abstract, two of them despite being `P_BMM_INTERFACE` declarations the generator renders as Go interfaces. Substituting a locally-derived answer is forbidden by [REQ-047](#req-047--bmm-spec-divergence-resolution) whether or not the local answer is better.
-- A caller that needs the set of `_type` values the SDK can actually decode **MUST** use the [REQ-040 type registry](rm-modeling.md#type-registry-req-040), which is the authority for that question. This surface answers the model's shape; the registry answers what is instantiable in Go.
+- The surface **MUST** report the BMM's flag verbatim, even where the BMM's answer looks wrong. Six classes the universe admits — `MEASUREMENT_SERVICE`, `TERMINOLOGY_SERVICE`, `CODE_SET_ACCESS`, `TERMINOLOGY_ACCESS`, `OPENEHR_CODE_SET_IDENTIFIERS`, `OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS` — carry no `is_abstract` flag and are reported non-abstract, two of them despite being `P_BMM_INTERFACE` declarations the generator renders as Go interfaces. The BMM wins over a locally derived answer, whether or not the local answer is better ([REQ-041](#req-041--pinned-bmm-sources)).
+- The set of `_type` values the SDK can actually decode is the question of the [REQ-040 type registry](rm-modeling.md#type-registry-req-040), which a caller asks instead. This surface answers the model's shape; the registry answers what is instantiable in Go.
 
-Whether abstractness should additionally report BMM-interface-ness — and whether the missing flags are an upstream BMM defect to raise per REQ-047 — is open as [STRAND-12](research-strands.md#strand-12--bmm-interface-classes-carry-no-is_abstract-flag) and **MUST NOT** be resolved in code ahead of that strand.
+Whether abstractness ought to report BMM-interface-ness as well — and whether the missing flags are an upstream BMM defect to raise — is open as [STRAND-12](research-strands.md#strand-12--bmm-interface-classes-carry-no-is_abstract-flag), and code leaves it open until that strand resolves.
 
 #### Three answers, never conflated
 
@@ -170,67 +157,62 @@ An introspection answer **MUST** keep these states distinct, because a caller re
 | **in the universe, abstract, with concrete descendants** | naming it denotes those descendants |
 | **in the universe, abstract, with none** | a dead end: it denotes nothing instantiable |
 
-An empty ancestor answer on a class **in** the universe means *root*; an empty concrete-descendant answer on a class in the universe means *dead-end abstract*. Either answer **MUST NOT** be conflated with the answer for a name the universe does not contain. Asking for the declaration site of an attribute the class does not carry **MUST** report not-found rather than guess a class.
+An empty ancestor answer on a class **in** the universe means *root*; an empty concrete-descendant answer on a class in the universe means *dead-end abstract*; neither is the answer for a name the universe does not contain. A question for the declaration site of an attribute the class does not carry **MUST** report not-found rather than a guessed class.
 
-The *out-of-universe* state itself has structure: why a given name is not in the universe is an answerable question, and [REQ-049](#req-049--rm-class-universe-absence-reasons) gives it a reason taxonomy of its own.
+The *out-of-universe* state itself has structure: why a given name is not in the universe is an answerable question, which [§ Absence reasons](#absence-reasons) answers.
 
-#### Determinism and independence
+#### Absence reasons
 
-- Answers **MUST** be deterministic across runs and processes: every returned ordering is fixed (BMM declaration order for immediate parents, sorted otherwise), and a returned collection **MUST NOT** alias package state a caller could mutate.
-- [REQ-024](idiom.md#generics-policy-req-024) (no reflection beyond its stated exceptions) and [REQ-013](module-layout.md#req-013--building-block-independence) (building-block independence) apply unchanged; they are cited here because they are what make this surface importable from any building block, not restated as fresh obligations.
-- Introducing it **MUST NOT** break an external implementer of the existing attribute-lookup interface: the new questions belong on an **optional capability interface** discovered by assertion, per [idiom.md § Public-API stability](idiom.md#public-api-stability), following the precedent already set for attribute enumeration. Each question **MUST** be reachable through the same seam that admits synthetic model data, so the negative space above is testable without the pinned RM.
+The universe answers "does this surface model the class?" with membership. The negative space behind a "no" has structure the generator already computes: a name can be undeclared by the pinned schemas, declared but in a package the target skips wholesale, declared but in the generator's named-class exclusion set, a `primitive_types` value rather than a modelled class ([§ Primitive type mapping](#primitive-type-mapping)), or a BMM enumeration. The surface keeps these apart, for the reason [§ Three answers, never conflated](#three-answers-never-conflated) keeps the in-universe states apart.
 
-**Acceptance:** the compiled-in answers equal an independent reduction of the pinned BMM (class universe, abstractness, immediate parents, transitive ancestors, per-attribute declaring class) — the equivalence [PROBE-094](conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm) asserts. `ENTRY` reports abstract and expands to exactly the concrete entry classes; a concrete class expands to itself; a dead-end abstract class expands to nothing while still reporting as known. `LOCATABLE`-inherited attributes report `LOCATABLE` (or the redefining descendant) as their declaration site while the flattened lookup keeps answering unchanged. A name outside the universe is distinguishable from every in-universe answer on every question. Hand-editing a generated hierarchy field fails the REQ-042 drift check.
-
-**Out of scope:** runtime BMM loading (forbidden above, not deferred); AOM/AM class hierarchies; generic-parameter resolution beyond the root-type reduction the attribute tables already apply; selecting among multiple pinned schemas at run time; and deriving *instantiability* beyond the BMM's own abstractness flag (an RM invariant that forbids a value is [REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)'s, not this surface's).
-
-- **Lives in:** `openehr/rm/rminfo/`, generated by `internal/bmmgen/`
-- **Extends:** [ADR 0005](../adr/0005-compiled-template-foundation.md) C1 — same generated, stdlib-only, no-runtime-BMM table, widened from the attribute-bearing classes to the whole emitted class universe
-
-### REQ-049 — RM class-universe absence reasons
-
-[REQ-048](#req-048--rm-meta-model-introspection-surface)'s universe answers "does this surface model the class?" with membership. The negative space behind a "no" has structure the generator already computes on every run and then discards: a name can be undeclared by the pinned schemas, declared but in a package the target skips wholesale (REQ-042), declared but in the generator's named-class exclusion set, a `primitive_types` value rather than a modelled class ([§ Primitive type mapping](#primitive-type-mapping)), or a BMM enumeration. [§ Three answers, never conflated](#three-answers-never-conflated) already forbids collapsing in-universe states because a caller refusing a query has to say which one it hit; this requirement extends the same discipline to the out-of-universe state, which today folds five different facts into one boolean.
-
-#### The reason taxonomy
-
-For any name **not** in the class universe, the surface **MUST** report exactly one reason, drawn from a closed set:
+For a name **not** in the class universe, the surface **MUST** report exactly one reason, drawn from this closed set:
 
 | Reason | Meaning |
 |---|---|
 | **undeclared** | no pinned schema of the RM generation target declares the name |
-| **excluded package** | declared; its BMM package is one the generator skips wholesale (REQ-042 — `org.openehr.rm.ehr_extract` and the functional/builtins foundation packages) |
+| **excluded package** | declared; its BMM package is one the generator skips wholesale (`org.openehr.rm.ehr_extract` and the functional/builtins foundation packages) |
 | **excluded class** | declared; in the generator's named-class exclusion set |
 | **primitive** | declared as (or mapped to) a [§ Primitive type mapping](#primitive-type-mapping) entry — a value the RM *uses*, not a class this surface models, even where the target emits a Go type for it |
 | **enumeration** | declared as a BMM enumeration, not a class |
 
 For a name the universe **does** contain, the surface **MUST** report a distinguished *none* answer — the reason type's zero value — that equals no absence reason, so the accessor cannot be misread as a membership test with inverted sense.
 
-A name matching more than one rule **MUST** report per this fixed precedence: **primitive, then enumeration, then excluded class, then excluded package**. The order puts what a name *is* ahead of why it was *skipped* — the generator's named-class exclusion list deliberately restates several primitive-mapped names as belt-and-braces, and the reported reason must not depend on that redundancy.
+A name that more than one rule matches **MUST** report the reason ranked first in this fixed precedence, which puts what a name *is* ahead of why it was *skipped*:
 
-The reason set is **closed and exhaustive-switchable**. Adding a member is an additive change to the public surface: which bump it warrants is [idiom.md § Public-API stability](idiom.md#public-api-stability)'s and REQ-004's question, not this taxonomy's, and what a caller does with a member it does not recognise is the caller's per § Out of scope below. The reason's string form **MUST** name the kind only.
+| Rank | Reason |
+|---|---|
+| 1 | primitive |
+| 2 | enumeration |
+| 3 | excluded class |
+| 4 | excluded package |
 
-#### Generated, accounted, computed
+The generator's named-class exclusion list deliberately restates several primitive-mapped names as belt-and-braces, and the precedence keeps the reported reason independent of that redundancy.
 
-- The absence table **MUST** be generated by the same run that generates the universe (REQ-042 applies unchanged: generated header, drift check, no hand edits), and the two **MUST NOT** overlap — a universe member never appears in the table.
-- **Accounting:** every name the RM generation target's pinned schemas declare (`class_definitions` and `primitive_types`) that the universe omits **MUST** be in the table with a reason that is neither *undeclared* nor *none*. A declared name no rule accounts for **MUST** fail generation rather than emit — that failure mode is what keeps a future widening of a package skip from silently reclassifying a real openEHR class as undeclared.
-- **Undeclared is computed, never stored.** The table **MUST** carry only declared-but-omitted names; a lookup for any other out-of-universe name **MUST** report *undeclared* with no table entry backing it.
+An out-of-universe name that no absence entry backs, the empty string included, **MUST** report *undeclared*: *undeclared* is computed from the table's silence, never stored. The generated table is produced by the run that generates the universe and never names a universe member. It accounts for every name the RM generation target's pinned schemas declare (`class_definitions` and `primitive_types`) that the universe omits, with a reason that is neither *undeclared* nor *none*; a declared name no rule accounts for fails generation rather than being emitted, which keeps a future widening of a package skip from silently reclassifying a real openEHR class as undeclared.
 
-#### Surface shape
+The reason set is **closed and exhaustive-switchable**. Adding a member is an additive change to the public surface: which bump it warrants is [idiom.md § Public-API stability](idiom.md#public-api-stability)'s and REQ-004's question, not this taxonomy's, and what a caller does with a member it does not recognise is the caller's (§ Out of scope below). The reason's string form **MUST** name the kind only.
 
-- The accessor **MUST NOT** be added to the `Lookup` or `Hierarchy` interfaces: it belongs on a new optional capability interface discovered by runtime type assertion, per [idiom.md § Public-API stability](idiom.md#public-api-stability) and the precedent set by attribute enumeration. `Default` implements it; every existing interface, constructor signature, and answer is unchanged.
-- **Synthetic seam:** the question **MUST** be reachable with synthetic data — a constructor that admits an absence table beside the class data — so the behaviour is testable without the pinned RM. A `Lookup` built without an absence table **MUST** report *undeclared* for every out-of-universe name, and that fallback **MUST** be documented on the constructor. Where synthetic class data and a synthetic absence entry name the same class, the universe **MUST** win. A synthetic absence entry whose value is the *none* reason **MUST** be treated as table silence — the name reports *undeclared* — so no caller-supplied table can make the surface report *none* for a name the universe does not contain.
-- **Negative-space consistency:** a name reporting an absence reason **MUST** report not-known on every `Lookup` and `Hierarchy` question, and a name reporting *none* **MUST** be in `KnownRMTypes()` — the two surfaces answer the same membership question and **MUST NOT** disagree.
+The question sits on its own optional capability interface, discovered by runtime type assertion, rather than on `Lookup` or `Hierarchy`, so every existing interface, constructor signature and answer stays as it was ([idiom.md § Public-API stability](idiom.md#public-api-stability)); `Default` implements it. It is reachable with synthetic data through a constructor that admits an absence table beside the class data, and a `Lookup` built without one reports *undeclared* for every out-of-universe name, as that constructor's documentation says. A caller-supplied absence table **MUST NOT** contradict the universe: where it and the class data name the same class, the universe wins, and an entry whose value is the *none* reason counts as no entry, so the name reports *undeclared*.
 
-**Acceptance:** [PROBE-098](conformance.md#probe-098--absence-reasons-account-for-the-universes-negative-space) — the compiled-in table equals an independent reduction of the pinned BMM, in both directions, under the fixed precedence, with the negative-space consistency held on every out-of-universe name it exercises.
+A name reporting an absence reason **MUST** report not-known on every `Lookup` and `Hierarchy` question, and a name reporting *none* is in `KnownRMTypes()`: the two surfaces answer the same membership question and never disagree.
 
-**Out of scope:** shipping any excluded model (the exclusions are pinned intent — PROBE-094 — and this requirement makes them legible, not reversible); any change to the universe or to an existing answer; naming the *skipped package* for an excluded-package name (deferred until a consumer needs it); and policy — what a caller does with a reason is the caller's, not this surface's.
+#### Determinism and independence
 
-- **Lives in:** `openehr/rm/rminfo/` (surface + generated table), generated by `internal/bmmgen/`
-- **Extends:** [REQ-048](#req-048--rm-meta-model-introspection-surface) — the same generated introspection surface, widened from the universe's members to its negative space
+- Answers **MUST** be deterministic across runs and processes, every returned ordering fixed (BMM declaration order for immediate parents, sorted otherwise), and a returned collection **MUST NOT** alias package state a caller could mutate.
+- The surface uses no reflection beyond the exceptions of [idiom.md § Generics and reflection](idiom.md#generics-and-reflection), and keeps to the building-block rules of [module-layout.md § REQ-013](module-layout.md#req-013--building-block-independence); that is what makes it importable from any building block.
+- Its class-graph questions sit on an **optional capability interface** discovered by assertion, rather than on the existing attribute-lookup interface, so an external implementer of that interface does not break ([idiom.md § Public-API stability](idiom.md#public-api-stability)), following the precedent already set for attribute enumeration. Each question is reachable through the same seam that admits synthetic model data, so the negative space above is testable without the pinned RM.
+
+**Acceptance:** the compiled-in answers equal an independent reduction of the pinned BMM (class universe, abstractness, immediate parents, transitive ancestors, per-attribute declaring class) — the equivalence [PROBE-094](conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm) asserts. `ENTRY` reports abstract and expands to exactly the concrete entry classes; a concrete class expands to itself; a dead-end abstract class expands to nothing while still reporting as known. `LOCATABLE`-inherited attributes report `LOCATABLE` (or the redefining descendant) as their declaration site while the flattened lookup keeps answering unchanged. A name outside the universe is distinguishable from every in-universe answer on every question. The compiled-in absence table equals an independent reduction of the pinned BMM, in both directions, under the fixed precedence, with the negative-space consistency held on every out-of-universe name it exercises — what [PROBE-098](conformance.md#probe-098--absence-reasons-account-for-the-universes-negative-space) asserts. Hand-editing a generated hierarchy field fails the drift check.
+
+**Out of scope:** runtime BMM loading (ruled out above, not deferred); AOM/AM class hierarchies; generic-parameter resolution beyond the root-type reduction the attribute tables already apply; selecting among multiple pinned schemas at run time; deriving *instantiability* beyond the BMM's own abstractness flag (an RM invariant that forbids a value is [REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)'s, not this surface's); shipping any excluded model (the exclusions are pinned intent — PROBE-094 — and the absence reasons make them legible, not reversible); naming the *skipped package* for an excluded-package name (deferred until a consumer needs it); and policy — what a caller does with a reason is the caller's, not this surface's.
+
+### REQ-049 — RM class-universe absence reasons
+
+**Retired.** Its absence reasons are now [REQ-048 § Absence reasons](#absence-reasons). The identifier is never reused.
 
 ## Mapping rules
 
-**Implements:** REQ-043
+**Implements:** REQ-041 (the retired REQ-043 points here)
 
 How each P_BMM construct becomes Go code.
 
@@ -258,7 +240,7 @@ How each P_BMM construct becomes Go code.
 | `P_BMM_ENUMERATION_INTEGER` | `type X int` + constants for each item |
 | Generic class (`generic_parameter_defs` present) | Generic Go type `type X[T constraint] struct { ... }` where the constraint corresponds to the `conforms_to_type` upper bound |
 
-Inheritance via `ancestors` is materialised by **embedding the ancestor struct(s)** in concrete classes, per REQ-031. Multiple inheritance flattens to multiple embedded structs (Go allows it; the BMM resolves conflicts at the model level).
+Inheritance via `ancestors` is materialised by **embedding the ancestor struct(s)** in concrete classes, per [rm-modeling.md § The shape of the RM in Go](rm-modeling.md#the-shape-of-the-rm-in-go). Multiple inheritance flattens to multiple embedded structs (Go allows it; the BMM resolves conflicts at the model level).
 
 LOCATABLE concrete descendants additionally receive the **generated identity surface** ([ADR 0013](../adr/0013-generated-locatable-identity-surface.md)): four value-receiver `Get<Field>` accessors (listed on the sealed `Locatable` interface) and four pointer-receiver `Set<Field>` mutators (behind the sealed `MutableLocatable` interface), with types resolved by the same property-mapping rules as the struct fields. The RM target's `typereg_gen.go` also emits the reverse registry — `RMTypeName` (Go concrete → bare registration name, generic instantiations enumerated over the parameter bound's owned concrete descendants) and the `IsTypedNil` guard.
 
@@ -320,7 +302,7 @@ The wire format JSON does not distinguish List/Set/Array — they all serialise 
 `P_BMM_*` function definitions on classes (e.g. `DV_QUANTITY.add`, `DV_QUANTITY.less_than`) carry pre/post-conditions and operator aliases. The SDK's posture:
 
 - The generator emits **method stubs** for class functions, with the documented `pre_conditions` / `post_conditions` as `// Pre:` / `// Post:` comments. A `P_BMM_INTERFACE`'s functions are the exception: no stub is emitted for them (Class → Go type above, [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4).
-- The generator does **not** emit the function body — implementations are hand-written in non-generated files (REQ-044) where they are needed.
+- The generator does **not** emit the function body — implementations are hand-written in non-generated files ([REQ-041](#req-041--pinned-bmm-sources)) where they are needed.
 - Functions that have not been hand-implemented **SHOULD** panic with a clear message (e.g. `panic("not implemented: DV_QUANTITY.add — implement in a non-generated file")`); this is one of the rare allowed panics in SDK code, justified by the fact that the function is documented in the BMM but not yet wired in.
 
 For SDK v1, the priority is the **types**, not the **methods** — most consumers do not need RM-level arithmetic. The RM functions the SDK implements, and those it leaves out, are specified in [rm-functions.md](rm-functions.md).
@@ -376,35 +358,21 @@ Helpers in `openehr/rm/` (hand-written, non-generated) **SHOULD** offer typed pa
 
 - File naming: `<package_name>_gen.go` for generated files. Example: `openehr/rm/data_types_quantity_gen.go` corresponds to BMM package `org.openehr.rm.data_types.quantity`.
 - Header: every generated file begins with `// Code generated by bmmgen; DO NOT EDIT.` followed by a `// Source: openehr_rm_1.2.0.bmm.json` line for traceability.
-- RM release: the generator **MUST** emit the primary RM schema's `rm_release` as the constant `rm.Release`. What the SDK writes into `ARCHETYPED.rm_version` is [wire.md § REQ-053](wire.md#req-053) for FLAT and STRUCTURED decode and [clinical-modeling.md § REQ-107](clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) for the instance generator.
+- RM release: the public constant `rm.Release` **MUST** carry the primary RM schema's `rm_release`. What the SDK writes into `ARCHETYPED.rm_version` is [wire.md § REQ-053](wire.md#req-053) for FLAT and STRUCTURED decode and [clinical-modeling.md § REQ-107](clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) for the instance generator.
 - Hand-written companions: `<package_name>_ext.go` (e.g. `data_types_quantity_ext.go`) hold method bodies, helper functions, and codec hooks.
 - One Go package per BMM top-level package; sub-packages flattened into the same Go package via filename (Go does not require a one-to-one directory mapping with BMM packages).
 - The generator emits `openehr/rm/typereg_gen.go` (and `openehr/aom/aom14/typereg_gen.go`) which register every concrete RM/AOM `_type` with its constructor (REQ-040). Per [`../docs/adr/0002-bmm-codegen-decisions.md`](../adr/0002-bmm-codegen-decisions.md) D3, the registration file lives in the target package — **not** under `openehr/rm/typereg/` — so the constructor closures can reference the target types directly without forming a `typereg → rm` import cycle.
 
 ## Documentation propagation
 
-The BMM `documentation` field on classes, properties, and functions **MUST** be preserved as Go doc comments on the generated types/fields/methods. The transformation is verbatim — no rewording, no abbreviation. Markdown-style cross-refs (`_units_`, `\`magnitude\``) are converted to Go-doc-friendly equivalents.
-
-## Coverage matrix
-
-| Topic | REQ | Lives in |
-|---|---|---|
-| Pinned BMM sources | REQ-041 | `resources/bmm/`, [`resources/bmm/README.md`](../../resources/bmm/README.md) |
-| Generator + drift detection | REQ-042 | `internal/bmmgen/`, `cmd/bmmgen/`, CI |
-| P_BMM → Go mapping | REQ-043 | this document (§ Mapping rules) |
-| Hand-written separation | REQ-044 | generator output convention; `<pkg>_gen.go` vs `<pkg>_ext.go` |
-| BMM loader (building block) | REQ-045 | `openehr/bmm/` |
-| Primitive mapping | REQ-046 | this document (§ Primitive type mapping) |
-| BMM-spec divergence | REQ-047 | this document (§ Requirements > REQ-047) |
-| RM meta-model introspection | REQ-048 | `openehr/rm/rminfo/` (generated by `internal/bmmgen/`) |
-| RM class-universe absence reasons | REQ-049 | `openehr/rm/rminfo/` (generated by `internal/bmmgen/`) |
+The generator carries the BMM `documentation` field on classes, properties, and functions into the Go doc comments of the generated types, fields and methods. The transformation is verbatim — no rewording, no abbreviation. Markdown-style cross-refs (`_units_`, `\`magnitude\``) are converted to Go-doc-friendly equivalents.
 
 ## v1 scope summary
 
 **Generated in v1:**
 - `openehr/rm/` from `openehr_rm_1.2.0` (excluding `ehr_extract`) + `openehr_base_1.3.0`.
 - `openehr/rm/typereg/` from the same.
-- `openehr/rm/rminfo/` from the same — the flattened attribute tables, the REQ-048 class graph, the REQ-049 absence table, and the REQ-112 function table that `rminfo.IsNonStorableAttr` reads.
+- `openehr/rm/rminfo/` from the same — the flattened attribute tables, the REQ-048 class graph and absence table, and the REQ-112 function table that `rminfo.IsNonStorableAttr` reads.
 - `internal/rmaccess/access_gen.go` from the same — the attribute access of every registered class (REQ-171).
 - `openehr/validation/inventory_gen.go` from the same and the hand-kept `invariants.json` — the invariant inventory (REQ-171).
 - `openehr/aom/aom14/` from `openehr_am_1.4.0` + `openehr_base_1.3.0`.

@@ -38,7 +38,7 @@ import (
 //     is the expected one-liner. Print it via t.Logf so a human
 //     running the test sees the suggestion.
 //
-// REQ-043: § Mapping rules, Property → Go field. The added optional property
+// REQ-041: § Mapping rules, Property → Go field. The added optional property
 // becomes a field whose JSON tag keeps the BMM property name.
 func TestSimulatedVersionBump(t *testing.T) {
 	// --- 1. Stage the synthetic 1.2.1 resources dir.

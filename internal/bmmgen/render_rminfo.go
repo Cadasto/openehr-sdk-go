@@ -172,7 +172,7 @@ type rmAttr struct {
 // abstract class is unanswerable while that class is absent from the table.
 //
 // The wholesale generator exclusions (org.openehr.rm.ehr_extract per
-// REQ-042) never reach here: BuildPlan drops them.
+// REQ-041) never reach here: BuildPlan drops them.
 func rmInfoUniverse(plan *Plan) []string {
 	names := make([]string, 0, len(plan.Classes))
 	for name, pc := range plan.Classes {

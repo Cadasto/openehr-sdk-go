@@ -123,7 +123,7 @@ func TestRenderRMInfoEmitsFunctions_REQ112(t *testing.T) {
 	}
 }
 
-// TestDriftDetectionCoversFunctionTable_REQ042 pins REQ-042 on the function
+// TestDriftDetectionCoversFunctionTable_REQ042 pins REQ-041 on the function
 // table: a hand edit of a function name in the generated lookup_gen.go is a
 // drift the verify run reports.
 func TestDriftDetectionCoversFunctionTable_REQ042(t *testing.T) {

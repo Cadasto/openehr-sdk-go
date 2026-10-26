@@ -136,7 +136,7 @@ func TestRMInfoUniverseIncludesAttributeLessClasses(t *testing.T) {
 	}
 
 	// The wholesale generator exclusions stay excluded: ehr_extract
-	// (REQ-042), enumerations, primitives, foundation typing constraints.
+	// (REQ-041), enumerations, primitives, foundation typing constraints.
 	for _, excluded := range []string{
 		"EXTRACT", "SYNC_EXTRACT", "MESSAGE", // ehr_extract
 		"PROPORTION_KIND",                                      // enumeration
@@ -208,7 +208,7 @@ func TestRMInfoParentsAreClosedOverTheUniverse(t *testing.T) {
 
 // TestRenderRMInfoEmitsHierarchyFields asserts the rendered table carries the
 // new generated fields — the data REQ-048 forbids re-deriving at run time and
-// REQ-042 drift-checks.
+// REQ-041 drift-checks.
 func TestRenderRMInfoEmitsHierarchyFields(t *testing.T) {
 	plan := rmInfoTestPlan(t)
 	out, err := RenderRMInfoFile(plan)
@@ -260,7 +260,7 @@ func classEntry(t *testing.T, src, class string) string {
 	return src[start : start+end+len("\n\t},")]
 }
 
-// TestDriftDetectionCoversHierarchyFields — REQ-042 discipline applied to the
+// TestDriftDetectionCoversHierarchyFields — REQ-041 discipline applied to the
 // REQ-048 fields. TestDriftDetection already proves the mechanism, but it
 // mutates a marker comment in a datatype file; REQ-048's acceptance criteria
 // claim specifically that hand-editing a generated HIERARCHY field is caught,

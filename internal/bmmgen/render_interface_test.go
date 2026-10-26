@@ -16,7 +16,7 @@ func markerOnlyInterface(src, goName string) bool {
 	return re.MatchString(src)
 }
 
-// TestInterfaceClassesMarkerOnlyRM covers the REQ-043 § Mapping rules,
+// TestInterfaceClassesMarkerOnlyRM covers the REQ-041 § Mapping rules,
 // Class → Go type rule for P_BMM_INTERFACE (ADR 0002 D4) on the pinned RM.
 // CODE_SET_ACCESS and TERMINOLOGY_ACCESS render as marker-only interfaces,
 // and no method stub naming either class appears anywhere in the RM output.
@@ -80,7 +80,7 @@ func TestInterfaceClassesMarkerOnlyRM(t *testing.T) {
 }
 
 // TestInterfaceWithoutDescendantMarkerOnlySynthetic pins the same rule on a
-// hand-built schema (REQ-043 § Mapping rules, Class → Go type): a
+// hand-built schema (REQ-041 § Mapping rules, Class → Go type): a
 // P_BMM_INTERFACE that declares a function and has no concrete descendant
 // renders as a marker-only interface and emits no method stub.
 func TestInterfaceWithoutDescendantMarkerOnlySynthetic(t *testing.T) {
@@ -124,7 +124,7 @@ func TestInterfaceWithoutDescendantMarkerOnlySynthetic(t *testing.T) {
 }
 
 // TestInterfaceDescendantGetsNoMarkerSynthetic pins the rest of ADR 0002 D4
-// for a P_BMM_INTERFACE (REQ-043 § Mapping rules, Class → Go type): a
+// for a P_BMM_INTERFACE (REQ-041 § Mapping rules, Class → Go type): a
 // concrete descendant of an interface receives neither the is<X>() marker
 // nor a stub for the interface's functions, because no pinned BMM interface
 // carries is_abstract (STRAND-12). Resolving STRAND-12 changes this test

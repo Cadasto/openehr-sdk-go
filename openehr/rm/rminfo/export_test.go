@@ -12,8 +12,8 @@ import (
 // class universe reports [AbsenceNone] whatever the table says about it, which
 // is the documented behaviour [NewWithAbsence] promises and absence_test.go's
 // TestUniverseWinsOverAnAbsenceEntry pins. That masking is right for consumers
-// and blinding for a conformance probe: REQ-049 § Generated, accounted,
-// computed constrains which names the table may CONTAIN, and no sequence of
+// and blinding for a conformance probe: REQ-048 § Absence reasons
+// constrains which names the table may CONTAIN, and no sequence of
 // AbsenceReason calls can see a masked entry. Exporting the table itself would
 // hand consumers a second, unmasked answer to the membership question and
 // invite exactly the disagreement the surface exists to prevent; a file named

@@ -16,7 +16,7 @@ import (
 type absenceReason string
 
 // The four reasons a DECLARED name can be out of the class universe, in
-// REQ-049's fixed precedence order. The other two members of the enum are
+// REQ-048's fixed precedence order. The other two members of the enum are
 // never generated: `AbsenceNone` means the name is IN the universe, and
 // `AbsenceUndeclared` is computed by the accessor from the table's silence.
 const (
@@ -120,7 +120,7 @@ func rmInfoAbsence(plan *Plan) ([]absenceEntry, error) {
 			return nil, fmt.Errorf(
 				"bmmgen: rminfo absence table: class %s (package %q) is declared by the pinned schemas, "+
 					"omitted from the class universe, and matched by no exclusion rule — "+
-					"account for it with a rule or a new reason before generating (REQ-049)",
+					"account for it with a rule or a new reason before generating (REQ-048)",
 				name, plan.ClassPackages[name])
 		}
 		entries = append(entries, absenceEntry{className: name, reason: reason})
@@ -129,7 +129,7 @@ func rmInfoAbsence(plan *Plan) ([]absenceEntry, error) {
 }
 
 // absenceReasonFor reports why the class universe omits a DECLARED name, under
-// REQ-049's fixed precedence: primitive, then enumeration, then excluded
+// REQ-048's fixed precedence: primitive, then enumeration, then excluded
 // class, then excluded package. ok=false means no rule accounts for the name —
 // the caller's cue to fail generation rather than emit.
 //

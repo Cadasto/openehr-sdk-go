@@ -15,7 +15,7 @@ const testResources = "../../" + bmm.DefaultResourcesDir
 // load-bearing: if a refactor accidentally re-buckets DV_QUANTITY,
 // the test fails.
 //
-// REQ-043: § Mapping rules, Schema → Go package set. The RM target emits one
+// REQ-041: § Mapping rules, Schema → Go package set. The RM target emits one
 // Go file per BMM package, so each class lands in the file of the package
 // that declares it.
 func TestPlanFileAssignments(t *testing.T) {
@@ -47,7 +47,7 @@ func TestPlanFileAssignments(t *testing.T) {
 }
 
 // TestPlanSkipsEHRExtract asserts that EHR_EXTRACT classes are
-// excluded per REQ-042.
+// excluded per REQ-041.
 func TestPlanSkipsEHRExtract(t *testing.T) {
 	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
 	if err != nil {
@@ -105,7 +105,7 @@ func TestPlanIncludesConcreteRegistrations(t *testing.T) {
 // that class. The expectation walks the ancestors upward, so it does not
 // share the plan's downward walk.
 //
-// REQ-043: § Mapping rules, Class → Go type. An abstract class becomes a Go
+// REQ-041: § Mapping rules, Class → Go type. An abstract class becomes a Go
 // interface whose marker method every concrete descendant carries; this pins
 // the descendant set the renderer emits those marker methods from.
 func TestPlanAbstractDescendants(t *testing.T) {

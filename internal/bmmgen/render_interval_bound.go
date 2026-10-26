@@ -854,7 +854,7 @@ func renderMarshalIntervalDerived(plan *Plan, pc, base *PlannedClass, recv, type
 // Returns (nil, nil) when the target owns no interval-shaped class.
 func RenderIntervalBoundFile(plan *Plan) ([]byte, error) {
 	// The open-side emptiness rule is REQ-052 and REQ-056; the no-reflection
-	// rule is REQ-024.
+	// convention is idiom.md § API conventions.
 	shaped, boundClasses, err := intervalBounds(plan)
 	if err != nil {
 		return nil, err

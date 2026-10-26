@@ -20,7 +20,7 @@ import (
 //	cp openehr/rm/data_types_quantity_gen.go \
 //	   internal/bmmgen/testdata/data_types_quantity_gen.go.golden
 //
-// REQ-043: § Mapping rules, for one whole BMM package. The golden holds the
+// REQ-041: § Mapping rules, for one whole BMM package. The golden holds the
 // class, property, type and container mapping: abstract classes as marker
 // interfaces, mandatory properties as values and optional ones as pointers,
 // containers as slices, generic classes as type parameters, and JSON tags
@@ -58,7 +58,7 @@ func TestGoldenDataTypesQuantity(t *testing.T) {
 // asserts byte-identity across runs. This catches any non-stable
 // iteration order (Go map iteration is randomised).
 //
-// REQ-042: the generator is reproducible; two runs over the same inputs are
+// REQ-041: the generator is reproducible; two runs over the same inputs are
 // byte-identical.
 func TestIdempotent(t *testing.T) {
 	dir1 := t.TempDir()
@@ -80,7 +80,7 @@ func TestIdempotent(t *testing.T) {
 // byte of a generated file, and asserts that -verify reports a
 // drift on that file.
 //
-// REQ-042: the drift check reports a generated file that no longer matches
+// REQ-041: the drift check reports a generated file that no longer matches
 // the generator's output.
 func TestDriftDetection(t *testing.T) {
 	dir := t.TempDir()
@@ -143,7 +143,7 @@ func TestDriftDetection(t *testing.T) {
 //
 // Phase 3 contract: every BMM function maps to one Go method stub.
 //
-// REQ-043: § Mapping rules, Functions. A BMM function becomes a method stub
+// REQ-041: § Mapping rules, Functions. A BMM function becomes a method stub
 // that carries its pre- and post-conditions as comments and panics with a
 // not-implemented message.
 func TestMethodStubsForDVQuantity(t *testing.T) {
@@ -196,7 +196,7 @@ func TestMethodStubsForDVQuantity(t *testing.T) {
 // openehr/rm/*_funcs.go and openehr/rm/rmpath provide those surfaces
 // without a "method redeclared" collision (ADR 0002 § D7, ADR 0011).
 //
-// REQ-043: § Mapping rules, Functions. A function that has no hand-written
+// REQ-041: § Mapping rules, Functions. A function that has no hand-written
 // body keeps its fail-loud stub.
 func TestManualImplementationSkip(t *testing.T) {
 	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
@@ -263,7 +263,7 @@ func TestManualImplementationSkip(t *testing.T) {
 // leaves unpointed, each with its omitempty tag, beside an optional field
 // typed by a class type parameter, which is a pointer with omitzero.
 //
-// REQ-043: § Mapping rules, Property → Go field. A non-mandatory property
+// REQ-041: § Mapping rules, Property → Go field. A non-mandatory property
 // whose type is emitted as a Go interface (an abstract class, or a concrete
 // class with subtypes emitted as a `…Like` interface) stays `T` and carries
 // `omitempty`, and so does a P_BMM_SINGLE_PROPERTY_OPEN.
@@ -307,7 +307,7 @@ func TestOptionalFieldsThatAreNotPointers(t *testing.T) {
 // by their mandatory flag or cardinality, each on a real RM field, beside an
 // optional field of the same kind.
 //
-// REQ-043: § Mapping rules, Property → Go field. A mandatory field that can
+// REQ-041: § Mapping rules, Property → Go field. A mandatory field that can
 // hold no value carries an omit option: a P_BMM_CONTAINER_PROPERTY whose
 // cardinality lower bound is 1 or more, and a mandatory P_BMM_GENERIC_PROPERTY
 // over Hash, take omitzero, and a mandatory P_BMM_SINGLE_PROPERTY_OPEN takes
@@ -356,7 +356,7 @@ func TestMandatoryFieldsOmitOnlyWhatCanBeAbsent(t *testing.T) {
 // is the primitive Any, on a property built for the test and on the real
 // AOM 1.4 fields of each kind.
 //
-// REQ-043: § Mapping rules, Property → Go field. A non-mandatory property
+// REQ-041: § Mapping rules, Property → Go field. A non-mandatory property
 // whose BMM type is Any is emitted as *any, because Any is a primitive and
 // not a class the interface exception covers. A mandatory one is any.
 func TestAnyPropertyType(t *testing.T) {
