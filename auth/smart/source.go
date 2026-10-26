@@ -18,7 +18,6 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/auth"
 	"github.com/cadasto/openehr-sdk-go/auth/jwtbearer"
-	"github.com/cadasto/openehr-sdk-go/internal/coalesce"
 	"github.com/cadasto/openehr-sdk-go/internal/noredirect"
 	"github.com/cadasto/openehr-sdk-go/internal/urlredact"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
@@ -44,6 +43,11 @@ const (
 	// defaultRefreshThreshold is how long before its expiry the held access
 	// token counts as stale when the configuration sets no threshold.
 	defaultRefreshThreshold = 30 * time.Second
+	// refreshTimeout is how long a refresh request may run. The request does
+	// not end with the context of the call that started it, so that a
+	// refresh token the server has rotated is installed and reported; this
+	// bounds it instead.
+	refreshTimeout = 30 * time.Second
 )
 
 // clientAssertionKey holds the asymmetric credential for private_key_jwt
@@ -351,7 +355,9 @@ func WithRefreshThreshold(d time.Duration) Option {
 //
 // The source calls fn without holding its lock, so fn may call the
 // source's methods. ctx is the context of the call that changed the tokens,
-// which may have ended by the time fn runs; a hook that must finish a write
+// for a refresh the call that started it, and it may have ended by the time
+// fn runs: a refresh goes on after that call gives up, and is then reported
+// from the refresh's own goroutine. A hook that must finish a write
 // regardless can use [context.WithoutCancel].
 //
 // fn sees the changes one at a time, in the order the source installed
@@ -367,9 +373,10 @@ func WithRefreshThreshold(d time.Duration) Option {
 // change, or a call reporting changes that others made), the panic goes up
 // through that call. The changes still waiting are then reported from a
 // new goroutine the source starts, so none of them waits for a later change
-// of tokens. No caller could recover a panic on that goroutine, so there
-// the source recovers it, drops the change fn panicked on, and goes on with
-// the rest.
+// of tokens. No caller could recover a panic on that goroutine, or on the
+// goroutine of a refresh whose starting call has returned, so there the
+// source recovers it, drops the change fn panicked on, and goes on with the
+// rest.
 func WithTokenChange(fn func(ctx context.Context, change TokenChange)) Option {
 	return func(cfg *Config) { cfg.tokenChange = fn }
 }
@@ -583,12 +590,27 @@ type tokenExchange struct {
 	// callers waiting on it try again. It is written before done is closed.
 	superseded bool
 	// retry reports that the refresh has no result for the callers waiting
-	// on it: it failed only because the context of the call leading it
-	// ended, or a panic unwound that call before the result was published.
-	// A waiter whose own context is live tries again; one whose context has
+	// on it, because it panicked. The refresh does not end with the context
+	// of the call that started it, so that call giving up does not set it. A
+	// waiter whose own context is live tries again; one whose context has
 	// ended returns its own context's error. It is written before done is
 	// closed.
 	retry bool
+
+	// The fields below are guarded by Source.mu. They decide which of the
+	// call that started the refresh and the refresh's own goroutine reports
+	// the change to the token-change hook or raises the refresh's panic
+	// again, so that exactly one of them does.
+
+	// ended reports that the refresh's goroutine has published its outcome.
+	ended bool
+	// starterLeft reports that the call that started the refresh returned
+	// because its context ended first.
+	starterLeft bool
+	// raise reports that the refresh panicked while the call that started
+	// it was waiting, which then panics again with panicValue.
+	raise      bool
+	panicValue any
 }
 
 // New constructs a Source from clientID and discovery auth endpoints.
@@ -1069,15 +1091,21 @@ func (s *Source) SetTokens(access auth.Token, refresh string) {
 // them in turn when they are stale, or, after Revoke, returns
 // [auth.ErrReauthRequired].
 //
-// Concurrent calls share one refresh, which runs under the context of the
-// call that started it. When that context ending is all that failed the
-// refresh, the calls waiting on it do not get that failure: each whose own
-// context is live tries again, sending a new refresh or waiting on a newer
-// one, and one whose context has ended returns its own context's error. Any
-// other failure reaches every waiting call. A panic in the refresh, from the
+// Concurrent calls share one refresh. It runs on a goroutine of its own,
+// with the values of the context of the call that started it but not its
+// cancellation or deadline, and for at most 30 seconds, so that a refresh
+// token the server has rotated is installed, and reported to the
+// [WithTokenChange] hook, even when that call gives up. A call whose context
+// ends first returns that context's error at once; the refresh goes on, and
+// the calls waiting on it get its result. A panic in the refresh, from the
 // HTTP client's RoundTripper or a client-assertion signer for example, goes
-// up through the call that started it, unchanged, and the calls waiting on
-// that refresh try again the same way.
+// up through the call that started it, unchanged, while that call waits, and
+// the calls waiting on the refresh try again: each whose own context is live
+// sends a new refresh or waits on a newer one, and one whose context has
+// ended returns its own context's error. When the call that started the
+// refresh has already returned, the panic is raised again on the refresh's
+// goroutine once the waiting calls are released, so it ends the program as
+// any unrecovered panic in a goroutine does.
 func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 	for {
 		tok, retry, err := s.tryToken(ctx)
@@ -1086,16 +1114,16 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 		}
 		// The refresh this call led or waited on left it no result: a code
 		// exchange, SetTokens or Revoke replaced the session the refresh
-		// belonged to, or the call leading it gave up or panicked. Read what
-		// the source holds now. A further retry needs another such event
-		// meanwhile, so the loop does not spin.
+		// belonged to, or the refresh panicked. Read what the source holds
+		// now. A further retry needs another such event meanwhile, so the
+		// loop does not spin.
 	}
 }
 
 // tryToken makes one attempt at Token. retry reports that the refresh it led
 // or waited on left it no result, because the session changed or because
-// the call leading the refresh gave up or panicked, so the caller tries
-// again against the current tokens.
+// the refresh panicked, so the caller tries again against the current
+// tokens.
 func (s *Source) tryToken(ctx context.Context) (tok auth.Token, retry bool, err error) {
 	if err := ctx.Err(); err != nil {
 		return auth.Token{}, false, err
@@ -1118,9 +1146,9 @@ func (s *Source) tryToken(ctx context.Context) (tok auth.Token, retry bool, err 
 		case ex.superseded:
 			return auth.Token{}, true, nil
 		case ex.retry:
-			// The leader's own context ended, or a panic unwound it: that
-			// outcome is not this caller's. Give up with this caller's own
-			// error when its context ended too, otherwise go round again.
+			// The refresh panicked: that outcome is not this caller's. Give
+			// up with this caller's own error when its context ended,
+			// otherwise go round again.
 			if err := ctx.Err(); err != nil {
 				return auth.Token{}, false, err
 			}
@@ -1158,63 +1186,131 @@ func (s *Source) tryToken(ctx context.Context) (tok auth.Token, retry bool, err 
 	s.inflight = ex
 	s.mu.Unlock()
 
-	tok, err = s.leadRefresh(ctx, ex, refreshTok, cur, binding)
-	if ex.superseded {
+	return s.leadRefresh(ctx, ex, refreshTok, cur, binding)
+}
+
+// leadRefresh starts the refresh ex stands for on a goroutine of its own and
+// waits for it on behalf of the call that started it. refreshTok is the
+// refresh token to redeem, and cur and binding are the access token and the
+// identity the session held when the refresh began.
+//
+// When ctx ends first, leadRefresh returns ctx's error at once and leaves the
+// refresh to finish on its goroutine, which then reports the change to the
+// token-change hook itself. Otherwise the change is reported here, after
+// the waiters have their token, so a hook that panics does so in this call.
+// A panic in the refresh while this call waits is raised here again.
+func (s *Source) leadRefresh(ctx context.Context, ex *tokenExchange, refreshTok string, cur auth.Token, binding *idTokenBinding) (auth.Token, bool, error) {
+	go s.runRefresh(ctx, ex, refreshTok, cur, binding)
+	select {
+	case <-ex.done:
+	case <-ctx.Done():
+		s.mu.Lock()
+		ended := ex.ended
+		ex.starterLeft = !ended
+		s.mu.Unlock()
+		if !ended {
+			return auth.Token{}, false, ctx.Err()
+		}
+		// The refresh published its outcome first, so it is this call's to
+		// report or raise; done closes right after.
+		<-ex.done
+	}
+	if ex.raise {
+		panic(ex.panicValue)
+	}
+	if ex.superseded || ex.retry {
 		return auth.Token{}, true, nil
 	}
 	// The waiters have their token; the change is reported after them, in
 	// the order it was installed whatever the hook does meanwhile.
 	s.deliverChanges()
-	return tok, false, err
+	return ex.token, false, ex.err
 }
 
-// leadRefresh runs the refresh ex stands for on behalf of every caller
-// waiting on it, installs its result and publishes it to those callers.
-// refreshTok is the refresh token to redeem, and cur and binding are the
-// access token and the identity the session held when the refresh began.
+// runRefresh runs the refresh ex stands for, installs its result and
+// publishes it to the callers waiting on it. The request keeps the values of
+// ctx, the context of the call that started the refresh, but not its
+// cancellation or deadline, and is cut off after refreshTimeout.
 //
-// A panic in the refresh unwinds leadRefresh before the result is published.
-// The deferred release still takes ex out of flight and wakes the waiters,
-// with ex marked for retry so that they try again, and the panic goes on to
-// the caller as it was raised.
-func (s *Source) leadRefresh(ctx context.Context, ex *tokenExchange, refreshTok string, cur auth.Token, binding *idTokenBinding) (auth.Token, error) {
-	// ex stays marked for retry unless the refresh returns and its result
-	// is published below.
-	ex.retry = true
-	defer s.release(ex)
+// A panic in the refresh is recovered here, and every waiter is released to
+// try again. The call that started the refresh raises it again when it is
+// still waiting; when it has returned, nobody could recover the panic, so it
+// is raised again on this goroutine, which ends the program.
+func (s *Source) runRefresh(ctx context.Context, ex *tokenExchange, refreshTok string, cur auth.Token, binding *idTokenBinding) {
+	rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), refreshTimeout)
+	defer cancel()
+	finished := false
+	defer func() {
+		if !finished {
+			s.endPanickedRefresh(ex, recover())
+		}
+	}()
 
-	tok, refreshedTR, next, err := s.refreshGrant(ctx, refreshTok, binding)
-	tok, err = s.installRefresh(ctx, ex, cur, tok, refreshedTR, next, err)
-	// The result is published before release closes done, so every waiter
-	// reads it (auth.md § Concurrency).
-	ex.token = tok
-	ex.err = err
-	ex.retry = coalesce.EndedByContext(ctx, err)
-	return tok, err
+	tok, refreshedTR, next, err := s.refreshGrant(rctx, refreshTok, binding)
+	report := s.installRefresh(ctx, ex, cur, tok, refreshedTR, next, err)
+	finished = true
+	// The result is published before done is closed, so every waiter reads
+	// it (auth.md § Concurrency).
+	close(ex.done)
+	if report {
+		// The call that started the refresh has returned, so this goroutine
+		// reports the change. No caller could recover a panic of the hook
+		// here, so reportChanges drops it.
+		s.reportChanges(true)
+	}
 }
 
-// release takes ex out of flight, unless a newer refresh has replaced it
-// there, then wakes the callers waiting on it. leadRefresh defers it, so it
-// runs exactly once per refresh, also when a panic unwinds leadRefresh.
-func (s *Source) release(ex *tokenExchange) {
+// endPanickedRefresh ends the refresh ex stands for after it panicked with
+// v: it takes ex out of flight and releases its waiters to try again. It
+// hands v to the call that started the refresh when that call is still
+// waiting, and otherwise panics with v itself. A nil v means the refresh's
+// goroutine is exiting through runtime.Goexit, which is left to go on.
+func (s *Source) endPanickedRefresh(ex *tokenExchange, v any) {
 	s.mu.Lock()
 	if s.inflight == ex {
 		s.inflight = nil
 	}
+	ex.retry = true
+	ex.ended = true
+	raiseHere := ex.starterLeft
+	if !raiseHere && v != nil {
+		ex.raise = true
+		ex.panicValue = v
+	}
 	s.mu.Unlock()
 	close(ex.done)
+	if raiseHere && v != nil {
+		panic(v)
+	}
 }
 
 // installRefresh installs what the refresh ex stands for returned: tok,
-// refreshedTR and refreshTok, or err. cur is the access token the session
-// held when the refresh began. It returns the token and error the callers
-// of the refresh get. When a code exchange, SetTokens or Revoke replaced the
-// session meanwhile, it installs nothing, marks ex superseded and returns no
-// error. It holds s.mu while it runs.
-func (s *Source) installRefresh(ctx context.Context, ex *tokenExchange, cur, tok auth.Token, refreshedTR TokenResponse, refreshTok string, err error) (auth.Token, error) {
+// refreshedTR and refreshTok, or err, and publishes on ex the token and error
+// the callers of the refresh get. cur is the access token the session held
+// when the refresh began, and ctx the context of the call that started the
+// refresh, which the token-change hook gets. When a code exchange, SetTokens
+// or Revoke replaced the session meanwhile, it installs nothing and marks ex
+// superseded. It takes ex out of flight, unless a newer refresh has replaced
+// it there, and reports whether the caller is to report the change to the
+// hook because the call that started the refresh has returned. The caller
+// closes ex.done next. It holds s.mu while it runs.
+func (s *Source) installRefresh(ctx context.Context, ex *tokenExchange, cur, tok auth.Token, refreshedTR TokenResponse, refreshTok string, err error) (report bool) {
 	s.mu.Lock()
-	// Deferred, so that a panic here leaves s.mu free for release.
+	// Deferred, so that a panic here leaves s.mu free for endPanickedRefresh.
 	defer s.mu.Unlock()
+	tok, err = s.installLocked(ctx, ex, cur, tok, refreshedTR, refreshTok, err)
+	ex.token = tok
+	ex.err = err
+	if s.inflight == ex {
+		s.inflight = nil
+	}
+	ex.ended = true
+	return ex.starterLeft
+}
+
+// installLocked is installRefresh's install step. It returns the token and
+// error the callers of the refresh get. The caller holds s.mu.
+func (s *Source) installLocked(ctx context.Context, ex *tokenExchange, cur, tok auth.Token, refreshedTR TokenResponse, refreshTok string, err error) (auth.Token, error) {
 	if s.session != ex.session {
 		// A code exchange, SetTokens or Revoke replaced the session while the
 		// refresh ran. Its result, success or failure, belongs to the old

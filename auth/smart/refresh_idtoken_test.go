@@ -21,6 +21,12 @@ func staleAccess(value string) auth.Token {
 	return auth.Token{Value: value, Type: auth.TokenTypeBearer, ExpiresAt: time.Now().Add(10 * time.Second)}
 }
 
+// expiredAccess is an access token past its expiry, which the source never
+// serves.
+func expiredAccess(value string) auth.Token {
+	return auth.Token{Value: value, Type: auth.TokenTypeBearer, ExpiresAt: time.Now().Add(-time.Second)}
+}
+
 // exchangeSession completes a launch on src whose ID token names sub, so
 // the source holds a verified ID token, then marks the access token stale.
 func exchangeSession(t *testing.T, p *oidcProvider, src *smart.Source, sub string) smart.TokenResponse {
