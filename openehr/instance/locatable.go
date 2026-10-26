@@ -8,7 +8,7 @@ import (
 // freshly-constructed RM value, archetype_details where archetypeDetails
 // is non-nil, and a uid where uidSource gives one. Identity writes go
 // through the generated
-// rm.MutableLocatable surface (ADR 0013) — REQ-024, no reflection.
+// rm.MutableLocatable surface (ADR 0013), with no reflection.
 //
 // archetypeDetails is non-nil only for archetype-root pins and the
 // template root; event nodes are never archetype roots, so the

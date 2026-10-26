@@ -10,7 +10,8 @@ import (
 )
 
 // config is the unexported configuration struct mutated through With*
-// options. REQ-022 — public consumers do not construct this directly.
+// options (idiom.md § API conventions); public consumers do not construct
+// this directly.
 type config struct {
 	httpClient *http.Client
 	tokenSrc   auth.TokenSource

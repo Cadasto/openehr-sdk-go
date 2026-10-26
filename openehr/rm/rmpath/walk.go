@@ -4,7 +4,7 @@ import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 
 // childrenAt returns the child object(s) at attribute attr on parent,
 // flattened to a slice (0, 1, or many). Dispatch is on the concrete RM
-// type — reflection-free (REQ-024). An unknown (type, attr) pair yields
+// type — reflection-free. An unknown (type, attr) pair yields
 // no children, so the path simply fails to resolve rather than panicking.
 //
 // A typed-nil pointer parent (including a typed-nil root, e.g. a
@@ -563,8 +563,7 @@ func ifaceSlice[T any](s []T) []any {
 // generated rm.IsTypedNil (ADR 0013), which covers every registered RM
 // concrete; the walker's previous hand-written switch covered only the
 // 18 types it dispatches on, so this is a strict superset with
-// identical semantics on all reachable values. Reflection-free
-// (REQ-024).
+// identical semantics on all reachable values. Reflection-free.
 func isNilPointer(v any) bool {
 	return rm.IsTypedNil(v)
 }

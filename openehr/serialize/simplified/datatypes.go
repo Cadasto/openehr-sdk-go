@@ -2,7 +2,7 @@ package simplified
 
 // REQ-053 — leaf datatype mapping: a concrete RM DataValue becomes one or
 // more FLAT entries under a leaf path, keyed by the pipe attribute suffix
-// (bare for value-only types). Explicit type switch, no reflection (REQ-024).
+// (bare for value-only types). Explicit type switch, no reflection.
 // The switch handles both value and pointer forms because a DataValue slot
 // may hold either (see openehr/rm on substitution slots).
 
@@ -542,7 +542,7 @@ func codePhraseCapturedIn(v any, keys map[string]bool) bool {
 
 // as extracts a concrete RM datatype from the value or pointer form a DataValue
 // slot may hold. A typed-nil pointer reports false. Type-switching on a type
-// parameter keeps the dispatch reflection-free (REQ-024) and halves the
+// parameter keeps the dispatch reflection-free and halves the
 // value/pointer case duplication.
 func as[T any](v any) (T, bool) {
 	switch x := v.(type) {
@@ -682,7 +682,8 @@ func multimediaToFlat(out map[string]any, flatPath string, dv rm.DVMultimedia) {
 // interval grammar ([intervalToFlat]), with the bound datatype the leaf type names
 // as the anchor its `/lower` and `/upper` are spelled with.
 //
-// The generated `DVInterval[T]` is generic and reflection is forbidden (REQ-024),
+// The generated `DVInterval[T]` is generic and the SDK uses no reflection
+// (idiom.md § API conventions),
 // so the instantiations are enumerated — the same set `rm.RMTypeName` switches
 // over. `DVInterval[DVOrdered]`, the abstract instantiation, is what a canonical
 // decode produces (typereg registers `DV_INTERVAL` as that), and the concrete ones
@@ -775,8 +776,7 @@ func emitRaw(out map[string]any, flatPath string, v any, stamp string) error {
 }
 
 // dvTypeName returns the canonical RM type name of a first-class datatype value
-// (value or pointer form), or "" for anything outside that set. No reflection
-// (REQ-024).
+// (value or pointer form), or "" for anything outside that set. No reflection.
 func dvTypeName(v any) string {
 	switch v.(type) {
 	case rm.DVText, *rm.DVText:
@@ -845,7 +845,7 @@ func rawFragment(v any, rmType string) (any, error) {
 
 // nilRMPointer reports whether v is a typed-nil pointer to a first-class RM
 // datatype — a value that would panic on dereference in emitCoreLeaf. Explicit
-// type switch, no reflection (REQ-024).
+// type switch, no reflection.
 func nilRMPointer(v any) bool {
 	switch p := v.(type) {
 	case *rm.DVText:

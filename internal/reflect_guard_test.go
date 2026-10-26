@@ -1,7 +1,7 @@
 package internal_test
 
-// reflect_guard_test.go: REQ-024. idiom.md § Generics policy (REQ-024) rules
-// that library code MUST NOT use reflection, with two exceptions: ordinary
+// reflect_guard_test.go: idiom.md § API conventions says that library code
+// uses no reflection, with two exceptions: ordinary
 // field mapping over struct tags, and uses that never choose a Go type from
 // `_type`. The second exception has four classes: a typed-nil or zero-value
 // check, a value comparison (reflect.DeepEqual), a type name in an error
@@ -134,19 +134,19 @@ func TestREQ024ReflectOnlyForReviewedUses(t *testing.T) {
 		seen[rel] = true
 		entry, listed := reflectReviewed[rel]
 		if !listed {
-			t.Errorf("%s imports reflect and is not on the reviewed list: library code MUST NOT use reflection outside the classes idiom.md § Generics policy (REQ-024) names; use the type registry or a type switch, or, for a use in a named class, add the file to reflectReviewed with its identifiers and class", rel)
+			t.Errorf("%s imports reflect and is not on the reviewed list: library code uses reflection only in the classes idiom.md § API conventions names; use the type registry or a type switch, or, for a use in a named class, add the file to reflectReviewed with its identifiers and class", rel)
 			continue
 		}
 		if len(entry.classes) == 0 {
-			t.Errorf("%s: reviewed entry names no class; every reflect use must fall in a class idiom.md § Generics policy (REQ-024) names", rel)
+			t.Errorf("%s: reviewed entry names no class; every reflect use must fall in a class idiom.md § API conventions names", rel)
 		}
 		for _, c := range entry.classes {
 			if !slices.Contains(reflectClasses, c) {
-				t.Errorf("%s: reviewed entry names class %q, which idiom.md § Generics policy (REQ-024) does not name", rel, c)
+				t.Errorf("%s: reviewed entry names class %q, which idiom.md § API conventions does not name", rel, c)
 			}
 		}
 		if name == "." {
-			t.Errorf("%s dot-imports reflect, which hides its uses from this guard (REQ-024); import it by name", rel)
+			t.Errorf("%s dot-imports reflect, which hides its uses from this guard; import it by name", rel)
 			continue
 		}
 		full, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
@@ -156,12 +156,12 @@ func TestREQ024ReflectOnlyForReviewedUses(t *testing.T) {
 		used := reflectMembers(full, name)
 		for _, m := range used {
 			if !slices.Contains(entry.members, m) {
-				t.Errorf("%s uses reflect.%s, which its reviewed entry (%s) does not list: check the use falls in a class idiom.md § Generics policy (REQ-024) names, then add it to the entry", rel, m, entry.reason)
+				t.Errorf("%s uses reflect.%s, which its reviewed entry (%s) does not list: check the use falls in a class idiom.md § API conventions names, then add it to the entry", rel, m, entry.reason)
 			}
 		}
 		for _, m := range entry.members {
 			if !slices.Contains(used, m) {
-				t.Errorf("%s no longer uses reflect.%s, which its reviewed entry still lists: remove it from the entry so a later use meets a reviewer (REQ-024)", rel, m)
+				t.Errorf("%s no longer uses reflect.%s, which its reviewed entry still lists: remove it from the entry so a later use meets a reviewer", rel, m)
 			}
 		}
 	}
@@ -170,7 +170,7 @@ func TestREQ024ReflectOnlyForReviewedUses(t *testing.T) {
 	}
 	for rel := range reflectReviewed {
 		if !seen[rel] {
-			t.Errorf("reviewed entry %s no longer imports reflect (or the file moved): remove the entry so the list cannot admit a later import unreviewed (REQ-024)", rel)
+			t.Errorf("reviewed entry %s no longer imports reflect (or the file moved): remove the entry so the list cannot admit a later import unreviewed", rel)
 		}
 	}
 	t.Logf("scanned %d non-test Go files; %d import reflect", scanned, len(seen))
@@ -182,7 +182,7 @@ func TestREQ024ReflectOnlyForReviewedUses(t *testing.T) {
 // directory whose name starts with "." or "_", testdata, vendor, the root
 // cmd/ or the root site/.
 func TestREQ024ReflectScanReadsOnlyWhatTheGoToolBuilds(t *testing.T) {
-	// idiom.md § Generics policy (REQ-024): the guard covers library code, the non-test code outside cmd/.
+	// idiom.md § API conventions: the guard covers library code, the non-test code outside cmd/.
 	t.Parallel()
 	const reflectSource = "package p\n\nimport \"reflect\"\n\nvar _ = reflect.TypeOf\n"
 	tests := []struct {

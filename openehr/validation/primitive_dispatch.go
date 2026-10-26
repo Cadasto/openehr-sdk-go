@@ -19,7 +19,7 @@ const noPrecision rm.Integer = -1
 // declared a primitive constraint on them anyway).
 //
 // The closed switch enumerates concrete `rm.DV*` types and their
-// pointer variants. Per REQ-024 — no reflection.
+// pointer variants, with no reflection.
 //
 // Supported set (REQ-103 closed primitive types mapped):
 //
