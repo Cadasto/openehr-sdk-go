@@ -866,11 +866,12 @@ func TestClientAssertionAndSecretBothRejected(t *testing.T) { // REQ-068
 	}
 }
 
-// TestG3CrossCheckRejectsUnsupportedMethod verifies the G-3 discovery
-// cross-check: when the server advertises token_endpoint_auth_methods_supported
-// that does NOT include private_key_jwt, construction must fail with
-// ErrInvalidConfig. Also verifies that when the list includes private_key_jwt
-// (or is empty), construction succeeds (REQ-068).
+// TestG3CrossCheckRejectsUnsupportedMethod verifies the discovery cross-check
+// of auth.md § Method cross-check against discovery: when the server
+// advertises token_endpoint_auth_methods_supported that does NOT include
+// private_key_jwt, construction must fail with ErrInvalidConfig. Also verifies
+// that when the list includes private_key_jwt (or is empty), construction
+// succeeds (REQ-068).
 func TestG3CrossCheckRejectsUnsupportedMethod(t *testing.T) { // REQ-068
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -892,7 +893,7 @@ func TestG3CrossCheckRejectsUnsupportedMethod(t *testing.T) { // REQ-068
 		smart.WithClientAssertionKey(key, "RS384", "kid-1"),
 	)
 	if !errors.Is(err, auth.ErrInvalidConfig) {
-		t.Fatalf("G-3 negative: expected ErrInvalidConfig when server does not advertise private_key_jwt, got %v", err)
+		t.Fatalf("method cross-check negative: expected ErrInvalidConfig when server does not advertise private_key_jwt, got %v", err)
 	}
 
 	// Positive case: server advertises private_key_jwt — construction must succeed.
@@ -907,7 +908,7 @@ func TestG3CrossCheckRejectsUnsupportedMethod(t *testing.T) { // REQ-068
 		smart.WithClientAssertionKey(key, "RS384", "kid-1"),
 	)
 	if err != nil {
-		t.Fatalf("G-3 positive: expected no error when server advertises private_key_jwt, got %v", err)
+		t.Fatalf("method cross-check positive: expected no error when server advertises private_key_jwt, got %v", err)
 	}
 
 	// Positive case: empty advertised list is not constraining — must also succeed.
@@ -921,7 +922,7 @@ func TestG3CrossCheckRejectsUnsupportedMethod(t *testing.T) { // REQ-068
 		smart.WithClientAssertionKey(key, "RS384", "kid-1"),
 	)
 	if err != nil {
-		t.Fatalf("G-3 positive (empty list): expected no error when methods list is empty, got %v", err)
+		t.Fatalf("method cross-check positive (empty list): expected no error when methods list is empty, got %v", err)
 	}
 }
 
@@ -1033,7 +1034,7 @@ func TestTokenExpiredWithoutRefreshReturnsReauthRequired(t *testing.T) { // REQ-
 }
 
 // ---------------------------------------------------------------------------
-// REQ-063: F-L refresh clearing
+// REQ-063: clearing the tokens after a terminal refresh failure
 // ---------------------------------------------------------------------------
 
 // TestRefreshFailureClearsRefreshTokenOnlyWhenTerminal verifies that:
@@ -1183,7 +1184,7 @@ func TestRefreshIfNeeded(t *testing.T) { // REQ-063
 
 // TestRefreshThresholdConfigurable verifies that WithRefreshThreshold sets the
 // proactive-refresh window: a token expiring within the configured threshold is
-// considered stale and triggers a refresh POST (REQ-063 / G-2).
+// considered stale and triggers a refresh POST (REQ-063).
 func TestRefreshThresholdConfigurable(t *testing.T) { // REQ-063
 	calls := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

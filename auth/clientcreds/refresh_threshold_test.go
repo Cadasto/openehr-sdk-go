@@ -83,7 +83,7 @@ func TestREQ063_NegativeRefreshThresholdCountsAsZero(t *testing.T) {
 }
 
 // TestREQ063_DefaultRefreshThresholdIsThirtySeconds pins REQ-063 (auth.md §
-// Token refresh, G-2): without WithRefreshThreshold, and with a
+// Token refresh): without WithRefreshThreshold, and with a
 // Config.RefreshThreshold of 0, the refresh window is the 30-second default.
 // A token valid for a minute is returned without an exchange 20 seconds on,
 // with 40 seconds left, and is exchanged exactly once 40 seconds on, with 20
