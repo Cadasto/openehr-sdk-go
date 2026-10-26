@@ -43,6 +43,11 @@ var scenarios = map[string]scenario{
 		desc:    "POST /ehr, PUT a fixed stored query, then POST its execution",
 		capture: captureStoredQuery,
 	},
+	"composition-update": {
+		name:    "composition-update",
+		desc:    "POST /ehr, upload a fixed OPT, save, update with the latest ETag, update again with that stale ETag (412), then save and update with return=representation",
+		capture: captureCompositionUpdate,
+	},
 	"error-envelopes": {
 		name:    "error-envelopes",
 		desc:    "GET an unknown EHR (404), then POST three AQL queries the server refuses (400)",
