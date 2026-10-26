@@ -61,7 +61,7 @@ sdd:
 
   check:
     script: scripts/sdd-check.py   # where the vendored gate lives
-    version: "0.15.0"              # must equal the vendored tool's own version
+    version: "0.16.0"              # must equal the vendored tool's own version
     links:
       exclude: []                  # globs; printed in every report when non-empty
     changelog:
@@ -101,4 +101,4 @@ sdd:
       "**/*.go": go-coding:go-reviewer
       "**/go.mod": go-coding:go-reviewer
     skip: ["testkit/corpus/**", "testkit/recordings/**", "resources/**"]  # vendored corpora and upstream resources no reviewer reads
-    task_review: lane               # on | off | lane  (lane = on for full, off for maintenance)
+    task_review: off                # off | on | lane  (off: the first review pass is the gate; lane = on for full, off for maintenance)

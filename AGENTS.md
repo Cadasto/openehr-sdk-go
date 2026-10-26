@@ -6,13 +6,13 @@
 
 A first-party **Go SDK for openEHR** — `github.com/cadasto/openehr-sdk-go`, MIT. **openEHR-first**: openEHR REST `1.1.0`, the Reference Model, AQL, ADL 1.4 OPT, and SMART-on-openEHR auth are the normative scope. Cadasto-platform extras (Datamap, MPI, Extra API, Admin, Care) ship in the same module for v1, behind a clean `cadasto/` cut line so later extraction is a subtree move, not a rewrite.
 
-Go `1.27.x`, module floor `1.27.0` ([REQ-002](docs/specifications/packaging.md#req-002--go-version)). **Early implementation, pre-1.0** — status per REQ in [REQ.md](docs/specifications/REQ.md), open work in [docs/roadmap.md](docs/roadmap.md).
+Go `1.27.x`, module floor `1.27.0` ([REQ-002](docs/specifications/packaging.md#req-002--go-version)). **Pre-1.0**: a minor release can change the public API ([releases.md § Pre-1.0](docs/releases.md#pre-10)). Status per REQ in [REQ.md](docs/specifications/REQ.md), open work in [docs/roadmap.md](docs/roadmap.md).
 
 ## Source of truth
 
 The normative spec lives **in this repo** under [`docs/specifications/`](docs/specifications/) — self-contained; implementing or reviewing the SDK needs no external sources. Conventions (RFC-2119 keywords, status headers, identifiers, traceability): [`docs/specifications/README.md`](docs/specifications/README.md).
 
-`docs/specifications/` carries the RFC-2119 statements code, plans, and tests are measured against; `docs/architecture.md` carries the design narrative. **When anything disagrees with the specs, the specs win.** Never silently resolve an open [research strand](docs/specifications/research-strands.md) in code — surface the decision or land an [ADR](docs/adr/).
+`docs/specifications/` carries the RFC-2119 statements code, plans, and tests are measured against; `docs/architecture.md` carries the design narrative. **The specs record the contract; the maintainer's instruction outranks them.** When a request contradicts a sentence, name the sentence once, do the work and amend it in the same change. Without the maintainer, anything that disagrees with the specs is a finding and the specs win, except a section marked *implementation-aligned*, where code leads and the spec is reconciled in the same PR. A `draft` section binds once it merges. Never silently resolve an open [research strand](docs/specifications/research-strands.md) in code — surface the decision or land an [ADR](docs/adr/).
 
 ## Documentation
 
@@ -25,7 +25,7 @@ Reading order — the specialized docs are **canonical**; defer to them rather t
 | 2 | [docs/architecture.md](docs/architecture.md) | Design narrative — package organization, dependencies, integration, mermaid diagrams |
 | 3 | [docs/ai-workflow.md](docs/ai-workflow.md) | **AI conventions** — the working loop, recommended plugins/skills, openEHR ground-truth lookups, hooks |
 | 4 | [docs/adr/](docs/adr/) | Closed architectural decisions |
-| 5 | [docs/plans/](docs/plans/) + [docs/roadmap.md](docs/roadmap.md) + [docs/backlog.md](docs/backlog.md) | Implementation plans, the open-work roadmap, and merged PRs' leftover suggestions (leads to verify, carried in at close-out by `/sdd-close` or later by `/sdd-triage --backlog` on `main`) |
+| 5 | [docs/plans/](docs/plans/) + [docs/roadmap.md](docs/roadmap.md) + [docs/backlog.md](docs/backlog.md) | Implementation plans, the open-work roadmap, and merged branches' leftover defects and suggestions (leads to verify before acting) |
 | 6 | [CHANGELOG.md](CHANGELOG.md) + [docs/releases.md](docs/releases.md) | Release log and version policy |
 | 7 | [CONTRIBUTING.md](CONTRIBUTING.md) + [SECURITY.md](SECURITY.md) | Contributor flow and vulnerability reporting |
 | 8 | [LICENSING.md](LICENSING.md) | MIT grant plus in-tree third-party inventory |
@@ -40,9 +40,10 @@ Reading order — the specialized docs are **canonical**; defer to them rather t
 - **Godoc is for SDK users.** Package docs and doc comments on exported identifiers carry no spec-process identifiers (REQ, ADR, STRAND, plan or spec paths) and no RFC-2119 capitals. State the behaviour a caller needs in plain English. A probe's own `PROBE-NNN` id and public openEHR specification citations are fine.
 - **`REQ`/`PROBE` is the feature register; there is no `SDK-GAP` identifier.** A discovered gap is worked under a REQ (extend or create via `sdd-specify`) with a `PROBE` for wire conformance. No GAP-style label appears anywhere — not in plan filenames, `traceability.yaml`, test names, `doc.go`, or normative prose ([ADR 0012](docs/adr/0012-retire-sdk-gap-identifier.md)).
 - Keep [`cmd/examples/`](cmd/examples/) docs in sync **in the same PR** as the program — checklist in [ai-workflow.md § Examples](docs/ai-workflow.md#examples).
-- **Write short.** Lead with the result; a finding is one sentence of about 30 words, a PR body about 300 words besides its checklist; quote only the output that proves a claim.
+- **Backlog size.** [`docs/backlog.md`](docs/backlog.md) is kept at about 80 lines ([ai-workflow.md § Review](docs/ai-workflow.md#review)), which outranks the 40 built into the sdd plugin's hook and its `/sdd-triage --backlog` consolidation.
+- **Write short.** Lead with the result; a finding is one sentence of about 30 words, a PR body about 450 words; quote only the output that proves a claim.
 
-**Descriptor & process.** The `sdd-*` skills read [`docs/.sdd.yaml`](docs/.sdd.yaml) first; the lanes, the ladder and the Definition of Ready / Done are in [`docs/development-process.md`](docs/development-process.md), and the SDD-vs-superpowers split in [development-process.md § superpowers + SDD](docs/development-process.md#superpowers--sdd). Plans go in [`docs/plans/`](docs/plans/), never a parallel `docs/superpowers/` tree. They are committed working notes outside the traceability chain: no gate, generator or map reads them; brainstorming docs are narrative input, not a normative source.
+**Descriptor & process.** The `sdd-*` skills read [`docs/.sdd.yaml`](docs/.sdd.yaml) first; the lanes, the ladder and the Definition of Ready / Done are in [`docs/development-process.md`](docs/development-process.md), and the SDD-vs-superpowers split in [development-process.md § superpowers + SDD](docs/development-process.md#superpowers--sdd). Plans go in [`docs/plans/`](docs/plans/), never a parallel `docs/superpowers/` tree. They are committed working notes outside the traceability chain: no generator or map reads them, though the drift gate checks them like any other document ([plans/README.md](docs/plans/README.md)); brainstorming docs are narrative input, not a normative source.
 
 ## Module layout & boundaries
 
@@ -83,9 +84,11 @@ Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev
 | BMM codegen verify | `make codegen-check` |
 | AQL parser codegen verify | `make aqlgen-check` — fails if `openehr/aql/parse/gen/` drifts from the `active/` grammar (needs Docker, not a host JRE); regenerate with `make aqlgen` |
 | Spec traceability | `make spec-check` |
+| Full gate report | `make sdd-check` — the SDD gate with every warning (`make spec-check` prints only the verdict) |
 | Regenerate spec indexes | `make spec-generate`: the map's `tests:` lists from the tests' REQ citations, the REQ.md registry from `traceability.yaml` |
 | Spec context bundle | `make spec-context REQ=NNN` — registry row + traceability + canonical excerpt + strands |
 | Probe status | `make probe-status` — each PROBE's status and whether its test file exists |
+| Live CDR (opt-in, not in `make ci`) | `make probe-record ARGS=…` records a cassette; `make cdr-crosscheck` checks generated documents against live CDRs. Environment variables are in [ci.md](docs/ci.md) |
 | FLAT corpus integrity | `make flat-check` — offline `sha256` of the vendored EHRbase FLAT corpus (PROBE-086's input); `make flat-drift` adds a network drift report (dev helper, not a gate) |
 | Build Docker dev image | `make build-dev` (when host Go is missing, or for `make test-race` on a host without a C compiler; rebuild an image made before the dev stage gained gcc) |
 | Docs site | `make docs-check` builds the site from `pages/` and asserts its output; `make docs-serve` previews it. The docs-theme brand layer is pinned by commit + sha256 in `sources.json` (bump recipe in its `$comment`) |
@@ -96,7 +99,7 @@ Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev
 - `make probe-status` prints `MISSING` for any probe covered inline or in a sibling's file. That is the filename heuristic, **not** drift — `make spec-check` is the real gate.
 - **`make ci` cannot complete without Docker:** `test` → `aqlgen-check` → `build-antlr` always needs it. Everything else uses Docker only when host tooling is missing (host Go `1.27.x`; a host `golangci-lint` **built with Go 1.27**; for `make test-race`, a host C compiler; routing in [ci.md](docs/ci.md)).
   Without Docker, run `fmt-check`, `vet`, `spec-check`, `flat-check`, `build` and `go test ./... -count=1`, and let PR CI be the gate.
-- After `git worktree remove`, run `golangci-lint cache clean`; otherwise lint reports phantom issues under the removed `.worktrees/` path.
+- Worktrees go under the gitignored `.worktrees/`. After `git worktree remove`, run `golangci-lint cache clean`; otherwise lint reports phantom issues under the removed `.worktrees/` path.
 - **Public docs never name downstream consuming projects.** Describe what a consumer needs, not who the consumer is.
 - **Release cut** follows [releases.md § Tag checklist](docs/releases.md#tag-checklist) and commits straight to `main`, no branch or PR. The same commit moves the `go get …@vX.Y.Z` pin in `README.md`, `docs/quick-start.md`, `pages/install.md` and `pages/index.md`; `make docs-check` fails until all four match the newest `## [X.Y.Z]` heading in `CHANGELOG.md`.
 
@@ -111,7 +114,7 @@ Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev
 
 Rationale and the wider picture: [architecture.md § Dependencies](docs/architecture.md#dependencies). Conformance probes (`testkit/probes/…`) run via `make test`; inventory in [conformance.md](docs/specifications/conformance.md).
 
-**Agent tooling:** a review of a Go diff goes through the plugin's `go-reviewer` agent, or the reviewer loads the same focused skills itself when the workflow already provides a single reviewer seat (the SDD subagent-driven loop does). `go-lint-setup` is never needed here: golangci-lint v2 is already pinned (`make lint`). Also: **gopls-lsp** (code intelligence) and **codebase-memory-mcp** (structural exploration / impact) — see [ai-workflow.md § Recommended tooling](docs/ai-workflow.md#recommended-tooling-claude-code--cursor).
+**Agent tooling:** a review of a Go diff goes through the plugin's `go-reviewer` agent, or the reviewer loads the same focused skills itself when the workflow already provides a single reviewer seat (the SDD subagent-driven loop does). `go-lint-setup` is never needed here: golangci-lint v2 is already pinned (`make lint`). Also: **gopls** (code intelligence; from a worktree, run it in the shell) and **codebase-memory-mcp** (structure and impact questions about `main`) — see [ai-workflow.md § Recommended tooling](docs/ai-workflow.md#recommended-tooling-claude-code--cursor).
 
 **Local agent config:** personal permission grants belong in the gitignored `.claude/settings.local.json` — never add a `permissions` block to the checked-in `.claude/settings.json` (shared hook/plugin config only).
 

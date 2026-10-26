@@ -4,7 +4,7 @@ kind: guide
 
 # Development process
 
-How a change moves through this repository. This page owns the two lanes and the ladder. The conventions they use (document kinds, RFC-2119 force, status headers, identifiers, the traceability chain) live once, in [specifications/README.md](specifications/README.md); the agent loop is in [ai-workflow.md § The loop](ai-workflow.md#the-loop).
+How a change moves through this repository. The specification records the contract and the maintainer's instruction outranks a sentence ([AGENTS.md § Source of truth](../AGENTS.md#source-of-truth)). This page owns the two lanes and the ladder. The conventions they use (document kinds, RFC-2119 force, status headers, identifiers, the traceability chain) live once, in [specifications/README.md](specifications/README.md); the agent loop is in [ai-workflow.md § The loop](ai-workflow.md#the-loop).
 
 The machine-readable side (identifier style, paths, build targets, the `PROBE`/`STRAND` toggles, the ground-truth source) is [`.sdd.yaml`](.sdd.yaml). The `sdd-*` skills read it first.
 

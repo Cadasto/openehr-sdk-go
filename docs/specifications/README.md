@@ -46,7 +46,7 @@ The repo uses several document kinds, each with a distinct role and boundary:
 
 ## Source of truth
 
-When code and a spec disagree, the spec wins. Which changes owe spec edits, and in what order, is [development-process.md § Two lanes](../development-process.md#two-lanes) and [§ The ladder](../development-process.md#the-ladder-full-lane).
+When code and a spec disagree, the spec wins, unless the maintainer's instruction says otherwise ([AGENTS.md § Source of truth](../../AGENTS.md#source-of-truth)). Which changes owe spec edits, and in what order, is [development-process.md § Two lanes](../development-process.md#two-lanes) and [§ The ladder](../development-process.md#the-ladder-full-lane).
 
 ## Status header
 
