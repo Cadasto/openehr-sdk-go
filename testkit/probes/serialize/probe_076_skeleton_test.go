@@ -20,11 +20,13 @@ import (
 // probe076SkeletonPolicies are the generator policies the leg runs under.
 var probe076SkeletonPolicies = []instance.Policy{instance.Required, instance.Medium}
 
-// probe076SkeletonPassFloor is the number of (template, policy) pairs that
-// pass today: 64 COMPOSITION templates under two policies. A corpus that
-// silently empties, or a COMPOSITION OPT that stops parsing and so drops out
-// of the corpus, falls below it. Raise it when the corpus grows.
-const probe076SkeletonPassFloor = 128
+// probe076SkeletonPairFloor is the number of (template, policy) pairs the
+// corpus gives today: 64 COMPOSITION templates under two policies. A corpus
+// that silently empties, or a COMPOSITION OPT that stops parsing and so drops
+// out of the corpus, falls below it. It counts the pairs the corpus lists, not
+// the ones a -run filter selects, so running one pair does not trip it; every
+// pair that runs must pass on its own. Raise it when the corpus grows.
+const probe076SkeletonPairFloor = 128
 
 // compositionOPT is one COMPOSITION OPT of the corpus: its template id and its
 // body.
@@ -37,7 +39,7 @@ type compositionOPT struct {
 // COMPOSITION, one per template id, in the order the listing gives. An OPT
 // that does not parse is left out: the PROBE-027 corpus ratchet
 // (corpusCompileFailures in testkit/probes/instance) names the ones that do
-// not, and the pass floor catches a COMPOSITION OPT that stops parsing.
+// not, and the pair floor catches a COMPOSITION OPT that stops parsing.
 func compositionOPTs(t *testing.T) []compositionOPT {
 	t.Helper()
 	refs, err := fixtures.ListAllOPTs()
@@ -122,8 +124,8 @@ func TestProbe076SkeletonLeg(t *testing.T) {
 			t.Errorf("exclusion %s is stale: the corpus runs no template %q under %s", ex.Finding, ex.Finding.Template, ex.Finding.Policy)
 		}
 	}
-	if passes < probe076SkeletonPassFloor {
-		t.Errorf("%d (template, policy) pairs pass, want at least %d; did the corpus shrink?", passes, probe076SkeletonPassFloor)
+	if len(ran) < probe076SkeletonPairFloor {
+		t.Errorf("the corpus gives %d (template, policy) pairs, want at least %d; did the corpus shrink?", len(ran), probe076SkeletonPairFloor)
 	}
 	t.Logf("%d COMPOSITION templates, %d (template, policy) pairs pass, %d registered exclusions", len(opts), passes, len(serializeprobes.Probe076SkeletonExclusions))
 }
