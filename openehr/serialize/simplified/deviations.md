@@ -360,12 +360,38 @@ partially or silently accepted.
   the other three are the folded structural wrappers, `archetype_details` and an ACTION
   transition's `transition` and `reason`.
 
-- **`ITEM_TREE` vs `ITEM_LIST` on decode** — the Web Template collapses `ITEM_STRUCTURE`
-  nodes, so the concrete subtype is inferred from the child aqlPath attribute:
-  `item` → `ITEM_SINGLE`, `rows` → `ITEM_TABLE`, `items` → `ITEM_TREE`. `ITEM_TREE` and
-  `ITEM_LIST` both use `items` and are indistinguishable from the path alone, so `items`
-  defaults to `ITEM_TREE`. This is round-trip-preserving (the leaf values and their
-  paths are identical); it can differ from an upstream canonical that used `ITEM_LIST`.
+- **`ITEM_TREE` vs `ITEM_LIST` on OPT-free decode** — the Web Template collapses
+  `ITEM_STRUCTURE` nodes, so FLAT and STRUCTURED carry no structure's concrete subtype.
+  With `WithTemplate`, decode takes it from the compiled template: the node at that path
+  (the compiled-path convention the names use, predicate only on container attributes)
+  names it, and decode builds that type where it is an `ITEM_STRUCTURE` declaring the
+  attribute the path goes on through (since 2026-10-26, issue 311: BMI's `protocol`,
+  `Episode.v2`'s ADMIN_ENTRY `data` and the `vital_signs` blood-pressure event `data` are
+  `ITEM_LIST`s that decoded as `ITEM_TREE` and failed `ValidateComposition` with
+  `rm_type_mismatch`). Where the template gives no single answer (no node there, or
+  alternatives that disagree), and in every **OPT-free** decode, the subtype is inferred
+  from the child aqlPath attribute: `item` → `ITEM_SINGLE`, `rows` → `ITEM_TABLE`,
+  `items` → `ITEM_TREE`. `ITEM_TREE` and `ITEM_LIST` both use `items` and are
+  indistinguishable from the path alone, so `items` defaults to `ITEM_TREE`. This is
+  round-trip-preserving (the leaf values and their paths are identical); it can differ
+  from an upstream canonical that used `ITEM_LIST`. Pinned by
+  `TestREQ053WithTemplateRoundTripValidatesBMI` and `TestREQ053OPTFreeDecodeKeepsTheInference`.
+
+- **Distinct sibling nodes are placed in template order on decode** — FLAT orders only the
+  instances of one node, by their `:index`; nothing in the format orders two distinct
+  nodes under one list attribute (the ELEMENTs of one `ITEM_LIST`, the entries of a
+  `SECTION`, the events of a `HISTORY`), and a STRUCTURED body is converted to that same
+  FLAT map. Decode therefore places the members of each list in the Web Template's node
+  order, which follows the template, and keeps the `:index` order among the instances of
+  one node. In both decode modes, since the Web Template is always present, and whichever
+  key reaches a node first: an ordinary leaf, a composite leaf (party, `DV_INTERVAL`) or
+  an underscore attribute (`<entry>/_uid` alone). A member no Web Template node accounts
+  for goes after the rest, in the order it was placed. A composition whose distinct
+  siblings were in another order comes back in template order; one written in template
+  order, as `instance.Generate` writes, comes back as written. Until 2026-10-26 decode
+  appended them in sorted FLAT-key order (BMI's protocol: written `at0006`, `at0010`,
+  `at0011`, decoded `at0011`, `at0010`, `at0006`). Pinned by
+  `TestREQ053DecodePlacesMembersInTemplateOrder`.
 
 ## Implementation notes (not deviations, but worth recording)
 
