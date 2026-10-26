@@ -1264,6 +1264,69 @@ func TestREQ056_XMLTerminologyCode(t *testing.T) {
 	})
 }
 
+// TestREQ170_XMLTerminologyIDTextBesideValue pins text beside the `value`
+// child of a TERMINOLOGY_CODE's `terminology_id`, the CODE_PHRASE shape: the
+// child holds the identifier, so text other than whitespace beside it is
+// unmatched content, one item at the element's path with a last `text()`
+// segment, however many runs there are. Text before the child is reported
+// when the child opens, before anything inside it; text after it when it is
+// met. With no `value` child the text is the identifier and nothing is
+// unmatched (TestREQ056_XMLTerminologyCode).
+func TestREQ170_XMLTerminologyIDTextBesideValue(t *testing.T) {
+	archetype := func(id string) []byte {
+		return []byte(`<archetype ` + ucNS + `><concept>at0000</concept><original_language><terminology_id>` + id +
+			`</terminology_id><code_string>en</code_string></original_language></archetype>`)
+	}
+	const (
+		value    = `<value>ISO_639-1</value>`
+		textPath = "/archetype[1]/original_language[1]/terminology_id[1]/text()"
+		attrPath = "/archetype[1]/original_language[1]/terminology_id[1]/value[1]/@x-attr"
+	)
+	for _, tc := range []struct {
+		name  string
+		id    string
+		paths []string
+	}{
+		{name: "text before the value child", id: xmlPlanted + value, paths: []string{textPath}},
+		{name: "text after the value child", id: value + xmlPlanted, paths: []string{textPath}},
+		{name: "text on both sides is one item", id: xmlPlanted + value + "<![CDATA[" + xmlPlanted + "]]>", paths: []string{textPath}},
+		{
+			name: "text before the child comes before what is inside it",
+			id:   xmlPlanted + `<value x-attr="` + xmlPlanted + `">ISO_639-1</value>`, paths: []string{textPath, attrPath},
+		},
+		{name: "whitespace beside the value child", id: "\n\t" + value + " \r\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			in := archetype(tc.id)
+			want := new(aom14.Archetype)
+			if err := canxml.Unmarshal(in, want); err != nil {
+				t.Fatalf("canxml.Unmarshal = %v; want nil", err)
+			}
+			if want.OriginalLanguage.TerminologyID != "ISO_639-1" {
+				t.Errorf("TerminologyID = %q; want the value child's ISO_639-1", want.OriginalLanguage.TerminologyID)
+			}
+			got, paths, err := unmarshalCollecting(func() any { return new(aom14.Archetype) }, in)
+			if err != nil {
+				t.Fatalf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
+			}
+			if !slices.Equal(paths, tc.paths) {
+				t.Errorf("WithUnmatched reported %q; want %q", paths, tc.paths)
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("canxml.Unmarshal(WithUnmatched) decoded\n%#v\nwant the default's value\n%#v", got, want)
+			}
+			err = canxml.Unmarshal(in, new(aom14.Archetype), canxml.WithStrict())
+			if len(tc.paths) == 0 {
+				if err != nil {
+					t.Errorf("canxml.Unmarshal(WithStrict) = %v; want nil: XML whitespace is not unmatched", err)
+				}
+				return
+			}
+			assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, tc.paths[0], false)
+		})
+	}
+}
+
 // TestREQ056_XMLMultimediaBase64 pins DV_MULTIMEDIA's `data` and
 // `integrity_check`, Octet lists held as Go []byte, as one element of
 // standard base64 text each: the `xs:base64Binary` the ITS-XML schema gives

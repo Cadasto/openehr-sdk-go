@@ -37,9 +37,12 @@
 //     read, [CheckUnmatchedText] for text between the elements they read,
 //     [DecodeElement] for an element decoded as text, [DecodeBase64] for an
 //     Octet list, and [DecodeParam] for a member typed by an open generic
-//     parameter. canxml calls [DiscriminatorRead] where its dispatch reads a
-//     bare `type`. Each helper looks the decoder up; an untracked decode
-//     finds nothing and behaves as encoding/xml does, but for one thing.
+//     parameter. The hand-written TERMINOLOGY_CODE decoder calls the same
+//     helpers, and [CheckUnmatchedTextBefore] for text it keeps until a child
+//     shows that the text is not its value. canxml calls [DiscriminatorRead]
+//     where its dispatch reads a bare `type`. Each helper looks the decoder
+//     up; an untracked decode finds nothing and behaves as encoding/xml
+//     does, but for one thing.
 //
 // # Primitive failures
 //
@@ -343,18 +346,25 @@ func (t *Tracker) attrs(attrs []xml.Attr, known []string) error {
 	return nil
 }
 
-// text applies the policy to text the decoder read directly inside the
-// innermost open element, whose content is elements: unless it is XML
-// whitespace, it is unmatched, at the element's path with a last `/text()`
-// segment. An element is one item however many runs of text it holds, so
-// only its first unmatched run counts.
-func (t *Tracker) text(text []byte) error {
-	f := &t.open[len(t.open)-1]
+// text applies the policy to text the decoder read directly inside the open
+// element whose frame is t.open[n-1], whose content is elements: unless it is
+// XML whitespace, it is unmatched, at the element's path with a last
+// `/text()` segment. An element is one item however many runs of text it
+// holds, so only its first unmatched run counts. With n below 2 no element
+// holds the text, and it is left alone.
+func (t *Tracker) text(n int, text []byte) error {
+	if n < 2 {
+		return nil
+	}
+	f := &t.open[n-1]
 	if f.text || isXMLSpace(text) {
 		return nil
 	}
 	f.text = true
-	return t.unmatched(t.path()+"/text()", false)
+	var b strings.Builder
+	t.writePath(&b, n)
+	b.WriteString("/text()")
+	return t.unmatched(b.String(), false)
 }
 
 // isXMLSpace reports whether text holds XML whitespace only: spaces, tabs,
@@ -714,7 +724,23 @@ func CheckUnmatchedText(dec *xml.Decoder, text xml.CharData) error {
 	if t == nil {
 		return nil
 	}
-	return t.text(text)
+	return t.text(len(t.open), text)
+}
+
+// CheckUnmatchedTextBefore applies the decode's policy for unmatched content
+// to text read directly inside an element before the child element the
+// decoder read last, as [CheckUnmatchedText] does for text read while no
+// child is open. A decoder that keeps such text until a child tells it that
+// the text is not the element's value calls it as that child opens, so the
+// text is reported before anything inside the child. The path names the
+// element that holds the text, with a last `/text()` segment, and that
+// element remains one item however many runs of text it holds.
+func CheckUnmatchedTextBefore(dec *xml.Decoder, text []byte) error {
+	t := trackerOf(dec)
+	if t == nil {
+		return nil
+	}
+	return t.text(len(t.open)-1, text)
 }
 
 // DecodeElement decodes the element start opens into v, as

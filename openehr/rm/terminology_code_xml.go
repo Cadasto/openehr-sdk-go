@@ -110,7 +110,9 @@ func (t *TerminologyCode) UnmarshalXML(dec *xml.Decoder, start xml.StartElement)
 // decodeTerminologyIDXML reads the `terminology_id` element start opens into
 // out: the text of its first `value` child when it has one (the TERMINOLOGY_ID
 // shape), and its own text otherwise. Any other child, and a second `value`,
-// is unmatched content.
+// is unmatched content. So is text other than whitespace beside a `value`
+// child, which then holds the identifier: text before the child is checked
+// as the child opens, and text after it as it is read.
 func decodeTerminologyIDXML(dec *xml.Decoder, start xml.StartElement, out *string) error {
 	if err := xmlunmatched.CheckUnmatchedAttrs(dec, start); err != nil {
 		return err
@@ -124,9 +126,18 @@ func decodeTerminologyIDXML(dec *xml.Decoder, start xml.StartElement, out *strin
 		}
 		switch tk := tok.(type) {
 		case xml.CharData:
+			if value != nil {
+				if err := xmlunmatched.CheckUnmatchedText(dec, tk); err != nil {
+					return err
+				}
+				continue
+			}
 			text = append(text, tk...)
 		case xml.StartElement:
 			if value == nil && xmlunmatched.LocalName(tk.Name) == "value" {
+				if err := xmlunmatched.CheckUnmatchedTextBefore(dec, text); err != nil {
+					return err
+				}
 				var v string
 				if err := xmlunmatched.DecodeElement(dec, &tk, &v); err != nil {
 					return err

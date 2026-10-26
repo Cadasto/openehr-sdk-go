@@ -235,3 +235,38 @@ func TestREQ170_TextInElementContent(t *testing.T) {
 		t.Errorf("CheckUnmatchedText(untracked decoder) = %v; want nil", err)
 	}
 }
+
+// textBeforeRoot is a decode target that hands text to
+// CheckUnmatchedTextBefore as soon as it is called, while the root element it
+// decodes is the innermost open one, so no element holds that text.
+type textBeforeRoot struct{}
+
+func (*textBeforeRoot) UnmarshalXML(dec *xml.Decoder, _ xml.StartElement) error {
+	if err := CheckUnmatchedTextBefore(dec, []byte("t0")); err != nil {
+		return err
+	}
+	return dec.Skip()
+}
+
+// TestREQ170_TextBeforeNoElement pins that the text CheckUnmatchedTextBefore
+// is handed is no item when no element holds it: called while the root is
+// the innermost open element, or with no element open at all, it neither
+// reports nor refuses, and it does not fail. An untracked decode does
+// nothing.
+func TestREQ170_TextBeforeNoElement(t *testing.T) {
+	var got []string
+	tr := NewTracker(func(p string) { got = append(got, p) }, true)
+	if err := tr.Decode(tr.NewDecoder(strings.NewReader("<r><x/></r>")), new(textBeforeRoot)); err != nil {
+		t.Errorf("Decode(strict) = %v; want nil: no element holds the text", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("reported %q; want nothing", got)
+	}
+	tr = NewTracker(nil, true)
+	if err := tr.text(len(tr.open)-1, []byte("t0")); err != nil {
+		t.Errorf("text with no element open = %v; want nil", err)
+	}
+	if err := CheckUnmatchedTextBefore(xml.NewDecoder(strings.NewReader("<r/>")), []byte("t0")); err != nil {
+		t.Errorf("CheckUnmatchedTextBefore(untracked decoder) = %v; want nil", err)
+	}
+}
