@@ -24,6 +24,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
@@ -1518,9 +1519,9 @@ func walkAQL(compJSON map[string]any, aqlPath string, predIndex map[string]int, 
 		}
 		// Only a LOCATABLE has a name. The template's name index also covers an
 		// archetyped ISM_TRANSITION node, which must not gain one.
-		if nm := tmpl.name(namePrefix.String()); nm != "" && nameable(childType) {
-			if _, has := cur["name"]; !has {
-				cur["name"] = textJSON(nm)
+		if _, has := cur["name"]; !has {
+			if name := tmpl.nameJSON(namePrefix.String()); name != nil && nameable(childType) {
+				cur["name"] = name
 			}
 		}
 		curType = childType
@@ -2168,6 +2169,12 @@ func bareAQLPath(p string) string {
 type templateIndex struct {
 	// names maps a path to the LOCATABLE name decode gives the node there.
 	names map[string]string
+	// codedNames maps a path to the DV_CODED_TEXT name decode gives the node
+	// there in place of the DV_TEXT name of names, where the template
+	// determines one ([codedNameOf]). It maps to the zero codedName where the
+	// nodes at one path disagree on it, one of them determining none
+	// included: the template then gives no single coded name.
+	codedNames map[string]codedName
 	// rmTypes maps a path to the RM type the template gives the node there. It
 	// maps to "" where the nodes at one path disagree, the alternatives of one
 	// single-valued attribute, say, which share a path: the template then gives
@@ -2214,6 +2221,202 @@ func (x *templateIndex) name(path string) string {
 	return x.names[path]
 }
 
+// nameJSON returns, as a canonical object, the name decode gives the node at
+// path: the coded name the template determines there, else a DV_TEXT of the
+// node's name, or nil where the index gives the node no name.
+func (x *templateIndex) nameJSON(path string) map[string]any {
+	if x == nil {
+		return nil
+	}
+	if c := x.codedNames[path]; c != (codedName{}) {
+		return c.json()
+	}
+	if name := x.name(path); name != "" {
+		return textJSON(name)
+	}
+	return nil
+}
+
+// addCodedName records name, the coded name the node at path gets, the zero
+// codedName where it gets none. A second node at that path with another
+// leaves the path with no coded name.
+func (x *templateIndex) addCodedName(path string, name codedName) {
+	if prev, seen := x.codedNames[path]; seen && prev != name {
+		name = codedName{}
+	}
+	x.codedNames[path] = name
+}
+
+// codedName is a DV_CODED_TEXT name the template determines for a node: its
+// text, and the code and terminology of its defining code. The zero value is
+// no coded name.
+type codedName struct {
+	value, code, terminology string
+}
+
+// json is the canonical object of the coded name c.
+func (c codedName) json() map[string]any {
+	return map[string]any{
+		"_type":         "DV_CODED_TEXT",
+		"value":         c.value,
+		"defining_code": codePhraseJSON(c.code, c.terminology),
+	}
+}
+
+// codedNameOf returns the coded name the template determines for the node n,
+// or the zero codedName where it determines none. The template determines
+// one where it constrains n's name as a DV_CODED_TEXT, through one child or
+// through alternatives that agree on it, each of which determines one coded
+// value ([codedValueOf]). A name the template constrains in any other way,
+// or not at all, gets the DV_TEXT name of the index.
+func codedNameOf(n *templatecompile.CompiledNode) codedName {
+	attr := n.Attribute("name")
+	if attr == nil {
+		return codedName{}
+	}
+	children := tcimpl.AllowedChildNodes(attr)
+	if len(children) == 0 {
+		return codedName{}
+	}
+	first := codedValueOf(children[0])
+	for _, c := range children[1:] {
+		if codedValueOf(c) != first {
+			return codedName{}
+		}
+	}
+	return first
+}
+
+// codedValueOf returns the coded value c, a child of a node's name,
+// determines, or the zero codedName where it determines none. c must be a
+// DV_CODED_TEXT whose defining_code the template constrains through one
+// C_CODE_PHRASE, of a named terminology, that lists either exactly one code,
+// or several of which exactly one has a term text ([codeTermText]) equal to
+// the text the template pins on c's value: a closed C_STRING list of one
+// entry. The value's text is the pinned text, else the code's term text, and
+// the C_STRING on c's value, if any, must admit it. This is the name the
+// generator writes there. A C_CODE_PHRASE that lists no code, an external
+// reference set (C_CODE_REFERENCE) and several codes with no pinned text
+// leave the code open, and a code with no term text and no pinned text leaves
+// the text open: decode invents neither.
+func codedValueOf(c *templatecompile.CompiledNode) codedName {
+	if c.RMTypeName() != "DV_CODED_TEXT" {
+		return codedName{}
+	}
+	phrase, ok := onePrimitive(c, "defining_code").(constraints.CodePhrase)
+	if !ok || phrase.Terminology == "" {
+		return codedName{}
+	}
+	text, hasText := onePrimitive(c, "value").(constraints.CString)
+	pinned := ""
+	if hasText && len(text.List) == 1 && !text.ListOpen {
+		pinned = text.List[0]
+	}
+	code := ""
+	switch {
+	case len(phrase.CodeList) == 1:
+		code = phrase.CodeList[0]
+	case pinned != "":
+		for _, listed := range phrase.CodeList {
+			if term, ok := codeTermText(c, phrase.Terminology, listed); ok && term == pinned {
+				if code != "" && code != listed {
+					return codedName{}
+				}
+				code = listed
+			}
+		}
+	}
+	if code == "" {
+		return codedName{}
+	}
+	value := pinned
+	if value == "" {
+		if value, ok = codeTermText(c, phrase.Terminology, code); !ok {
+			return codedName{}
+		}
+	}
+	if hasText && len(text.Validate(value)) > 0 {
+		return codedName{}
+	}
+	return codedName{value: value, code: code, terminology: phrase.Terminology}
+}
+
+// onePrimitive returns the primitive constraint of the one child the template
+// allows on the attribute attr of n, or nil where it allows none or more than
+// one.
+func onePrimitive(n *templatecompile.CompiledNode, attr string) constraints.PrimitiveConstraint {
+	a := n.Attribute(attr)
+	if a == nil {
+		return nil
+	}
+	children := tcimpl.AllowedChildNodes(a)
+	if len(children) != 1 {
+		return nil
+	}
+	return children[0].PrimitiveConstraint()
+}
+
+// codeTermText returns the term text of code in terminologyID, as the
+// generator reads it for a coded name under the node n. A code of the openEHR
+// terminology takes its rubric ([openehrRubric]). Any other takes the text of
+// the term that n's own archetype, its nearest enclosing archetype root,
+// defines for it: under the code for a local code, else under
+// "<terminology>::<code>", or under the code alone where that is no at-code,
+// the key some OPTs give such a term. ok is false where none gives a text.
+func codeTermText(n *templatecompile.CompiledNode, terminologyID, code string) (string, bool) {
+	switch terminologyID {
+	case terminology.ID:
+		return openehrRubric(code)
+	case localTerminology:
+		text, ok := tcimpl.RootTermItem(n, code, "text")
+		return text, ok && text != ""
+	}
+	if text, ok := tcimpl.RootTermItem(n, terminologyID+"::"+code, "text"); ok && text != "" {
+		return text, true
+	}
+	if isAtCode(code) {
+		return "", false
+	}
+	text, ok := tcimpl.RootTermItem(n, code, "text")
+	return text, ok && text != ""
+}
+
+// openehrRubric returns the rubric the openEHR terminology gives code. A
+// rubric belongs to a code within a group, and the RM ties a node's name to
+// no group, so code has a rubric only where every group that holds it gives
+// it the same one: 532 is "complete" in one group and "completed" in another,
+// and has none.
+func openehrRubric(code string) (string, bool) {
+	rubric := ""
+	for g := range terminology.Groups() {
+		r, ok := g.Rubric(code)
+		if !ok {
+			continue
+		}
+		if rubric != "" && r != rubric {
+			return "", false
+		}
+		rubric = r
+	}
+	return rubric, rubric != ""
+}
+
+// isAtCode reports whether code is an archetype term code: "at" followed by
+// digits, with any dot extensions of digits for a specialisation, such as
+// at0010 or at0010.2 (ADL 1.4, Node Identification).
+func isAtCode(code string) bool {
+	rest, ok := strings.CutPrefix(code, "at")
+	if !ok {
+		return false
+	}
+	for part := range strings.SplitSeq(rest, ".") {
+		if part == "" || strings.Trim(part, "0123456789") != "" {
+			return false
+		}
+	}
+	return true
+}
+
 // rmType returns the one RM type the template gives the node at path, or ""
 // where it gives none or the nodes there disagree.
 func (x *templateIndex) rmType(path string) string {
@@ -2238,6 +2441,9 @@ func (x *templateIndex) addRMType(path, rmType string) {
 // it is what the reference materialises), else the node-id term rubric in the
 // default language. Decode repopulates LOCATABLE.name from the names, and takes
 // a folded ITEM_STRUCTURE's concrete subtype from the types (see WithTemplate).
+// Where the template constrains a node's name as a DV_CODED_TEXT and
+// determines its code and text, the node's coded name ([codedNameOf]) takes
+// the place of its DV_TEXT name.
 //
 // Every node is indexed under both its compiled path and that path's bare
 // spelling. Siblings sharing a bare path carry the same at-code and therefore
@@ -2248,7 +2454,9 @@ func (x *templateIndex) addRMType(path, rmType string) {
 // needs the FLAT segment identity carried into this lookup — recorded in
 // deviations.md § Conformance as part of the reused-sibling residual the
 // PROBE-086 adapter work owns. Siblings sharing a bare path with distinct RM
-// types leave the type alias with no answer.
+// types leave the type alias with no answer, and siblings there that disagree
+// on a coded name, one of them giving none included, leave the alias with no
+// coded name, so those instances take the DV_TEXT name.
 //
 // The empty structures each node may get ([emptyStructure]) are indexed under
 // the bare path alone, the one the rebuild walk composes. Nodes at one bare
@@ -2263,6 +2471,7 @@ func (x *templateIndex) addRMType(path, rmType string) {
 func buildTemplateIndex(c *templatecompile.Compiled) *templateIndex {
 	x := &templateIndex{
 		names:      make(map[string]string),
+		codedNames: make(map[string]codedName),
 		rmTypes:    make(map[string]string),
 		structures: make(map[string][]emptyStructure),
 	}
@@ -2277,8 +2486,11 @@ func buildTemplateIndex(c *templatecompile.Compiled) *templateIndex {
 			path := n.AQLPath()
 			bare := bareAQLPath(path)
 			x.addRMType(path, n.RMTypeName())
+			coded := codedNameOf(n)
+			x.addCodedName(path, coded)
 			if bare != path {
 				x.addRMType(bare, n.RMTypeName())
+				x.addCodedName(bare, coded)
 			}
 			rubric, _ := tcimpl.TermItem(n, id, "text")
 			name := n.NodeName()
@@ -2463,11 +2675,11 @@ func rebuildEmptyStructures(compJSON map[string]any, tmpl *templateIndex) {
 			if _, has := node[s.attr]; has || (!s.required && !rmRequires(node, s.attr)) {
 				continue
 			}
-			if name := tmpl.name(s.path); name != "" {
+			if name := tmpl.nameJSON(s.path); name != nil {
 				node[s.attr] = map[string]any{
 					"_type":             s.rmType,
 					"archetype_node_id": s.nodeID,
-					"name":              textJSON(name),
+					"name":              name,
 				}
 			}
 		}

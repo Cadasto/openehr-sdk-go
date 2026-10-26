@@ -209,6 +209,15 @@ func TestREQ053EmptyStructureRebuildRules(t *testing.T) {
 			want:  emptyStructureJSON("ITEM_TREE", "at0010", "Protocol"),
 		},
 		{
+			name: "a required protocol whose name the template codes", path: protocol,
+			edits: []optEdit{withProtocol(optProtocol("1", tree(optAttribute("C_SINGLE_ATTRIBUTE", "name", "1", "", localCodes("", "at0010")))))},
+			want: map[string]any{
+				"_type":             "ITEM_TREE",
+				"archetype_node_id": "at0010",
+				"name":              codedNameJSON("Protocol", "at0010", "local"),
+			},
+		},
+		{
 			name: "event data the RM alone requires", path: eventData,
 			edits: []optEdit{replaceOnce(eventDataLower, "${1}0${2}")},
 			want:  emptyStructureJSON("ITEM_TREE", "at0003", "Tree"),
