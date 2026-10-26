@@ -292,7 +292,7 @@ This is a pre-existing emission gap, not a REQ-048 regression — REQ-048 only m
 
 ## STRAND-15 — Decode-time presence and unmatched-member capture on the generated types
 
-**Status:** Open. Opened 2026-10-13, after [PR 256](https://github.com/Cadasto/openehr-sdk-go/pull/256).
+**Status:** Partly resolved 2026-10-26: the presence question by [ADR 0033](../adr/0033-missing-members-reported-by-decoders.md), which puts the record beside the value, not on it: each codec reports the members a document leaves out ([wire.md § REQ-175](wire.md#req-175--missing-members-on-decode)) and the validators read that report ([clinical-modeling.md § REQ-112 *Value-typed mandatory presence*](clinical-modeling.md#value-typed-mandatory-presence)), so `ValidateRMEHRStatusBytes` is deprecated. The capture question, whether unmatched members are kept on the value for a lossless round trip, stays open, with the evidence below still to gather. Opened 2026-10-13, after [PR 256](https://github.com/Cadasto/openehr-sdk-go/pull/256).
 
 **Question:** do the generated RM types record, at decode, which by-value mandatory members the input left out, and the members the decoder matched to nothing? And when they capture unmatched members, are those kept on the value so a read, modify and write round trip is lossless, or discarded once reported?
 
@@ -319,7 +319,7 @@ This is a pre-existing emission gap, not a REQ-048 regression — REQ-048 only m
 
 ## STRAND-16 — Validator policy beyond the limits
 
-**Status:** Open. Opened 2026-10-13, after [PR 256](https://github.com/Cadasto/openehr-sdk-go/pull/256).
+**Status:** Partly resolved 2026-10-26: the presence question by [ADR 0033](../adr/0033-missing-members-reported-by-decoders.md), which puts the record beside the value, not on it: each codec reports the members a document leaves out ([wire.md § REQ-175](wire.md#req-175--missing-members-on-decode)) and the validators read that report ([clinical-modeling.md § REQ-112 *Value-typed mandatory presence*](clinical-modeling.md#value-typed-mandatory-presence)), so `ValidateRMEHRStatusBytes` is deprecated. The capture question, whether unmatched members are kept on the value for a lossless round trip, stays open, with the evidence below still to gather. Opened 2026-10-13, after [PR 256](https://github.com/Cadasto/openehr-sdk-go/pull/256).
 
 **Question:** which settings, beyond the depth and visit limits, does the validator of [REQ-171](clinical-modeling.md#req-171--validation-engine) take as options, and which stay outside the SDK as the caller's policy over a result?
 
@@ -357,5 +357,5 @@ Three candidates are named and none is built:
 | [STRAND-12](#strand-12--bmm-interface-classes-carry-no-is_abstract-flag) | BMM interface classes carry no `is_abstract` | Open | REQ-041, REQ-048 |
 | [STRAND-13](#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped) | Properties inherited from a primitive-mapped ancestor are dropped | Open | REQ-041, REQ-046, REQ-048 |
 | [STRAND-14](#strand-14--should-template-driven-validation-also-run-the-rm-floor-invariants) | Template-driven validation and the RM floor | **Resolved** ([ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md)) | REQ-102, REQ-112 |
-| [STRAND-15](#strand-15--decode-time-presence-and-unmatched-member-capture-on-the-generated-types) | Decode-time presence and unmatched-member capture | Open | REQ-040, REQ-052, REQ-112, REQ-170 |
+| [STRAND-15](#strand-15--decode-time-presence-and-unmatched-member-capture-on-the-generated-types) | Decode-time presence and unmatched-member capture | Partly resolved (presence: [ADR 0033](../adr/0033-missing-members-reported-by-decoders.md); capture open) | REQ-040, REQ-052, REQ-112, REQ-170, REQ-175 |
 | [STRAND-16](#strand-16--validator-policy-beyond-the-limits) | Validator policy beyond the limits | Open | REQ-102, REQ-171 |

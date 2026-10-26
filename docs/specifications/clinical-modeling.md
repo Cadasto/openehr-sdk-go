@@ -873,7 +873,7 @@ The SDK **MUST** expose a **template-less RM validation floor** beneath the OPT-
 
 ```go
 // Generic entry — any RM concrete in the v2 closed set.
-func ValidateRM(root any) Result
+func ValidateRM(root any, opts ...ValidateOption) Result
 
 // Typed convenience wrappers (delegate to ValidateRM):
 func ValidateRMFolder(folder *rm.Folder) Result
@@ -881,8 +881,19 @@ func ValidateRMEHRStatus(status *rm.EHRStatus) Result
 func ValidateRMEHRAccess(access *rm.EHRAccess) Result
 func ValidateRMDemographic(party rm.Party) Result   // PERSON / ORGANISATION / GROUP / AGENT / ROLE
 
-// Presence-aware EHR_STATUS entry (REQ-112) — decides value-typed
-// mandatory presence from JSON keys; see § Value-typed mandatory presence.
+// Decode-aware entries: decode a canonical document, read the members it
+// leaves out (wire.md § REQ-175) and validate in one call; a nil c applies
+// the RM rules alone. See § Value-typed mandatory presence.
+func ValidateJSON(data []byte, root any, c *templatecompile.Compiled) Result
+func ValidateXML(data []byte, root any, c *templatecompile.Compiled) Result
+
+// A decode's own report of missing members, handed to the value-based entries.
+type ValidateOption func(/* unexported */)
+func WithMissing(pointers []string) ValidateOption
+func ValidateRM(root any, opts ...ValidateOption) Result
+
+// Deprecated: ValidateJSON(data, new(rm.EHRStatus), nil) reads presence at
+// every level; this entry remains as that call.
 func ValidateRMEHRStatusBytes(data []byte) Result
 ```
 
@@ -963,19 +974,19 @@ These exclusions are by design: a CDR may layer template-driven validation on to
 
 ### Value-typed mandatory presence
 
-The required-set walk reads presence from the decoded Go value, as [§ REQ-171 *Structural access*](#req-171--validation-engine) says: an attribute held by value is absent when it holds its type's zero value, so an omitted DV_ORDINAL or DV_SCALE `symbol`, or an omitted REFERENCE_RANGE `range`, is reported as `required`. What the walk cannot detect is an omitted **value-typed** mandatory attribute whose zero value is itself a valid value. `EHR_STATUS.subject` is the case: typed `rm.PartySelf`, a value struct whose only field (`external_ref`) is optional, so an omitted subject and a valid bare `{"_type":"PARTY_SELF"}` decode to the identical zero value, and § REQ-171 *Structural access* reads it as always present. Interface-, pointer- and slice-typed mandatories (e.g. `name`, typed `rm.DVTextLike`) are unaffected, nil being a reliable absence signal, as are the value-level invariants, which inspect fields rather than presence.
+The required-set walk reads presence from the decoded Go value, as [§ REQ-171 *Structural access*](#structural-access) says: an attribute held by value is absent when it holds its type's zero value, so an omitted DV_ORDINAL or DV_SCALE `symbol`, or an omitted REFERENCE_RANGE `range`, is reported as `required`. What the walk cannot detect is an omitted **value-typed** mandatory attribute whose zero value is itself a valid value: a number or a boolean, such as `DV_QUANTITY.magnitude`, `DV_COUNT.magnitude`, `DV_BOOLEAN.value` or `DV_PROPORTION.denominator`, and a value struct, such as `EHR_STATUS.subject` (typed `rm.PartySelf`, whose only field is optional, so an omitted subject and a valid bare `{"_type":"PARTY_SELF"}` decode to the identical zero value) and an ARCHETYPED's `archetype_id` and `rm_version`. Interface-, pointer- and slice-typed mandatories are unaffected, nil being a reliable absence signal, as are the value-level invariants, which inspect fields rather than presence.
 
-The floor closes this by deciding presence from the **source JSON key set** rather than the Go zero value:
+The floor closes this by reading what the decode found missing, which the codecs report as [wire.md § REQ-175](wire.md#req-175--missing-members-on-decode) defines: every RM-mandatory member a document leaves out or sends as `null` (canonical JSON) or as `xsi:nil` or an empty primitive element (canonical XML), each identified by its JSON Pointer in the canonical-JSON form of the instance, in both formats ([ADR 0033](../adr/0033-missing-members-reported-by-decoders.md)).
 
-```go
-func ValidateRMEHRStatusBytes(data []byte) Result
-```
+- Every value-based entry, `ValidateRM`, `Validate` and `Validator.Validate`, **MUST** accept such a report through `WithMissing`, a trailing option, so a caller that decodes with a codec's report option hands the pointers on and validates once; the typed sugars take none and are for a value with no report. A nil option, an empty list and a repeated option are read as the union of what was given.
+- `ValidateJSON` and `ValidateXML`, and their `Validator` methods, **MUST** decode `data` into `root`, a non-nil pointer to one registered RM value, read the document's missing members, and validate `root` with that report in one call, returning what `Validator.Validate(root, c, WithMissing(…))` returns: with a nil `c` the RM rules alone, with a compiled template the template rules too ([§ REQ-102](#req-102--composition-validation)), under the entry's own limits. The decode is the codec's default decode: unmatched content is ignored ([wire.md § REQ-170](wire.md#req-170--unmatched-content-on-decode)), and `root` holds the decoded value afterwards, so a caller that wants the value and the result decodes once.
+- A reported member **MUST** be read as absent at the node its pointer names, whatever the Go value holds there, inside the one walk ([§ REQ-171 *One walk*](#one-walk)): the walk reports it as it reports any absent attribute, the template's `required` where the template requires it and the RM's `required` with the rule `mandatory` otherwise ([§ REQ-171 *Finding identity*](#finding-identity)), does not enter it and runs no other rule on it, so its path carries that one finding, a walk condition excepted. An absent `rm_version` is therefore `required` at `…/archetype_details/rm_version`, not `rm_version_valid`, and an absent `archetype_id` is `required` at `…/archetype_details/archetype_id` alone, with nothing at `…/archetype_id/value`. Presence is read at every level, a nested ARCHETYPED and a data value deep in a COMPOSITION included; the root is no exception.
+- A pointer that names no attribute the walk visits draws no finding: a node the template refused, a node past a limit, which `Coverage.Stopped` lists, a node the walk does not enter. The walk reports what it visits. A pointer into a value held by a `Hash` is matched by the entry's key, and one into a list by the item's position.
+- A value built in Go has no report, so a by-value mandatory member left unset there reads as present, as today; only a decode can say what a document said. The typed wrappers and `ValidateRM` without the option keep that blind spot, which their godoc names.
+- On `ValidateJSON` and `ValidateXML`, input that does not decode into `root`, malformed input, a canonical-JSON document whose root is not an object, a canonical-XML document with content before or after its root element or a root that fails its decode, **MUST** surface a single `invalid_shape` at `/` and a not-OK `Result`, with the decode error, whose text may quote the input, in the issue's `Value` and not in its `Detail` ([§ REQ-168](#req-168--value-free-validation-diagnostics)); JSON `null` raises no decode error, so its issue's `Value` is empty. A nil `root`, or one that is no registered RM value, draws the entry's `nil_root` or `rm_type_unknown` guard, as `ValidateRM` does.
+- `ValidateRMEHRStatusBytes(data)` is kept as `ValidateJSON(data, new(rm.EHRStatus), nil)` and is deprecated: an omitted or `null` `subject` is `required` at `/subject`, a supplied subject, even the bare form, **MUST NOT** draw a `required`, and its former root-only scope is gone, since presence is now read at every level.
 
-`ValidateRMEHRStatusBytes` decodes the EHR_STATUS, runs the value-based `ValidateRMEHRStatus` floor, and **MUST** additionally report `required` at `/subject` when the top-level `subject` key is absent from `data`, or present but JSON `null`, which does not satisfy the mandatory attribute and decodes to the same zero `PartySelf`. A supplied subject, even the bare form, **MUST NOT** draw a `required`, and a non-object or undecodable input **MUST** surface a single `invalid_shape` at `/`. The value-based `ValidateRMEHRStatus(*rm.EHRStatus)` remains, with the value-typed-subject blind spot its godoc names.
-
-`ValidateRMEHRStatusBytes` also decides the root EHR_STATUS's ARCHETYPED key presence, at the root node only, matching its existing `subject` scope. When `archetype_details` is present and not `null`, the entry **MUST** report `required` at `/archetype_details/archetype_id` for an absent or `null` `archetype_id` key, and `required` at `/archetype_details/rm_version` for an absent or `null` `rm_version` key. A key-absence finding sits at the attribute path and replaces the value walk's findings at that same path ([§ REQ-171](#req-171--validation-engine) *One finding per defect*), except a walk condition (`max_depth`, `max_nodes`, `cyclic_value`), which stays so that the issues and `Coverage.Stopped` agree; apart from a walk condition a consumer sees one finding per path: an absent `rm_version` reports `required` at `/archetype_details/rm_version`, not the value walk's `rm_version_valid`, while an absent `archetype_id` reports `required` at `/archetype_details/archetype_id` beside the value walk's `required` at the deeper `…/archetype_id/value`. Presence tracking stops at the root node: the entry tracks no key presence on a nested `archetype_details`.
-
-- **Probes:** PROBE-077 (every invariant the inventory classifies as evaluated, on every registered class subject to it, with a breaking and a conforming value); PROBE-081 (value-typed mandatory presence: EHR_STATUS `subject` and the root ARCHETYPED keys).
+- **Probes:** PROBE-077 (every invariant the inventory classifies as evaluated, on every registered class subject to it, with a breaking and a conforming value); PROBE-081 (the EHR_STATUS root: `subject` and the ARCHETYPED keys); PROBE-110 (missing members at every level, in both canonical formats, and the validators' one answer).
 
 ---
 
@@ -1076,8 +1087,13 @@ Template-driven validation ([§ REQ-102](#req-102--composition-validation)) and 
 type Validator struct { /* unexported */ }
 func New(opts ...Option) *Validator
 
-// c == nil: the RM rules alone, which is what ValidateRM returns.
-func (v *Validator) Validate(root any, c *templatecompile.Compiled) Result
+// c == nil: the RM rules alone, which is what ValidateRM returns. opts
+// carries a decode's report of missing members (§ REQ-112 Value-typed
+// mandatory presence); the decode-aware entries ValidateJSON and
+// ValidateXML, and their Validator methods, decode and validate in one call.
+func (v *Validator) Validate(root any, c *templatecompile.Compiled, opts ...ValidateOption) Result
+func (v *Validator) ValidateJSON(data []byte, root any, c *templatecompile.Compiled) Result
+func (v *Validator) ValidateXML(data []byte, root any, c *templatecompile.Compiled) Result
 
 type Limits struct {
     Depth int // nesting depth at which the walk stops descending; 256 by default
@@ -1088,7 +1104,7 @@ func WithLimits(l Limits) Option
 
 - `New` **MUST** take functional options ([idiom.md § Functional options](idiom.md#functional-options)), ignore a nil `Option`, and read a `Limits` field that is zero or negative as its default, so no option disables a limit; the limits are the first options, and a later setting is added as an option, never as a parameter.
 - The zero `Validator` and a nil `*Validator` **MUST** behave as one built with no options.
-- The value **MUST** hold no per-call state after `New`, so one instance serves every goroutine of a server ([idiom.md § Concurrency](idiom.md#concurrency-req-026)); the compiled template is built once per template and shared.
+- The value **MUST** hold no per-call state after `New`, so one instance serves every goroutine of a server ([idiom.md § Concurrency](idiom.md#concurrency-req-026)); the compiled template is built once per template and shared. What belongs to one call, a decode's report of missing members, travels as a trailing `ValidateOption` of the call, never as a setting of the value.
 - `Validate` **MUST** accept any RM value the registry knows ([rm-modeling.md § REQ-040](rm-modeling.md#type-registry-req-040)) and, given a nil `c`, apply the RM rules alone, so a root that binds to no template is validated by the same walk.
 - The package-level entry points of § REQ-102 and § REQ-112 **MUST** behave as a `Validator` built with no options, keeping their nil guards: `Validate(root, nil)` still reports `nil_template`, and `ValidateRM` is the package-level entry for the RM rules alone, returning for a root the issues `Validate(root, nil)` on a `Validator` returns.
 
@@ -1113,7 +1129,7 @@ At each attribute, in this order:
 - a part of a value a primitive constraint binds that the RM rules report as absent or empty (§ REQ-102 *Primitive constraints*), by the RM rules, unless the walk stops at the depth limit or the visit limit before they report it, when the constraint judges the part as it judges any value;
 - an empty CODE_PHRASE `code_string` and an empty temporal `value`, by the required-set walk's `required` (§ REQ-112 *Per-RM-type invariant catalogue*).
 
-On `ValidateRMEHRStatusBytes`, a root key that is absent or `null` is reported by the key-absence finding, which replaces the value walk's findings at its path, a walk condition excepted (§ REQ-112 *Value-typed mandatory presence*).
+A member a decode reports missing (§ REQ-112 *Value-typed mandatory presence*) is read as absent at its path, so it is reported by the absent-attribute finding alone, the template's or the RM's, and nothing is reported below it.
 
 An RM rule's own finding at the same path, such as a code outside its terminology group, is a second defect, reported beside the first.
 
@@ -1165,7 +1181,7 @@ The RM rules the validators apply are the *evaluated* entries together with the 
 
 The validators read a node's attributes through access the generator emits for every concrete RM class the registry knows: for each attribute its name, declared RM type, whether it is a container, whether it is present, and its value, by plain field access ([idiom.md § Generics and reflection](idiom.md#generics-and-reflection), [ADR 0028](../adr/0028-generated-rm-attribute-access.md)). No registered class is a leaf for want of a reader: the walk **MUST** go below every present attribute of every registered class, the entries of a hash included, in ascending key order, and report an RM-mandatory attribute absent on any of them, unless no serialization carries it, the set [§ REQ-112 *Driver*](#driver) leaves out.
 
-Whether an attribute is present **MUST** be decided from its declared type and the Go value alone, as follows. A pointer is present when it is not nil; an interface when it holds a value that is not a nil pointer; a string when it is not empty; a number or a boolean always; a list or a hash when it is not nil, and it is empty when it is present and holds no item or entry. A value held by value is present when it is not its type's zero value, an interface field holding a nil pointer counting as zero. At an attribute the RM marks mandatory, three types are also empty when their content is missing: a DV_TEXT whose `value` is empty, whether held directly or through an interface; a DV_CODED_TEXT with an empty `value` and an empty defining code; a CODE_PHRASE with an empty `code_string` and an empty terminology. At an optional attribute such a value is present, so the walk enters it and reports what it lacks; an object reference held by value is likewise present unless it is the zero value, so § REQ-112's reference entry reports each missing part at its own path. Three readings are fixed by § REQ-112: an interval bound is absent only when its side is marked unbounded and the bound is empty ([*Driver*](#driver)); EHR_STATUS `subject` is always present ([*Value-typed mandatory presence*](#value-typed-mandatory-presence)); and ARCHETYPED `archetype_id` and `rm_version` are always present, their emptiness being the *ARCHETYPED* entry's to report.
+Whether an attribute is present **MUST** be decided from its declared type and the Go value alone, as follows. A pointer is present when it is not nil; an interface when it holds a value that is not a nil pointer; a string when it is not empty; a number or a boolean always; a list or a hash when it is not nil, and it is empty when it is present and holds no item or entry. A value held by value is present when it is not its type's zero value, an interface field holding a nil pointer counting as zero. At an attribute the RM marks mandatory, three types are also empty when their content is missing: a DV_TEXT whose `value` is empty, whether held directly or through an interface; a DV_CODED_TEXT with an empty `value` and an empty defining code; a CODE_PHRASE with an empty `code_string` and an empty terminology. At an optional attribute such a value is present, so the walk enters it and reports what it lacks; an object reference held by value is likewise present unless it is the zero value, so § REQ-112's reference entry reports each missing part at its own path. Three readings are fixed by § REQ-112: an interval bound is absent only when its side is marked unbounded and the bound is empty ([*Driver*](#driver)); EHR_STATUS `subject` is always present from the Go value; and ARCHETYPED `archetype_id` and `rm_version` are always present from the Go value, their emptiness being the *ARCHETYPED* entry's to report. A decode's report of missing members overrides the Go value's reading at each member it names ([*Value-typed mandatory presence*](#value-typed-mandatory-presence)).
 
 ### Coverage
 
@@ -1189,7 +1205,7 @@ func (c Coverage) Complete() bool // Stopped and External are both empty
 
 ### Out of scope
 
-- Validation during the decode, presence recorded by a decoder, and unmatched members captured on the value: [STRAND-15](research-strands.md#strand-15--decode-time-presence-and-unmatched-member-capture-on-the-generated-types), which gets its own requirement once resolved.
+- Validation during the decode, and unmatched members captured on the value: [STRAND-15](research-strands.md#strand-15--decode-time-presence-and-unmatched-member-capture-on-the-generated-types). Its presence question is resolved by [ADR 0033](../adr/0033-missing-members-reported-by-decoders.md): a decode reports the members a document leaves out ([wire.md § REQ-175](wire.md#req-175--missing-members-on-decode)) and the engine reads that report (§ REQ-112 *Value-typed mandatory presence*); the capture question stays open.
 - Policy beyond the limits: descent under refused content, a severity policy per rule, a partial-instance mode: [STRAND-16](research-strands.md#strand-16--validator-policy-beyond-the-limits).
 - An external terminology service behind the seam; rendering an issue path as a Web Template id or a FLAT key; the interval representation.
 

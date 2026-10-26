@@ -1713,7 +1713,9 @@ requirements:
       - internal/rmaccess
       - openehr/internal/rmnames
       - internal/rmroots
-    probes: [PROBE-077, PROBE-081]
+      - internal/rmjsonwalk
+      - openehr/internal/xmlunmatched
+    probes: [PROBE-077, PROBE-081, PROBE-110]
     tests:
       - internal/bmmgen/container_bounds_test.go
       - internal/bmmgen/render_rminfo_functions_test.go
@@ -2484,3 +2486,11 @@ requirements:
       - testkit/probes/versioned/probe_092_contribution_get.go
       - testkit/probes/versioned/probe_109_versioned_object_reads.go
       - testkit/probes/versioned/probes_test.go
+
+  - id: REQ-175
+    title: Missing members on decode
+    canonical: docs/specifications/wire.md#req-175--missing-members-on-decode
+    status: draft
+    implementation: planned
+    packages: [openehr/serialize/canjson, openehr/serialize/canxml, internal/rmjsonwalk, openehr/internal/xmlunmatched, internal/bmmgen, openehr/rm, openehr/aom/aom14, openehr/validation]
+    probes: [PROBE-110, PROBE-081]
