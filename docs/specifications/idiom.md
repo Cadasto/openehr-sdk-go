@@ -40,7 +40,7 @@ All outgoing network I/O **MUST** go through the `*http.Client` the caller injec
 
 ```go
 // Explicit injection
-client, err := ehr.New(catalog,
+client, err := transport.New(catalog,
     transport.WithHTTPClient(httpClient),
     transport.WithTokenSource(ts),
 )
@@ -77,12 +77,12 @@ These conventions shape the public surface and the library code behind it. They 
 SDK constructors take their configuration as functional options:
 
 ```go
-client, err := ehr.New(catalog,
+client, err := transport.New(catalog,
     transport.WithHTTPClient(httpClient),
     transport.WithTokenSource(ts),
     transport.WithSpecVersion("1.1.0"),
     transport.WithUserAgent("my-app/1.0"),
-    transport.WithRetry(retry.Policy{...}),
+    transport.WithRetry(transport.RetryPolicy{...}),
 )
 ```
 
@@ -95,7 +95,7 @@ The SDK does not use:
 
 - Setter methods after construction (`client.SetHTTPClient(...)`) — mutable after construction implies a hidden lock or a data race.
 - Builder-pattern intermediate types (`ehr.NewBuilder().WithX(...).Build()`) — verbose and harder to compose than functional options.
-- The "options bag" pattern (`ehr.New(catalog, ehr.Options{HTTPClient: ..., TokenSource: ...})`) — a second configuration style beside functional options. A keyed literal keeps compiling when a field is added, and [module-layout.md § Versioning](module-layout.md#versioning) does not class that as a breaking change.
+- The "options bag" pattern (`transport.New(catalog, transport.Options{HTTPClient: ..., TokenSource: ...})`) — a second configuration style beside functional options. A keyed literal keeps compiling when a field is added, and [module-layout.md § Versioning](module-layout.md#versioning) does not class that as a breaking change.
 
 ### Surface shape
 

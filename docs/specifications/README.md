@@ -102,7 +102,7 @@ Identifiers are stable once published — they are referenced from outside the f
 | [REQ.md](REQ.md) | Requirement registry (generated index) — links to canonical topic specs |
 | [traceability.yaml](traceability.yaml) | Machine-readable REQ → package / probe / test map |
 | [../.sdd.yaml](../.sdd.yaml) | SDD project descriptor — identifier style, document paths, `make` targets (read by `sdd-*` skills) |
-| [../development-process.md](../development-process.md) | The two lanes, the delivery ladder, the superpowers boundary |
+| [../development-process.md](../development-process.md) | The two lanes, the delivery ladder, the superpowers boundary, the conformance probe harness ([§ Conformance probes](../development-process.md#conformance-probes)) |
 | [packaging.md](packaging.md) | Module path, semantic versioning and the internal boundary (REQ-001, REQ-004, REQ-005) |
 | [transport.md](transport.md) | Transport layer — OTel hooks, retry, TLS posture, error-envelope mapping, `Prefer` negotiation, the request observer, path-segment validation, typed 2xx failures, bearer challenges |
 | [glossary.md](glossary.md) | openEHR, SMART, Cadasto, and SDK-internal terms |
