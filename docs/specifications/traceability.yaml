@@ -621,10 +621,12 @@ requirements:
     probes: [PROBE-033, PROBE-034, PROBE-105]
     tests:
       - internal/bmmgen/render_interval_bound_test.go
+      - internal/bmmgen/render_xmlmar_order_test.go
       - internal/rmaccess/interval_test.go
       - openehr/aom/aom14/interval_open_side_test.go
       - openehr/rm/character_text_test.go
       - openehr/rm/interval_bound_test.go
+      - openehr/serialize/canxml/child_order_test.go
       - openehr/serialize/canxml/crossformat_test.go
       - openehr/serialize/canxml/decode_test.go
       - openehr/serialize/canxml/interval_flag_defaults_test.go
