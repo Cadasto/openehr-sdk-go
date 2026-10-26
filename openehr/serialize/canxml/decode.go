@@ -52,26 +52,34 @@ func (c decoderConfig) tracked() bool {
 // decodes as, other than namespace declarations and attributes in the XML
 // Schema instance namespace (`xsi:type`, `xsi:schemaLocation`, `xsi:nil`,
 // …); an element in a namespace other than the openEHR one (see
-// [ErrNamespace]), the root element aside; and an element whose content this codec does not model:
-// a `Hash` member, a BMM `Any` member (the AOM 1.4 `assumed_value` and
-// `EXPR_LEAF.item`), and a member whose Go type has no decoder of its own
-// (see the package documentation). A bare `type` attribute is unmatched
-// except where dispatch reads it as the discriminator. It applies at any
-// depth: inside a polymorphic slot, an interval bound, a primitive element or
-// an AOM 1.4 value too.
+// [ErrNamespace]), the root element aside; text other than XML whitespace
+// directly inside an element whose content is elements, such as an RM
+// object's, a CDATA section included; and an element whose content this
+// codec does not model: a `Hash` member, a BMM `Any` member (the AOM 1.4
+// `assumed_value` and `EXPR_LEAF.item`), and a member whose Go type has no
+// decoder of its own (see the package documentation). A bare `type`
+// attribute is unmatched except where dispatch reads it as the
+// discriminator. It applies at any depth: inside a polymorphic slot, an
+// interval bound, a primitive element or an AOM 1.4 value too. The text of
+// a primitive element, such as `magnitude`, is its value and is read, and
+// XML whitespace (spaces, tabs, carriage returns and line feeds) between
+// elements is never unmatched, so an indented document decodes as a compact
+// one does.
 //
 // By default the decoder ignores unmatched content: the value it returns
 // holds the rest of the input and none of it. With this option fn receives
 // each item, once, in the order it appears in the input, and the value
 // returned is the same as without the option. An unmatched element is one
-// item, whatever it holds.
+// item, whatever it holds, and the text of an element is one item, however
+// many runs of text it holds.
 //
 // fn gets the item's path from the root of the value: one `/name[n]` segment
 // per element, where name is the element's local name and n its position
 // among the earlier siblings of the same name plus one, counting from 1; an
-// attribute adds a last `/@name` segment. For example
-// "/composition[1]/content[2]/x-note[1]" or "/composition[1]/@x-flag". The
-// path carries names only, never a value from the input. fn runs during the
+// attribute adds a last `/@name` segment, and text a last `/text()` segment.
+// For example "/composition[1]/content[2]/x-note[1]",
+// "/composition[1]/@x-flag" or "/ehr_status[1]/subject[1]/text()". The path
+// carries names only, never a value from the input. fn runs during the
 // decode, on the caller's goroutine.
 //
 // A nil fn is the same as leaving the option out. Combined with
@@ -82,9 +90,10 @@ func WithUnmatched(fn func(path string)) DecoderOption {
 }
 
 // WithStrict refuses the decode at its first unmatched item (see
-// [WithUnmatched] for what is unmatched and for the form of its path). The
-// error wraps [ErrUnknownElement] and names the item's path from the root of
-// the value; it carries none of the item's value. An element in a foreign
+// [WithUnmatched] for what is unmatched, text in an element whose content is
+// elements among it, and for the form of its path). The error wraps
+// [ErrUnknownElement] and names the item's path from the root of the value;
+// it carries none of the item's value or text. An element in a foreign
 // namespace also wraps [ErrNamespace]. The value v points to is unspecified
 // after the refusal.
 //

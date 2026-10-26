@@ -173,3 +173,65 @@ func TestREQ170_RefusalMessage(t *testing.T) {
 		t.Errorf("Error() = %q; want the quoted path", foreign.Error())
 	}
 }
+
+// elementsOnly is a decode target whose content is elements, read as a
+// generated decoder reads it: each child element decodes into another
+// elementsOnly, and the text between them goes to CheckUnmatchedText.
+type elementsOnly struct{}
+
+func (*elementsOnly) UnmarshalXML(dec *xml.Decoder, _ xml.StartElement) error {
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			return err
+		}
+		switch tk := tok.(type) {
+		case xml.StartElement:
+			if err := dec.DecodeElement(new(elementsOnly), &tk); err != nil {
+				return err
+			}
+		case xml.CharData:
+			if err := CheckUnmatchedText(dec, tk); err != nil {
+				return err
+			}
+		case xml.EndElement:
+			return nil
+		}
+	}
+}
+
+// TestREQ170_TextInElementContent pins the tracker's rule for text in an
+// element whose content is elements: text other than XML whitespace is one
+// item per element, at the element's path with a last `/text()` segment,
+// however many runs it holds, a CDATA section among them; a later element
+// whose frame reuses the slot of one already reported starts afresh; XML
+// whitespace never counts; strict refuses the first item without its text;
+// and an untracked decode does nothing.
+func TestREQ170_TextInElementContent(t *testing.T) {
+	const doc = "<r>t1<x>t2</x>t3<x> \t\r\n</x><x>t4<y>t5</y>t6<![CDATA[t7]]></x><![CDATA[t8]]></r>"
+	var got []string
+	tr := NewTracker(func(p string) { got = append(got, p) }, false)
+	if err := tr.Decode(tr.NewDecoder(strings.NewReader(doc)), new(elementsOnly)); err != nil {
+		t.Fatalf("Decode(reporting) = %v; want nil", err)
+	}
+	want := []string{"/r[1]/text()", "/r[1]/x[1]/text()", "/r[1]/x[3]/text()", "/r[1]/x[3]/y[1]/text()"}
+	if !slices.Equal(got, want) {
+		t.Errorf("reported %q; want %q", got, want)
+	}
+
+	tr = NewTracker(nil, true)
+	err := tr.Decode(tr.NewDecoder(strings.NewReader(doc)), new(elementsOnly))
+	if !errors.Is(err, ErrUnknownElement) || errors.Is(err, ErrNamespace) {
+		t.Fatalf("Decode(strict) = %v; want a refusal wrapping ErrUnknownElement only", err)
+	}
+	if msg := err.Error(); !strings.Contains(msg, `"/r[1]/text()"`) || strings.Contains(msg, "t1") {
+		t.Errorf("Decode(strict) = %q; want the quoted path /r[1]/text() and not the text", msg)
+	}
+
+	if err := xml.NewDecoder(strings.NewReader(doc)).Decode(new(elementsOnly)); err != nil {
+		t.Errorf("untracked Decode = %v; want nil", err)
+	}
+	if err := CheckUnmatchedText(xml.NewDecoder(strings.NewReader(doc)), xml.CharData("t1")); err != nil {
+		t.Errorf("CheckUnmatchedText(untracked decoder) = %v; want nil", err)
+	}
+}

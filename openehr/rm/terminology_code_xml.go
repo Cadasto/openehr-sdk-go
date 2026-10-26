@@ -57,9 +57,9 @@ func (t *TerminologyCode) MarshalXML(e *xml.Encoder, start xml.StartElement) err
 // `terminology_id` in both spellings: the CODE_PHRASE one of the AOM 1.4
 // ITS-XML schema, with the identifier in a `value` child, and the plain text
 // one that mirrors the canonical-JSON string. `code_string`,
-// `terminology_version` and `uri` are text. Content it does not read is
-// unmatched: skipped, or reported or refused under canxml.WithUnmatched and
-// canxml.WithStrict.
+// `terminology_version` and `uri` are text. Content it does not read, text
+// between its child elements among it, is unmatched: skipped, or reported or
+// refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TerminologyCode) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error {
 	if err := xmlunmatched.CheckUnmatchedAttrs(dec, start); err != nil {
 		return err
@@ -96,6 +96,10 @@ func (t *TerminologyCode) UnmarshalXML(dec *xml.Decoder, start xml.StartElement)
 				if err := xmlunmatched.SkipUnmatched(dec, tk); err != nil {
 					return err
 				}
+			}
+		case xml.CharData:
+			if err := xmlunmatched.CheckUnmatchedText(dec, tk); err != nil {
+				return err
 			}
 		case xml.EndElement:
 			return nil

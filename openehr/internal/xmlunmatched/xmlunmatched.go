@@ -10,7 +10,9 @@
 // Schema instance namespace (`xsi:type`, `xsi:schemaLocation`, `xsi:nil`, …);
 // an element in a namespace other than the openEHR one; and an element whose
 // content the codec does not model: a `Hash` member, a BMM `Any` member, and
-// a member whose Go type has no decoder of its own. By default the decode
+// a member whose Go type has no decoder of its own. So is text other than
+// XML whitespace directly inside an element whose content is elements, one
+// item per element however many runs of text it holds. By default the decode
 // skips it. A caller can instead track it: report each item, in document
 // order, by its path, and optionally refuse the first one.
 //
@@ -32,15 +34,16 @@
 //   - The generated decoders call the helpers of this package where content
 //     goes unread: [CheckUnmatchedAttrs] on entry, [LocalName] for the name
 //     they switch on, [SkipUnmatched] in the arm for an element they do not
-//     read, [DecodeElement] for an element decoded as text, [DecodeBase64]
-//     for an Octet list, and [DecodeParam] for a member typed by an open
-//     generic parameter. canxml
-//     calls [DiscriminatorRead] where its dispatch reads a bare `type`. Each
-//     helper looks the decoder up; an untracked decode finds nothing and
-//     behaves as encoding/xml does.
+//     read, [CheckUnmatchedText] for text between the elements they read,
+//     [DecodeElement] for an element decoded as text, [DecodeBase64] for an
+//     Octet list, and [DecodeParam] for a member typed by an open generic
+//     parameter. canxml calls [DiscriminatorRead] where its dispatch reads a
+//     bare `type`. Each helper looks the decoder up; an untracked decode
+//     finds nothing and behaves as encoding/xml does.
 package xmlunmatched
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/xml"
 	"errors"
@@ -90,8 +93,9 @@ type Tracker struct {
 
 // frame is one open element: its local name, its 1-based position among its
 // earlier siblings of the same name plus one, the children it has opened so
-// far, counted by local name, and whether dispatch read its bare `type`
-// attribute as the discriminator.
+// far, counted by local name, whether dispatch read its bare `type`
+// attribute as the discriminator, and whether its text was found unmatched
+// already.
 //
 // The child counts sit in a short slice while the element has opened children
 // of few names, which is the canonical shape and costs no map. Once it opens
@@ -104,6 +108,7 @@ type frame struct {
 	children      []nameCount
 	byName        map[string]int // nil until the slice outgrows linearChildNames
 	discriminator bool
+	text          bool
 }
 
 // linearChildNames is the number of distinct child names a frame counts in its
@@ -117,7 +122,7 @@ const linearChildNames = 8
 // element is dropped rather than cleared, so a later narrow element never pays
 // for it.
 func (f *frame) open(local string, pos int) {
-	f.name, f.pos, f.children, f.byName, f.discriminator = local, pos, f.children[:0], nil, false
+	f.name, f.pos, f.children, f.byName, f.discriminator, f.text = local, pos, f.children[:0], nil, false, false
 }
 
 // nameCount is how many children of one local name an element has opened.
@@ -259,6 +264,26 @@ func (t *Tracker) attrs(attrs []xml.Attr, known []string) error {
 		}
 	}
 	return nil
+}
+
+// text applies the policy to text the decoder read directly inside the
+// innermost open element, whose content is elements: unless it is XML
+// whitespace, it is unmatched, at the element's path with a last `/text()`
+// segment. An element is one item however many runs of text it holds, so
+// only its first unmatched run counts.
+func (t *Tracker) text(text []byte) error {
+	f := &t.open[len(t.open)-1]
+	if f.text || isXMLSpace(text) {
+		return nil
+	}
+	f.text = true
+	return t.unmatched(t.path()+"/text()", false)
+}
+
+// isXMLSpace reports whether text holds XML whitespace only: spaces, tabs,
+// carriage returns and line feeds.
+func isXMLSpace(text []byte) bool {
+	return len(bytes.TrimLeft(text, " \t\r\n")) == 0
 }
 
 // decodeText decodes the element start opens, whose content is text, into v.
@@ -499,6 +524,27 @@ func CheckUnmatchedAttrs(dec *xml.Decoder, start xml.StartElement, known ...stri
 		return nil
 	}
 	return t.attrs(start.Attr, known)
+}
+
+// CheckUnmatchedText applies the decode's policy for unmatched content to
+// text, a run of character data the generated decoder read directly inside
+// the element it decodes, whose content is elements. A CDATA section is such
+// a run too: encoding/xml reports it as character data. dec must be the
+// decoder the text was read from, with no child element of that element open.
+//
+// By default it does nothing, and costs no more than finding the decode
+// untracked. Text that is XML whitespace only (spaces, tabs, carriage returns
+// and line feeds) is never unmatched. A tracked decode reports any other text
+// as one item per element, at the element's path with a last `/text()`
+// segment, however many runs the element holds, and a strict one refuses it
+// with an error that wraps [ErrUnknownElement]. The path never carries the
+// text.
+func CheckUnmatchedText(dec *xml.Decoder, text xml.CharData) error {
+	t := trackerOf(dec)
+	if t == nil {
+		return nil
+	}
+	return t.text(text)
 }
 
 // DecodeElement decodes the element start opens into v, as

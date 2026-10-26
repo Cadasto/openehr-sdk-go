@@ -97,8 +97,12 @@
 //
 // Content the decode does not read is unmatched: an element or attribute
 // that names no attribute of the RM type its element decodes as; an
-// element in a namespace other than the openEHR one ([ErrNamespace]); and
-// the element of a `Hash` member or of a BMM `Any` member (see below).
+// element in a namespace other than the openEHR one ([ErrNamespace]); text
+// other than XML whitespace directly inside an element whose content is
+// elements, such as an RM object's, a CDATA section included; and the
+// element of a `Hash` member or of a BMM `Any` member (see below). The text
+// of a primitive element is its value, and whitespace between elements is
+// never unmatched, so an indented document decodes as a compact one does.
 // Two kinds of attribute are never unmatched: a namespace declaration,
 // and an attribute in the XML Schema instance namespace, whether the
 // `xsi:type` discriminator, `xsi:schemaLocation`, `xsi:nil` or another.
@@ -115,9 +119,10 @@
 // By default the decoder ignores unmatched content: the value holds the
 // rest of the input and none of it. [WithUnmatched] passes each item, in
 // document order, to a caller function as its path from the root of the
-// value, such as "/composition[1]/content[2]/x-note[1]" or
-// "/composition[1]/@x-flag"; the path names the item and carries none of
-// its value. [WithStrict] refuses the decode at the first item with an
+// value, such as "/composition[1]/content[2]/x-note[1]",
+// "/composition[1]/@x-flag" or "/ehr_status[1]/subject[1]/text()", the last
+// naming the text of an element, one item however many runs of text it
+// holds; the path names the item and carries none of its value. [WithStrict] refuses the decode at the first item with an
 // error wrapping [ErrUnknownElement] (and [ErrNamespace] for a foreign
 // element). Strict never refuses an absent element.
 //

@@ -14,9 +14,10 @@ import (
 // decoder hands the content it does not read to the xmlunmatched helpers that
 // apply the decode's policy (REQ-170): the start element's attributes on
 // entry, an element in a foreign namespace through the name it switches on,
-// every other element it does not read through its default arm, a Hash
-// element and the element of an Any member through their own arms, and a
-// primitive element through xmlunmatched.DecodeElement.
+// every other element it does not read through its default arm, the text
+// between its child elements through its character-data arm, a Hash element
+// and the element of an Any member through their own arms, and a primitive
+// element through xmlunmatched.DecodeElement.
 //
 // An arm may hand an element to the decoder's own DecodeElement only when the
 // member's class is one of those the two targets render a decoder for, which
@@ -33,6 +34,7 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 		attrs        = "\tif _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start"
 		switchOnName = "\t\t\tswitch xmlunmatched.LocalName(_t.Name) {\n"
 		defaultArm   = "\t\t\tdefault:\n\t\t\t\tif _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {\n"
+		textArm      = "\t\tcase xml.CharData:\n\t\t\tif _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {\n"
 	)
 	plans := map[string]*Plan{}
 	withDecoder := map[string]bool{}
@@ -73,7 +75,7 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 				if err != nil {
 					t.Fatalf("renderUnmarshalXML(%s): %v", pc.BMMName, err)
 				}
-				for _, want := range []string{attrs, switchOnName, defaultArm} {
+				for _, want := range []string{attrs, switchOnName, defaultArm, textArm} {
 					if !strings.Contains(src, want) {
 						t.Errorf("%s XML decoder lacks %q:\n%s", pc.BMMName, want, src)
 					}

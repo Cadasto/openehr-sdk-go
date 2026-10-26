@@ -84,6 +84,10 @@ func (i *Interval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					return _err
 				}
 			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
+			}
 		case xml.EndElement:
 			if _err := _seen.settle(intervalBoundHeldByValue(&i.Lower), &i.LowerIncluded, &i.LowerUnbounded, &i.UpperIncluded, &i.UpperUnbounded); _err != nil {
 				return fmt.Errorf("%w: Interval: %w", canxml.ErrInvalidShape, _err)
@@ -158,6 +162,10 @@ func (p *PointInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 					return _err
 				}
 			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
+			}
 		case xml.EndElement:
 			if _err := _seen.settle(intervalBoundHeldByValue(&p.Lower), &p.LowerIncluded, &p.LowerUnbounded, &p.UpperIncluded, &p.UpperUnbounded); _err != nil {
 				return fmt.Errorf("%w: Point_interval: %w", canxml.ErrInvalidShape, _err)
@@ -231,6 +239,10 @@ func (p *ProperInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
+			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
 			}
 		case xml.EndElement:
 			if _err := _seen.settle(intervalBoundHeldByValue(&p.Lower), &p.LowerIncluded, &p.LowerUnbounded, &p.UpperIncluded, &p.UpperUnbounded); _err != nil {
