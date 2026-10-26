@@ -434,6 +434,7 @@ requirements:
       - openehr/instance/instance_test.go
       - openehr/instance/polymorphic_roundtrip_test.go
       - openehr/internal/refused/refused_test.go
+      - openehr/internal/xmlunmatched/document_internal_test.go
       - openehr/rm/character_test.go
       - openehr/rm/character_text_test.go
       - openehr/rm/integer64_test.go
@@ -640,6 +641,7 @@ requirements:
       - internal/bmmgen/render_xmlmar_order_test.go
       - internal/rmaccess/interval_test.go
       - openehr/aom/aom14/interval_open_side_test.go
+      - openehr/internal/xmlunmatched/document_internal_test.go
       - openehr/rm/character_text_test.go
       - openehr/rm/interval_bound_test.go
       - openehr/serialize/canxml/child_order_test.go
@@ -647,6 +649,7 @@ requirements:
       - openehr/serialize/canxml/decode_test.go
       - openehr/serialize/canxml/interval_flag_defaults_test.go
       - openehr/serialize/canxml/interval_open_side_test.go
+      - openehr/serialize/canxml/missing_test.go
       - openehr/serialize/canxml/oneroot_test.go
       - openehr/serialize/canxml/primitive_error_test.go
       - openehr/serialize/canxml/roundtrip_test.go
@@ -2351,6 +2354,7 @@ requirements:
       - internal/rmjsonwalk/root_internal_test.go
       - internal/rmjsonwalk/root_test.go
       - internal/rmjsonwalk/walk_test.go
+      - openehr/internal/xmlunmatched/document_internal_test.go
       - openehr/serialize/canjson/unmatched_test.go
       - openehr/serialize/canxml/primitive_error_test.go
       - openehr/serialize/canxml/unmatched_test.go
@@ -2497,6 +2501,8 @@ requirements:
     probes: [PROBE-110, PROBE-081]
     tests:
       - internal/bmmgen/render_xmlunmar_class_test.go
+      - openehr/internal/xmlunmatched/document_internal_test.go
       - openehr/internal/xmlunmatched/missing_internal_test.go
       - openehr/rm/missing_members_test.go
       - openehr/serialize/canjson/missing_test.go
+      - openehr/serialize/canxml/missing_test.go
