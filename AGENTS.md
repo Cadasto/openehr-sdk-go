@@ -89,7 +89,7 @@ Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev
 | Spec context bundle | `make spec-context REQ=NNN` — registry row + traceability + canonical excerpt + strands |
 | Probe status | `make probe-status` — each PROBE's status and whether its test file exists |
 | Live CDR (opt-in, not in `make ci`) | `make probe-record ARGS=…` records a cassette; `make cdr-crosscheck` checks generated documents against live CDRs. Environment variables are in [ci.md](docs/ci.md) |
-| FLAT corpus integrity | `make flat-check` — offline `sha256` of the vendored EHRbase FLAT corpus (PROBE-086's input); `make flat-drift` adds a network drift report (dev helper, not a gate) |
+| FLAT corpus integrity | `make flat-check` — offline `sha256` of the vendored EHRbase FLAT corpus (PROBE-086's input); `make flat-drift` adds a network drift report (dev helper, not a gate). `make corpus-pins-check` holds every EHRbase corpus to the one commit per repository in `testkit/corpus/UPSTREAM_PINS.txt` |
 | Build Docker dev image | `make build-dev` (when host Go is missing, or for `make test-race` on a host without a C compiler; rebuild an image made before the dev stage gained gcc) |
 | Docs site | `make docs-check` builds the site from `pages/` and asserts its output; `make docs-serve` previews it. The docs-theme brand layer is pinned by commit + sha256 in `sources.json` (bump recipe in its `$comment`) |
 

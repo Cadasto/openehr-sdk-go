@@ -24,10 +24,12 @@
 # path inside the clone names the two roots read from the commit:
 # tests/robot/AQL, two levels above it, and its aql/fields_and_results subtree.
 #
-# EXPECTED_COMMIT below is the pin. The script refuses unless it names, in full,
-# a commit present in the clone; HEAD may point anywhere. Refreshing the corpus
-# to a newer upstream commit means editing EXPECTED_COMMIT here, in the same
-# commit as the refreshed files.
+# The pin, EXPECTED_COMMIT below, is the ehrbase/integration-tests line of
+# testkit/corpus/UPSTREAM_PINS.txt, which every corpus vendored from that
+# repository shares. The script refuses unless it names, in full, a commit
+# present in the clone; HEAD may point anywhere. Refreshing the corpus to a
+# newer upstream commit means editing that line, in the same commit as the
+# refreshed files of every corpus it lists.
 #
 # The pin records source_repo, the GitHub owner/repo of the clone's origin
 # remote. Only a github.com origin names one: https://github.com/OWNER/REPO,
@@ -50,8 +52,6 @@
 # moves the recorded date.
 set -euo pipefail
 
-EXPECTED_COMMIT=b4625fc28d6785c05adfd6db26339b4bb2272e06
-
 if [[ -z "${ROBOT_ROOT:-}" ]]; then
   echo "ROBOT_ROOT is unset or empty" >&2
   echo "set ROBOT_ROOT to the upstream tests/robot/_resources/test_data_sets directory of an ehrbase/integration-tests clone" >&2
@@ -60,6 +60,13 @@ fi
 ROBOT=$ROBOT_ROOT
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 SUITES_DEST="$REPO/testkit/corpus/aql/suites"
+PINS="$REPO/testkit/corpus/UPSTREAM_PINS.txt"
+
+EXPECTED_COMMIT=$(awk '!/^[[:space:]]*#/ && $1 == "ehrbase/integration-tests" { print $3; exit }' "$PINS" 2>/dev/null || true)
+if [[ -z "$EXPECTED_COMMIT" ]]; then
+  echo "no ehrbase/integration-tests pin in $PINS" >&2
+  exit 1
+fi
 
 if [[ ! -d "$ROBOT" ]]; then
   echo "ROBOT_ROOT $ROBOT is not a directory" >&2
@@ -110,7 +117,7 @@ far_rel=${aql_rel#"$tests_robot_rel/"}
 if [[ "$(git -C "$src_root" rev-parse --verify --quiet "$EXPECTED_COMMIT^{commit}" 2>/dev/null || true)" != "$EXPECTED_COMMIT" ]]; then
   echo "EXPECTED_COMMIT $EXPECTED_COMMIT is not a commit in the clone $src_root" >&2
   echo "(by its full object name); fetch it into the clone, or update" >&2
-  echo "EXPECTED_COMMIT in $(basename "$0") when re-pinning" >&2
+  echo "testkit/corpus/UPSTREAM_PINS.txt when re-pinning" >&2
   exit 1
 fi
 src_date=$(git -C "$src_root" show -s --format=%cI "$EXPECTED_COMMIT")

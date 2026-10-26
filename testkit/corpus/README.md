@@ -8,6 +8,8 @@ Vendored fixture documents for codec, validation, and probe tests: OPTs, composi
 
 ```
 corpus/
+  UPSTREAM_PINS.txt                   # one commit per EHRbase upstream repository
+  ROBOT_SOURCE.txt                    # commit the curated Robot fixtures came from
   templates/{template-id}.opt
   compositions/{template-id}.json
   compositions/{template-id}.xml      # when vendored
@@ -54,6 +56,15 @@ which also regenerates `EXCLUDED.txt`.
 
 `crossformat/` is a third pinned subtree; do not hand-edit it either. See
 [Cross-format sets](#cross-format-sets) below.
+
+Every corpus vendored from one EHRbase repository comes from one commit, the
+line [`UPSTREAM_PINS.txt`](UPSTREAM_PINS.txt) holds for that repository; the
+vendoring scripts read it, so none carries a pin of its own. `make
+corpus-pins-check`, part of `make ci`, fails when a provenance file
+(`flat-conformance/MANIFEST.txt`, `crossformat/MANIFEST.txt`,
+`aql/suites/AQL_SOURCE.txt`, `ROBOT_SOURCE.txt`) records another commit, and
+`make corpus-pins-drift` reports how far each pin is behind its branch. To
+re-pin, change the line and re-run every script the file lists for it.
 
 Resolve paths via [`testkit/fixtures`](../fixtures/) (`TemplateOpt`, `CompositionJSON`, `CompositionXML`, `RMJSON`, `RMXML`, `SubmissionJSON`, `WebTemplateOpt`, `WebTemplateReference`, `AQLSuitesRoot`, `ListCrossFormatSets`).
 
@@ -121,7 +132,7 @@ Two OPTs in this table are not CODE24's. `alternative_types.en.v1` is byte-ident
 
 ### ehrbase (openEHR_SDK)
 
-**License:** Apache 2.0 — [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) (RM / template-triplet pin `8a5dae6fd82a5f0aa23b25681a13df79bfc21d2b`, 2026-09-28; WebTemplate + FLAT pin `e57511c6aca27ed501d31d663762c37c3491e74e`).
+**License:** Apache 2.0 — [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) (pin `8a5dae6fd82a5f0aa23b25681a13df79bfc21d2b`, the `ehrbase/openEHR_SDK` line of [`UPSTREAM_PINS.txt`](UPSTREAM_PINS.txt)).
 
 **RM-only** (`rm/`, no OPT):
 

@@ -25,11 +25,13 @@
 #   robot  https://github.com/ehrbase/integration-tests
 #          clone: the directory in $CROSSFORMAT_ROBOT_CLONE
 #
-# The pins below are a hard guard: `ingest` refuses to run when a clone's HEAD
-# is not its pin, or when a source file in the clone differs from the blob at
-# that pin, so vendoring from the wrong tree cannot happen silently. Re-pinning
-# means editing SDK_PIN / ROBOT_PIN here, in the same commit as the refreshed
-# files and MANIFEST.txt.
+# The pins, read from testkit/corpus/UPSTREAM_PINS.txt (one commit per
+# upstream repository, shared with every other corpus vendored from it), are a
+# hard guard: `ingest` refuses to run when a clone's HEAD is not its pin, or
+# when a source file in the clone differs from the blob at that pin, so
+# vendoring from the wrong tree cannot happen silently. Re-pinning means
+# editing that file, in the same commit as the refreshed files and manifests
+# of every corpus it lists.
 #
 # Subcommands:
 #   ingest   Check both clones against their pins, copy every file in the table
@@ -55,11 +57,12 @@
 set -euo pipefail
 
 readonly SDK_REPO="https://github.com/ehrbase/openEHR_SDK"
-readonly SDK_PIN="8a5dae6fd82a5f0aa23b25681a13df79bfc21d2b"
 readonly SDK_LICENCE="Apache-2.0"
 readonly ROBOT_REPO="https://github.com/ehrbase/integration-tests"
-readonly ROBOT_PIN="fcb3ac4b0a47e51bf23c03c13f86bea8fb0bfb67"
 readonly ROBOT_LICENCE="Apache-2.0"
+# Set from UPSTREAM_PINS.txt by cmd_ingest; `verify` needs no pin.
+SDK_PIN=""
+ROBOT_PIN=""
 
 SDK_CLONE="${CROSSFORMAT_SDK_CLONE:-}"
 ROBOT_CLONE="${CROSSFORMAT_ROBOT_CLONE:-}"
@@ -71,6 +74,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 readonly CORPUS="$ROOT/testkit/corpus"
 readonly DEST="$CORPUS/crossformat"
 readonly MANIFEST="$DEST/MANIFEST.txt"
+readonly PINS="$CORPUS/UPSTREAM_PINS.txt"
 
 # FILES: <set>/<local name> <source name> <upstream path>, one per line.
 # Local names are fixed: template.opt, canonical.json, canonical.xml,
@@ -155,6 +159,15 @@ clone_of() {
   esac
 }
 
+# upstream_pin <repo URL>: print the commit UPSTREAM_PINS.txt pins for the
+# github.com repository at that URL, or fail when it has no full commit.
+upstream_pin() {
+  local repo="${1#https://github.com/}" pin
+  pin="$(awk -v r="$repo" '!/^[[:space:]]*#/ && $1 == r { print $3; exit }' "$PINS" 2>/dev/null || true)"
+  [[ "$pin" =~ ^[0-9a-f]{40}$ ]] || die "no full commit for $repo in testkit/corpus/UPSTREAM_PINS.txt"
+  echo "$pin"
+}
+
 # pin_of <source name>: print the pinned commit of a source.
 pin_of() {
   case "$1" in
@@ -177,7 +190,7 @@ check_clone() {
   if [[ "$head" != "$pin" ]]; then
     echo "ingest-crossformat: $name clone $clone is at $head" >&2
     echo "ingest-crossformat: expected pin $pin; refusing to vendor from an unpinned tree" >&2
-    die "check out the pin, or update the pin in $(basename "$0") when re-pinning"
+    die "check out the pin, or update testkit/corpus/UPSTREAM_PINS.txt when re-pinning"
   fi
 }
 
@@ -196,6 +209,8 @@ pinned_sha() {
 
 cmd_ingest() {
   require_hasher
+  SDK_PIN="$(upstream_pin "$SDK_REPO")"
+  ROBOT_PIN="$(upstream_pin "$ROBOT_REPO")"
   check_clone sdk
   check_clone robot
 

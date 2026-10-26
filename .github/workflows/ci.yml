@@ -57,6 +57,11 @@ jobs:
       - name: Vendored fixture integrity
         run: make flat-check
 
+      # Every EHRbase corpus records the one commit UPSTREAM_PINS.txt names
+      # for its upstream repository (offline, no network).
+      - name: Vendored corpus pins
+        run: make corpus-pins-check
+
       # Same offline sha256 guard for the pinned openEHR Terminology, whose
       # whole value is being byte-identical to the TERM release (REQ-034).
       - name: Vendored terminology integrity

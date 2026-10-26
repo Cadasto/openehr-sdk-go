@@ -68,7 +68,7 @@ HELP_FOOTER    = Before a pull request: make ci · docs site: make docs-serve (h
 
 ##= REQ=094 | the requirement spec-context bundles
 ##= ARGS='-base URL -deployment NAME ...' | probe-record flags
-##= BMM_REF= ITS_REST_REF= ... | pin a Vendor sync (TERMINOLOGY_REF, FLAT_CONFORMANCE_REF too)
+##= BMM_REF= ITS_REST_REF= ... | pin a Vendor sync (TERMINOLOGY_REF too; EHRbase pins: testkit/corpus/UPSTREAM_PINS.txt)
 ##= DOCS_SYNC=docs-sync-offline | build the docs site from the cached brand files
 
 .PHONY: help doctor go-version build-dev build-antlr \
@@ -76,9 +76,9 @@ HELP_FOOTER    = Before a pull request: make ci · docs site: make docs-serve (h
         fmt fmt-check vet lint mod-tidy \
         test test-race \
         codegen termgen aqlgen spec-generate \
-        bmm-sync bmm-drift its-rest-sync its-rest-drift flat-sync flat-drift crossformat-sync \
+        bmm-sync bmm-drift its-rest-sync its-rest-drift flat-sync flat-drift crossformat-sync corpus-pins-drift \
         terminology-sync terminology-drift \
-        mod-tidy-check codegen-check termgen-check aqlgen-check bmm-check flat-check crossformat-check terminology-check \
+        mod-tidy-check codegen-check termgen-check aqlgen-check bmm-check flat-check crossformat-check corpus-pins-check terminology-check \
         spec-check sdd-check ci \
         spec-context probe-status probe-record cdr-crosscheck \
         docs-sync docs-sync-offline docs-build docs-check docs-serve docs-clean
@@ -179,7 +179,7 @@ its-rest-sync: ## Vendor the ITS-REST OpenAPI specs (network; ITS_REST_REF)
 its-rest-drift: ## Verify the ITS-REST specs; report upstream drift (network)
 	@./scripts/sync-its-rest-specs.sh check
 
-flat-sync: ## Vendor the EHRbase FLAT conformance corpus (network)
+flat-sync: ## Vendor the EHRbase FLAT conformance corpus at its pin (network)
 	@./scripts/sync-flat-conformance.sh sync
 
 flat-drift: ## Verify the FLAT corpus; report upstream drift (network)
@@ -187,6 +187,9 @@ flat-drift: ## Verify the FLAT corpus; report upstream drift (network)
 
 crossformat-sync: ## Vendor the cross-format sets from local EHRbase clones
 	@./scripts/ingest-crossformat.sh ingest
+
+corpus-pins-drift: ## Check the EHRbase corpus pins; report how far each is behind (network)
+	@./scripts/corpus-pins.sh drift
 
 terminology-sync: ## Vendor the openEHR terminology and regenerate it (network)
 	@./scripts/sync-terminology.sh sync
@@ -225,6 +228,9 @@ flat-check: ## Verify the vendored FLAT corpus (offline sha256)
 
 crossformat-check: ## Verify the vendored cross-format sets (offline)
 	@./scripts/ingest-crossformat.sh verify
+
+corpus-pins-check: ## Fail if an EHRbase corpus is not at its upstream pin (offline)
+	@./scripts/corpus-pins.sh verify
 
 terminology-check: ## Verify the vendored terminology (offline sha256)
 	@./scripts/sync-terminology.sh verify
@@ -448,4 +454,4 @@ docs-clean: ## Remove the site build, brand layer and caches
 
 ##@ Gates
 
-ci: fmt-check mod-tidy-check vet test lint spec-check bmm-check flat-check terminology-check build ## Run the full PR gate (docs/ci.md)
+ci: fmt-check mod-tidy-check vet test lint spec-check bmm-check flat-check corpus-pins-check terminology-check build ## Run the full PR gate (docs/ci.md)

@@ -23,7 +23,7 @@ Jobs run in parallel. All use Go 1.27.x (`actions/setup-go@v7` with module cache
 
 | Job | Makefile targets | Purpose |
 |---|---|---|
-| **Verify** | `fmt-check`, `mod-tidy-check`, `codegen-check`, `aqlgen-check`, `termgen-check`, `vet`, `spec-check`, `bmm-check`, `flat-check`, `terminology-check`, `build` | Static checks and compile-all without running tests |
+| **Verify** | `fmt-check`, `mod-tidy-check`, `codegen-check`, `aqlgen-check`, `termgen-check`, `vet`, `spec-check`, `bmm-check`, `flat-check`, `corpus-pins-check`, `terminology-check`, `build` | Static checks and compile-all without running tests |
 | **Test** | `test` | Unit tests; `test` already depends on `codegen-check`, `aqlgen-check` and `termgen-check` |
 | **Lint** | (via `golangci-lint-action` v2.14.0, config [`.golangci.yml`](../.golangci.yml)) | Same rules as `make lint` |
 | **Race** | `test-race` | **Push to `main` only**, because `-race` is slower. Catches data races in `typereg` and codecs. The runner has a C compiler, so the race run uses the host `go` |
@@ -54,7 +54,7 @@ Run `make help` for the full grouped list. Common targets:
 
 | Group | Target | What it does |
 |---|---|---|
-| CI | `make ci` | Full PR gate (fmt, mod tidy, vet, test, lint, spec-check, bmm-check, flat-check, terminology-check, build) |
+| CI | `make ci` | Full PR gate (fmt, mod tidy, vet, test, lint, spec-check, bmm-check, flat-check, corpus-pins-check, terminology-check, build) |
 | Test | `make test` | Unit tests; depends on `codegen-check`, `aqlgen-check` and `termgen-check` |
 | Test | `make test-race` | `-race` detector (main-branch job only). The detector needs cgo, so it runs on host Go 1.27.x only when the C compiler `go env CC` names is on `PATH`. Otherwise it runs in the dev container with cgo turned on for that run only (`make build-dev` builds the image) |
 | Format | `make fmt-check` | Fail if `golangci-lint fmt --diff` (gofumpt + goimports) would change any file |
@@ -69,6 +69,8 @@ Run `make help` for the full grouped list. Common targets:
 | Docs | `make docs-serve` | Live preview on `http://127.0.0.1:8000` |
 | Fixtures | `make flat-check` | Offline `sha256` integrity of the pinned upstream FLAT corpus against its `MANIFEST.txt`; no network and no `curl`/`jq` needed, so it is safe in the gate. Catches a hand-edit to a vendored fixture whose whole value is being byte-identical to upstream. `make crossformat-check` does the same for the PROBE-105 cross-format sets, whose integrity also runs in `make test` |
 | Fixtures | `make flat-drift` | The above **plus** a best-effort upstream-drift report (needs network; degrades with a note when offline). Dev helper, not a CI gate |
+| Fixtures | `make corpus-pins-check` | Fails when an EHRbase corpus provenance file (FLAT and cross-format manifests, `AQL_SOURCE.txt`, `ROBOT_SOURCE.txt`) records a commit other than the one [`testkit/corpus/UPSTREAM_PINS.txt`](../testkit/corpus/UPSTREAM_PINS.txt) names for its repository. Offline |
+| Fixtures | `make corpus-pins-drift` | The above **plus** how far each pin is behind its upstream branch (`git ls-remote`; needs network). Dev helper, not a CI gate |
 | Fixtures | `make bmm-check` | Offline `sha256` integrity of the pinned BMM schemas against `resources/bmm/MANIFEST.txt`; also fails on a `*.bmm.json` the manifest does not list |
 | Fixtures | `make bmm-drift` | The above **plus** a best-effort report of pinned files changed on ITS-BMM `master` and of newer schema versions (needs network). Dev helper, not a CI gate |
 | Fixtures | `make terminology-check` | Offline `sha256` integrity of the pinned openEHR Terminology against its `MANIFEST.txt` |
