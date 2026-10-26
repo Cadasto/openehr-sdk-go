@@ -300,8 +300,8 @@ func deepPrimitiveTree(depth int) ([]byte, string) {
 // primitive failure deep inside nested polymorphic slots, which Unmarshal
 // decodes a second time to name the element by its full path: the error,
 // built and rendered, costs memory in proportion to the depth, as the deep
-// dispatch failure does (REQ-108). The second pass is one more linear pass,
-// never one per slot.
+// dispatch failure does. The second pass is one more linear pass, never one
+// per slot.
 //
 // Can-fail control: decode once more per slot on the way out, or format the
 // failure below at every slot, and the bytes allocated grow with the square

@@ -156,7 +156,14 @@ func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 }
 
 // Decode reads the next XML element from the stream and stores it
-// in v. Errors follow the same classification as [Unmarshal].
+// in v. Errors follow the same classification as [Unmarshal], with one
+// difference: a Decoder given neither [WithUnmatched] nor [WithStrict] reads
+// the stream once and does not follow the path of the elements it reads, so
+// the [DecodeError] for the text of a primitive element that does not decode
+// as its type names the element alone, such as "/is_queryable", inside the
+// envelope of each polymorphic slot it sits in. A Decoder given either
+// option returns it on its own, with the element's path from the root of the
+// value, as [Unmarshal] does.
 //
 // Decode reads no further than the end of that element, so whatever
 // follows it, another element included, is left for the next call. A
@@ -208,6 +215,17 @@ func (d *Decoder) RelaxedTypeDispatch() bool { return d.cfg.relaxedTypeDispatch 
 // from encoding/xml, so an errors.Is against [ErrInvalidShape] does not
 // match a truncated root or a syntax error inside it.
 //
+// The text of a primitive element that does not decode as its type, such
+// as a boolean written `maybe` or a whole number written `2.5`, fails in
+// every mode with a [DecodeError] on its own, outside any slot envelope,
+// whose Path is the element's path from the root of the value, such as
+// "/ehr_status[1]/is_queryable[1]", in the form [WithUnmatched] uses. It
+// wraps [ErrInvalidShape] and keeps the conversion's own error, such as a
+// *strconv.NumError, reachable through unwrapping; its text carries none of
+// the element's. Given no option, Unmarshal finds that path by decoding
+// data a second time once the first decode has failed so, which a decode
+// that succeeds never does.
+//
 // Content the decode does not read is ignored by default. [WithUnmatched]
 // reports each such item and [WithStrict] refuses the first, wrapping
 // [ErrUnknownElement].
@@ -217,9 +235,26 @@ func Unmarshal(data []byte, v any, opts ...DecoderOption) error {
 	}
 	d := NewDecoder(bytes.NewReader(data), opts...)
 	if err := d.Decode(v); err != nil {
+		if d.trk == nil && xmlunmatched.IsPrimitiveFailure(err) {
+			return locate(data, v, err)
+		}
 		return err
 	}
 	return d.end()
+}
+
+// locate decodes data into v once more after a decode without options failed
+// with err, a primitive failure that names the element alone. The second
+// decode reads through a tracker that follows the open elements and applies
+// no policy, so it fails at the same element and names it by its path from
+// the root of the value. locate returns that error, or err should the second
+// decode not fail.
+func locate(data []byte, v any, err error) error {
+	t := xmlunmatched.NewTracker(nil, false)
+	if located := t.Decode(t.NewDecoder(bytes.NewReader(data)), v); located != nil {
+		return located
+	}
+	return err
 }
 
 // end reads the rest of the document after the root element. Comments,

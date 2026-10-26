@@ -144,7 +144,25 @@
 // while it runs. Concurrent decodes each have their own decoder and so
 // their own policy. The generated methods hand the content they do not
 // read to helpers in an internal package of the SDK, which look the
-// decoder up and, for an untracked decode, behave as encoding/xml does.
+// decoder up and, for an untracked decode, behave as encoding/xml does,
+// except for the errors below.
+//
+// # Primitive failures
+//
+// The text of a primitive element that does not decode as its type, such
+// as a boolean written `maybe`, a whole number written `2.5`, a number out
+// of its type's range, a `TERM_MAPPING.match` that is not one character or
+// a DV_MULTIMEDIA `data` that is not base64, fails the decode in every mode
+// with a [DecodeError] whose Inner wraps [ErrInvalidShape] and the
+// conversion's own error. Its text names the element and carries none of
+// its text. [Unmarshal], and a [Decoder] given [WithUnmatched] or
+// [WithStrict], return it on its own with the element's path from the root
+// of the value, such as "/ehr_status[1]/is_queryable[1]". Without an
+// option, [Unmarshal] decodes the input a second time to find that path,
+// once the first decode has failed so; a decode that succeeds never pays
+// for it. A [Decoder] given no option cannot read its stream again, so it
+// names the element alone, "/is_queryable", inside the envelope of each
+// polymorphic slot the element sits in.
 //
 // # Polymorphic dispatch
 //

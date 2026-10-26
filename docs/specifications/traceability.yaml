@@ -472,6 +472,7 @@ requirements:
       - openehr/serialize/canjson/unmatched_test.go
       - openehr/serialize/canjson/valuefree_test.go
       - openehr/serialize/canxml/interval_open_side_test.go
+      - openehr/serialize/canxml/primitive_error_test.go
       - openehr/serialize/canxml/unmatched_test.go
       - openehr/serialize/canxml/valuefree_test.go
       - openehr/serialize/internal/poly/poly_test.go
@@ -634,6 +635,7 @@ requirements:
       - openehr/serialize/canxml/interval_flag_defaults_test.go
       - openehr/serialize/canxml/interval_open_side_test.go
       - openehr/serialize/canxml/oneroot_test.go
+      - openehr/serialize/canxml/primitive_error_test.go
       - openehr/serialize/canxml/roundtrip_test.go
       - openehr/serialize/canxml/unmatched_test.go
       - testkit/conformance/crossformat/census_test.go
@@ -2324,6 +2326,7 @@ requirements:
       - internal/rmjsonwalk/root_test.go
       - internal/rmjsonwalk/walk_test.go
       - openehr/serialize/canjson/unmatched_test.go
+      - openehr/serialize/canxml/primitive_error_test.go
       - openehr/serialize/canxml/unmatched_test.go
       - openehr/serialize/simplified/composer_test.go
       - openehr/serialize/simplified/composition_name_test.go

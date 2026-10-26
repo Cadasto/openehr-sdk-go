@@ -100,15 +100,16 @@ func TestREQ056_XMLOneRoot(t *testing.T) {
 
 // TestREQ056_XMLOneRootAfterFailedRoot pins that a root which fails to decode
 // fails as itself: the decode does not read on, so the error is the root's
-// own, whatever follows it.
+// own, a DecodeError naming its magnitude, whatever follows it, and not the
+// refusal of content after the root, which is no DecodeError.
 func TestREQ056_XMLOneRootAfterFailedRoot(t *testing.T) {
 	in := []byte(`<dv_count xmlns="http://schemas.openehr.org/v1"><magnitude>not-a-number</magnitude></dv_count><extra/>`)
 	err := canxml.Unmarshal(in, new(rm.DVCount))
 	if err == nil {
 		t.Fatal("canxml.Unmarshal = nil; want the root's own decode error")
 	}
-	if errors.Is(err, canxml.ErrInvalidShape) {
-		t.Errorf("canxml.Unmarshal err = %v; want the root's own error, not the one-root refusal", err)
+	if de, ok := errors.AsType[*canxml.DecodeError](err); !ok || de == nil || de.Path != "/dv_count[1]/magnitude[1]" {
+		t.Errorf("canxml.Unmarshal err = %v; want the root's own error, a DecodeError on /dv_count[1]/magnitude[1], not the one-root refusal", err)
 	}
 }
 
