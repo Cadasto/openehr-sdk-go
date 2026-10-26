@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"maps"
 	"net/http"
 	"net/url"
@@ -59,6 +60,10 @@ type clientAssertionKey struct {
 // [FromConfig] keeps its own copy of Scopes, IDTokenTrustedAudiences and
 // Auth, with the URLs and lists Auth points to, so a change the caller makes
 // to them afterwards does not reach the source.
+//
+// Printed with fmt or logged with log/slog, a Config shows its ClientSecret
+// and the private key [WithClientAssertionKey] sets as "[redacted]": see
+// [Config.String] and [Config.LogValue].
 type Config struct {
 	// HTTPClient is the injected client used for token and JWKS calls. The
 	// token, refresh and revocation requests never follow a redirect,
@@ -102,8 +107,89 @@ type Config struct {
 	tokenChange func(context.Context, TokenChange)
 }
 
+// String describes c with its ClientSecret replaced by "[redacted]", or left
+// empty when it is empty, and the key [WithClientAssertionKey] sets shown by
+// its algorithm and key ID only. Auth is shown by its authorization and token
+// endpoints, with the password of one that carries one masked. HTTPClient,
+// JWKS and the token-change hook are left out; the other fields are shown as
+// they are.
+func (c Config) String() string {
+	return fmt.Sprintf("smart.Config{ClientID: %q, ClientSecret: %q, ClientAssertion: %s, RedirectURI: %q, Scopes: %q, Audience: %q, "+
+		"AuthorizationEndpoint: %q, TokenEndpoint: %q, Issuer: %q, RefreshThreshold: %s, IDTokenTrustedAudiences: %q}",
+		c.ClientID, redact(c.ClientSecret), c.clientAssertion.text(), c.RedirectURI, c.Scopes, c.Audience,
+		redactedURL(c.Auth.AuthorizationEndpoint), redactedURL(c.Auth.TokenEndpoint), c.Issuer, c.RefreshThreshold, c.IDTokenTrustedAudiences)
+}
+
+// GoString returns the text of [Config.String], so that printing c in Go
+// syntax shows no credential either.
+func (c Config) GoString() string { return c.String() }
+
+// Format writes the text of [Config.String] for every fmt verb it is called
+// for, whatever the flags and width. fmt answers %T and %p without calling
+// it, and %p of a Config value prints its fields, so never print a Config
+// with %p.
+func (c Config) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, c.String()) }
+
+// LogValue lets log/slog log c as a group of the fields [Config.String]
+// shows, keyed by field name, with the credentials and endpoints replaced as
+// String replaces them.
+func (c Config) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("ClientID", c.ClientID),
+		slog.String("ClientSecret", redact(c.ClientSecret)),
+		c.clientAssertion.logAttr(),
+		slog.String("RedirectURI", c.RedirectURI),
+		slog.Any("Scopes", c.Scopes),
+		slog.String("Audience", c.Audience),
+		slog.String("AuthorizationEndpoint", redactedURL(c.Auth.AuthorizationEndpoint)),
+		slog.String("TokenEndpoint", redactedURL(c.Auth.TokenEndpoint)),
+		slog.String("Issuer", c.Issuer),
+		slog.Duration("RefreshThreshold", c.RefreshThreshold),
+		slog.Any("IDTokenTrustedAudiences", c.IDTokenTrustedAudiences),
+	)
+}
+
+// text describes k by its algorithm and key ID, with the signer shown as
+// "[redacted]". A nil k gives "<nil>".
+func (k *clientAssertionKey) text() string {
+	if k == nil {
+		return "<nil>"
+	}
+	signer := "<nil>"
+	if k.signer != nil {
+		signer = redacted
+	}
+	return fmt.Sprintf("{Signer: %s, Alg: %q, KeyID: %q}", signer, k.alg, k.kid)
+}
+
+// logAttr is the ClientAssertion attribute of [Config.LogValue]: a group of
+// the values text shows, or nil for a nil k.
+func (k *clientAssertionKey) logAttr() slog.Attr {
+	if k == nil {
+		return slog.Any("ClientAssertion", nil)
+	}
+	signer := slog.Any("Signer", nil)
+	if k.signer != nil {
+		signer = slog.String("Signer", redacted)
+	}
+	return slog.Attr{Key: "ClientAssertion", Value: slog.GroupValue(signer, slog.String("Alg", k.alg), slog.String("KeyID", k.kid))}
+}
+
+// redactedURL returns u with the password in its userinfo masked, or "" for a
+// nil u.
+func redactedURL(u *url.URL) string {
+	if u == nil {
+		return ""
+	}
+	return u.Redacted()
+}
+
 // TokenChange is what the source reports to the [WithTokenChange] hook when
 // its tokens change. [Source.Revoke] reports the zero TokenChange.
+//
+// Printed with fmt or logged with log/slog, a TokenChange shows its tokens as
+// "[redacted]": see [TokenChange.String]. Its JSON encoding is unchanged and
+// carries the tokens, so an application can store it.
 type TokenChange struct {
 	// Access is the access token the source now holds.
 	Access auth.Token
@@ -117,6 +203,34 @@ type TokenChange struct {
 	// down to a value nested inside Raw, the IDTokenClaims or
 	// NeedPatientBanner, does not reach the source.
 	Response TokenResponse
+}
+
+// String describes c by the text of [auth.Token.String] for Access and of
+// [TokenResponse.String] for Response, with RefreshToken replaced by
+// "[redacted]", or left empty when it is empty.
+func (c TokenChange) String() string {
+	return fmt.Sprintf("smart.TokenChange{Access: %s, RefreshToken: %q, Response: %s}",
+		c.Access.String(), redact(c.RefreshToken), c.Response.String())
+}
+
+// GoString returns the text of [TokenChange.String], so that printing c in Go
+// syntax shows no token either.
+func (c TokenChange) GoString() string { return c.String() }
+
+// Format writes the text of [TokenChange.String] for every fmt verb it is
+// called for, whatever the flags and width. fmt answers %T and %p without
+// calling it, and %p of a TokenChange value prints its fields, so never print
+// a TokenChange with %p.
+func (c TokenChange) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, c.String()) }
+
+// LogValue lets log/slog log c as a group of Access, RefreshToken and
+// Response, with the tokens replaced as [TokenChange.String] replaces them.
+func (c TokenChange) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.Attr{Key: "Access", Value: c.Access.LogValue()},
+		slog.String("RefreshToken", redact(c.RefreshToken)),
+		slog.Attr{Key: "Response", Value: c.Response.LogValue()},
+	)
 }
 
 // Option mutates Config during construction.
@@ -657,6 +771,11 @@ func NewFromCatalog(catalog *discovery.ServiceCatalog, clientID string, opts ...
 // example in the user's session, and pass it unchanged to
 // [Source.AuthorizeURL] and then to [Source.CompleteAuthorization] or
 // [Source.ExchangeAuthorizationCode].
+//
+// Printed with fmt or logged with log/slog, an AuthorizationRequest shows its
+// PKCE verifier as "[redacted]": see [AuthorizationRequest.String]. Its JSON
+// encoding is unchanged and carries the verifier, so it can be kept in a
+// session store.
 type AuthorizationRequest struct {
 	State string
 	// Launch is the launch value an EHR passed to the app (see
@@ -675,6 +794,37 @@ type AuthorizationRequest struct {
 	// and leaves it empty otherwise. The ID token returned by the code
 	// exchange has to carry the same value.
 	Nonce string
+}
+
+// String describes r with its PKCE shown by the text of [PKCEPair.String],
+// which replaces the verifier by "[redacted]". The other fields are shown as
+// they are.
+func (r AuthorizationRequest) String() string {
+	return fmt.Sprintf("smart.AuthorizationRequest{State: %q, Launch: %q, PKCE: %s, Issuer: %q, Nonce: %q}",
+		r.State, r.Launch, r.PKCE.String(), r.Issuer, r.Nonce)
+}
+
+// GoString returns the text of [AuthorizationRequest.String], so that
+// printing r in Go syntax shows no verifier either.
+func (r AuthorizationRequest) GoString() string { return r.String() }
+
+// Format writes the text of [AuthorizationRequest.String] for every fmt verb
+// it is called for, whatever the flags and width. fmt answers %T and %p
+// without calling it, and %p of an AuthorizationRequest value prints its
+// fields, so never print an AuthorizationRequest with %p.
+func (r AuthorizationRequest) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, r.String()) }
+
+// LogValue lets log/slog log r as a group of its fields, keyed by field name,
+// with the PKCE verifier replaced as [AuthorizationRequest.String] replaces
+// it.
+func (r AuthorizationRequest) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("State", r.State),
+		slog.String("Launch", r.Launch),
+		slog.Attr{Key: "PKCE", Value: r.PKCE.LogValue()},
+		slog.String("Issuer", r.Issuer),
+		slog.String("Nonce", r.Nonce),
+	)
 }
 
 // BeginAuthorization starts one launch: it generates the PKCE pair and
