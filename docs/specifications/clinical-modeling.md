@@ -1314,7 +1314,7 @@ The profile's `top` production admits no `PARAMETER`, and the `SDK-AQL-003` para
 
 - `parse.LiteralExpr` **MUST** carry the literal's source text as written (`Raw`) beside its typed `aql.Value`, for a literal in a `SELECT` projection and for a literal in a function-call argument. The openEHR result schema names a projected column with no `AS` alias by its expression text, and re-rendering the typed value gives the canonical form, not the source form (`1.50` → `1.5`, `001` → `1`, `"x"` → `'x'`).
 - `parse.FunctionCall` **MUST** carry the call's source text as written (`Raw`), for a function or aggregate call in a `SELECT` projection and for a call nested as a function-call argument, for the same reason: rebuilding the text from the parts gives the upper-cased name and canonical spacing (`length( c/name/value )` → `LENGTH(c/name/value)`), which is neither what the client wrote nor how a path or literal column is named.
-- Emission **MUST** render the typed value and the call's parts in canonical form, never the source text: the canonical write form is normative ([wire.md § REQ-055](wire.md#req-055--wire-boundary)), and a `LiteralExpr` or `FunctionCall` a caller constructed has no source text, so a consumer treats `Raw` as optional.
+- Emission **MUST** render the typed value in canonical form and the call from its parts, never the source text: the canonical write form is normative ([wire.md § REQ-055](wire.md#req-055--wire-boundary)), and a `LiteralExpr` or `FunctionCall` a caller constructed has no source text, so a consumer treats `Raw` as optional.
 
 A value-position call (`aql.FuncCall`) carries no source text, as a `WHERE` literal carries none: only a projection names a result column.
 

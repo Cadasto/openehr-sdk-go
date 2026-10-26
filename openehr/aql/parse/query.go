@@ -224,8 +224,8 @@ func (StarExpr) isSelectExpr() {}
 //     call nested as a function-call argument, and is empty on a
 //     FunctionCall a caller constructed, so it must not be treated as
 //     required;
-//   - emission renders Name, Args, Distinct and Star in canonical form,
-//     never Raw.
+//   - emission renders the call from Name, Args, Distinct and Star,
+//     never from Raw.
 //
 // The two therefore differ whenever the source was not already canonical:
 // `length( c/name/value )` yields Name `LENGTH` with Raw

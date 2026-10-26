@@ -1501,9 +1501,6 @@ func TestParseQueryFunctionCallSourceText(t *testing.T) {
 // REQ-113 · REQ-119
 func TestParseQueryConstructedFunctionCallHasNoSourceText(t *testing.T) {
 	call := parse.FunctionCall{Name: "COUNT", Star: true}
-	if call.Raw != "" {
-		t.Errorf("constructed FunctionCall.Raw = %q, want empty", call.Raw)
-	}
 	q := &parse.Query{
 		Select: parse.SelectClause{Items: []parse.SelectItem{{Expr: call}}},
 		From:   parse.FromClause{Root: parse.ClassExpr{RMType: "EHR", Alias: "e"}},
