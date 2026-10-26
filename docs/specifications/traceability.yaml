@@ -404,6 +404,7 @@ requirements:
       - testkit/probes/demographic/probes_test.go
       - testkit/probes/versioned/probe_072_contribution_submission_shape.go
       - testkit/probes/versioned/probes_test.go
+      - transport/cadasto_header_test.go
       - transport/hot_path_internal_test.go
 
   - id: REQ-051
@@ -1026,6 +1027,7 @@ requirements:
       - transport/client_test.go
       - transport/errors_test.go
       - transport/span_status_test.go
+      - transport/span_url_test.go
 
   - id: REQ-091
     title: Retry policy
