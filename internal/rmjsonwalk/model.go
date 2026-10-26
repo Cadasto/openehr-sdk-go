@@ -2,21 +2,24 @@
 // Reference Model's own attribute lists, as openehr/rm/rminfo publishes them,
 // without decoding it into Go values.
 //
-// It answers two questions for every JSON object in the document: which RM
-// type the object decodes as, and which of its members name no attribute of
-// that type. The canonical-JSON codec reports or refuses those members on
-// request, and testkit/expectedform removes them from the expected form of a
-// round trip, so both read the same answer from here.
+// It answers three questions for every JSON object in the document: which RM
+// type the object decodes as, which of its members name no attribute of that
+// type, and which attributes the RM requires of that type that the object
+// carries no value for. The canonical-JSON codec reports or refuses the
+// unmatched members on request and reports the missing ones, and
+// testkit/expectedform removes the unmatched members from the expected form
+// of a round trip, so all read the same answer from here.
 //
 // An object's RM type is its "_type" when it carries one. Otherwise it is the
 // declared type of the attribute that holds it, and the root's type is the
-// decode target's. A [Model] holds the rules; [Model.Unmatched] walks a
-// document with them.
+// decode target's. A [Model] holds the rules; [Model.Walk] walks a document
+// with them.
 package rmjsonwalk
 
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
@@ -32,6 +35,30 @@ type Model struct {
 	hier    rminfo.Hierarchy
 	absence rminfo.AbsenceReporter
 	roots   sync.Map // reflect.Type → rootOf, see [Model.RootOf]
+	lists   sync.Map // class name → []string, see [Model.required]
+}
+
+// intervalFlags are the four boundary flags BASE Interval declares. The RM
+// makes them mandatory, and the decoder gives each a value when the document
+// leaves it out, so a walk never reports one missing.
+var intervalFlags = []string{"lower_unbounded", "upper_unbounded", "lower_included", "upper_included"}
+
+// required returns the presence-checked attributes of class: the attributes
+// the RM makes mandatory on it, in the RM's order (an ancestor's before the
+// class's own), minus the attributes no serialization carries
+// ([rminfo.IsNonStorableAttr]: a function the model computes, and
+// RESOURCE_DESCRIPTION.parent_resource) and minus the interval boundary
+// flags. The list of a class is read from the RM once and kept; callers must
+// not change it. A name that is no class gives nil.
+func (m *Model) required(class string) []string {
+	if cached, ok := m.lists.Load(class); ok {
+		return cached.([]string)
+	}
+	attrs := slices.DeleteFunc(m.lookup.RequiredAttributes(class), func(attr string) bool {
+		return rminfo.IsNonStorableAttr(class, attr) || slices.Contains(intervalFlags, attr)
+	})
+	cached, _ := m.lists.LoadOrStore(class, slices.Clip(attrs))
+	return cached.([]string)
 }
 
 // New returns a Model over l. l must also implement [rminfo.Hierarchy] and
