@@ -26,7 +26,7 @@ What the `openehr-sdk-go` v1 surface includes and excludes. Out-of-scope items a
 | Cadasto-platform extras | Cadasto Extra API, **Datamap V2** (REQ-058), minimal MPI search (preview), Admin endpoints, Care aggregates — shipped in the same module under `cadasto/` ([module-layout.md § Cadasto extras](module-layout.md#cadasto-extras)) |
 | Sandbox + recordings | In-memory `sandbox.Backend` (`http.RoundTripper`) for hermetic SDK-consumer tests ([conformance.md § REQ-082](conformance.md#req-082--runnability)); Cassette HAR 1.2 recordings under `testkit/recordings/` ([ADR 0020](../adr/0020-cassette-recording-har.md)) |
 | Testkit + conformance probes | Conformance probes, the shared result type and catalog runner (`testkit/probe/`), vendored fixture documents, and fixture-path resolution under `testkit/` ([conformance.md](conformance.md)) |
-| openEHR wire conformance | The probe suite verifies wire-level correctness against the openEHR spec (REQ-080) |
+| openEHR wire conformance | The probe suite verifies wire-level correctness against the openEHR spec ([conformance.md](conformance.md)) |
 | Examples per primary use case | Worked example programs under `cmd/examples/`, catalogued in [`../examples.md`](../examples.md); the four primary consumers — benchmark, seeder, MCP, federator ([use-cases.md](use-cases.md)) — are downstream products that follow those shapes, not programs in this tree |
 
 ## Out of scope (v1)
@@ -44,7 +44,7 @@ What the `openehr-sdk-go` v1 surface includes and excludes. Out-of-scope items a
 | Production federator policy (authority, merge strategy, partial-failure semantics) | A separate proposal pending MPI research outcomes. The SDK provides per-node primitives; policy is bespoke per deployment. |
 | MCP framework selection and MCP tool catalog | A separate proposal. This SDK only guarantees the surface is *consumable* from an MCP server. |
 | Webhooks client | Deferred to a later phase. |
-| Extraction of Cadasto-platform extras (`cadasto/…`) into a separate Go module | Conditional later step driven by STRAND-08. v1 keeps everything together; the cut line (REQ-010, REQ-011) ensures extraction would be mechanical. |
+| Extraction of Cadasto-platform extras (`cadasto/…`) into a separate Go module | Conditional later step driven by STRAND-08. v1 keeps everything together; the cut line ([module-layout.md § Boundary rules](module-layout.md#boundary-rules)) ensures extraction would be mechanical. |
 | Code generation from a shared contract source (OpenAPI-generated wire DTOs) | Not pursued (STRAND-02, cancelled). The SDK is hand-written; openEHR wire conformance is the probe suite. |
 | Template-specific generated structs (e.g. a typed Go struct for a vital-signs OPT) | Belongs in the consuming project; the generic OPT-driven builder lives in `openehr/composition`. |
 | Connection-pooling, transport-level TLS, proxy config | Owned by the consumer's injected `*http.Client` (REQ-021); SDK does not allocate transports. |
