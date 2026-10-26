@@ -453,3 +453,43 @@ func TestREQ053WithTemplateRebuildsNoStructureThatNeedsAMember(t *testing.T) {
 		})
 	}
 }
+
+// actionOf returns the one ACTION the minimal_action_2 composition comp holds.
+func actionOf(t *testing.T, comp *rm.Composition) *rm.Action {
+	t.Helper()
+	if len(comp.Content) != 1 {
+		t.Fatalf("composition holds %d content items, want the one ACTION", len(comp.Content))
+	}
+	a, ok := comp.Content[0].(*rm.Action)
+	if !ok {
+		t.Fatalf("content[0] = %T, want *rm.Action", comp.Content[0])
+	}
+	return a
+}
+
+// TestREQ053WithTemplateRoundTripKeepsInContextIsmTransition — REQ-053,
+// REQ-106: the minimal_action_2 ACTION archetype constrains no ISM transition,
+// but ACTION.ism_transition is RM-mandatory, and the skeleton writes one. The
+// Web Template gives such an ACTION the reference's in-context
+// `ism_transition` node with its `current_state` leaf, so FLAT and STRUCTURED
+// carry the current state both ways, and the round trip validates against the
+// OPT.
+func TestREQ053WithTemplateRoundTripKeepsInContextIsmTransition(t *testing.T) {
+	wt, compiled := templateOf(t, "minimal_action_2")
+	comp := skeletonOf(t, compiled, instance.Medium)
+	written := actionOf(t, comp).IsmTransition.CurrentState
+	if written.DefiningCode.CodeString == "" {
+		t.Fatalf("the written ACTION has no current_state code — fixture changed?")
+	}
+	for _, format := range []string{"FLAT", "STRUCTURED"} {
+		t.Run(format, func(t *testing.T) {
+			back := bmiRoundTrip(t, format, comp, wt, simplified.WithTemplate(compiled), simplified.WithStrict())
+			for _, is := range validation.ValidateComposition(back, compiled).Issues {
+				t.Errorf("decoded composition: %s at %s: %s", is.Code, is.Path, is.Detail)
+			}
+			if got := actionOf(t, back).IsmTransition.CurrentState; !reflect.DeepEqual(got, written) {
+				t.Errorf("decoded ACTION current_state = %+v, want the written %+v", got, written)
+			}
+		})
+	}
+}

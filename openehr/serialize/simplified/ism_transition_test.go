@@ -11,11 +11,16 @@ import (
 	"errors"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 // ismTransitionKeys is one careflow step of the corpus ACTION archetype, as the
@@ -338,6 +343,205 @@ func TestIsmTransitionCanonicalJSONCarriesOnlyRMMembers(t *testing.T) {
 				case "_type", "current_state", "careflow_step", "transition", "reason":
 				default:
 					t.Errorf("canonical ISM_TRANSITION carries %q, which the RM class does not declare", member)
+				}
+			}
+		})
+	}
+}
+
+// FLAT path fragments of the minimal_action_2 corpus template, whose ACTION
+// archetype constrains no ISM transition: the Web Template gives that ACTION
+// the reference's in-context `ism_transition` node.
+const (
+	minimalRoot   = "minimal"
+	minimalAction = minimalRoot + "/minimal_2:0"
+	minimalIsm    = minimalAction + "/ism_transition"
+)
+
+// minimalActionWT builds the minimal_action_2 Web Template and compiled
+// template.
+func minimalActionWT(t *testing.T) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
+	t.Helper()
+	opt, err := template.ParseFile(fixtures.TemplateOpt("minimal_action_2"))
+	if err != nil {
+		t.Fatalf("parse minimal_action_2: %v", err)
+	}
+	c, err := templatecompile.Compile(opt)
+	if err != nil {
+		t.Fatalf("compile minimal_action_2: %v", err)
+	}
+	wt, err := webtemplate.Build(c)
+	if err != nil {
+		t.Fatalf("build minimal_action_2 Web Template: %v", err)
+	}
+	if wt.Tree.ID != minimalRoot {
+		t.Fatalf("minimal_action_2 root is %q, want %q — fixture changed?", wt.Tree.ID, minimalRoot)
+	}
+	return wt, c
+}
+
+// minimalActionBody is a decodable minimal_action_2 FLAT body: the context,
+// the category and the ACTION's proportion, plus extra.
+func minimalActionBody(extra map[string]any) map[string]any {
+	body := map[string]any{
+		"ctx/language":                            "en",
+		"ctx/territory":                           "NL",
+		"ctx/time":                                "2026-10-26T09:00:00Z",
+		"ctx/composer_name":                       "Composer",
+		minimalRoot + "/category|code":            "433",
+		minimalRoot + "/category|value":           "event",
+		minimalRoot + "/category|terminology":     "openehr",
+		minimalAction + "/proportion|numerator":   0,
+		minimalAction + "/proportion|denominator": 1,
+		minimalAction + "/proportion|type":        3,
+	}
+	maps.Copy(body, extra)
+	return body
+}
+
+// referenceCurrentState is the in-context `current_state` spelling of the
+// EHRbase FLAT corpus (ehrbase_conformance_action.json, test_all_types).
+var referenceCurrentState = map[string]any{
+	minimalIsm + "/current_state|code":        "532",
+	minimalIsm + "/current_state|value":       "completed",
+	minimalIsm + "/current_state|terminology": "openehr",
+}
+
+// TestREQ053InContextIsmTransitionDecodesReferenceSpelling — REQ-053, REQ-106.
+// The EHRbase corpus spells an ACTION's current state in context,
+// `<action>/ism_transition/current_state|code|value|terminology`. For an ACTION
+// whose template constrains no ISM transition the Web Template has that node,
+// so the spelling decodes, in every mode and in both formats, into the
+// ACTION's current_state, and the WithTemplate decode validates.
+func TestREQ053InContextIsmTransitionDecodesReferenceSpelling(t *testing.T) {
+	wt, compiled := minimalActionWT(t)
+	flat := mustJSON(t, minimalActionBody(referenceCurrentState))
+	structured, err := FlatToStructured(flat)
+	if err != nil {
+		t.Fatalf("FlatToStructured: %v", err)
+	}
+	for format, decode := range map[string]func([]byte, *webtemplate.WebTemplate, ...Option) (*rm.Composition, error){
+		"FLAT": UnmarshalFlat, "STRUCTURED": UnmarshalStructured,
+	} {
+		body := flat
+		if format == "STRUCTURED" {
+			body = structured
+		}
+		for mode, opts := range map[string][]Option{
+			"default":                 nil,
+			"WithStrict":              {WithStrict()},
+			"WithTemplate+WithStrict": {WithTemplate(compiled), WithStrict()},
+		} {
+			t.Run(format+"/"+mode, func(t *testing.T) {
+				comp, err := decode(body, wt, opts...)
+				if err != nil {
+					t.Fatalf("Unmarshal %s (%s): %v", format, mode, err)
+				}
+				a, ok := comp.Content[0].(*rm.Action)
+				if !ok {
+					t.Fatalf("content[0] = %T, want *rm.Action", comp.Content[0])
+				}
+				got := a.IsmTransition.CurrentState
+				if got.Value != "completed" || got.DefiningCode.CodeString != "532" || got.DefiningCode.TerminologyID.Value != "openehr" {
+					t.Errorf("Unmarshal %s (%s) current_state = %+v, want openehr::532|completed", format, mode, got)
+				}
+				if a.IsmTransition.CareflowStep != nil || a.IsmTransition.Transition != nil {
+					t.Errorf("Unmarshal %s (%s) ISM transition = %+v, want no careflow_step or transition: the body carries none", format, mode, a.IsmTransition)
+				}
+				if mode == "WithTemplate+WithStrict" {
+					for _, is := range validation.ValidateComposition(comp, compiled).Issues {
+						t.Errorf("decoded composition: %s at %s: %s", is.Code, is.Path, is.Detail)
+					}
+				}
+			})
+		}
+	}
+}
+
+// TestREQ053InContextIsmTransitionInventsNoState — REQ-053. The in-context ISM
+// transition is not archetyped, so decode gives it no careflow step, and keeps
+// no node id or name on it; and a body that spells no current state gets no
+// ISM transition at all, even with WithTemplate: the decode invents no state,
+// and the validator's `required` is the right answer.
+func TestREQ053InContextIsmTransitionInventsNoState(t *testing.T) {
+	wt, compiled := minimalActionWT(t)
+	tmpl := buildTemplateIndex(compiled)
+	compJSON, err := decodeFlat(minimalActionBody(referenceCurrentState), wt, tmpl, nil)
+	if err != nil {
+		t.Fatalf("decodeFlat: %v", err)
+	}
+	content, _ := compJSON["content"].([]any)
+	action, _ := content[0].(map[string]any)
+	ism, _ := action["ism_transition"].(map[string]any)
+	if got := slices.Sorted(maps.Keys(ism)); !slices.Equal(got, []string{"_type", "current_state"}) {
+		t.Errorf("decoded in-context ISM_TRANSITION members = %v, want only [_type current_state]", got)
+	}
+
+	comp, err := UnmarshalFlat(mustJSON(t, minimalActionBody(nil)), wt, WithTemplate(compiled), WithStrict())
+	if err != nil {
+		t.Fatalf("UnmarshalFlat (WithTemplate): %v", err)
+	}
+	a, ok := comp.Content[0].(*rm.Action)
+	if !ok {
+		t.Fatalf("content[0] = %T, want *rm.Action", comp.Content[0])
+	}
+	if a.IsmTransition.CurrentState.DefiningCode.CodeString != "" {
+		t.Errorf("UnmarshalFlat (WithTemplate) invented current_state %+v for a body that spells none", a.IsmTransition.CurrentState)
+	}
+	const want = "/content[openEHR-EHR-ACTION.minimal_2.v1]/ism_transition"
+	issues := validation.ValidateComposition(comp, compiled).Issues
+	if !slices.ContainsFunc(issues, func(is validation.Issue) bool { return is.Code == "required" && is.Path == want }) {
+		t.Errorf("ValidateComposition issues = %v, want `required` at %s", issues, want)
+	}
+}
+
+// TestREQ170InContextIsmTransitionNodeRefusesUnmodelledKeys — REQ-170, REQ-140.
+// The in-context `ism_transition` node models `current_state` only. Under it,
+// the reference's `transition` and `careflow_step` leaves and its `_reason`
+// family stay refused in every mode and in both formats, carrying none of the
+// value, and FLAT names the key; the refusal of `transition` and `reason`
+// cites REQ-140, the other REQ-170. The ACTION's own `time` leaf stays refused
+// too.
+func TestREQ170InContextIsmTransitionNodeRefusesUnmodelledKeys(t *testing.T) {
+	wt, _ := minimalActionWT(t)
+	const secret = "secret-value-0451"
+	for _, tc := range []struct {
+		name, named, cite string
+		keys              []string
+	}{
+		{
+			"transition leaf", minimalIsm + "/transition|code", "REQ-140",
+			[]string{minimalIsm + "/transition|code", minimalIsm + "/transition|value", minimalIsm + "/transition|terminology"},
+		},
+		{
+			"careflow_step leaf", minimalIsm + "/careflow_step|code", "REQ-170",
+			[]string{minimalIsm + "/careflow_step|code", minimalIsm + "/careflow_step|value", minimalIsm + "/careflow_step|terminology"},
+		},
+		{"reason family", minimalIsm + "/_reason:0", "REQ-140", []string{minimalIsm + "/_reason:0"}},
+		{"ACTION time leaf", minimalAction + "/time", "REQ-170", []string{minimalAction + "/time"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			keys := maps.Clone(referenceCurrentState)
+			for _, k := range tc.keys {
+				keys[k] = secret
+			}
+			body := minimalActionBody(keys)
+			for format, err := range map[string]error{
+				"FLAT":       refusedInEveryMode(t, wt, body),
+				"STRUCTURED": structuredRefusedInEveryMode(t, wt, body),
+			} {
+				if !errors.Is(err, ErrUnknownPath) || !strings.Contains(err.Error(), "in-context spelling") {
+					t.Errorf("%s err = %v, want the in-context ErrUnknownPath refusal", format, err)
+				}
+				// STRUCTURED names the key as its FLAT form, with indexes.
+				if format == "FLAT" && !strings.Contains(err.Error(), strconv.Quote(tc.named)) {
+					t.Errorf("%s err = %v, want it to name %q", format, err, tc.named)
+				}
+				if !strings.Contains(err.Error(), "("+tc.cite+",") {
+					t.Errorf("%s err = %v, want it to cite %s", format, err, tc.cite)
+				}
+				if strings.Contains(err.Error(), secret) {
+					t.Errorf("%s err = %v carries the key's value", format, err)
 				}
 			}
 		})
