@@ -13,8 +13,16 @@ than `true` is discarded, not replayed ([ValidateHAR](../probe/har.go)).
 | [ehr-lifecycle.har](ehr-lifecycle.har) | Live EHRbase 2.36.0 `POST /ehr`, then `GET` and `HEAD` the created id (the create-then-read path) | `-scenario ehr-lifecycle` |
 | [ehr-status.har](ehr-status.har) | Live EHRbase 2.36.0 `POST /ehr` with a fixed initial EHR_STATUS, then `GET` that status | `-scenario ehr-status` |
 | [composition-minimal.har](composition-minimal.har) | Live EHRbase 2.36.0 `POST /ehr`, upload the fixture OPT under a per-capture template id (`sdk_cassette_comp_cee0ccd903be449d94dc4919055ff8aa.v1` in this recording), `POST` a composition, then `GET` the version the save returned | `-scenario composition-minimal` |
+| [composition-update.har](composition-update.har) | Live EHRbase 2.37.0-SNAPSHOT (`ehrbase/ehrbase:next`, commit `580ea750b`) `POST /ehr`, upload the fixture OPT under a per-capture template id, save with `return=representation`, `GET` the latest version and `PUT` with its `ETag`, `PUT` again with that stale `If-Match` (`412`), `GET` again, then save and `PUT` with `return=representation`. Not a release: EHRbase 2.36.0 refuses the quoted `If-Match` the ITS-REST pin requires | `-scenario composition-update` |
 | [error-envelopes.har](error-envelopes.har) | Live EHRbase 2.36.0 `GET` of an EHR id it does not hold (`404`), then three ad-hoc queries it refuses with `400`: one that does not parse, one naming an unknown COMPOSITION attribute, one selecting an EHR attribute that does not exist | `-scenario error-envelopes` |
 | [stored-query.har](stored-query.har) | Live EHRbase 2.36.0 `POST /ehr`, `PUT` a fixed stored query, then `POST` its execution | `-scenario stored-query` |
+
+A recording from another deployment sits in a folder named for it, under the same file name, and is replayed by the same test:
+
+| File | Capture | Recapture |
+|---|---|---|
+| [ferroehr/composition-update.har](ferroehr/composition-update.har) | Live FerroEHR 5.0.0, the composition-update scenario above. Its `ETag`s are weak (`W/"…"`) | `-scenario composition-update -out testkit/recordings/ferroehr` |
+| [ferroehr/error-envelopes.har](ferroehr/error-envelopes.har) | Live FerroEHR 5.0.0, the error-envelopes scenario above. Its envelope carries `message`, `validationErrors` and `error` | `-scenario error-envelopes -out testkit/recordings/ferroehr` |
 
 Replay through [`probe.NewReplayer`](../probe/replay.go).
 

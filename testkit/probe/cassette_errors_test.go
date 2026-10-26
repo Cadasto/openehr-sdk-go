@@ -55,18 +55,25 @@ func rawReplayClientFor(t *testing.T, har probe.HAR) *transport.Client {
 	return c
 }
 
+// recordedEntries returns, in capture order, every exchange in har whose
+// method is method and whose URL ends in suffix.
+func recordedEntries(har *probe.HAR, method, suffix string) []*probe.HAREntry {
+	var out []*probe.HAREntry
+	for i := range har.Log.Entries {
+		e := &har.Log.Entries[i]
+		if e.Request.Method == method && strings.HasSuffix(e.Request.URL, suffix) {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
 // recordedQueries returns the recording's ad-hoc query exchanges in the
 // order they were captured. It fails the test unless there are three, one
 // per query the scenario sends.
 func recordedQueries(t *testing.T, har *probe.HAR) []*probe.HAREntry {
 	t.Helper()
-	var out []*probe.HAREntry
-	for i := range har.Log.Entries {
-		e := &har.Log.Entries[i]
-		if e.Request.Method == "POST" && strings.HasSuffix(e.Request.URL, "/query/aql") {
-			out = append(out, e)
-		}
-	}
+	out := recordedEntries(har, "POST", "/query/aql")
 	if len(out) != 3 {
 		t.Fatalf("the recording holds %d ad-hoc query exchanges, want 3", len(out))
 	}
@@ -112,13 +119,7 @@ func replayErrorEnvelopes(ctx context.Context, c *transport.Client, har probe.HA
 		return fmt.Errorf("unknown EHR envelope message: want the recorded message: %w", err)
 	}
 
-	var queries []*probe.HAREntry
-	for i := range har.Log.Entries {
-		e := &har.Log.Entries[i]
-		if e.Request.Method == "POST" && strings.HasSuffix(e.Request.URL, "/query/aql") {
-			queries = append(queries, e)
-		}
-	}
+	queries := recordedEntries(&har, "POST", "/query/aql")
 	for i, q := range []string{cassetteMalformedAQL, cassetteUnknownAttributeAQL, cassetteUnsupportedPathAQL} {
 		if i >= len(queries) {
 			return fmt.Errorf("query %d: the recording holds no exchange for %q", i, q)
@@ -148,20 +149,32 @@ func replayErrorEnvelopes(ctx context.Context, c *transport.Client, har probe.HA
 	return nil
 }
 
+// errorEnvelopesRecordings are the error-envelopes captures, one per
+// deployment.
+var errorEnvelopesRecordings = []string{
+	"error-envelopes.har",
+	"ferroehr/error-envelopes.har",
+}
+
 // TestCassette_ReplaysErrorEnvelopes_PROBE068_PROBE021_REQ093_REQ055_REQ082
-// replays the error-envelopes recording (PROBE-068, PROBE-021, REQ-082,
-// REQ-093, REQ-055): the read of an unknown EHR, then three refused queries,
-// checking what the SDK makes of each real refusal. An extra HEAD is
-// unmatched.
+// replays each error-envelopes recording (PROBE-068, PROBE-021, REQ-082,
+// REQ-093, REQ-055): the read of an unknown EHR, then three refused
+// queries, checking what the SDK makes of each real refusal. An extra HEAD
+// is unmatched.
 func TestCassette_ReplaysErrorEnvelopes_PROBE068_PROBE021_REQ093_REQ055_REQ082(t *testing.T) {
 	t.Parallel()
-	har := loadRecording(t, "error-envelopes.har")
-	c := rawReplayClientFor(t, har)
-	if err := replayErrorEnvelopes(t.Context(), c, har); err != nil {
-		t.Fatal(err)
+	for _, name := range errorEnvelopesRecordings {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			har := loadRecording(t, name)
+			c := rawReplayClientFor(t, har)
+			if err := replayErrorEnvelopes(t.Context(), c, har); err != nil {
+				t.Fatal(err)
+			}
+			_, err := ehr.Exists(t.Context(), c, ehr.EHRID(cassetteUnknownEHRID))
+			wantUnmatched(t, err)
+		})
 	}
-	_, err := ehr.Exists(t.Context(), c, ehr.EHRID(cassetteUnknownEHRID))
-	wantUnmatched(t, err)
 }
 
 // TestCassette_ErrorEnvelopesWithholdBodiesByDefault_REQ093: a client built
@@ -170,25 +183,30 @@ func TestCassette_ReplaysErrorEnvelopes_PROBE068_PROBE021_REQ093_REQ055_REQ082(t
 // body can carry patient data (REQ-093).
 func TestCassette_ErrorEnvelopesWithholdBodiesByDefault_REQ093(t *testing.T) {
 	t.Parallel()
-	har := loadRecording(t, "error-envelopes.har")
-	c := replayClientFor(t, har)
-	_, _, err := ehr.Get(t.Context(), c, ehr.EHRID(cassetteUnknownEHRID))
-	if !errors.Is(err, transport.ErrNotFound) {
-		t.Fatalf("ehr.Get(unknown) = %v, want transport.ErrNotFound", err)
-	}
-	queries := recordedQueries(t, &har)
-	_, _, err = query.ExecuteString(t.Context(), c, cassetteMalformedAQL, nil)
-	we, ok := errors.AsType[*transport.WireError](err)
-	if !ok || we == nil {
-		t.Fatalf("query.ExecuteString(malformed) = %v, want a *transport.WireError inside", err)
-	}
-	if len(we.RawBody) != 0 {
-		t.Errorf("default client kept the raw body %q, want none", we.RawBody)
-	}
-	if we.OpenEHR != nil && we.OpenEHR.Message != "" {
-		t.Errorf("default client kept the envelope message %q, want none", we.OpenEHR.Message)
-	}
-	if msg := recordedMessage(queries[0]); msg == "" || strings.Contains(err.Error(), msg) {
-		t.Errorf("error text %q names the recorded message %q, or the recording holds none", err, msg)
+	for _, name := range errorEnvelopesRecordings {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			har := loadRecording(t, name)
+			c := replayClientFor(t, har)
+			_, _, err := ehr.Get(t.Context(), c, ehr.EHRID(cassetteUnknownEHRID))
+			if !errors.Is(err, transport.ErrNotFound) {
+				t.Fatalf("ehr.Get(unknown) = %v, want transport.ErrNotFound", err)
+			}
+			queries := recordedQueries(t, &har)
+			_, _, err = query.ExecuteString(t.Context(), c, cassetteMalformedAQL, nil)
+			we, ok := errors.AsType[*transport.WireError](err)
+			if !ok || we == nil {
+				t.Fatalf("query.ExecuteString(malformed) = %v, want a *transport.WireError inside", err)
+			}
+			if len(we.RawBody) != 0 {
+				t.Errorf("default client kept the raw body %q, want none", we.RawBody)
+			}
+			if we.OpenEHR != nil && we.OpenEHR.Message != "" {
+				t.Errorf("default client kept the envelope message %q, want none", we.OpenEHR.Message)
+			}
+			if msg := recordedMessage(queries[0]); msg == "" || strings.Contains(err.Error(), msg) {
+				t.Errorf("error text %q names the recorded message %q, or the recording holds none", err, msg)
+			}
+		})
 	}
 }
