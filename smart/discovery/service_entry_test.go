@@ -216,3 +216,54 @@ func TestResolveVersionGate(t *testing.T) { // REQ-072
 		})
 	}
 }
+
+// TestResolveVersionGateSkipsUnrequiredServices pins REQ-072: the version
+// check covers only the services the caller requires, so a service it does
+// not require may advertise any spec_version. The last case requires that
+// service too and is refused, so the document is one the check would refuse.
+func TestResolveVersionGateSkipsUnrequiredServices(t *testing.T) { // REQ-072
+	const extra = "org.example.extra"
+	body := mustJSON(map[string]any{
+		"services": map[string]any{
+			discovery.ServiceIDOpenEHRRest: map[string]any{
+				"baseUrl":      "https://api.example.com/openehr/v1",
+				"spec_version": discovery.SpecVersionPin,
+			},
+			extra: map[string]any{
+				"baseUrl":      "https://api.example.com/extra",
+				"spec_version": "1.0.3",
+				"version":      "9.9.9",
+			},
+		},
+	})
+	tests := []struct {
+		name    string
+		opts    []discovery.Option
+		refused bool
+	}{
+		{name: "default accepted set"},
+		{name: "strict accepted set", opts: []discovery.Option{discovery.WithAcceptedSpecVersions(discovery.SpecVersionPin)}},
+		{
+			name:    "the extra service required",
+			opts:    []discovery.Option{discovery.WithRequiredServices(discovery.ServiceIDOpenEHRRest, extra)},
+			refused: true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			p := startPlatform(t, false, serve(func(string) string { return body }), notFound)
+			_, err := p.resolver(t, tc.opts...).Resolve(t.Context(), p.baseURL())
+
+			if !tc.refused {
+				if err != nil {
+					t.Fatalf("Resolve error = %v, want success: %s does not require %s", err, tc.name, extra)
+				}
+				return
+			}
+			derr, ok := errors.AsType[*discovery.DiscoveryError](err)
+			if !ok || derr.Reason != discovery.ReasonSpecVersionMismatch || derr.SpecVersionGot != "1.0.3" {
+				t.Fatalf("Resolve error = %v, want a DiscoveryError with Reason %q and SpecVersionGot %q", err, discovery.ReasonSpecVersionMismatch, "1.0.3")
+			}
+		})
+	}
+}
