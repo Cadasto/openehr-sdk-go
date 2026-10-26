@@ -1,6 +1,6 @@
 package transport_test
 
-// body_read_error_test.go — REQ-172 § Typed 2xx body-read failure.
+// body_read_error_test.go — REQ-151 § A body that cannot be read.
 //
 // A response can arrive with its status line and headers and then fail while
 // its body is read. These tests pin both arms of what Client.Do returns then:
@@ -118,13 +118,13 @@ func compositionPost() *transport.Request {
 	}
 }
 
-// assertTwoXXResponseKept checks the Response half of REQ-172 § The 2xx arm:
+// assertTwoXXResponseKept checks the Response half of REQ-151's 2xx arm:
 // non-nil, the status, the headers and the parsed Metadata as for any 2xx, and
 // an empty Body.
 func assertTwoXXResponseKept(t *testing.T, resp *transport.Response, status int) {
 	t.Helper()
 	if resp == nil {
-		t.Fatal("Do returned a nil *Response beside a body-read failure; REQ-172 requires the status and headers survive")
+		t.Fatal("Do returned a nil *Response beside a body-read failure; REQ-151 requires the status and headers survive")
 	}
 	if resp.StatusCode != status {
 		t.Errorf("Response.StatusCode = %d, want %d", resp.StatusCode, status)
@@ -140,11 +140,11 @@ func assertTwoXXResponseKept(t *testing.T, resp *transport.Response, status int)
 	}
 }
 
-// TestBodyReadErrorCutTwoXXKeepsStatusAndHeaders pins REQ-172 § The 2xx arm on
+// TestBodyReadErrorCutTwoXXKeepsStatusAndHeaders pins REQ-151's 2xx arm on
 // the reported case: a 201 whose body is cut mid-read. The status, the
 // headers and the Metadata come back on a non-nil Response, and the error is a
 // *BodyReadError that names the request and reaches io.ErrUnexpectedEOF.
-func TestBodyReadErrorCutTwoXXKeepsStatusAndHeaders(t *testing.T) { // REQ-172
+func TestBodyReadErrorCutTwoXXKeepsStatusAndHeaders(t *testing.T) { // REQ-151
 	c := newBodyReadClient(t, cutBodyHandler(http.StatusCreated, committedHeader(), cutPartialBody, nil))
 
 	resp, err := c.Do(t.Context(), compositionPost())
@@ -182,7 +182,7 @@ func TestBodyReadErrorCutTwoXXKeepsStatusAndHeaders(t *testing.T) { // REQ-172
 		t.Errorf("BodyReadError.Unwrap() = %v, want the read failure", bre.Unwrap())
 	}
 
-	// REQ-172 § Disjoint classifications: a body that could not be read is
+	// REQ-151's disjoint classifications: a body that could not be read is
 	// neither a wire failure nor a decode failure.
 	if we, ok := errors.AsType[*transport.WireError](err); ok {
 		t.Errorf("errors.AsType[*transport.WireError] matched a 2xx body-read failure (%v)", we)
@@ -198,10 +198,10 @@ func TestBodyReadErrorCutTwoXXKeepsStatusAndHeaders(t *testing.T) { // REQ-172
 	}
 }
 
-// TestBodyReadErrorContentCoding pins REQ-172's content-coding cause: a 2xx
+// TestBodyReadErrorContentCoding pins REQ-151's content-coding cause: a 2xx
 // whose Content-Encoding says gzip over a plain body gives the same shape as a
 // cut body, with errors.Is reaching gzip.ErrHeader.
-func TestBodyReadErrorContentCoding(t *testing.T) { // REQ-172
+func TestBodyReadErrorContentCoding(t *testing.T) { // REQ-151
 	var acceptEncoding atomic.Value
 	c := newBodyReadClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		acceptEncoding.Store(r.Header.Get("Accept-Encoding"))
@@ -236,10 +236,10 @@ func TestBodyReadErrorContentCoding(t *testing.T) { // REQ-172
 	}
 }
 
-// TestBodyReadErrorOverLimit pins REQ-172 on the REQ-093 ceiling: a 2xx body
+// TestBodyReadErrorOverLimit pins REQ-151 on the REQ-093 ceiling: a 2xx body
 // over WithMaxResponseBody gives the same shape, with errors.Is reaching
 // transport.ErrResponseTooLarge and a message that names the limit.
-func TestBodyReadErrorOverLimit(t *testing.T) { // REQ-172
+func TestBodyReadErrorOverLimit(t *testing.T) { // REQ-151
 	const limit = 16
 	body := strings.Repeat(bodyReadBodyMarker, 4)
 	c := newDecodeClient(t, http.StatusOK, body, http.Header{"ETag": {`"` + cutBodyETag + `"`}}, transport.WithMaxResponseBody(limit))
@@ -270,12 +270,12 @@ func TestBodyReadErrorOverLimit(t *testing.T) { // REQ-172
 	}
 }
 
-// TestBodyReadErrorNonTwoXXStaysWireError pins REQ-172 § The non-2xx arm: a
+// TestBodyReadErrorNonTwoXXStaysWireError pins REQ-151's non-2xx arm: a
 // status that is not 2xx still classifies the failure as the *WireError its
 // status and headers give, with no envelope and no RawBody even under
 // WithRawErrorBodies, beside a non-nil Response with an empty Body. The
 // returned error also wraps the read failure, and is never a *BodyReadError.
-func TestBodyReadErrorNonTwoXXStaysWireError(t *testing.T) { // REQ-172
+func TestBodyReadErrorNonTwoXXStaysWireError(t *testing.T) { // REQ-151
 	// An envelope's start, so a RawBody built from the bytes before the cut
 	// would show.
 	const partialEnvelope = `{"code":"VERSION_CONFLICT","message":"` + bodyReadBodyMarker
@@ -337,7 +337,7 @@ func TestBodyReadErrorNonTwoXXStaysWireError(t *testing.T) { // REQ-172
 				t.Fatal("Do succeeded; the premise of this test is gone")
 			}
 			if resp == nil {
-				t.Fatal("Do returned a nil *Response; REQ-172 requires the status and headers survive on the non-2xx arm too")
+				t.Fatal("Do returned a nil *Response; REQ-151 requires the status and headers survive on the non-2xx arm too")
 			}
 			if resp.StatusCode != tc.status {
 				t.Errorf("Response.StatusCode = %d, want %d", resp.StatusCode, tc.status)
@@ -375,7 +375,7 @@ func TestBodyReadErrorNonTwoXXStaysWireError(t *testing.T) { // REQ-172
 				t.Errorf("err.Error() = %q, want it to name the limit %d (REQ-093)", err.Error(), tc.limit)
 			}
 
-			// REQ-172 § Disjoint classifications.
+			// REQ-151's disjoint classifications.
 			if bre, ok := errors.AsType[*transport.BodyReadError](err); ok {
 				t.Errorf("errors.AsType[*transport.BodyReadError] matched a %d (%v); it belongs to the 2xx arm only", tc.status, bre)
 			}
@@ -387,10 +387,10 @@ func TestBodyReadErrorNonTwoXXStaysWireError(t *testing.T) { // REQ-172
 }
 
 // TestBodyReadErrorNonTwoXXKeepsBearerChallenge pins the REQ-166 part of
-// REQ-172 § The non-2xx arm: a 401 whose body is cut still carries its Bearer
+// REQ-151's non-2xx arm: a 401 whose body is cut still carries its Bearer
 // challenge, and the opt-in 401 safety net (REQ-063) still reads it through
 // the wrap, so Reauth runs and the request is sent once more.
-func TestBodyReadErrorNonTwoXXKeepsBearerChallenge(t *testing.T) { // REQ-172
+func TestBodyReadErrorNonTwoXXKeepsBearerChallenge(t *testing.T) { // REQ-151
 	var hits, reauths atomic.Int32
 	header := http.Header{"WWW-Authenticate": {`Bearer error="invalid_token"`}}
 	c := newBodyReadClient(t, cutBodyHandler(http.StatusUnauthorized, header, cutPartialBody, &hits),
@@ -428,11 +428,11 @@ func TestBodyReadErrorNonTwoXXKeepsBearerChallenge(t *testing.T) { // REQ-172
 	}
 }
 
-// TestBodyReadErrorStringIsValueFree pins REQ-172 § Error() stays value-free:
+// TestBodyReadErrorStringIsValueFree pins REQ-151 § Error() stays value-free:
 // the text names the method, the route template and the status, and never a
 // header value or a byte read before the cut. The non-2xx arm's text is held
 // to the same rule.
-func TestBodyReadErrorStringIsValueFree(t *testing.T) { // REQ-172
+func TestBodyReadErrorStringIsValueFree(t *testing.T) { // REQ-151
 	header := http.Header{
 		"ETag":     {`"` + bodyReadHeaderMarker + `"`},
 		"Location": {"/ehr/abc/composition/" + bodyReadHeaderMarker},
@@ -518,12 +518,12 @@ func malformedTrailerHandler(t *testing.T, status int) http.HandlerFunc {
 	}
 }
 
-// TestBodyReadErrorTrailerTextStaysOut pins REQ-172 § Error() stays value-free
+// TestBodyReadErrorTrailerTextStaysOut pins REQ-151 § Error() stays value-free
 // on the read failure's own text: net/http quotes a malformed chunked trailer
 // line in its read error, so a server can put any value there. That value
 // appears nowhere in the error text on either arm, and the read failure is
 // still reached by unwrapping.
-func TestBodyReadErrorTrailerTextStaysOut(t *testing.T) { // REQ-172
+func TestBodyReadErrorTrailerTextStaysOut(t *testing.T) { // REQ-151
 	req := func() *transport.Request {
 		return &transport.Request{Method: http.MethodGet, Path: "/ehr/abc", Route: "/ehr/{ehr_id}"}
 	}
@@ -581,11 +581,11 @@ func TestBodyReadErrorTrailerTextStaysOut(t *testing.T) { // REQ-172
 	})
 }
 
-// TestBodyReadErrorRetryGate pins REQ-172 § Retry. With retries enabled, a 2xx
-// whose body could not be read is sent again only for GET, HEAD or OPTIONS:
-// the server acted on any other method, so a second send would repeat it. The
-// non-2xx arm keeps the status-based retry of any *WireError.
-func TestBodyReadErrorRetryGate(t *testing.T) { // REQ-172
+// TestBodyReadErrorRetryGate pins REQ-091's retry gate. With retries enabled,
+// a 2xx whose body could not be read is sent again only for GET, HEAD or
+// OPTIONS: the server acted on any other method, so a second send would repeat
+// it. The non-2xx arm keeps the status-based retry of any *WireError.
+func TestBodyReadErrorRetryGate(t *testing.T) { // REQ-091, REQ-151
 	const attempts = 3
 	cases := []struct {
 		name          string
@@ -637,13 +637,13 @@ func TestBodyReadErrorRetryGate(t *testing.T) { // REQ-172
 	}
 }
 
-// TestBodyReadErrorOverLimitIsNotSentAgain pins a limit inside REQ-172 § Retry,
-// which allows a safe method whose 2xx body could not be read to be sent again
-// but does not require it. A GET whose 200 body is over the
+// TestBodyReadErrorOverLimitIsNotSentAgain pins a limit inside REQ-091's retry
+// gate, which allows a safe method whose 2xx body could not be read to be sent
+// again but does not require it. A GET whose 200 body is over the
 // WithMaxResponseBody ceiling is sent once: every attempt would read up to the
 // same ceiling again and stop there. The 503 over the ceiling is the contrast:
 // the non-2xx arm is still retried by its status, as any *WireError is.
-func TestBodyReadErrorOverLimitIsNotSentAgain(t *testing.T) { // REQ-172, REQ-091
+func TestBodyReadErrorOverLimitIsNotSentAgain(t *testing.T) { // REQ-091, REQ-151
 	const (
 		attempts = 3
 		limit    = 16
@@ -706,12 +706,12 @@ func TestBodyReadErrorOverLimitIsNotSentAgain(t *testing.T) { // REQ-172, REQ-09
 	}
 }
 
-// TestBodyReadErrorRetryGateHEAD pins HEAD in REQ-172 § Retry's list of safe
+// TestBodyReadErrorRetryGateHEAD pins HEAD in REQ-091's list of safe
 // methods. net/http never reads the body of a response to HEAD, so an
 // httptest server cannot make that read fail; a RoundTripper hands back a 2xx
 // whose Body fails instead. A PUT through the same RoundTripper is the
 // contrast that shows the gate is what decides.
-func TestBodyReadErrorRetryGateHEAD(t *testing.T) { // REQ-172
+func TestBodyReadErrorRetryGateHEAD(t *testing.T) { // REQ-091
 	const attempts = 3
 	cases := []struct {
 		method   string
@@ -748,8 +748,8 @@ func TestBodyReadErrorRetryGateHEAD(t *testing.T) { // REQ-172
 	}
 }
 
-// TestBodyReadErrorCallerDeadlineIsNotRetried pins REQ-172 § Retry beside
-// REQ-091's "Retries MUST respect ctx cancellation". A GET whose 200 body
+// TestBodyReadErrorCallerDeadlineIsNotRetried pins REQ-091's retry gate beside
+// its "Retries MUST respect ctx cancellation". A GET whose 200 body
 // read is stopped by the caller's own deadline is not sent again, so Do
 // returns the Response and the *BodyReadError rather than a later attempt's
 // token or dial failure. The outcome alone does not show that the ctx guard
@@ -757,7 +757,7 @@ func TestBodyReadErrorRetryGateHEAD(t *testing.T) { // REQ-172
 // backoff, and Do's retry-wait branch keeps the *BodyReadError. The span does:
 // it carries retry.backoff_ms only when a retry was scheduled, so its absence
 // in both cases pins the guard. Keep both cases.
-func TestBodyReadErrorCallerDeadlineIsNotRetried(t *testing.T) { // REQ-172, REQ-091
+func TestBodyReadErrorCallerDeadlineIsNotRetried(t *testing.T) { // REQ-091, REQ-151
 	cases := []struct {
 		name    string
 		backoff time.Duration
@@ -800,7 +800,7 @@ func TestBodyReadErrorCallerDeadlineIsNotRetried(t *testing.T) { // REQ-172, REQ
 				t.Fatal("Do of a stalled 200 under a deadline succeeded; the premise of this test is gone")
 			}
 			if resp == nil {
-				t.Fatalf("Do returned a nil *Response beside %v; REQ-172 requires the status and headers survive", err)
+				t.Fatalf("Do returned a nil *Response beside %v; REQ-091 requires the status and headers survive", err)
 			}
 			if resp.StatusCode != http.StatusOK {
 				t.Errorf("Response.StatusCode = %d, want %d", resp.StatusCode, http.StatusOK)
@@ -838,7 +838,7 @@ func assertNoRetryScheduled(t *testing.T, tp *recordingTracerProvider) {
 // an error that still carries the *BodyReadError, with the context's error
 // reachable beside it. The fake clock of testing/synctest runs the hour-long
 // backoff past the deadline at once.
-func TestBodyReadErrorSurvivesCancelledBackoff(t *testing.T) { // REQ-172, REQ-091
+func TestBodyReadErrorSurvivesCancelledBackoff(t *testing.T) { // REQ-091, REQ-151
 	synctest.Test(t, func(t *testing.T) {
 		hits := 0
 		c := newBrokenTransportClient(t, func(*http.Request) (*http.Response, error) {
@@ -897,8 +897,8 @@ func stallMidBodyHandler(status int, hits *atomic.Int32, release <-chan struct{}
 	}
 }
 
-// TestBodyReadErrorNonTwoXXCallerDeadlineIsNotRetried pins REQ-172 § Retry on
-// the non-2xx arm, beside REQ-091's "Retries MUST respect ctx cancellation". A
+// TestBodyReadErrorNonTwoXXCallerDeadlineIsNotRetried pins REQ-091's retry
+// gate on the non-2xx arm, beside its "Retries MUST respect ctx cancellation". A
 // GET whose 503 body read is stopped by the caller's own deadline is not sent
 // again by its status, so Do returns the 503 Response and the *WireError
 // rather than a later attempt's token failure or the bare context error. The
@@ -907,7 +907,7 @@ func stallMidBodyHandler(status int, hits *atomic.Int32, release <-chan struct{}
 // branch keeps the non-2xx arm's error. The span does: it carries
 // retry.backoff_ms only when a retry was scheduled, so its absence in both
 // cases pins the guard. Keep both cases.
-func TestBodyReadErrorNonTwoXXCallerDeadlineIsNotRetried(t *testing.T) { // REQ-172, REQ-091
+func TestBodyReadErrorNonTwoXXCallerDeadlineIsNotRetried(t *testing.T) { // REQ-091, REQ-151
 	cases := []struct {
 		name    string
 		backoff time.Duration
@@ -939,7 +939,7 @@ func TestBodyReadErrorNonTwoXXCallerDeadlineIsNotRetried(t *testing.T) { // REQ-
 				t.Fatal("Do of a stalled 503 under a deadline succeeded; the premise of this test is gone")
 			}
 			if resp == nil {
-				t.Fatalf("Do returned a nil *Response beside %v; REQ-172 requires the status and headers survive on the non-2xx arm", err)
+				t.Fatalf("Do returned a nil *Response beside %v; REQ-091 requires the status and headers survive on the non-2xx arm", err)
 			}
 			if resp.StatusCode != http.StatusServiceUnavailable {
 				t.Errorf("Response.StatusCode = %d, want %d", resp.StatusCode, http.StatusServiceUnavailable)
@@ -969,14 +969,15 @@ func TestBodyReadErrorNonTwoXXCallerDeadlineIsNotRetried(t *testing.T) { // REQ-
 }
 
 // TestBodyReadErrorNonTwoXXSurvivesCancelledBackoff pins the other half of
-// REQ-172 § Retry on the non-2xx arm: a GET whose 503 body could not be read is
-// due to be sent again by its status, and the caller's deadline ends during the
-// backoff. Do then returns the Response and an error that still carries the
-// *WireError and the read failure, with the context's error reachable beside
-// them. The "503 read in full" case is the control: a *WireError whose body was
-// read is still replaced by the context's error, as before. The fake clock of
-// testing/synctest runs the hour-long backoff past the deadline at once.
-func TestBodyReadErrorNonTwoXXSurvivesCancelledBackoff(t *testing.T) { // REQ-172, REQ-091
+// REQ-091's retry gate on the non-2xx arm: a GET whose 503 body could not be
+// read is due to be sent again by its status, and the caller's deadline ends
+// during the backoff. Do then returns the Response and an error that still
+// carries the *WireError and the read failure, with the context's error
+// reachable beside them. The "503 read in full" case is the control: a
+// *WireError whose body was read is still replaced by the context's error, as
+// before. The fake clock of testing/synctest runs the hour-long backoff past
+// the deadline at once.
+func TestBodyReadErrorNonTwoXXSurvivesCancelledBackoff(t *testing.T) { // REQ-091, REQ-151
 	cases := []struct {
 		name string
 		body func() io.ReadCloser
@@ -1044,10 +1045,10 @@ func TestBodyReadErrorNonTwoXXSurvivesCancelledBackoff(t *testing.T) { // REQ-17
 	}
 }
 
-// TestBodyReadErrorObservation pins REQ-172's REQ-098 sentence: the
+// TestBodyReadErrorObservation pins REQ-151's REQ-098 sentence: the
 // observation of a call whose 2xx body could not be read carries the response
 // status beside the error.
-func TestBodyReadErrorObservation(t *testing.T) { // REQ-172
+func TestBodyReadErrorObservation(t *testing.T) { // REQ-151
 	obs := &recordingObserver{}
 	c := newBodyReadClient(t, cutBodyHandler(http.StatusCreated, committedHeader(), cutPartialBody, nil), transport.WithObserver(obs))
 
@@ -1063,13 +1064,13 @@ func TestBodyReadErrorObservation(t *testing.T) { // REQ-172
 	}
 }
 
-// TestBodyReadErrorDisjointFromDecode pins the remaining directions of REQ-172
-// § Disjoint classifications through transport.Decode: a 2xx body that was
+// TestBodyReadErrorDisjointFromDecode pins the remaining directions of REQ-151's
+// disjoint classifications through transport.Decode: a 2xx body that was
 // read but does not decode is a *DecodeError and never a *BodyReadError; a
 // 2xx body that could not be read is a *BodyReadError and never a
 // *DecodeError, with the Metadata still beside it; and a non-2xx whose body
 // was read is a *WireError and never a *BodyReadError.
-func TestBodyReadErrorDisjointFromDecode(t *testing.T) { // REQ-172
+func TestBodyReadErrorDisjointFromDecode(t *testing.T) { // REQ-151
 	req := func() *transport.Request {
 		return &transport.Request{Method: http.MethodGet, Path: "/ehr/abc", Route: "/ehr/{ehr_id}"}
 	}
@@ -1117,7 +1118,7 @@ func TestBodyReadErrorDisjointFromDecode(t *testing.T) { // REQ-172
 // TestBodyReadErrorNilReceiver pins the REQ-025 nil-receiver axis for the new
 // exported type: the typed nil a failed errors.As leaves behind answers every
 // method instead of panicking.
-func TestBodyReadErrorNilReceiver(t *testing.T) { // REQ-172, REQ-025
+func TestBodyReadErrorNilReceiver(t *testing.T) { // REQ-151, REQ-025
 	var e *transport.BodyReadError
 
 	t.Run("Error", func(t *testing.T) {

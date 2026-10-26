@@ -10,7 +10,7 @@ package transport_test
 // by doOnce's non-2xx branch, the *transport.DecodeError built by Decode's
 // 2xx-but-undecodable branch, the *transport.BodyReadError doOnce returns
 // for a 2xx whose body could not be read (read-body failure, over-limit;
-// REQ-172), and the URL a wrapped net/http *url.Error prints from the
+// REQ-151), and the URL a wrapped net/http *url.Error prints from the
 // network-failure arm.
 //
 // The telemetry half is pinned here too, as the carve-out it is rather than
@@ -77,7 +77,7 @@ func assertValueFree(t *testing.T, got string) {
 // TestErrorStringsValueFreeWhenRouteUnset pins REQ-093 across every surface
 // that shared the effectiveRoute→Path leak: WireError (a non-2xx response),
 // DecodeError (a 2xx body that fails to decode), and the BodyReadError of a
-// 2xx whose body could not be read (read-body failure, over-limit; REQ-172).
+// 2xx whose body could not be read (read-body failure, over-limit; REQ-151).
 // A routed request is checked last as the
 // regression guard: the fix must not touch the template a caller did set.
 func TestErrorStringsValueFreeWhenRouteUnset(t *testing.T) { // REQ-093
@@ -181,7 +181,7 @@ func TestErrorStringsValueFreeWhenRouteUnset(t *testing.T) { // REQ-093
 
 // errReadCloser is an io.ReadCloser whose Read always fails with err —
 // simulating a connection that drops mid-body, the doOnce read-body-failure
-// arm (a *BodyReadError on a 2xx, REQ-172).
+// arm (a *BodyReadError on a 2xx, REQ-151).
 type errReadCloser struct{ err error }
 
 func (e errReadCloser) Read([]byte) (int, error) { return 0, e.err }
@@ -229,7 +229,7 @@ func (o *recordingObserver) OnRequest(obs transport.Observation) { o.last = obs 
 // networkFailureClient returns a *transport.Client whose every attempt
 // fails at the RoundTripper with cause, plus the hit counter and the
 // observer. Retries are switched off explicitly (they are off by
-// default, REQ-096) so the counter pins one attempt and the test cannot
+// default, REQ-091) so the counter pins one attempt and the test cannot
 // pass by accident on a second try.
 func networkFailureClient(t *testing.T, cause error, obs transport.Observer) (*transport.Client, *int) {
 	t.Helper()

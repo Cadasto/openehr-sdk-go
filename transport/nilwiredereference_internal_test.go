@@ -73,13 +73,13 @@ func boxedNilBodyReadError() error {
 	return error(e)
 }
 
-// TestShouldRetryGatesABoxedNilBodyReadErrorByMethod pins the REQ-172 retry
+// TestShouldRetryGatesABoxedNilBodyReadErrorByMethod pins the REQ-091 retry
 // arm of shouldRetry on a boxed typed nil. That arm decides by the request's
 // method and reads no field of the error, so it takes a boxed nil
 // *BodyReadError as it is: a safe method is sent again, any other is not.
 // Adding a `bre != nil` check there sends the nil to the generic arm, which
 // retries the PUT as a transient failure.
-func TestShouldRetryGatesABoxedNilBodyReadErrorByMethod(t *testing.T) { // REQ-172, REQ-025
+func TestShouldRetryGatesABoxedNilBodyReadErrorByMethod(t *testing.T) { // REQ-091, REQ-025
 	c := &Client{cfg: config{retry: RetryPolicy{MaxAttempts: 3}}}
 
 	boxed := boxedNilBodyReadError()

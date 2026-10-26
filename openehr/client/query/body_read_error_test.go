@@ -1,6 +1,6 @@
 package query_test
 
-// body_read_error_test.go — REQ-172 § Metadata still arrives, held against the
+// body_read_error_test.go — REQ-151 § Metadata still arrives, held against the
 // result-set funnel (doResultSet, behind Execute, ExecuteString and
 // RunStored): a 200 whose body is cut mid-read still hands back the response
 // headers beside the *transport.BodyReadError, through mapQueryError.
@@ -22,7 +22,7 @@ import (
 // ETag the server sent, and an error from which the *transport.BodyReadError
 // is recovered. The three rows reach the same return in doResultSet through
 // different requests.
-func TestResultSetCutBodyKeepsMetadata(t *testing.T) { // REQ-172
+func TestResultSetCutBodyKeepsMetadata(t *testing.T) { // REQ-151
 	const (
 		etag    = "rs-1"
 		aqlText = "SELECT c FROM COMPOSITION c"
@@ -75,7 +75,7 @@ func TestResultSetCutBodyKeepsMetadata(t *testing.T) { // REQ-172
 				t.Errorf("%s returned %+v beside a body-read failure; a partial body is not the representation", tc.name, rs)
 			}
 			if meta == nil {
-				t.Fatalf("%s returned nil *transport.Metadata; REQ-172 requires the response headers come back beside the error", tc.name)
+				t.Fatalf("%s returned nil *transport.Metadata; REQ-151 requires the response headers come back beside the error", tc.name)
 			}
 			if meta.ETag != etag {
 				t.Errorf("%s: Metadata.ETag = %q, want %q", tc.name, meta.ETag, etag)

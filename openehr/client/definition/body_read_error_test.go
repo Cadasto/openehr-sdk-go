@@ -1,6 +1,6 @@
 package definition_test
 
-// body_read_error_test.go — REQ-172 § Metadata still arrives, held against
+// body_read_error_test.go — REQ-151 § Metadata still arrives, held against
 // every Definition leaf that returns a *transport.Metadata: a 2xx whose body
 // is cut mid-read still hands back the response headers beside the
 // *transport.BodyReadError.
@@ -48,7 +48,7 @@ func cutBodyClient(t *testing.T, status int, etag, location string) *transport.C
 	return newClient(t, srv)
 }
 
-// TestDefinitionCutBodyKeepsMetadata pins REQ-172 § Metadata still arrives at
+// TestDefinitionCutBodyKeepsMetadata pins REQ-151 § Metadata still arrives at
 // each Definition leaf's transport-error return. Each case serves a 2xx with
 // an ETag and a cut body and requires three things: no decoded value, the
 // response metadata carrying the ETag (and the Location on the leaves that
@@ -58,7 +58,7 @@ func cutBodyClient(t *testing.T, status int, etag, location string) *transport.C
 // PutStoredQuery and PutStoredQueryVersion reach the same return in the
 // shared putStoredQuery helper; both rows are kept so the site stays pinned
 // whichever entry point a later refactor moves it under.
-func TestDefinitionCutBodyKeepsMetadata(t *testing.T) { // REQ-172
+func TestDefinitionCutBodyKeepsMetadata(t *testing.T) { // REQ-151
 	const (
 		etag        = "org.example::q::1.0.0"
 		queryLoc    = "/openehr/v1/definition/query/org.example::q/1.0.0"
@@ -159,7 +159,7 @@ func TestDefinitionCutBodyKeepsMetadata(t *testing.T) { // REQ-172
 				t.Errorf("%s returned a value beside a body-read failure; a partial body is not the representation", tc.name)
 			}
 			if meta == nil {
-				t.Fatalf("%s returned nil *transport.Metadata; REQ-172 requires the response headers come back beside the error", tc.name)
+				t.Fatalf("%s returned nil *transport.Metadata; REQ-151 requires the response headers come back beside the error", tc.name)
 			}
 			if meta.ETag != etag {
 				t.Errorf("%s: Metadata.ETag = %q, want %q", tc.name, meta.ETag, etag)

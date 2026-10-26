@@ -1,6 +1,6 @@
 package composition_test
 
-// body_read_error_test.go — REQ-172 § Metadata still arrives, at the
+// body_read_error_test.go — REQ-151 § Metadata still arrives, at the
 // Composition write leaf: a 201 whose body is cut mid-read still hands back
 // the version metadata that proves the commit, beside the
 // *transport.BodyReadError.
@@ -22,7 +22,7 @@ import (
 // the version metadata the ETag names, and an error from which the
 // *transport.BodyReadError is recovered. A caller can then tell the write
 // committed and which version it made, instead of retrying it blind.
-func TestSaveCutBodyKeepsVersionMetadata(t *testing.T) { // REQ-172
+func TestSaveCutBodyKeepsVersionMetadata(t *testing.T) { // REQ-151
 	const newVUID openehrclient.VersionUID = "5ea3b1b0-7b8f-4f0c-9d3e-0c1f2a3b4c5d::repro.example::1"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("ETag", `"`+string(newVUID)+`"`)
@@ -47,7 +47,7 @@ func TestSaveCutBodyKeepsVersionMetadata(t *testing.T) { // REQ-172
 		t.Errorf("Save returned %+v beside a body-read failure; a partial body is not the representation", comp)
 	}
 	if meta == nil {
-		t.Fatal("Save returned nil version metadata; REQ-172 requires the commit's metadata come back beside the error")
+		t.Fatal("Save returned nil version metadata; REQ-151 requires the commit's metadata come back beside the error")
 	}
 	if meta.VersionUID != newVUID {
 		t.Errorf("VersionMetadata.VersionUID = %q, want %q, the version the ETag names", meta.VersionUID, newVUID)
@@ -75,7 +75,7 @@ func TestSaveCutBodyKeepsVersionMetadata(t *testing.T) { // REQ-172
 // the version metadata the ETag names, and the *transport.BodyReadError.
 // The ETag is the only part of the response that arrived intact, so it is
 // what the caller must still receive.
-func TestGetCutBodyKeepsVersionMetadata(t *testing.T) { // REQ-172
+func TestGetCutBodyKeepsVersionMetadata(t *testing.T) { // REQ-151
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("ETag", `"`+string(compositionVUID)+`"`)
 		// Announce more bytes than are written, then drop the connection.
@@ -98,7 +98,7 @@ func TestGetCutBodyKeepsVersionMetadata(t *testing.T) { // REQ-172
 		t.Errorf("Get returned %+v beside a body-read failure; a partial body is not the representation", comp)
 	}
 	if meta == nil {
-		t.Fatal("Get returned nil version metadata; REQ-172 requires the response metadata come back beside the error")
+		t.Fatal("Get returned nil version metadata; REQ-151 requires the response metadata come back beside the error")
 	}
 	if meta.VersionUID != compositionVUID {
 		t.Errorf("VersionMetadata.VersionUID = %q, want %q, the version the ETag names", meta.VersionUID, compositionVUID)

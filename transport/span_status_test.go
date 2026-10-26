@@ -90,12 +90,12 @@ func (s *recordingSpan) attr(key attribute.Key) (attribute.Value, bool) {
 	return v, ok
 }
 
-// TestSpanCarriesStatusCode pins REQ-090's "The span MUST carry attributes:
-// … status code" on every request a response arrived for. A 404 and a 201
-// whose body is cut (REQ-172) fail, and their spans still carry the status the
-// server sent. The 200 read in full is the control that shows the recorder
-// sees the attribute at all.
-func TestSpanCarriesStatusCode(t *testing.T) { // REQ-090, REQ-172
+// TestSpanCarriesStatusCode pins REQ-090's "The span SHOULD carry as
+// attributes … the status code" on every request a response arrived for. A
+// 404 and a 201 whose body is cut (REQ-151) fail, and their spans still carry
+// the status the server sent. The 200 read in full is the control that shows
+// the recorder sees the attribute at all.
+func TestSpanCarriesStatusCode(t *testing.T) { // REQ-090, REQ-151
 	cases := []struct {
 		name    string
 		client  func(t *testing.T, tp trace.TracerProvider) *transport.Client
@@ -160,14 +160,14 @@ func TestSpanCarriesStatusCode(t *testing.T) { // REQ-090, REQ-172
 // follow (http.method, http.url, http.status_code).
 const responseSizeKey attribute.Key = "http.response_content_length"
 
-// TestSpanCarriesResponseSize pins REQ-090's "The span MUST carry attributes:
-// … response size". A body read in full puts the number of bytes read on the
-// span, on a failed request as on a successful one; an empty body read in full
-// is a size of 0. A body that could not be read has no size (REQ-172): it was
-// cut, or it was over the WithMaxResponseBody ceiling, and the Response carries
-// an empty Body. Its span carries no size attribute, since a 0 there would be a
-// false value.
-func TestSpanCarriesResponseSize(t *testing.T) { // REQ-090, REQ-172
+// TestSpanCarriesResponseSize pins REQ-090's "The span SHOULD carry as
+// attributes … the response size". A body read in full puts the number of
+// bytes read on the span, on a failed request as on a successful one; an empty
+// body read in full is a size of 0. A body that could not be read has no size
+// (REQ-151): it was cut, or it was over the WithMaxResponseBody ceiling, and
+// the Response carries an empty Body. Its span carries no size attribute, since
+// a 0 there would be a false value.
+func TestSpanCarriesResponseSize(t *testing.T) { // REQ-090, REQ-151
 	const (
 		okBody       = `{"ehr_id":{"value":"abc"}}`
 		notFoundBody = `{"code":"NOT_FOUND","message":"no such EHR"}`

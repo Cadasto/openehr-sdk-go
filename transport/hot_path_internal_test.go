@@ -161,7 +161,7 @@ func TestREQ093_DeclaredLengthDoesNotChangeTheRead(t *testing.T) {
 // and answers with lower-case header names, so it pins the names on the
 // wire in both directions: the request carries the canonical spelling
 // net/http has always sent, and the response's openEHR headers are read
-// whatever their case (REQ-059, REQ-051).
+// whatever their case (REQ-059, REQ-050).
 func TestREQ059_HeaderNamesOnTheWire(t *testing.T) {
 	t.Parallel()
 	ln, err := new(net.ListenConfig).Listen(t.Context(), "tcp", "127.0.0.1:0")

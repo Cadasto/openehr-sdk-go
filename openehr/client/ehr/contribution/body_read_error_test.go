@@ -1,6 +1,6 @@
 package contribution_test
 
-// body_read_error_test.go — REQ-172 § Metadata still arrives, held against the
+// body_read_error_test.go — REQ-151 § Metadata still arrives, held against the
 // Contribution write leaf: a 201 whose body is cut mid-read still hands back
 // the metadata that proves the commit, beside the *transport.BodyReadError.
 
@@ -21,7 +21,7 @@ import (
 // and Location the server sent, and an error from which the
 // *transport.BodyReadError is recovered. The caller can then tell the commit
 // happened and which contribution it made, instead of sending it again.
-func TestCommitCutBodyKeepsMetadata(t *testing.T) { // REQ-172
+func TestCommitCutBodyKeepsMetadata(t *testing.T) { // REQ-151
 	const contributionUID = "0826851c-c4c2-4d61-92b9-410fb8275ff0"
 	location := "/openehr/v1/ehr/" + string(ehrIDFixture) + "/contribution/" + contributionUID
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -52,7 +52,7 @@ func TestCommitCutBodyKeepsMetadata(t *testing.T) { // REQ-172
 		t.Errorf("Commit returned %+v beside a body-read failure; a partial body is not the representation", out)
 	}
 	if meta == nil || meta.Metadata == nil {
-		t.Fatal("Commit returned nil metadata; REQ-172 requires the commit's metadata come back beside the error")
+		t.Fatal("Commit returned nil metadata; REQ-151 requires the commit's metadata come back beside the error")
 	}
 	if meta.ETag != contributionUID {
 		t.Errorf("Metadata.ETag = %q, want %q", meta.ETag, contributionUID)

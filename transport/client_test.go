@@ -502,7 +502,7 @@ func TestRetryDisabledByDefault(t *testing.T) {
 	}
 }
 
-// TestRetryNoRetrySentinel covers REQ-096: an explicit NoRetry / Disabled
+// TestRetryNoRetrySentinel covers REQ-091: an explicit NoRetry / Disabled
 // policy MUST produce exactly one attempt even when the server returns
 // a normally-retriable status. Regression guard for benchmarks that
 // require hidden-retry-free latency measurement.
