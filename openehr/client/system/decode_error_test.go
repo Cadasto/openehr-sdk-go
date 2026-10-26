@@ -4,10 +4,10 @@ package system_test
 // package's single hand-rolled 2xx response decode: the ServiceCapabilities
 // body in Capabilities.
 //
-// The neighbouring empty-body arm is a keyed exclusion and stays
-// transport.ErrInvalidShape — there is no representation to decode and no
-// bytes to hand back — so the guard below serves a non-empty body that cannot
-// decode, which is what this requirement is about.
+// The neighbouring empty-body arm stays transport.ErrInvalidShape, the
+// empty-body row of REQ-151 § The taxonomy — there is no representation to
+// decode and no bytes to hand back — so the guard below serves a non-empty
+// body that cannot decode, which is what this requirement is about.
 
 import (
 	"errors"
@@ -78,8 +78,8 @@ func TestCapabilitiesDecodeFailureIsTyped(t *testing.T) { // REQ-151
 }
 
 // TestCapabilitiesEmptyBodyKeepsInvalidShape holds the other side of the
-// requirement: REQ-151 § An empty 2xx body keeps its existing contract. This
-// arm is deliberately not unified under *transport.DecodeError, so callers
+// requirement, the empty-body row of REQ-151 § The taxonomy. This arm is
+// deliberately not unified under *transport.DecodeError, so callers
 // already keying on transport.ErrInvalidShape keep working unchanged.
 func TestCapabilitiesEmptyBodyKeepsInvalidShape(t *testing.T) { // REQ-151
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -92,7 +92,7 @@ func TestCapabilitiesEmptyBodyKeepsInvalidShape(t *testing.T) { // REQ-151
 		t.Fatalf("err = %v, want transport.ErrInvalidShape on an empty 2xx body", err)
 	}
 	if _, ok := errors.AsType[*transport.DecodeError](err); ok {
-		t.Error("an empty 2xx body produced a *transport.DecodeError; REQ-151's keyed exclusion keeps this arm on ErrInvalidShape")
+		t.Error("an empty 2xx body produced a *transport.DecodeError; REQ-151 § The taxonomy keeps this arm on ErrInvalidShape")
 	}
 }
 

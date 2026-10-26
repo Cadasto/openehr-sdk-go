@@ -1,15 +1,15 @@
 package composition_test
 
 // decode_error_test.go — REQ-151 § Typed 2xx decode failure at the Composition
-// read leaf, and the keyed exclusion that sits right next to it.
+// read leaf, and the write-result row of its taxonomy that sits beside it.
 //
 // Get decodes the response body itself via canjson rather than through
 // transport.Decode, so it did not inherit the contract by construction;
 // REQ-151 § Scope requires it satisfy the contract identically anyway. Update
 // under Prefer=return=representation decodes through the REQ-094 write-result
-// funnel, which keeps its own taxonomy — *ehr.NoRepresentationError — and
-// REQ-151 § Keyed exclusions forbids re-typing it. Both are pinned here, so
-// the boundary between the two is visible in one file.
+// funnel, whose failure REQ-151 § The taxonomy reports as
+// *ehr.NoRepresentationError, never as a *transport.DecodeError. Both are
+// pinned here, so the boundary between the two is visible in one file.
 
 import (
 	"errors"
@@ -73,8 +73,9 @@ func TestGetDecodeFailureIsTyped(t *testing.T) { // REQ-151
 	if want := "/ehr/{ehr_id}/composition/{versioned_object_or_version_uid}"; de.Route != want {
 		t.Errorf("DecodeError.Route = %q, want the route template %q, not the expanded path", de.Route, want)
 	}
-	// REQ-151 § The typed error: wrapping the decoder's error preserves the
-	// codec's own typed diagnostics (path, type) through errors.AsType.
+	// REQ-151 § What each typed error carries: wrapping the decoder's error
+	// preserves the codec's own typed diagnostics (path, type) through
+	// errors.AsType.
 	if _, ok := errors.AsType[*canjson.DecodeError](err); !ok {
 		t.Errorf("canjson's typed diagnostics no longer reachable through the conversion: %v", err)
 	}
@@ -83,8 +84,8 @@ func TestGetDecodeFailureIsTyped(t *testing.T) { // REQ-151
 	}
 }
 
-// TestGetEmptyBodyKeepsInvalidShape holds REQ-151 § An empty 2xx body keeps its
-// existing contract at this leaf: an absent body is not an unusable one.
+// TestGetEmptyBodyKeepsInvalidShape holds the empty-body row of REQ-151
+// § The taxonomy at this leaf: an absent body is not an unusable one.
 func TestGetEmptyBodyKeepsInvalidShape(t *testing.T) { // REQ-151
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -96,12 +97,12 @@ func TestGetEmptyBodyKeepsInvalidShape(t *testing.T) { // REQ-151
 		t.Fatalf("err = %v, want transport.ErrInvalidShape on an empty 200 body", err)
 	}
 	if _, ok := errors.AsType[*transport.DecodeError](err); ok {
-		t.Error("an empty 2xx body produced a *transport.DecodeError; REQ-151's keyed exclusion keeps this arm on ErrInvalidShape")
+		t.Error("an empty 2xx body produced a *transport.DecodeError; REQ-151 § The taxonomy keeps this arm on ErrInvalidShape")
 	}
 }
 
-// TestUpdateRepresentationDecodeFailureIsNotDecodeError is the keyed-exclusion
-// pin for the write-result funnel (REQ-151 § Keyed exclusions, first bullet).
+// TestUpdateRepresentationDecodeFailureIsNotDecodeError pins the write-result
+// funnel's row of REQ-151 § The taxonomy, *ehr.NoRepresentationError.
 // Update under Prefer=return=representation decodes through
 // ehr.WriteResult, whose committed-but-unusable arm is REQ-094's
 // *ehr.NoRepresentationError — a materially different contract, since the
@@ -143,8 +144,8 @@ func TestUpdateRepresentationDecodeFailureIsNotDecodeError(t *testing.T) { // RE
 		t.Errorf("commit metadata must survive: meta=%v nre.Meta=%v", meta, nre.Meta)
 	}
 
-	// The keyed exclusion itself: REQ-151 must NOT have re-typed this arm.
+	// The disjointness itself: this arm is never a *transport.DecodeError.
 	if de, ok := errors.AsType[*transport.DecodeError](err); ok {
-		t.Errorf("a write-result representation decode failure surfaced as *transport.DecodeError (%v); REQ-151 § Keyed exclusions leaves this arm to REQ-094's *ehr.NoRepresentationError", de)
+		t.Errorf("a write-result representation decode failure surfaced as *transport.DecodeError (%v); REQ-151 § The taxonomy reports this arm as REQ-094's *ehr.NoRepresentationError", de)
 	}
 }

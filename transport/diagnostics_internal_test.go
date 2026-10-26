@@ -211,9 +211,9 @@ func runeSegmentFault(s string) string {
 }
 
 // TestSegmentFaultByteLoopMatchesRuneLoop pins that ranging the bytes, as
-// idiom.md § String iteration asks of a byte check, answers exactly as the
-// rune loop did: every byte it looks for is ASCII, so multi-byte characters
-// and invalid UTF-8 change nothing (REQ-150, REQ-020).
+// idiom.md § API conventions asks of a byte check (String iteration), answers
+// exactly as the rune loop did: every byte it looks for is ASCII, so
+// multi-byte characters and invalid UTF-8 change nothing (REQ-150).
 func TestSegmentFaultByteLoopMatchesRuneLoop(t *testing.T) {
 	t.Parallel()
 	for _, s := range []string{

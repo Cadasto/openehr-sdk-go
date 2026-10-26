@@ -1,13 +1,14 @@
 package ehr_test
 
-// decode_error_test.go — REQ-151 § Keyed exclusions, held at
+// decode_error_test.go — the identifier surface that keeps an outcome of its
+// own under REQ-151 § The taxonomy, held at
 // VersionMetadata.ResolveIdentifierBody.
 //
 // The `Prefer: return=identifier` arm is REQ-094's negotiation surface, not a
 // representation decode: what fails there is the ITS-REST Identifier wrapper
 // the SDK asked the server to substitute FOR the representation, and REQ-094's
 // no-silent-downgrade rule already gives it transport.ErrInvalidShape. REQ-151
-// § Keyed exclusions names it explicitly and leaves that wrap alone.
+// § The taxonomy names it explicitly and leaves that wrap alone.
 
 import (
 	"errors"
@@ -40,9 +41,9 @@ func TestResolveIdentifierBodyFailureIsNotDecodeError(t *testing.T) { // REQ-151
 			if !errors.Is(err, transport.ErrInvalidShape) {
 				t.Errorf("err = %v, want the transport.ErrInvalidShape wrap REQ-094 gives this arm", err)
 			}
-			// The keyed exclusion itself.
+			// The surface keeps its own outcome: no *transport.DecodeError.
 			if de, ok := errors.AsType[*transport.DecodeError](err); ok {
-				t.Errorf("the Prefer=identifier arm surfaced as *transport.DecodeError (%v); REQ-151 § Keyed exclusions leaves it to REQ-094's ErrInvalidShape wrap", de)
+				t.Errorf("the Prefer=identifier arm surfaced as *transport.DecodeError (%v); REQ-151 § The taxonomy leaves it to REQ-094's ErrInvalidShape wrap", de)
 			}
 		})
 	}

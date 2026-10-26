@@ -5,16 +5,17 @@ package definition_test
 //
 // None of these leaves decodes through transport.Decode: each one calls
 // json.Unmarshal on resp.Body itself. REQ-151 § Scope is explicit that this
-// makes no difference to the caller — "hand-rolled response decodes on the same
-// stack MUST satisfy it identically, so which implementation route a leaf took
-// stays invisible" — and that the Definition upload and PUT leaves are in scope
-// even though their requests are writes, because their 2xx metadata responses
-// are decoded exactly as a read response is.
+// makes no difference to the caller — the taxonomy binds "a decode a leaf
+// writes by hand" as it binds transport.Decode, "so which route a leaf took is
+// invisible to the caller" — and that the Definition upload and PUT leaves are
+// in scope even though their requests are writes, because their 2xx metadata
+// responses are decoded as any read response is.
 //
-// The § Keyed exclusion is pinned here too, from the other side: an empty 2xx
-// body on a list leaf is a successful empty catalog, never an error, and the
-// metadata leaves keep their Location / synthesised-metadata arms. Those arms
-// are untouched by this requirement and the guards below say so.
+// The surfaces REQ-151 § The taxonomy lets keep an outcome of their own are
+// pinned here too, from the other side: an empty 2xx body on a list leaf is a
+// successful empty catalog, never an error, and the metadata leaves return
+// metadata they build themselves, from Location or the call's arguments. The
+// guards below say so.
 
 import (
 	"errors"
@@ -195,8 +196,9 @@ func TestDefinitionDecodeFailuresAreTyped(t *testing.T) { // REQ-151
 // TestListTemplatesDecodeErrorSurvivesOperationWrap states plainly what the
 // table above assumes: the returned error is *not* the DecodeError itself — the
 // leaf wraps it with its operation name — and errors.AsType reaches through
-// that wrap to the typed value and its Body anyway. REQ-151 § The typed error
-// puts it as "a leaf's wrap is presentation, never a barrier".
+// that wrap to the typed value and its Body anyway. REQ-151 § What each typed
+// error carries requires it "through any fmt.Errorf operation-name wrap a leaf
+// package adds".
 func TestListTemplatesDecodeErrorSurvivesOperationWrap(t *testing.T) { // REQ-151
 	c := newBodyClient(t, objectWhereArrayExpected)
 
@@ -268,12 +270,12 @@ func TestListStoredQueriesDecodesCatalog(t *testing.T) { // REQ-151
 	}
 }
 
-// TestListStoredQueriesEmptyBodyIsEmptyCatalog holds REQ-151's keyed exclusion
-// on the leaf that had no test to hold it: an empty 2xx body on a Definition
-// list operation is a successful empty catalog. It must produce neither
-// transport.ErrInvalidShape nor a *transport.DecodeError. Only a non-empty body
-// that fails to decode is REQ-151's, which is why the arm below is untouched by
-// the conversion.
+// TestListStoredQueriesEmptyBodyIsEmptyCatalog holds the outcome REQ-151
+// § The taxonomy leaves to the Definition list operations, on the leaf that
+// had no test to hold it: an empty 2xx body on a Definition list operation is
+// a successful empty catalog. It must produce neither transport.ErrInvalidShape
+// nor a *transport.DecodeError. Only a non-empty body that fails to decode is
+// REQ-151's, which is why the arm below is untouched by the conversion.
 func TestListStoredQueriesEmptyBodyIsEmptyCatalog(t *testing.T) { // REQ-151
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
@@ -284,10 +286,10 @@ func TestListStoredQueriesEmptyBodyIsEmptyCatalog(t *testing.T) { // REQ-151
 	// Classify before the nil check: on a regression these two say which
 	// contract the leaf reached for, which a bare "unexpected error" would not.
 	if _, ok := errors.AsType[*transport.DecodeError](err); ok {
-		t.Error("an empty list body produced a *transport.DecodeError; REQ-151's keyed exclusion forbids it")
+		t.Error("an empty list body produced a *transport.DecodeError; REQ-151 § The taxonomy makes it an empty catalog")
 	}
 	if errors.Is(err, transport.ErrInvalidShape) {
-		t.Error("an empty list body produced transport.ErrInvalidShape; REQ-151's keyed exclusion forbids it")
+		t.Error("an empty list body produced transport.ErrInvalidShape; REQ-151 § The taxonomy makes it an empty catalog")
 	}
 	if err != nil {
 		t.Fatalf("ListStoredQueries on an empty 204 body: unexpected error %v; an empty list body is success", err)

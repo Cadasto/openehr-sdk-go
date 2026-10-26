@@ -8,14 +8,14 @@ package demographic_test
 // None of the three routes through transport.Decode: the abstract rm.Party
 // interface cannot be decoded by the generated unmarshallers, so these leaves
 // call typereg.DecodeAs themselves (REQ-040). REQ-151 § Scope is explicit that
-// this makes no difference to the caller — a hand-rolled response decode "MUST
-// satisfy it identically, so which implementation route a leaf took stays
-// invisible".
+// this makes no difference to the caller — the taxonomy binds "a decode a leaf
+// writes by hand" as it binds transport.Decode, "so which route a leaf took is
+// invisible to the caller".
 //
-// The neighbouring empty-body arms are keyed exclusions and stay as they are:
-// a 204 is a legitimate "no version at that time" success, and any other
-// empty-body 2xx is transport.ErrInvalidShape. Every body below is therefore
-// non-empty and undecodable, which is what this requirement is about.
+// The neighbouring empty-body arms keep the outcomes REQ-151 § The taxonomy
+// gives them: a 204 is a legitimate "no version at that time" success, and any
+// other empty-body 2xx is transport.ErrInvalidShape. Every body below is
+// therefore non-empty and undecodable, which is what this requirement is about.
 
 import (
 	"errors"
@@ -161,9 +161,9 @@ func isNil(out any) bool {
 // asserts in passing, because it is the one design decision of this phase that
 // a future reader could plausibly get wrong: the VERSION data arm was decoding
 // only the envelope's `data` sub-slice, but DecodeError.Body carries the whole
-// response the server sent. REQ-151 § The typed error requires "the raw
-// response bytes", and a caller who has to re-read the payload should not have
-// to care which of getVersion's two decodes tripped.
+// response the server sent. REQ-151 § A body that does not decode requires
+// "the raw response bytes in Body", and a caller who has to re-read the
+// payload should not have to care which of getVersion's two decodes tripped.
 func TestGetVersionDataArmCarriesFullBody(t *testing.T) { // REQ-151
 	full := originalVersionEnvelope([]byte(unregisteredParty))
 
@@ -184,10 +184,10 @@ func TestGetVersionDataArmCarriesFullBody(t *testing.T) { // REQ-151
 	}
 }
 
-// TestGetPartyEmptyBodyKeepsInvalidShape and its 204 sibling hold REQ-151's
-// keyed exclusion at this package: an empty 2xx body is an absent body, not an
-// unusable one, so it keeps today's contract and must never become a
-// *transport.DecodeError.
+// TestGetPartyEmptyBodyKeepsInvalidShape and its 204 sibling hold, at this
+// package, the empty-body row of REQ-151 § The taxonomy and the 204 outcome it
+// leaves to the demographic reads: an empty 2xx body is an absent body, not an
+// unusable one, so it must never become a *transport.DecodeError.
 func TestGetPartyEmptyBodyKeepsInvalidShape(t *testing.T) { // REQ-151
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -199,7 +199,7 @@ func TestGetPartyEmptyBodyKeepsInvalidShape(t *testing.T) { // REQ-151
 		t.Fatalf("err = %v, want transport.ErrInvalidShape on an empty 200 body", err)
 	}
 	if _, ok := errors.AsType[*transport.DecodeError](err); ok {
-		t.Error("an empty 2xx body produced a *transport.DecodeError; REQ-151's keyed exclusion keeps this arm on ErrInvalidShape")
+		t.Error("an empty 2xx body produced a *transport.DecodeError; REQ-151 § The taxonomy keeps this arm on ErrInvalidShape")
 	}
 }
 

@@ -13,7 +13,7 @@ import (
 // The Definition leaves answer an empty 2xx body with a synthesized value —
 // an empty catalog for the list operations (§ REQ-144), a metadata record
 // rebuilt from the request or the Location header for the upload and
-// stored-query surfaces (§ REQ-151 keyed exclusions). "Empty" includes the
+// stored-query surfaces (REQ-151 § The taxonomy). "Empty" includes the
 // JSON `null` literal: without the raw-bytes check, `null` unmarshals to a
 // nil slice (published as JSON null by a caller re-serialising the result) or
 // to an all-zero metadata struct with a nil error. Each test below fails on a
@@ -45,7 +45,7 @@ func TestListStoredQueriesNullBodyIsEmptyCatalog(t *testing.T) { // REQ-144, REQ
 	}
 }
 
-func TestGetStoredQueryNullBodySynthesizesMetadata(t *testing.T) { // REQ-151 keyed exclusion (REQ-057)
+func TestGetStoredQueryNullBodySynthesizesMetadata(t *testing.T) { // REQ-151 § The taxonomy (REQ-057)
 	const wantName, wantVersion = "org.openehr::vitals", "1.0.0"
 	meta, _, err := definition.GetStoredQuery(t.Context(), jsonServerClient(t, "null"), wantName, wantVersion)
 	if err != nil {
@@ -56,7 +56,7 @@ func TestGetStoredQueryNullBodySynthesizesMetadata(t *testing.T) { // REQ-151 ke
 	}
 }
 
-func TestUploadTemplateNullBodyFallsBackToLocation(t *testing.T) { // REQ-151 keyed exclusion
+func TestUploadTemplateNullBodyFallsBackToLocation(t *testing.T) { // REQ-151 § The taxonomy
 	opt := readFixture(t, "body_weight.opt")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Location", "/openehr/v1/definition/template/adl1.4/body_weight.v1")
@@ -76,15 +76,16 @@ func TestUploadTemplateNullBodyFallsBackToLocation(t *testing.T) { // REQ-151 ke
 }
 
 // TestPutStoredQueryNullBodySynthesizesFromArguments is the can-fail control
-// for the two stored-query PUT arms § REQ-151 names as synthesized-metadata
-// surfaces. Both public entry points share putStoredQuery, so one table covers
-// them; each sends a Location the parser must reject (one path segment, where
-// two are required) so the arm falls through to the body classification.
+// for the two stored-query PUT arms REQ-151 § The taxonomy names among the
+// surfaces that return metadata they build themselves. Both public entry
+// points share putStoredQuery, so one table covers them; each sends a Location
+// the parser must reject (one path segment, where two are required) so the arm
+// falls through to the body classification.
 //
 // It fails on a len(body) == 0 guard: json.Unmarshal("null", &StoredQueryMetadata)
 // returns a nil error and an all-zero record, so the caller would get an empty
 // Name, Version and Q instead of the values it passed in.
-func TestPutStoredQueryNullBodySynthesizesFromArguments(t *testing.T) { // REQ-151 keyed exclusion
+func TestPutStoredQueryNullBodySynthesizesFromArguments(t *testing.T) { // REQ-151 § The taxonomy
 	const aql = "SELECT c/uid/value FROM COMPOSITION c"
 	for _, tc := range []struct {
 		name        string
