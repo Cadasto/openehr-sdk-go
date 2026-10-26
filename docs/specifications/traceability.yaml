@@ -519,10 +519,13 @@ requirements:
       - PROBE-105
     tests:
       - openehr/serialize/simplified/archetype_details_test.go
+      - openehr/serialize/simplified/coded_name_internal_test.go
+      - openehr/serialize/simplified/coded_name_test.go
       - openehr/serialize/simplified/composer_test.go
       - openehr/serialize/simplified/composition_name_test.go
       - openehr/serialize/simplified/context_test.go
       - openehr/serialize/simplified/datatypes_test.go
+      - openehr/serialize/simplified/empty_structure_test.go
       - openehr/serialize/simplified/fit_test.go
       - openehr/serialize/simplified/flat_decode_test.go
       - openehr/serialize/simplified/flat_encode_test.go
@@ -549,8 +552,11 @@ requirements:
       - openehr/serialize/simplified/string_leaf_test.go
       - openehr/serialize/simplified/structured_ctx_test.go
       - openehr/serialize/simplified/structured_test.go
+      - openehr/serialize/simplified/template_order_test.go
+      - openehr/serialize/simplified/template_roundtrip_test.go
       - openehr/serialize/simplified/unmatched_test.go
       - openehr/template/webtemplate/incontext_rmpath_test.go
+      - openehr/template/webtemplate/ism_transition_test.go
       - openehr/template/webtemplate/paths_rmpath_test.go
       - testkit/conformance/crossformat/census_test.go
       - testkit/conformance/crossformat/harness_internal_test.go
@@ -561,6 +567,8 @@ requirements:
       - testkit/conformance/webtemplate/runner_test.go
       - testkit/fixtures/crossformat_test.go
       - testkit/probes/serialize/probe_076_simplified_round_trip.go
+      - testkit/probes/serialize/probe_076_skeleton_internal_test.go
+      - testkit/probes/serialize/probe_076_skeleton_test.go
       - testkit/probes/serialize/probe_086_upstream_flat_parity.go
       - testkit/probes/serialize/probe_089_underscore_round_trip.go
       - testkit/probes/serialize/probe_105_cross_format_parity.go
@@ -1411,6 +1419,8 @@ requirements:
       - openehr/template/webtemplate
     probes: [PROBE-075, PROBE-086]
     tests:
+      - openehr/serialize/simplified/ism_transition_test.go
+      - openehr/serialize/simplified/template_roundtrip_test.go
       - openehr/template/webtemplate/build_internal_test.go
       - openehr/template/webtemplate/build_test.go
       - openehr/template/webtemplate/dedupe_test.go
@@ -1418,6 +1428,7 @@ requirements:
       - openehr/template/webtemplate/id_internal_test.go
       - openehr/template/webtemplate/incontext_rmpath_test.go
       - openehr/template/webtemplate/inputs_test.go
+      - openehr/template/webtemplate/ism_transition_test.go
       - openehr/template/webtemplate/parity_test.go
       - openehr/template/webtemplate/req116_gap_test.go
       - testkit/probes/serialize/probe_076_simplified_round_trip.go
@@ -1835,9 +1846,12 @@ requirements:
       - internal/templatecompile/registerpath_test.go
       - internal/templatecompile/webtemplate_oracle_compile_test.go
       - openehr/composition/named_sibling_test.go
+      - openehr/serialize/simplified/coded_name_internal_test.go
+      - openehr/serialize/simplified/coded_name_test.go
       - openehr/serialize/simplified/flat_encode_test.go
       - openehr/serialize/simplified/flat_nameindex_test.go
       - openehr/serialize/simplified/flat_pinned_test.go
+      - openehr/serialize/simplified/template_roundtrip_test.go
       - openehr/template/node_name_test.go
       - openehr/template/webtemplate/build_test.go
       - openehr/template/webtemplate/dedupe_test.go
@@ -2336,6 +2350,7 @@ requirements:
       - openehr/serialize/simplified/flat_decode_test.go
       - openehr/serialize/simplified/hardening_test.go
       - openehr/serialize/simplified/index_bound_test.go
+      - openehr/serialize/simplified/ism_transition_test.go
       - openehr/serialize/simplified/null_test.go
       - openehr/serialize/simplified/raw_fit_test.go
       - openehr/serialize/simplified/rmattr_encapsulated_test.go

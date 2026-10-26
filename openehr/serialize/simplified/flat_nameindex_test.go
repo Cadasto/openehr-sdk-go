@@ -87,7 +87,7 @@ func TestBuildNameIndex_AnswersBareSpelling(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Compile: %v", err)
 	}
-	idx := buildNameIndex(c)
+	idx := buildTemplateIndex(c).names
 
 	var predicated int
 	for key, want := range idx {
@@ -111,11 +111,11 @@ func TestBuildNameIndex_AnswersBareSpelling(t *testing.T) {
 	}
 }
 
-// buildNameIndexReference is buildNameIndex as it stood before it read the
+// buildNameIndexReference is the name index as it stood before it read the
 // compiled template without copying: it reads each term through Term, which
 // copies the term's items, and the tree through Attributes and Children,
 // which copy their slices. Decode repopulates LOCATABLE.name from the
-// index, so buildNameIndex must give the same index as this copy.
+// index, so buildTemplateIndex must give the same names as this copy.
 func buildNameIndexReference(c *templatecompile.Compiled) map[string]string {
 	names := make(map[string]string)
 	lang := c.Language()
@@ -160,7 +160,7 @@ func buildNameIndexReference(c *templatecompile.Compiled) map[string]string {
 // corpus templates compile today.
 const minNameIndexTemplates = 61
 
-// buildNameIndex must give the index the earlier version gave on every
+// buildTemplateIndex must give the names the earlier version gave on every
 // template of the corpus that compiles, entry for entry.
 func TestBuildNameIndexMatchesReference(t *testing.T) {
 	refs, err := fixtures.ListAllOPTs()
@@ -178,18 +178,18 @@ func TestBuildNameIndexMatchesReference(t *testing.T) {
 			continue
 		}
 		compared++
-		got, want := buildNameIndex(c), buildNameIndexReference(c)
+		got, want := buildTemplateIndex(c).names, buildNameIndexReference(c)
 		if maps.Equal(got, want) {
 			continue
 		}
 		for _, k := range slices.Sorted(maps.Keys(want)) {
 			if g, ok := got[k]; !ok || g != want[k] {
-				t.Errorf("%s: buildNameIndex()[%q] = %q (present %t), earlier version gave %q", ref.Name, k, g, ok, want[k])
+				t.Errorf("%s: buildTemplateIndex().names[%q] = %q (present %t), earlier version gave %q", ref.Name, k, g, ok, want[k])
 			}
 		}
 		for _, k := range slices.Sorted(maps.Keys(got)) {
 			if _, ok := want[k]; !ok {
-				t.Errorf("%s: buildNameIndex() has %q = %q, earlier version has no such key", ref.Name, k, got[k])
+				t.Errorf("%s: buildTemplateIndex().names has %q = %q, earlier version has no such key", ref.Name, k, got[k])
 			}
 		}
 	}

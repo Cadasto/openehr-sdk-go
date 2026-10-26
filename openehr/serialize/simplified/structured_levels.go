@@ -212,9 +212,10 @@ var (
 		"_mapping":                subPathGrammar(mappingSubTails, nil),
 		"_feeder_audit":           feederLevel,
 	}
-	// ismReferenceLevel is the reference's in-context `ism_transition` node,
-	// which the decode refuses wherever it reads one of its leaves or its
-	// `_reason` family; any other name below it is unmatched.
+	// ismReferenceLevel is the reference's in-context `ism_transition` node
+	// where the Web Template has no node for it, which the decode refuses
+	// wherever it reads one of its leaves or its `_reason` family; any other
+	// name below it is unmatched.
 	ismReferenceLevel = grammarOf(ismLeaves).with(ismReasonFamily, opaqueLevel)
 )
 

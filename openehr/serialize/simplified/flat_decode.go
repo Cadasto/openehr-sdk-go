@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -22,6 +23,8 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
+	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
@@ -92,11 +95,11 @@ func UnmarshalFlat(data []byte, wt *webtemplate.WebTemplate, opts ...Option) (*r
 // the map was made, as [memberKeys] of STRUCTURED member paths; the policy
 // takes them with the keys the decode sets aside.
 func decodeFlatMap(flat map[string]any, wt *webtemplate.WebTemplate, cfg decodeConfig, loc locator, skipped []string) (*rm.Composition, error) {
-	var names map[string]string
+	var tmpl *templateIndex
 	if cfg.template != nil {
-		names = buildNameIndex(cfg.template)
+		tmpl = buildTemplateIndex(cfg.template)
 	}
-	compJSON, unmatched, err := decodeFlatIgnoring(flat, wt, names, cfg.strict)
+	compJSON, unmatched, err := decodeFlatIgnoring(flat, wt, tmpl, cfg.strict)
 	unmatched = slices.Concat(skipped, unmatched)
 	if cfg.strict {
 		if refusal := applyUnmatchedPolicy(cfg, loc, unmatched); refusal != nil {
@@ -125,10 +128,11 @@ func decodeFlatMap(flat map[string]any, wt *webtemplate.WebTemplate, cfg decodeC
 }
 
 // decodeFlat builds the canonical-JSON object for the COMPOSITION from the
-// FLAT map, driven by the Web Template. names (optional; nil unless a template
-// was supplied) maps a node's compiled aqlPath to its LOCATABLE.name. Every
-// key it does not read goes to sink, and the decode carries on without it.
-func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[string]string, sink *unmatchedSink) (map[string]any, error) {
+// FLAT map, driven by the Web Template. tmpl (nil unless a template was
+// supplied) holds what the decode reads from the compiled template at each
+// node path ([templateIndex]). Every key it does not read goes to sink, and the
+// decode carries on without it.
+func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *templateIndex, sink *unmatchedSink) (map[string]any, error) {
 	root := wt.Tree
 	compJSON := map[string]any{
 		"_type":             "COMPOSITION",
@@ -196,9 +200,9 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 		keys[base][suffix] = key
 	}
 	// Process leaf groups in a stable (sorted) order so the reconstructed tree
-	// is deterministic: distinct-node-id siblings with no explicit :index
-	// (e.g. multiple content items, or elements under one ITEM_TREE) are
-	// appended in this order, which must not depend on Go map iteration.
+	// is deterministic: distinct-node-id siblings are appended in this order,
+	// which must not depend on Go map iteration. [orderByTemplate] later puts
+	// them in template order.
 	for _, base := range slices.Sorted(maps.Keys(groups)) {
 		keyOf := func(suffix string) string { return keys[base][suffix] }
 		pk, err := parseFlatKey(base)
@@ -231,23 +235,27 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 		if err != nil {
 			return nil, fmt.Errorf("simplified: decode %q: %w", base, err)
 		}
-		if err := placeLeaf(compJSON, leaf.AQLPath, predIndex, predType, dv, budget, names); err != nil {
+		if err := placeLeaf(compJSON, leaf.AQLPath, predIndex, predType, dv, budget, tmpl); err != nil {
 			return nil, fmt.Errorf("simplified: place %q: %w", base, err)
 		}
 	}
 	// Composite leaves are placed like any other leaf, after the clinical loop so a
 	// malformed ordinary key still surfaces first.
 	for _, g := range compositeGroups {
-		if err := placeCompositeLeaf(compJSON, wt, g, ambiguous, budget, names); err != nil {
+		if err := placeCompositeLeaf(compJSON, wt, g, ambiguous, budget, tmpl); err != nil {
 			return nil, err
 		}
 	}
 	// Underscore RM attributes come after the clinical leaves, so their owners
 	// are decorated onto nodes the content walk has already materialised rather
 	// than gap-filling their own (REQ-140).
-	if err := decodeRMAttrGroups(compJSON, wt, attrGroups, ambiguous, budget, names); err != nil {
+	if err := decodeRMAttrGroups(compJSON, wt, attrGroups, ambiguous, budget, tmpl); err != nil {
 		return nil, err
 	}
+	// Every member is placed, the ones a composite leaf or an underscore family
+	// reached first among them: each list now takes the template's node order
+	// (REQ-053).
+	orderByTemplate(compJSON, wt)
 	// The composition is named by its `<root>/_name` where the body spells one,
 	// which the router has just placed, and otherwise by the Web Template
 	// (REQ-140).
@@ -255,7 +263,8 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 		compJSON["name"] = textJSON(impliedCompositionName(wt))
 	}
 	// Every key is placed, so each rebuilt ISM transition can now get the careflow
-	// step its node names, or have the body's checked against it (REQ-053).
+	// step its node names, or have the body's checked against it, and a current
+	// state that names no terminology gets `openehr` (REQ-053).
 	if err := settleIsmTransitions(compJSON, wt); err != nil {
 		return nil, err
 	}
@@ -278,10 +287,13 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	if err := applyContext(compJSON, ci, composerJSON); err != nil {
 		return nil, err
 	}
-	// Conformant mode (a template was supplied, so names is non-nil): fill the
-	// RM-mandatory attributes the formats do not carry, from ctx defaults + RM
+	// Conformant mode (a template was supplied, so tmpl is non-nil): every key
+	// is placed, so each rebuilt node gets the required structures with no
+	// member the formats have no key for (REQ-053); then the RM-mandatory
+	// attributes the formats do not carry are filled, from ctx defaults + RM
 	// conventions, so the decoded composition is OPT-validatable.
-	if names != nil {
+	if tmpl != nil {
+		rebuildEmptyStructures(compJSON, tmpl)
 		completeRequired(compJSON, ci)
 	}
 	// Both modes: archetype_details has no FLAT key, and the Web Template
@@ -705,7 +717,7 @@ func holdsOneValue(parent, child *webtemplate.Node) bool {
 	}
 	curType := nodeRMType(parent)
 	for i, seg := range rel[:target] {
-		curType = concreteType(curType, seg.attr, "", rel[i+1].attr)
+		curType = concreteType(curType, seg.attr, "", "", rel[i+1].attr)
 		if curType == "" {
 			return false
 		}
@@ -1402,15 +1414,16 @@ func parseAQL(p string) []aqlSeg {
 // attribute to the leaf value: a DataValue, or the RM String of a STRING leaf.
 //
 // Reconstructed intermediate and leaf nodes carry _type + archetype_node_id;
-// when names is non-nil (a template was supplied via WithTemplate) the mandatory
-// LOCATABLE.name is set from it, keyed by the node's compiled aqlPath — which
-// the walk reconstructs by keeping a predicate only on container attributes
-// (matching templatecompile's path convention). Without names, nodes are left
-// unnamed (rmpath re-resolves by archetype_node_id, so the round-trip does not
-// depend on it — but the result is then format-idempotent, not canonically
-// complete; see deviations.md).
-func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int, predType map[string]string, value any, budget *allocBudget, names map[string]string) error {
-	cur, attr, err := walkAQL(compJSON, aqlPath, predIndex, predType, budget, names)
+// when tmpl is non-nil (a template was supplied via WithTemplate) the mandatory
+// LOCATABLE.name is set from it, and a folded ITEM_STRUCTURE takes the concrete
+// subtype it gives, both keyed by the node's compiled aqlPath — which the walk
+// reconstructs by keeping a predicate only on container attributes (matching
+// templatecompile's path convention). Without tmpl, nodes are left unnamed
+// (rmpath re-resolves by archetype_node_id, so the round-trip does not depend
+// on it — but the result is then format-idempotent, not canonically complete;
+// see deviations.md).
+func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int, predType map[string]string, value any, budget *allocBudget, tmpl *templateIndex) error {
+	cur, attr, err := walkAQL(compJSON, aqlPath, predIndex, predType, budget, tmpl)
 	if err != nil {
 		return err
 	}
@@ -1430,7 +1443,7 @@ func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int
 // underscore family's is the RM attribute it addresses
 // (`…/items[at0008]/uid`), which is also the lookahead [concreteType] needs to
 // resolve the abstract ITEM_STRUCTURE slot the Web Template collapses.
-func walkAQL(compJSON map[string]any, aqlPath string, predIndex map[string]int, predType map[string]string, budget *allocBudget, names map[string]string) (map[string]any, string, error) {
+func walkAQL(compJSON map[string]any, aqlPath string, predIndex map[string]int, predType map[string]string, budget *allocBudget, tmpl *templateIndex) (map[string]any, string, error) {
 	segs := parseAQL(aqlPath)
 	if len(segs) == 0 {
 		return nil, "", fmt.Errorf("%w: empty canonical path", ErrUnknownPath)
@@ -1442,8 +1455,8 @@ func walkAQL(compJSON map[string]any, aqlPath string, predIndex map[string]int, 
 	// predicate on every predicated segment — the positional key
 	// predIndex/predType are stored under, bare-keyed by resolveLeaf to
 	// match; namePrefix keeps a predicate only on container attributes
-	// (templatecompile's convention), the key of the WithTemplate name
-	// index, which aliases every entry under its bare spelling.
+	// (templatecompile's convention), the key of the WithTemplate
+	// [templateIndex], which aliases every entry under its bare spelling.
 	var aqlPrefix, namePrefix strings.Builder
 	for i, seg := range segs {
 		if i == len(segs)-1 {
@@ -1456,12 +1469,6 @@ func walkAQL(compJSON map[string]any, aqlPath string, predIndex map[string]int, 
 			aqlPrefix.WriteString(seg.pred)
 			aqlPrefix.WriteString("]")
 		}
-		wtType := predType[aqlPrefix.String()]
-		nextAttr := segs[i+1].attr
-		childType := concreteType(curType, seg.attr, wtType, nextAttr)
-		if childType == "" {
-			return nil, "", fmt.Errorf("%w: cannot resolve RM type for %q on %s (aqlPath %q)", ErrUnknownPath, seg.attr, curType, aqlPath)
-		}
 		container, _ := rminfo.Default.IsContainer(curType, seg.attr)
 		namePrefix.WriteString("/")
 		namePrefix.WriteString(seg.attr)
@@ -1469,6 +1476,12 @@ func walkAQL(compJSON map[string]any, aqlPath string, predIndex map[string]int, 
 			namePrefix.WriteString("[")
 			namePrefix.WriteString(seg.pred)
 			namePrefix.WriteString("]")
+		}
+		wtType := predType[aqlPrefix.String()]
+		nextAttr := segs[i+1].attr
+		childType := concreteType(curType, seg.attr, wtType, tmpl.rmType(namePrefix.String()), nextAttr)
+		if childType == "" {
+			return nil, "", fmt.Errorf("%w: cannot resolve RM type for %q on %s (aqlPath %q)", ErrUnknownPath, seg.attr, curType, aqlPath)
 		}
 		if container {
 			next, err := selectElem(cur, seg.attr, childType, seg.pred, predIndex[aqlPrefix.String()], budget)
@@ -1507,9 +1520,9 @@ func walkAQL(compJSON map[string]any, aqlPath string, predIndex map[string]int, 
 		}
 		// Only a LOCATABLE has a name. The template's name index also covers an
 		// archetyped ISM_TRANSITION node, which must not gain one.
-		if nm := names[namePrefix.String()]; nm != "" && nameable(childType) {
-			if _, has := cur["name"]; !has {
-				cur["name"] = textJSON(nm)
+		if _, has := cur["name"]; !has {
+			if name := tmpl.nameJSON(namePrefix.String()); name != nil && nameable(childType) {
+				cur["name"] = name
 			}
 		}
 		curType = childType
@@ -1533,15 +1546,20 @@ type ismNode struct {
 
 // ismTransitionNodes indexes the Web Template's archetyped ISM_TRANSITION nodes
 // by the bare spelling of their canonical path, which is the path
-// [settleIsmTransitions] rebuilds from the decoded tree.
-func ismTransitionNodes(wt *webtemplate.WebTemplate) map[string]ismNode {
-	out := make(map[string]ismNode)
+// [settleIsmTransitions] rebuilds from the decoded tree. found reports whether
+// the Web Template has an ISM_TRANSITION node of either kind, the in-context
+// `ism_transition` node included.
+func ismTransitionNodes(wt *webtemplate.WebTemplate) (nodes map[string]ismNode, found bool) {
+	nodes = make(map[string]ismNode)
 	var walk func(n *webtemplate.Node, flat string)
 	walk = func(n *webtemplate.Node, flat string) {
 		for _, ch := range n.Children {
 			chFlat := flat + "/" + ch.ID
-			if ch.NodeID != "" && nodeRMType(ch) == "ISM_TRANSITION" {
-				out[bareAQLPath(ch.AQLPath)] = ismNode{id: ch.NodeID, name: ch.Name, flat: chFlat}
+			if nodeRMType(ch) == "ISM_TRANSITION" {
+				found = true
+				if ch.NodeID != "" {
+					nodes[bareAQLPath(ch.AQLPath)] = ismNode{id: ch.NodeID, name: ch.Name, flat: chFlat}
+				}
 			}
 			walk(ch, chFlat)
 		}
@@ -1549,25 +1567,29 @@ func ismTransitionNodes(wt *webtemplate.WebTemplate) map[string]ismNode {
 	if wt.Tree != nil {
 		walk(wt.Tree, wt.Tree.ID)
 	}
-	return out
+	return nodes, found
 }
 
-// settleIsmTransitions finishes each ISM_TRANSITION the placement walk rebuilt
-// at an archetyped `ism_transition[atNNNN]` node, once every key is placed.
+// settleIsmTransitions finishes each ISM_TRANSITION the placement walk rebuilt,
+// once every key is placed.
 //
-// Encode matches a transition to its node by careflow step code, because an
-// ISM_TRANSITION is not LOCATABLE and has no archetype_node_id (REQ-121). So a
-// transition without a careflow step gets the one its node names: the node id as
-// a `local` code, the node's Web Template name as its value. A careflow step the
-// body carries must be coded with the node id; one coded otherwise belongs to
-// another node, and encode would move the transition there (REQ-053). The node id
-// [walkAQL] recorded on the object is removed here, so it never reaches canjson.
+// At either kind of node, the archetyped `ism_transition[atNNNN]` one and the
+// in-context `ism_transition` one, a current state that names no terminology
+// takes `openehr` ([impliedCurrentStateTerminology]). The rest applies at an
+// archetyped node only. Encode matches a transition to its node by careflow
+// step code, because an ISM_TRANSITION is not LOCATABLE and has no
+// archetype_node_id (REQ-121). So a transition without a careflow step gets the
+// one its node names: the node id as a `local` code, the node's Web Template
+// name as its value. A careflow step the body carries must be coded with the
+// node id; one coded otherwise belongs to another node, and encode would move
+// the transition there (REQ-053). The node id [walkAQL] recorded on the object
+// is removed here, so it never reaches canjson.
 //
 // The walk rebuilds each object's bare canonical path from the archetype_node_id
 // values placement wrote, which is how [walkAQL] spells the same path.
 func settleIsmTransitions(compJSON map[string]any, wt *webtemplate.WebTemplate) error {
-	nodes := ismTransitionNodes(wt)
-	if len(nodes) == 0 {
+	nodes, found := ismTransitionNodes(wt)
+	if !found {
 		return nil
 	}
 	return settleIsmTransitionsUnder(compJSON, "", nodes)
@@ -1581,9 +1603,12 @@ func settleIsmTransitionsUnder(obj map[string]any, path string, nodes map[string
 		switch v := obj[attr].(type) {
 		case map[string]any:
 			p := path + "/" + attr + nodePredicate(v)
-			if n, ok := nodes[p]; ok && v["_type"] == "ISM_TRANSITION" {
-				if err := settleIsmTransition(v, n); err != nil {
-					return err
+			if v["_type"] == "ISM_TRANSITION" {
+				impliedCurrentStateTerminology(v)
+				if n, ok := nodes[p]; ok {
+					if err := settleIsmTransition(v, n); err != nil {
+						return err
+					}
 				}
 				continue
 			}
@@ -1603,6 +1628,18 @@ func settleIsmTransitionsUnder(obj map[string]any, path string, nodes map[string
 		}
 	}
 	return nil
+}
+
+// impliedCurrentStateTerminology gives a rebuilt ISM_TRANSITION's current state
+// the `openehr` terminology when it names none (no terminology_id, or a null
+// one). RM `Current_state_valid` admits a code of the openEHR `instruction
+// states` group alone, so no other terminology can be meant; it is the footing
+// `ctx/setting` has in EVENT_CONTEXT `Setting_valid` (REQ-053). A terminology
+// the body names is kept as written, for validation to check.
+func impliedCurrentStateTerminology(tr map[string]any) {
+	if dc := definingCodeOf(tr["current_state"]); dc != nil && dc["terminology_id"] == nil {
+		dc["terminology_id"] = map[string]any{"_type": "TERMINOLOGY_ID", "value": terminology.ID}
+	}
 }
 
 // nodePredicate is the `[id]` a rebuilt node adds to its canonical path, or ""
@@ -1721,11 +1758,12 @@ func inContextCite(attr string) string {
 // third out-of-scope class covers `transition` and `reason`):
 //
 //   - a `current_state`, `transition` or `careflow_step` leaf, with any suffix,
-//     under an ISM transition node: the reference's in-context `ism_transition`
-//     node, which this SDK's Web Template does not project, or an archetyped
-//     `ism_transition[atNNNN]` node that has no child of that id (the Web
-//     Template models `current_state` and `careflow_step` there, never
-//     `transition`);
+//     under an ISM transition node that has no child of that id: the
+//     reference's in-context `ism_transition` node, which this SDK's Web
+//     Template projects, with `current_state` alone, only for an ACTION whose
+//     template constrains no ISM transition, or an archetyped
+//     `ism_transition[atNNNN]` node (the Web Template models `current_state`
+//     and `careflow_step` there, never `transition`);
 //   - a `_reason` family under either node;
 //   - the ACTION's own `time` leaf, with any suffix;
 //   - an INTERVAL_EVENT's `math_function`, `width` or `sample_count`, and an
@@ -1798,8 +1836,9 @@ func inContextKey(wt *webtemplate.WebTemplate, key string, pk parsedKey, ambiguo
 }
 
 // ismAttrKey judges the key below the ISM transition segment segs[i], whose Web
-// Template node is ism (nil for the reference's in-context node): an
-// ISM_TRANSITION leaf the node does not model, or a `_reason` family.
+// Template node is ism (nil for the reference's in-context node where the Web
+// Template has none): an ISM_TRANSITION leaf the node does not model, or a
+// `_reason` family.
 func ismAttrKey(key string, segs []flatSeg, i int, ism *webtemplate.Node) (named, attr string, ok bool) {
 	rest := segs[i+1:]
 	switch {
@@ -1984,7 +2023,7 @@ func compositeLeafOwnsSub(rmType, seg string) bool {
 // placeCompositeLeaf decodes one composite-leaf group and places the value at the
 // leaf's canonical path, exactly as the clinical leaf loop places a DataValue.
 func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g rmattrGroup,
-	ambiguous map[string]bool, budget *allocBudget, names map[string]string,
+	ambiguous map[string]bool, budget *allocBudget, tmpl *templateIndex,
 ) error {
 	pk, err := parseFlatKey(g.prefix())
 	if err != nil {
@@ -2014,7 +2053,7 @@ func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g 
 	if err != nil {
 		return err
 	}
-	if err := placeLeaf(compJSON, node.AQLPath, predIndex, predType, value, budget, names); err != nil {
+	if err := placeLeaf(compJSON, node.AQLPath, predIndex, predType, value, budget, tmpl); err != nil {
 		return fmt.Errorf("simplified: place %q: %w", g.prefix(), err)
 	}
 	return nil
@@ -2060,7 +2099,7 @@ func compositeLeafValue(g rmattrGroup, rmType string) (map[string]any, error) {
 //     `context/start_time`, an ENTRY `language`, an ISM_TRANSITION member), so
 //     it has no underscore owner and the key is unresolvable.
 func rmattrOwnerAt(wt *webtemplate.WebTemplate, compJSON map[string]any, base string,
-	ambiguous map[string]bool, budget *allocBudget, names map[string]string,
+	ambiguous map[string]bool, budget *allocBudget, tmpl *templateIndex,
 ) (rmattrOwner, error) {
 	pk, err := parseFlatKey(base)
 	if err != nil {
@@ -2072,7 +2111,7 @@ func rmattrOwnerAt(wt *webtemplate.WebTemplate, compJSON map[string]any, base st
 	}
 	walk := func(ownerAql string, predIndex map[string]int, predType map[string]string) func(string) (map[string]any, error) {
 		return func(attr string) (map[string]any, error) {
-			node, _, err := walkAQL(compJSON, ownerAql+"/"+attr, predIndex, predType, budget, names)
+			node, _, err := walkAQL(compJSON, ownerAql+"/"+attr, predIndex, predType, budget, tmpl)
 			return node, err
 		}
 	}
@@ -2146,48 +2185,354 @@ func bareAQLPath(p string) string {
 	return b.String()
 }
 
-// buildNameIndex walks the compiled template and maps each archetype node's
-// aqlPath to its LOCATABLE name — the template-level node name where the OPT
-// pins one (REQ-116: that pinned value IS the node's modelled name, and it is
-// what the reference materialises), else the node-id term rubric in the
-// default language. Used by decode to repopulate LOCATABLE.name (see
-// WithTemplate).
+// templateIndex is what a WithTemplate decode reads from the compiled template:
+// the facts the formats do not carry and the template determines, per archetype
+// node. Each is keyed by the node's compiled aqlPath, which keeps a predicate
+// only on container attributes and which [walkAQL] rebuilds as it walks, and
+// again by that path's bare spelling (REQ-116 name predicates removed), because
+// decode composes its key from FLAT segments that carry no name.
+//
+// A nil index is the OPT-free decode: every lookup then answers "".
+type templateIndex struct {
+	// names maps a path to the LOCATABLE name decode gives the node there.
+	names map[string]string
+	// codedNames maps a path to the DV_CODED_TEXT name decode gives the node
+	// there in place of the DV_TEXT name of names, where the template
+	// determines one ([codedNameOf]). It maps to the zero codedName where the
+	// nodes at one path disagree on it, one of them determining none
+	// included: the template then gives no single coded name.
+	codedNames map[string]codedName
+	// rmTypes maps a path to the RM type the template gives the node there. It
+	// maps to "" where the nodes at one path disagree, the alternatives of one
+	// single-valued attribute, say, which share a path: the template then gives
+	// no single answer.
+	rmTypes map[string]string
+	// structures maps the bare path of a node to the empty structures decode
+	// may rebuild under it ([emptyStructure]). A path whose nodes disagree on
+	// them has no entry: the template then gives no single answer.
+	structures map[string][]emptyStructure
+	// structureRoute holds the bare path of every node on the way to a key of
+	// structures, that key included, so the rebuild walk enters no other node.
+	structureRoute map[string]bool
+}
+
+// emptyStructure is a structure decode rebuilds with no member, under a
+// rebuilt node that lacks it, as the generator writes it: an ITEM_STRUCTURE
+// object that holds its type, its node id and a name, and nothing else. The
+// formats have no key for a structure with no member, so its node is never
+// rebuilt from the body.
+//
+// The template gives one where a single-valued attribute of a node allows
+// only children that agree, on the RM type and the node id, and that are
+// each a concrete ITEM_STRUCTURE the template lets hold no member
+// ([holdsNoMember]). A slot and an archetype root give none: the node they
+// stand for is not the template's alone to name.
+type emptyStructure struct {
+	// attr is the single-valued attribute that holds the structure, and path
+	// the structure's bare path, whose name in the index the structure takes.
+	attr, path string
+	// rmType is the structure's concrete ITEM_STRUCTURE subtype, and nodeID its
+	// archetype_node_id.
+	rmType, nodeID string
+	// required is set where the template's existence requires attr. Where it
+	// does not, decode rebuilds the structure only where the RM requires attr
+	// of the rebuilt node's class, as the validator reads it.
+	required bool
+}
+
+// name returns the LOCATABLE name the template gives the node at path, or "".
+func (x *templateIndex) name(path string) string {
+	if x == nil {
+		return ""
+	}
+	return x.names[path]
+}
+
+// nameJSON returns, as a canonical object, the name decode gives the node at
+// path: the coded name the template determines there, else a DV_TEXT of the
+// node's name, or nil where the index gives the node no name.
+func (x *templateIndex) nameJSON(path string) map[string]any {
+	if x == nil {
+		return nil
+	}
+	if c := x.codedNames[path]; c != (codedName{}) {
+		return c.json()
+	}
+	if name := x.name(path); name != "" {
+		return textJSON(name)
+	}
+	return nil
+}
+
+// addCodedName records name, the coded name the node at path gets, the zero
+// codedName where it gets none. A second node at that path with another
+// leaves the path with no coded name.
+func (x *templateIndex) addCodedName(path string, name codedName) {
+	if prev, seen := x.codedNames[path]; seen && prev != name {
+		name = codedName{}
+	}
+	x.codedNames[path] = name
+}
+
+// codedName is a DV_CODED_TEXT name the template determines for a node: its
+// text, and the code and terminology of its defining code. The zero value is
+// no coded name.
+type codedName struct {
+	value, code, terminology string
+}
+
+// json is the canonical object of the coded name c.
+func (c codedName) json() map[string]any {
+	return map[string]any{
+		"_type":         "DV_CODED_TEXT",
+		"value":         c.value,
+		"defining_code": codePhraseJSON(c.code, c.terminology),
+	}
+}
+
+// codedNameOf returns the coded name the template determines for the node n,
+// or the zero codedName where it determines none. The template determines
+// one where it constrains n's name as a DV_CODED_TEXT, through one child or
+// through alternatives that agree on it, each of which determines one coded
+// value ([codedValueOf]). A name the template constrains in any other way,
+// or not at all, gets the DV_TEXT name of the index.
+func codedNameOf(n *templatecompile.CompiledNode) codedName {
+	attr := n.Attribute("name")
+	if attr == nil {
+		return codedName{}
+	}
+	children := tcimpl.AllowedChildNodes(attr)
+	if len(children) == 0 {
+		return codedName{}
+	}
+	first := codedValueOf(children[0])
+	for _, c := range children[1:] {
+		if codedValueOf(c) != first {
+			return codedName{}
+		}
+	}
+	return first
+}
+
+// codedValueOf returns the coded value c, a child of a node's name,
+// determines, or the zero codedName where it determines none. c must be a
+// DV_CODED_TEXT whose defining_code the template constrains through one
+// C_CODE_PHRASE, of a named terminology, that lists either exactly one code,
+// or several of which exactly one has a term text ([codeTermText]) equal to
+// the text the template pins on c's value: a closed C_STRING list of one
+// entry. The value's text is the pinned text, else the code's term text, and
+// the C_STRING on c's value, if any, must admit it. This is the name the
+// generator writes there. A C_CODE_PHRASE that lists no code, an external
+// reference set (C_CODE_REFERENCE) and several codes with no pinned text
+// leave the code open, and a code with no term text and no pinned text leaves
+// the text open: decode invents neither.
+func codedValueOf(c *templatecompile.CompiledNode) codedName {
+	if c.RMTypeName() != "DV_CODED_TEXT" {
+		return codedName{}
+	}
+	phrase, ok := onePrimitive(c, "defining_code").(constraints.CodePhrase)
+	if !ok || phrase.Terminology == "" {
+		return codedName{}
+	}
+	text, hasText := onePrimitive(c, "value").(constraints.CString)
+	pinned := ""
+	if hasText && len(text.List) == 1 && !text.ListOpen {
+		pinned = text.List[0]
+	}
+	code := ""
+	switch {
+	case len(phrase.CodeList) == 1:
+		code = phrase.CodeList[0]
+	case pinned != "":
+		for _, listed := range phrase.CodeList {
+			if term, ok := codeTermText(c, phrase.Terminology, listed); ok && term == pinned {
+				if code != "" && code != listed {
+					return codedName{}
+				}
+				code = listed
+			}
+		}
+	}
+	if code == "" {
+		return codedName{}
+	}
+	value := pinned
+	if value == "" {
+		if value, ok = codeTermText(c, phrase.Terminology, code); !ok {
+			return codedName{}
+		}
+	}
+	if hasText && len(text.Validate(value)) > 0 {
+		return codedName{}
+	}
+	return codedName{value: value, code: code, terminology: phrase.Terminology}
+}
+
+// onePrimitive returns the primitive constraint of the one child the template
+// allows on the attribute attr of n, or nil where it allows none or more than
+// one.
+func onePrimitive(n *templatecompile.CompiledNode, attr string) constraints.PrimitiveConstraint {
+	a := n.Attribute(attr)
+	if a == nil {
+		return nil
+	}
+	children := tcimpl.AllowedChildNodes(a)
+	if len(children) != 1 {
+		return nil
+	}
+	return children[0].PrimitiveConstraint()
+}
+
+// codeTermText returns the term text of code in terminologyID, as the
+// generator reads it for a coded name under the node n. A code of the openEHR
+// terminology takes its rubric ([openehrRubric]). Any other takes the text of
+// the term that n's own archetype, its nearest enclosing archetype root,
+// defines for it: under the code for a local code, else under
+// "<terminology>::<code>", or under the code alone where that is no at-code,
+// the key some OPTs give such a term. ok is false where none gives a text.
+func codeTermText(n *templatecompile.CompiledNode, terminologyID, code string) (string, bool) {
+	switch terminologyID {
+	case terminology.ID:
+		return openehrRubric(code)
+	case localTerminology:
+		text, ok := tcimpl.RootTermItem(n, code, "text")
+		return text, ok && text != ""
+	}
+	if text, ok := tcimpl.RootTermItem(n, terminologyID+"::"+code, "text"); ok && text != "" {
+		return text, true
+	}
+	if isAtCode(code) {
+		return "", false
+	}
+	text, ok := tcimpl.RootTermItem(n, code, "text")
+	return text, ok && text != ""
+}
+
+// openehrRubric returns the rubric the openEHR terminology gives code. A
+// rubric belongs to a code within a group, and the RM ties a node's name to
+// no group, so code has a rubric only where every group that holds it gives
+// it the same one: 532 is "complete" in one group and "completed" in another,
+// and has none.
+func openehrRubric(code string) (string, bool) {
+	rubric := ""
+	for g := range terminology.Groups() {
+		r, ok := g.Rubric(code)
+		if !ok {
+			continue
+		}
+		if rubric != "" && r != rubric {
+			return "", false
+		}
+		rubric = r
+	}
+	return rubric, rubric != ""
+}
+
+// isAtCode reports whether code is an archetype term code: "at" followed by
+// digits, with any dot extensions of digits for a specialisation, such as
+// at0010 or at0010.2 (ADL 1.4, Node Identification).
+func isAtCode(code string) bool {
+	rest, ok := strings.CutPrefix(code, "at")
+	if !ok {
+		return false
+	}
+	for part := range strings.SplitSeq(rest, ".") {
+		if part == "" || strings.Trim(part, "0123456789") != "" {
+			return false
+		}
+	}
+	return true
+}
+
+// rmType returns the one RM type the template gives the node at path, or ""
+// where it gives none or the nodes there disagree.
+func (x *templateIndex) rmType(path string) string {
+	if x == nil {
+		return ""
+	}
+	return x.rmTypes[path]
+}
+
+// addRMType records rmType for the node at path. A second node at that path
+// with another type leaves the path with no single answer.
+func (x *templateIndex) addRMType(path, rmType string) {
+	if prev, seen := x.rmTypes[path]; seen && prev != rmType {
+		rmType = ""
+	}
+	x.rmTypes[path] = rmType
+}
+
+// buildTemplateIndex walks the compiled template and indexes each archetype
+// node's RM type and its LOCATABLE name — the template-level node name where
+// the OPT pins one (REQ-116: that pinned value IS the node's modelled name, and
+// it is what the reference materialises), else the node-id term rubric in the
+// default language. Decode repopulates LOCATABLE.name from the names, and takes
+// a folded ITEM_STRUCTURE's concrete subtype from the types (see WithTemplate).
+// Where the template constrains a node's name as a DV_CODED_TEXT and
+// determines its code and text, the node's coded name ([codedNameOf]) takes
+// the place of its DV_TEXT name.
 //
 // Every node is indexed under both its compiled path and that path's bare
-// spelling (REQ-116 name predicates removed), because decode composes its
-// key from FLAT segments that carry no name. Siblings sharing a bare path
-// carry the same at-code and therefore the same rubric — but where they pin
-// *distinct* names (archetype reuse under a slot), the bare spelling cannot
-// say which sibling is meant, so the alias falls back to the shared rubric
-// rather than guess: those instances decode with the pre-REQ-116 name. The
-// per-sibling pinned name at a bare key needs the FLAT segment identity
-// carried into this lookup — recorded in deviations.md § Conformance as part
-// of the reused-sibling residual the PROBE-086 adapter work owns.
+// spelling. Siblings sharing a bare path carry the same at-code and therefore
+// the same rubric — but where they pin *distinct* names (archetype reuse under
+// a slot), the bare spelling cannot say which sibling is meant, so the name
+// alias falls back to the shared rubric rather than guess: those instances
+// decode with the pre-REQ-116 name. The per-sibling pinned name at a bare key
+// needs the FLAT segment identity carried into this lookup — recorded in
+// deviations.md § Conformance as part of the reused-sibling residual the
+// PROBE-086 adapter work owns. Siblings sharing a bare path with distinct RM
+// types leave the type alias with no answer, and siblings there that disagree
+// on a coded name, one of them giving none included, leave the alias with no
+// coded name, so those instances take the DV_TEXT name.
+//
+// The empty structures each node may get ([emptyStructure]) are indexed under
+// the bare path alone, the one the rebuild walk composes. Nodes at one bare
+// path that disagree on them, alternatives or siblings that narrow one
+// archetype differently, leave the path with none, since decode cannot tell
+// which of them a rebuilt node stands for ([dropDisagreeingStructures]).
 //
 // The walk reads the compiled template in place, through the module-internal
 // readers that do not copy a node's attributes, an attribute's children or a
 // term's items. A compiled template carries one set of terms, in its default
 // language, so the rubric is in that language.
-func buildNameIndex(c *templatecompile.Compiled) map[string]string {
-	names := make(map[string]string)
+func buildTemplateIndex(c *templatecompile.Compiled) *templateIndex {
+	x := &templateIndex{
+		names:      make(map[string]string),
+		codedNames: make(map[string]codedName),
+		rmTypes:    make(map[string]string),
+		structures: make(map[string][]emptyStructure),
+	}
 	var walk func(n *templatecompile.CompiledNode)
 	walk = func(n *templatecompile.CompiledNode) {
+		if s := emptyStructuresOf(n); len(s) > 0 {
+			if bare := bareAQLPath(n.AQLPath()); x.structures[bare] == nil {
+				x.structures[bare] = s
+			}
+		}
 		if id := n.NodeID(); id != "" {
+			path := n.AQLPath()
+			bare := bareAQLPath(path)
+			x.addRMType(path, n.RMTypeName())
+			coded := codedNameOf(n)
+			x.addCodedName(path, coded)
+			if bare != path {
+				x.addRMType(bare, n.RMTypeName())
+				x.addCodedName(bare, coded)
+			}
 			rubric, _ := tcimpl.TermItem(n, id, "text")
 			name := n.NodeName()
 			if name == "" {
 				name = rubric
 			}
 			if name != "" {
-				path := n.AQLPath()
-				names[path] = name
-				if bare := bareAQLPath(path); bare != path {
-					if prev, taken := names[bare]; taken && prev != name {
+				x.names[path] = name
+				if bare != path {
+					if prev, taken := x.names[bare]; taken && prev != name {
 						// Two named siblings share this bare spelling —
 						// ambiguous; keep the shared rubric instead.
-						names[bare] = rubric
+						x.names[bare] = rubric
 					} else {
-						names[bare] = name
+						x.names[bare] = name
 					}
 				}
 			}
@@ -2200,8 +2545,200 @@ func buildNameIndex(c *templatecompile.Compiled) map[string]string {
 	}
 	if root := c.Root(); root != nil {
 		walk(root)
+		dropDisagreeingStructures(root, x.structures)
 	}
-	return names
+	x.structureRoute = make(map[string]bool)
+	for p := range x.structures {
+		for i := 1; i <= len(p); i++ {
+			if i == len(p) || p[i] == '/' {
+				x.structureRoute[p[:i]] = true
+			}
+		}
+	}
+	return x
+}
+
+// dropDisagreeingStructures removes from structures each bare path at which
+// two nodes of the template below root, the root included, disagree on the
+// empty structures they give ([emptyStructuresOf]): a node that gives none
+// there disagrees with one that gives some.
+func dropDisagreeingStructures(root *templatecompile.CompiledNode, structures map[string][]emptyStructure) {
+	if len(structures) == 0 {
+		return
+	}
+	var walk func(n *templatecompile.CompiledNode)
+	walk = func(n *templatecompile.CompiledNode) {
+		bare := bareAQLPath(n.AQLPath())
+		if s, ok := structures[bare]; ok && !slices.Equal(s, emptyStructuresOf(n)) {
+			delete(structures, bare)
+		}
+		for _, a := range tcimpl.NodeAttributes(n) {
+			for _, ch := range tcimpl.ChildNodes(a) {
+				walk(ch)
+			}
+		}
+	}
+	walk(root)
+}
+
+// emptyStructuresOf returns, in attribute order, the empty structures the
+// template gives the node n ([emptyStructure]), one per single-valued
+// attribute at most.
+func emptyStructuresOf(n *templatecompile.CompiledNode) []emptyStructure {
+	var out []emptyStructure
+	for _, a := range tcimpl.NodeAttributes(n) {
+		if a.Cardinality() == template.Multiple {
+			continue
+		}
+		children := tcimpl.AllowedChildNodes(a)
+		if len(children) == 0 {
+			continue
+		}
+		first := children[0]
+		if slices.ContainsFunc(children, func(c *templatecompile.CompiledNode) bool {
+			return c.RMTypeName() != first.RMTypeName() || c.NodeID() != first.NodeID() || !isEmptyStructure(c)
+		}) {
+			continue
+		}
+		out = append(out, emptyStructure{
+			attr:     a.Name(),
+			path:     bareAQLPath(first.AQLPath()),
+			rmType:   first.RMTypeName(),
+			nodeID:   first.NodeID(),
+			required: tcimpl.LowerAtLeastOne(a.Existence()),
+		})
+	}
+	return out
+}
+
+// isEmptyStructure reports whether decode can rebuild the template node c as
+// a structure with no member: c is no slot and no archetype root, is of a
+// concrete ITEM_STRUCTURE subtype, and holds no member the template or the RM
+// requires ([holdsNoMember]). A node with no node id has no name in the index,
+// so [rebuildEmptyStructures] leaves it out.
+func isEmptyStructure(c *templatecompile.CompiledNode) bool {
+	if c.IsSlot() || c.ArchetypeID() != "" {
+		return false
+	}
+	if conforms, _ := tcimpl.ClassConformsTo(c.RMTypeName(), "ITEM_STRUCTURE"); !conforms {
+		return false
+	}
+	h, ok := rminfo.Default.(rminfo.Hierarchy)
+	if !ok {
+		return false
+	}
+	if abstract, _ := h.IsAbstract(c.RMTypeName()); abstract {
+		return false
+	}
+	return holdsNoMember(c)
+}
+
+// holdsNoMember reports whether the template node c, an ITEM_STRUCTURE,
+// validates with no member, as the validator reads it (clinical-modeling.md,
+// An existence lower bound alone asks for no member). The RM requires none of
+// its attributes but its name and node id, which the rebuilt structure
+// carries. The template requires none of the others: no single-valued one by
+// its existence, no list by its existence together with a member it asks for
+// ([tcimpl.AsksForMember]), and no list it leaves optional by its existence
+// by a child that asks a list with no item for a member
+// ([tcimpl.MandatoryListChildren]). The validator also lets an RM rule that
+// keeps a list non-empty once present ask for a member, but the floor keeps
+// no list of an ITEM_STRUCTURE so ([rminfo.NonEmptyLists]).
+func holdsNoMember(c *templatecompile.CompiledNode) bool {
+	for _, attr := range rminfo.Default.RequiredAttributes(bmmtype.Class(c.RMTypeName())) {
+		if !carriedByEmptyStructure(attr) {
+			return false
+		}
+	}
+	for _, a := range tcimpl.NodeAttributes(c) {
+		if carriedByEmptyStructure(a.Name()) || a.NotInRM() {
+			continue
+		}
+		existence := tcimpl.LowerAtLeastOne(a.Existence())
+		switch {
+		case a.Cardinality() != template.Multiple:
+			if existence {
+				return false
+			}
+		case existence:
+			if tcimpl.AsksForMember(a) {
+				return false
+			}
+		default:
+			for range tcimpl.MandatoryListChildren(a) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// carriedByEmptyStructure reports whether attr is one a rebuilt empty
+// structure carries: its archetype_node_id and its name.
+func carriedByEmptyStructure(attr string) bool {
+	return attr == "archetype_node_id" || attr == "name"
+}
+
+// rebuildEmptyStructures gives each node decode rebuilt the empty structures
+// the template gives it ([emptyStructure]) that it lacks, where the template's
+// existence or the RM requires the attribute that holds one: the formats have
+// no key for a structure with no member, so a body whose template requires
+// one never spells it. Each structure gets its type, its node id and the name
+// the template index gives its path; one whose path has no name, a node with
+// no node id say, is not rebuilt. The walk composes each node's bare path as
+// walkAQL does, a predicate only on a list member, and enters only the nodes
+// on the way to one the template gives structures (structureRoute). The root
+// is entered with an empty path, which no key has: a COMPOSITION holds no
+// ITEM_STRUCTURE. It never builds a parent node, a member or a value: only a
+// structure under a node the body rebuilt.
+func rebuildEmptyStructures(compJSON map[string]any, tmpl *templateIndex) {
+	if len(tmpl.structures) == 0 {
+		return
+	}
+	var walk func(node map[string]any, path []byte)
+	walk = func(node map[string]any, path []byte) {
+		base := len(path)
+		for _, s := range tmpl.structures[string(path)] {
+			if _, has := node[s.attr]; has || (!s.required && !rmRequires(node, s.attr)) {
+				continue
+			}
+			if name := tmpl.nameJSON(s.path); name != nil {
+				node[s.attr] = map[string]any{
+					"_type":             s.rmType,
+					"archetype_node_id": s.nodeID,
+					"name":              name,
+				}
+			}
+		}
+		for attr, v := range node {
+			switch x := v.(type) {
+			case map[string]any:
+				path = append(append(path[:base], '/'), attr...)
+				if tmpl.structureRoute[string(path)] {
+					walk(x, path)
+				}
+			case []any:
+				for _, e := range x {
+					m, ok := e.(map[string]any)
+					if !ok {
+						continue
+					}
+					path = appendMemberPath(path[:base], attr, m)
+					if tmpl.structureRoute[string(path)] {
+						walk(m, path)
+					}
+				}
+			}
+		}
+	}
+	walk(compJSON, make([]byte, 0, 256))
+}
+
+// rmRequires reports whether the RM requires attr of node's class, as the
+// validator reads it, from the value's class.
+func rmRequires(node map[string]any, attr string) bool {
+	t, _ := node["_type"].(string)
+	return slices.Contains(rminfo.Default.RequiredAttributes(bmmtype.Class(t)), attr)
 }
 
 // checkNoPhantoms walks the rebuilt tree and rejects any container element that
@@ -2248,6 +2785,125 @@ func phantomKeysOnly(m map[string]any) bool {
 	return true
 }
 
+// orderByTemplate puts the members of every list in the rebuilt tree in the
+// Web Template's node order (REQ-053). FLAT orders only the instances of one
+// node, by their :index; nothing orders distinct nodes, and the leaf loop, the
+// composite leaves and the underscore families each append the members they
+// reach first, in the order of their keys. A member's place is where its node
+// first appears in a pre-order walk of the Web Template ([templateRanks]),
+// which follows the template. The instances of one node share a place, and
+// the sort is stable, so they keep their :index order. A member no Web Template
+// node accounts for, one without an archetype_node_id say, goes after the rest
+// in the order it was placed, so a list of RM attribute values keeps its order.
+//
+// The walk descends only into the nodes whose path the Web Template accounts
+// for: no node below any other one is a member it places.
+func orderByTemplate(compJSON map[string]any, wt *webtemplate.WebTemplate) {
+	rank := templateRanks(wt)
+	type member struct {
+		rank int
+		v    any
+	}
+	// walk visits the members of node, whose path is in path, and gives the
+	// buffer back cut to that path; it grows the buffer for each child's path.
+	var walk func(node map[string]any, path []byte) []byte
+	walk = func(node map[string]any, path []byte) []byte {
+		base := len(path)
+		for attr, v := range node {
+			switch x := v.(type) {
+			case map[string]any:
+				path = appendMemberPath(path[:base], attr, x)
+				if _, known := rank[string(path)]; known {
+					path = walk(x, path)
+				}
+			case []any:
+				if len(x) > 1 {
+					ranks := make([]int, len(x))
+					sorted := true
+					for i, e := range x {
+						m, _ := e.(map[string]any)
+						path = appendMemberPath(path[:base], attr, m)
+						r, known := rank[string(path)]
+						if !known {
+							r = math.MaxInt
+						}
+						ranks[i] = r
+						sorted = sorted && (i == 0 || ranks[i-1] <= r)
+					}
+					if !sorted {
+						members := make([]member, len(x))
+						for i, e := range x {
+							members[i] = member{rank: ranks[i], v: e}
+						}
+						slices.SortStableFunc(members, func(a, b member) int { return cmp.Compare(a.rank, b.rank) })
+						for i, mb := range members {
+							x[i] = mb.v
+						}
+					}
+				}
+				for _, e := range x {
+					m, ok := e.(map[string]any)
+					if !ok {
+						continue
+					}
+					path = appendMemberPath(path[:base], attr, m)
+					if _, known := rank[string(path)]; known {
+						path = walk(m, path)
+					}
+				}
+			}
+		}
+		return path[:base]
+	}
+	walk(compJSON, make([]byte, 0, 256))
+}
+
+// appendMemberPath appends to the path of a rebuilt node the bare canonical
+// path segment of the node m it holds under attr: the attribute, and m's
+// archetype_node_id as its predicate where it has one — the spelling [walkAQL]
+// keys predIndex by, and the bare spelling of a Web Template node's aqlPath.
+func appendMemberPath(path []byte, attr string, m map[string]any) []byte {
+	path = append(path, '/')
+	path = append(path, attr...)
+	if id, _ := m["archetype_node_id"].(string); id != "" {
+		path = append(path, '[')
+		path = append(path, id...)
+		path = append(path, ']')
+	}
+	return path
+}
+
+// templateRanks maps the bare spelling of every Web Template node's aqlPath,
+// and of every prefix of it that ends at a segment, to the position at which a
+// pre-order walk of the Web Template first reaches it. A prefix stands for a
+// node the Web Template folds away, such as the ELEMENT a collapsed leaf at
+// `…/items[at0004]/value` stands for at `…/items[at0004]`: that ELEMENT takes
+// its leaf's place.
+func templateRanks(wt *webtemplate.WebTemplate) map[string]int {
+	rank := make(map[string]int)
+	next := 0
+	var walk func(n *webtemplate.Node)
+	walk = func(n *webtemplate.Node) {
+		p := bareAQLPath(n.AQLPath)
+		for i := 1; i <= len(p); i++ {
+			if i < len(p) && p[i] != '/' {
+				continue
+			}
+			if _, seen := rank[p[:i]]; !seen {
+				rank[p[:i]] = next
+			}
+		}
+		next++
+		for _, ch := range n.Children {
+			walk(ch)
+		}
+	}
+	if wt.Tree != nil {
+		walk(wt.Tree)
+	}
+	return rank
+}
+
 // selectElem finds (or creates) the element with archetype_node_id==pred in
 // cur[attr]'s list, at the idx-th position among same-pred siblings (idx is
 // the flat :index for a repeatable node; 0 otherwise). Distinct sibling node
@@ -2287,10 +2943,12 @@ func selectElem(cur map[string]any, attr, elemType, pred string, idx int, budget
 // mapping the abstract RM slots to concrete types the way the Web Template /
 // canonical form require. wtType is the Web Template rmType positionally
 // resolved for this segment ("" when the segment has no WT node — e.g. the
-// collapsed wrappers); nextAttr is the following aqlPath attribute, used to
-// disambiguate the abstract ITEM_STRUCTURE slot whose concrete subtype the Web
-// Template does not carry (it collapses those nodes).
-func concreteType(parentType, attr, wtType, nextAttr string) string {
+// collapsed wrappers); tmplType is the RM type the compiled template gives the
+// node ("" in an OPT-free decode, or where the template gives no single
+// answer); nextAttr is the following aqlPath attribute. Both resolve the
+// abstract ITEM_STRUCTURE slot whose concrete subtype the Web Template does not
+// carry (it collapses those nodes).
+func concreteType(parentType, attr, wtType, tmplType, nextAttr string) string {
 	t, ok := rminfo.Default.AttributeRMType(parentType, attr)
 	if !ok {
 		return ""
@@ -2308,12 +2966,17 @@ func concreteType(parentType, attr, wtType, nextAttr string) string {
 		return "POINT_EVENT"
 	case "T", "ITEM_STRUCTURE":
 		// The Web Template collapses ITEM_STRUCTURE nodes, so their concrete
-		// subtype is absent from predType; infer it from the child attribute:
-		// `item` -> ITEM_SINGLE, `rows` -> ITEM_TABLE, `items` -> ITEM_TREE /
-		// ITEM_LIST. ITEM_TREE and ITEM_LIST both use `items` and are not
-		// distinguishable from the path alone; default to ITEM_TREE, which is
-		// round-trip-preserving (rmpath re-resolves by attribute + node id).
-		// See deviations.md.
+		// subtype is absent from predType. Under WithTemplate the compiled
+		// template names it (REQ-053), and the walk takes that type where it can
+		// build it there.
+		if foldedStructureType(tmplType, nextAttr) {
+			return tmplType
+		}
+		// Otherwise infer it from the child attribute: `item` -> ITEM_SINGLE,
+		// `rows` -> ITEM_TABLE, `items` -> ITEM_TREE / ITEM_LIST. ITEM_TREE and
+		// ITEM_LIST both use `items` and are not distinguishable from the path
+		// alone; default to ITEM_TREE, which is round-trip-preserving (rmpath
+		// re-resolves by attribute + node id). See deviations.md.
 		switch nextAttr {
 		case "item":
 			return "ITEM_SINGLE"
@@ -2330,6 +2993,25 @@ func concreteType(parentType, attr, wtType, nextAttr string) string {
 	default:
 		return t // already concrete (HISTORY, …)
 	}
+}
+
+// foldedStructureType reports whether rmType, the type the compiled template
+// gives a folded ITEM_STRUCTURE, is one the walk can build there: an
+// ITEM_STRUCTURE that declares nextAttr, the attribute the path goes on
+// through. A template naming anything else gives the walk nothing to take.
+func foldedStructureType(rmType, nextAttr string) bool {
+	if rmType == "" {
+		return false
+	}
+	h, ok := rminfo.Default.(rminfo.Hierarchy)
+	if !ok {
+		return false
+	}
+	if conforms, _ := h.ConformsTo(rmType, "ITEM_STRUCTURE"); !conforms {
+		return false
+	}
+	_, declared := rminfo.Default.AttributeRMType(rmType, nextAttr)
+	return declared
 }
 
 // bareLeafAttr maps each bare-leaf datatype to the canonical attribute its ""
