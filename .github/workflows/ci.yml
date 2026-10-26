@@ -62,6 +62,11 @@ jobs:
       - name: Vendored terminology integrity
         run: make terminology-check
 
+      # Same offline sha256 guard for the pinned BMM schemas, the codegen
+      # inputs byte-identical to openEHR/specifications-ITS-BMM (REQ-041).
+      - name: Vendored BMM integrity
+        run: make bmm-check
+
       - name: Build
         run: make build
 

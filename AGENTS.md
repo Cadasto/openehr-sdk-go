@@ -81,7 +81,7 @@ Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev
 | Format / check | `make fmt` / `make fmt-check` |
 | Vet / lint | `make vet` / `make lint` |
 | Unit / race tests | `make test` / `make test-race` |
-| BMM codegen verify | `make codegen-check` |
+| BMM codegen verify | `make codegen-check`; `make bmm-check` verifies the pinned schemas' `sha256` (offline), `make bmm-drift` reports ITS-BMM changes |
 | AQL parser codegen verify | `make aqlgen-check` — fails if `openehr/aql/parse/gen/` drifts from the `active/` grammar (needs Docker, not a host JRE); regenerate with `make aqlgen` |
 | Spec traceability | `make spec-check` |
 | Full gate report | `make sdd-check` — the SDD gate with every warning (`make spec-check` prints only the verdict) |

@@ -35,27 +35,29 @@ base 1.3.0  (foundation)
 
 These BMM files are published by the openEHR Foundation as the computable form of the corresponding openEHR specification documents. The on-disk format is `P_BMM`, the persistence binding of the abstract BMM meta-model defined in the openEHR LANG specification (`bmm` and `bmm_persistence`).
 
-The files in this directory are byte-identical copies of the upstream releases. They are stored here, not fetched at build time, for the reasons listed above. When upstream publishes a newer version, follow § Updating below.
+The files in this directory are byte-identical copies of [`openEHR/specifications-ITS-BMM`](https://github.com/openEHR/specifications-ITS-BMM) `components/<COMPONENT>/json/` at the commit [`MANIFEST.txt`](MANIFEST.txt) records, fetched by [`scripts/sync-bmm.sh`](../../scripts/sync-bmm.sh) (`make bmm-sync`). They are stored here, not fetched at build time, for the reasons listed above. When upstream publishes a newer version, follow § Updating below.
 
-All six pins were verified byte-identical to [`openEHR/BMM-publisher`](https://github.com/openEHR/BMM-publisher) `resources/` on 2026-06-12. At that time `openehr_lang_1.1.0` was re-synced to the canonical modular publisher form, replacing a flattened variant. The other five matched. To re-audit, fetch each `resources/<file>` from the publisher and compare its `sha256sum` with the pin.
+`make bmm-drift` compares each pinned file with ITS-BMM `master` and lists any newer version of a pinned component. It needs the network and is not a gate.
+
+Until 2026-10 the pins were audited by hand against [`openEHR/BMM-publisher`](https://github.com/openEHR/BMM-publisher) `resources/` (last on 2026-06-12, when `openehr_lang_1.1.0` was re-synced to the modular form). On 2026-10-26 all six were byte-identical at ITS-BMM `1c678406`, which became the first manifest pin; the publisher's copies of base, rm and term had changed since.
 
 ## Updating
 
 A BMM version bump is always deliberate and follows [ADR 0001: BMM version-bump runbook](../../docs/adr/0001-bmm-version-bump-runbook.md), the canonical procedure. In outline:
 
-1. Drop the new file alongside the old (e.g. `openehr_rm_1.2.1.bmm.json` next to `openehr_rm_1.2.0.bmm.json`). Do **not** overwrite the old file.
+1. Add the new file's upstream path to `SRC_PATHS` in [`scripts/sync-bmm.sh`](../../scripts/sync-bmm.sh), beside the old one, and run `BMM_REF=master make bmm-sync` (e.g. `openehr_rm_1.2.1.bmm.json` lands next to `openehr_rm_1.2.0.bmm.json`). Do **not** overwrite the old file.
 2. Run `make codegen` then `make codegen-check`. Optionally inspect the semantic diff with `go run ./cmd/bmmdiff <old> <new>`.
 3. Update version pins in [`../../docs/specifications/bmm-conformance.md`](../../docs/specifications/bmm-conformance.md) and the schema ID table above.
 4. Propose the one-line CHANGELOG bullet in the PR body; the CHANGELOG follows the rule in [`AGENTS.md § Code style and conventions`](../../AGENTS.md#code-style-and-conventions) (ADR 0001 step 8).
-5. Remove the old file **in the same commit** once the regen and tests pass.
+5. Remove the old path from `SRC_PATHS` and re-run `make bmm-sync`, which deletes the old file, **in the same commit** once the regen and tests pass.
 
 See ADR 0001 for the full procedure, roles, and tooling notes. The weekly drift bot ([`.github/workflows/codegen-drift.yml`](../../.github/workflows/codegen-drift.yml)) catches accidental hand-edits or generator-template changes between bumps.
 
-Mid-version evolution (`openehr_rm_1.2.0` → `openehr_rm_1.2.0.2`, i.e. a `schema_revision` change without a `rm_release` change) is recorded by replacing the file and noting it in the CHANGELOG. If no semantic content changed, no code regeneration is required.
+Mid-version evolution (`openehr_rm_1.2.0` → `openehr_rm_1.2.0.2`, i.e. a `schema_revision` change without a `rm_release` change) is recorded by moving its path in `SRC_PATHS`, re-syncing, and noting it in the CHANGELOG. If no semantic content changed, no code regeneration is required.
 
 ## Integrity
 
-Each BMM file SHOULD be accompanied by a checksum in this README's git history. Once the codegen pipeline lands, CI computes and asserts it at PR time (see [`../../docs/plans/`](../../docs/plans/)). The checksums are not stored separately, to avoid two sources of truth.
+[`MANIFEST.txt`](MANIFEST.txt) records the upstream commit and each file's `sha256`; the sync script writes it, so never edit it by hand. `make bmm-check`, part of `make ci`, recomputes the hashes offline and fails on a file whose bytes differ, a pinned file with no hash line, or a `*.bmm.json` the manifest does not list. `make bmm-sync` restores the pinned bytes.
 
 ## Why these files and not the upstream URL
 

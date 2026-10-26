@@ -68,7 +68,7 @@ HELP_FOOTER    = Before a pull request: make ci · docs site: make docs-serve (h
 
 ##= REQ=094 | the requirement spec-context bundles
 ##= ARGS='-base URL -deployment NAME ...' | probe-record flags
-##= ITS_REST_REF= TERMINOLOGY_REF= ... | pin a Vendor sync (FLAT_CONFORMANCE_REF too)
+##= BMM_REF= ITS_REST_REF= ... | pin a Vendor sync (TERMINOLOGY_REF, FLAT_CONFORMANCE_REF too)
 ##= DOCS_SYNC=docs-sync-offline | build the docs site from the cached brand files
 
 .PHONY: help doctor go-version build-dev build-antlr \
@@ -76,9 +76,9 @@ HELP_FOOTER    = Before a pull request: make ci · docs site: make docs-serve (h
         fmt fmt-check vet lint mod-tidy \
         test test-race \
         codegen termgen aqlgen spec-generate \
-        its-rest-sync its-rest-drift flat-sync flat-drift crossformat-sync \
+        bmm-sync bmm-drift its-rest-sync its-rest-drift flat-sync flat-drift crossformat-sync \
         terminology-sync terminology-drift \
-        mod-tidy-check codegen-check termgen-check aqlgen-check flat-check crossformat-check terminology-check \
+        mod-tidy-check codegen-check termgen-check aqlgen-check bmm-check flat-check crossformat-check terminology-check \
         spec-check sdd-check ci \
         spec-context probe-status probe-record cdr-crosscheck \
         docs-sync docs-sync-offline docs-build docs-check docs-serve docs-clean
@@ -167,6 +167,12 @@ spec-generate: ## Regenerate the map's tests lists and the REQ.md registry
 
 ##@ Vendor | refreshes the vendored upstream files
 
+bmm-sync: ## Vendor the BMM schemas from ITS-BMM and regenerate (network; BMM_REF)
+	@./scripts/sync-bmm.sh sync
+
+bmm-drift: ## Verify the BMM schemas; report upstream changes (network)
+	@./scripts/sync-bmm.sh check
+
 its-rest-sync: ## Vendor the ITS-REST OpenAPI specs (network; ITS_REST_REF)
 	@./scripts/sync-its-rest-specs.sh sync
 
@@ -210,6 +216,9 @@ aqlgen-check: build-antlr ## Fail if the AQL parser drifts from its grammar
 	rm -rf $(AQL_GEN_DIR).verify; \
 	if [ $$status -ne 0 ]; then echo "aqlgen-check: AQL parser drifts from active/ — run 'make aqlgen'"; exit 1; fi; \
 	echo "aqlgen-check: OK"
+
+bmm-check: ## Verify the vendored BMM schemas (offline sha256)
+	@./scripts/sync-bmm.sh verify
 
 flat-check: ## Verify the vendored FLAT corpus (offline sha256)
 	@./scripts/sync-flat-conformance.sh verify
@@ -439,4 +448,4 @@ docs-clean: ## Remove the site build, brand layer and caches
 
 ##@ Gates
 
-ci: fmt-check mod-tidy-check vet test lint spec-check flat-check terminology-check build ## Run the full PR gate (docs/ci.md)
+ci: fmt-check mod-tidy-check vet test lint spec-check bmm-check flat-check terminology-check build ## Run the full PR gate (docs/ci.md)
