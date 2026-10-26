@@ -940,6 +940,40 @@ func TestWireErrorDefaultOmitsMessageAndRawBody(t *testing.T) {
 	}
 }
 
+// TestWireErrorQuotesTheServerCode pins that WireError.Error writes the
+// openEHR code as a quoted Go string. The code is the server's text, so
+// written as it came it could put a newline into the error string and the
+// logs that print it, or text that reads as another field of the error.
+func TestWireErrorQuotesTheServerCode(t *testing.T) { // REQ-093
+	cases := []struct {
+		name string
+		code string
+		want string
+	}{
+		{name: "plain code", code: "NOT_FOUND", want: ` code="NOT_FOUND"`},
+		{name: "newline", code: "A\nB", want: ` code="A\nB"`},
+		{name: "text that reads as a field", code: "X status=200", want: ` code="X status=200"`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			we := &WireError{
+				Sentinel:   ErrNotFound,
+				Method:     http.MethodGet,
+				Route:      "/ehr/{ehr_id}",
+				StatusCode: http.StatusNotFound,
+				OpenEHR:    &OpenEHRErrorDetail{Code: tc.code},
+			}
+			got := we.Error()
+			if strings.ContainsAny(got, "\r\n") {
+				t.Errorf("WireError{OpenEHR.Code: %q}.Error() = %q, want no line break", tc.code, got)
+			}
+			if !strings.HasSuffix(got, tc.want) {
+				t.Errorf("WireError{OpenEHR.Code: %q}.Error() = %q, want it to end with %q", tc.code, got, tc.want)
+			}
+		})
+	}
+}
+
 // TestWireErrorOptInPreservesMessageAndRawBody verifies that a Client built
 // with WithRawErrorBodies(true) preserves the full server payload on WireError:
 // OpenEHR.Message is populated and RawBody contains the server response bytes.
