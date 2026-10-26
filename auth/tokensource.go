@@ -2,6 +2,9 @@ package auth
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"log/slog"
 	"time"
 )
 
@@ -14,6 +17,11 @@ const TokenTypeBasic = "Basic"
 
 // Token is the credential delivered to the wire. Token is opaque to
 // transport/, which emits Authorization: <Type> <Value>.
+//
+// Printed with fmt or logged with log/slog, a Token shows its Value as
+// "[redacted]" and its other fields as they are: see [Token.String] and
+// [Token.LogValue]. Its JSON encoding is unchanged and carries the Value, so
+// an application can store a token and read it back.
 type Token struct {
 	// Value is the scheme-specific credential (bearer token or Basic payload).
 	Value string
@@ -91,4 +99,48 @@ func AnonymousTokenSource() TokenSource {
 // header on an outgoing request.
 func (t Token) IsZero() bool {
 	return t.Value == "" && t.Type == ""
+}
+
+// redacted is the text that stands for a credential when a value is printed
+// or logged.
+const redacted = "[redacted]"
+
+// redact returns redacted for a credential s that is set and "" for an empty
+// one.
+func redact(s string) string {
+	if s == "" {
+		return ""
+	}
+	return redacted
+}
+
+// String describes t with its Value replaced by "[redacted]", or by "" when
+// it is empty. Type, ExpiresAt (in RFC 3339 form), Scope and Issuer are shown
+// as they are.
+func (t Token) String() string {
+	return fmt.Sprintf("auth.Token{Value: %q, Type: %q, ExpiresAt: %s, Scope: %q, Issuer: %q}",
+		redact(t.Value), t.Type, t.ExpiresAt.Format(time.RFC3339Nano), t.Scope, t.Issuer)
+}
+
+// GoString returns the text of [Token.String], so that printing t in Go
+// syntax shows no credential either.
+func (t Token) GoString() string { return t.String() }
+
+// Format writes the text of [Token.String] for every fmt verb it is called
+// for, whatever the flags and width, so no such verb prints the Value. fmt
+// answers %T and %p without calling Format: %T prints the type name, %p of a
+// *Token prints an address, and %p of a Token value is a fmt error whose text
+// shows the fields, Value included, so never print a Token with %p.
+func (t Token) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, t.String()) }
+
+// LogValue lets log/slog log t as a group of its fields, keyed by field name,
+// with the Value replaced as [Token.String] replaces it.
+func (t Token) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("Value", redact(t.Value)),
+		slog.String("Type", t.Type),
+		slog.Time("ExpiresAt", t.ExpiresAt),
+		slog.String("Scope", t.Scope),
+		slog.String("Issuer", t.Issuer),
+	)
 }
