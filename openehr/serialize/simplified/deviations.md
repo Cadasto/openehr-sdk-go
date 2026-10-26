@@ -288,8 +288,23 @@ partially or silently accepted.
   reconstructed node below the root from the archetype terminology (keyed by the compiled
   aqlPath); without it, those nodes are unnamed and the round-trip is merely
   **format-idempotent**. Their names never leak into FLAT, so idempotence is preserved either
-  way. **The composition's own name** travels as `<root>/_name` (REQ-140, since 2026-10-15),
-  in both modes: decode sets the COMPOSITION's `name` from it, in the DV_TEXT leaf grammar
+  way. **A coded node name:** where the template constrains a node's name as a `DV_CODED_TEXT`
+  (one child, or alternatives that agree) and determines one coded value, decode gives the node
+  that coded name in place of the `DV_TEXT` one, as the generator writes it. The value is
+  determined where the name's `C_CODE_PHRASE` lists one code, or several of which exactly one has
+  the pinned name text as its term text. Its text is the pinned one, else the code's term text: a
+  `local` code's archetype term, an external code's term under `<terminology>::<code>` or the bare
+  code, or an `openehr` code's rubric where every terminology group that holds the code gives the
+  same one. Its terminology is the `C_CODE_PHRASE`'s. Reused siblings that share a bare path and
+  disagree on the coded name leave it with none, as they do with a pinned name.
+  **Registered format limit:** FLAT has no key for a node's name below the root, so a coded name
+  the template leaves open (a code from an external reference set, several codes and no pinned
+  text, a code with no term text) comes back as `DV_TEXT`, and the round trip reports
+  `rm_type_mismatch` on that name: decode invents no code. The corpus instance is
+  `Referral Request.v1`, whose annotation name
+  (`/context/other_context/items[openEHR-EHR-CLUSTER.annotations.v1]/items[at0001]/name`) takes
+  its code from an external reference set (`C_CODE_REFERENCE`, no code listed). **The
+  composition's own name** travels as `<root>/_name` (REQ-140, since 2026-10-15), in both modes: decode sets the COMPOSITION's `name` from it, in the DV_TEXT leaf grammar
   (`\|formatting` beside a bare name, a coded name in the `\|code` + `\|value` +
   `\|terminology` substitution form, a name the suffixes cannot carry as `_name\|raw`), and a
   body without it names the composition after the Web Template root, or after the template id

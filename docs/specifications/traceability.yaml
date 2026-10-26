@@ -517,6 +517,8 @@ requirements:
       - PROBE-105
     tests:
       - openehr/serialize/simplified/archetype_details_test.go
+      - openehr/serialize/simplified/coded_name_internal_test.go
+      - openehr/serialize/simplified/coded_name_test.go
       - openehr/serialize/simplified/composer_test.go
       - openehr/serialize/simplified/composition_name_test.go
       - openehr/serialize/simplified/context_test.go
@@ -1830,9 +1832,12 @@ requirements:
       - internal/templatecompile/registerpath_test.go
       - internal/templatecompile/webtemplate_oracle_compile_test.go
       - openehr/composition/named_sibling_test.go
+      - openehr/serialize/simplified/coded_name_internal_test.go
+      - openehr/serialize/simplified/coded_name_test.go
       - openehr/serialize/simplified/flat_encode_test.go
       - openehr/serialize/simplified/flat_nameindex_test.go
       - openehr/serialize/simplified/flat_pinned_test.go
+      - openehr/serialize/simplified/template_roundtrip_test.go
       - openehr/template/node_name_test.go
       - openehr/template/webtemplate/build_test.go
       - openehr/template/webtemplate/dedupe_test.go
