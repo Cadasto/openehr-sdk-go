@@ -1,6 +1,7 @@
 package templatecompile_test
 
 import (
+	json "encoding/json/v2"
 	"errors"
 	"os"
 	"path/filepath"
@@ -165,7 +166,16 @@ func tryRobotPair(t *testing.T, root string, p robotPair) {
 	t.Logf("template_id=%q", opt.TemplateID())
 }
 
-// Set SCAN_ROBOT=1 — RM-only JSON (EHR_STATUS, FOLDER, CONTRIBUTION submission).
+// Set SCAN_ROBOT=1 to decode the Robot RM-only JSON (EHR_STATUS, FOLDER)
+// with canjson.Unmarshal, which reads canonical RM JSON.
+//
+// The scan reads ehr/valid, directory and directory/update. A file with no
+// _type member at its root is EHRbase's older ECIS form, not canonical RM
+// JSON, and is skipped. The invalid sets are left out because they are
+// invalid on purpose. The contribution sets are left out too. They are
+// ITS-REST contribution submission bodies, whose versions hold inline
+// ORIGINAL_VERSION objects. rm.Contribution holds its versions as
+// OBJECT_REFs, and the SDK has no decoder for a submission body.
 func TestRobotRMOnlyJSON(t *testing.T) {
 	if os.Getenv("SCAN_ROBOT") == "" {
 		t.Skip("set SCAN_ROBOT=1 to run")
@@ -173,89 +183,47 @@ func TestRobotRMOnlyJSON(t *testing.T) {
 	root := robotRoot(t)
 
 	var rels []string
-	// 2 — ehr
-	for _, sub := range []string{"ehr/valid", "ehr/invalid"} {
-		dir := filepath.Join(root, sub)
-		ents, _ := os.ReadDir(dir)
+	for _, sub := range []string{"ehr/valid", "directory", "directory/update"} {
+		ents, err := os.ReadDir(filepath.Join(root, sub))
+		if err != nil {
+			t.Fatal(err)
+		}
 		for _, e := range ents {
-			if strings.HasSuffix(e.Name(), ".json") {
+			if !e.IsDir() && strings.HasSuffix(e.Name(), ".json") {
 				rels = append(rels, filepath.Join(sub, e.Name()))
 			}
 		}
 	}
-	// 3 — directory
-	dirEnts, _ := os.ReadDir(filepath.Join(root, "directory"))
-	for _, e := range dirEnts {
-		if strings.HasSuffix(e.Name(), ".json") {
-			rels = append(rels, filepath.Join("directory", e.Name()))
-		}
-	}
-	upd := filepath.Join(root, "directory/update")
-	if updEnts, err := os.ReadDir(upd); err == nil {
-		for _, e := range updEnts {
-			if strings.HasSuffix(e.Name(), ".json") {
-				rels = append(rels, filepath.Join("directory/update", e.Name()))
-			}
-		}
-	}
-	// 6 — contributions (submission shape)
-	for _, sub := range []string{"contributions/valid/minimal", "contributions/invalid"} {
-		walkContrib(t, filepath.Join(root, sub), root, &rels)
-	}
-	contribPersistent := filepath.Join(root, "contributions/invalid/minimal_persistent")
-	if _, err := os.Stat(contribPersistent); err == nil {
-		walkContrib(t, contribPersistent, root, &rels)
-	}
 
 	for _, rel := range rels {
 		t.Run(rel, func(t *testing.T) {
-			path := filepath.Join(root, rel)
-			raw, err := os.ReadFile(path)
+			raw, err := os.ReadFile(filepath.Join(root, rel))
 			if err != nil {
 				t.Fatal(err)
 			}
-			// CONTRIBUTION vs EHR_STATUS vs FOLDER — try decode by _type hint
-			s := string(raw)
-			switch {
-			case strings.Contains(s, `"EHR_STATUS"`):
+			var head struct {
+				Type *string `json:"_type"`
+			}
+			if err := json.Unmarshal(raw, &head); err != nil {
+				t.Fatalf("read the root _type: %v", err)
+			}
+			if head.Type == nil {
+				t.Skip("no _type member at the root: not canonical RM JSON (ECIS form)")
+			}
+			switch *head.Type {
+			case "EHR_STATUS":
 				var st rm.EHRStatus
 				if err := canjson.Unmarshal(raw, &st); err != nil {
 					t.Fatalf("EHR_STATUS: %v", err)
 				}
-			case strings.Contains(s, `"FOLDER"`):
+			case "FOLDER":
 				var f rm.Folder
 				if err := canjson.Unmarshal(raw, &f); err != nil {
 					t.Fatalf("FOLDER: %v", err)
 				}
-			case strings.Contains(s, `"CONTRIBUTION"`):
-				var c rm.Contribution
-				if err := canjson.Unmarshal(raw, &c); err != nil {
-					t.Fatalf("CONTRIBUTION: %v", err)
-				}
 			default:
-				t.Fatalf("unknown RM root in %s", rel)
+				t.Fatalf("root _type %q is neither EHR_STATUS nor FOLDER", *head.Type)
 			}
 		})
-	}
-}
-
-func walkContrib(t *testing.T, dir, root string, rels *[]string) {
-	t.Helper()
-	ents, err := os.ReadDir(dir)
-	if err != nil {
-		return
-	}
-	for _, e := range ents {
-		if e.IsDir() {
-			walkContrib(t, filepath.Join(dir, e.Name()), root, rels)
-			continue
-		}
-		if strings.HasSuffix(e.Name(), ".json") {
-			rel, err := filepath.Rel(root, filepath.Join(dir, e.Name()))
-			if err != nil {
-				t.Fatal(err)
-			}
-			*rels = append(*rels, rel)
-		}
 	}
 }
