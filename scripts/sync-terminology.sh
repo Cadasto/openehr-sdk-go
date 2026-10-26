@@ -218,7 +218,8 @@ cmd_sync() {
 
   echo "Synced ${#SRC_PATHS[@]} files → resources/terminology/ ($ref, commit ${commit:0:12})"
 
-  # Keep the generated tables in step with the pin (REQ-034 / the REQ-042 rule).
+  # Keep the generated tables in step with the pin (REQ-034; the drift check
+  # of the BMM-generated code, REQ-041, works the same way).
   if [[ "${TERMINOLOGY_SKIP_GEN:-}" == "1" ]]; then
     echo "(TERMINOLOGY_SKIP_GEN=1 — skipped 'make termgen')"
     return 0
