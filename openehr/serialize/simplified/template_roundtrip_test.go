@@ -7,7 +7,8 @@ package simplified_test
 // node, so decode places the members of one container list in the Web
 // Template's node order; and the formats have no key for a structure with no
 // member, so decode rebuilds, empty, one the template requires and lets hold
-// no member.
+// no member; and the formats have no key for a node's name below the root, so
+// decode gives a node the coded name the template determines for it.
 
 import (
 	"encoding/json"
@@ -355,6 +356,49 @@ func TestREQ053OPTFreeDecodeRebuildsNoEmptyStructure(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// codedNameNode is the ELEMENT of sdk_crosscheck_values.v1 whose name the
+// template constrains as a DV_CODED_TEXT: its text pinned to "Second option",
+// its code one of the local at0017 and at0018, whose terms are "First option"
+// and "Second option".
+const codedNameNode = "/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0016]"
+
+// nameAt returns the name of the node at path in comp's canonical JSON.
+func nameAt(t *testing.T, comp *rm.Composition, path string) (map[string]any, bool) {
+	t.Helper()
+	node, ok := nodeAt(canonicalDoc(t, comp), path)
+	if !ok {
+		return nil, false
+	}
+	name, ok := node["name"].(map[string]any)
+	return name, ok
+}
+
+// TestREQ053WithTemplateRebuildsCodedName — REQ-053, REQ-116: FLAT has no key
+// for a node's name below the root, so a WithTemplate decode names the node
+// from the template. Where the template constrains the name as a
+// DV_CODED_TEXT and determines its code and text, decode rebuilds that coded
+// name, as the skeleton wrote it, and the round trip validates against the
+// OPT.
+func TestREQ053WithTemplateRebuildsCodedName(t *testing.T) {
+	wt, compiled := templateOf(t, "sdk_crosscheck_values.v1")
+	comp := skeletonOf(t, compiled, instance.Medium)
+	written, ok := nameAt(t, comp, codedNameNode)
+	if !ok || written["_type"] != "DV_CODED_TEXT" {
+		t.Fatalf("the written name at %s is %s, want a DV_CODED_TEXT — fixture changed?", codedNameNode, jsonText(written))
+	}
+	for _, format := range []string{"FLAT", "STRUCTURED"} {
+		t.Run(format, func(t *testing.T) {
+			back := bmiRoundTrip(t, format, comp, wt, simplified.WithTemplate(compiled), simplified.WithStrict())
+			for _, is := range validation.ValidateComposition(back, compiled).Issues {
+				t.Errorf("decoded composition: %s at %s: %s", is.Code, is.Path, is.Detail)
+			}
+			if got, _ := nameAt(t, back, codedNameNode); !reflect.DeepEqual(got, written) {
+				t.Errorf("decoded name at %s = %s, want the written %s", codedNameNode, jsonText(got), jsonText(written))
+			}
+		})
 	}
 }
 
