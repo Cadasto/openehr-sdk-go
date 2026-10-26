@@ -229,11 +229,13 @@ func proportionsOf(root any) []rm.DVProportion {
 }
 
 // TestREQ107_CorpusProportionsMeetTheirKindRules is the REQ-107 Output
-// check, on the RM invariants the floor does not evaluate yet, that every
-// DV_PROPORTION the generator writes for a vendored template meets the
-// rules of its kind (Type_validity, Unitary_validity, Percent_validity,
-// Fraction_validity, Valid_denominator) and Precision_validity, under
-// every policy, both value fills and several fixed RandomFill seeds. It
+// check that every DV_PROPORTION the generator writes for a vendored
+// template meets the rules of its kind (Type_validity, Unitary_validity,
+// Percent_validity, Fraction_validity, Valid_denominator) and
+// Precision_validity, under every policy, both value fills and several
+// fixed RandomFill seeds. It reads the rules on its own
+// ([proportionKindBreaks]) rather than through the validation floor, which
+// evaluates the same invariants, and names the path of each breach. It
 // also checks that a second call with the same seed writes the same
 // proportions (REQ-107 Primitive-leaf value fill).
 func TestREQ107_CorpusProportionsMeetTheirKindRules(t *testing.T) {
