@@ -1270,8 +1270,10 @@ func TestREQ056_XMLTerminologyCode(t *testing.T) {
 // unmatched content, one item at the element's path with a last `text()`
 // segment, however many runs there are. Text before the child is reported
 // when the child opens, before anything inside it; text after it when it is
-// met. With no `value` child the text is the identifier and nothing is
-// unmatched (TestREQ056_XMLTerminologyCode).
+// met. Every item comes in document order, so text before an unmatched child
+// that precedes the `value` child is reported before that child. With no
+// `value` child the text is the identifier, and only an unmatched child
+// beside it is reported (TestREQ056_XMLTerminologyCode).
 func TestREQ170_XMLTerminologyIDTextBesideValue(t *testing.T) {
 	archetype := func(id string) []byte {
 		return []byte(`<archetype ` + ucNS + `><concept>at0000</concept><original_language><terminology_id>` + id +
@@ -1281,6 +1283,7 @@ func TestREQ170_XMLTerminologyIDTextBesideValue(t *testing.T) {
 		value    = `<value>ISO_639-1</value>`
 		textPath = "/archetype[1]/original_language[1]/terminology_id[1]/text()"
 		attrPath = "/archetype[1]/original_language[1]/terminology_id[1]/value[1]/@x-attr"
+		fooPath  = "/archetype[1]/original_language[1]/terminology_id[1]/x-foo[1]"
 	)
 	for _, tc := range []struct {
 		name  string
@@ -1295,6 +1298,12 @@ func TestREQ170_XMLTerminologyIDTextBesideValue(t *testing.T) {
 			id:   xmlPlanted + `<value x-attr="` + xmlPlanted + `">ISO_639-1</value>`, paths: []string{textPath, attrPath},
 		},
 		{name: "whitespace beside the value child", id: "\n\t" + value + " \r\n"},
+		{name: "text before an unmatched child before the value child", id: xmlPlanted + `<x-foo/>` + value, paths: []string{textPath, fooPath}},
+		{
+			name: "an unmatched child after text comes before what is inside the value child",
+			id:   xmlPlanted + `<x-foo/><value x-attr="` + xmlPlanted + `">ISO_639-1</value>`, paths: []string{textPath, fooPath, attrPath},
+		},
+		{name: "text beside an unmatched child and no value child is the identifier", id: `ISO_639-1<x-foo/>`, paths: []string{fooPath}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			in := archetype(tc.id)
