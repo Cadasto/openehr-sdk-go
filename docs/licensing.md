@@ -2,6 +2,6 @@
 kind: reference
 ---
 
-# Licensing (moved)
+# Licensing
 
-The licensing inventory lives at the repository root: [`LICENSING.md`](../LICENSING.md). This page stays only so that older links to `docs/licensing.md` still lead somewhere.
+The SDK is distributed under the MIT License ([`LICENSE`](../LICENSE)). Vendored third-party artefacts keep their upstream licences and are not re-licensed as MIT. The inventory at the repository root, [`LICENSING.md`](../LICENSING.md), lists each one with its licence and upstream.

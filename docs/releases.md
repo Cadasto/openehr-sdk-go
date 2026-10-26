@@ -23,9 +23,13 @@ The repo pins four versions independently, and the git tag tracks only the first
 | Concept | Pin location | Bumps when |
 |---|---|---|
 | **SDK semver** | git tag `vX.Y.Z` | every release |
-| Go toolchain (minimum) | `go.mod` `go` line | current stable line (N) (REQ-002) |
+| Go toolchain (minimum) | `go.mod` `go` line | a new stable Go minor line ([§ Minimum Go version](#minimum-go-version)) |
 | openEHR REST | [REQ-050](specifications/wire.md#req-050) → `1.1.0` | spec bump; discovery mismatch fails fast |
 | BMM corpus | `resources/bmm/*.bmm.json` | [ADR 0001](adr/0001-bmm-version-bump-runbook.md) |
+
+### Minimum Go version
+
+The `go.mod` `go` directive names the current stable Go minor line at its `.0` patch, for example `go 1.27.0`. It states the minimum Go the module needs, not a patch to build with. A Go patch release adds no language or standard-library API, so a mid-line patch floor buys nothing, and it would make every consumer, linter image and CI runner on an earlier patch of the same minor fetch a newer toolchain (`GOTOOLCHAIN=auto`), which breaks offline and air-gapped builds. When a newer Go minor line becomes stable, the directive moves to that line's `.0` patch in a minor SDK release ([`module-layout.md` § Versioning](specifications/module-layout.md#versioning)). It never names a mid-line patch or a pre-release (rc or beta) toolchain. Dev-image pins in the [Dockerfile](../Dockerfile) move independently of it.
 
 ### Pre-1.0
 
@@ -37,8 +41,8 @@ While on `v0.x`, minor bumps may break the public API (release notes list every 
 
 Cut when all three hold ([`module-layout.md` § Versioning](specifications/module-layout.md#versioning)):
 
-1. Every REQ in [`REQ.md`](specifications/REQ.md) is `Impl. landed` or `retired`, with no `partial` and no `planned`. (`retired` is terminal: REQ-081 and REQ-097 carry no active requirement and will never land, so a gate demanding `landed` for every row could not be met.)
-2. The openEHR wire-conformance probe suite passes ([REQ-080](specifications/conformance.md#req-080--openehr-wire-conformance)).
+1. Every REQ in [`REQ.md`](specifications/REQ.md) is `Impl. landed` or `retired`, with no `partial` and no `planned`. (`retired` is terminal: a retired requirement carries no active rule and will never land, so a gate demanding `landed` for every row could not be met.)
+2. The openEHR wire-conformance probe suite in [`conformance.md`](specifications/conformance.md) passes.
 3. A reference openEHR deployment passes the live probe suite ([REQ-082](specifications/conformance.md#req-082--runnability)).
 
 Promoting each spec file `Status: Draft → Stable` then happens as part of the `v1.0.0` cut. It is not a fourth precondition. `Status:` is a per-**file** stability promise ([README.md § Status header](specifications/README.md#status-header)). Whether a requirement is *built* is recorded in the per-REQ `Impl.` column, which condition 1 checks.

@@ -6,7 +6,7 @@ kind: specification
 
 **Status:** Draft
 
-Normative requirements REQ-001 through REQ-005 for the Go module `github.com/cadasto/openehr-sdk-go`.
+Normative requirements for the Go module `github.com/cadasto/openehr-sdk-go`: its path (REQ-001), its versioning (REQ-004) and its internal boundary (REQ-005). REQ-002 and REQ-003 are retired.
 
 ---
 
@@ -14,31 +14,23 @@ Normative requirements REQ-001 through REQ-005 for the Go module `github.com/cad
 
 The SDK **MUST** be published as the Go module `github.com/cadasto/openehr-sdk-go`.
 
-The path is all lowercase, matching idiomatic Go module naming and the GitHub organisation login. Consumer imports **MUST** use this exact spelling.
+The path is all lowercase, matching idiomatic Go module naming and the GitHub organisation login, and consumer imports use this exact spelling.
 
-- **Lives in:** [`go.mod`](../../go.mod), all package import paths
+The path is locked. Renaming it is a change [module-layout.md § Versioning](module-layout.md#versioning) maps to major, and a rename **MUST** follow a deprecation cycle of at least one minor release. A patch release **MUST NOT** change the module path. The `/vN` suffix that [REQ-004](#req-004--semantic-versioning) requires for major versions v2 and beyond is Go's semantic import version of this same path, not a rename, so the deprecation cycle does not apply to it.
+
 - **Related:** [module-layout.md § Module identity](module-layout.md#module-identity)
 
 ---
 
 ## REQ-002 — Go version
 
-The SDK **MUST** set the `go.mod` `go` directive to the **current stable Go minor line (N) at its `.0` patch** — e.g. `go 1.27.0` — expressing the minimum Go the module needs, not a specific patch. Patch releases add no language or standard-library API surface, so a mid-line patch floor buys nothing and would force every consumer, linter image, and CI runner on an *earlier* patch of the same minor to fetch a newer toolchain (`GOTOOLCHAIN=auto`), breaking offline/air-gapped builds. When a newer major Go release becomes stable, the minimum **MUST** be raised to the new line at its `.0` patch — a **minor** SemVer bump ([module-layout.md § Versioning](module-layout.md#versioning)). The directive **MUST NOT** name a specific mid-line patch, nor a pre-release (rc/beta) toolchain.
-
-*Informative: at the time of writing the directive is `go 1.27.0`.*
-
-- **Lives in:** [`go.mod`](../../go.mod)
-- **Related:** [module-layout.md § Versioning](module-layout.md#versioning), [releases.md § Versioning](../releases.md#versioning)
+**Retired.** The rule for the `go.mod` `go` directive is now prose in [releases.md § Minimum Go version](../releases.md#minimum-go-version). The identifier is never reused.
 
 ---
 
 ## REQ-003 — License
 
-The SDK **MUST** be distributed under the MIT License.
-
-Vendored third-party artefacts **MUST** retain their upstream licences and **MUST** be inventoried in [`LICENSING.md`](../../LICENSING.md). They are not re-licensed as MIT.
-
-- **Lives in:** [`LICENSE`](../../LICENSE), [`LICENSING.md`](../../LICENSING.md)
+**Retired.** The licence rule is now prose in [licensing.md](../licensing.md). The identifier is never reused.
 
 ---
 
@@ -52,7 +44,6 @@ The SDK **MUST** follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0
 
 ## REQ-005 — Internal boundary
 
-Anything under `internal/` **MUST** be considered outside the public API surface. Consumers **MUST NOT** import from it, and the SDK **MAY** change it without notice.
+Anything under `internal/` is outside the public API surface: the Go toolchain refuses an import of it from another module, and the SDK **MAY** change it without notice.
 
-- **Lives in:** `internal/` (e.g. `internal/bmmgen/`, `internal/bmmdiff/`)
 - **Related:** [module-layout.md § The `internal/` boundary](module-layout.md#the-internal-boundary)
