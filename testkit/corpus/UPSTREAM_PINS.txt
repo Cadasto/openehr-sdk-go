@@ -18,4 +18,4 @@
 # Edited by hand; fields are separated by spaces.
 # repository                 branch   commit
 ehrbase/openEHR_SDK          develop  8a5dae6fd82a5f0aa23b25681a13df79bfc21d2b
-ehrbase/integration-tests    main     fcb3ac4b0a47e51bf23c03c13f86bea8fb0bfb67
+ehrbase/integration-tests    main     d7f11bf41966f453aecc8fe688da4c4d27f14dc4
