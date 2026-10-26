@@ -23,13 +23,13 @@ requirements:
 
   - id: REQ-002
     title: Go version (retired)
-    canonical: docs/specifications/packaging.md#req-002--go-version
+    canonical: docs/specifications/retired-requirements.md#req-002--go-version
     status: deprecated
     implementation: retired
 
   - id: REQ-003
     title: License (retired)
-    canonical: docs/specifications/packaging.md#req-003--license
+    canonical: docs/specifications/retired-requirements.md#req-003--license
     status: deprecated
     implementation: retired
 
@@ -49,19 +49,19 @@ requirements:
 
   - id: REQ-010
     title: "`cadasto/` cut line (retired)"
-    canonical: docs/specifications/module-layout.md#req-010--cadasto-cut-line
+    canonical: docs/specifications/retired-requirements.md#req-010--cadasto-cut-line
     status: deprecated
     implementation: retired
 
   - id: REQ-011
     title: No sideways `cadasto/` imports (retired)
-    canonical: docs/specifications/module-layout.md#req-011--no-sideways-imports-inside-cadasto
+    canonical: docs/specifications/retired-requirements.md#req-011--no-sideways-cadasto-imports
     status: deprecated
     implementation: retired
 
   - id: REQ-012
     title: Auth layering (retired)
-    canonical: docs/specifications/module-layout.md#req-012--auth-layering
+    canonical: docs/specifications/retired-requirements.md#req-012--auth-layering
     status: deprecated
     implementation: retired
 
@@ -97,7 +97,7 @@ requirements:
 
   - id: REQ-014
     title: Dependency direction (retired)
-    canonical: docs/specifications/module-layout.md#req-014--dependency-direction
+    canonical: docs/specifications/retired-requirements.md#req-014--dependency-direction
     status: deprecated
     implementation: retired
 
@@ -127,19 +127,19 @@ requirements:
 
   - id: REQ-022
     title: Functional options (retired)
-    canonical: docs/specifications/idiom.md#functional-options-req-022
+    canonical: docs/specifications/retired-requirements.md#req-022--functional-options
     status: deprecated
     implementation: retired
 
   - id: REQ-023
     title: Package-level functions (retired)
-    canonical: docs/specifications/idiom.md#surface-shape-req-023
+    canonical: docs/specifications/retired-requirements.md#req-023--package-level-functions
     status: deprecated
     implementation: retired
 
   - id: REQ-024
     title: Generics, no reflection (retired)
-    canonical: docs/specifications/idiom.md#generics-policy-req-024
+    canonical: docs/specifications/retired-requirements.md#req-024--generics-no-reflection
     status: deprecated
     implementation: retired
 
@@ -231,25 +231,25 @@ requirements:
 
   - id: REQ-030
     title: Concrete RM structs (retired)
-    canonical: docs/specifications/rm-modeling.md#concrete-types-req-030
+    canonical: docs/specifications/retired-requirements.md#req-030--concrete-rm-structs
     status: deprecated
     implementation: retired
 
   - id: REQ-031
     title: Embedded base structs (retired)
-    canonical: docs/specifications/rm-modeling.md#embedded-base-structs-req-031
+    canonical: docs/specifications/retired-requirements.md#req-031--embedded-base-structs
     status: deprecated
     implementation: retired
 
   - id: REQ-032
     title: Interfaces for abstract RM (retired)
-    canonical: docs/specifications/rm-modeling.md#abstract-categories-req-032
+    canonical: docs/specifications/retired-requirements.md#req-032--interfaces-for-abstract-rm
     status: deprecated
     implementation: retired
 
   - id: REQ-033
     title: No inheritance emulation (retired)
-    canonical: docs/specifications/rm-modeling.md#no-inheritance-emulation-req-033
+    canonical: docs/specifications/retired-requirements.md#req-033--no-inheritance-emulation
     status: deprecated
     implementation: retired
 
@@ -317,19 +317,19 @@ requirements:
 
   - id: REQ-042
     title: Generated code, drift-detected (retired)
-    canonical: docs/specifications/bmm-conformance.md#req-042--generated-code-drift-detected
+    canonical: docs/specifications/retired-requirements.md#req-042--generated-code-drift-detected
     status: deprecated
     implementation: retired
 
   - id: REQ-043
     title: P_BMM → Go mapping rules (retired)
-    canonical: docs/specifications/bmm-conformance.md#req-043--mapping-rules-p_bmm--go
+    canonical: docs/specifications/retired-requirements.md#req-043--p_bmm--go-mapping-rules
     status: deprecated
     implementation: retired
 
   - id: REQ-044
     title: Hand-written extensions isolated (retired)
-    canonical: docs/specifications/bmm-conformance.md#req-044--hand-written-extensions-are-isolated
+    canonical: docs/specifications/retired-requirements.md#req-044--hand-written-extensions-isolated
     status: deprecated
     implementation: retired
 
@@ -357,7 +357,7 @@ requirements:
 
   - id: REQ-047
     title: BMM authoritative on divergence (retired)
-    canonical: docs/specifications/bmm-conformance.md#req-047--bmm-spec-divergence-resolution
+    canonical: docs/specifications/retired-requirements.md#req-047--bmm-authoritative-on-divergence
     status: deprecated
     implementation: retired
 
@@ -383,7 +383,7 @@ requirements:
 
   - id: REQ-049
     title: RM class-universe absence reasons (retired)
-    canonical: docs/specifications/bmm-conformance.md#req-049--rm-class-universe-absence-reasons
+    canonical: docs/specifications/retired-requirements.md#req-049--rm-class-universe-absence-reasons
     status: deprecated
     implementation: retired
 
@@ -409,7 +409,7 @@ requirements:
 
   - id: REQ-051
     title: Cadasto spec-version header (retired)
-    canonical: docs/specifications/wire.md#req-051
+    canonical: docs/specifications/retired-requirements.md#req-051--cadasto-spec-version-header
     status: deprecated
     implementation: retired
 
@@ -816,7 +816,7 @@ requirements:
 
   - id: REQ-065
     title: Per-client tenant binding (retired)
-    canonical: docs/specifications/auth.md#req-065
+    canonical: docs/specifications/retired-requirements.md#req-065--per-client-tenant-binding
     status: deprecated
     implementation: retired
 
@@ -960,13 +960,13 @@ requirements:
 
   - id: REQ-080
     title: openEHR wire conformance (retired)
-    canonical: docs/specifications/conformance.md#req-080--openehr-wire-conformance
+    canonical: docs/specifications/retired-requirements.md#req-080--openehr-wire-conformance
     status: deprecated
     implementation: retired
 
   - id: REQ-081
     title: Wire-level parity (retired)
-    canonical: docs/specifications/conformance.md#req-081--wire-level-parity-retired
+    canonical: docs/specifications/retired-requirements.md#req-081--wire-level-parity
     status: deprecated
     implementation: retired
 
@@ -1151,13 +1151,13 @@ requirements:
 
   - id: REQ-096
     title: Unambiguous "disable retry" (retired)
-    canonical: docs/specifications/transport.md#req-096--unambiguous-disable-retry
+    canonical: docs/specifications/retired-requirements.md#req-096--unambiguous-disable-retry
     status: deprecated
     implementation: retired
 
   - id: REQ-097
     title: First-class `Idempotency-Key` (deprecated)
-    canonical: docs/specifications/transport.md#req-097--first-class-idempotency-key-deprecated
+    canonical: docs/specifications/retired-requirements.md#req-097--first-class-idempotency-key
     status: deprecated
     implementation: retired
 
@@ -1384,13 +1384,13 @@ requirements:
 
   - id: REQ-104
     title: Slot assertion grammar (retired)
-    canonical: docs/specifications/clinical-modeling.md#req-104--slot-assertion-grammar
+    canonical: docs/specifications/retired-requirements.md#req-104--slot-assertion-grammar
     status: deprecated
     implementation: retired
 
   - id: REQ-105
     title: Terminology bindings (retired)
-    canonical: docs/specifications/clinical-modeling.md#req-105--terminology-bindings
+    canonical: docs/specifications/retired-requirements.md#req-105--terminology-bindings
     status: deprecated
     implementation: retired
 
@@ -1646,7 +1646,7 @@ requirements:
 
   - id: REQ-110
     title: Template-driven validation beyond COMPOSITION (retired)
-    canonical: docs/specifications/clinical-modeling.md#req-110--template-driven-validation-beyond-composition
+    canonical: docs/specifications/retired-requirements.md#req-110--template-driven-validation-beyond-composition
     status: deprecated
     implementation: retired
 
@@ -1844,13 +1844,13 @@ requirements:
 
   - id: REQ-117
     title: AQL expression-catalogue completion (retired)
-    canonical: docs/specifications/clinical-modeling.md#req-117--aql-expression-catalogue-completion
+    canonical: docs/specifications/retired-requirements.md#req-117--aql-expression-catalogue-completion
     status: deprecated
     implementation: retired
 
   - id: REQ-118
     title: Deprecated `SELECT TOP` clause and literal source text (retired)
-    canonical: docs/specifications/clinical-modeling.md#req-118--deprecated-select-top-clause-and-literal-source-text
+    canonical: docs/specifications/retired-requirements.md#req-118--deprecated-select-top-clause-and-literal-source-text
     status: deprecated
     implementation: retired
 
@@ -2008,7 +2008,7 @@ requirements:
 
   - id: REQ-142
     title: Contribution read (retired)
-    canonical: docs/specifications/wire.md#req-142--contribution-read
+    canonical: docs/specifications/retired-requirements.md#req-142--contribution-read
     status: deprecated
     implementation: retired
 
@@ -2162,7 +2162,7 @@ requirements:
 
   - id: REQ-162
     title: Builder containment verification (retired)
-    canonical: docs/specifications/clinical-modeling.md#req-162--builder-containment-verification
+    canonical: docs/specifications/retired-requirements.md#req-162--builder-containment-verification
     status: deprecated
     implementation: retired
 
@@ -2414,7 +2414,7 @@ requirements:
 
   - id: REQ-172
     title: Typed 2xx body-read failure (retired)
-    canonical: docs/specifications/transport.md#req-172--typed-2xx-body-read-failure
+    canonical: docs/specifications/retired-requirements.md#req-172--typed-2xx-body-read-failure
     status: deprecated
     implementation: retired
 

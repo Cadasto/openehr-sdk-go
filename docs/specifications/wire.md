@@ -65,10 +65,6 @@ The version pin is enforced at discovery time (REQ-072), not on the first reques
 
 ## Cadasto spec-version header
 
-### REQ-051
-
-**Retired.** The rule for the `Cadasto-OpenEhr-Spec-Version` header moved to [§ REQ-050](#req-050) *The Cadasto spec-version header*. The identifier is never reused.
-
 ## openEHR custom header family
 
 ### REQ-059
@@ -544,10 +540,6 @@ ETag handling on reads is symmetric: the SDK **MUST** capture `ETag` from a resp
 ## REST leaf operations
 
 When a leaf gains an operation or an option, its package's `Repository` interface **MUST** grow with it. That is no break for a caller of the package functions, but it breaks an implementer of the interface at compile time.
-
-### REQ-142 — Contribution read
-
-**Retired.** The contribution read moved to [§ REQ-174](#req-174--versioned-object-reads) *The contribution read*. The identifier is never reused.
 
 ### REQ-143 — Template list filters
 

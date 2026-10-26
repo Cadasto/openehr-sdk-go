@@ -20,14 +20,6 @@ Each probe has a stable `PROBE-NNN` ID, one catalogue entry here, and a pass/fai
 
 ## Conformance scope
 
-### REQ-080 — openEHR wire conformance
-
-**Retired.** Its test-writing rules moved to [development-process.md § Writing a probe](../development-process.md#writing-a-probe), and the round-trip comparison it restated is [wire.md § REQ-052](wire.md#req-052)'s. The identifier is never reused.
-
-### REQ-081 — Wire-level parity (retired)
-
-**Retired.** The SDK checks no parity with another SDK: its wire output is checked against the openEHR specification by the [probe catalog](#probe-catalog), and its Go surface follows [idiom.md § Surface shape](idiom.md#surface-shape). The identifier is never reused.
-
 ### REQ-082 — Runnability
 
 A backend-facing probe runs in up to three modes: **Sandbox**, against the in-memory `sandbox/` transport; **Cassette**, against a replayed recording; and **Live**, against a reference openEHR deployment. An **in-repo** probe asserts a property over vendored inputs or over the SDK's own output and reaches no server in any mode. Each catalogue entry's **Modes** line says which applies: 35 of the 80 catalog entries are in-repo by construction. Today 12 entries declare all three modes; a mode missing from a backend-facing entry is open work in this requirement, not a defect in the probe ([roadmap.md](../roadmap.md)).

@@ -479,10 +479,6 @@ This is the SDK's contribution to platform-side audit. The platform decides what
 
 ## Per-client binding
 
-### REQ-065
-
-**Retired.** A client takes the catalog of one Platform ([service-discovery.md § REQ-070](service-discovery.md#req-070)), and a SMART source built from a catalog defaults its audience to that Platform's base URL ([§ REQ-061](#req-061--pkce-flow)). The identifier is never reused.
-
 ## HTTP Basic on openEHR REST
 
 ### REQ-069

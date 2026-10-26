@@ -56,18 +56,6 @@ Rationale:
 
 The package documentation of `transport/` says that the injected client governs all outgoing network I/O.
 
-## Functional options (REQ-022)
-
-**Retired.** Its conventions are now prose in [§ API conventions](#api-conventions). The identifier is never reused.
-
-## Surface shape (REQ-023)
-
-**Retired.** Its conventions are now prose in [§ API conventions](#api-conventions). The identifier is never reused.
-
-## Generics policy (REQ-024)
-
-**Retired.** Its conventions, the no-reflection rule included, are now prose in [§ API conventions](#api-conventions). The identifier is never reused.
-
 ## API conventions
 
 These conventions shape the public surface and the library code behind it. They are informative: the code follows them, and the code can change them without an amendment here.

@@ -141,18 +141,6 @@ testkit/  -. helpers for .-→ all of the above
 - `openehr/terminology/` imports only the standard library (the table of [§ REQ-013](#req-013--building-block-independence)); it sits *below* `openehr/rm`, so `openehr/rm` can import it later without a cycle.
 - `internal/termgen` is a generator tool consumed only by `cmd/termgen` at build time — no library package imports it.
 
-## REQ-010 — `cadasto/` cut line
-
-**Retired.** The `cadasto/` cut line is now prose in [§ Boundary rules](#boundary-rules). The identifier is never reused.
-
-## REQ-011 — No sideways imports inside `cadasto/`
-
-**Retired.** The rule against sideways imports inside `cadasto/` is now prose in [§ Boundary rules](#boundary-rules). The identifier is never reused.
-
-## REQ-012 — Auth layering
-
-**Retired.** The layering of `auth/` is now prose in [§ Boundary rules](#boundary-rules). The identifier is never reused.
-
 ## REQ-013 — Building-block independence
 
 Each building block in the table below **MUST** be importable and useful without an authenticated client: no package in its import closure, the packages of this module it imports directly or indirectly, is `transport/`, `auth/` or `openehr/client/*`.
@@ -182,10 +170,6 @@ The table is the one home of each block's own import rule beside that closure ru
 The closure and own-files rules of each row are held by that package's import-guard test, which walks the block's in-module import closure for a closure rule and reads its own imports for an own-files rule. The note on `openehr/aql/parse`'s one third-party import describes the dependency; no guard checks it.
 
 See [use-cases.md § Building-block use cases](use-cases.md#building-block-use-cases).
-
-## REQ-014 — Dependency direction
-
-**Retired.** The downward dependency direction is now prose in [§ Boundary rules](#boundary-rules). The identifier is never reused.
 
 ## REQ-058 — Datamap V2
 

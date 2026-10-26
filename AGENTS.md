@@ -21,7 +21,7 @@ Reading order — the specialized docs are **canonical**; defer to them rather t
 | # | Doc | Scope |
 |---|---|---|
 | 0 | [docs/quick-start.md](docs/quick-start.md) · [docs/examples.md](docs/examples.md) | **Developer onboarding** — install, integration paths, runnable `cmd/examples/` catalog |
-| 1 | [docs/specifications/](docs/specifications/) | **Normative specs** — REQ index in [REQ.md](docs/specifications/REQ.md), PROBE in [conformance.md](docs/specifications/conformance.md), STRAND in [research-strands.md](docs/specifications/research-strands.md); machine map in [traceability.yaml](docs/specifications/traceability.yaml); process + descriptor in [development-process.md](docs/development-process.md) / [.sdd.yaml](docs/.sdd.yaml) |
+| 1 | [docs/specifications/](docs/specifications/) | **Normative specs** — REQ index in [REQ.md](docs/specifications/REQ.md), PROBE in [conformance.md](docs/specifications/conformance.md), STRAND in [research-strands.md](docs/specifications/research-strands.md), retired REQ in [retired-requirements.md](docs/specifications/retired-requirements.md); machine map in [traceability.yaml](docs/specifications/traceability.yaml); process + descriptor in [development-process.md](docs/development-process.md) / [.sdd.yaml](docs/.sdd.yaml) |
 | 2 | [docs/architecture.md](docs/architecture.md) | Design narrative — package organization, dependencies, integration, mermaid diagrams |
 | 3 | [docs/ai-workflow.md](docs/ai-workflow.md) | **AI conventions** — the working loop, recommended plugins/skills, openEHR ground-truth lookups, hooks |
 | 4 | [docs/adr/](docs/adr/) | Closed architectural decisions |

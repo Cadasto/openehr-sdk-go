@@ -19,22 +19,6 @@ The RM has deep polymorphism: `LOCATABLE → ENTRY → COMPOSITION`; `DATA_VALUE
 - **Marker interfaces for abstract categories.** An abstract RM category (`DATA_VALUE`, `ITEM_STRUCTURE`, `ENTRY`, …) is a Go interface with an unexported marker method (`isDataValue()`), which keeps a type outside the package from satisfying it by accident; a concrete type satisfies it through its method set, with no registration.
 - **The type registry for `_type`.** The `_type` discriminator maps onto a concrete Go type only through the type registry ([§ Type registry (REQ-040)](#type-registry-req-040)): no tag-magic dispatch on a peeked `_type`, and no generic "RM node" that holds any kind of RM value indistinguishably.
 
-## Concrete types (REQ-030)
-
-**Retired.** The rule is now [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4, summarised in [§ The shape of the RM in Go](#the-shape-of-the-rm-in-go). The identifier is never reused.
-
-## Embedded base structs (REQ-031)
-
-**Retired.** The rule is now [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4, summarised in [§ The shape of the RM in Go](#the-shape-of-the-rm-in-go). The identifier is never reused.
-
-## Abstract categories (REQ-032)
-
-**Retired.** The rule is now [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4, summarised in [§ The shape of the RM in Go](#the-shape-of-the-rm-in-go). The identifier is never reused.
-
-## No inheritance emulation (REQ-033)
-
-**Retired.** The rule is now [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4, summarised in [§ The shape of the RM in Go](#the-shape-of-the-rm-in-go). The identifier is never reused.
-
 ## openEHR terminology vocabulary (REQ-034)
 
 The openEHR Terminology — the `openehr` terminology's **groups** (*audit change type*, *version lifecycle state*, *setting*, *participation mode*, *composition category*, …) and **code sets** (*normal statuses*, *compression algorithms*, *integrity check algorithms*), and the **external code sets** the Foundation publishes beside them (*languages* ISO_639-1, *countries* ISO_3166-1, *character sets* IANA_character-sets, *media types* IANA_media-types), that the RM's own invariants reference (`EVENT_CONTEXT.Setting_valid`, `AUDIT_DETAILS.Change_type_valid`, `PARTICIPATION.Mode_valid`, `DV_ORDERED.Normal_status_validity`, `ENTRY.Language_valid`, …) — is part of the specifications the SDK targets, published as a computable artefact by the openEHR Foundation. It is small, closed and versioned with the specifications; it is **not** a runtime terminology-service lookup. The external code sets are the snapshots the Foundation publishes with the TERM release, not the live ISO and IANA registers. Beside them the release publishes the **property-unit table**, `PropertyUnitData.xml`: for each code of the *property* group, the units of measure that measure it, with their UCUM codes, which a `C_DV_QUANTITY` constraint's `property` names ([clinical-modeling.md § REQ-103](clinical-modeling.md#req-103--primitive-constraint-introspection)). The SDK carries the terminology the way it carries the BMM ([bmm-conformance.md § REQ-041](bmm-conformance.md#req-041--pinned-bmm-sources)):

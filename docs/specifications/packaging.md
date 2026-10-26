@@ -22,18 +22,6 @@ The path is locked. Renaming it is a change [module-layout.md § Versioning](mod
 
 ---
 
-## REQ-002 — Go version
-
-**Retired.** The rule for the `go.mod` `go` directive is now prose in [releases.md § Minimum Go version](../releases.md#minimum-go-version). The identifier is never reused.
-
----
-
-## REQ-003 — License
-
-**Retired.** The licence rule is now prose in [licensing.md](../licensing.md). The identifier is never reused.
-
----
-
 ## REQ-004 — Semantic versioning
 
 The SDK **MUST** follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html). Major versions `v2` and beyond **MUST** use Go's semantic-import-versioning convention (`…/v2/`).

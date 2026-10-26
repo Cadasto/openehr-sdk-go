@@ -260,18 +260,6 @@ An assertion that does not parse is kept on `Slot.Includes` or `Slot.Excludes`, 
 
 ---
 
-## REQ-104 — Slot assertion grammar
-
-**Retired.** Its rules moved to [§ REQ-103](#req-103--primitive-constraint-introspection) *Slot assertions*. The identifier is never reused.
-
----
-
-## REQ-105 — Terminology bindings
-
-**Retired.** Its rules moved to [§ REQ-111](#req-111--public-compiled-template-bridge) *Term definitions and bindings*. The identifier is never reused.
-
----
-
 ## REQ-102 — Composition validation
 
 The SDK **MUST** ship a `ValidateComposition(comp *rm.Composition, c *templatecompile.Compiled) Result` entry point that walks a parsed RM `Composition` against a compiled OPT and returns a `Result` aggregating every issue found in a single pass.
@@ -745,12 +733,6 @@ A `$param` archetype predicate (`[$name]`, `parse.ClassExpr.ParamArchetype`) is 
 - **Re-emission / pretty-printing**: canonical re-emission from the structured AST is [§ REQ-113](#req-113--execution-oriented-parsed-aql-ast)'s `(*parse.Query).Emit`.
 
 - **Probes:** PROBE-028 — lint fixed query strings against the grammar profile (+ a compiled OPT for Layer 3) and assert a stable issue-code multiset; [PROBE-107](conformance.md#probe-107--upstream-aql-suite-admissibility-corpus) — every query the vendored upstream suites send and an engine answers parses under the profile, or is a recorded decline.
-
-## REQ-110 — Template-driven validation beyond COMPOSITION
-
-**Retired.** Its rules moved to [§ REQ-102](#req-102--composition-validation) *Roots beyond COMPOSITION*. The identifier is never reused.
-
----
 
 ## REQ-111 — Public compiled-template bridge
 
@@ -1392,16 +1374,6 @@ Structured diagnostics for the simplified-format codecs ([§ REQ-053](wire.md#re
 
 - **Probes:** [PROBE-080](conformance.md#probe-080--aql-parseemit-round-trip-property) (the round-trip property), [PROBE-082](conformance.md#probe-082--aql-structured-path-access-standing-predicate--where-path) (structured path access), [PROBE-087](conformance.md#probe-087--aql-structured-ast-catalogue-completeness) (the catalogue, the `TOP` carrier and literal source text), [PROBE-095](conformance.md#probe-095--aql-predicate-structuring) (predicate structuring), [PROBE-096](conformance.md#probe-096--aql-value-free-structured-diagnostics) (value-free diagnostics).
 
-## REQ-117 — AQL expression-catalogue completion
-
-**Retired.** Its rules moved to [§ REQ-113](#req-113--execution-oriented-parsed-aql-ast) (the read-side catalogue and its residual), [§ REQ-109](#req-109--aql-static-lint) (alias resolution in the lint) and [§ REQ-163](#req-163--aql-write-side-expressivity-parity) (the builder's containment algebra and in-text paging). The identifier is never reused.
-
-## REQ-118 — Deprecated `SELECT TOP` clause and literal source text
-
-**Retired.** Its rules moved to [§ REQ-113](#req-113--execution-oriented-parsed-aql-ast) (the `TOP` carrier and literal source text), [§ REQ-163](#req-163--aql-write-side-expressivity-parity) (the builder's `TOP` and the row-bound channels) and [§ REQ-109](#req-109--aql-static-lint) (the `TOP` lint codes). The identifier is never reused.
-
----
-
 ## REQ-119 — Re-parseable canonical AQL emission
 
 [PROBE-021](conformance.md#probe-021--aql-parse-error-mapping) pins that the typed builders cannot emit syntactically invalid AQL (the write-side complement of [§ REQ-055](wire.md#req-055--wire-boundary)'s canonical form), and [§ REQ-113](#req-113--execution-oriented-parsed-aql-ast) makes `(*Query).Emit` a fixed point of the parse/emit round trip. Both are stated over the *shapes* the catalogue models. This requirement binds the value positions inside those shapes and the text a write path splices in verbatim, so that a consumer gets one guarantee, *what this SDK writes, it can read back*, rather than one that holds per clause and lapses per literal.
@@ -1653,10 +1625,6 @@ Engine-capability findings (valid AQL a particular engine does not implement) ar
 Widening `aql_contains_not_containable` to the FROM-root anchor position is also out of scope (§ Checks): the catalogue scopes that code to a `CONTAINS` operand, and a root-position finding would need its own catalogue row, severity and span rule rather than a re-pointed existing code.
 
 - **Probes:** [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus) (its read/write parity arm included); PROBE-028 re-baseline where applicable
-
-## REQ-162 — Builder containment verification
-
-**Retired.** Its rules moved to [§ REQ-161 § Builder adapter](#builder-adapter). The identifier is never reused.
 
 ## REQ-163 — AQL write-side expressivity parity
 

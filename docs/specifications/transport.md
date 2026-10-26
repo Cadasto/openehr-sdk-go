@@ -135,18 +135,6 @@ For the `WriteResult` family (`composition`, `directory`, `ehr_status`, `demogra
 
 ---
 
-## REQ-096 — Unambiguous "disable retry"
-
-**Retired.** The rule that tells "no retries" apart from "use the package default" moved to [§ REQ-091](#req-091--retry-policy) *Disabling retries*. The identifier is never reused.
-
----
-
-## REQ-097 — First-class `Idempotency-Key` (deprecated)
-
-**Retired.** Cadasto openEHR services no longer accept the `Idempotency-Key` header, so the SDK does not send it. The identifier is never reused.
-
----
-
 ## REQ-098 — Request-level observer hook
 
 `transport.Client` **MUST** expose a structured observer hook that fires once per request lifecycle, independent of OTel:
@@ -294,7 +282,3 @@ type BearerChallenge struct {
 - The opt-in 401 safety net (REQ-063) **MUST** call `Reauth` only for a 401 whose challenge is absent, carries no `error`, or carries `error="invalid_token"` (RFC 6750 §3.1: the token is expired, revoked or malformed, and a new one may succeed). A 401 whose challenge names any other error, `insufficient_scope` included, **MUST** be surfaced without calling `Reauth`, since a fresh token with the same grant cannot fix it.
 
 ---
-
-## REQ-172 — Typed 2xx body-read failure
-
-**Retired.** Its rules moved to [§ REQ-151](#req-151--typed-2xx-decode-failure), and its retry rule to [§ REQ-091](#req-091--retry-policy). The identifier is never reused.

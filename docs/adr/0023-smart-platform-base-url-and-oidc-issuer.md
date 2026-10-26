@@ -11,7 +11,7 @@ date: 2026-10-04
 - **Status:** Accepted, 2026-10-04 (maintainer sign-off on the proposal, choosing the cross-check on by default).
 - **Supersedes:** —
 - **Superseded by:** —
-- **Amends:** [REQ-070](../specifications/service-discovery.md#req-070) (the catalog carries both values), [REQ-071](../specifications/service-discovery.md#req-071) (the cache key), [REQ-073](../specifications/service-discovery.md#req-073--discovery-trust-posture) (the issuer rule), [REQ-061](../specifications/auth.md#req-061--pkce-flow) (the default `aud`), [REQ-065](../specifications/auth.md#req-065) (what a client binds to).
+- **Amends:** [REQ-070](../specifications/service-discovery.md#req-070) (the catalog carries both values), [REQ-071](../specifications/service-discovery.md#req-071) (the cache key), [REQ-073](../specifications/service-discovery.md#req-073--discovery-trust-posture) (the issuer rule), [REQ-061](../specifications/auth.md#req-061--pkce-flow) (the default `aud`), [REQ-065](../specifications/retired-requirements.md#req-065--per-client-tenant-binding) (what a client binds to).
 - **Related:** [ADR 0008](0008-smart-discovery-services-shape.md) (the `services` map shape, unchanged); [ADR 0009](0009-smart-auth-library-scope.md) (the auth library scope, unchanged).
 
 ## Context

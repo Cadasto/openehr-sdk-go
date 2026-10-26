@@ -43,18 +43,6 @@ How the SDK keeps that correspondence:
 
 The openEHR Terminology vocabulary is pinned the same way under `resources/terminology/` ([rm-modeling.md § REQ-034](rm-modeling.md#openehr-terminology-vocabulary-req-034)).
 
-### REQ-042 — Generated code, drift-detected
-
-**Retired.** Generation and its drift check are now prose under [REQ-041](#req-041--pinned-bmm-sources). The identifier is never reused.
-
-### REQ-043 — Mapping rules: P_BMM → Go
-
-**Retired.** The mapping rules now bind through [REQ-041](#req-041--pinned-bmm-sources) and live in [§ Mapping rules](#mapping-rules). The identifier is never reused.
-
-### REQ-044 — Hand-written extensions are isolated
-
-**Retired.** The separation of generated and hand-written files is now prose under [REQ-041](#req-041--pinned-bmm-sources). The identifier is never reused.
-
 ### REQ-045 — BMM loader is a building block
 
 `openehr/bmm/` **MUST** be a public loader for BMM schemas that a consumer — a validator, an archetype tool, a custom code generator, a BMM-aware diff tool — can import without `transport/`, `auth/` or any HTTP machinery. Its import rule is in the table of [module-layout.md § REQ-013](module-layout.md#req-013--building-block-independence).
@@ -83,10 +71,6 @@ Schema, Class, Property, Type, FunctionParameter are the in-memory equivalents o
 The SDK **MUST** map openEHR primitive types to Go types per the table in [§ Primitive type mapping](#primitive-type-mapping) below. The mapping is fixed; alternative widenings (e.g. mapping `Real` to `float32`) are not permitted.
 
 `Character` is the one primitive whose canonical JSON spelling (a one-character string) disagrees with a numeric Go `rune`, so it maps to a named type carrying its own codec — the mapping is still fixed, this is the fixed target.
-
-### REQ-047 — BMM-spec divergence resolution
-
-**Retired.** The rule that the BMM wins over spec prose is now prose under [REQ-041](#req-041--pinned-bmm-sources). The identifier is never reused.
 
 ### REQ-048 — RM meta-model introspection surface
 
@@ -205,10 +189,6 @@ A name reporting an absence reason **MUST** report not-known on every `Lookup` a
 **Acceptance:** the compiled-in answers equal an independent reduction of the pinned BMM (class universe, abstractness, immediate parents, transitive ancestors, per-attribute declaring class) — the equivalence [PROBE-094](conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm) asserts. `ENTRY` reports abstract and expands to exactly the concrete entry classes; a concrete class expands to itself; a dead-end abstract class expands to nothing while still reporting as known. `LOCATABLE`-inherited attributes report `LOCATABLE` (or the redefining descendant) as their declaration site while the flattened lookup keeps answering unchanged. A name outside the universe is distinguishable from every in-universe answer on every question. The compiled-in absence table equals an independent reduction of the pinned BMM, in both directions, under the fixed precedence, with the negative-space consistency held on every out-of-universe name it exercises — what [PROBE-098](conformance.md#probe-098--absence-reasons-account-for-the-universes-negative-space) asserts. Hand-editing a generated hierarchy field fails the drift check.
 
 **Out of scope:** runtime BMM loading (ruled out above, not deferred); AOM/AM class hierarchies; generic-parameter resolution beyond the root-type reduction the attribute tables already apply; selecting among multiple pinned schemas at run time; deriving *instantiability* beyond the BMM's own abstractness flag (an RM invariant that forbids a value is [REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)'s, not this surface's); shipping any excluded model (the exclusions are pinned intent — PROBE-094 — and the absence reasons make them legible, not reversible); naming the *skipped package* for an excluded-package name (deferred until a consumer needs it); and policy — what a caller does with a reason is the caller's, not this surface's.
-
-### REQ-049 — RM class-universe absence reasons
-
-**Retired.** Its absence reasons are now [REQ-048 § Absence reasons](#absence-reasons). The identifier is never reused.
 
 ## Mapping rules
 
