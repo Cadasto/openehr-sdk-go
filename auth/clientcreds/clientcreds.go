@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"slices"
@@ -65,6 +66,10 @@ const (
 // Config carries the constructor inputs. Use New(...Option) for the
 // idiomatic call site; Config is exposed for declarative configuration
 // (env, YAML).
+//
+// Printed with fmt or logged with log/slog, a Config shows its ClientSecret
+// and ClientAssertion as "[redacted]": see [Config.String] and
+// [Config.LogValue].
 type Config struct {
 	// HTTPClient is the injected client used for token-endpoint calls.
 	// The token request never follows a redirect, whatever CheckRedirect
@@ -103,6 +108,66 @@ type Config struct {
 	// Issuer is the issuer URL recorded on the produced Token. Optional;
 	// when set it is round-tripped to Token.Issuer for audit.
 	Issuer string
+}
+
+// redacted is the text that stands for a credential when a value is printed
+// or logged.
+const redacted = "[redacted]"
+
+// redact returns redacted for a credential s that is set and "" for an empty
+// one.
+func redact(s string) string {
+	if s == "" {
+		return ""
+	}
+	return redacted
+}
+
+// String describes c with its ClientSecret shown as "[redacted]", or as ""
+// when it is empty, its ClientAssertion shown as "[redacted]", or as <nil>
+// when it has none, and the password of a TokenURL that carries one masked.
+// The other fields are shown as they are, except HTTPClient, which is left
+// out.
+func (c Config) String() string {
+	assertion := "<nil>"
+	if c.ClientAssertion != nil {
+		assertion = redacted
+	}
+	return fmt.Sprintf("clientcreds.Config{TokenURL: %q, ClientID: %q, ClientSecret: %q, ClientAssertion: %s, Scope: %q, Audience: %q, AuthMethod: %d, RefreshThreshold: %s, Issuer: %q}",
+		urlredact.String(c.TokenURL), c.ClientID, redact(c.ClientSecret), assertion, c.Scope, c.Audience, c.AuthMethod, c.RefreshThreshold, c.Issuer)
+}
+
+// GoString returns the text of [Config.String], so that printing c in Go
+// syntax shows no credential either.
+func (c Config) GoString() string { return c.String() }
+
+// Format writes the text of [Config.String] for every fmt verb it is called
+// for, whatever the flags and width. fmt answers %T and %p without calling
+// it, and %p of a Config value prints its fields, so never print a Config
+// with %p.
+func (c Config) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, c.String()) }
+
+// LogValue lets log/slog log c as a group of the fields [Config.String]
+// shows, keyed by field name, with the ClientSecret, the ClientAssertion and
+// the TokenURL replaced as String replaces them. Without it, the JSON handler
+// would encode the client secret, and the private key of a
+// [jwtbearer.ClaimsSigner] client assertion.
+func (c Config) LogValue() slog.Value {
+	assertion := slog.Any("ClientAssertion", nil)
+	if c.ClientAssertion != nil {
+		assertion = slog.String("ClientAssertion", redacted)
+	}
+	return slog.GroupValue(
+		slog.String("TokenURL", urlredact.String(c.TokenURL)),
+		slog.String("ClientID", c.ClientID),
+		slog.String("ClientSecret", redact(c.ClientSecret)),
+		assertion,
+		slog.String("Scope", c.Scope),
+		slog.String("Audience", c.Audience),
+		slog.Int("AuthMethod", int(c.AuthMethod)),
+		slog.Duration("RefreshThreshold", c.RefreshThreshold),
+		slog.String("Issuer", c.Issuer),
+	)
 }
 
 // Option mutates a Config during construction.
@@ -150,6 +215,10 @@ func WithClientAssertion(src jwtbearer.AssertionSource) Option {
 // Source is the client_credentials TokenSource. Safe for concurrent
 // use; concurrent Token() callers coalesce around one outgoing
 // exchange.
+//
+// Printing a Source with any fmt verb shows only its token URL, client ID and
+// issuer, never its client secret, its client assertion or the token it
+// holds: see [Source.String].
 type Source struct {
 	cfg      Config
 	tokenURL *url.URL
@@ -162,6 +231,29 @@ type Source struct {
 	cur      auth.Token
 	inflight *exchange
 }
+
+// String describes s by three values fixed when s was built: its token URL,
+// with the password of one that carries one masked, its client ID and its
+// issuer. It never shows the client secret, the client assertion or a token,
+// and it reads nothing an exchange changes, so it is safe to call while
+// other goroutines use s. A nil s gives "<nil>".
+func (s *Source) String() string {
+	if s == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("clientcreds.Source{TokenURL: %q, ClientID: %q, Issuer: %q}",
+		urlredact.String(s.cfg.TokenURL), s.cfg.ClientID, s.cfg.Issuer)
+}
+
+// GoString returns the text of [Source.String], so that printing s in Go
+// syntax shows no credential either.
+func (s *Source) GoString() string { return s.String() }
+
+// Format writes the text of [Source.String] for every fmt verb, whatever its
+// flags and width. Without it, fmt would print the unexported fields of s
+// without calling their methods, the client secret and the held token
+// included.
+func (s *Source) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, s.String()) }
 
 type exchange struct {
 	done  chan struct{}
