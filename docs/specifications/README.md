@@ -104,7 +104,7 @@ Identifiers are stable once published — they are referenced from outside the f
 | [../.sdd.yaml](../.sdd.yaml) | SDD project descriptor — identifier style, document paths, `make` targets (read by `sdd-*` skills) |
 | [../development-process.md](../development-process.md) | The two lanes, the delivery ladder, the superpowers boundary |
 | [packaging.md](packaging.md) | Module path, semantic versioning and the internal boundary (REQ-001, REQ-004, REQ-005) |
-| [transport.md](transport.md) | Transport layer REQ-090–094, 096–098, 150 |
+| [transport.md](transport.md) | Transport layer — OTel hooks, retry, TLS posture, error-envelope mapping, `Prefer` negotiation, the request observer, path-segment validation, typed 2xx failures, bearer challenges |
 | [glossary.md](glossary.md) | openEHR, SMART, Cadasto, and SDK-internal terms |
 | [scope.md](scope.md) | What is in and out of v1 scope |
 | [module-layout.md](module-layout.md) | Package taxonomy, dependency direction, building-block independence and each block's import rule (REQ-013), boundary rules, versioning |
@@ -116,7 +116,7 @@ Identifiers are stable once published — they are referenced from outside the f
 | [wire.md](wire.md) | openEHR REST 1.1.0 pin, AQL wire, canonical JSON / FLAT / STRUCTURED |
 | [service-discovery.md](service-discovery.md) | Service catalog resolution and refresh |
 | [conformance.md](conformance.md) | openEHR wire-conformance probe catalog |
-| [clinical-modeling.md](clinical-modeling.md) | Clinical-modeling artefacts — OPT parse and paths (REQ-100); composition, validation, AQL paths follow in later REQs |
+| [clinical-modeling.md](clinical-modeling.md) | Clinical-modeling artefacts — OPT parse and paths, primitive constraints, validation, the instance generator and composition builder, the Web Template export, AQL parse, lint, containment and builders |
 | [use-cases.md](use-cases.md) | Primary use cases, building-block use cases, delivery sequence |
 | [research-strands.md](research-strands.md) | Open strands awaiting resolution (each becomes an ADR) |
 
