@@ -14,6 +14,12 @@ import (
 
 // BMM package: org.openehr.rm.data_types.basic — canonical-XML UnmarshalXML companions
 
+// xmlClassDVBoolean describes DV_BOOLEAN to the canonical-XML decode runtime.
+var xmlClassDVBoolean = xmlunmatched.Class{
+	Name:     "DV_BOOLEAN",
+	Required: []string{"value"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into DVBoolean.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -24,7 +30,7 @@ import (
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVBoolean) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVBoolean); _err != nil {
 		return _err
 	}
 	for {
@@ -54,6 +60,12 @@ func (d *DVBoolean) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 	}
 }
 
+// xmlClassDVIdentifier describes DV_IDENTIFIER to the canonical-XML decode runtime.
+var xmlClassDVIdentifier = xmlunmatched.Class{
+	Name:     "DV_IDENTIFIER",
+	Required: []string{"id"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into DVIdentifier.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -64,7 +76,7 @@ func (d *DVBoolean) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVIdentifier) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVIdentifier); _err != nil {
 		return _err
 	}
 	for {
@@ -112,6 +124,12 @@ func (d *DVIdentifier) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 	}
 }
 
+// xmlClassDVState describes DV_STATE to the canonical-XML decode runtime.
+var xmlClassDVState = xmlunmatched.Class{
+	Name:     "DV_STATE",
+	Required: []string{"value", "is_terminal"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into DVState.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -122,7 +140,7 @@ func (d *DVIdentifier) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVState) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVState); _err != nil {
 		return _err
 	}
 	for {

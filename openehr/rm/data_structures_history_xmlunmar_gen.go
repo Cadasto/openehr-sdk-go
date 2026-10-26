@@ -14,6 +14,14 @@ import (
 
 // BMM package: org.openehr.rm.data_structures.history — canonical-XML UnmarshalXML companions
 
+// xmlClassHistory describes HISTORY to the canonical-XML decode runtime.
+var xmlClassHistory = xmlunmatched.Class{
+	Name:     "HISTORY",
+	Attrs:    []string{"archetype_node_id"},
+	Required: []string{"name", "archetype_node_id", "origin"},
+	Items:    []string{"links", "events"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into History.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -24,7 +32,7 @@ import (
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (h *History[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start, "archetype_node_id"); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassHistory); _err != nil {
 		return _err
 	}
 	for _, _a := range _start.Attr {
@@ -118,6 +126,14 @@ func (h *History[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 	}
 }
 
+// xmlClassIntervalEvent describes INTERVAL_EVENT to the canonical-XML decode runtime.
+var xmlClassIntervalEvent = xmlunmatched.Class{
+	Name:     "INTERVAL_EVENT",
+	Attrs:    []string{"archetype_node_id"},
+	Required: []string{"name", "archetype_node_id", "time", "data", "width", "math_function"},
+	Items:    []string{"links"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into IntervalEvent.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -128,7 +144,7 @@ func (h *History[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (i *IntervalEvent[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start, "archetype_node_id"); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassIntervalEvent); _err != nil {
 		return _err
 	}
 	for _, _a := range _start.Attr {
@@ -224,6 +240,14 @@ func (i *IntervalEvent[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 	}
 }
 
+// xmlClassPointEvent describes POINT_EVENT to the canonical-XML decode runtime.
+var xmlClassPointEvent = xmlunmatched.Class{
+	Name:     "POINT_EVENT",
+	Attrs:    []string{"archetype_node_id"},
+	Required: []string{"name", "archetype_node_id", "time", "data"},
+	Items:    []string{"links"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into PointEvent.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -234,7 +258,7 @@ func (i *IntervalEvent[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (p *PointEvent[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start, "archetype_node_id"); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassPointEvent); _err != nil {
 		return _err
 	}
 	for _, _a := range _start.Attr {

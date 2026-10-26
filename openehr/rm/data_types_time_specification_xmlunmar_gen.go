@@ -14,6 +14,12 @@ import (
 
 // BMM package: org.openehr.rm.data_types.time_specification — canonical-XML UnmarshalXML companions
 
+// xmlClassDVGeneralTimeSpecification describes DV_GENERAL_TIME_SPECIFICATION to the canonical-XML decode runtime.
+var xmlClassDVGeneralTimeSpecification = xmlunmatched.Class{
+	Name:     "DV_GENERAL_TIME_SPECIFICATION",
+	Required: []string{"value"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into DVGeneralTimeSpecification.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -24,7 +30,7 @@ import (
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVGeneralTimeSpecification) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVGeneralTimeSpecification); _err != nil {
 		return _err
 	}
 	for {
@@ -54,6 +60,12 @@ func (d *DVGeneralTimeSpecification) UnmarshalXML(_dec *xml.Decoder, _start xml.
 	}
 }
 
+// xmlClassDVPeriodicTimeSpecification describes DV_PERIODIC_TIME_SPECIFICATION to the canonical-XML decode runtime.
+var xmlClassDVPeriodicTimeSpecification = xmlunmatched.Class{
+	Name:     "DV_PERIODIC_TIME_SPECIFICATION",
+	Required: []string{"value"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into DVPeriodicTimeSpecification.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -64,7 +76,7 @@ func (d *DVGeneralTimeSpecification) UnmarshalXML(_dec *xml.Decoder, _start xml.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVPeriodicTimeSpecification) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVPeriodicTimeSpecification); _err != nil {
 		return _err
 	}
 	for {

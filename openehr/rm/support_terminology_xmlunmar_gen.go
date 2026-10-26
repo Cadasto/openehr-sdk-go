@@ -14,6 +14,11 @@ import (
 
 // BMM package: org.openehr.rm.support.terminology — canonical-XML UnmarshalXML companions
 
+// xmlClassOpenehrCodeSetIdentifiers describes OPENEHR_CODE_SET_IDENTIFIERS to the canonical-XML decode runtime.
+var xmlClassOpenehrCodeSetIdentifiers = xmlunmatched.Class{
+	Name: "OPENEHR_CODE_SET_IDENTIFIERS",
+}
+
 // UnmarshalXML decodes canonical openEHR XML into OpenehrCodeSetIdentifiers.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -24,7 +29,7 @@ import (
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (o *OpenehrCodeSetIdentifiers) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassOpenehrCodeSetIdentifiers); _err != nil {
 		return _err
 	}
 	for {
@@ -48,6 +53,11 @@ func (o *OpenehrCodeSetIdentifiers) UnmarshalXML(_dec *xml.Decoder, _start xml.S
 			return nil
 		}
 	}
+}
+
+// xmlClassOpenehrTerminologyGroupIdentifiers describes OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS to the canonical-XML decode runtime.
+var xmlClassOpenehrTerminologyGroupIdentifiers = xmlunmatched.Class{
+	Name: "OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS",
 }
 
 // UnmarshalXML decodes canonical openEHR XML into OpenehrTerminologyGroupIdentifiers.
@@ -60,7 +70,7 @@ func (o *OpenehrCodeSetIdentifiers) UnmarshalXML(_dec *xml.Decoder, _start xml.S
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (o *OpenehrTerminologyGroupIdentifiers) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassOpenehrTerminologyGroupIdentifiers); _err != nil {
 		return _err
 	}
 	for {
@@ -86,6 +96,11 @@ func (o *OpenehrTerminologyGroupIdentifiers) UnmarshalXML(_dec *xml.Decoder, _st
 	}
 }
 
+// xmlClassTerminologyService describes TERMINOLOGY_SERVICE to the canonical-XML decode runtime.
+var xmlClassTerminologyService = xmlunmatched.Class{
+	Name: "TERMINOLOGY_SERVICE",
+}
+
 // UnmarshalXML decodes canonical openEHR XML into TerminologyService.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -96,7 +111,7 @@ func (o *OpenehrTerminologyGroupIdentifiers) UnmarshalXML(_dec *xml.Decoder, _st
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TerminologyService) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassTerminologyService); _err != nil {
 		return _err
 	}
 	for {

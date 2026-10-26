@@ -15,6 +15,12 @@ import (
 
 // BMM package: org.openehr.am.aom14.archetype.primitive — canonical-XML UnmarshalXML companions
 
+// xmlClassCBoolean describes C_BOOLEAN to the canonical-XML decode runtime.
+var xmlClassCBoolean = xmlunmatched.Class{
+	Name:     "C_BOOLEAN",
+	Required: []string{"true_valid", "false_valid"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into CBoolean.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -25,7 +31,7 @@ import (
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CBoolean) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCBoolean); _err != nil {
 		return _err
 	}
 	for {
@@ -65,6 +71,11 @@ func (c *CBoolean) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 	}
 }
 
+// xmlClassCDate describes C_DATE to the canonical-XML decode runtime.
+var xmlClassCDate = xmlunmatched.Class{
+	Name: "C_DATE",
+}
+
 // UnmarshalXML decodes canonical openEHR XML into CDate.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -75,7 +86,7 @@ func (c *CBoolean) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCDate); _err != nil {
 		return _err
 	}
 	for {
@@ -125,6 +136,11 @@ func (c *CDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 	}
 }
 
+// xmlClassCDateTime describes C_DATE_TIME to the canonical-XML decode runtime.
+var xmlClassCDateTime = xmlunmatched.Class{
+	Name: "C_DATE_TIME",
+}
+
 // UnmarshalXML decodes canonical openEHR XML into CDateTime.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -135,7 +151,7 @@ func (c *CDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCDateTime); _err != nil {
 		return _err
 	}
 	for {
@@ -215,6 +231,11 @@ func (c *CDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 	}
 }
 
+// xmlClassCDuration describes C_DURATION to the canonical-XML decode runtime.
+var xmlClassCDuration = xmlunmatched.Class{
+	Name: "C_DURATION",
+}
+
 // UnmarshalXML decodes canonical openEHR XML into CDuration.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -225,7 +246,7 @@ func (c *CDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCDuration); _err != nil {
 		return _err
 	}
 	for {
@@ -311,6 +332,12 @@ func (c *CDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 	}
 }
 
+// xmlClassCInteger describes C_INTEGER to the canonical-XML decode runtime.
+var xmlClassCInteger = xmlunmatched.Class{
+	Name:  "C_INTEGER",
+	Items: []string{"list"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into CInteger.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -321,7 +348,7 @@ func (c *CDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CInteger) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCInteger); _err != nil {
 		return _err
 	}
 	for {
@@ -365,6 +392,12 @@ func (c *CInteger) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 	}
 }
 
+// xmlClassCReal describes C_REAL to the canonical-XML decode runtime.
+var xmlClassCReal = xmlunmatched.Class{
+	Name:  "C_REAL",
+	Items: []string{"list"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into CReal.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -375,7 +408,7 @@ func (c *CInteger) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CReal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCReal); _err != nil {
 		return _err
 	}
 	for {
@@ -419,6 +452,13 @@ func (c *CReal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 	}
 }
 
+// xmlClassCString describes C_STRING to the canonical-XML decode runtime.
+var xmlClassCString = xmlunmatched.Class{
+	Name:     "C_STRING",
+	Required: []string{"list_open"},
+	Items:    []string{"list"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into CString.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -429,7 +469,7 @@ func (c *CReal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CString) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCString); _err != nil {
 		return _err
 	}
 	for {
@@ -477,6 +517,11 @@ func (c *CString) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 	}
 }
 
+// xmlClassCTime describes C_TIME to the canonical-XML decode runtime.
+var xmlClassCTime = xmlunmatched.Class{
+	Name: "C_TIME",
+}
+
 // UnmarshalXML decodes canonical openEHR XML into CTime.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -487,7 +532,7 @@ func (c *CString) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCTime); _err != nil {
 		return _err
 	}
 	for {

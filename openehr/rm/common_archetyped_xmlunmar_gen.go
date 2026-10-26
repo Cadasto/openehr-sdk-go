@@ -14,6 +14,12 @@ import (
 
 // BMM package: org.openehr.rm.common.archetyped — canonical-XML UnmarshalXML companions
 
+// xmlClassArchetyped describes ARCHETYPED to the canonical-XML decode runtime.
+var xmlClassArchetyped = xmlunmatched.Class{
+	Name:     "ARCHETYPED",
+	Required: []string{"archetype_id", "rm_version"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into Archetyped.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -24,7 +30,7 @@ import (
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *Archetyped) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassArchetyped); _err != nil {
 		return _err
 	}
 	for {
@@ -64,6 +70,13 @@ func (a *Archetyped) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 	}
 }
 
+// xmlClassFeederAudit describes FEEDER_AUDIT to the canonical-XML decode runtime.
+var xmlClassFeederAudit = xmlunmatched.Class{
+	Name:     "FEEDER_AUDIT",
+	Required: []string{"originating_system_audit"},
+	Items:    []string{"originating_system_item_ids", "feeder_system_item_ids"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into FeederAudit.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -74,7 +87,7 @@ func (a *Archetyped) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (f *FeederAudit) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassFeederAudit); _err != nil {
 		return _err
 	}
 	for {
@@ -128,6 +141,12 @@ func (f *FeederAudit) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 	}
 }
 
+// xmlClassFeederAuditDetails describes FEEDER_AUDIT_DETAILS to the canonical-XML decode runtime.
+var xmlClassFeederAuditDetails = xmlunmatched.Class{
+	Name:     "FEEDER_AUDIT_DETAILS",
+	Required: []string{"system_id"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into FeederAuditDetails.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -138,7 +157,7 @@ func (f *FeederAudit) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (f *FeederAuditDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassFeederAuditDetails); _err != nil {
 		return _err
 	}
 	for {
@@ -204,6 +223,12 @@ func (f *FeederAuditDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 	}
 }
 
+// xmlClassLink describes LINK to the canonical-XML decode runtime.
+var xmlClassLink = xmlunmatched.Class{
+	Name:     "LINK",
+	Required: []string{"meaning", "type", "target"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into Link.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -214,7 +239,7 @@ func (f *FeederAuditDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (l *Link) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassLink); _err != nil {
 		return _err
 	}
 	for {

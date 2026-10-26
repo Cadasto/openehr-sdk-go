@@ -14,6 +14,13 @@ import (
 
 // BMM package: org.openehr.rm.ehr — canonical-XML UnmarshalXML companions
 
+// xmlClassEHR describes EHR to the canonical-XML decode runtime.
+var xmlClassEHR = xmlunmatched.Class{
+	Name:     "EHR",
+	Required: []string{"system_id", "ehr_id", "ehr_status", "ehr_access", "time_created"},
+	Items:    []string{"contributions", "compositions", "folders", "tags"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into EHR.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -24,7 +31,7 @@ import (
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (e *EHR) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassEHR); _err != nil {
 		return _err
 	}
 	for {
@@ -104,6 +111,14 @@ func (e *EHR) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 	}
 }
 
+// xmlClassEHRAccess describes EHR_ACCESS to the canonical-XML decode runtime.
+var xmlClassEHRAccess = xmlunmatched.Class{
+	Name:     "EHR_ACCESS",
+	Attrs:    []string{"archetype_node_id"},
+	Required: []string{"name", "archetype_node_id"},
+	Items:    []string{"links"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into EHRAccess.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -114,7 +129,7 @@ func (e *EHR) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (e *EHRAccess) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start, "archetype_node_id"); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassEHRAccess); _err != nil {
 		return _err
 	}
 	for _, _a := range _start.Attr {
@@ -186,6 +201,14 @@ func (e *EHRAccess) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 	}
 }
 
+// xmlClassEHRStatus describes EHR_STATUS to the canonical-XML decode runtime.
+var xmlClassEHRStatus = xmlunmatched.Class{
+	Name:     "EHR_STATUS",
+	Attrs:    []string{"archetype_node_id"},
+	Required: []string{"name", "archetype_node_id", "subject", "is_queryable", "is_modifiable"},
+	Items:    []string{"links"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into EHRStatus.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -196,7 +219,7 @@ func (e *EHRAccess) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (e *EHRStatus) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start, "archetype_node_id"); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassEHRStatus); _err != nil {
 		return _err
 	}
 	for _, _a := range _start.Attr {
@@ -280,6 +303,12 @@ func (e *EHRStatus) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 	}
 }
 
+// xmlClassVersionedComposition describes VERSIONED_COMPOSITION to the canonical-XML decode runtime.
+var xmlClassVersionedComposition = xmlunmatched.Class{
+	Name:     "VERSIONED_COMPOSITION",
+	Required: []string{"uid", "owner_id", "time_created"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into VersionedComposition.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -290,7 +319,7 @@ func (e *EHRStatus) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (v *VersionedComposition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassVersionedComposition); _err != nil {
 		return _err
 	}
 	for {
@@ -328,6 +357,12 @@ func (v *VersionedComposition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartE
 			return nil
 		}
 	}
+}
+
+// xmlClassVersionedEHRAccess describes VERSIONED_EHR_ACCESS to the canonical-XML decode runtime.
+var xmlClassVersionedEHRAccess = xmlunmatched.Class{
+	Name:     "VERSIONED_EHR_ACCESS",
+	Required: []string{"uid", "owner_id", "time_created"},
 }
 
 // UnmarshalXML decodes canonical openEHR XML into VersionedEHRAccess.
@@ -340,7 +375,7 @@ func (v *VersionedComposition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartE
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (v *VersionedEHRAccess) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassVersionedEHRAccess); _err != nil {
 		return _err
 	}
 	for {
@@ -380,6 +415,12 @@ func (v *VersionedEHRAccess) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 	}
 }
 
+// xmlClassVersionedEHRStatus describes VERSIONED_EHR_STATUS to the canonical-XML decode runtime.
+var xmlClassVersionedEHRStatus = xmlunmatched.Class{
+	Name:     "VERSIONED_EHR_STATUS",
+	Required: []string{"uid", "owner_id", "time_created"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into VersionedEHRStatus.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -390,7 +431,7 @@ func (v *VersionedEHRAccess) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (v *VersionedEHRStatus) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassVersionedEHRStatus); _err != nil {
 		return _err
 	}
 	for {

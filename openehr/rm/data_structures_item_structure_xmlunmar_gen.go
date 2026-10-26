@@ -14,6 +14,14 @@ import (
 
 // BMM package: org.openehr.rm.data_structures.item_structure — canonical-XML UnmarshalXML companions
 
+// xmlClassItemList describes ITEM_LIST to the canonical-XML decode runtime.
+var xmlClassItemList = xmlunmatched.Class{
+	Name:     "ITEM_LIST",
+	Attrs:    []string{"archetype_node_id"},
+	Required: []string{"name", "archetype_node_id"},
+	Items:    []string{"links", "items"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into ItemList.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -24,7 +32,7 @@ import (
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (i *ItemList) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start, "archetype_node_id"); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassItemList); _err != nil {
 		return _err
 	}
 	for _, _a := range _start.Attr {
@@ -96,6 +104,14 @@ func (i *ItemList) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 	}
 }
 
+// xmlClassItemSingle describes ITEM_SINGLE to the canonical-XML decode runtime.
+var xmlClassItemSingle = xmlunmatched.Class{
+	Name:     "ITEM_SINGLE",
+	Attrs:    []string{"archetype_node_id"},
+	Required: []string{"name", "archetype_node_id", "item"},
+	Items:    []string{"links"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into ItemSingle.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -106,7 +122,7 @@ func (i *ItemList) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (i *ItemSingle) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start, "archetype_node_id"); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassItemSingle); _err != nil {
 		return _err
 	}
 	for _, _a := range _start.Attr {
@@ -176,6 +192,14 @@ func (i *ItemSingle) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 	}
 }
 
+// xmlClassItemTable describes ITEM_TABLE to the canonical-XML decode runtime.
+var xmlClassItemTable = xmlunmatched.Class{
+	Name:     "ITEM_TABLE",
+	Attrs:    []string{"archetype_node_id"},
+	Required: []string{"name", "archetype_node_id"},
+	Items:    []string{"links", "rows"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into ItemTable.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -186,7 +210,7 @@ func (i *ItemSingle) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (i *ItemTable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start, "archetype_node_id"); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassItemTable); _err != nil {
 		return _err
 	}
 	for _, _a := range _start.Attr {
@@ -258,6 +282,14 @@ func (i *ItemTable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 	}
 }
 
+// xmlClassItemTree describes ITEM_TREE to the canonical-XML decode runtime.
+var xmlClassItemTree = xmlunmatched.Class{
+	Name:     "ITEM_TREE",
+	Attrs:    []string{"archetype_node_id"},
+	Required: []string{"name", "archetype_node_id"},
+	Items:    []string{"links", "items"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into ItemTree.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -268,7 +300,7 @@ func (i *ItemTable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (i *ItemTree) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start, "archetype_node_id"); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassItemTree); _err != nil {
 		return _err
 	}
 	for _, _a := range _start.Attr {

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"go/format"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
@@ -12,7 +14,9 @@ import (
 // RenderUnmarshalXMLFile renders the canonical-XML `UnmarshalXML`
 // companion file for every concrete class in `file`, the parallel
 // of [RenderUnmarshalJSONFile] for XML. Each emitted class gains
-// one method:
+// one method and, beside it, one description of the class:
+//
+//	var xmlClassC = xmlunmatched.Class{Name: "C", …}
 //
 //	func (c *C) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error
 //
@@ -23,7 +27,9 @@ import (
 // `xsi:type` discriminator. Content the method does not read is handed
 // to the helpers of openehr/internal/xmlunmatched, which apply the
 // decode's policy for unmatched content: ignore it (the default), report
-// it, or refuse it.
+// it, or refuse it. The description tells the same runtime what the
+// Reference Model requires of the class, so a decode that asks can learn
+// which mandatory members the document left out (ADR 0033).
 //
 // Returns (nil, nil) when the file has no concrete classes.
 //
@@ -31,11 +37,18 @@ import (
 //
 // For each concrete class C:
 //
-//  1. On entry, hand the start element's attributes to
-//     `xmlunmatched.CheckUnmatchedAttrs`, naming the ones the class reads as
-//     XML attributes: every other attribute, bar the XML Schema instance
-//     attributes (`xsi:type` among them) and the namespace declarations,
-//     is unmatched.
+//  1. On entry, hand the start element and the class's description to
+//     `xmlunmatched.Enter`. The description, a package-level
+//     `xmlClassC` emitted once per class (never per generic
+//     instantiation), names the members the class reads as XML
+//     attributes, its presence-checked mandatory members in the Reference
+//     Model's declaration order (an ancestor's before the class's own,
+//     minus the four interval boundary flags and
+//     RESOURCE_DESCRIPTION.parent_resource) and its multi-valued members.
+//     Every attribute but the ones named, the XML Schema instance
+//     attributes (`xsi:type` among them) and the namespace declarations
+//     is unmatched; the runtime reports a mandatory member the element
+//     leaves out, by its JSON Pointer, when the decode asks.
 //
 //  2. Initialise a flat switch on `xmlunmatched.LocalName` of the child
 //     element covering every effective property (in any order: XML
@@ -177,6 +190,14 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 		}
 	}
 
+	// The description of the class the method hands the runtime on entry.
+	desc, err := xmlClassDescriptor(plan, pc, fields)
+	if err != nil {
+		return "", err
+	}
+	b.WriteString(renderXMLClassVar(desc))
+	b.WriteString("\n")
+
 	fmt.Fprintf(&b, "// UnmarshalXML decodes canonical openEHR XML into %s.\n", pc.GoName)
 	b.WriteString("// Polymorphic fields are routed through canxml.DecodeAs so the\n")
 	b.WriteString("// concrete type is selected by `xsi:type` at each polymorphic site.\n")
@@ -204,8 +225,9 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 		b.WriteString(intervalFlagXMLDoc)
 	}
 	fmt.Fprintf(&b, "func (%s *%s%s) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {\n", recv, pc.GoName, typeArgs)
-	// Every attribute the class does not read is unmatched content.
-	b.WriteString(checkUnmatchedXMLAttrs(attrFields))
+	// The runtime learns the class, and every attribute the class does not
+	// read is unmatched content.
+	b.WriteString(enterXMLClass(pc.GoName))
 	// Read attribute-typed properties from _start.Attr.
 	for _, ef := range attrFields {
 		line := unmarshalXMLAttribute(recv, FieldName(ef.Prop.PropertyName()), ef.Prop.PropertyName())
@@ -655,17 +677,142 @@ func unmarshalXMLAttribute(recv, goField, attrName string) string {
 		attrName, recv, goField)
 }
 
-// checkUnmatchedXMLAttrs emits the call that hands the start element's
-// attributes to xmlunmatched.CheckUnmatchedAttrs at the head of UnmarshalXML,
-// naming the properties the class reads as XML attributes.
-func checkUnmatchedXMLAttrs(attrFields []emittedField) string {
-	var known strings.Builder
-	for _, ef := range attrFields {
-		fmt.Fprintf(&known, ", %q", ef.Prop.PropertyName())
-	}
+// enterXMLClass emits the call that hands the start element and the class's
+// description to xmlunmatched.Enter at the head of UnmarshalXML.
+func enterXMLClass(goName string) string {
 	return fmt.Sprintf(
-		"\tif _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start%s); _err != nil {\n\t\treturn _err\n\t}\n",
-		known.String())
+		"\tif _err := xmlunmatched.Enter(_dec, _start, &xmlClass%s); _err != nil {\n\t\treturn _err\n\t}\n",
+		goName)
+}
+
+// maxXMLRequired is the most presence-checked members a class may have: the
+// runtime keeps which of them an element has a value for in one 64-bit word.
+const maxXMLRequired = 64
+
+// xmlClassDesc is the description of a class its generated decoder hands
+// xmlunmatched.Enter, rendered by [renderXMLClassVar] as a package-level var
+// named `xmlClass<GoName>`: the class's BMM name, the members the decoder
+// reads as XML attributes, the presence-checked mandatory members in the
+// Reference Model's declaration order, and the multi-valued members.
+type xmlClassDesc struct {
+	goName   string
+	name     string
+	attrs    []string
+	required []string
+	items    []string
+}
+
+// xmlClassDescriptor builds the description of pc from its effective fields.
+// Required is the mandatory fields ([xmlPresenceChecked]) in the order
+// [effectiveProperties] gives, the Reference Model's declaration order with
+// an ancestor's members before the class's own, which rminfo's table shares;
+// the decoder's own field order puts the nearest ancestor first and is not
+// used. A class with more presence-checked members than the runtime holds
+// ([maxXMLRequired]) is refused.
+func xmlClassDescriptor(plan *Plan, pc *PlannedClass, fields []emittedField) (xmlClassDesc, error) {
+	d := xmlClassDesc{goName: pc.GoName, name: pc.BMMName}
+	for _, ef := range fields {
+		prop := ef.Prop.PropertyName()
+		if isXMLAttributeProperty(ef.Prop) {
+			d.attrs = append(d.attrs, prop)
+		}
+		if _, ok := ef.Prop.(*bmm.ContainerProperty); ok {
+			d.items = append(d.items, prop)
+		}
+	}
+	_, order := effectiveProperties(plan, pc.BMMName)
+	required, err := xmlRequiredMembers(pc.BMMName, fields, order)
+	if err != nil {
+		return xmlClassDesc{}, err
+	}
+	d.required = required
+	return d, nil
+}
+
+// xmlRequiredMembers returns the presence-checked members among fields, the
+// effective fields of the class named name, in the order of order, the
+// Reference Model's declaration order of the class's attributes. A field
+// order does not place, and more members than [maxXMLRequired], are errors.
+func xmlRequiredMembers(name string, fields []emittedField, order []string) ([]string, error) {
+	checked := make(map[string]bool, len(fields))
+	for _, ef := range fields {
+		if xmlPresenceChecked(ef) {
+			checked[ef.Prop.PropertyName()] = true
+		}
+	}
+	required := make([]string, 0, len(checked))
+	for _, prop := range order {
+		if checked[prop] {
+			required = append(required, prop)
+			delete(checked, prop)
+		}
+	}
+	if len(checked) > 0 {
+		return nil, fmt.Errorf("%s: mandatory members %v are not in the class's declaration order", name, slices.Sorted(maps.Keys(checked)))
+	}
+	if len(required) > maxXMLRequired {
+		return nil, fmt.Errorf("%s has %d presence-checked members; the canonical-XML runtime holds at most %d", name, len(required), maxXMLRequired)
+	}
+	return required, nil
+}
+
+// xmlPresenceChecked reports whether the runtime checks that a document
+// carries ef: the Reference Model makes it mandatory, by the rule rminfo's
+// table applies (a single or generic property by its flag, a container by
+// its flag or a lower bound of one), and it is neither one of the four
+// interval boundary flags, which the decoder gives a value when absent
+// (REQ-169), nor RESOURCE_DESCRIPTION.parent_resource, which no value can
+// be held in (rminfo.IsNonStorableAttr).
+func xmlPresenceChecked(ef emittedField) bool {
+	prop := ef.Prop.PropertyName()
+	if isIntervalFlag(prop) || (ef.OwnerName == "RESOURCE_DESCRIPTION" && prop == "parent_resource") {
+		return false
+	}
+	switch p := ef.Prop.(type) {
+	case *bmm.SingleProperty:
+		return p.IsMandatory
+	case *bmm.SinglePropertyOpen:
+		return p.IsMandatory
+	case *bmm.GenericProperty:
+		return p.IsMandatory
+	case *bmm.ContainerProperty:
+		return containerRequired(p.Cardinality, p.IsMandatory)
+	}
+	return false
+}
+
+// renderXMLClassVar renders d as the package-level var the decoder hands
+// xmlunmatched.Enter, one field per line, leaving out an empty list.
+func renderXMLClassVar(d xmlClassDesc) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "// xmlClass%s describes %s to the canonical-XML decode runtime.\n", d.goName, d.name)
+	fmt.Fprintf(&b, "var xmlClass%s = xmlunmatched.Class{\n", d.goName)
+	fmt.Fprintf(&b, "\tName: %q,\n", d.name)
+	for _, f := range []struct {
+		name string
+		vals []string
+	}{{"Attrs", d.attrs}, {"Required", d.required}, {"Items", d.items}} {
+		if len(f.vals) == 0 {
+			continue
+		}
+		fmt.Fprintf(&b, "\t%s: %s,\n", f.name, stringSliceLiteral(f.vals))
+	}
+	b.WriteString("}\n")
+	return b.String()
+}
+
+// stringSliceLiteral renders vals as a Go `[]string{…}` literal.
+func stringSliceLiteral(vals []string) string {
+	var b strings.Builder
+	b.WriteString("[]string{")
+	for i, v := range vals {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		fmt.Fprintf(&b, "%q", v)
+	}
+	b.WriteByte('}')
+	return b.String()
 }
 
 // checkUnmatchedXMLText is the token-loop arm that hands the text read

@@ -14,6 +14,13 @@ import (
 
 // BMM package: org.openehr.am.aom14.archetype.assertion — canonical-XML UnmarshalXML companions
 
+// xmlClassAssertion describes ASSERTION to the canonical-XML decode runtime.
+var xmlClassAssertion = xmlunmatched.Class{
+	Name:     "ASSERTION",
+	Required: []string{"expression"},
+	Items:    []string{"variables"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into Assertion.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -24,7 +31,7 @@ import (
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *Assertion) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassAssertion); _err != nil {
 		return _err
 	}
 	for {
@@ -74,6 +81,12 @@ func (a *Assertion) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 	}
 }
 
+// xmlClassAssertionVariable describes ASSERTION_VARIABLE to the canonical-XML decode runtime.
+var xmlClassAssertionVariable = xmlunmatched.Class{
+	Name:     "ASSERTION_VARIABLE",
+	Required: []string{"name", "definition"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into AssertionVariable.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -84,7 +97,7 @@ func (a *Assertion) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *AssertionVariable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassAssertionVariable); _err != nil {
 		return _err
 	}
 	for {
@@ -118,6 +131,12 @@ func (a *AssertionVariable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 	}
 }
 
+// xmlClassExprBinaryOperator describes EXPR_BINARY_OPERATOR to the canonical-XML decode runtime.
+var xmlClassExprBinaryOperator = xmlunmatched.Class{
+	Name:     "EXPR_BINARY_OPERATOR",
+	Required: []string{"type", "operator", "left_operand", "right_operand"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into ExprBinaryOperator.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -128,7 +147,7 @@ func (a *AssertionVariable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (e *ExprBinaryOperator) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassExprBinaryOperator); _err != nil {
 		return _err
 	}
 	for {
@@ -180,6 +199,12 @@ func (e *ExprBinaryOperator) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 	}
 }
 
+// xmlClassExprLeaf describes EXPR_LEAF to the canonical-XML decode runtime.
+var xmlClassExprLeaf = xmlunmatched.Class{
+	Name:     "EXPR_LEAF",
+	Required: []string{"type", "reference_type", "item"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into ExprLeaf.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -190,7 +215,7 @@ func (e *ExprBinaryOperator) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (e *ExprLeaf) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassExprLeaf); _err != nil {
 		return _err
 	}
 	for {
@@ -229,6 +254,12 @@ func (e *ExprLeaf) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 	}
 }
 
+// xmlClassExprUnaryOperator describes EXPR_UNARY_OPERATOR to the canonical-XML decode runtime.
+var xmlClassExprUnaryOperator = xmlunmatched.Class{
+	Name:     "EXPR_UNARY_OPERATOR",
+	Required: []string{"type", "operator", "operand"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into ExprUnaryOperator.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -239,7 +270,7 @@ func (e *ExprLeaf) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (e *ExprUnaryOperator) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassExprUnaryOperator); _err != nil {
 		return _err
 	}
 	for {
