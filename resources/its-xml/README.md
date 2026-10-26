@@ -1,38 +1,75 @@
-# `resources/its-xml/` — pinned openEHR ITS-XML schemas
+# `resources/its-xml/`: pinned openEHR ITS-XML schemas
 
-Vendored, version-pinned XML Schemas (XSD) from the openEHR ITS-XML specification: the RM schemas that define canonical XML, and the ADL 1.4 operational template (OPT) schema. The canonical XML codec (`openehr/serialize/canxml`, whose marshalling code `internal/bmmgen` generates) and the OPT parser (`openehr/template`) are written against them.
+Vendored, version-pinned XML Schema (XSD) files from the openEHR ITS-XML specification. They are
+the source of each class's `xs:sequence`: the order in which the canonical-XML encoders write a
+class's child elements ([ADR 0002 D10](../../docs/adr/0002-bmm-codegen-decisions.md),
+[REQ-056](../../docs/specifications/wire.md#req-056)). The BMM schemas under
+[`resources/bmm/`](../bmm/README.md) give no such order, so the code generator reads it from here.
 
-**A reference only.** No code is generated from these files and no test reads them. They are here so a reviewer or an agent checks an element name, an attribute-versus-element choice, a type or an occurrence in the published schema rather than guessing, the way [`../its-rest/`](../its-rest/README.md) serves the REST API. `make its-xml-check` keeps them byte-identical to upstream.
+The generator reads only the element sequences. These schemas declare
+`targetNamespace="http://schemas.openehr.org/v2"`, while canonical XML writes the
+`http://schemas.openehr.org/v1` default namespace that REQ-056 requires.
 
 ## Provenance
 
-[`MANIFEST.txt`](MANIFEST.txt) records the upstream commit of [`openEHR/specifications-ITS-XML`](https://github.com/openEHR/specifications-ITS-XML) and each file's `sha256`. [`scripts/sync-its-xml.sh`](../../scripts/sync-its-xml.sh) writes it. Each file sits at its upstream path below `components/`, so the relative `xs:include` locations between the schemas resolve inside this directory, and the sync refuses a file set that is not closed under them.
-
-Two facts about the upstream set matter when reading it against the SDK:
-
-- **RM release.** The SDK generates from RM 1.2.0 ([`../bmm/`](../bmm/README.md)), but the newest RM release ITS-XML publishes schemas for is `Release-1.1.0`. Its `latest` RM directory is the same schema (it differs only in the line endings of `Demographic.xsd`), and the AM 1.4 schemas include `Release-1.1.0`, so that release is the one pinned.
-- **Namespace.** Every pinned schema declares `targetNamespace="http://schemas.openehr.org/v2"`. The SDK reads and writes `http://schemas.openehr.org/v1`, the namespace of OPTs and canonical XML documents in circulation. Validating an SDK document against these schemas therefore needs the namespace rewritten first.
+- **Source:** [`openEHR/specifications-ITS-XML`](https://github.com/openEHR/specifications-ITS-XML).
+- **Roots:** `components/RM/Release-1.1.0/*.xsd`, `components/BASE/Release-1.1.0/*.xsd`,
+  `components/AM/Release-1.4/Archetype.xsd` and `components/AM/Release-1.4/OpenehrProfile.xsd`.
+  A `*` matches within its own directory, so the `documents/` subdirectory of the RM release is not
+  a root: its files declare top-level elements only (`composition`, `version`, `extract` and the
+  like), over types the main files define.
+- **Closure:** the sync script follows every `xs:include`, `xs:import` and `xs:redefine` from the
+  roots, transitively, and vendors each file it reaches. Every file keeps its upstream path under
+  this directory, so each `schemaLocation` still resolves here.
+- **Pin + integrity:** the exact upstream commit and a per-file `sha256` are recorded in
+  [`MANIFEST.txt`](MANIFEST.txt). Regenerate with `make its-xml-sync`; verify offline with
+  `make its-xml-check`, which `make ci` runs, or with `make its-xml-drift`, which also reports
+  upstream drift (see [the sync script](../../scripts/sync-its-xml-schemas.sh)).
 
 ## Files
 
-| Path | Role |
-|---|---|
-| `RM/Release-1.1.0/*.xsd`, `RM/Release-1.1.0/documents/*.xsd` | Canonical XML of the RM: data types, data structures, common, EHR, demographic, extract, and the document roots (`Composition.xsd`, `Version.xsd`, …) |
-| `BASE/latest/BaseTypes.xsd` | BASE types the RM schemas include |
-| `AM/Release-1.4/Template.xsd` | The ADL 1.4 operational template (`<template>`), including `OpenehrProfile.xsd`, `Archetype.xsd` and `Resource.xsd` |
+At the pinned commit the closure holds these files.
 
-The pinned commit also carries upstream's SPECPR-492 change to the AM 1.4 schemas (ordinal and scale constraints that accept the empty symbol text some tools write) and its SPECPR-432 change (`C_PRIMITIVE_OBJECT` item).
+| File | Classes | Reached as |
+|---|---|---|
+| `components/RM/Release-1.1.0/DataTypes.xsd` | RM data types (`DV_*`, `CODE_PHRASE`, `TERM_MAPPING`, ...) | root |
+| `components/RM/Release-1.1.0/DataStructures.xsd` | RM data structures (`ITEM_TREE`, `HISTORY`, `EVENT`, ...) | root |
+| `components/RM/Release-1.1.0/Common.xsd` | RM common (`LOCATABLE`, `PARTY_PROXY`, `FEEDER_AUDIT`, `VERSION`, `FOLDER`, ...) | root |
+| `components/RM/Release-1.1.0/Ehr.xsd` | RM EHR and composition (`EHR_STATUS`, `COMPOSITION`, `OBSERVATION`, ...) | root |
+| `components/RM/Release-1.1.0/Demographic.xsd` | RM demographic (`PERSON`, `ORGANISATION`, `ROLE`, ...) | root |
+| `components/RM/Release-1.1.0/EhrExtract.xsd` | RM EHR extract (`EXTRACT`, `X_VERSIONED_OBJECT`, ...) | root |
+| `components/BASE/Release-1.1.0/BaseTypes.xsd` | BASE base types (`UID`, `OBJECT_ID`, `ARCHETYPE_ID`, ...) | root |
+| `components/BASE/Release-1.1.0/Resource.xsd` | BASE resource (`AUTHORED_RESOURCE`, `RESOURCE_DESCRIPTION`, ...) | root |
+| `components/AM/Release-1.4/Archetype.xsd` | AOM 1.4 (`ARCHETYPE`, `C_OBJECT`, `C_ATTRIBUTE`, ...) | root |
+| `components/AM/Release-1.4/OpenehrProfile.xsd` | openEHR Archetype Profile 1.4 (`C_DV_QUANTITY`, `C_DV_ORDINAL`, ...) | root |
+| `components/AM/Release-1.4/Resource.xsd` | AOM 1.4 resource (`AUTHORED_RESOURCE`, `RESOURCE_DESCRIPTION`, ...) | included by `Archetype.xsd` |
+| `components/BASE/latest/BaseTypes.xsd` | BASE base types (`UID`, `OBJECT_ID`, `ARCHETYPE_ID`, ...) | included by RM `DataTypes.xsd` |
+
+Two inclusions are worth knowing when reading the files:
+
+- The RM Release-1.1.0 `DataTypes.xsd` includes `../../BASE/latest/BaseTypes.xsd`, not the BASE
+  Release-1.1.0 copy. At the pinned commit the two `BaseTypes.xsd` files differ only in the schema's
+  `version` attribute (`v1.2.0` against `v1.1.0`).
+- The AM Release-1.4 `Resource.xsd` includes `../../RM/Release-1.1.0/Common.xsd`, so the AOM 1.4
+  types resolve against the RM Release-1.1.0 schemas.
 
 ## Updating the pin
 
 ```bash
-make its-xml-drift                     # changed files and newer releases upstream (network)
-ITS_XML_REF=master make its-xml-sync   # move the pin to the tip of master
-make its-xml-check                     # offline sha256 check; part of make ci
+make its-xml-sync                              # fetch from master, rewrite MANIFEST.txt
+ITS_XML_REF=Release-2.0.0v2 make its-xml-sync  # pin a tag / branch / commit instead
+make its-xml-check                             # verify local copies only (offline; in make ci)
+make its-xml-drift                             # verify local copies + report if upstream advanced
 ```
 
-A bare `make its-xml-sync` re-fetches the commit already pinned and never moves it. The upstream release tags predate the current AM 1.4 schemas, so a re-pin is normally `ITS_XML_REF=master`. The file set is the `SRC_PATHS` list in the script; to take a newer RM release, edit the list there, and the sync drops the files the list no longer names. Never edit a schema or the manifest by hand.
+A version bump is an explicit, reviewable commit: diff the schemas and `MANIFEST.txt`. Never edit
+a vendored schema by hand; re-sync instead. After a re-pin, re-run `make codegen`, so the generated
+XML encoders follow the new sequences, and commit what it changes with the bump: `make codegen-check`
+fails until the generated files match the schemas.
 
 ## Licence
 
-Apache-2.0, the licence of the upstream repository ([`LICENSE`](https://github.com/openEHR/specifications-ITS-XML/blob/master/LICENSE)); a full copy is [`../../licenses/Apache-2.0.txt`](../../licenses/Apache-2.0.txt). Repository-wide inventory: [`LICENSING.md`](../../LICENSING.md).
+The upstream repository is licensed under the **Apache License 2.0** (its `LICENSE` file). The
+schemas carry no licence header of their own; the three AM Release-1.4 files carry the comment
+"Authored by Ocean Informatics 2008.12.22". They are vendored unmodified. Repository-wide
+inventory: [`LICENSING.md`](../../LICENSING.md).

@@ -73,8 +73,8 @@ Run `make help` for the full grouped list. Common targets:
 | Fixtures | `make corpus-pins-drift` | The above **plus** how far each pin is behind its upstream branch (`git ls-remote`; needs network). Dev helper, not a CI gate |
 | Fixtures | `make bmm-check` | Offline `sha256` integrity of the pinned BMM schemas against `resources/bmm/MANIFEST.txt`; also fails on a `*.bmm.json` the manifest does not list |
 | Fixtures | `make bmm-drift` | The above **plus** a best-effort report of pinned files changed on ITS-BMM `master` and of newer schema versions (needs network). Dev helper, not a CI gate |
-| Fixtures | `make its-xml-check` | Offline `sha256` integrity of the pinned ITS-XML schemas (a reference only) against `resources/its-xml/MANIFEST.txt` |
-| Fixtures | `make its-xml-drift` | The above **plus** a best-effort report of changed files on ITS-XML `master` and of a newer release directory for a pinned component (needs network). Dev helper, not a CI gate |
+| Fixtures | `make its-xml-check` | Offline `sha256` integrity of the pinned ITS-XML schemas against `resources/its-xml/MANIFEST.txt` |
+| Fixtures | `make its-xml-drift` | The above **plus** a best-effort report of whether ITS-XML `master` has moved past the pin and whether any vendored file changed there (needs network). Dev helper, not a CI gate |
 | Fixtures | `make terminology-check` | Offline `sha256` integrity of the pinned openEHR Terminology against its `MANIFEST.txt` |
 | Fixtures | `make terminology-drift` | The above **plus** a best-effort report of a newer upstream TERM release (needs network). Dev helper, not a CI gate |
 | Specs | `make spec-context REQ=NNN` | Assemble the SDD context bundle for a REQ (dev/agent helper; not a CI gate) |

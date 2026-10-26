@@ -18,9 +18,10 @@ func (r *ResourceDescription) BMMName() string { return "RESOURCE_DESCRIPTION" }
 
 // MarshalXML emits canonical openEHR XML for ResourceDescription. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -52,13 +53,13 @@ func (r *ResourceDescription) MarshalXML(_e *xml.Encoder, _start xml.StartElemen
 			return err
 		}
 	}
+	if err := _e.EncodeElement(&r.Details, xml.StartElement{Name: xml.Name{Local: "details"}}); err != nil {
+		return err
+	}
 	if r.ParentResource != nil {
 		if err := canxml.EncodePoly(_e, "parent_resource", r.ParentResource); err != nil {
 			return err
 		}
-	}
-	if err := _e.EncodeElement(&r.Details, xml.StartElement{Name: xml.Name{Local: "details"}}); err != nil {
-		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err
@@ -73,9 +74,10 @@ func (r *ResourceDescriptionItem) BMMName() string { return "RESOURCE_DESCRIPTIO
 
 // MarshalXML emits canonical openEHR XML for ResourceDescriptionItem. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -135,9 +137,10 @@ func (t *TranslationDetails) BMMName() string { return "TRANSLATION_DETAILS" }
 
 // MarshalXML emits canonical openEHR XML for TranslationDetails. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -154,13 +157,13 @@ func (t *TranslationDetails) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 	if err := _e.EncodeElement(&t.Author, xml.StartElement{Name: xml.Name{Local: "author"}}); err != nil {
 		return err
 	}
-	if t.Accreditaton != nil {
-		if err := _e.EncodeElement(*t.Accreditaton, xml.StartElement{Name: xml.Name{Local: "accreditaton"}}); err != nil {
+	if t.OtherDetails != nil {
+		if err := _e.EncodeElement(t.OtherDetails, xml.StartElement{Name: xml.Name{Local: "other_details"}}); err != nil {
 			return err
 		}
 	}
-	if t.OtherDetails != nil {
-		if err := _e.EncodeElement(t.OtherDetails, xml.StartElement{Name: xml.Name{Local: "other_details"}}); err != nil {
+	if t.Accreditaton != nil {
+		if err := _e.EncodeElement(*t.Accreditaton, xml.StartElement{Name: xml.Name{Local: "accreditaton"}}); err != nil {
 			return err
 		}
 	}

@@ -194,10 +194,9 @@ func (c Character) MarshalJSON() ([]byte, error) {
 // kind to accept.
 //
 // The error is deliberately outside typereg.ErrInvalidShape:
-// that sentinel's own text names canonical JSON, and canxml classifies
-// nothing at element level; it returns encoding/xml's errors unchanged
-// and reserves canxml.ErrInvalidShape for xmi:type rejection and for a
-// nil / non-xml.Marshaler root. A nil receiver is refused rather than
+// that sentinel's own text names canonical JSON. canxml classifies the
+// refusal itself: it comes back in a canxml.DecodeError that names the
+// element's path and wraps canxml.ErrInvalidShape. A nil receiver is refused rather than
 // dereferenced, on the same terms as [Character.UnmarshalJSON].
 //
 // encoding/json prefers [Character.UnmarshalJSON] over this method for

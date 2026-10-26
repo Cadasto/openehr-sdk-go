@@ -125,25 +125,24 @@ func (f intervalFlagJSON) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // XML into field and marks it seen. An empty or whitespace-only element
 // carries no boolean: it leaves field alone and the flag unmarked, so the
 // flag takes its default like one the document leaves out. Any other text,
-// trimmed, is parsed as a boolean, and a text that is none is an error.
-// The text is read through xmlunmatched.DecodeElement, so an attribute or child
+// trimmed, is parsed as a boolean, and a text that is none fails as the text
+// of any primitive element fails, with no part of the text in the error.
+// The text is read through xmlunmatched.DecodeText, so an attribute or child
 // element on the flag is unmatched content like any other.
 func decodeIntervalFlagXML(dec *xml.Decoder, start *xml.StartElement, field, seen *bool) error {
-	var text string
-	if err := xmlunmatched.DecodeElement(dec, start, &text); err != nil {
-		return err
-	}
-	text = strings.TrimSpace(text)
-	if text == "" {
+	return xmlunmatched.DecodeText(dec, start, func(text string) error {
+		text = strings.TrimSpace(text)
+		if text == "" {
+			return nil
+		}
+		v, err := strconv.ParseBool(text)
+		if err != nil {
+			return err
+		}
+		*field = v
+		*seen = true
 		return nil
-	}
-	v, err := strconv.ParseBool(text)
-	if err != nil {
-		return err
-	}
-	*field = v
-	*seen = true
-	return nil
+	})
 }
 
 // omitIntervalBound reports whether the canonical encoders leave out an

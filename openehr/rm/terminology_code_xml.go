@@ -57,9 +57,9 @@ func (t *TerminologyCode) MarshalXML(e *xml.Encoder, start xml.StartElement) err
 // `terminology_id` in both spellings: the CODE_PHRASE one of the AOM 1.4
 // ITS-XML schema, with the identifier in a `value` child, and the plain text
 // one that mirrors the canonical-JSON string. `code_string`,
-// `terminology_version` and `uri` are text. Content it does not read is
-// unmatched: skipped, or reported or refused under canxml.WithUnmatched and
-// canxml.WithStrict.
+// `terminology_version` and `uri` are text. Content it does not read, text
+// between its child elements among it, is unmatched: skipped, or reported or
+// refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TerminologyCode) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error {
 	if err := xmlunmatched.CheckUnmatchedAttrs(dec, start); err != nil {
 		return err
@@ -97,6 +97,10 @@ func (t *TerminologyCode) UnmarshalXML(dec *xml.Decoder, start xml.StartElement)
 					return err
 				}
 			}
+		case xml.CharData:
+			if err := xmlunmatched.CheckUnmatchedText(dec, tk); err != nil {
+				return err
+			}
 		case xml.EndElement:
 			return nil
 		}
@@ -106,13 +110,20 @@ func (t *TerminologyCode) UnmarshalXML(dec *xml.Decoder, start xml.StartElement)
 // decodeTerminologyIDXML reads the `terminology_id` element start opens into
 // out: the text of its first `value` child when it has one (the TERMINOLOGY_ID
 // shape), and its own text otherwise. Any other child, and a second `value`,
-// is unmatched content.
+// is unmatched content. So is text other than whitespace beside a `value`
+// child, which then holds the identifier: text before the child is checked
+// as the child opens, and text after it as it is read. An unmatched child
+// after such text and before the `value` child waits for the text, so the
+// items come in document order: it is checked once the `value` child opens
+// and the text has been checked, or once the element closes with no `value`
+// child, the text then being the identifier.
 func decodeTerminologyIDXML(dec *xml.Decoder, start xml.StartElement, out *string) error {
 	if err := xmlunmatched.CheckUnmatchedAttrs(dec, start); err != nil {
 		return err
 	}
 	var text []byte
 	var value *string
+	var held xmlunmatched.Held
 	for {
 		tok, err := dec.Token()
 		if err != nil {
@@ -120,9 +131,21 @@ func decodeTerminologyIDXML(dec *xml.Decoder, start xml.StartElement, out *strin
 		}
 		switch tk := tok.(type) {
 		case xml.CharData:
+			if value != nil {
+				if err := xmlunmatched.CheckUnmatchedText(dec, tk); err != nil {
+					return err
+				}
+				continue
+			}
 			text = append(text, tk...)
 		case xml.StartElement:
 			if value == nil && xmlunmatched.LocalName(tk.Name) == "value" {
+				if err := xmlunmatched.CheckUnmatchedTextBefore(dec, text); err != nil {
+					return err
+				}
+				if err := xmlunmatched.ApplyHeld(dec, &held); err != nil {
+					return err
+				}
 				var v string
 				if err := xmlunmatched.DecodeElement(dec, &tk, &v); err != nil {
 					return err
@@ -130,10 +153,19 @@ func decodeTerminologyIDXML(dec *xml.Decoder, start xml.StartElement, out *strin
 				value = &v
 				continue
 			}
+			if value == nil {
+				if err := xmlunmatched.SkipUnmatchedAfter(dec, tk, text, &held); err != nil {
+					return err
+				}
+				continue
+			}
 			if err := xmlunmatched.SkipUnmatched(dec, tk); err != nil {
 				return err
 			}
 		case xml.EndElement:
+			if err := xmlunmatched.ApplyHeld(dec, &held); err != nil {
+				return err
+			}
 			if value != nil {
 				*out = *value
 			} else {

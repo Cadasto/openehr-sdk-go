@@ -18,9 +18,10 @@ func (a *Archetyped) BMMName() string { return "ARCHETYPED" }
 
 // MarshalXML emits canonical openEHR XML for Archetyped. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -55,9 +56,10 @@ func (f *FeederAudit) BMMName() string { return "FEEDER_AUDIT" }
 
 // MarshalXML emits canonical openEHR XML for FeederAudit. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -104,9 +106,10 @@ func (f *FeederAuditDetails) BMMName() string { return "FEEDER_AUDIT_DETAILS" }
 
 // MarshalXML emits canonical openEHR XML for FeederAuditDetails. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -125,13 +128,13 @@ func (f *FeederAuditDetails) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 			return err
 		}
 	}
-	if f.Subject != nil {
-		if err := canxml.EncodePoly(_e, "subject", f.Subject); err != nil {
+	if f.Provider != nil {
+		if err := canxml.EncodePoly(_e, "provider", f.Provider); err != nil {
 			return err
 		}
 	}
-	if f.Provider != nil {
-		if err := canxml.EncodePoly(_e, "provider", f.Provider); err != nil {
+	if f.Subject != nil {
+		if err := canxml.EncodePoly(_e, "subject", f.Subject); err != nil {
 			return err
 		}
 	}
@@ -163,9 +166,10 @@ func (l *Link) BMMName() string { return "LINK" }
 
 // MarshalXML emits canonical openEHR XML for Link. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.

@@ -422,11 +422,11 @@ type rmattrDecoded struct {
 //  5. only then is the owner materialised, so a refusal leaves no half-built
 //     node in the rebuilt tree.
 func decodeRMAttrGroups(compJSON map[string]any, wt *webtemplate.WebTemplate, groups []rmattrGroup,
-	ambiguous map[string]bool, budget *allocBudget, names map[string]string,
+	ambiguous map[string]bool, budget *allocBudget, tmpl *templateIndex,
 ) error {
 	var ready []rmattrDecoded
 	for _, g := range groups {
-		owner, err := rmattrOwnerAt(wt, compJSON, g.base, ambiguous, budget, names)
+		owner, err := rmattrOwnerAt(wt, compJSON, g.base, ambiguous, budget, tmpl)
 		if errors.Is(err, errSegNotFound) {
 			g.dropAll()
 			continue

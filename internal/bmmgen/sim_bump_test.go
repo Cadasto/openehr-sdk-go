@@ -66,6 +66,7 @@ func TestSimulatedVersionBump(t *testing.T) {
 	outDir := writeValidationTree(t, raw)
 	bumpOpts := Options{
 		ResourcesDir: stage,
+		ITSXMLDir:    testITSXML,
 		OutDir:       outDir,
 		Targets:      []Target{TargetRM},
 		RootID:       "openehr_rm_1.2.1",

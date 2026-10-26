@@ -3,6 +3,7 @@ package bmmgen
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"maps"
 	"os"
 	"os/exec"
@@ -19,16 +20,31 @@ import (
 // the second runs each on scratch trees that break the pin one way, and the
 // check must name that way.
 
-// pinScripts are the sync scripts whose verify `make ci` runs over a pinned
+// pinScript is a sync script whose verify `make ci` runs over a pinned
 // resources/ directory.
-var pinScripts = []struct {
+type pinScript struct {
 	script, dir string
 	// extra is a path, relative to dir, of a schema the manifest does not
 	// list.
 	extra string
-}{
-	{script: "sync-bmm.sh", dir: "resources/bmm", extra: "openehr_rm_9.9.9.bmm.json"},
-	{script: "sync-its-xml.sh", dir: "resources/its-xml", extra: "RM/Release-9.9.9/Extra.xsd"},
+	// edited and unhashed are how verify names, by path, a schema whose
+	// bytes no longer match its hash line and a schema with no hash line.
+	// sync-bmm.sh lists the paths it pins, so it reports the second as not
+	// pinned; sync-its-xml-schemas.sh follows the schemas' includes, which
+	// it cannot do offline, so it reports any file without a hash line as
+	// untracked.
+	edited, unhashed string
+}
+
+var pinScripts = []pinScript{
+	{
+		script: "sync-bmm.sh", dir: "resources/bmm", extra: "openehr_rm_9.9.9.bmm.json",
+		edited: "FAILED: %s (sha256 mismatch)", unhashed: "NOT PINNED: %s",
+	},
+	{
+		script: "sync-its-xml-schemas.sh", dir: "resources/its-xml", extra: "components/RM/Release-9.9.9/Extra.xsd",
+		edited: "MODIFIED: %s", unhashed: "UNTRACKED: %s",
+	},
 }
 
 func TestPinScriptsVerifyVendoredPins(t *testing.T) {
@@ -58,16 +74,17 @@ func TestPinScriptsVerifyNamesTheBrokenPin(t *testing.T) {
 	for _, ps := range pinScripts {
 		t.Run(ps.script, func(t *testing.T) {
 			t.Parallel()
-			testVerifyNamesTheBrokenPin(t, bash, ps.script, ps.dir, ps.extra)
+			testVerifyNamesTheBrokenPin(t, bash, ps)
 		})
 	}
 }
 
-// testVerifyNamesTheBrokenPin runs script's verify over scratch copies of
-// dir whose files carry the vendored manifest's paths, each copy broken one
-// way.
-func testVerifyNamesTheBrokenPin(t *testing.T, bash, scriptName, dir, extra string) {
+// testVerifyNamesTheBrokenPin runs ps's verify over scratch copies of its
+// directory whose files carry the vendored manifest's paths, each copy
+// broken one way.
+func testVerifyNamesTheBrokenPin(t *testing.T, bash string, ps pinScript) {
 	t.Helper()
+	scriptName, dir, extra := ps.script, ps.dir, ps.extra
 	script, err := os.ReadFile(filepath.Join("..", "..", "scripts", scriptName))
 	if err != nil {
 		t.Fatal(err)
@@ -128,7 +145,7 @@ func testVerifyNamesTheBrokenPin(t *testing.T, bash, scriptName, dir, extra stri
 		{
 			name: "edited schema", tree: files(""),
 			change: map[string]string{last: content(last) + " "},
-			want:   "FAILED: " + last + " (sha256 mismatch)",
+			want:   fmt.Sprintf(ps.edited, last),
 		},
 		{
 			name: "missing schema", tree: files(""),
@@ -136,8 +153,8 @@ func testVerifyNamesTheBrokenPin(t *testing.T, bash, scriptName, dir, extra stri
 			want:   "MISSING: " + last,
 		},
 		{
-			name: "pinned schema with no hash line", tree: files(last),
-			want: "NOT PINNED: " + last,
+			name: "schema with no hash line", tree: files(last),
+			want: fmt.Sprintf(ps.unhashed, last),
 		},
 		{
 			name: "schema the manifest does not list", tree: files(""),

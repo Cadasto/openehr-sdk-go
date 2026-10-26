@@ -116,6 +116,10 @@ type Plan struct {
 	// referenced a class that was skipped (FUNCTION, ROUTINE, etc.).
 	// Diagnostic only; populated by the renderer.
 	MethodTodoEscapes int
+	// xmlOrder gives the XML encoders their child order from the ITS-XML
+	// schemas. [Run] sets it from [Target.ITSXMLSchemaSets]; when it is nil
+	// the encoders write their children in the generator's property order.
+	xmlOrder *xmlChildOrder
 }
 
 // BuildPlan loads the BMM root schema (and its transitive includes

@@ -18,9 +18,10 @@ func (h *History[T]) BMMName() string { return "HISTORY" }
 
 // MarshalXML emits canonical openEHR XML for History. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -70,16 +71,16 @@ func (h *History[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 			return err
 		}
 	}
-	if h.Summary != nil {
-		if err := canxml.EncodePoly(_e, "summary", h.Summary); err != nil {
-			return err
-		}
-	}
 	for _, _item := range h.Events {
 		if _item == nil {
 			continue
 		}
 		if err := canxml.EncodePoly(_e, "events", _item); err != nil {
+			return err
+		}
+	}
+	if h.Summary != nil {
+		if err := canxml.EncodePoly(_e, "summary", h.Summary); err != nil {
 			return err
 		}
 	}
@@ -96,9 +97,10 @@ func (i *IntervalEvent[T]) BMMName() string { return "INTERVAL_EVENT" }
 
 // MarshalXML emits canonical openEHR XML for IntervalEvent. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -108,17 +110,6 @@ func (i *IntervalEvent[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) 
 	}
 	_start.Attr = append(_start.Attr, xml.Attr{Name: xml.Name{Local: "archetype_node_id"}, Value: i.ArchetypeNodeID})
 	if err := _e.EncodeToken(_start); err != nil {
-		return err
-	}
-	if err := _e.EncodeElement(&i.Time, xml.StartElement{Name: xml.Name{Local: "time"}}); err != nil {
-		return err
-	}
-	if i.State != nil {
-		if err := canxml.EncodePoly(_e, "state", i.State); err != nil {
-			return err
-		}
-	}
-	if err := canxml.EncodePoly(_e, "data", i.Data); err != nil {
 		return err
 	}
 	if i.Name != nil {
@@ -146,6 +137,17 @@ func (i *IntervalEvent[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) 
 			return err
 		}
 	}
+	if err := _e.EncodeElement(&i.Time, xml.StartElement{Name: xml.Name{Local: "time"}}); err != nil {
+		return err
+	}
+	if err := canxml.EncodePoly(_e, "data", i.Data); err != nil {
+		return err
+	}
+	if i.State != nil {
+		if err := canxml.EncodePoly(_e, "state", i.State); err != nil {
+			return err
+		}
+	}
 	if err := _e.EncodeElement(&i.Width, xml.StartElement{Name: xml.Name{Local: "width"}}); err != nil {
 		return err
 	}
@@ -170,9 +172,10 @@ func (p *PointEvent[T]) BMMName() string { return "POINT_EVENT" }
 
 // MarshalXML emits canonical openEHR XML for PointEvent. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -182,17 +185,6 @@ func (p *PointEvent[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) err
 	}
 	_start.Attr = append(_start.Attr, xml.Attr{Name: xml.Name{Local: "archetype_node_id"}, Value: p.ArchetypeNodeID})
 	if err := _e.EncodeToken(_start); err != nil {
-		return err
-	}
-	if err := _e.EncodeElement(&p.Time, xml.StartElement{Name: xml.Name{Local: "time"}}); err != nil {
-		return err
-	}
-	if p.State != nil {
-		if err := canxml.EncodePoly(_e, "state", p.State); err != nil {
-			return err
-		}
-	}
-	if err := canxml.EncodePoly(_e, "data", p.Data); err != nil {
 		return err
 	}
 	if p.Name != nil {
@@ -217,6 +209,17 @@ func (p *PointEvent[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) err
 	}
 	if p.FeederAudit != nil {
 		if err := _e.EncodeElement(p.FeederAudit, xml.StartElement{Name: xml.Name{Local: "feeder_audit"}}); err != nil {
+			return err
+		}
+	}
+	if err := _e.EncodeElement(&p.Time, xml.StartElement{Name: xml.Name{Local: "time"}}); err != nil {
+		return err
+	}
+	if err := canxml.EncodePoly(_e, "data", p.Data); err != nil {
+		return err
+	}
+	if p.State != nil {
+		if err := canxml.EncodePoly(_e, "state", p.State); err != nil {
 			return err
 		}
 	}

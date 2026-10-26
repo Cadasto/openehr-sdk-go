@@ -126,7 +126,13 @@ func populated(rmType string) (root rm.Locatable, prefix string, ok bool) {
 			Narrative: &rm.DVText{Value: "n"}, ExpiryTime: &exp,
 		}, "", true
 	case "ACTION":
-		return &rm.Action{Name: name, Language: lang, Encoding: enc, Subject: subject, Time: when}, "", true
+		// The ISM transition's current state is set so that
+		// TestActionIsmTransitionICResolvesToValues compares a resolution
+		// against a distinguishable value rather than a zero DV_CODED_TEXT.
+		return &rm.Action{
+			Name: name, Language: lang, Encoding: enc, Subject: subject, Time: when,
+			IsmTransition: rm.IsmTransition{CurrentState: rm.DVCodedText{DVText: rm.DVText{Value: "completed"}, DefiningCode: code("532")}},
+		}, "", true
 	case "ADMIN_ENTRY":
 		return &rm.AdminEntry{Name: name, Language: lang, Encoding: enc, Subject: subject}, "", true
 	case "ACTIVITY":
@@ -274,5 +280,46 @@ func TestPopulatedEventContextIsReachable(t *testing.T) {
 	if comp.Context.StartTime.Value == "" || comp.Context.Setting.Value == "" {
 		t.Error("the populated EVENT_CONTEXT leaves start_time/setting unset — deleting either " +
 			"exemption would then fail because the value is missing, not because rmpath cannot resolve it")
+	}
+}
+
+// TestActionIsmTransitionICResolvesToValues — REQ-121, REQ-106. The builder
+// adds the in-context `ism_transition` node to an ACTION whose template
+// constrains no ISM transition ([ismTransitionIC]); it is outside
+// inContextByRM because it is conditional, so TestInContextLeavesResolveViaRmpath
+// does not reach it. Every leaf below it must resolve through rmpath on a
+// populated ACTION, to the instance's own value, or the FLAT encoder would
+// drop the RM-mandatory transition without an error.
+func TestActionIsmTransitionICResolvesToValues(t *testing.T) {
+	root, prefix, ok := populated("ACTION")
+	if !ok {
+		t.Fatal("no populated instance for ACTION")
+	}
+	action, ok := root.(*rm.Action)
+	if !ok {
+		t.Fatalf("populated(ACTION) = %T, want *rm.Action", root)
+	}
+	want := map[string]any{"current_state": action.IsmTransition.CurrentState}
+	if action.IsmTransition.CurrentState.DefiningCode.CodeString == "" {
+		t.Fatal("populated(ACTION) leaves current_state unset — a value assertion would then pass on a zero DV_CODED_TEXT")
+	}
+	ism := ismTransitionIC(prefix)
+	if len(ism.Children) == 0 {
+		t.Fatal("ismTransitionIC emits no leaf")
+	}
+	for _, leaf := range ism.Children {
+		t.Run(leaf.ID, func(t *testing.T) {
+			w, known := want[leaf.ID]
+			if !known {
+				t.Fatalf("no populated value for the in-context ISM transition leaf %q — set one on populated(ACTION)", leaf.ID)
+			}
+			got, err := rmpath.ItemAtPath(root, leaf.AQLPath)
+			if err != nil {
+				t.Fatalf("rmpath cannot resolve %s on ACTION: %v — flat_encode would drop the value", leaf.AQLPath, err)
+			}
+			if !reflect.DeepEqual(got, w) {
+				t.Errorf("ItemAtPath(%s) on ACTION = %#v, want %#v", leaf.AQLPath, got, w)
+			}
+		})
 	}
 }

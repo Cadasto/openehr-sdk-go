@@ -18,9 +18,10 @@ func (d *DVCount) BMMName() string { return "DV_COUNT" }
 
 // MarshalXML emits canonical openEHR XML for DVCount. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -31,8 +32,18 @@ func (d *DVCount) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if d.AccuracyIsPercent != nil {
-		if err := _e.EncodeElement(*d.AccuracyIsPercent, xml.StartElement{Name: xml.Name{Local: "accuracy_is_percent"}}); err != nil {
+	if d.NormalRange != nil {
+		if err := _e.EncodeElement(d.NormalRange, xml.StartElement{Name: xml.Name{Local: "normal_range"}}); err != nil {
+			return err
+		}
+	}
+	for _idx := range d.OtherReferenceRanges {
+		if err := _e.EncodeElement(&d.OtherReferenceRanges[_idx], xml.StartElement{Name: xml.Name{Local: "other_reference_ranges"}}); err != nil {
+			return err
+		}
+	}
+	if d.NormalStatus != nil {
+		if err := _e.EncodeElement(d.NormalStatus, xml.StartElement{Name: xml.Name{Local: "normal_status"}}); err != nil {
 			return err
 		}
 	}
@@ -46,23 +57,13 @@ func (d *DVCount) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 			return err
 		}
 	}
-	if d.NormalStatus != nil {
-		if err := _e.EncodeElement(d.NormalStatus, xml.StartElement{Name: xml.Name{Local: "normal_status"}}); err != nil {
+	if d.AccuracyIsPercent != nil {
+		if err := _e.EncodeElement(*d.AccuracyIsPercent, xml.StartElement{Name: xml.Name{Local: "accuracy_is_percent"}}); err != nil {
 			return err
 		}
 	}
 	if err := _e.EncodeElement(d.Magnitude, xml.StartElement{Name: xml.Name{Local: "magnitude"}}); err != nil {
 		return err
-	}
-	if d.NormalRange != nil {
-		if err := _e.EncodeElement(d.NormalRange, xml.StartElement{Name: xml.Name{Local: "normal_range"}}); err != nil {
-			return err
-		}
-	}
-	for _idx := range d.OtherReferenceRanges {
-		if err := _e.EncodeElement(&d.OtherReferenceRanges[_idx], xml.StartElement{Name: xml.Name{Local: "other_reference_ranges"}}); err != nil {
-			return err
-		}
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err
@@ -77,9 +78,10 @@ func (d *DVInterval[T]) BMMName() string { return "DV_INTERVAL" }
 
 // MarshalXML emits canonical openEHR XML for DVInterval. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -103,16 +105,16 @@ func (d *DVInterval[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) err
 			return err
 		}
 	}
-	if err := _e.EncodeElement(d.LowerUnbounded, xml.StartElement{Name: xml.Name{Local: "lower_unbounded"}}); err != nil {
-		return err
-	}
-	if err := _e.EncodeElement(d.UpperUnbounded, xml.StartElement{Name: xml.Name{Local: "upper_unbounded"}}); err != nil {
-		return err
-	}
 	if err := _e.EncodeElement(d.LowerIncluded, xml.StartElement{Name: xml.Name{Local: "lower_included"}}); err != nil {
 		return err
 	}
 	if err := _e.EncodeElement(d.UpperIncluded, xml.StartElement{Name: xml.Name{Local: "upper_included"}}); err != nil {
+		return err
+	}
+	if err := _e.EncodeElement(d.LowerUnbounded, xml.StartElement{Name: xml.Name{Local: "lower_unbounded"}}); err != nil {
+		return err
+	}
+	if err := _e.EncodeElement(d.UpperUnbounded, xml.StartElement{Name: xml.Name{Local: "upper_unbounded"}}); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
@@ -128,9 +130,10 @@ func (d *DVOrdinal) BMMName() string { return "DV_ORDINAL" }
 
 // MarshalXML emits canonical openEHR XML for DVOrdinal. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -140,11 +143,6 @@ func (d *DVOrdinal) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	}
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
-	}
-	if d.NormalStatus != nil {
-		if err := _e.EncodeElement(d.NormalStatus, xml.StartElement{Name: xml.Name{Local: "normal_status"}}); err != nil {
-			return err
-		}
 	}
 	if d.NormalRange != nil {
 		if err := _e.EncodeElement(d.NormalRange, xml.StartElement{Name: xml.Name{Local: "normal_range"}}); err != nil {
@@ -156,10 +154,15 @@ func (d *DVOrdinal) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&d.Symbol, xml.StartElement{Name: xml.Name{Local: "symbol"}}); err != nil {
-		return err
+	if d.NormalStatus != nil {
+		if err := _e.EncodeElement(d.NormalStatus, xml.StartElement{Name: xml.Name{Local: "normal_status"}}); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeElement(d.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
+		return err
+	}
+	if err := _e.EncodeElement(&d.Symbol, xml.StartElement{Name: xml.Name{Local: "symbol"}}); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
@@ -175,9 +178,10 @@ func (d *DVProportion) BMMName() string { return "DV_PROPORTION" }
 
 // MarshalXML emits canonical openEHR XML for DVProportion. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -188,8 +192,18 @@ func (d *DVProportion) MarshalXML(_e *xml.Encoder, _start xml.StartElement) erro
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if d.AccuracyIsPercent != nil {
-		if err := _e.EncodeElement(*d.AccuracyIsPercent, xml.StartElement{Name: xml.Name{Local: "accuracy_is_percent"}}); err != nil {
+	if d.NormalRange != nil {
+		if err := _e.EncodeElement(d.NormalRange, xml.StartElement{Name: xml.Name{Local: "normal_range"}}); err != nil {
+			return err
+		}
+	}
+	for _idx := range d.OtherReferenceRanges {
+		if err := _e.EncodeElement(&d.OtherReferenceRanges[_idx], xml.StartElement{Name: xml.Name{Local: "other_reference_ranges"}}); err != nil {
+			return err
+		}
+	}
+	if d.NormalStatus != nil {
+		if err := _e.EncodeElement(d.NormalStatus, xml.StartElement{Name: xml.Name{Local: "normal_status"}}); err != nil {
 			return err
 		}
 	}
@@ -203,8 +217,8 @@ func (d *DVProportion) MarshalXML(_e *xml.Encoder, _start xml.StartElement) erro
 			return err
 		}
 	}
-	if d.NormalStatus != nil {
-		if err := _e.EncodeElement(d.NormalStatus, xml.StartElement{Name: xml.Name{Local: "normal_status"}}); err != nil {
+	if d.AccuracyIsPercent != nil {
+		if err := _e.EncodeElement(*d.AccuracyIsPercent, xml.StartElement{Name: xml.Name{Local: "accuracy_is_percent"}}); err != nil {
 			return err
 		}
 	}
@@ -222,16 +236,6 @@ func (d *DVProportion) MarshalXML(_e *xml.Encoder, _start xml.StartElement) erro
 			return err
 		}
 	}
-	if d.NormalRange != nil {
-		if err := _e.EncodeElement(d.NormalRange, xml.StartElement{Name: xml.Name{Local: "normal_range"}}); err != nil {
-			return err
-		}
-	}
-	for _idx := range d.OtherReferenceRanges {
-		if err := _e.EncodeElement(&d.OtherReferenceRanges[_idx], xml.StartElement{Name: xml.Name{Local: "other_reference_ranges"}}); err != nil {
-			return err
-		}
-	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err
 	}
@@ -245,9 +249,10 @@ func (d *DVQuantity) BMMName() string { return "DV_QUANTITY" }
 
 // MarshalXML emits canonical openEHR XML for DVQuantity. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -258,8 +263,18 @@ func (d *DVQuantity) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if d.AccuracyIsPercent != nil {
-		if err := _e.EncodeElement(*d.AccuracyIsPercent, xml.StartElement{Name: xml.Name{Local: "accuracy_is_percent"}}); err != nil {
+	if d.NormalRange != nil {
+		if err := _e.EncodeElement(d.NormalRange, xml.StartElement{Name: xml.Name{Local: "normal_range"}}); err != nil {
+			return err
+		}
+	}
+	for _idx := range d.OtherReferenceRanges {
+		if err := _e.EncodeElement(&d.OtherReferenceRanges[_idx], xml.StartElement{Name: xml.Name{Local: "other_reference_ranges"}}); err != nil {
+			return err
+		}
+	}
+	if d.NormalStatus != nil {
+		if err := _e.EncodeElement(d.NormalStatus, xml.StartElement{Name: xml.Name{Local: "normal_status"}}); err != nil {
 			return err
 		}
 	}
@@ -273,29 +288,19 @@ func (d *DVQuantity) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 			return err
 		}
 	}
-	if d.NormalStatus != nil {
-		if err := _e.EncodeElement(d.NormalStatus, xml.StartElement{Name: xml.Name{Local: "normal_status"}}); err != nil {
+	if d.AccuracyIsPercent != nil {
+		if err := _e.EncodeElement(*d.AccuracyIsPercent, xml.StartElement{Name: xml.Name{Local: "accuracy_is_percent"}}); err != nil {
 			return err
 		}
 	}
 	if err := _e.EncodeElement(d.Magnitude, xml.StartElement{Name: xml.Name{Local: "magnitude"}}); err != nil {
 		return err
 	}
-	if d.Precision != nil {
-		if err := _e.EncodeElement(*d.Precision, xml.StartElement{Name: xml.Name{Local: "precision"}}); err != nil {
-			return err
-		}
-	}
 	if err := _e.EncodeElement(d.Units, xml.StartElement{Name: xml.Name{Local: "units"}}); err != nil {
 		return err
 	}
-	if d.NormalRange != nil {
-		if err := _e.EncodeElement(d.NormalRange, xml.StartElement{Name: xml.Name{Local: "normal_range"}}); err != nil {
-			return err
-		}
-	}
-	for _idx := range d.OtherReferenceRanges {
-		if err := _e.EncodeElement(&d.OtherReferenceRanges[_idx], xml.StartElement{Name: xml.Name{Local: "other_reference_ranges"}}); err != nil {
+	if d.Precision != nil {
+		if err := _e.EncodeElement(*d.Precision, xml.StartElement{Name: xml.Name{Local: "precision"}}); err != nil {
 			return err
 		}
 	}
@@ -322,9 +327,10 @@ func (d *DVScale) BMMName() string { return "DV_SCALE" }
 
 // MarshalXML emits canonical openEHR XML for DVScale. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -334,11 +340,6 @@ func (d *DVScale) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	}
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
-	}
-	if d.NormalStatus != nil {
-		if err := _e.EncodeElement(d.NormalStatus, xml.StartElement{Name: xml.Name{Local: "normal_status"}}); err != nil {
-			return err
-		}
 	}
 	if d.NormalRange != nil {
 		if err := _e.EncodeElement(d.NormalRange, xml.StartElement{Name: xml.Name{Local: "normal_range"}}); err != nil {
@@ -350,10 +351,15 @@ func (d *DVScale) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&d.Symbol, xml.StartElement{Name: xml.Name{Local: "symbol"}}); err != nil {
-		return err
+	if d.NormalStatus != nil {
+		if err := _e.EncodeElement(d.NormalStatus, xml.StartElement{Name: xml.Name{Local: "normal_status"}}); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeElement(d.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
+		return err
+	}
+	if err := _e.EncodeElement(&d.Symbol, xml.StartElement{Name: xml.Name{Local: "symbol"}}); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
@@ -369,9 +375,10 @@ func (r *ReferenceRange[T]) BMMName() string { return "REFERENCE_RANGE" }
 
 // MarshalXML emits canonical openEHR XML for ReferenceRange. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.

@@ -151,7 +151,7 @@ test-race: ## Run the unit tests under the race detector
 ##@ Generate
 
 codegen: ## Regenerate RM and AOM 1.4 from the pinned BMM
-	@$(GO) run ./cmd/bmmgen -resources ./resources/bmm -out .
+	@$(GO) run ./cmd/bmmgen -resources ./resources/bmm -its-xml ./resources/its-xml -out .
 
 termgen: ## Regenerate openehr/terminology from the pinned XML
 	@$(GO) run ./cmd/termgen -resources ./resources/terminology -out .
@@ -173,11 +173,11 @@ bmm-sync: ## Vendor the BMM schemas from ITS-BMM and regenerate (network; BMM_RE
 bmm-drift: ## Verify the BMM schemas; report upstream changes (network)
 	@./scripts/sync-bmm.sh check
 
-its-xml-sync: ## Vendor the ITS-XML schemas, a reference only (network; ITS_XML_REF)
-	@./scripts/sync-its-xml.sh sync
+its-xml-sync: ## Vendor the ITS-XML schemas (network; ITS_XML_REF)
+	@./scripts/sync-its-xml-schemas.sh sync
 
-its-xml-drift: ## Verify the ITS-XML schemas; report upstream changes (network)
-	@./scripts/sync-its-xml.sh check
+its-xml-drift: ## Verify the ITS-XML schemas; report upstream drift (network)
+	@./scripts/sync-its-xml-schemas.sh check
 
 its-rest-sync: ## Vendor the ITS-REST OpenAPI specs (network; ITS_REST_REF)
 	@./scripts/sync-its-rest-specs.sh sync
@@ -211,7 +211,7 @@ mod-tidy-check: ## Fail if go mod tidy would change go.mod or go.sum
 	@if test -f go.sum; then git diff --exit-code go.sum; fi
 
 codegen-check: ## Fail if the generated RM and AOM drift from the BMM
-	@$(GO) run ./cmd/bmmgen -resources ./resources/bmm -out . -verify
+	@$(GO) run ./cmd/bmmgen -resources ./resources/bmm -its-xml ./resources/its-xml -out . -verify
 
 termgen-check: ## Fail if openehr/terminology drifts from its XML
 	@$(GO) run ./cmd/termgen -resources ./resources/terminology -out . -verify
@@ -230,7 +230,7 @@ bmm-check: ## Verify the vendored BMM schemas (offline sha256)
 	@./scripts/sync-bmm.sh verify
 
 its-xml-check: ## Verify the vendored ITS-XML schemas (offline sha256)
-	@./scripts/sync-its-xml.sh verify
+	@./scripts/sync-its-xml-schemas.sh verify
 
 flat-check: ## Verify the vendored FLAT corpus (offline sha256)
 	@./scripts/sync-flat-conformance.sh verify

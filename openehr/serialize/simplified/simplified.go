@@ -88,16 +88,28 @@ func (c decodeConfig) tracked() bool {
 // reconstructed node from the archetype terminology (the formats carry no
 // name but the composition's own, `<root>/_name`, which decode reads in both
 // modes, and the Web Template collapses the HISTORY / ITEM_STRUCTURE
-// wrappers, so the compiled template is the authoritative source). The
-// RM-mandatory attributes the formats omit (HISTORY.origin, EVENT.time,
-// ENTRY language/encoding/subject, EVENT_CONTEXT.setting, …) are completed
-// from ctx defaults and RM conventions; these are synthesised defaults, not
-// recovered data. The decoded composition then validates against the OPT,
-// provided ctx/time is present when the template carries HISTORY/EVENT
+// wrappers, so the compiled template is the authoritative source). Where the
+// template constrains a node's name as a DV_CODED_TEXT and settles both its
+// code and its text, the node gets that coded name. Where it leaves the code
+// or the text open (a code from an external value set, say), the node gets a
+// DV_TEXT name, since the formats carry no name to read the rest from. A
+// structure the formats fold away takes the concrete ITEM_STRUCTURE subtype
+// the template gives it, such as an ITEM_LIST, which the path alone cannot
+// tell from an ITEM_TREE. The RM-mandatory attributes the formats omit
+// (HISTORY.origin, EVENT.time, ENTRY language/encoding/subject,
+// EVENT_CONTEXT.setting, …) are completed from ctx defaults and RM
+// conventions; these are synthesised defaults, not recovered data. An empty structure (an ITEM_TREE or ITEM_LIST with no
+// items, say) that the template requires and allows to stay empty has no key
+// in the formats, so decode adds it back, empty, under a parent the body
+// rebuilt, with the type, node id and name the template gives it. It is
+// synthesised too, and decode adds none where the template asks the
+// structure for a member. The decoded composition then validates against the
+// OPT, provided ctx/time is present when the template carries HISTORY/EVENT
 // nodes (their mandatory origin/time have no other source; see
 // deviations.md).
 //
-// Without this option decode omits names and defaults: the round-trip stays
+// Without this option decode omits names, defaults and empty structures, and
+// infers a folded structure's subtype from its path: the round-trip stays
 // format-idempotent but the result is not canonically complete.
 func WithTemplate(c *templatecompile.Compiled) Option {
 	return func(cfg *decodeConfig) { cfg.template = c }

@@ -25,9 +25,13 @@
 // The codec produces deterministic canonical XML:
 //
 //   - One root element per document. [Unmarshal] refuses an element, or
-//     text other than whitespace, after the root, in every mode, with
-//     [ErrInvalidShape]; comments, processing instructions and whitespace
-//     after the root are accepted, as XML allows them.
+//     text other than whitespace, after the root, and text, an end element
+//     or markup other than one document type declaration before it, in
+//     every mode, with [ErrInvalidShape]. Comments, processing
+//     instructions and whitespace are accepted on either side of the root,
+//     as XML allows them, and so are, before it, the XML declaration, one
+//     document type declaration and a UTF-8 byte order mark at the very
+//     start.
 //   - Default namespace: `http://schemas.openehr.org/v1`.
 //   - `xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"` is
 //     declared on the document root whenever any descendant carries
@@ -44,8 +48,13 @@
 //   - Element local names are snake_case BMM property/class names
 //     (identical to canjson JSON keys; e.g. `dv_quantity`,
 //     `magnitude_status`).
-//   - Child elements follow BMM property declaration order, the
-//     same order the generator emits struct fields.
+//   - Child elements follow the `xs:sequence` of the class's type in
+//     the openEHR ITS-XML schemas (RM and BASE Release-1.1.0, AM
+//     Release-1.4), or of its nearest ancestor's type when the schemas
+//     have none, with the elements of the type it extends first. A
+//     property the schemas do not declare, one a later release added
+//     such as `EHR.tags`, comes after the declared ones. The decoder
+//     accepts children in any order.
 //   - Nil-pointer optional fields and empty containers with
 //     `cardinality.lower == 0` are emitted as absent (no element).
 //     Both absent and an empty self-closing element are accepted on
@@ -92,8 +101,12 @@
 //
 // Content the decode does not read is unmatched: an element or attribute
 // that names no attribute of the RM type its element decodes as; an
-// element in a namespace other than the openEHR one ([ErrNamespace]); and
-// the element of a `Hash` member or of a BMM `Any` member (see below).
+// element in a namespace other than the openEHR one ([ErrNamespace]); text
+// other than XML whitespace directly inside an element whose content is
+// elements, such as an RM object's, a CDATA section included; and the
+// element of a `Hash` member or of a BMM `Any` member (see below). The text
+// of a primitive element is its value, and whitespace between elements is
+// never unmatched, so an indented document decodes as a compact one does.
 // Two kinds of attribute are never unmatched: a namespace declaration,
 // and an attribute in the XML Schema instance namespace, whether the
 // `xsi:type` discriminator, `xsi:schemaLocation`, `xsi:nil` or another.
@@ -110,9 +123,10 @@
 // By default the decoder ignores unmatched content: the value holds the
 // rest of the input and none of it. [WithUnmatched] passes each item, in
 // document order, to a caller function as its path from the root of the
-// value, such as "/composition[1]/content[2]/x-note[1]" or
-// "/composition[1]/@x-flag"; the path names the item and carries none of
-// its value. [WithStrict] refuses the decode at the first item with an
+// value, such as "/composition[1]/content[2]/x-note[1]",
+// "/composition[1]/@x-flag" or "/ehr_status[1]/subject[1]/text()", the last
+// naming the text of an element, one item however many runs of text it
+// holds; the path names the item and carries none of its value. [WithStrict] refuses the decode at the first item with an
 // error wrapping [ErrUnknownElement] (and [ErrNamespace] for a foreign
 // element). Strict never refuses an absent element.
 //
@@ -130,7 +144,25 @@
 // while it runs. Concurrent decodes each have their own decoder and so
 // their own policy. The generated methods hand the content they do not
 // read to helpers in an internal package of the SDK, which look the
-// decoder up and, for an untracked decode, behave as encoding/xml does.
+// decoder up and, for an untracked decode, behave as encoding/xml does,
+// except for the errors below.
+//
+// # Primitive failures
+//
+// The text of a primitive element that does not decode as its type, such
+// as a boolean written `maybe`, a whole number written `2.5`, a number out
+// of its type's range, a `TERM_MAPPING.match` that is not one character or
+// a DV_MULTIMEDIA `data` that is not base64, fails the decode in every mode
+// with a [DecodeError] whose Inner wraps [ErrInvalidShape] and the
+// conversion's own error. Its text names the element and carries none of
+// its text. [Unmarshal], and a [Decoder] given [WithUnmatched] or
+// [WithStrict], return it on its own with the element's path from the root
+// of the value, such as "/ehr_status[1]/is_queryable[1]". Without an
+// option, [Unmarshal] decodes the input a second time to find that path,
+// once the first decode has failed so; a decode that succeeds never pays
+// for it. A [Decoder] given no option cannot read its stream again, so it
+// names the element alone, "/is_queryable", inside the envelope of each
+// polymorphic slot the element sits in.
 //
 // # Polymorphic dispatch
 //

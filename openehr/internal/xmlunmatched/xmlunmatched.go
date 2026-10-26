@@ -10,7 +10,9 @@
 // Schema instance namespace (`xsi:type`, `xsi:schemaLocation`, `xsi:nil`, …);
 // an element in a namespace other than the openEHR one; and an element whose
 // content the codec does not model: a `Hash` member, a BMM `Any` member, and
-// a member whose Go type has no decoder of its own. By default the decode
+// a member whose Go type has no decoder of its own. So is text other than
+// XML whitespace directly inside an element whose content is elements, one
+// item per element however many runs of text it holds. By default the decode
 // skips it. A caller can instead track it: report each item, in document
 // order, by its path, and optionally refuse the first one.
 //
@@ -32,25 +34,47 @@
 //   - The generated decoders call the helpers of this package where content
 //     goes unread: [CheckUnmatchedAttrs] on entry, [LocalName] for the name
 //     they switch on, [SkipUnmatched] in the arm for an element they do not
-//     read, [DecodeElement] for an element decoded as text, [DecodeBase64]
-//     for an Octet list, and [DecodeParam] for a member typed by an open
-//     generic parameter. canxml
-//     calls [DiscriminatorRead] where its dispatch reads a bare `type`. Each
-//     helper looks the decoder up; an untracked decode finds nothing and
-//     behaves as encoding/xml does.
+//     read, [CheckUnmatchedText] for text between the elements they read,
+//     [DecodeElement] for an element decoded as text, [DecodeText] for one
+//     whose text they convert themselves, such as an interval boundary flag,
+//     [DecodeBase64] for an Octet list, and [DecodeParam] for a member typed
+//     by an open generic parameter. The hand-written TERMINOLOGY_CODE
+//     decoder calls the same helpers, [CheckUnmatchedTextBefore] for text
+//     it keeps until a child shows that the text is not its value, and
+//     [SkipUnmatchedAfter] and [ApplyHeld] for an unmatched child after
+//     that text. canxml calls [DiscriminatorRead] where its dispatch reads a
+//     bare `type`. Each helper looks the decoder up; an untracked decode
+//     finds nothing and behaves as encoding/xml does, but for one thing.
+//
+// # Primitive failures
+//
+// The text of a primitive element that does not decode as its type is a
+// primitive failure, in every decode: [DecodeElement], [DecodeParam],
+// [DecodeText] and [DecodeBase64] return a *typereg.DecodeError whose cause
+// wraps [ErrInvalidShape] and the conversion's own error, never the bare
+// error encoding/xml or a TextUnmarshaler gives, whose text may quote the
+// value. A tracked decode names the element by its path from the root of
+// the value and [Tracker.Decode] returns the failure on its own; an
+// untracked decode names the element alone, and the failure travels out
+// inside the dispatch envelopes it passes through. [IsPrimitiveFailure] tells
+// such a failure apart, so canxml can decode the input again, tracked, to
+// find the path.
 package xmlunmatched
 
 import (
+	"bytes"
+	"encoding"
 	"encoding/base64"
 	"encoding/xml"
 	"errors"
-	"fmt"
 	"io"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
 // Canonical XML namespaces: the values of canxml.NSDefault and canxml.NSXSI,
@@ -70,6 +94,11 @@ var ErrUnknownElement = errors.New("canxml: unknown element or attribute")
 // one. canxml re-exports it as canxml.ErrNamespace, where it is documented.
 var ErrNamespace = errors.New("canxml: foreign XML namespace")
 
+// ErrInvalidShape classifies input of the wrong shape, among it the text of a
+// primitive element that does not decode as its type. canxml re-exports it as
+// canxml.ErrInvalidShape, where it is documented.
+var ErrInvalidShape = errors.New("canxml: invalid XML shape")
+
 // Tracker is the policy and position of one tracked decode: the caller's
 // report function, whether the first unmatched item refuses the decode, and
 // the elements open at the decoder's current token. A Tracker serves one
@@ -86,12 +115,16 @@ type Tracker struct {
 	// first frame for the document itself, which counts the top-level
 	// elements of the value being decoded.
 	open []frame
+	// failure is the primitive failure the value being decoded raised, kept
+	// so that [Tracker.Decode] returns it on its own; nil until one is raised.
+	failure *typereg.DecodeError
 }
 
 // frame is one open element: its local name, its 1-based position among its
 // earlier siblings of the same name plus one, the children it has opened so
-// far, counted by local name, and whether dispatch read its bare `type`
-// attribute as the discriminator.
+// far, counted by local name, whether dispatch read its bare `type`
+// attribute as the discriminator, and whether its text was found unmatched
+// already.
 //
 // The child counts sit in a short slice while the element has opened children
 // of few names, which is the canonical shape and costs no map. Once it opens
@@ -104,6 +137,7 @@ type frame struct {
 	children      []nameCount
 	byName        map[string]int // nil until the slice outgrows linearChildNames
 	discriminator bool
+	text          bool
 }
 
 // linearChildNames is the number of distinct child names a frame counts in its
@@ -117,7 +151,7 @@ const linearChildNames = 8
 // element is dropped rather than cleared, so a later narrow element never pays
 // for it.
 func (f *frame) open(local string, pos int) {
-	f.name, f.pos, f.children, f.byName, f.discriminator = local, pos, f.children[:0], nil, false
+	f.name, f.pos, f.children, f.byName, f.discriminator, f.text = local, pos, f.children[:0], nil, false, false
 }
 
 // nameCount is how many children of one local name an element has opened.
@@ -143,9 +177,10 @@ func (t *Tracker) NewDecoder(r io.Reader) *xml.Decoder {
 // Decode decodes the next value of dec, a decoder from [Tracker.NewDecoder],
 // into v, with dec registered for t meanwhile, so the generated decoders
 // apply t's policy. Paths are relative to the value being decoded. A strict
-// refusal comes back on its own, not inside the dispatch envelopes it passed
-// through on its way out: it names the item from the root of the value, where
-// each envelope names only its own slot.
+// refusal and a primitive failure come back on their own, not inside the
+// dispatch envelopes they passed through on their way out: each names its
+// item from the root of the value, where each envelope names only its own
+// slot.
 func (t *Tracker) Decode(dec *xml.Decoder, v any) error {
 	t.reset()
 	tracking.Add(1)
@@ -154,15 +189,32 @@ func (t *Tracker) Decode(dec *xml.Decoder, v any) error {
 		trackers.Delete(dec)
 		tracking.Add(-1)
 	}()
-	return unwrapUnknownElement(dec.Decode(v))
+	return t.alone(dec.Decode(v))
 }
 
 // reset starts a new value: the document frame forgets the top-level elements
 // of the values decoded before, so every path is relative to the value being
-// decoded.
+// decoded, and no primitive failure is kept.
 func (t *Tracker) reset() {
 	t.open = t.open[:1]
 	t.open[0].open("", 0)
+	t.failure = nil
+}
+
+// alone returns the failure in err's chain that names its item from the root
+// of the value, a strict refusal or the primitive failure t raised, on its
+// own, and err unchanged when the chain holds neither (a nil err included).
+func (t *Tracker) alone(err error) error {
+	if err == nil {
+		return nil
+	}
+	if ue, ok := errors.AsType[*unknownElementError](err); ok && ue != nil {
+		return ue
+	}
+	if t.failure != nil && errors.Is(err, t.failure) {
+		return t.failure
+	}
+	return err
 }
 
 // push records that the decoder opened an element named local inside the
@@ -215,13 +267,49 @@ func (f *frame) count(local string) int {
 // segment per open element, from the root of the value.
 func (t *Tracker) path() string {
 	var b strings.Builder
-	for _, f := range t.open[1:] {
-		b.WriteByte('/')
-		b.WriteString(f.name)
-		b.WriteByte('[')
-		b.WriteString(strconv.Itoa(f.pos))
-		b.WriteByte(']')
+	t.writePath(&b, len(t.open))
+	return b.String()
+}
+
+// writePath writes the path of the open element whose frame is t.open[n-1]:
+// one `/name[n]` segment per open element from the root of the value down to
+// it, and nothing for the document frame.
+func (t *Tracker) writePath(b *strings.Builder, n int) {
+	for _, f := range t.open[1:n] {
+		writeSegment(b, f.name, f.pos)
 	}
+}
+
+// writeSegment writes the path segment of the element named name at position
+// pos among its siblings of that name.
+func writeSegment(b *strings.Builder, name string, pos int) {
+	b.WriteByte('/')
+	b.WriteString(name)
+	b.WriteByte('[')
+	b.WriteString(strconv.Itoa(pos))
+	b.WriteByte(']')
+}
+
+// place is where an element sits: its local name and its position among its
+// siblings of that name. A decode keeps the place of an element it reads as
+// text, so that it can name the element once the element has closed.
+type place struct {
+	name string
+	pos  int
+}
+
+// here returns the place of the innermost open element.
+func (t *Tracker) here() place {
+	f := &t.open[len(t.open)-1]
+	return place{name: f.name, pos: f.pos}
+}
+
+// closedPath returns the path of the element at p, a child of the innermost
+// open element that has closed since its place was kept.
+func (t *Tracker) closedPath(p place) string {
+	var b strings.Builder
+	t.writePath(&b, len(t.open))
+	writeSegment(&b, p.name, p.pos)
 	return b.String()
 }
 
@@ -261,12 +349,41 @@ func (t *Tracker) attrs(attrs []xml.Attr, known []string) error {
 	return nil
 }
 
+// text applies the policy to text the decoder read directly inside the open
+// element whose frame is t.open[n-1], whose content is elements: unless it is
+// XML whitespace, it is unmatched, at the element's path with a last
+// `/text()` segment. An element is one item however many runs of text it
+// holds, so only its first unmatched run counts. With n below 2 no element
+// holds the text, and it is left alone.
+func (t *Tracker) text(n int, text []byte) error {
+	if n < 2 {
+		return nil
+	}
+	f := &t.open[n-1]
+	if f.text || isXMLSpace(text) {
+		return nil
+	}
+	f.text = true
+	var b strings.Builder
+	t.writePath(&b, n)
+	b.WriteString("/text()")
+	return t.unmatched(b.String(), false)
+}
+
+// isXMLSpace reports whether text holds XML whitespace only: spaces, tabs,
+// carriage returns and line feeds.
+func isXMLSpace(text []byte) bool {
+	return len(bytes.TrimLeft(text, " \t\r\n")) == 0
+}
+
 // decodeText decodes the element start opens, whose content is text, into v.
 // An attribute and a child element are unmatched, and the text around a child
 // element is kept, as encoding/xml keeps it. The text then decodes into v
 // through encoding/xml itself, so the conversion is the one an untracked
-// decode applies.
+// decode applies. Text that does not convert is a primitive failure, which
+// names the element by its path from the root of the value.
 func (t *Tracker) decodeText(dec *xml.Decoder, start *xml.StartElement, v any) error {
+	at := t.here()
 	if err := t.attrs(start.Attr, nil); err != nil {
 		return err
 	}
@@ -288,9 +405,15 @@ func (t *Tracker) decodeText(dec *xml.Decoder, start *xml.StartElement, v any) e
 			}
 		case xml.EndElement:
 			name := start.Name
-			return xml.NewTokenDecoder(&tokenList{toks: []xml.Token{
+			// The tokens are whole, so the decode fails only where the text
+			// does not convert to v's type.
+			err := xml.NewTokenDecoder(&tokenList{toks: []xml.Token{
 				xml.StartElement{Name: name}, xml.CharData(text), xml.EndElement{Name: name},
 			}}).Decode(v)
+			if err != nil {
+				return t.fail(t.closedPath(at), err)
+			}
+			return nil
 		}
 	}
 }
@@ -442,13 +565,111 @@ func (e *unknownElementError) Unwrap() []error {
 	return []error{ErrUnknownElement}
 }
 
-// unwrapUnknownElement returns the strict refusal in err's chain on its own,
-// or err unchanged when the chain holds none (a nil err included).
-func unwrapUnknownElement(err error) error {
-	if ue, ok := errors.AsType[*unknownElementError](err); ok && ue != nil {
-		return ue
+// primitiveError is the cause of a primitive failure: the text of a primitive
+// element did not decode as its type. It wraps [ErrInvalidShape] and the
+// conversion's own error, whose text may name the value. The DecodeError that
+// holds it writes no value: its text keeps the sentinel's and renders the
+// conversion's error by its structure alone.
+type primitiveError struct {
+	cause error
+}
+
+// Error names the class, then the conversion's own error.
+func (e *primitiveError) Error() string {
+	return ErrInvalidShape.Error() + ": " + e.cause.Error()
+}
+
+// Unwrap returns the shape sentinel and the conversion's own error.
+func (e *primitiveError) Unwrap() []error {
+	return []error{ErrInvalidShape, e.cause}
+}
+
+// primitiveFailure returns the failure of the element at path, whose text did
+// not decode as its type; cause is the conversion's own error.
+func primitiveFailure(path string, cause error) *typereg.DecodeError {
+	return &typereg.DecodeError{Path: path, Inner: &primitiveError{cause: cause}}
+}
+
+// fail returns the primitive failure of the element at path and keeps it, so
+// that [Tracker.Decode] returns it on its own.
+func (t *Tracker) fail(path string, cause error) error {
+	t.failure = primitiveFailure(path, cause)
+	return t.failure
+}
+
+// IsPrimitiveFailure reports whether err holds a primitive failure: the text
+// of a primitive element that did not decode as its type.
+func IsPrimitiveFailure(err error) bool {
+	pe, ok := errors.AsType[*primitiveError](err)
+	return ok && pe != nil
+}
+
+// conversionRefusal returns the conversion's own error when err, which
+// encoding/xml returned decoding an element's text into a primitive, is the
+// conversion's refusal: a *strconv.NumError, which encoding/xml returns for a
+// number or a boolean, or the refusal of a TextUnmarshaler read through
+// [textConversion]. It returns nil for any other error, such as a syntax
+// error or one reading the input, and for nil.
+func conversionRefusal(err error) error {
+	switch e := err.(type) { //nolint:errorlint // encoding/xml returns the conversion's error as it is
+	case *strconv.NumError:
+		return e
+	case *conversionError:
+		return e.cause
 	}
-	return err
+	return nil
+}
+
+// textConversion reads an element's text through u, as encoding/xml does for
+// a TextUnmarshaler, and marks u's refusal as a [conversionError], so that it
+// is told apart from an error reading the input.
+type textConversion struct {
+	u encoding.TextUnmarshaler
+}
+
+// UnmarshalText hands text to u.
+func (c *textConversion) UnmarshalText(text []byte) error {
+	if err := c.u.UnmarshalText(text); err != nil {
+		return &conversionError{cause: err}
+	}
+	return nil
+}
+
+// conversionError is the refusal of a TextUnmarshaler read through
+// [textConversion].
+type conversionError struct {
+	cause error
+}
+
+// Error is the refusal's own text.
+func (e *conversionError) Error() string { return e.cause.Error() }
+
+// Unwrap returns the refusal.
+func (e *conversionError) Unwrap() error { return e.cause }
+
+// asText returns, in a [textConversion], the TextUnmarshaler whose
+// UnmarshalText method encoding/xml reads v through, and v itself when
+// encoding/xml reads v otherwise. That TextUnmarshaler is v itself when v is
+// one and no xml.Unmarshaler. When v is a pointer to a pointer, it is the
+// pointer v points to, under the same condition, which asText allocates when
+// it is nil, as encoding/xml would: a member typed as a pointer to a
+// TextUnmarshaler, such as *time.Time, is decoded through the address of
+// that pointer.
+func asText(v any) any {
+	if _, ok := v.(xml.Unmarshaler); ok {
+		return v
+	}
+	if u, ok := v.(encoding.TextUnmarshaler); ok {
+		return &textConversion{u: u}
+	}
+	if p, ok := pointee(v); ok {
+		if _, ok := p.(xml.Unmarshaler); !ok {
+			if u, ok := p.(encoding.TextUnmarshaler); ok {
+				return &textConversion{u: u}
+			}
+		}
+	}
+	return v
 }
 
 // LocalName returns the local name of an element in the openEHR namespace or
@@ -501,9 +722,107 @@ func CheckUnmatchedAttrs(dec *xml.Decoder, start xml.StartElement, known ...stri
 	return t.attrs(start.Attr, known)
 }
 
+// CheckUnmatchedText applies the decode's policy for unmatched content to
+// text, a run of character data the generated decoder read directly inside
+// the element it decodes, whose content is elements. A CDATA section is such
+// a run too: encoding/xml reports it as character data. dec must be the
+// decoder the text was read from, with no child element of that element open.
+//
+// By default it does nothing, and costs no more than finding the decode
+// untracked. Text that is XML whitespace only (spaces, tabs, carriage returns
+// and line feeds) is never unmatched. A tracked decode reports any other text
+// as one item per element, at the element's path with a last `/text()`
+// segment, however many runs the element holds, and a strict one refuses it
+// with an error that wraps [ErrUnknownElement]. The path never carries the
+// text.
+func CheckUnmatchedText(dec *xml.Decoder, text xml.CharData) error {
+	t := trackerOf(dec)
+	if t == nil {
+		return nil
+	}
+	return t.text(len(t.open), text)
+}
+
+// CheckUnmatchedTextBefore applies the decode's policy for unmatched content
+// to text read directly inside an element before the child element the
+// decoder read last, as [CheckUnmatchedText] does for text read while no
+// child is open. A decoder that keeps such text until a child tells it that
+// the text is not the element's value calls it as that child opens, so the
+// text is reported before anything inside the child. The path names the
+// element that holds the text, with a last `/text()` segment, and that
+// element remains one item however many runs of text it holds.
+func CheckUnmatchedTextBefore(dec *xml.Decoder, text []byte) error {
+	t := trackerOf(dec)
+	if t == nil {
+		return nil
+	}
+	return t.text(len(t.open)-1, text)
+}
+
+// Held holds the unmatched elements a decoder skipped after text it keeps for
+// [CheckUnmatchedTextBefore], while it cannot yet tell whether that text is
+// unmatched too. The text comes first in document order, so the policy for
+// the elements waits for the text's own. The zero value holds nothing.
+type Held struct {
+	items []heldItem
+}
+
+// heldItem is one unmatched element a [Held] holds: its path from the root of
+// the value, and whether it lies in a foreign namespace.
+type heldItem struct {
+	path    string
+	foreign bool
+}
+
+// SkipUnmatchedAfter skips the element start opens, which the decoder does
+// not read, as [SkipUnmatched] does. text is the text the decoder read
+// directly inside the enclosing element before start and keeps, for
+// [CheckUnmatchedTextBefore] or as that element's value. start must be the
+// token the decoder read last.
+//
+// Text other than XML whitespace may yet prove unmatched once a later child
+// opens, and it comes before the element in document order. So a tracked
+// decode then holds the element in h instead of reporting or refusing it at
+// once, and [ApplyHeld] applies the policy later. Beside whitespace only,
+// the element is reported or refused at once, as by [SkipUnmatched].
+func SkipUnmatchedAfter(dec *xml.Decoder, start xml.StartElement, text []byte, h *Held) error {
+	if t := trackerOf(dec); t != nil {
+		if !isXMLSpace(text) {
+			h.items = append(h.items, heldItem{path: t.path(), foreign: isForeign(start.Name)})
+		} else if err := t.unmatched(t.path(), isForeign(start.Name)); err != nil {
+			return err
+		}
+	}
+	return dec.Skip()
+}
+
+// ApplyHeld applies the decode's policy for unmatched content to the elements
+// h holds, in document order, as [SkipUnmatched] would have, and empties h. A
+// decoder calls it once the text before them has been checked by
+// [CheckUnmatchedTextBefore], or has proved to be the value of the element
+// that holds it, at the latest as that element closes.
+func ApplyHeld(dec *xml.Decoder, h *Held) error {
+	if len(h.items) == 0 {
+		return nil
+	}
+	items := h.items
+	h.items = nil
+	t := trackerOf(dec)
+	if t == nil {
+		return nil
+	}
+	for _, it := range items {
+		if err := t.unmatched(it.path, it.foreign); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // DecodeElement decodes the element start opens into v, as
 // dec.DecodeElement(v, start) does. v is a pointer to a primitive, such as a
-// string, a number or a boolean, or to a type with an UnmarshalXML method.
+// string, a number, a boolean or a TextUnmarshaler, a pointer to a pointer
+// to a TextUnmarshaler, or a pointer to a type with an UnmarshalXML method.
 // start must be the token the decoder read last.
 //
 // A primitive decodes from the element's text alone: by default, as with
@@ -512,15 +831,39 @@ func CheckUnmatchedAttrs(dec *xml.Decoder, start xml.StartElement, known ...stri
 // is the same as by default. A type with an UnmarshalXML method checks its
 // own content. A member of interface type goes through [DecodeParam]
 // instead, which sees its type.
+//
+// Text that does not decode as the primitive's type, such as a boolean
+// written `maybe` or a string a TextUnmarshaler refuses, fails with a
+// *typereg.DecodeError whose cause wraps [ErrInvalidShape] and the
+// conversion's own error, and whose text carries none of the element's. A
+// tracked decode names the element by its path from the root of the value;
+// an untracked one, which does not know the path, by its name alone.
 func DecodeElement(dec *xml.Decoder, start *xml.StartElement, v any) error {
-	t := trackerOf(dec)
-	if t == nil {
-		return dec.DecodeElement(v, start)
+	if t := trackerOf(dec); t != nil {
+		if _, ok := v.(xml.Unmarshaler); ok {
+			return dec.DecodeElement(v, start)
+		}
+		return t.decodeText(dec, start, v)
 	}
+	if err := dec.DecodeElement(asText(v), start); err != nil {
+		return untrackedFailure(start, v, err)
+	}
+	return nil
+}
+
+// untrackedFailure returns the error of an untracked decode of the element
+// start opens into v that failed with err: a primitive failure, which names
+// the element by its name alone, when err is the conversion's refusal, and
+// err itself otherwise. A type with an UnmarshalXML method reports its own
+// failures.
+func untrackedFailure(start *xml.StartElement, v any, err error) error {
 	if _, ok := v.(xml.Unmarshaler); ok {
-		return dec.DecodeElement(v, start)
+		return err
 	}
-	return t.decodeText(dec, start, v)
+	if cause := conversionRefusal(err); cause != nil {
+		return primitiveFailure("/"+start.Name.Local, cause)
+	}
+	return err
 }
 
 // DecodeParam decodes the element start opens into v, a member typed by an
@@ -529,20 +872,24 @@ func DecodeElement(dec *xml.Decoder, start *xml.StartElement, v any) error {
 //
 //   - T is an interface type, such as the `any` of ORIGINAL_VERSION<any> or
 //     the DV_ORDERED of BASE Interval<DV_ORDERED>: the member is a
-//     polymorphic slot. An empty one decodes through dispatch, the canxml
-//     polymorphic dispatch on `xsi:type` the generated code passes in, so a
-//     missing or unknown `xsi:type` fails as at any polymorphic slot. One
-//     that already holds a value is decoded into ([decodeInterface]).
+//     polymorphic slot. An empty one, nil or holding a nil pointer of some
+//     type, decodes through dispatch, the canxml polymorphic dispatch on
+//     `xsi:type` the generated code passes in, so a missing or unknown
+//     `xsi:type` fails as at any polymorphic slot. One that already holds a
+//     value is decoded into ([decodeInterface]).
 //   - T is a pointer to a type with an UnmarshalXML method: encoding/xml
 //     allocates it and that method checks its own content.
-//   - Any other T, a primitive or a type with an UnmarshalXML method on its
-//     pointer, goes to [DecodeElement].
+//   - Any other T, a primitive, a pointer to a TextUnmarshaler or a type
+//     with an UnmarshalXML method on its pointer, goes to [DecodeElement].
+//
+// Text that does not decode as a primitive's type fails as in
+// [DecodeElement], whichever way the member decodes.
 func DecodeParam[T any](dec *xml.Decoder, start *xml.StartElement, v *T, dispatch func(*xml.Decoder, xml.StartElement) (T, error)) error {
 	var zero T
 	switch any(zero).(type) {
 	case nil:
-		if any(*v) != nil {
-			return decodeInterface(dec, start, v)
+		if held := any(*v); held != nil && !isNilPointer(held) {
+			return decodeInterface(dec, start, v, held)
 		}
 		got, err := dispatch(dec, *start)
 		if err != nil {
@@ -557,7 +904,7 @@ func DecodeParam[T any](dec *xml.Decoder, start *xml.StartElement, v *T, dispatc
 }
 
 // decodeInterface decodes the element start opens into v, a pointer to a
-// member of interface type that already holds a value.
+// member of interface type that holds held.
 //
 // encoding/xml decodes into such a member only when it holds a non-nil
 // pointer, and skips the element otherwise; the default decode does exactly
@@ -565,14 +912,29 @@ func DecodeParam[T any](dec *xml.Decoder, start *xml.StartElement, v *T, dispatc
 // to an RM type then checks its own content, and when nothing of the SDK
 // checked the element's content, because encoding/xml skipped it or read it
 // into a primitive, the element is reported or refused as one item once it is
-// read.
-func decodeInterface(dec *xml.Decoder, start *xml.StartElement, v any) error {
+// read. Text that does not decode as the held primitive's type fails as in
+// [DecodeElement].
+func decodeInterface(dec *xml.Decoder, start *xml.StartElement, v, held any) error {
+	target := v
+	if tc, ok := asText(held).(*textConversion); ok {
+		// encoding/xml reads the element into a held TextUnmarshaler through
+		// its UnmarshalText method; decoding into tc is the same decode with
+		// the method's refusal marked.
+		target = tc
+	}
 	t := trackerOf(dec)
 	if t == nil {
-		return dec.DecodeElement(v, start)
+		err := dec.DecodeElement(target, start)
+		if cause := conversionRefusal(err); cause != nil {
+			return primitiveFailure("/"+start.Name.Local, cause)
+		}
+		return err
 	}
 	path, checked := t.path(), t.checked
-	if err := dec.DecodeElement(v, start); err != nil {
+	if err := dec.DecodeElement(target, start); err != nil {
+		if cause := conversionRefusal(err); cause != nil {
+			return t.fail(path, cause)
+		}
 		return err
 	}
 	if t.checked == checked {
@@ -581,28 +943,55 @@ func decodeInterface(dec *xml.Decoder, start *xml.StartElement, v any) error {
 	return nil
 }
 
-// DecodeBase64 decodes the element start opens, an `xs:base64Binary` value
-// such as DV_MULTIMEDIA's `data` and `integrity_check`, into v. The element's
-// text is read as [DecodeElement] reads a primitive's, so a tracked decode
-// reports an attribute or child element on it. XML whitespace inside the
-// text is ignored, as the XML Schema type allows. An empty element leaves v
-// nil, as an empty byte field reads in canonical JSON. A text that is no
-// standard, padded base64 fails; the error names the element and the offset
-// of the first bad byte, never the text.
-func DecodeBase64(dec *xml.Decoder, start *xml.StartElement, v *[]byte) error {
+// DecodeText reads the text of the element start opens, as [DecodeElement]
+// reads a string, and hands it to convert, which reads the text as the
+// element's value. start must be the token the decoder read last.
+//
+// A tracked decode reports an attribute or child element on the element, as
+// for any primitive. convert's refusal is a primitive failure, as in
+// [DecodeElement]: a *typereg.DecodeError whose cause wraps [ErrInvalidShape]
+// and convert's own error, and whose text carries none of the element's, so
+// convert's error may quote the text. A tracked decode names the element by
+// its path from the root of the value; an untracked one by its name alone.
+func DecodeText(dec *xml.Decoder, start *xml.StartElement, convert func(text string) error) error {
+	t := trackerOf(dec)
+	var at place
+	if t != nil {
+		at = t.here()
+	}
 	var text string
 	if err := DecodeElement(dec, start, &text); err != nil {
 		return err
 	}
-	b, err := base64.StdEncoding.DecodeString(strings.Map(dropXMLSpace, text))
-	if err != nil {
-		return fmt.Errorf("canxml: <%s>: %w", start.Name.Local, err)
+	if err := convert(text); err != nil {
+		if t != nil {
+			return t.fail(t.closedPath(at), err)
+		}
+		return primitiveFailure("/"+start.Name.Local, err)
 	}
-	if len(b) == 0 {
-		b = nil
-	}
-	*v = b
 	return nil
+}
+
+// DecodeBase64 decodes the element start opens, an `xs:base64Binary` value
+// such as DV_MULTIMEDIA's `data` and `integrity_check`, into v. The element's
+// text is read as [DecodeText] reads it, so a tracked decode reports an
+// attribute or child element on it. XML whitespace inside the text is
+// ignored, as the XML Schema type allows. An empty element leaves v nil, as
+// an empty byte field reads in canonical JSON. A text that is no standard,
+// padded base64 fails as a primitive's text fails in [DecodeElement]: the
+// cause names the offset of the first bad byte, never the text.
+func DecodeBase64(dec *xml.Decoder, start *xml.StartElement, v *[]byte) error {
+	return DecodeText(dec, start, func(text string) error {
+		b, err := base64.StdEncoding.DecodeString(strings.Map(dropXMLSpace, text))
+		if err != nil {
+			return err
+		}
+		if len(b) == 0 {
+			b = nil
+		}
+		*v = b
+		return nil
+	})
 }
 
 // dropXMLSpace maps the four XML whitespace characters to -1, which drops

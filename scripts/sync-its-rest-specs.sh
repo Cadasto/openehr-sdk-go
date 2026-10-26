@@ -169,8 +169,23 @@ cmd_check() {
   hash_block="$(sed -n '/^# sha256  filename/,$p' "$MANIFEST" | tail -n +2)"
   [[ -n "$hash_block" ]] || die "manifest has no hash block"
 
-  local rc=0
-  ( cd "$DEST" && sha256sum -c --quiet - <<<"$hash_block" ) || rc=1
+  # Recompute through sha256_of rather than `sha256sum -c` so hosts that only
+  # have Perl's shasum (stock macOS) can still run the check.
+  command -v sha256sum >/dev/null 2>&1 || command -v shasum >/dev/null 2>&1 \
+    || die "sha256sum or shasum is required"
+
+  local rc=0 line want path
+  while IFS= read -r line; do
+    want="${line%% *}"
+    path="${line#*  }"
+    if [[ ! -f "$DEST/$path" ]]; then
+      echo "  MISSING: $path"
+      rc=1
+    elif [[ "$(sha256_of "$DEST/$path")" != "$want" ]]; then
+      echo "  FAILED: $path (sha256 mismatch)"
+      rc=1
+    fi
+  done <<<"$hash_block"
 
   # Detect vendored specs absent from the manifest (extras).
   local name

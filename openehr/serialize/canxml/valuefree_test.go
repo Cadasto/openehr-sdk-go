@@ -65,17 +65,17 @@ func slotElement(xsiType, body string) string {
 // TestUnmarshal_REQ052_SlotRefusalsKeepTheirTextOnOneLine pins the text of a
 // DecodeError over two canonical-XML refusals the SDK writes around a cause:
 // an interval side written bounded with no bound, which names the RM type
-// between canxml's shape sentinel and the refusal, and an element whose text
-// is not base64, which names the element and the offset of the first bad
-// byte. The text keeps each part, stays on one line (REQ-052) and carries no
-// value from the document, and Value stays empty: canonical XML holds no
-// literal for either.
+// between canxml's shape sentinel and the refusal, and an element inside a
+// slot whose text is not base64, which names the element by its path and the
+// offset of the first bad byte. The text keeps each part, stays on one line
+// (REQ-052) and carries no value from the document, and Value stays empty:
+// canonical XML holds no literal for either.
 //
 // Can-fail control: write an error that wraps several causes as errors.Join
 // does, a line break between the causes and none of its own text, and the
 // interval rows lose "DV_INTERVAL" and break the line; name a base64 refusal
-// by its class alone, or drop canxml's element prefix, and the base64 rows
-// lose the offset or the element.
+// by its class alone, or leave the element out of its path, and the base64
+// rows lose the offset or the element.
 func TestUnmarshal_REQ052_SlotRefusalsKeepTheirTextOnOneLine(t *testing.T) {
 	const media = `<media_type><terminology_id><value>IANA_media-types</value></terminology_id><code_string>text/plain</code_string></media_type><size>5</size>`
 	cases := []struct {
@@ -98,8 +98,8 @@ func TestUnmarshal_REQ052_SlotRefusalsKeepTheirTextOnOneLine(t *testing.T) {
 			name: "a data element that is not base64",
 			in:   slotElement("DV_MULTIMEDIA", `<data>Jane@7777</data>`+media),
 			keep: []string{
-				`decode /value (_type="DV_MULTIMEDIA"): `,
-				"canxml: <data>: illegal base64 data at input byte 4",
+				"decode /element[1]/value[1]/data[1]: ",
+				"canxml: invalid XML shape: illegal base64 data at input byte 4",
 			},
 			absent: []string{"Jane", "7777"},
 		},

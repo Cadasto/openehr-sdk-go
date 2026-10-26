@@ -242,7 +242,7 @@ The HL7 Inferno **SMART App Launch Test Kit STU2.2 _Client_** suite serves as an
 - **Preconditions:** Composition has been updated since the SDK's cached `version_uid`.
 - **Wire assertion:** PUT returns `412`, and the SDK maps it to `ErrPreconditionFailed`. The vendored ITS-REST pin answers a stale `If-Match` on a PUT with `412` and lists no `409` for it, so a `409` fails the probe.
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Implemented (Sandbox).
+- **Status:** Implemented (Sandbox). A scenario recording on EHRbase 2.37.0-SNAPSHOT (`next`) and on FerroEHR 5.0.0 (`composition-update.har`, `ferroehr/composition-update.har`) is replayed through the probe function by its own test, outside the runner, so it is not yet this probe's Cassette mode. EHRbase 2.36.0 cannot be recorded here: it refuses the quoted `If-Match` the pin requires with `400`, a refusal its later builds no longer make.
 - **Satisfies:** REQ-054, REQ-093
 
 #### PROBE-012 — ETag survives round trip
@@ -251,7 +251,7 @@ The HL7 Inferno **SMART App Launch Test Kit STU2.2 _Client_** suite serves as an
 - **Preconditions:** Read-then-write workflow.
 - **Wire assertion:** GET response carries `ETag`; PUT carries the same value as `If-Match`; PUT returns `204` or `200`.
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Implemented (Sandbox).
+- **Status:** Implemented (Sandbox). A scenario recording on EHRbase 2.37.0-SNAPSHOT (`next`) and on FerroEHR 5.0.0 (`composition-update.har`, `ferroehr/composition-update.har`) is replayed through the probe function by its own test, outside the runner, so it is not yet this probe's Cassette mode.
 - **Satisfies:** REQ-054
 
 #### PROBE-013 — Cross-EHR isolation
@@ -280,7 +280,7 @@ The HL7 Inferno **SMART App Launch Test Kit STU2.2 _Client_** suite serves as an
 - **Preconditions:** Reference deployment that validates AQL against templates.
 - **Wire assertion:** The typed builders cannot emit syntactically invalid AQL (structural guarantee). Execution of a query referencing a non-existent path returns the backend's AQL error envelope; the SDK maps it to `*query.AQLError`, which satisfies `errors.Is(err, aql.ErrPathResolution)`. A **501** response maps to `*query.AQLError` satisfying `errors.Is(err, aql.ErrEngineCapability)` and never `aql.ErrPathResolution`: the capability gap is read from the status alone, with an envelope or bare, never from message text (REQ-055).
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Implemented (Sandbox) — the error mapping is tested against synthesised backend responses: a path-resolution envelope, and a 501 capability gap with an envelope and bare. Cassette and Live ratification wait for a reference deployment.
+- **Status:** Implemented (Sandbox) — the error mapping is tested against synthesised backend responses: a path-resolution envelope, and a 501 capability gap with an envelope and bare. Cassette and Live ratification wait for a reference deployment. Scenario recordings of three query refusals by EHRbase 2.36.0 and FerroEHR 5.0.0 (`error-envelopes.har`, `ferroehr/error-envelopes.har`) are replayed by their own test, outside the runner: each surfaces as `*query.AQLError` and none as a capability gap, but neither deployment's unknown-attribute refusal (`400`) is classified as `aql.ErrPathResolution`, so that half stays unratified.
 - **Satisfies:** REQ-055.
 
 #### PROBE-028 — AQL lint stability
@@ -494,11 +494,15 @@ The HL7 Inferno **SMART App Launch Test Kit STU2.2 _Client_** suite serves as an
 
 #### PROBE-076 — FLAT / STRUCTURED composition round-trip
 
-- **Title:** For a vendored upstream (OPT + canonical COMPOSITION) pair, the simplified codecs round-trip the composition without losing the data the formats carry — FLAT is idempotent (`MarshalFlat → UnmarshalFlat → MarshalFlat`), STRUCTURED re-encodes to the same FLAT, OPT-free interconversion preserves it — **and**, when the source composition is itself OPT-valid, a `WithTemplate` decode of the emitted FLAT validates against the OPT (the conformance leg).
-- **Preconditions:** Vendored EHRbase (Apache-2.0) `Test_dv_*` datatype OPTs and matching canonical composition JSON under `testkit/corpus/` (provenance in [`THIRD_PARTY_LICENSES.md`](../../testkit/corpus/THIRD_PARTY_LICENSES.md)); the WebTemplate is built with `templatecompile.Compile` and `webtemplate.Build` (REQ-106).
-- **Wire assertion:** Not backend-facing: an in-repo property across the datatype corpus (DV_TEXT/CODED_TEXT/DATE_TIME/QUANTITY/COUNT/BOOLEAN/ORDINAL/PROPORTION/DURATION/IDENTIFIER/URI + the `|raw`-carried MULTIMEDIA/PARSABLE/INTERVAL): round-trip idempotence plus the OPT-validation leg, which catches dropped or mistyped leaves that a symmetric omission would hide from idempotence alone. **Scope limit:** symmetric omission of *optional* data can still pass, and the probe does **not** compare emitted FLAT/STRUCTURED against vendored upstream simplified output, which is [PROBE-086](#probe-086--upstream-flat-serialisation-parity)'s check; see [`deviations.md`](../../openehr/serialize/simplified/deviations.md) § Conformance. A template the WebTemplate builder cannot yet model is a documented skip, never a fail.
+- **Title:** For a vendored upstream (OPT + canonical COMPOSITION) pair, the simplified codecs round-trip the composition without losing the data the formats carry — FLAT is idempotent (`MarshalFlat → UnmarshalFlat → MarshalFlat`), STRUCTURED re-encodes to the same FLAT, OPT-free interconversion preserves it — **and**, when the source composition is itself OPT-valid, a `WithTemplate` decode of the emitted FLAT validates against the OPT (the conformance leg). **And** for every COMPOSITION OPT the corpus vendors, under both `instance.Required` and `instance.Medium`, the skeleton `composition.NewSkeleton` writes, carried through FLAT and through STRUCTURED and decoded with `WithTemplate` and `WithStrict`, validates against its OPT with no issue, apart from the named exclusions below, each registered in [`deviations.md`](../../openehr/serialize/simplified/deviations.md) (the skeleton leg).
+- **Preconditions:** Round-trip and conformance legs: vendored EHRbase (Apache-2.0) `Test_dv_*` datatype OPTs and matching canonical composition JSON under `testkit/corpus/` (provenance in [`THIRD_PARTY_LICENSES.md`](../../testkit/corpus/THIRD_PARTY_LICENSES.md)). Skeleton leg: every OPT `fixtures.ListAllOPTs` lists whose root is COMPOSITION, one per template id (64 today); an OPT the parser refuses is left out, as the PROBE-027 corpus ratchet lists it. The skeleton is written with a composer, a territory and a fixed clock. Both: the WebTemplate is built with `templatecompile.Compile` and `webtemplate.Build` (REQ-106).
+- **Wire assertion:** Not backend-facing: an in-repo property across the datatype corpus (DV_TEXT/CODED_TEXT/DATE_TIME/QUANTITY/COUNT/BOOLEAN/ORDINAL/PROPORTION/DURATION/IDENTIFIER/URI + the `|raw`-carried MULTIMEDIA/PARSABLE/INTERVAL): round-trip idempotence plus the OPT-validation leg, which catches dropped or mistyped leaves that a symmetric omission would hide from idempotence alone. **Scope limit:** symmetric omission of *optional* data can still pass, and the probe does **not** compare emitted FLAT/STRUCTURED against vendored upstream simplified output, which is [PROBE-086](#probe-086--upstream-flat-serialisation-parity)'s check; see [`deviations.md`](../../openehr/serialize/simplified/deviations.md) § Conformance. In these two legs a template the WebTemplate builder cannot yet model is a documented skip, never a fail.
+
+  The skeleton leg first requires the written skeleton to validate (`validation.ValidateComposition`); a skeleton that does not fails the pair, named, and no round trip is judged from it. It then runs `MarshalFlat → UnmarshalFlat` and `MarshalStructured → UnmarshalStructured`, both decoding with `WithTemplate(c)` and `WithStrict()`, and requires `validation.ValidateComposition` of each decoded composition to report nothing. Every encode error, decode error and issue fails the pair and is named by template, policy, format, and the error text or the issue code and path; so is an OPT that does not compile, a WebTemplate that does not build, and a skeleton the generator refuses. A finding passes only when an exclusion matches it exactly: template id, policy, format, stage, and the error text or the issue code and path. An exclusion that no longer fires fails as stale, and so does one naming a template the corpus no longer holds. A floor on the number of (template, policy) pairs the corpus gives fails a corpus that silently empties, whatever a `-run` filter selects, while each pair that runs and does not pass fails on its own. The exclusions, each in FLAT and in STRUCTURED (`Probe076SkeletonExclusions`), are two:
+  - `sdk_crosscheck_siblings.v1` under Medium fails at **encode** with `simplified: FLAT id "twin" is one of several reused siblings sharing the path "/context/other_context[at0001]/items[at0002]/value" — not yet encodable (see deviations.md): rmpath: path resolves to multiple items`, the whole text the exclusion matches. This is the reused-sibling refusal registered in [`deviations.md`](../../openehr/serialize/simplified/deviations.md#conformance) § Conformance, *Archetype-reuse siblings (REQ-116 residual)*, Encode. Under Required the skeleton holds no data there and passes.
+  - `Referral Request.v1` under Medium reports `rm_type_mismatch` at `/context/other_context/items[openEHR-EHR-CLUSTER.annotations.v1]/items[at0001]/name`: a coded name the template leaves open comes back as `DV_TEXT`, the registered format limit in [`deviations.md`](../../openehr/serialize/simplified/deviations.md#deviations) § Deviations, *`LOCATABLE.name` on decode*.
 - **Modes:** In-repo (round-trip property against vendored fixtures; no backend).
-- **Status:** Implemented (inline) — over the vendored constraint-template corpus (24 pass, 1 skip).
+- **Status:** Implemented (inline) — run by `TestProbe076` over the vendored constraint-template corpus (25 pass), and the skeleton leg by `TestProbe076SkeletonLeg` over 64 COMPOSITION OPTs under two policies (128 pairs pass, 2 of them through the four exclusions above, all four firing).
 - **Satisfies:** REQ-053.
 
 #### PROBE-086 — Upstream FLAT serialisation parity
@@ -636,7 +640,7 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 - **Preconditions:** Existing EHR; a valid Composition body conforming to a deployed template.
 - **Wire assertion:** Request carries `Prefer: return=representation`; response body decodes as bare `*rm.Composition` per the ITS-REST OpenAPI `201_COMPOSITION` schema (oneOf: `Composition` | `Identifier`) — **not** an `ORIGINAL_VERSION<COMPOSITION>` envelope, which lives at `GET /versioned_composition/{vo_uid}/version/{version_uid}` (`UVersionOfComposition`). The response `ETag` is captured into `VersionMetadata`.
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Implemented (Sandbox) via PROBE-071 — PROBE-071 checks the bare-body response for the POST and the symmetric PUT, with the strict rejection of an `ORIGINAL_VERSION` body; this entry stays as the named POST probe.
+- **Status:** Implemented (Sandbox) via PROBE-071 — PROBE-071 checks the bare-body response for the POST and the symmetric PUT, with the strict rejection of an `ORIGINAL_VERSION` body; this entry stays as the named POST probe. A scenario recording on EHRbase 2.37.0-SNAPSHOT (`next`) and on FerroEHR 5.0.0 (`composition-update.har`, `ferroehr/composition-update.har`) is replayed through the save it names by its own test, outside the runner, so it is not yet this probe's Cassette mode.
 - **Satisfies:** REQ-094 (`return=representation` arm only).
 
 #### PROBE-062 — `openehr-audit-details` header round-trip
@@ -697,7 +701,7 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 - **Preconditions:** Cassette of a real 400 error envelope.
 - **Wire assertion:** `errors.As(err, &wire)` succeeds; `wire.OpenEHR.Message`, `wire.OpenEHR.Code` are set from the envelope; `wire.RawBody` preserves the raw bytes.
 - **Modes:** Sandbox, Cassette.
-- **Status:** Draft.
+- **Status:** Draft. Scenario recordings of real refusals by EHRbase 2.36.0 and FerroEHR 5.0.0 (`error-envelopes.har`, `ferroehr/error-envelopes.har`) are replayed by their own test, outside the runner, so they are not yet this probe's Cassette mode: the `400` envelope's `message` decodes and `RawBody` keeps the bytes, but neither envelope carries a `code`, so the `OpenEHR.Code` half is not witnessed.
 
 #### PROBE-069 — `Idempotency-Key` header round-trip
 
@@ -723,7 +727,7 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 - **Preconditions:** Existing EHR; a valid Composition body conforming to a deployed template.
 - **Wire assertion:** Response body decodes cleanly as `*rm.Composition` per the ITS-REST OpenAPI `201_COMPOSITION` / `200_COMPOSITION_updated` schemas. A server that returns `{"_type":"ORIGINAL_VERSION", ...}` on these paths is non-conformant; the SDK surfaces that as a decode error (strict-against-spec posture per REQ-094). The full version envelope is reached via `GET /versioned_composition/{vo_uid}/version/{version_uid}` (`UVersionOfComposition`).
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Implemented (Sandbox) — the probe exercises the POST and PUT arms in one invocation when a versioned-object id and an `If-Match` are supplied; otherwise it skips the PUT arm and passes on POST alone. Leaf unit tests cover both verbs and both halves of the strict-against-spec contract, and the same shape for `directory.Save` and `directory.Update` (`201_directory`, `200_FOLDER_retrieved`).
+- **Status:** Implemented (Sandbox) — the probe exercises the POST and PUT arms in one invocation when a versioned-object id and an `If-Match` are supplied; otherwise it skips the PUT arm and passes on POST alone. Leaf unit tests cover both verbs and both halves of the strict-against-spec contract, and the same shape for `directory.Save` and `directory.Update` (`201_directory`, `200_FOLDER_retrieved`). A scenario recording on EHRbase 2.37.0-SNAPSHOT (`next`) and on FerroEHR 5.0.0 (`composition-update.har`, `ferroehr/composition-update.har`) is replayed through the probe function by its own test, outside the runner, so it is not yet this probe's Cassette mode.
 - **Satisfies:** REQ-094 (`return=representation` arm only).
 
 #### PROBE-072 — Contribution submission body matches `Contribution_create`

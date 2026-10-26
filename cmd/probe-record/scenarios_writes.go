@@ -100,6 +100,74 @@ func captureCompositionMinimal(ctx context.Context, c *transport.Client) error {
 	return nil
 }
 
+// captureCompositionUpdate records the versioned writes PROBE-061, PROBE-012,
+// PROBE-011 and PROBE-071 drive against one composition: a save with
+// return=representation; a read of the latest version and an update with its
+// ETag as If-Match; the same update again with that now stale If-Match, which
+// must be refused with 412; and, after a second read, a save and an update
+// with return=representation. Each write sends the options its probe sends,
+// so the recording replays through the probe functions.
+func captureCompositionUpdate(ctx context.Context, c *transport.Client) error {
+	rec, _, err := ehr.Create(ctx, c)
+	if err != nil {
+		return fmt.Errorf("create EHR: %w", err)
+	}
+	if rec == nil || rec.EHRID.Value == "" {
+		return errors.New("create EHR returned no ehr_id")
+	}
+	ehrID := ehr.EHRID(rec.EHRID.Value)
+	templateID := newCassetteTemplateID()
+	opt, comp, err := cassetteMinimalComposition(templateID)
+	if err != nil {
+		return err
+	}
+	if _, _, err := definition.UploadTemplate(ctx, c, definition.FormatADL14, bytes.NewReader(opt)); err != nil {
+		return fmt.Errorf("upload template: %w", err)
+	}
+	representation := composition.WithPrefer(transport.PreferRepresentation)
+	_, saved, err := composition.Save(ctx, c, ehrID, comp, representation)
+	if err != nil {
+		return fmt.Errorf("save composition: %w", err)
+	}
+	if saved == nil || saved.VersionUID == "" {
+		return errors.New("save composition returned no version uid")
+	}
+	voID := saved.VersionUID.VersionedObjectID()
+
+	_, latest, err := composition.Get(ctx, c, ehrID, ehr.LatestOf(voID))
+	if err != nil {
+		return fmt.Errorf("get latest composition: %w", err)
+	}
+	if latest == nil || latest.VersionUID == "" {
+		return errors.New("get latest composition returned no version uid")
+	}
+	if _, _, err := composition.Update(ctx, c, ehrID, voID, string(latest.VersionUID), comp); err != nil {
+		return fmt.Errorf("update with the latest If-Match: %w", err)
+	}
+	_, _, err = composition.Update(ctx, c, ehrID, voID, string(latest.VersionUID), comp)
+	if err == nil {
+		return errors.New("update with a stale If-Match: answered, want a 412 refusal")
+	}
+	if !errors.Is(err, transport.ErrPreconditionFailed) {
+		return fmt.Errorf("update with a stale If-Match: want a 412 refusal: %w", err)
+	}
+
+	_, latest, err = composition.Get(ctx, c, ehrID, ehr.LatestOf(voID))
+	if err != nil {
+		return fmt.Errorf("get latest composition again: %w", err)
+	}
+	if latest == nil || latest.VersionUID == "" {
+		return errors.New("second get of the latest composition returned no version uid")
+	}
+	if _, _, err := composition.Save(ctx, c, ehrID, comp, representation); err != nil {
+		return fmt.Errorf("save a second composition: %w", err)
+	}
+	if _, _, err := composition.Update(ctx, c, ehrID, voID, string(latest.VersionUID), comp, representation); err != nil {
+		return fmt.Errorf("update with return=representation: %w", err)
+	}
+	return nil
+}
+
 // captureStoredQuery records a server-assigned EHR create, a PUT of one
 // fixed stored query, and the stored execution that follows it. The
 // qualified name is a constant. The EHR id in the query parameter comes

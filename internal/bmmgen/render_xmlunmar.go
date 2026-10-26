@@ -59,7 +59,11 @@ import (
 //     arm, `xmlunmatched.SkipUnmatched`, which skips it, reports it or refuses
 //     it as the decode's options say.
 //
-//  5. `xmi:type` is rejected via [canxml.XSITypeOf] (centralised in the
+//  5. Text between the child elements goes to
+//     `xmlunmatched.CheckUnmatchedText`: the class's content is elements, so
+//     text other than XML whitespace is unmatched, one item per element.
+//
+//  6. `xmi:type` is rejected via [canxml.XSITypeOf] (centralised in the
 //     helper).
 //
 // # Hash/map and Any decoding
@@ -245,6 +249,8 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	b.WriteString("\t\t\t\t\treturn _err\n")
 	b.WriteString("\t\t\t\t}\n")
 	b.WriteString("\t\t\t}\n") // close inner switch (Name.Local)
+	// The class's content is elements: text between them is unmatched.
+	b.WriteString(checkUnmatchedXMLText)
 	b.WriteString("\t\tcase xml.EndElement:\n")
 	if flagged {
 		fmt.Fprintf(&b, "\t\t\tif _err := %s; _err != nil {\n", intervalFlagSettle("_seen", recv))
@@ -661,6 +667,13 @@ func checkUnmatchedXMLAttrs(attrFields []emittedField) string {
 		"\tif _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start%s); _err != nil {\n\t\treturn _err\n\t}\n",
 		known.String())
 }
+
+// checkUnmatchedXMLText is the token-loop arm that hands the text read
+// directly inside the element to xmlunmatched.CheckUnmatchedText.
+const checkUnmatchedXMLText = "\t\tcase xml.CharData:\n" +
+	"\t\t\tif _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {\n" +
+	"\t\t\t\treturn _err\n" +
+	"\t\t\t}\n"
 
 // bmmAnyType is the BMM name of the root type, which the generator maps to
 // the Go empty interface.

@@ -18,9 +18,10 @@ func (c *CCodedText) BMMName() string { return "C_CODED_TEXT" }
 
 // MarshalXML emits canonical openEHR XML for CCodedText. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -31,11 +32,6 @@ func (c *CCodedText) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if c.AssumedValue != nil {
-		if err := _e.EncodeElement(*c.AssumedValue, xml.StartElement{Name: xml.Name{Local: "assumed_value"}}); err != nil {
-			return err
-		}
-	}
 	if err := _e.EncodeElement(c.RMTypeName, xml.StartElement{Name: xml.Name{Local: "rm_type_name"}}); err != nil {
 		return err
 	}
@@ -44,6 +40,11 @@ func (c *CCodedText) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 	}
 	if err := _e.EncodeElement(c.NodeID, xml.StartElement{Name: xml.Name{Local: "node_id"}}); err != nil {
 		return err
+	}
+	if c.AssumedValue != nil {
+		if err := _e.EncodeElement(*c.AssumedValue, xml.StartElement{Name: xml.Name{Local: "assumed_value"}}); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeElement(c.Terminology, xml.StartElement{Name: xml.Name{Local: "terminology"}}); err != nil {
 		return err
@@ -71,9 +72,10 @@ func (c *COrdinal) BMMName() string { return "C_ORDINAL" }
 
 // MarshalXML emits canonical openEHR XML for COrdinal. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -84,11 +86,6 @@ func (c *COrdinal) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if c.AssumedValue != nil {
-		if err := _e.EncodeElement(*c.AssumedValue, xml.StartElement{Name: xml.Name{Local: "assumed_value"}}); err != nil {
-			return err
-		}
-	}
 	if err := _e.EncodeElement(c.RMTypeName, xml.StartElement{Name: xml.Name{Local: "rm_type_name"}}); err != nil {
 		return err
 	}
@@ -97,6 +94,11 @@ func (c *COrdinal) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	}
 	if err := _e.EncodeElement(c.NodeID, xml.StartElement{Name: xml.Name{Local: "node_id"}}); err != nil {
 		return err
+	}
+	if c.AssumedValue != nil {
+		if err := _e.EncodeElement(*c.AssumedValue, xml.StartElement{Name: xml.Name{Local: "assumed_value"}}); err != nil {
+			return err
+		}
 	}
 	for _idx := range c.List {
 		if err := _e.EncodeElement(&c.List[_idx], xml.StartElement{Name: xml.Name{Local: "list"}}); err != nil {
@@ -116,9 +118,10 @@ func (c *CQuantity) BMMName() string { return "C_QUANTITY" }
 
 // MarshalXML emits canonical openEHR XML for CQuantity. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -129,11 +132,6 @@ func (c *CQuantity) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if c.AssumedValue != nil {
-		if err := _e.EncodeElement(*c.AssumedValue, xml.StartElement{Name: xml.Name{Local: "assumed_value"}}); err != nil {
-			return err
-		}
-	}
 	if err := _e.EncodeElement(c.RMTypeName, xml.StartElement{Name: xml.Name{Local: "rm_type_name"}}); err != nil {
 		return err
 	}
@@ -142,6 +140,11 @@ func (c *CQuantity) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	}
 	if err := _e.EncodeElement(c.NodeID, xml.StartElement{Name: xml.Name{Local: "node_id"}}); err != nil {
 		return err
+	}
+	if c.AssumedValue != nil {
+		if err := _e.EncodeElement(*c.AssumedValue, xml.StartElement{Name: xml.Name{Local: "assumed_value"}}); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeElement(c.Property, xml.StartElement{Name: xml.Name{Local: "property"}}); err != nil {
 		return err
@@ -164,9 +167,10 @@ func (c *CQuantityItem) BMMName() string { return "C_QUANTITY_ITEM" }
 
 // MarshalXML emits canonical openEHR XML for CQuantityItem. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -198,9 +202,10 @@ func (o *Ordinal) BMMName() string { return "ORDINAL" }
 
 // MarshalXML emits canonical openEHR XML for Ordinal. The default
 // element local name is the snake-cased BMM class name when the
-// parent did not set one. Child elements follow BMM property
-// declaration order; nil-pointer optionals and empty containers are
-// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
@@ -211,10 +216,10 @@ func (o *Ordinal) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&o.Symbol, xml.StartElement{Name: xml.Name{Local: "symbol"}}); err != nil {
+	if err := _e.EncodeElement(o.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(o.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
+	if err := _e.EncodeElement(&o.Symbol, xml.StartElement{Name: xml.Name{Local: "symbol"}}); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {

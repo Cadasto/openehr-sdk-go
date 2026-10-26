@@ -4,6 +4,9 @@
 //
 //	bmmgen [flags]
 //	  -resources string   path to resources/bmm/ directory (default "./resources/bmm")
+//	  -its-xml string     path to resources/its-xml/ directory, the ITS-XML
+//	                      schemas that give the XML encoders their child order
+//	                      (default: the its-xml directory beside -resources)
 //	  -out string         output module root (default ".")
 //	  -target string      comma-separated targets: "rm", "aom14", "all"
 //	                      (default "all")
@@ -13,10 +16,11 @@
 //	                      files; exit 1 on drift
 //	  -v                  verbose
 //
-// The generator reads the pinned BMM JSON files under resources/bmm/ and
-// emits Go source under <out>/openehr/rm/ and/or
-// <out>/openehr/aom/aom14/ depending on -target. The implementation
-// lives in internal/bmmgen.
+// The generator reads the pinned BMM JSON files under resources/bmm/, and
+// the ITS-XML schemas under resources/its-xml/ for the order of the
+// canonical-XML child elements. It emits Go source under
+// <out>/openehr/rm/ and/or <out>/openehr/aom/aom14/ depending on
+// -target. The implementation lives in internal/bmmgen.
 package main
 
 import (
@@ -32,6 +36,7 @@ import (
 func main() {
 	var (
 		resources = flag.String("resources", "./"+bmm.DefaultResourcesDir, "path to resources/bmm/ directory")
+		itsXML    = flag.String("its-xml", "", "path to resources/its-xml/ directory (XML child order); empty means the its-xml directory beside -resources")
 		out       = flag.String("out", ".", "output module root")
 		verify    = flag.Bool("verify", false, "verify; do not write; exit 1 on drift")
 		rootID    = flag.String("root", "", "legacy: override the first target's BMM root id (without .bmm.json)")
@@ -48,6 +53,7 @@ func main() {
 
 	result, err := bmmgen.Run(bmmgen.Options{
 		ResourcesDir: *resources,
+		ITSXMLDir:    *itsXML,
 		OutDir:       *out,
 		Targets:      targets,
 		RootID:       *rootID,
