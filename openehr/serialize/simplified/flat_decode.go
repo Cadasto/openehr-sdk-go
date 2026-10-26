@@ -263,7 +263,8 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 		compJSON["name"] = textJSON(impliedCompositionName(wt))
 	}
 	// Every key is placed, so each rebuilt ISM transition can now get the careflow
-	// step its node names, or have the body's checked against it (REQ-053).
+	// step its node names, or have the body's checked against it, and a current
+	// state that names no terminology gets `openehr` (REQ-053).
 	if err := settleIsmTransitions(compJSON, wt); err != nil {
 		return nil, err
 	}
@@ -1545,15 +1546,20 @@ type ismNode struct {
 
 // ismTransitionNodes indexes the Web Template's archetyped ISM_TRANSITION nodes
 // by the bare spelling of their canonical path, which is the path
-// [settleIsmTransitions] rebuilds from the decoded tree.
-func ismTransitionNodes(wt *webtemplate.WebTemplate) map[string]ismNode {
-	out := make(map[string]ismNode)
+// [settleIsmTransitions] rebuilds from the decoded tree. found reports whether
+// the Web Template has an ISM_TRANSITION node of either kind, the in-context
+// `ism_transition` node included.
+func ismTransitionNodes(wt *webtemplate.WebTemplate) (nodes map[string]ismNode, found bool) {
+	nodes = make(map[string]ismNode)
 	var walk func(n *webtemplate.Node, flat string)
 	walk = func(n *webtemplate.Node, flat string) {
 		for _, ch := range n.Children {
 			chFlat := flat + "/" + ch.ID
-			if ch.NodeID != "" && nodeRMType(ch) == "ISM_TRANSITION" {
-				out[bareAQLPath(ch.AQLPath)] = ismNode{id: ch.NodeID, name: ch.Name, flat: chFlat}
+			if nodeRMType(ch) == "ISM_TRANSITION" {
+				found = true
+				if ch.NodeID != "" {
+					nodes[bareAQLPath(ch.AQLPath)] = ismNode{id: ch.NodeID, name: ch.Name, flat: chFlat}
+				}
 			}
 			walk(ch, chFlat)
 		}
@@ -1561,25 +1567,29 @@ func ismTransitionNodes(wt *webtemplate.WebTemplate) map[string]ismNode {
 	if wt.Tree != nil {
 		walk(wt.Tree, wt.Tree.ID)
 	}
-	return out
+	return nodes, found
 }
 
-// settleIsmTransitions finishes each ISM_TRANSITION the placement walk rebuilt
-// at an archetyped `ism_transition[atNNNN]` node, once every key is placed.
+// settleIsmTransitions finishes each ISM_TRANSITION the placement walk rebuilt,
+// once every key is placed.
 //
-// Encode matches a transition to its node by careflow step code, because an
-// ISM_TRANSITION is not LOCATABLE and has no archetype_node_id (REQ-121). So a
-// transition without a careflow step gets the one its node names: the node id as
-// a `local` code, the node's Web Template name as its value. A careflow step the
-// body carries must be coded with the node id; one coded otherwise belongs to
-// another node, and encode would move the transition there (REQ-053). The node id
-// [walkAQL] recorded on the object is removed here, so it never reaches canjson.
+// At either kind of node, the archetyped `ism_transition[atNNNN]` one and the
+// in-context `ism_transition` one, a current state that names no terminology
+// takes `openehr` ([impliedCurrentStateTerminology]). The rest applies at an
+// archetyped node only. Encode matches a transition to its node by careflow
+// step code, because an ISM_TRANSITION is not LOCATABLE and has no
+// archetype_node_id (REQ-121). So a transition without a careflow step gets the
+// one its node names: the node id as a `local` code, the node's Web Template
+// name as its value. A careflow step the body carries must be coded with the
+// node id; one coded otherwise belongs to another node, and encode would move
+// the transition there (REQ-053). The node id [walkAQL] recorded on the object
+// is removed here, so it never reaches canjson.
 //
 // The walk rebuilds each object's bare canonical path from the archetype_node_id
 // values placement wrote, which is how [walkAQL] spells the same path.
 func settleIsmTransitions(compJSON map[string]any, wt *webtemplate.WebTemplate) error {
-	nodes := ismTransitionNodes(wt)
-	if len(nodes) == 0 {
+	nodes, found := ismTransitionNodes(wt)
+	if !found {
 		return nil
 	}
 	return settleIsmTransitionsUnder(compJSON, "", nodes)
@@ -1593,9 +1603,12 @@ func settleIsmTransitionsUnder(obj map[string]any, path string, nodes map[string
 		switch v := obj[attr].(type) {
 		case map[string]any:
 			p := path + "/" + attr + nodePredicate(v)
-			if n, ok := nodes[p]; ok && v["_type"] == "ISM_TRANSITION" {
-				if err := settleIsmTransition(v, n); err != nil {
-					return err
+			if v["_type"] == "ISM_TRANSITION" {
+				impliedCurrentStateTerminology(v)
+				if n, ok := nodes[p]; ok {
+					if err := settleIsmTransition(v, n); err != nil {
+						return err
+					}
 				}
 				continue
 			}
@@ -1615,6 +1628,18 @@ func settleIsmTransitionsUnder(obj map[string]any, path string, nodes map[string
 		}
 	}
 	return nil
+}
+
+// impliedCurrentStateTerminology gives a rebuilt ISM_TRANSITION's current state
+// the `openehr` terminology when it names none (no terminology_id, or a null
+// one). RM `Current_state_valid` admits a code of the openEHR `instruction
+// states` group alone, so no other terminology can be meant; it is the footing
+// `ctx/setting` has in EVENT_CONTEXT `Setting_valid` (REQ-053). A terminology
+// the body names is kept as written, for validation to check.
+func impliedCurrentStateTerminology(tr map[string]any) {
+	if dc := definingCodeOf(tr["current_state"]); dc != nil && dc["terminology_id"] == nil {
+		dc["terminology_id"] = map[string]any{"_type": "TERMINOLOGY_ID", "value": terminology.ID}
+	}
 }
 
 // nodePredicate is the `[id]` a rebuilt node adds to its canonical path, or ""
