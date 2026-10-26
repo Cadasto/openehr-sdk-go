@@ -169,18 +169,44 @@ func TestREQ103_UTCMagnitude(t *testing.T) {
 	}
 	// The magnitudes of two zoned values compare as their instants do:
 	// 10:00+02:00 is 08:00Z, before 09:00Z, and 2004-05-20T00:30+01:00
-	// is the day before's 23:30Z.
-	early, _ := ParseTime("10:00:00+02:00")
-	late, _ := ParseTime("09:00:00Z")
-	e, _ := UTCMagnitude(early.Magnitude(), early.Zone)
-	l, _ := UTCMagnitude(late.Magnitude(), late.Zone)
+	// is the day before's 23:30Z. Each parse and each UTCMagnitude must
+	// succeed first: two failed ones give two zero magnitudes, which the
+	// equality below would accept.
+	parseTime := func(s string) Time {
+		t.Helper()
+		v, err := ParseTime(s)
+		if err != nil {
+			t.Fatalf("ParseTime(%q): %v", s, err)
+		}
+		return v
+	}
+	parseDateTime := func(s string) (Date, Time) {
+		t.Helper()
+		d, tm, err := ParseDateTime(s)
+		if err != nil {
+			t.Fatalf("ParseDateTime(%q): %v", s, err)
+		}
+		return d, tm
+	}
+	utc := func(m float64, zone string) float64 {
+		t.Helper()
+		got, ok := UTCMagnitude(m, zone)
+		if !ok {
+			t.Fatalf("UTCMagnitude(%v, %q) = %v, false; want an instant", m, zone, got)
+		}
+		return got
+	}
+	early := parseTime("10:00:00+02:00")
+	late := parseTime("09:00:00Z")
+	e := utc(early.Magnitude(), early.Zone)
+	l := utc(late.Magnitude(), late.Zone)
 	if e >= l {
 		t.Errorf("UTCMagnitude of 10:00:00+02:00 = %v, of 09:00:00Z = %v; want the first below the second", e, l)
 	}
-	d, tm, _ := ParseDateTime("2004-05-20T00:30:00+01:00")
-	prev, prevTime, _ := ParseDateTime("2004-05-19T23:30:00Z")
-	a, _ := UTCMagnitude(DateTimeMagnitude(d, tm), tm.Zone)
-	b, _ := UTCMagnitude(DateTimeMagnitude(prev, prevTime), prevTime.Zone)
+	d, tm := parseDateTime("2004-05-20T00:30:00+01:00")
+	prev, prevTime := parseDateTime("2004-05-19T23:30:00Z")
+	a := utc(DateTimeMagnitude(d, tm), tm.Zone)
+	b := utc(DateTimeMagnitude(prev, prevTime), prevTime.Zone)
 	if a != b {
 		t.Errorf("UTCMagnitude of 2004-05-20T00:30:00+01:00 = %v, of 2004-05-19T23:30:00Z = %v; want them equal", a, b)
 	}
