@@ -90,10 +90,12 @@ func WithUnmatched(fn func(pointer string)) DecoderOption {
 // member's value. The value v points to is unspecified after the refusal.
 //
 // Strict covers unmatched members only. An absent member is never refused,
-// mandatory or not, and neither is a boundary flag an interval leaves out.
-// The members are checked after the decode succeeds, so a decode error, such
-// as an unknown `_type`, is returned as itself in every mode, wherever it
-// sits in the input (see [DecodeError]).
+// mandatory or not, and neither is a boundary flag an interval leaves out:
+// [WithMissing] reports the members the RM requires that the input leaves
+// out, and may be combined with this option. The members are checked after
+// the decode succeeds, so a decode error, such as an unknown `_type`, is
+// returned as itself in every mode, wherever it sits in the input (see
+// [DecodeError]).
 //
 // By default the decoder ignores unmatched members.
 func WithStrict() DecoderOption {
@@ -101,15 +103,16 @@ func WithStrict() DecoderOption {
 }
 
 // checksMembers reports whether the decode reports or refuses unmatched
-// members.
+// members, or reports missing ones.
 func (c *decoderConfig) checksMembers() bool {
-	return c.unmatched != nil || c.strict
+	return c.unmatched != nil || c.strict || c.missing != nil
 }
 
-// checkUnmatched applies opts to the members of data, which the default
-// decode has just read into v without error. Options that neither report nor
-// refuse unmatched members, nil ones included, leave the decode as it is.
-func checkUnmatched(data []byte, v any, opts []DecoderOption) error {
+// checkMembers applies opts to the members of data, which the default decode
+// has just read into v without error. Options that neither report nor refuse
+// unmatched members nor report missing ones, nil ones included, leave the
+// decode as it is.
+func checkMembers(data []byte, v any, opts []DecoderOption) error {
 	if !slices.ContainsFunc(opts, func(o DecoderOption) bool { return o != nil }) {
 		return nil
 	}
@@ -117,15 +120,16 @@ func checkUnmatched(data []byte, v any, opts []DecoderOption) error {
 	if !c.checksMembers() {
 		return nil
 	}
-	return c.walkUnmatched(data, v)
+	return c.walkMembers(data, v)
 }
 
-// walkUnmatched walks data, the input the default decode has just read into v
-// without error, against the RM's attribute lists, and reports or refuses each
-// unmatched member as c says. v's Go type gives the root's shape: the RM type
-// each value at the root is declared as, inside any slices and maps. A target
-// whose own shape is no RM class is not walked.
-func (c *decoderConfig) walkUnmatched(data []byte, v any) error {
+// walkMembers walks data, the input the default decode has just read into v
+// without error, against the RM's attribute lists in one pass, and reports or
+// refuses each unmatched member and reports each missing one as c says. v's
+// Go type gives the root's shape: the RM type each value at the root is
+// declared as, inside any slices and maps. A target whose own shape is no RM
+// class is not walked.
+func (c *decoderConfig) walkMembers(data []byte, v any) error {
 	model, err := rmjsonwalk.Default()
 	if err != nil {
 		return err
@@ -134,13 +138,23 @@ func (c *decoderConfig) walkUnmatched(data []byte, v any) error {
 	if !ok {
 		return nil
 	}
-	return model.Unmatched(data, root, func(pointer string) error {
-		if c.unmatched != nil {
-			c.unmatched(pointer)
+	var hooks rmjsonwalk.Hooks
+	if c.unmatched != nil || c.strict {
+		hooks.Unmatched = func(pointer string) error {
+			if c.unmatched != nil {
+				c.unmatched(pointer)
+			}
+			if c.strict {
+				return &DecodeError{Path: pointer, Inner: &unknownMemberError{pointer: pointer}}
+			}
+			return nil
 		}
-		if c.strict {
-			return &DecodeError{Path: pointer, Inner: &unknownMemberError{pointer: pointer}}
+	}
+	if c.missing != nil {
+		hooks.Missing = func(pointer string) error {
+			c.missing(pointer)
+			return nil
 		}
-		return nil
-	})
+	}
+	return model.Walk(data, root, hooks)
 }
