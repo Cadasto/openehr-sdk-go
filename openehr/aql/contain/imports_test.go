@@ -13,8 +13,8 @@ import (
 //   - REQ-013 (docs/specifications/module-layout.md § REQ-013): neither the
 //     package nor any package of this module it pulls in imports transport,
 //     auth or openehr/client.
-//   - REQ-160 (docs/specifications/clinical-modeling.md § REQ-160,
-//     Building-block independence): the package's own non-test files import
+//   - REQ-013 (docs/specifications/module-layout.md § REQ-013, the
+//     openehr/aql/contain row): the package's own non-test files import
 //     only openehr/rm, openehr/rm/rminfo and the standard library. That also
 //     keeps out openehr/aql and openehr/aql/lint, which sit above the
 //     relation, and third-party modules. It cannot cover what they pull in:
@@ -42,7 +42,7 @@ func TestContainForbiddenImports(t *testing.T) {
 	}
 	for _, imp := range imports {
 		if !importguard.Standard(imp) && !slices.Contains(allowed, imp) {
-			t.Errorf("openehr/aql/contain MUST NOT import %q in its own files (REQ-160: aql/contain imports only openehr/rm, openehr/rm/rminfo and the standard library)", imp)
+			t.Errorf("openehr/aql/contain MUST NOT import %q in its own files (REQ-013: aql/contain imports only openehr/rm, openehr/rm/rminfo and the standard library)", imp)
 		}
 	}
 }
