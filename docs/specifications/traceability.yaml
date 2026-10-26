@@ -418,7 +418,7 @@ requirements:
     canonical: docs/specifications/wire.md#req-052
     status: draft
     implementation: landed
-    packages: [openehr/serialize/canjson, openehr/rm, openehr/rm/typereg, openehr/internal/refused, openehr/aom/aom14, testkit/corpus, testkit/fixtures, testkit/wireequiv, testkit/expectedform]
+    packages: [openehr/serialize/canjson, openehr/rm, openehr/rm/typereg, openehr/internal/refused, openehr/internal/xmlunmatched, openehr/aom/aom14, testkit/corpus, testkit/fixtures, testkit/wireequiv, testkit/expectedform]
     probes: [PROBE-030, PROBE-031, PROBE-038, PROBE-105]
     tests:
       - internal/bmmgen/render_interval_bound_test.go
@@ -616,6 +616,7 @@ requirements:
     implementation: landed
     packages:
       - openehr/serialize/canxml
+      - openehr/internal/xmlunmatched
       - openehr/rm
       - openehr/aom/aom14
       - testkit/corpus
