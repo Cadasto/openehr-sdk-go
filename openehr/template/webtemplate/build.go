@@ -142,7 +142,46 @@ func childrenOf(n *templatecompile.CompiledNode, parentPath string, cfg *config)
 		ic.Inputs = cloneInputs(ic.Inputs) // never alias the table's slices or pointers into returned trees
 		out = append(out, &ic)
 	}
+	if n.RMTypeName() == "ACTION" && !constrainsIsmTransition(n) {
+		out = append(out, ismTransitionIC(parentPath))
+	}
 	return out
+}
+
+// constrainsIsmTransition reports whether the ACTION a constrains an
+// ISM_TRANSITION under its `ism_transition` attribute: the archetyped
+// `ism_transition[atNNNN]` nodes, one per careflow step, that the walk emits.
+func constrainsIsmTransition(a *templatecompile.CompiledNode) bool {
+	attr := a.Attribute("ism_transition")
+	return attr != nil && slices.ContainsFunc(impl.ChildNodes(attr), func(c *templatecompile.CompiledNode) bool {
+		return c.RMTypeName() == "ISM_TRANSITION"
+	})
+}
+
+// ismTransitionIC returns the reference's in-context ISM transition node for
+// the ACTION at actionPath, which the builder adds where the template
+// constrains no ISM transition ([constrainsIsmTransition]). ACTION
+// `ism_transition` is RM-mandatory, so without a node the FLAT encoder would
+// have nowhere to write it.
+//
+// The node holds one leaf, the transition's `current_state`, a code of the
+// openehr terminology written as `|code` and `|value`, as EVENT_CONTEXT
+// `setting` is. The reference also writes `transition`, `careflow_step` and a
+// `_reason` family under the node; the builder models none of them, and FLAT
+// decode refuses them. min is 0, the in-context convention (§ REQ-106
+// deviation 5), and the names follow the in-context capitalisation
+// (`Start_time`): no vendored reference fixture pins an ACTION node, so
+// neither, nor the node's place after the ENTRY leaves, is checked against
+// one.
+func ismTransitionIC(actionPath string) *Node {
+	path := actionPath + "/ism_transition"
+	return &Node{
+		ID: "ism_transition", Name: "Ism_transition", RMType: "ISM_TRANSITION", Max: 1, AQLPath: path,
+		Children: []*Node{{
+			ID: "current_state", Name: "Current_state", RMType: "DV_CODED_TEXT", Max: 1,
+			AQLPath: path + "/current_state", Inputs: cloneInputs(settingIC),
+		}},
+	}
 }
 
 // cloneInputs deep-copies an in-context input set. The table prototypes now
