@@ -25,9 +25,13 @@
 // The codec produces deterministic canonical XML:
 //
 //   - One root element per document. [Unmarshal] refuses an element, or
-//     text other than whitespace, after the root, in every mode, with
-//     [ErrInvalidShape]; comments, processing instructions and whitespace
-//     after the root are accepted, as XML allows them.
+//     text other than whitespace, after the root, and text, an end element
+//     or markup other than one document type declaration before it, in
+//     every mode, with [ErrInvalidShape]. Comments, processing
+//     instructions and whitespace are accepted on either side of the root,
+//     as XML allows them, and so are, before it, the XML declaration, one
+//     document type declaration and a UTF-8 byte order mark at the very
+//     start.
 //   - Default namespace: `http://schemas.openehr.org/v1`.
 //   - `xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"` is
 //     declared on the document root whenever any descendant carries

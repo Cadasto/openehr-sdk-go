@@ -12,8 +12,10 @@ import (
 // non-polymorphic field, numeric overflow, `xmi:type` rejection).
 // Only part of that range is produced today: decode returns it for an
 // `xmi:type` discriminator on the wire (via [XSITypeOf]) and, through
-// [Unmarshal], for content after the root element other than comments,
-// processing instructions and whitespace, and for an interval side written
+// [Unmarshal], for content before the root element other than the XML
+// declaration, comments, processing instructions, whitespace and one
+// document type declaration, and after it other than comments, processing
+// instructions and whitespace, and for an interval side written
 // bounded with no bound where the bound is held by value; encode returns it for a nil
 // value or a value that does not implement xml.Marshaler. Other XML syntax errors come back
 // unchanged from encoding/xml, so an errors.Is against this sentinel

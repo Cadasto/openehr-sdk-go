@@ -122,8 +122,11 @@ func TestREQ056_XMLOneRootAfterFailedRoot(t *testing.T) {
 // reads a stream of values, is unchanged.
 //
 // Can-fail control: drop the scan of what precedes the root and every
-// refused case decodes without an error, since encoding/xml skips every
-// token before the first start element.
+// refused case decodes without an error, or fails with an unclassified
+// syntax error, since encoding/xml skips every token before the first start
+// element; let a second document type declaration or an end element through
+// and its case decodes; drop the byte order mark rule and the accepted
+// cases that start with one fail.
 func TestREQ056_XMLBeforeRoot(t *testing.T) {
 	const root = `<dv_count xmlns="http://schemas.openehr.org/v1"><magnitude>1</magnitude></dv_count>`
 	const bom = "\ufeff"
