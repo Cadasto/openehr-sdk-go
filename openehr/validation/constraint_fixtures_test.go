@@ -31,14 +31,14 @@ func TestValidateComposition_ConstraintFixtures_NoPrimitiveViolations(t *testing
 	constraintViolatingFixtures := map[string]string{
 		// OPT pins media_type to a closed code_list [application/pdf]
 		// (despite the "open_constraint" name) while the instance carries
-		// application/dicom. Surfaced once the REQ-110 DV_MULTIMEDIA
+		// application/dicom. Surfaced once the REQ-102 DV_MULTIMEDIA
 		// media_type reader let the constraint run; the genuine violation
 		// is asserted positively in
 		// TestValidateComposition_ConstraintFixture_MultimediaViolation.
 		"Test_dv_multimedia_open_constraint.v0": "DV_MULTIMEDIA media_type outside the closed C_CODE_PHRASE list",
 		// OPT pins false_valid=false while the instance carries false.
 		// Surfaced once INTEGER/BOOLEAN AOM short-name channels validate
-		// through DV wrapper scalar attrs (REQ-110 attribute access path).
+		// through DV wrapper scalar attrs (REQ-102 attribute access path).
 		"Test_dv_boolean_true_false.v0": "DV_BOOLEAN value the C_BOOLEAN does not allow",
 		// OPT pins magnitude range [10..20] while the instance carries 25.
 		"Test_dv_count_range_constraint.v0": "DV_COUNT magnitude outside the C_INTEGER range",
@@ -83,7 +83,7 @@ func TestValidateComposition_ConstraintFixtures_NoPrimitiveViolations(t *testing
 	}
 }
 
-// REQ-103 and REQ-110: the DV_MULTIMEDIA media_type reader lets the OPT's
+// REQ-103 and REQ-102: the DV_MULTIMEDIA media_type reader lets the OPT's
 // C_CODE_PHRASE constraint run instead of skipping the attribute.
 // Test_dv_multimedia_open_constraint.v0 pins media_type to the closed code
 // list [application/pdf] while its instance carries application/dicom. The
@@ -102,7 +102,7 @@ func TestValidateComposition_ConstraintFixture_MultimediaViolation(t *testing.T)
 	assertFixtureIssues(t, id, want)
 }
 
-// REQ-103 and REQ-110: a BOOLEAN AOM short name on a DV wrapper's scalar
+// REQ-103 and REQ-102: a BOOLEAN AOM short name on a DV wrapper's scalar
 // channel validates against the OPT's C_BOOLEAN constraint.
 // Test_dv_boolean_true_false.v0 pins false_valid=false while its instance
 // carries false. The instance has three events, all at at0002, so each is
@@ -120,7 +120,7 @@ func TestValidateComposition_ConstraintFixture_BooleanViolation(t *testing.T) {
 	assertFixtureIssues(t, id, want)
 }
 
-// REQ-103 and REQ-110: an INTEGER magnitude on DV_COUNT's scalar channel
+// REQ-103 and REQ-102: an INTEGER magnitude on DV_COUNT's scalar channel
 // validates against the OPT's C_INTEGER range.
 // Test_dv_count_range_constraint.v0 pins magnitude to [10..20] while its
 // instance carries 25. The instance has three events, all at at0002, so

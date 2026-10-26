@@ -29,7 +29,7 @@ func hasRepeat(ps []string) bool {
 	return false
 }
 
-// REQ-104: an Archetype Designer slot blob states its pattern twice, as
+// REQ-103: an Archetype Designer slot blob states its pattern twice, as
 // <string_expression> text and as an <expression> tree. Every slot of
 // clinical_notes.v0 has such blobs, and each pattern is listed once.
 func TestParseFile_ClinicalNotesSlotPatternsListedOnce(t *testing.T) {
@@ -100,7 +100,7 @@ func supportedSlotExpression(pattern string) string {
           </expression>`
 }
 
-// REQ-104: a pattern one blob states more than once is listed once, in
+// REQ-103: a pattern one blob states more than once is listed once, in
 // the place it first appears; a blob whose forms state different
 // patterns keeps each of them, in order.
 func TestParseOPT_SlotBlobPatternListedOnce(t *testing.T) {

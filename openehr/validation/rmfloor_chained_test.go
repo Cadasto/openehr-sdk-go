@@ -1,6 +1,6 @@
 package validation_test
 
-// rmfloor_chained_test.go: REQ-102 § RM floor, REQ-110, REQ-112 — every
+// rmfloor_chained_test.go: REQ-102 § RM floor, REQ-112 — every
 // template-driven entry point applies the RM rules in its walk and returns
 // their findings in the same Result, on the nodes the OPT models and on
 // those it does not (ADR 0025, ADR 0027). These tests inject a defect only
@@ -115,7 +115,7 @@ func TestValidateComposition_REQ102_REQ112_IncludesRMFloor(t *testing.T) {
 	}
 }
 
-// REQ-110, REQ-112 — every template-driven entry point applies the RM rules,
+// REQ-102, REQ-112 — every template-driven entry point applies the RM rules,
 // not only ValidateComposition: each reports a defect only the RM rules find
 // on the root it validates.
 func TestValidate_REQ110_REQ112_EveryEntryIncludesRMFloor(t *testing.T) {

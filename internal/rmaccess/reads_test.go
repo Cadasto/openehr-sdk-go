@@ -1,7 +1,7 @@
 package rmaccess
 
 // reads_test.go: what the generated access reads for the attributes the
-// validators walk (REQ-102, REQ-107, REQ-110, REQ-112): each attribute reads
+// validators walk (REQ-102, REQ-107, REQ-112): each attribute reads
 // present when set and absent when empty, by the readings of REQ-171
 // Structural access, and a set one gives back the value the parent holds, in
 // the pointer and the value form of the parent. These rows carry over the
@@ -75,7 +75,7 @@ func sameValue(got, want any) bool {
 }
 
 // TestAccess_REQ102_REQ110_ReadsTheTemplateWalkAttributes pins the
-// attributes the template walk descends through (REQ-102, REQ-110): those of
+// attributes the template walk descends through (REQ-102): those of
 // COMPOSITION, EVENT_CONTEXT, OBSERVATION, ACTION and ISM_TRANSITION, of the
 // item structures, of DV_CODED_TEXT, of the data values whose scalar the
 // template constrains, and of the demographic PARTY hierarchy, FOLDER and
@@ -168,7 +168,7 @@ func TestAccess_REQ102_REQ110_ReadsTheTemplateWalkAttributes(t *testing.T) {
 		{name: "empty TERM_MAPPING purpose", parent: rm.TermMapping{}, attr: "purpose"},
 		{name: "empty TERM_MAPPING target", parent: rm.TermMapping{}, attr: "target"},
 
-		// The data-value scalars a template constrains (REQ-110).
+		// The data-value scalars a template constrains (REQ-102).
 		{name: "DV_COUNT magnitude", parent: rm.DVCount{Magnitude: 5}, attr: "magnitude", present: true, want: rm.Integer64(5)},
 		{name: "DV_QUANTITY magnitude", parent: rm.DVQuantity{Magnitude: 1.5}, attr: "magnitude", present: true, want: rm.Real(1.5)},
 		{name: "DV_QUANTITY units", parent: rm.DVQuantity{Units: "kg"}, attr: "units", present: true, want: "kg"},
@@ -194,7 +194,7 @@ func TestAccess_REQ102_REQ110_ReadsTheTemplateWalkAttributes(t *testing.T) {
 		{name: "empty DV_MULTIMEDIA media_type", parent: rm.DVMultimedia{}, attr: "media_type"},
 
 		// The demographic PARTY hierarchy, its parts, FOLDER, EHR_STATUS and
-		// EHR_ACCESS (REQ-110, REQ-112).
+		// EHR_ACCESS (REQ-102, REQ-112).
 		{name: "PERSON details", parent: rm.Person{Details: tree}, attr: "details", present: true, want: tree},
 		{name: "PERSON details unset", parent: rm.Person{}, attr: "details"},
 		{name: "ORGANISATION details", parent: rm.Organisation{Details: tree}, attr: "details", present: true, want: tree},
@@ -231,7 +231,7 @@ type listCase struct {
 }
 
 // TestAccess_REQ102_REQ110_REQ112_ReadsTheContainers pins the containers the
-// walks descend through (REQ-102, REQ-110, REQ-112): a set list reads
+// walks descend through (REQ-102, REQ-112): a set list reads
 // present with its items, a list of values boxed as pointers into its
 // backing array so a walk enters the live item, a list of interfaces as it
 // is; a nil list reads absent (REQ-171 Structural access), in the pointer

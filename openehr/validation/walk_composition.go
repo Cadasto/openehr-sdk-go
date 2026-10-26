@@ -375,7 +375,7 @@ func primitiveInput(rmValue any) any {
 	case rm.Real:
 		// Normalise the named float64 to a bare float64 so a C_REAL
 		// constraint validates it instead of rejecting it as
-		// wrong_type (REQ-110: REAL on DV_QUANTITY.magnitude).
+		// wrong_type (REQ-102: REAL on DV_QUANTITY.magnitude).
 		return float64(v)
 	}
 	return value
@@ -656,7 +656,7 @@ func unboundItemIssue(
 }
 
 // slotFitsArchetypeID checks whether archetypeID satisfies the
-// slot's REQ-104 include / exclude rules, including the RM-type-
+// slot's REQ-103 include / exclude rules, including the RM-type-
 // prefix fallback when no includes were parsed.
 func slotFitsArchetypeID(slot *tcimpl.CompiledNode, archetypeID string) bool {
 	return slot.AllowsArchetypeID(archetypeID)
@@ -687,7 +687,7 @@ func describeLocatableID(v any) string {
 // (at-code-pinned) compare against NodeID().
 func identityIssue(opt *tcimpl.CompiledNode, rmValue any, path issuePath) (iss Issue, ok bool) {
 	if opt.IsSlot() {
-		// Slot fit is by the parsed REQ-104 archetype-id assertion
+		// Slot fit is by the parsed REQ-103 archetype-id assertion
 		// grammar (RM-type-prefix fallback when no includes parsed).
 		// The slot's NodeID is the OPT's own at-code for the slot
 		// point — it
@@ -756,7 +756,7 @@ func rmTypeIssue(opt *tcimpl.CompiledNode, rmValue any, path issuePath) (iss Iss
 }
 
 // intervalRMTypeMatches reports whether a concrete interval RM type
-// name satisfies an OPT-declared generic interval type (REQ-052 / REQ-110).
+// name satisfies an OPT-declared generic interval type (REQ-052 / REQ-102).
 //
 // REQ-052 sub-gap B: a DV_INTERVAL<T> value that has been through a
 // canonical-JSON round-trip re-decodes as the bare DVInterval[DVOrdered]

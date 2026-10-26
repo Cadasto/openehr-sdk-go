@@ -235,7 +235,7 @@ func TestNodeAt_PredicateAtCode(t *testing.T) {
 
 // REQ-100 § Resolution semantics — *Slot is a leaf; an OPT path that
 // attempts to descend through a slot returns ErrPathNotFound. The
-// slot's child shape is opaque to path resolution: REQ-104 surfaces
+// slot's child shape is opaque to path resolution: REQ-103 surfaces
 // the include/exclude assertion grammar on the slot node, but the
 // fillers themselves are not part of the OPT tree.
 func TestNodeAt_CannotDescendSlot(t *testing.T) {
@@ -528,7 +528,7 @@ func TestObjectNode_SatisfiedByObjectNodes(t *testing.T) {
 // nested under a C_ARCHETYPE_ROOT. Spot-check a known at-code from
 // the blood-pressure archetype root in vital_signs.opt.
 //
-// REQ-105: an archetype root exposes the term definitions its OPT carries.
+// REQ-111: an archetype root exposes the term definitions its OPT carries.
 func TestArchetypeRoot_TermsCaptured(t *testing.T) {
 	opt := mustParseVitalSigns(t)
 	root, ok := opt.Root().(*template.ArchetypeRoot)
@@ -560,7 +560,7 @@ func TestArchetypeRoot_TermsCaptured(t *testing.T) {
 // terminology="..."> blocks. The blood-pressure fixture binds at-codes
 // to SNOMED-CT codes; at least one binding must surface.
 //
-// REQ-105: an archetype root exposes the external terminology bindings its
+// REQ-111: an archetype root exposes the external terminology bindings its
 // OPT carries.
 func TestArchetypeRoot_TermBindingsCaptured(t *testing.T) {
 	opt := mustParseVitalSigns(t)

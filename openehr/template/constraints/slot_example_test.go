@@ -110,7 +110,7 @@ func walkSlotNodes(n template.Node, fn func(*template.Slot)) {
 	}
 }
 
-// REQ-104: the example archetype id NewSlotAssertion computes once equals
+// REQ-103: the example archetype id NewSlotAssertion computes once equals
 // what the synthesis gives when it runs on every call, for every slot
 // pattern in the corpus and for the edge shapes above.
 func TestSlotRules_ExampleArchetypeIDMatchesUncachedSynthesis(t *testing.T) {

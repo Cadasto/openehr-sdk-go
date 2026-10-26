@@ -244,7 +244,7 @@ func TestCompile_FlattenTermBindings(t *testing.T) {
 	}
 }
 
-// REQ-105 — TermBindingsForNode filters by at-code / path locator.
+// REQ-111 — TermBindingsForNode filters by at-code / path locator.
 func TestCompile_TermBindingsForNode(t *testing.T) {
 	c := mustCompile(t, "vital_signs")
 	all := c.TermBindings()
@@ -283,7 +283,7 @@ func TestCompile_TermBindingsForNode(t *testing.T) {
 	}
 }
 
-// REQ-105 — term lookup on compiled nodes. ADL 1.4 OPTs are
+// REQ-111 — term lookup on compiled nodes. ADL 1.4 OPTs are
 // single-language, so the lang argument is currently accepted but
 // ignored: every language resolves to the document-language term.
 func TestCompile_TermLang(t *testing.T) {
@@ -315,7 +315,7 @@ func TestCompile_TermLang(t *testing.T) {
 	}
 }
 
-// REQ-104 — parsed slot rules survive compile.
+// REQ-103 — parsed slot rules survive compile.
 func TestCompile_SlotRulesParsed(t *testing.T) {
 	c := mustCompile(t, "vital_signs")
 	var withRules bool
@@ -361,7 +361,7 @@ func TestCompile_SlotRulesReturnsDefensiveCopies(t *testing.T) {
 	}
 }
 
-// REQ-104 — clinical_note DV_DURATION primitive lands on nested value/value.
+// REQ-103 — clinical_note DV_DURATION primitive lands on nested value/value.
 func TestCompile_ClinicalNoteDurationPrimitive(t *testing.T) {
 	c := mustCompile(t, "clinical_note")
 	path := "/content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/description/items[openEHR-EHR-CLUSTER.therapeutic_direction.v1]/items[at0066]/value/value"

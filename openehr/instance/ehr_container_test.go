@@ -10,8 +10,8 @@ import (
 
 // The OPTs below are small EHR_STATUS and FOLDER templates for the REQ-107
 // rule that the generator builds any RM class an OPT roots, here the
-// EHR-wide roots REQ-110 validates: what the template names comes out, and
-// the root passes both validators and the typed REQ-110 entry for its
+// EHR-wide roots REQ-102 validates: what the template names comes out, and
+// the root passes both validators and the typed REQ-102 entry for its
 // class.
 
 // optTrueOnly is a required single-valued attribute called name whose
@@ -25,7 +25,7 @@ func optTrueOnly(name string) string {
 // EHR_STATUS root whose template names its subject, both flags and
 // other_details comes out with each, at every policy, either value fill and
 // either compile mode, and passes both validators and
-// validation.ValidateEHRStatus (REQ-110). The subject is a PARTY_SELF whose
+// validation.ValidateEHRStatus (REQ-102). The subject is a PARTY_SELF whose
 // external_ref keeps the namespace the template pins and takes the type
 // PERSON and an id drawn from UIDSource; is_queryable and is_modifiable
 // take the one value their C_BOOLEAN admits.
@@ -58,7 +58,7 @@ func TestREQ107_EHRStatusRootTakesItsParts(t *testing.T) {
 // TestREQ107_FolderRootTakesItsParts is the REQ-107 check that a FOLDER root
 // whose template names its details, a sub-folder and two items comes out
 // with each, at every policy, either value fill and either compile mode,
-// and passes both validators and validation.ValidateFolder (REQ-110). The
+// and passes both validators and validation.ValidateFolder (REQ-102). The
 // items are an OBJECT_REF whose type the template pins and an
 // ACCESS_GROUP_REF it leaves open, which takes the type ACCESS_GROUP; each
 // takes the namespace local and an id drawn from UIDSource, in OPT order.

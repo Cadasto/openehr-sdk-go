@@ -1,6 +1,6 @@
 package validation_test
 
-// locatable_attributes_test.go: REQ-110 — the walk reads an RM
+// locatable_attributes_test.go: REQ-102 — the walk reads an RM
 // attribute through the access the generator emits for every registered
 // class (REQ-171 § Structural access), so LOCATABLE's uid, links and
 // feeder_audit on an ELEMENT are read like any other attribute: one the
@@ -63,7 +63,7 @@ func locatableElement(full bool) *rm.Element {
 	return el
 }
 
-// REQ-110 — an ELEMENT that carries a uid, a feeder_audit and a link draws
+// REQ-102 — an ELEMENT that carries a uid, a feeder_audit and a link draws
 // `prohibited` at each of the three under a template that prohibits them,
 // and nothing under a template that requires them. An ELEMENT that carries
 // none of them draws `required` at each under the template that requires

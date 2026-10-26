@@ -111,7 +111,7 @@ func TestValidateComposition_SlotFillUnknownArchetype(t *testing.T) {
 	}
 }
 
-// REQ-104 — a CLUSTER filling the protocol slot whose archetype id
+// REQ-103 — a CLUSTER filling the protocol slot whose archetype id
 // fails the slot's parsed include assertions surfaces slot_fill. This
 // is the reject path of the parsed grammar (distinct from the
 // unknown-root case above, which never matches any OPT child).
@@ -157,7 +157,7 @@ func TestValidateComposition_SlotFillParsedIncludeRejects(t *testing.T) {
 	}
 }
 
-// REQ-104 — C_SINGLE_ATTRIBUTE slots enforce the same parsed
+// REQ-103 — C_SINGLE_ATTRIBUTE slots enforce the same parsed
 // include/exclude rules as C_MULTIPLE_ATTRIBUTE slots. A protocol
 // slot that accepts only openEHR-EHR-ITEM_TREE.allowed.v1 must reject
 // any other ITEM_TREE archetype id even though the RM type matches.
@@ -876,7 +876,7 @@ func validBloodPressureObservation() *rm.Observation {
 		},
 		// The OPT pins /protocol/items to an ARCHETYPE_SLOT
 		// constrained to CLUSTER. Slot fit is evaluated against the
-		// parsed REQ-104 assertion grammar, falling back to the
+		// parsed REQ-103 assertion grammar, falling back to the
 		// RM-type-prefix rule when the OPT carried no parseable
 		// includes; an archetype id of the shape
 		// "openEHR-EHR-CLUSTER.<concept>.v<n>" satisfies the match.

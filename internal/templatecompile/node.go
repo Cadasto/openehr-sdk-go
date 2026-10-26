@@ -214,7 +214,7 @@ func (n *CompiledNode) PrimitiveConstraint() constraints.PrimitiveConstraint {
 //
 // The returned [template.ArchetypeTerm.Items] map is a defensive copy.
 func (n *CompiledNode) Term(code, lang string) (template.ArchetypeTerm, bool) {
-	_ = lang // single-language OPT (REQ-105); see doc comment.
+	_ = lang // single-language OPT (REQ-111); see doc comment.
 	for cur := n; cur != nil; cur = cur.parent {
 		if t, ok := cur.terms[code]; ok {
 			return template.ArchetypeTerm{Code: t.Code, Items: maps.Clone(t.Items)}, true

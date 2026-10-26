@@ -182,7 +182,7 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	// Slots are leaf fill-points: the slot body is not in this OPT, and
 	// the caller composes it via REQ-101 builder Set calls. A slot the
 	// walk must fill has been stamped by stampSlotFill with an archetype
-	// id from the parsed REQ-104 grammar, or the RM-type-prefix example.
+	// id from the parsed REQ-103 slot grammar, or the RM-type-prefix example.
 	// The fill then gets the RM-mandatory attributes of its class, with
 	// the defaults an attribute the OPT leaves silent gets, so it passes
 	// the RM floor: an entry's language, encoding, subject and its own
@@ -1864,7 +1864,7 @@ func (g *generator) planMembers(optNode *tcimpl.CompiledNode, attr *tcimpl.Compi
 	// every OPT child is a slot, the seed is the first slot, and
 	// buildChild synthesises a slot-shaped fill: an RM value of the slot's
 	// RMTypeName stamped (by stampSlotFill) with an archetype id drawn
-	// from the parsed REQ-104 include grammar, or from the RM-type-prefix
+	// from the parsed REQ-103 include grammar, or from the RM-type-prefix
 	// fallback only when no includes were parsed. Where only the
 	// existence asks for it, there is no seed unless a child needs no
 	// undescribed content (topUpSeed), and the attribute keeps no member.
