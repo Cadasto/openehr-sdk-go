@@ -227,3 +227,23 @@ func TestREQ063_CoalescedRenewalSharesTheHeldToken(t *testing.T) {
 		}
 	})
 }
+
+// TestREQ063_TerminalRefreshFailureIsNotServed pins REQ-063: a terminal
+// failure surfaces as auth.ErrReauthRequired and drops both tokens even
+// while the held access token is still valid.
+func TestREQ063_TerminalRefreshFailureIsNotServed(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		srv := &scriptedServer{refresh: func(r *http.Request, _ int) (*http.Response, error) {
+			return scriptedAnswer(r, http.StatusBadRequest, `{"error":"invalid_grant"}`), nil
+		}}
+		src := scriptedSource(t, srv)
+		src.SetTokens(staleAccess("at-0"), "rt-0")
+
+		if tok, err := src.Token(t.Context()); !errors.Is(err, auth.ErrReauthRequired) {
+			t.Errorf("Token() = (%q, %v), want auth.ErrReauthRequired", tok.Value, err)
+		}
+		if access, refresh := src.HeldTokens(); !access.IsZero() || refresh != "" {
+			t.Errorf("held tokens = (%q, %q), want none after a terminal failure", access.Value, refresh)
+		}
+	})
+}
