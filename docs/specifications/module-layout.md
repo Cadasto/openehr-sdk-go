@@ -179,7 +179,7 @@ The table is the one home of each block's own import rule beside that closure ru
 | `openehr/aql/lint` | Its own files import no package under `openehr/serialize/`, and no package in its closure is `openehr/validation` ([clinical-modeling.md § REQ-109](clinical-modeling.md#req-109--aql-static-lint)). |
 | `openehr/aql/contain` | Its own files import only `openehr/rm`, `openehr/rm/rminfo` and the standard library, so it sits below both `openehr/aql` and `openehr/aql/lint` ([clinical-modeling.md § REQ-160](clinical-modeling.md#req-160--aql-containment-admissibility-relation)). |
 
-Each row is held by that package's import-guard test, which walks the block's in-module import closure for a closure rule and reads its own imports for an own-files rule.
+The closure and own-files rules of each row are held by that package's import-guard test, which walks the block's in-module import closure for a closure rule and reads its own imports for an own-files rule. The note on `openehr/aql/parse`'s one third-party import describes the dependency; no guard checks it.
 
 See [use-cases.md § Building-block use cases](use-cases.md#building-block-use-cases).
 

@@ -12,7 +12,7 @@ The premise: **the SDK is idiomatic Go.** Wire-level correctness is defined agai
 
 ## Context propagation (REQ-020)
 
-Every exported function or method that performs I/O — HTTP, file system, network DNS, disk-cached lookup, OS clock if used for deadlines — **MUST** take `context.Context` as its first parameter, and **MUST** honour that context's cancellation and deadline.
+Every exported function or method that performs network I/O (HTTP, DNS, a discovery lookup) or waits on a deadline **MUST** take `context.Context` as its first parameter, and **MUST** honour that context's cancellation and deadline. The local readers are the exception: `template.ParseFile`, `template.ParseFileStrict` and `probe.ValidateHAR` read a local file the way `os.ReadFile` does, with no context, and `bmm.LoadAll` calls its `Resolver` without one.
 
 ```go
 // Correct

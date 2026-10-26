@@ -52,7 +52,7 @@ The openEHR Terminology — the `openehr` terminology's **groups** (*audit chang
 A central type registry in `openehr/rm/typereg` maps each `_type` string to the constructor of its concrete Go type, and polymorphic JSON decoding of RM fields goes through it.
 
 ```go
-// openehr/rm/typereg/registry.go (sketch)
+// package typereg (sketch)
 
 type Registry struct { ... }
 
@@ -71,7 +71,7 @@ func (r *Registry) Decode(data []byte) (any, error)
 
 Rules:
 
-- The registry **MUST** decode the `_type` of every concrete RM type the SDK generates; the `rm` package's `init()` registers each one. A `_type` that is missing, or that the registry does not know, **MUST** fail with an error that carries `typereg.ErrMissingType` or `typereg.ErrUnknownType` respectively, never decode as a guessed type.
+- The registry **MUST** decode the `_type` of every concrete RM type the SDK generates; the `rm` package's `init()` registers each one. A `_type` the registry does not know **MUST** fail with an error that carries `typereg.ErrUnknownType`. A missing `_type` **MUST** fail with an error that carries `typereg.ErrMissingType` where no declared type fixes the value, at the top level (`Registry.Decode`) and at an abstract slot; a narrow-interface slot whose declared parent is concrete reads it as that parent type ([wire.md § Polymorphic substitution](wire.md#polymorphic-substitution)). Neither case decodes as a guessed type.
 - The registry is append-only at runtime. Calling `Register` twice for the same `_type` with different constructors **MUST** panic — a name collision is a programmer error, not a recoverable condition. Consumers do not register types unless they extend the RM, which the SDK does not actively support but does not prevent either.
 - The constructor closure is the only mechanism that instantiates a type: the registry uses no reflection ([idiom.md § Generics and reflection](idiom.md#generics-and-reflection)).
 - A decoded value of static type `any` is type-asserted at the call site. The SDK provides generic helpers (`typereg.DecodeAs[T DataValue](data)`) where useful.

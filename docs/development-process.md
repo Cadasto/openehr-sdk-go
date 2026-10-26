@@ -121,7 +121,7 @@ Every backend-facing probe declares its effect, **read-only** or **mutating**, i
 
 Recordings are checked-in evidence, held to the standard of any vendored corpus. Their encoding is HTTP Archive 1.2 ([ADR 0020](adr/0020-cassette-recording-har.md)); what a recording keeps off disk, and what the replayer refuses, is [conformance.md § Cassette mode](specifications/conformance.md#cassette-mode).
 
-- A recording carries its provenance: the deployment it came from, the date, and the SDK commit that captured it. A recording whose provenance cannot be stated is discarded rather than replayed.
+- A recording's provenance (the deployment, the date and the capturing SDK commit) and the refusal of a recording without it are part of the replayer's contract in [conformance.md § Cassette mode](specifications/conformance.md#cassette-mode).
 - Replay matches a normalised request key, not byte-exact equality: the method, the path with the deployment's REST base stripped, and the headers and body fields the probe's assertion depends on. A capture carries timestamps, generated UUIDs and `ETag` values that differ on every run, so byte-exact matching would make every recording single-use. The browser-oriented HAR fields (`timings`, `cache`, `pageref`) are outside the key, and the replayer ignores them. While no recording's assertion depends on a header or a body field, the key is the method and the stripped path alone, so two exchanges that differ only in headers or body match the same entry, in recorded order.
 - Where one probe issues the same normalised request more than once and expects different responses (a write followed by a read of what it wrote), the recording keeps the exchange order and the replayer consumes matches in that order.
 

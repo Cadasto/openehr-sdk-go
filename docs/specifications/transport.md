@@ -127,7 +127,7 @@ Rules:
 - **Defaults:** writes default to `minimal`; reads default to `representation` (no Prefer header).
 - The SDK **MUST NOT** silently downgrade `representation` when the server omits the body.
 
-For the `WriteResult` family (`composition`, `directory`, `ehr_status`, `demographic`), `identifier` fills the identifier slot of `VersionMetadata` from the ITS-REST `Identifier` body (`{"uid": …}`) through `ehr.ResolveIdentifierBody`, after the version identifier [REQ-054](wire.md#req-054) selects. `contribution.Commit` decodes a `representation` body and never fills the identifier slot from a body.
+For the `WriteResult` family (`composition`, `directory`, `ehr_status`, `demographic`), `identifier` fills the identifier slot of `VersionMetadata` from the ITS-REST `Identifier` body (`{"uid": …}`) through `(*ehr.VersionMetadata).ResolveIdentifierBody`, after the version identifier [REQ-054](wire.md#req-054) selects. `contribution.Commit` decodes a `representation` body and never fills the identifier slot from a body.
 
 **Absent resource on a successful write.** `minimal` and `identifier` **MUST** return a nil error and a zero resource. For a pointer resource type the zero value is a typed nil: `== nil` is the right test for a concrete `*T` return, but an interface return (`rm.Party`) can hold a typed-nil pointer, for which `== nil` is the wrong test. The SDK **MUST** expose a `HasResource` helper scoped to registered RM types: it reports false for a typed-nil pointer to a registered RM type, a bare-nil interface, and an interface holding a typed-nil registered RM pointer, and true for any populated resource. A typed nil of a type outside the RM registry is out of scope. The helper uses no reflection, and the write-path documentation names the typed-nil trap and points at it, and at `rm.IsTypedNil` for callers already on the RM type.
 
@@ -240,7 +240,7 @@ A body that could not be read is never decoded, so the first row takes precedenc
 
 Two surfaces keep an outcome of their own, which the table **MUST NOT** override:
 
-- The `Prefer: return=identifier` arm (`ehr.ResolveIdentifierBody`, [§ REQ-094](#req-094--prefer-response-shape-negotiation)) reports a body it cannot read as an identifier with an error wrapping `transport.ErrInvalidShape`, not a `*transport.DecodeError`.
+- The `Prefer: return=identifier` arm (`(*ehr.VersionMetadata).ResolveIdentifierBody`, [§ REQ-094](#req-094--prefer-response-shape-negotiation)) reports a body it cannot read as an identifier with an error wrapping `transport.ErrInvalidShape`, not a `*transport.DecodeError`.
 - On the Definition list operations, and on `GetStoredQuery`, `PutStoredQuery`, `PutStoredQueryVersion` and `UploadTemplate`, an empty body is a success: the list operations return an empty catalog ([wire.md § REQ-144](wire.md#req-144--definition-metadata-decoding) *Empty list bodies*), and the other four return metadata they build themselves with a nil error ([wire.md § REQ-057](wire.md#req-057), [§ REQ-144](wire.md#req-144--definition-metadata-decoding)). A non-empty body there that does not decode is still a `*transport.DecodeError`.
 
 A read that answers `204 No Content` with an outcome of its own before the empty-body refusal keeps it: `composition.ErrDeletedAtTime`, and the demographic reads' nil result for no matching version.
