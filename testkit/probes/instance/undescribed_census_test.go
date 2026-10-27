@@ -177,10 +177,16 @@ func censusItems(children ...string) string {
 
 // censusOptional is a C_COMPLEX_OBJECT of rmType with occurrences 0..1.
 func censusOptional(rmType, nodeID string, attrs ...string) string {
+	return censusOccurring(rmType, nodeID, 0, attrs...)
+}
+
+// censusOccurring is a C_COMPLEX_OBJECT of rmType with occurrences
+// lower..1.
+func censusOccurring(rmType, nodeID string, lower int, attrs ...string) string {
 	return `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>` + rmType + `</rm_type_name>` +
 		`<occurrences><lower_included>true</lower_included><upper_included>true</upper_included>` +
 		`<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded>` +
-		`<lower>0</lower><upper>1</upper></occurrences>` +
+		fmt.Sprintf(`<lower>%d</lower><upper>1</upper></occurrences>`, lower) +
 		`<node_id>` + nodeID + `</node_id>` + strings.Join(attrs, "") + `</children>`
 }
 
@@ -910,11 +916,18 @@ func censusList(name string, existence, lower int, children ...string) string {
 //     the top-up takes the first.
 //
 // Read beside a template that leaves the SECTION's items optional, where
-// no top-up runs, the first root holds a violation.
+// no top-up runs, the first root holds a violation. So does a root
+// generated from a CLUSTER's items at cardinality 1..* over a required
+// ELEMENT and a required CLUSTER whose items admit only a slot, read beside
+// the same template with that CLUSTER optional: the ELEMENT's own member
+// meets the cardinality lower bound, so no top-up runs, although every
+// child before the CLUSTER is full.
 func TestREQ107_CensusLastResortFollowsTheGenerator(t *testing.T) {
+	slotItems := func(nodeID string) string {
+		return censusItems(`<children xsi:type="ARCHETYPE_SLOT"><rm_type_name>CLUSTER</rm_type_name><node_id>` + nodeID + `1</node_id></children>`)
+	}
 	slotCluster := func(nodeID string) string {
-		return censusOptional("CLUSTER", nodeID,
-			censusItems(`<children xsi:type="ARCHETYPE_SLOT"><rm_type_name>CLUSTER</rm_type_name><node_id>`+nodeID+`1</node_id></children>`))
+		return censusOptional("CLUSTER", nodeID, slotItems(nodeID))
 	}
 	innerSection := censusOptional("SECTION", "at0002", censusList("items", 1, 0,
 		`<children xsi:type="ARCHETYPE_SLOT"><rm_type_name>SECTION</rm_type_name><node_id>at0003</node_id></children>`))
@@ -944,6 +957,14 @@ func TestREQ107_CensusLastResortFollowsTheGenerator(t *testing.T) {
 					`<existence><lower_included>true</lower_included><upper_included>true</upper_included>`+
 					`<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>1</lower><upper>1</upper></existence>`+
 					`<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>FEEDER_AUDIT</rm_type_name><node_id></node_id></children></attributes>`))),
+		},
+		{
+			name: "a required CLUSTER after a required ELEMENT read as optional",
+			generated: censusRootOPT("CLUSTER", censusList("items", -1, 1,
+				censusOccurring("ELEMENT", "at0001", 1), censusOccurring("CLUSTER", "at0002", 1, slotItems("at0002")))),
+			against: censusRootOPT("CLUSTER", censusList("items", -1, 1,
+				censusOccurring("ELEMENT", "at0001", 1), slotCluster("at0002"))),
+			violation: true,
 		},
 	}
 	for _, tc := range cases {
