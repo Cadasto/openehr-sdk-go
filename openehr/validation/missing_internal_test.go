@@ -29,13 +29,15 @@ func marks(n *missingNode, prefix string) []string {
 // pointers: the segments of each, unescaped "~1" before "~0", so that "~01"
 // names a key "~1"; the union of every list the call gives, a pointer given
 // twice marking one member; and no mark for the empty pointer, which names
-// the root, nor for a text that does not start with "/".
+// the root, nor for a text that is no JSON Pointer: one that does not start
+// with "/", and one with a "~" that opens no escape, which would otherwise
+// name a Hash key spelled with that "~".
 func TestWithMissing_REQ112_ReadsPointers(t *testing.T) {
 	t.Parallel()
 	c := newCallConfig([]ValidateOption{
 		WithMissing([]string{"/subject", "/details/de~1x/purpose", "/details/~01/purpose"}),
 		nil,
-		WithMissing([]string{"/content/0/data/events/0/time", "/subject", "", "name"}),
+		WithMissing([]string{"/content/0/data/events/0/time", "/subject", "", "name", "/details/de~2x/purpose", "/details/x~"}),
 	})
 	want := []string{
 		"/content/0/data/events/0/time",
@@ -54,8 +56,9 @@ func TestWithMissing_REQ112_ReadsPointers(t *testing.T) {
 
 // TestWithMissing_REQ171_NoMemberBuildsNoTrie pins the cost of a call that
 // names no member: no option, a nil option, a nil list, an empty list and a
-// list of texts that name no member each leave the call with no trie, so
-// every node of the walk carries a nil one and child lookups stop at once.
+// list of texts that name no member, malformed escapes among them, each
+// leave the call with no trie, so every node of the walk carries a nil one
+// and child lookups stop at once.
 func TestWithMissing_REQ171_NoMemberBuildsNoTrie(t *testing.T) {
 	t.Parallel()
 	for name, opts := range map[string][]ValidateOption{
@@ -63,7 +66,7 @@ func TestWithMissing_REQ171_NoMemberBuildsNoTrie(t *testing.T) {
 		"a nil option":   {nil},
 		"a nil list":     {WithMissing(nil)},
 		"an empty list":  {WithMissing([]string{})},
-		"no member text": {WithMissing([]string{"", "subject"})},
+		"no member text": {WithMissing([]string{"", "subject", "/de~2x/purpose", "/x~", "/a/~"})},
 	} {
 		if c := newCallConfig(opts); c.missing != nil {
 			t.Errorf("%s: newCallConfig built a trie %+v, want none", name, c.missing)
