@@ -125,3 +125,46 @@ func childTypes(t *testing.T, b []byte) []string {
 		}
 	}
 }
+
+// TestREQ056_AOM14SchemaTypeNameInDecodeError pins that a decode error
+// raised inside a C_ATTRIBUTE child names the child's type as the document
+// wrote it, the AM 1.4 schema name or the BMM name, in the envelope of the
+// child's slot (REQ-056): through canxml.Unmarshal, for an interval written
+// bounded with no bound, and through a canxml.Decoder given no option, which
+// keeps a primitive failure inside that envelope.
+func TestREQ056_AOM14SchemaTypeNameInDecodeError(t *testing.T) {
+	const (
+		noBound    = `<occurrences><lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded></occurrences>`
+		badInteger = `<occurrences><lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>one</lower></occurrences>`
+	)
+	decoders := []struct {
+		name   string
+		body   string
+		decode func([]byte) error
+	}{
+		{"Unmarshal", noBound, func(b []byte) error { return canxml.Unmarshal(b, new(aom14.CSingleAttribute)) }},
+		{"Decoder", badInteger, func(b []byte) error {
+			return canxml.NewDecoder(bytes.NewReader(b)).Decode(new(aom14.CSingleAttribute))
+		}},
+	}
+	for _, tc := range schemaTypeNameCases() {
+		for _, name := range []string{tc.schema, tc.bmm} {
+			for _, d := range decoders {
+				t.Run(name+"/"+d.name, func(t *testing.T) {
+					doc := `<c_single_attribute xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">` +
+						`<rm_attribute_name>value</rm_attribute_name>` +
+						`<children xsi:type="` + name + `"><rm_type_name>X</rm_type_name>` + d.body + `<node_id>at0001</node_id></children>` +
+						`</c_single_attribute>`
+					err := d.decode([]byte(doc))
+					de, ok := errors.AsType[*canxml.DecodeError](err)
+					if !ok || de == nil {
+						t.Fatalf("%s of a child typed %s = %v; want a *canxml.DecodeError", d.name, name, err)
+					}
+					if de.Path != "/children" || de.Type != name {
+						t.Errorf("%s of a child typed %s: DecodeError Path %q, Type %q; want /children and the type as written, %s", d.name, name, de.Path, de.Type, name)
+					}
+				})
+			}
+		}
+	}
+}
