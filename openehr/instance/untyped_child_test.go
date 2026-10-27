@@ -339,10 +339,12 @@ func TestREQ107_IntervalOverAnUnorderedTypeIsRefused(t *testing.T) {
 // names the RM type the walk builds that child as, as it names the type a
 // typed child names: a required feeder_audit the generator has no writer
 // for and a list whose children ask for more members than its cardinality
-// upper bound admits, each wrapping ErrConstraintUnsatisfiable, and a
-// member the RM writer cannot attach or append, under a single-valued
-// attribute, a list the template writes as one, or a multi-valued one. It
-// holds under every policy and both compile modes.
+// upper bound admits, each wrapping ErrConstraintUnsatisfiable, an untyped
+// child the walk builds as an archetype-root class, wrapping
+// ErrArchetypeIDMissing, and a member the RM writer cannot attach or
+// append, under a single-valued attribute, a list the template writes as
+// one, or a multi-valued one. It holds under every policy and both compile
+// modes.
 func TestREQ107_UntypedChildRefusalNamesItsType(t *testing.T) {
 	cases := []struct {
 		name string
@@ -350,9 +352,16 @@ func TestREQ107_UntypedChildRefusalNamesItsType(t *testing.T) {
 		// detail is the text after ErrConstraintUnsatisfiable, or "" where
 		// the error wraps none of the documented errors.
 		detail string
+		// missing is the text after ErrArchetypeIDMissing.
+		missing string
 		// prefix starts an error that wraps none of the documented errors.
 		prefix string
 	}{
+		{
+			name:    "a required child of a SECTION's items",
+			opt:     optTemplate("SECTION", optMultiple("items", optOccurring("C_COMPLEX_OBJECT", "", "at0001", 1, 1))),
+			missing: "OBSERVATION at /items[at0001]",
+		},
 		{
 			name: "a feeder_audit at existence 1..1",
 			opt: optTemplate("CLUSTER", optMultiple("items",
@@ -391,8 +400,14 @@ func TestREQ107_UntypedChildRefusalNamesItsType(t *testing.T) {
 					if out != nil {
 						t.Errorf("Generate returned %T, want no root", out)
 					}
-					if tc.detail != "" {
+					switch {
+					case tc.detail != "":
 						checkUnsatisfiableDetail(t, "Generate", err, tc.detail)
+						return
+					case tc.missing != "":
+						if got, ok := strings.CutPrefix(fmt.Sprint(err), instance.ErrArchetypeIDMissing.Error()+": "); !errors.Is(err, instance.ErrArchetypeIDMissing) || !ok || got != tc.missing {
+							t.Errorf("Generate error = %v, want %q followed by %q", err, instance.ErrArchetypeIDMissing, tc.missing)
+						}
 						return
 					}
 					if err == nil || !strings.HasPrefix(err.Error(), tc.prefix) {
