@@ -121,6 +121,7 @@ func TestDocsExamplesTranscripts(t *testing.T) {
 
 	root := moduleRoot(t)
 	doc := docLines(t, root)
+	trackBuildInputs(t, root)
 
 	for _, tc := range transcripts {
 		t.Run(tc.program, func(t *testing.T) {
@@ -364,6 +365,74 @@ func extractSample(t *testing.T, doc []string, section string) string {
 	}
 
 	return strings.Join(doc[openFence+1:closeFence], "\n")
+}
+
+// trackBuildInputs shows the Go test cache the source files the allowlisted
+// examples compile. The builds run in subprocesses, whose reads the cache
+// does not see: without this, a cached pass would survive a change to an
+// example or to an SDK package it imports, and hide a stale transcript until
+// a run with -count=1.
+//
+// The cache records the size and modification time of every file the test
+// process opens or stats inside the module, and of every entry in a directory
+// it opens. So the test opens the directory of each example and of every
+// package from this module an example imports, directly or not; stats each
+// file such a package embeds, which may sit in a subdirectory; and stats
+// go.mod and go.sum, which pin the packages from other modules. The files an
+// example reads while it runs, such as its fixtures, stay out of sight.
+func trackBuildInputs(t *testing.T, root string) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(t.Context(), exampleTimeout)
+	defer cancel()
+
+	args := []string{
+		"list", "-deps", "-f",
+		`{{if not .Standard}}{{.Dir}}{{range .EmbedFiles}}{{"\t"}}{{.}}{{end}}{{end}}`,
+	}
+	for _, tc := range transcripts {
+		args = append(args, "./cmd/examples/"+tc.program)
+	}
+	cmd := exec.CommandContext(ctx, "go", args...)
+	cmd.Dir = root
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("go list -deps (in %s): %v%s\nstderr:\n%s", root, err, deadlineNote(ctx), stderr.String())
+	}
+
+	dirs := 0
+	for line := range strings.Lines(string(out)) {
+		dir, embeds, _ := strings.Cut(strings.TrimSuffix(line, "\n"), "\t")
+		if dir == "" {
+			continue // a standard library package
+		}
+		if rel, err := filepath.Rel(root, dir); err != nil || !filepath.IsLocal(rel) {
+			continue // a package from another module
+		}
+		if _, err := os.ReadDir(dir); err != nil {
+			t.Fatalf("list the build input directory %s: %v", dir, err)
+		}
+		dirs++
+		if embeds == "" {
+			continue
+		}
+		for name := range strings.SplitSeq(embeds, "\t") {
+			if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
+				t.Fatalf("stat the embedded file %s: %v", filepath.Join(dir, name), err)
+			}
+		}
+	}
+	if dirs < len(transcripts) {
+		t.Fatalf("go list -deps named %d package directories in this module, fewer than the %d allowlisted examples",
+			dirs, len(transcripts))
+	}
+	for _, name := range []string{"go.mod", "go.sum"} {
+		if _, err := os.Stat(filepath.Join(root, name)); err != nil {
+			t.Fatalf("stat %s: %v", name, err)
+		}
+	}
 }
 
 // buildExample compiles one example program into the test's scratch directory
