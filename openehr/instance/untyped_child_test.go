@@ -39,7 +39,9 @@ func valueTypeName(v rm.DataValue) string {
 // child, which names no RM type, is built as the type the BMM declares for
 // its attribute, or the concrete type the generator builds for it: a
 // DV_TEXT for an ELEMENT's value, typed DATA_VALUE, and an ELEMENT for a
-// CLUSTER's items, typed ITEM. A DV_INTERVAL over an abstract parameter
+// CLUSTER's items, typed ITEM. A child of an abstract data-value class,
+// such as DV_QUANTIFIED, is built as its first concrete descendant in name
+// order. A DV_INTERVAL over an abstract parameter
 // other than DV_ORDERED is built over a concrete descendant of it: the type
 // the OPT names for a bound where that is one, and otherwise the first in
 // name order, DV_COUNT for DV_QUANTIFIED and DV_AMOUNT. Each root passes
@@ -62,6 +64,21 @@ func TestREQ107_UntypedAndAbstractIntervalChildrenAreBuilt(t *testing.T) {
 			name: "an untyped CLUSTER item",
 			opt:  optTemplate("CLUSTER", optMultiple("items", optUntyped("at0001"))),
 			want: "ELEMENT",
+		},
+		{
+			name: "an ELEMENT value of the abstract DV_QUANTIFIED",
+			opt:  optTemplate("ELEMENT", optSingle("value", optNode("DV_QUANTIFIED", ""))),
+			want: "DV_COUNT",
+		},
+		{
+			name: "an ELEMENT value of the abstract DV_ORDERED",
+			opt:  optTemplate("ELEMENT", optSingle("value", optNode("DV_ORDERED", ""))),
+			want: "DV_COUNT",
+		},
+		{
+			name: "an ELEMENT value of the abstract DV_TEMPORAL",
+			opt:  optTemplate("ELEMENT", optSingle("value", optNode("DV_TEMPORAL", ""))),
+			want: "DV_DATE",
 		},
 		{
 			name: "a DV_INTERVAL over DV_QUANTIFIED with no bound",
