@@ -36,12 +36,7 @@ func writeDVMultimediaSingle(m *rm.DVMultimedia, attr string, child any) error {
 	case "integrity_check_algorithm":
 		return assignVia(child, func(v rm.CodePhrase) { m.IntegrityCheckAlgorithm = &v }, attr, "CODE_PHRASE")
 	case "alternate_text":
-		v, ok := child.(string)
-		if !ok {
-			return mismatch(attr, child, "String")
-		}
-		m.AlternateText = &v
-		return nil
+		return writeOptionalString(&m.AlternateText, attr, child)
 	case "uri":
 		// A DV_URI or its descendant DV_EHR_URI, stored as given.
 		return assignURI(child, func(v rm.DVURILike) { m.URI = v }, attr)

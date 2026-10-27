@@ -51,3 +51,25 @@ func TestREQ107_IsmTransitionCareflowStepTakesValueOrPointer(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ107_OptionalStringsRefuseANilPointer checks that CODE_PHRASE
+// preferred_term and DV_MULTIMEDIA alternate_text, the two optional String
+// attributes once written by hand, follow the rule every other optional
+// String follows (writeOptionalString): a string is taken as a value or as a
+// pointer, and a nil pointer is refused with ErrTypeMismatch and stores
+// nothing, instead of storing a nil that reads back as an absent term.
+func TestREQ107_OptionalStringsRefuseANilPointer(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name   string
+		parent any
+		attr   string
+	}{
+		{name: "CODE_PHRASE preferred_term", parent: &rm.CodePhrase{}, attr: "preferred_term"},
+		{name: "DV_MULTIMEDIA alternate_text", parent: &rm.DVMultimedia{}, attr: "alternate_text"},
+	} {
+		if err := EnsureSingle(tc.parent, tc.attr, (*string)(nil)); !errors.Is(err, ErrTypeMismatch) {
+			t.Errorf("EnsureSingle(%s, nil *string) = %v, want ErrTypeMismatch", tc.name, err)
+		}
+	}
+}

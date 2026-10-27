@@ -1137,12 +1137,7 @@ func writeCodePhraseSingle(c *rm.CodePhrase, attr string, child any) error {
 		}
 		return mismatch(attr, child, "TERMINOLOGY_ID")
 	case "preferred_term":
-		v, ok := child.(*string)
-		if !ok {
-			return mismatch(attr, child, "String")
-		}
-		c.PreferredTerm = v
-		return nil
+		return writeOptionalString(&c.PreferredTerm, attr, child)
 	}
 	return fmt.Errorf("%w: *rm.CodePhrase has no single attr %q", ErrUnknownAttribute, attr)
 }
