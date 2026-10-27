@@ -861,11 +861,13 @@ func deltaSeconds(arg string) (ttl time.Duration, ok bool) {
 	if len(arg) >= 2 && arg[0] == '"' && arg[len(arg)-1] == '"' {
 		arg = arg[1 : len(arg)-1]
 	}
-	n, err := strconv.ParseUint(arg, 10, 64)
+	// 32 bits hold maxDeclaredTTL's 2^31 seconds, and a parse that wide
+	// lets a reader, and a static check, see that n fits a Duration.
+	n, err := strconv.ParseUint(arg, 10, 32)
 	if err != nil && !errors.Is(err, strconv.ErrRange) {
 		return 0, false
 	}
-	// On ErrRange n is the largest uint64, so the cap below applies.
+	// On ErrRange n is the largest uint32, so the cap below applies.
 	const maxSeconds = uint64(maxDeclaredTTL / time.Second)
 	return time.Duration(min(n, maxSeconds)) * time.Second, true
 }
