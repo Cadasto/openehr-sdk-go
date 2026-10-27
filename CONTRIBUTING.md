@@ -26,7 +26,7 @@
 
 1. Fork and branch from `main`. Name the branch after what it does: `feat/req-N-short-name`, `fix/short-name`, `docs/<area>`, etc.
 2. **Run `make ci` locally** before opening the PR. CI replicates the gate ([`docs/ci.md`](docs/ci.md)).
-3. Leave [`CHANGELOG.md`](CHANGELOG.md) to the maintainers. They curate it on request or when a release is cut, not in each feature PR ([AGENTS.md](AGENTS.md#code-style-and-conventions)). Call out any consumer-visible change in the PR description so it can be folded in.
+3. Leave [`CHANGELOG.md`](CHANGELOG.md) to the maintainers. They curate it on request or when a release is cut, not in each feature PR ([releases.md § CHANGELOG](docs/releases.md#changelog)). Call out any consumer-visible change in the PR description so it can be folded in.
 4. If you add or change a REQ-marked behaviour, update [`docs/specifications/traceability.yaml`](docs/specifications/traceability.yaml) in the same PR (`make spec-check` enforces this).
 5. Cite REQ-NNN / PROBE-NNN in commit messages, tests and maintainer comments, but not in godoc: package docs and doc comments on exported identifiers are written for SDK users. REQs are stable identifiers, so never renumber one.
 6. **New or changed `cmd/examples/`**: update [`docs/examples.md`](docs/examples.md) and [`cmd/examples/doc.go`](cmd/examples/doc.go) in the same PR; touch [`docs/quick-start.md`](docs/quick-start.md) when the onboarding path changes. See [ai-workflow.md § Examples](docs/ai-workflow.md#examples).
@@ -78,11 +78,11 @@ make fmt     # gofumpt + goimports
 
 ### Hooks and IDE integration
 
-Nothing runs on commit, so run `make lint` yourself before opening a PR. If you use Claude Code, its format-on-save hook is described in [`.claude/CLAUDE.md`](.claude/CLAUDE.md).
+Nothing runs on commit, so run `make lint` yourself before opening a PR. If you use Claude Code, its format-on-save hook is described in [AGENTS.md § Tooling & workflow](AGENTS.md#tooling--workflow).
 
 ## Code style
 
-The detailed, normative idiom spec is [`docs/specifications/idiom.md`](docs/specifications/idiom.md). It covers context propagation, `*http.Client` injection, functional options, generics-no-reflection, error wrapping / typed errors, concurrency, imports & naming, and public-API stability. Formatting, lint, and commit conventions are in [AGENTS.md § Code style and conventions](AGENTS.md#code-style-and-conventions). Read those first. The points below trip up most PRs:
+The detailed, normative idiom spec is [`docs/specifications/idiom.md`](docs/specifications/idiom.md). It covers context propagation, `*http.Client` injection, functional options, generics-no-reflection, error wrapping / typed errors, concurrency, imports & naming, and public-API stability. Commit conventions are in [AGENTS.md § Code style and conventions](AGENTS.md#code-style-and-conventions), and the format and lint commands in [§ Tooling & workflow](AGENTS.md#tooling--workflow). Read those first. The points below trip up most PRs:
 
 - **Building-block independence (REQ-013)**: the openEHR building-block packages and the AQL blocks are usable standalone, with no `transport/` or `auth/` import. The exact package set and each package's import rule are in the table in [`docs/specifications/module-layout.md` § REQ-013](docs/specifications/module-layout.md#req-013--building-block-independence).
 - **No reflection** beyond the exceptions in [idiom.md § API conventions](docs/specifications/idiom.md#api-conventions): `_type` dispatch goes through the type registry, and generics are fine.

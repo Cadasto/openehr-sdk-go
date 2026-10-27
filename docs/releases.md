@@ -54,7 +54,7 @@ Until then the project ships `v0.x` adopter slices. Current progress is in [`doc
 ### Tag checklist
 
 1. **CI green on `main`.** Run `make ci` (the same gate as [`ci.yml`](../.github/workflows/ci.yml)).
-2. **CHANGELOG.** Rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD` and open a fresh `## [Unreleased]` above it. Keep it terse: one-sentence bullets and a one-sentence summary, per the [CHANGELOG brevity rule](../AGENTS.md#code-style-and-conventions). The release notes are copied verbatim from this block, so trim *here*, not in the GitHub draft. Commit this (with step 3) **directly to `main`**, with no branch or PR for a release bump (see [Branch & tag policy](#branch--tag-policy)). The same commit bumps the `go get …@vX.Y.Z` line on [`pages/install.md`](../pages/install.md), [`pages/index.md`](../pages/index.md), the [README](../README.md) and [`docs/quick-start.md`](quick-start.md). `make docs-check` reads the release straight out of this CHANGELOG heading and fails until all four name it.
+2. **CHANGELOG.** Rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD` and open a fresh `## [Unreleased]` above it. Keep it terse: one-sentence bullets and a one-sentence summary, per [§ CHANGELOG](#changelog). The release notes are copied verbatim from this block, so trim *here*, not in the GitHub draft. Commit this (with step 3) **directly to `main`**, with no branch or PR for a release bump (see [Branch & tag policy](#branch--tag-policy)). The same commit bumps the `go get …@vX.Y.Z` line on [`pages/install.md`](../pages/install.md), [`pages/index.md`](../pages/index.md), the [README](../README.md) and [`docs/quick-start.md`](quick-start.md). `make docs-check` reads the release straight out of this CHANGELOG heading and fails until all four name it.
 3. **Roadmap.** Bump [`docs/roadmap.md`](roadmap.md) if the release crosses a milestone.
 4. **Annotated tag from `main`.** Create it and push:
    ```bash
@@ -64,6 +64,10 @@ Until then the project ships `v0.x` adopter slices. Current progress is in [`doc
 6. **Publish.** Review the draft on the [Releases page](https://github.com/Cadasto/openehr-sdk-go/releases), edit if needed, and click **Publish release**.
 
 Preview notes locally without side effects: `bash scripts/release-notes.sh X.Y.Z`, or the workflow's `workflow_dispatch` dry-run.
+
+### CHANGELOG
+
+[`CHANGELOG.md`](../CHANGELOG.md) is updated only on request or when cutting a release. **One single-sentence bullet (~35 words max) per artefact class**: artefact + scope + key REQ/PROBE, never API inventories or per-REQ breakdowns (those live in `traceability.yaml`, commits, and PR bodies); the optional per-release summary line is one sentence too, plus a `**Breaking:**` sentence naming each change [`module-layout.md` § Versioning](specifications/module-layout.md#versioning) maps to major. Release notes are generated verbatim from the block, so a long entry is a defect — err short. Sections, in this order and only when they have entries: `### Added` for new capability; `### Changed` for behaviour a caller may have to adapt to (a tightened check, a different output, a different error); `### Deprecated` and `### Removed` for public symbols. No `### Fixed`: a fix of unreleased work folds into its bullet, and a fix of released behaviour goes under `### Changed` when callers may have to adapt, otherwise into its artefact class's `### Added` bullet.
 
 ### Pre-releases & hotfixes
 
