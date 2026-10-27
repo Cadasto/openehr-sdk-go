@@ -313,7 +313,8 @@
 // the objects inside it come first. The decode returns the same value as
 // the default.
 //
-// A present member is never missing, whatever it holds: an empty string, a
+// A member that carries a value is never missing, whatever the value: an
+// empty string, a
 // zero, an empty list or object and a bare {"_type":"PARTY_SELF"} are
 // present, and whether such a value is valid is for the validators to say.
 // Three kinds of attribute are never missing: one no serialization carries,

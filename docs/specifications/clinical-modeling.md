@@ -356,7 +356,7 @@ The validator treats the **compiled OPT as authoritative for structure** and the
 | `max_depth` | the walk hit its recursion-depth limit ([§ REQ-171 *One walk*](#req-171--validation-engine)) |
 | `max_nodes` | the walk hit its per-call visit limit and stopped ([§ REQ-171 *One walk*](#req-171--validation-engine)) |
 | `cyclic_value` | a value that contains itself, reported where it recurs ([§ REQ-171 *One walk*](#req-171--validation-engine), REQ-112 *Driver*) |
-| `invalid_shape` | a non-object or undecodable JSON body handed to a `…Bytes` entry (REQ-112 floor) |
+| `invalid_shape` | input that does not decode into the root handed to `ValidateJSON`, `ValidateXML`, their `Validator` methods or the deprecated `ValidateRMEHRStatusBytes`: malformed canonical JSON or XML, or a JSON root that is not an object (REQ-112 floor, *Value-typed mandatory presence*) |
 | `rm_type_unknown` | a Go value outside the v2 closed RM set handed to `ValidateRM` (REQ-112 floor) |
 | `nil_root` / `nil_folder` / `nil_ehr_status` / `nil_ehr_access` / `nil_party` | global guards: a nil argument to `ValidateRM` or a typed RM-floor wrapper (REQ-112 floor) |
 | `nil_composition` / `nil_template` | global guards — caller supplied a nil argument |

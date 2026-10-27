@@ -14,7 +14,8 @@ package canxml
 // or ARCHETYPE_ID, decodes to its zero value whether the input carried it or
 // not.
 //
-// A present member is never missing, whatever it holds: an empty struct
+// A member that carries a value is never missing, whatever the value: an
+// empty struct
 // element such as `<subject/>` or a bare `<subject xsi:type="PARTY_SELF"/>`,
 // `<magnitude>0</magnitude>`, `<units>kg</units>` where `<units></units>` is
 // missing, an `archetype_node_id` written as an XML attribute, and a `Hash`
