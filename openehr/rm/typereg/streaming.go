@@ -20,6 +20,8 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 )
@@ -59,10 +61,19 @@ import (
 // Otherwise the result is dec's options with the hooks and v2 error semantics
 // joined on top: the outermost value under a bare v2 or v1 call, or a nested one
 // whose memo entry another caller's decode has displaced, which joins again.
+//
+// Either identity of the SDK aggregate ([hookSet]) counts as the aggregate, so
+// a decode inside a buffered slot keeps the buffered identity its decoder holds.
 func decodeOptions(dec *jsontext.Decoder) json.Options {
-	hooks := aggregateUnmarshalers()
+	var hooks *json.Unmarshalers
 	opts := dec.Options()
 	caller, ok := json.GetOption(opts, json.WithUnmarshalers)
+	if set := unmarshalerAgg.Load(); set != nil {
+		hooks = set.all
+		if caller == set.buffered {
+			caller = hooks
+		}
+	}
 	if legacy, _ := json.GetOption(opts, jsonv1.ReportErrorsWithLegacySemantics); !legacy {
 		if caller == hooks {
 			return nil
@@ -148,8 +159,26 @@ func joinCallerUnmarshalers(hooks, caller *json.Unmarshalers) *json.Unmarshalers
 var (
 	unmarshalerRegMu sync.Mutex           // guards unmarshalerHooks during registration
 	unmarshalerHooks []*json.Unmarshalers // append-only, init-time
-	unmarshalerAgg   atomic.Pointer[json.Unmarshalers]
+	unmarshalerAgg   atomic.Pointer[hookSet]
 )
+
+// hookSet is the joined SDK interface hooks under two identities. all is the
+// aggregate every SDK decode threads. buffered joins the same hooks again, so
+// it decodes exactly as all does, but its own pointer tells a hook where it
+// runs: [DecodePolymorphic] decodes a slot it buffered with buffered in place of
+// all, so a slot nested in that buffer finds buffered on its decoder and knows
+// the bytes ahead were already read whole (see [decodeSlotInPlace]). bufferedOpt
+// is the option that installs it, built once.
+type hookSet struct {
+	all, buffered *json.Unmarshalers
+	bufferedOpt   json.Options
+}
+
+// sdkHooks reports whether hooks is the SDK aggregate under either identity of
+// set.
+func (set *hookSet) sdkHooks(hooks *json.Unmarshalers) bool {
+	return set != nil && (hooks == set.all || hooks == set.buffered)
+}
 
 // RegisterUnmarshaler adds one per-interface decode hook to the aggregate.
 // The generator emits one call per polymorphic interface from the owning
@@ -164,13 +193,21 @@ func RegisterUnmarshaler(hook *json.Unmarshalers) {
 	unmarshalerRegMu.Lock()
 	defer unmarshalerRegMu.Unlock()
 	unmarshalerHooks = append(unmarshalerHooks, hook)
-	unmarshalerAgg.Store(json.JoinUnmarshalers(unmarshalerHooks...))
+	buffered := json.JoinUnmarshalers(unmarshalerHooks...)
+	unmarshalerAgg.Store(&hookSet{
+		all:         json.JoinUnmarshalers(unmarshalerHooks...),
+		buffered:    buffered,
+		bufferedOpt: json.WithUnmarshalers(buffered),
+	})
 }
 
 // aggregateUnmarshalers returns the joined SDK interface hooks, or nil when
 // none are registered (JoinUnmarshalers treats a nil element as empty).
 func aggregateUnmarshalers() *json.Unmarshalers {
-	return unmarshalerAgg.Load()
+	if set := unmarshalerAgg.Load(); set != nil {
+		return set.all
+	}
+	return nil
 }
 
 // Unmarshalers returns the aggregate of every registered interface hook as a
@@ -365,6 +402,11 @@ func slotPointer(err error) string {
 // errors.As finds the envelope; the JSON position is supplied by the v2
 // decoder's own SemanticError wrapper around this return.
 //
+// A slot is read whole before it is decoded, so the slot's malformed bytes
+// and its depth are refused before anything inside it is decoded. A slot
+// nested in a value an enclosing slot read whole is decoded where it stands
+// instead ([decodeSlotInPlace]): the enclosing read already covered its bytes.
+//
 // A nil dec or a nil out is caller misuse (no generated hook passes one),
 // refused before any read with a [DecodeError] wrapping [ErrNilArgument].
 func DecodePolymorphic[T any](dec *jsontext.Decoder, out *T, fallback func() any) error {
@@ -373,6 +415,9 @@ func DecodePolymorphic[T any](dec *jsontext.Decoder, out *T, fallback func() any
 		return nilArgument("DecodePolymorphic", "dec", reflect.TypeFor[T]().Name())
 	case out == nil:
 		return nilArgument("DecodePolymorphic", "out", reflect.TypeFor[T]().Name())
+	}
+	if handled, err := decodeSlotInPlace(dec, out); handled {
+		return err
 	}
 	raw, err := dec.ReadValue()
 	if err != nil {
@@ -450,7 +495,20 @@ func DecodePolymorphic[T any](dec *jsontext.Decoder, out *T, fallback func() any
 	if slotOpts == nil {
 		slotOpts = opts
 	}
-	if err := json.Unmarshal(raw, v, slotOpts); err != nil {
+	// Where the SDK's own hooks decode raw, they go in under their buffered
+	// identity, which tells a slot nested in raw that raw was read whole
+	// ([decodeSlotInPlace]). Neither identity changes how anything decodes. A
+	// caller's hooks keep their own set, and its slots are buffered as before.
+	var inBuffer json.Options
+	if set := unmarshalerAgg.Load(); set != nil {
+		if hooks, _ := json.GetOption(slotOpts, json.WithUnmarshalers); set.sdkHooks(hooks) {
+			inBuffer = set.bufferedOpt
+		}
+	}
+	if err := json.Unmarshal(raw, v, slotOpts, inBuffer); err != nil {
+		if inBuffer != nil {
+			settleSlotError(err, "", 0)
+		}
 		// A shape failure inside the concrete type selected at this slot stays a
 		// shape failure (it already carries ErrInvalidShape from the concrete's
 		// own funnel); wrapping it in a DecodeError adds the slot classification
@@ -464,6 +522,209 @@ func DecodePolymorphic[T any](dec *jsontext.Decoder, out *T, fallback func() any
 	}
 	*out = tv
 	return nil
+}
+
+// decodeSlotInPlace decodes the slot dec reads next straight from dec, without
+// reading it whole first, where that decodes it as [DecodePolymorphic]'s
+// buffered decode would: dec carries the SDK's hooks under their buffered
+// identity ([hookSet]), so the slot sits in a value an enclosing slot read
+// whole; dec reports errors with v2 semantics; and the slot is an object whose
+// leading `_type` [leadingType] reads and [Default] knows. The enclosing read
+// tokenised every byte of that value under these options and checked its depth
+// from the document's root (REQ-108), so a second read of this slot could find
+// neither malformed input nor a depth refusal. It would only cost time, once
+// for every level of slots the bytes sit under.
+//
+// handled is false, and dec is left as it was, where any condition fails; the
+// caller then reads the slot whole. A failure keeps the positions a decoder of
+// the slot's own would give it ([rebaseSlotError]), inside the [DecodeError]
+// that names the slot's `_type`, as the buffered decode's does.
+func decodeSlotInPlace[T any](dec *jsontext.Decoder, out *T) (handled bool, err error) {
+	opts := dec.Options()
+	set := unmarshalerAgg.Load()
+	if hooks, _ := json.GetOption(opts, json.WithUnmarshalers); set == nil || hooks != set.buffered {
+		return false, nil
+	}
+	if legacy, _ := json.GetOption(opts, jsonv1.ReportErrorsWithLegacySemantics); legacy {
+		return false, nil
+	}
+	// The buffered identity rides only on the decode of a slot read whole, over
+	// its bytes in memory, so the unread buffer holds the rest of them: the slot
+	// is next, maybe after the colon or comma that separates it from what came
+	// before. leadingType refuses anything but an object.
+	ahead := dec.UnreadBuffer()
+	lead := skipWhitespace(ahead, 0)
+	if lead < len(ahead) && (ahead[lead] == ':' || ahead[lead] == ',') {
+		lead = skipWhitespace(ahead, lead+1)
+	}
+	name, ok := leadingType(ahead[lead:], opts)
+	if !ok || name == "" {
+		return false, nil
+	}
+	ctor, ok := Default.Lookup(name)
+	if !ok {
+		return false, nil
+	}
+	v := ctor()
+	depth, start := dec.StackDepth(), dec.InputOffset()+int64(lead)
+	if err := json.UnmarshalDecode(dec, v); err != nil {
+		slot := slotPrefix(dec.StackPointer(), depth)
+		settleSlotError(err, slot, start)
+		return true, inPlaceError(slot, start, &DecodeError{Type: name, Inner: &inPlaceFailure{err: err, start: start}})
+	}
+	tv, ok := v.(T)
+	if !ok {
+		err := fmt.Errorf("typereg.DecodeAs: decoded %T: %w", v, ErrTypeMismatch)
+		return true, inPlaceError(string(dec.StackPointer()), start, &DecodeError{Type: name, Inner: &inPlaceFailure{err: err, start: start}})
+	}
+	*out = tv
+	return true, nil
+}
+
+// inPlaceError returns the failure de of a slot decoded in place, at slot,
+// opening at start, placed as json/v2 places a buffered slot's.
+//
+// json/v2 places a failure from where the decoder stands when it comes back,
+// and from the token or value it read last. A buffered slot has been read
+// whole by then, so its failure is placed at the slot, and every failure above
+// it, up to the enclosing slot, where the slot opens. A slot decoded in place
+// stops where its decode failed, or past its closing bracket, and a decoder
+// json/v2 has failed on cannot read on. So the failure comes back placed at the
+// slot already, which json/v2 keeps while filling in the rest as it would, and
+// de carries where the slot opens to the enclosing slot, which places the
+// failures above this one ([settleSlotError]).
+func inPlaceError(slot string, start int64, de *DecodeError) error {
+	return &json.SemanticError{ByteOffset: start, JSONPointer: jsontext.Pointer(slot), Err: de}
+}
+
+// slotPrefix returns the JSON Pointer of a slot that opened depth levels down,
+// read from p, the decoder's pointer after the slot's decode failed: the slot's
+// own token is the one at its depth, whatever the failure left open beneath.
+func slotPrefix(p jsontext.Pointer, depth int) string {
+	s := string(p)
+	for i := range len(s) {
+		if s[i] != '/' {
+			continue
+		}
+		if depth == 0 {
+			return s[:i]
+		}
+		depth--
+	}
+	return s
+}
+
+// inPlaceFailure carries the failure of a slot decoded in place
+// ([decodeSlotInPlace]) up to the slot that encloses it, with start, the
+// offset where the failed slot opens on the decoder the two share. It sits
+// for that long only: the enclosing slot's [settleSlotError] reads start and
+// puts err back in its place, so no caller meets it.
+type inPlaceFailure struct {
+	err   error
+	start int64
+}
+
+func (f *inPlaceFailure) Error() string { return f.err.Error() }
+func (f *inPlaceFailure) Unwrap() error { return f.err }
+
+// settleSlotError gives err, the failure of a slot's decode, the positions a
+// decoder of the slot's own gives it. The positions it settles are the ones
+// above the first [DecodeError] that marks a slot beneath (every one but
+// [DecodeInto]'s refusal of a `_type`, the envelopes the entry points' own walk
+// treats as slots): beneath that, the slot below settled its own.
+//
+// Where the slot beneath was decoded in place, every failure json/v2 placed
+// above it was placed inside it, where the decode stopped, rather than where a
+// buffered slot leaves the decoder: past the slot. From there json/v2 places
+// each such failure at the slot's parent, opening where the slot opens, so that
+// is where each goes.
+//
+// A slot decoded in place shares its decoder with the value around it, so
+// its positions also come to count from the slot, as they do on a decoder of
+// its own: prefix, the slot's pointer, comes off every JSON Pointer, and start,
+// the offset where the slot opens, off every byte offset. A buffered slot,
+// whose decoder is its own, passes "" and 0. Every error settleSlotError
+// changes was built by the slot's decode.
+func settleSlotError(err error, prefix string, start int64) {
+	settleLinks(err, nil, prefix, start)
+}
+
+// settleLinks settles err's chain for [settleSlotError]. above holds the
+// semantic failures already passed on the way down.
+func settleLinks(err error, above []*json.SemanticError, prefix string, start int64) {
+	rebase := func() {
+		for _, e := range above {
+			e.JSONPointer = jsontext.Pointer(trimPointer(string(e.JSONPointer), prefix))
+			e.ByteOffset = trimOffset(e.ByteOffset, start)
+		}
+	}
+	for err != nil {
+		switch e := err.(type) { //nolint:errorlint // each link of the chain is settled in turn, by its own type
+		case *json.SemanticError:
+			if e == nil {
+				return
+			}
+			above = append(above, e)
+		case *jsontext.SyntacticError:
+			if e == nil {
+				return
+			}
+			e.JSONPointer = jsontext.Pointer(trimPointer(string(e.JSONPointer), prefix))
+			e.ByteOffset = trimOffset(e.ByteOffset, start)
+		case *DecodeError:
+			if e == nil {
+				return
+			}
+			if e.Type == "" && e.Path == typeMemberPath {
+				break
+			}
+			if f, ok := e.Inner.(*inPlaceFailure); ok && f != nil { //nolint:errorlint // the carrier is the DecodeError's own Inner
+				parent := jsontext.Pointer(e.Path).Parent()
+				for _, a := range above {
+					a.JSONPointer, a.ByteOffset = parent, f.start
+				}
+				e.Inner = f.err
+			}
+			rebase()
+			e.Path = trimPointer(e.Path, prefix)
+			return
+		}
+		switch u := err.(type) { //nolint:errorlint // walks the chain link by link
+		case interface{ Unwrap() error }:
+			err = u.Unwrap()
+		case interface{ Unwrap() []error }:
+			for _, cause := range u.Unwrap() {
+				settleLinks(cause, slices.Clone(above), prefix, start)
+			}
+			return
+		default:
+			rebase()
+			return
+		}
+	}
+	rebase()
+}
+
+// typeMemberPath is the Path of [DecodeInto]'s refusal of a `_type` that names
+// another class: the member of the value being decoded, not a slot.
+const typeMemberPath = "/_type"
+
+// trimPointer returns p without the leading prefix, the pointer of the value
+// p is read from; a pointer outside that value is returned as it is.
+func trimPointer(p, prefix string) string {
+	if rest, ok := strings.CutPrefix(p, prefix); ok && (rest == "" || rest[0] == '/') {
+		return rest
+	}
+	return p
+}
+
+// trimOffset returns off counted from start, the offset of the value off is
+// read from; an offset before that value is returned as it is.
+func trimOffset(off, start int64) int64 {
+	if off >= start {
+		return off - start
+	}
+	return off
 }
 
 // typeDiscriminator is the head struct peekType decodes into. It is a named
@@ -528,7 +789,7 @@ func leadingType(raw jsontext.Value, opts json.Options) (name string, ok bool) {
 	if fold, _ := json.GetOption(opts, json.MatchCaseInsensitiveNames); fold {
 		return "", false
 	}
-	if hooks, _ := json.GetOption(opts, json.WithUnmarshalers); hooks != aggregateUnmarshalers() {
+	if hooks, _ := json.GetOption(opts, json.WithUnmarshalers); !unmarshalerAgg.Load().sdkHooks(hooks) {
 		return "", false
 	}
 	i := skipWhitespace(raw, 0)

@@ -459,6 +459,7 @@ requirements:
       - openehr/rm/quoted_literal_test.go
       - openehr/rm/real_test.go
       - openehr/rm/typereg/decodeerror_chain_test.go
+      - openehr/rm/typereg/inplace_test.go
       - openehr/rm/typereg/nildecodeerror_test.go
       - openehr/rm/typereg/registry_test.go
       - openehr/rm/typereg/valuefree_test.go
@@ -469,6 +470,7 @@ requirements:
       - openehr/serialize/canjson/edgecases_test.go
       - openehr/serialize/canjson/encode_test.go
       - openehr/serialize/canjson/entryerror_internal_test.go
+      - openehr/serialize/canjson/inplace_slots_test.go
       - openehr/serialize/canjson/interval_failed_decode_test.go
       - openehr/serialize/canjson/interval_flag_defaults_test.go
       - openehr/serialize/canjson/interval_open_side_test.go
