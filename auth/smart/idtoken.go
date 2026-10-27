@@ -84,8 +84,9 @@ func WithTrustedAudiences(aud ...string) IDTokenOption {
 // The signing key is the one the token's kid names. A token without a kid is
 // verified with the set's only signing key (see [JWKS.Key]). When that key
 // does not verify the signature, the set is fetched once more, in case the
-// server has rotated its key, and the token is checked against the key it
-// then holds. A key published for a use other than signing verifies no
+// server has rotated its key, unless it was fetched less than
+// [JWKS.MinRefreshInterval] ago, and the token is checked against the key
+// the set then holds. A key published for a use other than signing verifies no
 // token, and a key that publishes an alg verifies only a token whose header
 // names that alg (RFC 8725 §3.1).
 //

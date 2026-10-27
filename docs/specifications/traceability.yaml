@@ -793,6 +793,7 @@ requirements:
       - auth/smart/jwk_use_alg_test.go
       - auth/smart/jwks_kidless_test.go
       - auth/smart/jwks_min_refresh_test.go
+      - auth/smart/jwks_refresh_internal_test.go
       - auth/smart/jwks_ttl_test.go
       - auth/smart/redact_test.go
       - auth/smart/shared_refresh_test.go

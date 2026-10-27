@@ -102,6 +102,7 @@ func (j *JWKS) Key(ctx context.Context, kid string) (json.RawMessage, error) {
 	j.mu.Lock()
 	stale := j.staleLocked()
 	recent := j.fetchedWithinLocked(j.MinRefreshInterval)
+	seen := j.fetchedAt
 	k, ok := j.keys[kid]
 	j.mu.Unlock()
 	if ok && !stale {
@@ -112,7 +113,7 @@ func (j *JWKS) Key(ctx context.Context, kid string) (json.RawMessage, error) {
 		// a fetch, so unknown kids cannot make a fetch each (REQ-062).
 		return nil, fmt.Errorf("%w: kid %q not found in a key set fetched less than %v ago", auth.ErrJWKSValidationFailed, kid, j.MinRefreshInterval)
 	}
-	if err := j.refresh(ctx); err != nil {
+	if err := j.refresh(ctx, seen); err != nil {
 		return nil, err
 	}
 	// This lookup fetched the set or waited on a fetch: look kid up in what
@@ -132,9 +133,10 @@ func (j *JWKS) Key(ctx context.Context, kid string) (json.RawMessage, error) {
 func (j *JWKS) onlySigningKey(ctx context.Context) (json.RawMessage, error) {
 	j.mu.Lock()
 	stale := j.staleLocked()
+	seen := j.fetchedAt
 	j.mu.Unlock()
 	if stale {
-		if err := j.refresh(ctx); err != nil {
+		if err := j.refresh(ctx, seen); err != nil {
 			return nil, err
 		}
 	}
@@ -144,15 +146,18 @@ func (j *JWKS) onlySigningKey(ctx context.Context) (json.RawMessage, error) {
 // refreshedSigningKey refreshes the set, sharing a refresh already in flight,
 // and returns its only signing key. It serves a token without a kid that the
 // cached key did not verify (REQ-062). As for a kid miss, a set fetched less
-// than MinRefreshInterval ago is not fetched again: it fails at once.
+// than MinRefreshInterval ago is not fetched again: the set's signing key is
+// returned as it is, which another lookup's fetch may have replaced since
+// the caller read it.
 func (j *JWKS) refreshedSigningKey(ctx context.Context) (json.RawMessage, error) {
 	j.mu.Lock()
 	recent := !j.staleLocked() && j.fetchedWithinLocked(j.MinRefreshInterval)
+	seen := j.fetchedAt
 	j.mu.Unlock()
 	if recent {
-		return nil, fmt.Errorf("%w: the signing key of a key set fetched less than %v ago does not verify the token", auth.ErrJWKSValidationFailed, j.MinRefreshInterval)
+		return j.cachedSigningKey()
 	}
-	if err := j.refresh(ctx); err != nil {
+	if err := j.refresh(ctx, seen); err != nil {
 		return nil, err
 	}
 	return j.cachedSigningKey()
@@ -186,16 +191,24 @@ func (j *JWKS) fetchedWithinLocked(d time.Duration) bool {
 	return d > 0 && !j.fetchedAt.IsZero() && time.Since(j.fetchedAt) < d
 }
 
-// refresh fetches the set, or waits for the fetch another lookup leads. The
+// refresh fetches the set, or waits for the fetch another lookup leads,
+// unless a fetch has landed since the caller read the set at seen: the set
+// is then already newer than the one the caller found wanting. The
 // fetch runs under the context of the lookup that leads it. When that
 // context ending is all that failed the fetch, or a panic unwound the
 // leading lookup, a waiter whose own context is live goes round again: it
 // leads a new fetch or waits on a newer one. A waiter whose context has
 // ended returns its own context's error. Every other outcome reaches every
 // waiter.
-func (j *JWKS) refresh(ctx context.Context) error {
+func (j *JWKS) refresh(ctx context.Context, seen time.Time) error {
 	for {
 		j.mu.Lock()
+		if j.fetchedAt.After(seen) {
+			// A fetch landed after the caller read the set at seen, so the
+			// set is already newer than the one it found wanting.
+			j.mu.Unlock()
+			return nil
+		}
 		r := j.inflight
 		if r == nil {
 			r = &jwksRefresh{done: make(chan struct{})}
