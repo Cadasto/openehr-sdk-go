@@ -6,6 +6,8 @@ import (
 	"io"
 	"log/slog"
 	"time"
+
+	"github.com/cadasto/openehr-sdk-go/internal/urlredact"
 )
 
 // TokenTypeBearer is the OAuth2 access-token scheme (default when Type is empty).
@@ -139,11 +141,12 @@ func redact(s string) string {
 }
 
 // String describes t with its Value replaced by "[redacted]", or by "" when
-// it is empty. Type, ExpiresAt (in RFC 3339 form), Scope and Issuer are shown
-// as they are.
+// it is empty, and the password of an Issuer URL that carries one masked, as
+// [net/url.URL.Redacted] masks it. Type, ExpiresAt (in RFC 3339 form) and Scope
+// are shown as they are.
 func (t Token) String() string {
 	return fmt.Sprintf("auth.Token{Value: %q, Type: %q, ExpiresAt: %s, Scope: %q, Issuer: %q}",
-		redact(t.Value), t.Type, t.ExpiresAt.Format(time.RFC3339Nano), t.Scope, t.Issuer)
+		redact(t.Value), t.Type, t.ExpiresAt.Format(time.RFC3339Nano), t.Scope, urlredact.String(t.Issuer))
 }
 
 // GoString returns the text of [Token.String], so that printing t in Go
@@ -163,13 +166,14 @@ func (t Token) Format(f fmt.State, _ rune) {
 }
 
 // LogValue lets log/slog log t as a group of its fields, keyed by field name,
-// with the Value replaced as [Token.String] replaces it.
+// with the Value replaced and the Issuer masked as [Token.String] replaces and
+// masks them.
 func (t Token) LogValue() slog.Value {
 	return slog.GroupValue(
 		slog.String("Value", redact(t.Value)),
 		slog.String("Type", t.Type),
 		slog.Time("ExpiresAt", t.ExpiresAt),
 		slog.String("Scope", t.Scope),
-		slog.String("Issuer", t.Issuer),
+		slog.String("Issuer", urlredact.String(t.Issuer)),
 	)
 }

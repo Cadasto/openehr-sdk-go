@@ -16,6 +16,13 @@ import (
 // redactedMarker is the text a credential prints and logs as.
 const redactedMarker = "[redacted]"
 
+// urlPassword is the password the tests put in a URL, and urlMask the text
+// url.URL.Redacted writes in its place.
+const (
+	urlPassword = "urlpass-s3cr3t"
+	urlMask     = "xxxxx"
+)
+
 // printVerbs are the fmt verbs, with flags and widths, that must all print the
 // text of a value's String method.
 var printVerbs = []string{"%v", "%+v", "%#v", "%s", "%q", "%d", "%x", "%X", "%t", "%20v", "%-20s", "%+q", "%#x"}
@@ -83,8 +90,9 @@ func printProblems(v any, secrets, shown []string) []string {
 }
 
 // TestREQ060_TokenPrintsNoCredential pins REQ-060: an auth.Token printed with
-// any fmt verb, or logged through log/slog, shows its Value as [redacted],
-// keeps its other fields visible, and shows an empty Value as empty.
+// any fmt verb, or logged through log/slog, shows its Value as [redacted] and
+// the password of its issuer URL masked, keeps its other fields visible, and
+// shows an empty Value as empty and an issuer that is not a URL as written.
 func TestREQ060_TokenPrintsNoCredential(t *testing.T) { // REQ-060
 	t.Parallel()
 	const secret = "TOKEN-VALUE-s3cr3t"
@@ -136,6 +144,26 @@ func TestREQ060_TokenPrintsNoCredential(t *testing.T) { // REQ-060
 			t.Errorf("fmt.Sprint(%s) = %q, want an empty Value and no %s", "auth.Token{Type: Basic}", out, redactedMarker)
 		}
 	})
+
+	t.Run("a password in the issuer URL is masked", func(t *testing.T) {
+		t.Parallel()
+		withPassword := tok
+		withPassword.Issuer = "https://iss:" + urlPassword + "@idp.example"
+		for _, v := range []any{withPassword, &withPassword} {
+			for _, p := range printProblems(v, []string{secret, urlPassword}, []string{redactedMarker, "https://iss:" + urlMask + "@idp.example"}) {
+				t.Errorf("%T: %s", v, p)
+			}
+		}
+	})
+
+	t.Run("an issuer that is not a URL prints as written", func(t *testing.T) {
+		t.Parallel()
+		plain := tok
+		plain.Issuer = "issuer name"
+		for _, p := range printProblems(plain, []string{secret}, []string{`Issuer: "issuer name"`}) {
+			t.Error(p)
+		}
+	})
 }
 
 // plainToken has the fields of auth.Token and none of its methods.
@@ -176,7 +204,8 @@ func TestREQ060_TokenJSONUnchanged(t *testing.T) { // REQ-060
 // TestREQ060_StaticTokenSourcePrintsNoCredential pins REQ-060: the token
 // source auth.StaticTokenSource returns holds its token in an unexported
 // field, which fmt prints without calling the token's methods, so the source
-// prints the token's String text itself, with any fmt verb.
+// prints the token's String text itself, with any fmt verb, the password of
+// the token's issuer URL masked.
 func TestREQ060_StaticTokenSourcePrintsNoCredential(t *testing.T) { // REQ-060
 	t.Parallel()
 	const secret = "STATIC-TOKEN-s3cr3t"
@@ -184,4 +213,11 @@ func TestREQ060_StaticTokenSourcePrintsNoCredential(t *testing.T) { // REQ-060
 	for _, p := range printProblems(ts, []string{secret}, []string{redactedMarker, "Bearer"}) {
 		t.Error(p)
 	}
+
+	t.Run("a password in the issuer URL is masked", func(t *testing.T) {
+		withPassword := auth.StaticTokenSource(auth.Token{Value: secret, Type: auth.TokenTypeBearer, Issuer: "https://iss:" + urlPassword + "@idp.example"})
+		for _, p := range printProblems(withPassword, []string{secret, urlPassword}, []string{redactedMarker, "https://iss:" + urlMask + "@idp.example"}) {
+			t.Error(p)
+		}
+	})
 }
