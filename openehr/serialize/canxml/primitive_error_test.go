@@ -66,8 +66,8 @@ func isTimeParseError(err error) bool {
 func anyError(error) bool { return true }
 
 // primitiveCases covers each primitive kind the RM decodes from text, outside
-// a polymorphic slot and inside one, a Character refused through its
-// UnmarshalText, an Octet list that is not base64, an AOM 1.4 interval bound,
+// a polymorphic slot and inside one, a lossy Real and a Character refused
+// through their UnmarshalText, an Octet list that is not base64, an AOM 1.4 interval bound,
 // a bound held in an interface-typed member, a bound typed as a pointer to a
 // TextUnmarshaler, and an interval boundary flag that is no boolean.
 func primitiveCases(t *testing.T) []primitiveCase {
@@ -136,6 +136,24 @@ func primitiveCases(t *testing.T) []primitiveCase {
 			path: "/element[1]/value[1]/magnitude[1]", alone: "/magnitude", slot: `decode /value (_type="DV_QUANTITY"): `,
 			cause: "strconv.ParseFloat: invalid syntax", raw: `strconv.ParseFloat: parsing "7777kg": invalid syntax`,
 			value: "7777kg", reach: isNumError,
+		},
+		{
+			name: "lossy Real",
+			in:   `<dv_quantity ` + ucNS + `><magnitude>9007199254740993</magnitude><units>kg</units></dv_quantity>`,
+			into: func() any { return new(rm.DVQuantity) },
+			path: "/dv_quantity[1]/magnitude[1]", alone: "/magnitude",
+			cause: "rm.Real: literal cannot be held in a float64 at its own precision",
+			raw:   "rm.Real: literal cannot be held in a float64 at its own precision",
+			value: "9007199254740993", reach: anyError,
+		},
+		{
+			name: "lossy Real in a slot",
+			in:   slotElement("DV_QUANTITY", `<magnitude>1.2345678901234567890</magnitude><units>kg</units>`),
+			into: func() any { return new(rm.Element) },
+			path: "/element[1]/value[1]/magnitude[1]", alone: "/magnitude", slot: `decode /value (_type="DV_QUANTITY"): `,
+			cause: "rm.Real: literal cannot be held in a float64 at its own precision",
+			raw:   "rm.Real: literal cannot be held in a float64 at its own precision",
+			value: "1.2345678901234567890", reach: anyError,
 		},
 		{
 			name: "Integer64 in a slot",
