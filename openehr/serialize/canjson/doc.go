@@ -97,10 +97,11 @@
 //     when the float64 it parses to, written back correctly rounded to
 //     as many significant decimal digits as the literal carries, denotes
 //     another value. 9007199254740993 (2^53+1, which parses to
-//     9007199254740992), 1.2345678901234567890 and 1e-400 (which
-//     underflows to zero) are lossy, and each fails decode wrapping
-//     [ErrInvalidShape], bare or quoted. A literal of at most 15
-//     significant digits that does not underflow is never lossy, so 0.1
+//     9007199254740992), 1.2345678901234567890, 1.23e-322 (which parses
+//     to 1.24e-322) and 1e-400 (which underflows to zero) are lossy, and
+//     each fails decode wrapping [ErrInvalidShape], bare or quoted. A
+//     literal of at most 15 significant digits is never lossy while its
+//     magnitude is at least 2^-1022, the smallest normal float64, so 0.1
 //     decodes although no float64 holds it exactly. A longer literal the
 //     float64 gives back at its own precision decodes too:
 //     18446744073709551616 (2^64), and 0.10000000000000001, the 17-digit
