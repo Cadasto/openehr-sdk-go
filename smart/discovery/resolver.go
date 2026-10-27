@@ -105,7 +105,9 @@ type resolverConfig struct {
 type Option func(*resolverConfig)
 
 // WithHTTPClient injects the *http.Client used for discovery fetches.
-// Required.
+// Required. [NewResolver] fetches with a shallow copy of c, which shares
+// c's Transport, Jar and Timeout but not c itself, so setting one of c's
+// fields after NewResolver does not reach the resolver.
 func WithHTTPClient(c *http.Client) Option {
 	return func(cfg *resolverConfig) { cfg.httpClient = c }
 }
@@ -227,16 +229,17 @@ func NewResolver(cache Cache, opts ...Option) (*Resolver, error) {
 // target is not an https URL.
 var errInsecureRedirect = errors.New("redirect to a non-https URL refused; use WithAllowInsecure for development")
 
-// refuseDowngrade returns the client the resolver fetches with. Unless
-// allowInsecure, it is a shallow copy of c whose redirect policy refuses a
-// redirect to a URL that is not https, and otherwise applies c's own
-// CheckRedirect, or net/http's default limit of 10 redirects when c has
-// none. c itself is never modified.
+// refuseDowngrade returns the client the resolver fetches with: a shallow
+// copy of c, so a change the caller makes to c afterwards does not reach the
+// resolver. With allowInsecure the copy keeps c's redirect policy. Otherwise
+// its redirect policy refuses a redirect to a URL that is not https, and
+// otherwise applies c's own CheckRedirect, or net/http's default limit of 10
+// redirects when c has none. c itself is never modified.
 func refuseDowngrade(c *http.Client, allowInsecure bool) *http.Client {
-	if allowInsecure {
-		return c
-	}
 	cp := *c
+	if allowInsecure {
+		return &cp
+	}
 	callerPolicy := c.CheckRedirect
 	cp.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 		if req.URL.Scheme != "https" {
