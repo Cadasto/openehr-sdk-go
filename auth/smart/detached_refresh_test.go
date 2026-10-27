@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"runtime"
 	"slices"
 	"sync"
 	"testing"
@@ -275,4 +276,60 @@ func TestREQ063_HookPanicAfterTheStarterLeftIsDropped(t *testing.T) {
 			t.Errorf("held tokens = (%q, %q), want (at-1, rt-1)", access.Value, refresh)
 		}
 	})
+}
+
+// TestREQ063_RefreshGoroutineExitIsATransientFailure pins REQ-063 with
+// REQ-026 (idiom.md § Concurrency): a refresh whose goroutine exits through
+// runtime.Goexit, as one whose RoundTripper calls t.FailNow does, ends as a
+// refresh failure that is not terminal. Token sends that one request and
+// returns: past ExpiresAt with an error matching auth.ErrRefreshFailed, and
+// before it with the held token, which it then serves without a request
+// while the backoff holds. Releasing the callers to try again would send a
+// new refresh that exits the same way, without end.
+func TestREQ063_RefreshGoroutineExitIsATransientFailure(t *testing.T) {
+	tests := []struct {
+		name string
+		held func(value string) auth.Token
+		// wantHeld reports that Token serves the held token in place of
+		// the failure.
+		wantHeld bool
+	}{
+		{name: "past ExpiresAt", held: expiredAccess},
+		{name: "before ExpiresAt", held: staleAccess, wantHeld: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				ctx, cancel := context.WithCancel(t.Context())
+				defer cancel()
+				srv := &scriptedServer{}
+				srv.refresh = func(_ *http.Request, n int) (*http.Response, error) {
+					if n > 1 {
+						// Token sent the refresh again: end the call
+						// rather than let it go round without end.
+						cancel()
+					}
+					runtime.Goexit()
+					panic("unreachable")
+				}
+				src := scriptedSource(t, srv)
+				src.SetTokens(tc.held("at-old"), "rt-0")
+
+				tok, err := src.Token(ctx)
+				if tc.wantHeld {
+					if err != nil || tok.Value != "at-old" {
+						t.Errorf("Token() = (%q, %v), want (at-old, nil): the held token in place of the failure", tok.Value, err)
+					}
+					if tok, err := src.Token(ctx); err != nil || tok.Value != "at-old" {
+						t.Errorf("second Token() = (%q, %v), want (at-old, nil) while the backoff holds", tok.Value, err)
+					}
+				} else if !errors.Is(err, auth.ErrRefreshFailed) {
+					t.Errorf("Token() error = %v, want one matching auth.ErrRefreshFailed", err)
+				}
+				if n, _ := srv.counts(); n != 1 {
+					t.Errorf("refresh requests = %d, want 1: a refresh that exits its goroutine is not sent again", n)
+				}
+			})
+		})
+	}
 }

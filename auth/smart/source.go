@@ -1141,7 +1141,11 @@ func (s *Source) SetTokens(access auth.Token, refresh string) {
 // ended returns its own context's error. When the call that started the
 // refresh has already returned, the panic is raised again on the refresh's
 // goroutine once the waiting calls are released, so it ends the program as
-// any unrecovered panic in a goroutine does.
+// any unrecovered panic in a goroutine does. A refresh whose goroutine exits
+// through [runtime.Goexit] instead, from a RoundTripper that calls t.FailNow
+// for example, got no answer: it ends as a refresh failure that is not
+// terminal, as below, with an error matching [auth.ErrRefreshFailed], and
+// its callers are not released to try again.
 //
 // A refresh that fails without being terminal (a server or network error, a
 // timeout, an answer the source cannot read, or an ID token it refuses)
@@ -1172,8 +1176,11 @@ func (s *Source) token(ctx context.Context, forced bool) (auth.Token, error) {
 		// The refresh this call led or waited on left it no result: a code
 		// exchange, SetTokens or Revoke replaced the session the refresh
 		// belonged to, or the refresh panicked. Read what the source holds
-		// now. A further retry needs another such event meanwhile, so the
-		// loop does not spin.
+		// now. A further retry needs another such event meanwhile: a new
+		// session, or a panic in a newer refresh, which goes up through the
+		// call that started that refresh or ends the program. A refresh
+		// whose goroutine exits through runtime.Goexit publishes a failure
+		// instead of a retry, so the loop does not spin.
 	}
 }
 
@@ -1307,15 +1314,24 @@ func (s *Source) leadRefresh(ctx context.Context, ex *tokenExchange, refreshTok 
 // A panic in the refresh is recovered here, and every waiter is released to
 // try again. The call that started the refresh raises it again when it is
 // still waiting; when it has returned, nobody could recover the panic, so it
-// is raised again on this goroutine, which ends the program.
+// is raised again on this goroutine, which ends the program. A refresh
+// whose goroutine exits through runtime.Goexit instead ends as a refresh
+// failure that is not terminal (see endExitedRefresh).
 func (s *Source) runRefresh(ctx context.Context, ex *tokenExchange, refreshTok string, cur auth.Token, binding *idTokenBinding) {
 	rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), refreshTimeout)
 	defer cancel()
 	finished := false
 	defer func() {
-		if !finished {
-			s.endPanickedRefresh(ex, recover())
+		if finished {
+			return
 		}
+		if v := recover(); v != nil {
+			s.endPanickedRefresh(ex, v)
+			return
+		}
+		// Not finished, yet nothing to recover: the goroutine is exiting
+		// through runtime.Goexit.
+		s.endExitedRefresh(ctx, ex, cur)
 	}()
 
 	tok, refreshedTR, next, err := s.refreshGrant(rctx, refreshTok, binding)
@@ -1333,10 +1349,9 @@ func (s *Source) runRefresh(ctx context.Context, ex *tokenExchange, refreshTok s
 }
 
 // endPanickedRefresh ends the refresh ex stands for after it panicked with
-// v: it takes ex out of flight and releases its waiters to try again. It
-// hands v to the call that started the refresh when that call is still
-// waiting, and otherwise panics with v itself. A nil v means the refresh's
-// goroutine is exiting through runtime.Goexit, which is left to go on.
+// v, which is not nil: it takes ex out of flight and releases its waiters
+// to try again. It hands v to the call that started the refresh when that
+// call is still waiting, and otherwise panics with v itself.
 func (s *Source) endPanickedRefresh(ex *tokenExchange, v any) {
 	s.mu.Lock()
 	if s.inflight == ex {
@@ -1345,15 +1360,31 @@ func (s *Source) endPanickedRefresh(ex *tokenExchange, v any) {
 	ex.retry = true
 	ex.ended = true
 	raiseHere := ex.starterLeft
-	if !raiseHere && v != nil {
+	if !raiseHere {
 		ex.raise = true
 		ex.panicValue = v
 	}
 	s.mu.Unlock()
 	close(ex.done)
-	if raiseHere && v != nil {
+	if raiseHere {
 		panic(v)
 	}
+}
+
+// endExitedRefresh ends the refresh ex stands for when its goroutine exits
+// through runtime.Goexit, as one whose RoundTripper calls t.FailNow does.
+// The refresh got no answer, so it ends as a refresh failure that is not
+// terminal: installRefresh publishes an error matching
+// [auth.ErrRefreshFailed], or the held token where such a failure leaves it
+// to be served, and the backoff holds the next refresh back. Releasing the
+// callers to try again instead would start a new refresh that may exit the
+// same way, without end. cur and ctx are as for installRefresh.
+func (s *Source) endExitedRefresh(ctx context.Context, ex *tokenExchange, cur auth.Token) {
+	err := &auth.ExchangeError{Sentinel: auth.ErrRefreshFailed, Inner: errors.New("the refresh goroutine exited before the token endpoint answered")}
+	// A failure queues no token change, so there is nothing to report
+	// whether or not the call that started the refresh has returned.
+	s.installRefresh(ctx, ex, cur, auth.Token{}, TokenResponse{}, "", err)
+	close(ex.done)
 }
 
 // installRefresh installs what the refresh ex stands for returned: tok,
