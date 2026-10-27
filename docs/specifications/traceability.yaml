@@ -570,6 +570,7 @@ requirements:
       - openehr/serialize/simplified/string_leaf_test.go
       - openehr/serialize/simplified/structured_ctx_test.go
       - openehr/serialize/simplified/structured_test.go
+      - openehr/serialize/simplified/template_index_cache_test.go
       - openehr/serialize/simplified/template_order_test.go
       - openehr/serialize/simplified/template_roundtrip_test.go
       - openehr/serialize/simplified/unmatched_test.go
