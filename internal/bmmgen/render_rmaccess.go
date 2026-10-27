@@ -556,11 +556,11 @@ func (g *rmaccessGen) render() ([]byte, error) {
 	b.WriteString(":\n\t\treturn true\n\t}\n\treturn false\n}\n")
 
 	// single, multiple and hash dispatch.
-	writeDispatch(&b, "single", "the single-valued attribute attr of parent: its value, whether it is\n// present, and whether parent's class declares attr as a single-valued\n// attribute at all", "any, bool, bool", "nil, false, false",
+	writeDispatch(&b, "single", "the single-valued attribute attr of parent: its value, whether it is\n// present, and whether parent's class declares attr as a single-valued\n// attribute at all. With peek set, a primitive leaf comes back as leafMarker{}\n// in place of its value", "peek bool", "any, bool, bool", "nil, false, false",
 		all, func(e armAttrs) bool { return len(e.single) > 0 })
-	writeDispatch(&b, "multiple", "the container attribute attr of parent: its list, whether the list\n// is present, and whether parent's class declares attr as a container at\n// all", "list, bool, bool", "nil, false, false",
+	writeDispatch(&b, "multiple", "the container attribute attr of parent: its items, boxed only when\n// box is set, its length, whether the list is present, and whether\n// parent's class declares attr as a container at all", "box bool", "[]any, int, bool, bool", "nil, 0, false, false",
 		all, func(e armAttrs) bool { return len(e.multi) > 0 })
-	writeDispatch(&b, "hash", "the Hash attribute attr of parent: the keys of its entries in\n// ascending order, their values, whether the hash is present, and whether\n// parent's class declares attr as a Hash at all", "[]string, []any, bool, bool", "nil, nil, false, false",
+	writeDispatch(&b, "hash", "the Hash attribute attr of parent: the keys of its entries in\n// ascending order, their values, whether the hash is present, and whether\n// parent's class declares attr as a Hash at all", "", "[]string, []any, bool, bool", "nil, nil, false, false",
 		all, func(e armAttrs) bool { return len(e.hash) > 0 })
 
 	for _, e := range all {
@@ -593,11 +593,17 @@ func (g *rmaccessGen) render() ([]byte, error) {
 }
 
 // writeDispatch writes the type switch fn that hands parent to the reader of
-// its arm, for every arm that has such a reader; results are the readers'
-// result types and zero what fn returns for any other parent.
-func writeDispatch(b *bytes.Buffer, fn, doc, results, zero string, all []armAttrs, has func(armAttrs) bool) {
+// its arm, for every arm that has such a reader; param is the one parameter,
+// if any, the readers take after attr and fn passes on, results are the
+// readers' result types and zero what fn returns for any other parent.
+func writeDispatch(b *bytes.Buffer, fn, doc, param, results, zero string, all []armAttrs, has func(armAttrs) bool) {
+	params, args := "", ""
+	if param != "" {
+		name, _, _ := strings.Cut(param, " ")
+		params, args = ", "+param, ", "+name
+	}
 	fmt.Fprintf(b, "\n// %s reads %s.\n", fn, doc)
-	fmt.Fprintf(b, "func %s(parent any, attr string) (%s) {\n", fn, results)
+	fmt.Fprintf(b, "func %s(parent any, attr string%s) (%s) {\n", fn, params, results)
 	b.WriteString("\tswitch p := parent.(type) {\n")
 	for _, e := range all {
 		if !has(e) {
@@ -605,17 +611,44 @@ func writeDispatch(b *bytes.Buffer, fn, doc, results, zero string, all []armAttr
 		}
 		q := e.arm.typ.qualified()
 		name := fn + e.arm.typ.suffix()
-		fmt.Fprintf(b, "\tcase *%s:\n\t\treturn %s(p, attr)\n", q, name)
-		fmt.Fprintf(b, "\tcase %s:\n\t\treturn %s(&p, attr)\n", q, name)
+		fmt.Fprintf(b, "\tcase *%s:\n\t\treturn %s(p, attr%s)\n", q, name, args)
+		fmt.Fprintf(b, "\tcase %s:\n\t\treturn %s(&p, attr%s)\n", q, name, args)
 	}
 	fmt.Fprintf(b, "\t}\n\treturn %s\n}\n", zero)
 }
 
-// writeSingle writes the reader of arm's single-valued attributes.
+// leafGoTypes are the Go types of a field whose value is a primitive leaf,
+// which a single reader called to peek hands back as leafMarker{} in place of
+// the value: the predeclared string, boolean, integer and floating-point
+// types and the named RM primitives ([rmPrimitiveKinds]). Boxing a string or a number allocates;
+// a walk that only counts such a leaf has no use for the value. They are the
+// value types the validation walk reads as a primitive leaf (primitiveLeaf
+// in openehr/validation), which a test there holds to every leaf a reader
+// hands back. An enumeration, a pointer, an interface, a list and a class are
+// never a leaf here, even where they hold a primitive.
+var leafGoTypes = map[string]bool{
+	"string": true, "bool": true,
+	"byte": true, "rune": true,
+	"int": true, "int8": true, "int16": true, "int32": true, "int64": true,
+	"uint": true, "uint8": true, "uint16": true, "uint32": true, "uint64": true,
+	"float32": true, "float64": true,
+	"Character": true, "Integer": true, "Integer64": true, "Real": true,
+}
+
+// leafField reports whether a field of Go type t holds a primitive leaf
+// ([leafGoTypes]).
+func leafField(t *goType) bool {
+	return t.kind == goNamed && len(t.args) == 0 && leafGoTypes[t.name]
+}
+
+// writeSingle writes the reader of arm's single-valued attributes. A field
+// that holds a primitive leaf ([leafField]) is handed back through leafValue,
+// which, when the reader is called to peek, gives leafMarker{} in place of the
+// value, so the value is not boxed.
 func (g *rmaccessGen) writeSingle(b *bytes.Buffer, arm *accessArm, attrs []*accessAttr) error {
 	q := arm.typ.qualified()
 	fmt.Fprintf(b, "\n// single%s reads the single-valued attributes of %s.\n", arm.typ.suffix(), q)
-	fmt.Fprintf(b, "func single%s(x *%s, attr string) (any, bool, bool) {\n", arm.typ.suffix(), q)
+	fmt.Fprintf(b, "func single%s(x *%s, attr string, peek bool) (any, bool, bool) {\n", arm.typ.suffix(), q)
 	b.WriteString("\tif x == nil {\n\t\treturn nil, false, false\n\t}\n")
 	b.WriteString("\tswitch attr {\n")
 	interval, err := intervalShaped(g.plan, arm.class)
@@ -631,7 +664,11 @@ func (g *rmaccessGen) writeSingle(b *bytes.Buffer, arm *accessArm, attrs []*acce
 		fmt.Fprintf(b, "\tcase %q:\n", a.name)
 		switch shape := g.shapes[arm.class.BMMName][a.name]; shape {
 		case shapeField:
-			fmt.Fprintf(b, "\t\treturn %s, %s, true\n", field, present)
+			value := field
+			if leafField(a.typ) {
+				value = fmt.Sprintf("leafValue(peek, %s)", field)
+			}
+			fmt.Fprintf(b, "\t\treturn %s, %s, true\n", value, present)
 		case shapeAddress:
 			if a.kind != accessStruct {
 				return fmt.Errorf("bmmgen: rmaccess: %s.%s is handed back by address, but its field is not held by value", arm.class.BMMName, a.name)
@@ -642,7 +679,11 @@ func (g *rmaccessGen) writeSingle(b *bytes.Buffer, arm *accessArm, attrs []*acce
 				return fmt.Errorf("bmmgen: rmaccess: %s.%s is handed back dereferenced, but its field is not a pointer", arm.class.BMMName, a.name)
 			}
 			fmt.Fprintf(b, "\t\tif %s == nil {\n\t\t\treturn nil, false, true\n\t\t}\n", field)
-			fmt.Fprintf(b, "\t\treturn *%s, true, true\n", field)
+			value := "*" + field
+			if leafField(a.typ.elem) {
+				value = fmt.Sprintf("leafValue(peek, %s)", value)
+			}
+			fmt.Fprintf(b, "\t\treturn %s, true, true\n", value)
 		default:
 			return fmt.Errorf("bmmgen: rmaccess: %s.%s has shape %d, which the generator does not know", arm.class.BMMName, a.name, shape)
 		}
@@ -652,16 +693,15 @@ func (g *rmaccessGen) writeSingle(b *bytes.Buffer, arm *accessArm, attrs []*acce
 }
 
 // writeMultiple writes the reader of arm's containers, each a Go slice
-// ([rmaccessGen.split] refuses any other), handed over as a list whose items
-// are boxed only when they are read: those of a list of values as pointers
-// into the backing array (boxPointers), those of a list of interfaces or
-// pointers as they are (boxValues). A list is counted without boxing an
-// item.
+// ([rmaccessGen.split] refuses any other), whose items are boxed only when the
+// reader is called to box them: those of a list of values as pointers into
+// the backing array (boxPointers), those of a list of interfaces or pointers
+// as they are (boxValues). A list is counted without boxing an item.
 func (g *rmaccessGen) writeMultiple(b *bytes.Buffer, arm *accessArm, attrs []*accessAttr) error {
 	q := arm.typ.qualified()
 	fmt.Fprintf(b, "\n// multiple%s reads the containers of %s.\n", arm.typ.suffix(), q)
-	fmt.Fprintf(b, "func multiple%s(x *%s, attr string) (list, bool, bool) {\n", arm.typ.suffix(), q)
-	b.WriteString("\tif x == nil {\n\t\treturn nil, false, false\n\t}\n")
+	fmt.Fprintf(b, "func multiple%s(x *%s, attr string, box bool) ([]any, int, bool, bool) {\n", arm.typ.suffix(), q)
+	b.WriteString("\tif x == nil {\n\t\treturn nil, 0, false, false\n\t}\n")
 	b.WriteString("\tswitch attr {\n")
 	for _, a := range attrs {
 		field := "x." + a.field
@@ -673,9 +713,9 @@ func (g *rmaccessGen) writeMultiple(b *bytes.Buffer, arm *accessArm, attrs []*ac
 		if elem == accessInterface || elem == accessPointer {
 			box = "boxValues"
 		}
-		fmt.Fprintf(b, "\tcase %q:\n\t\treturn %s(%s), %s != nil, true\n", a.name, box, field, field)
+		fmt.Fprintf(b, "\tcase %q:\n\t\treturn %s(box, %s), len(%s), %s != nil, true\n", a.name, box, field, field, field)
 	}
-	b.WriteString("\t}\n\treturn nil, false, false\n}\n")
+	b.WriteString("\t}\n\treturn nil, 0, false, false\n}\n")
 	return nil
 }
 

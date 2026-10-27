@@ -157,816 +157,817 @@ func covers(v any) bool {
 
 // single reads the single-valued attribute attr of parent: its value, whether it is
 // present, and whether parent's class declares attr as a single-valued
-// attribute at all.
-func single(parent any, attr string) (any, bool, bool) {
+// attribute at all. With peek set, a primitive leaf comes back as leafMarker{}
+// in place of its value.
+func single(parent any, attr string, peek bool) (any, bool, bool) {
 	switch p := parent.(type) {
 	case *rm.AccessGroupRef:
-		return singleAccessGroupRef(p, attr)
+		return singleAccessGroupRef(p, attr, peek)
 	case rm.AccessGroupRef:
-		return singleAccessGroupRef(&p, attr)
+		return singleAccessGroupRef(&p, attr, peek)
 	case *rm.Action:
-		return singleAction(p, attr)
+		return singleAction(p, attr, peek)
 	case rm.Action:
-		return singleAction(&p, attr)
+		return singleAction(&p, attr, peek)
 	case *rm.Activity:
-		return singleActivity(p, attr)
+		return singleActivity(p, attr, peek)
 	case rm.Activity:
-		return singleActivity(&p, attr)
+		return singleActivity(&p, attr, peek)
 	case *rm.Address:
-		return singleAddress(p, attr)
+		return singleAddress(p, attr, peek)
 	case rm.Address:
-		return singleAddress(&p, attr)
+		return singleAddress(&p, attr, peek)
 	case *rm.AdminEntry:
-		return singleAdminEntry(p, attr)
+		return singleAdminEntry(p, attr, peek)
 	case rm.AdminEntry:
-		return singleAdminEntry(&p, attr)
+		return singleAdminEntry(&p, attr, peek)
 	case *rm.Agent:
-		return singleAgent(p, attr)
+		return singleAgent(p, attr, peek)
 	case rm.Agent:
-		return singleAgent(&p, attr)
+		return singleAgent(&p, attr, peek)
 	case *rm.Archetyped:
-		return singleArchetyped(p, attr)
+		return singleArchetyped(p, attr, peek)
 	case rm.Archetyped:
-		return singleArchetyped(&p, attr)
+		return singleArchetyped(&p, attr, peek)
 	case *rm.ArchetypeID:
-		return singleArchetypeID(p, attr)
+		return singleArchetypeID(p, attr, peek)
 	case rm.ArchetypeID:
-		return singleArchetypeID(&p, attr)
+		return singleArchetypeID(&p, attr, peek)
 	case *rm.Attestation:
-		return singleAttestation(p, attr)
+		return singleAttestation(p, attr, peek)
 	case rm.Attestation:
-		return singleAttestation(&p, attr)
+		return singleAttestation(&p, attr, peek)
 	case *rm.AuditDetails:
-		return singleAuditDetails(p, attr)
+		return singleAuditDetails(p, attr, peek)
 	case rm.AuditDetails:
-		return singleAuditDetails(&p, attr)
+		return singleAuditDetails(&p, attr, peek)
 	case *rm.Capability:
-		return singleCapability(p, attr)
+		return singleCapability(p, attr, peek)
 	case rm.Capability:
-		return singleCapability(&p, attr)
+		return singleCapability(&p, attr, peek)
 	case *rm.Cluster:
-		return singleCluster(p, attr)
+		return singleCluster(p, attr, peek)
 	case rm.Cluster:
-		return singleCluster(&p, attr)
+		return singleCluster(&p, attr, peek)
 	case *rm.CodePhrase:
-		return singleCodePhrase(p, attr)
+		return singleCodePhrase(p, attr, peek)
 	case rm.CodePhrase:
-		return singleCodePhrase(&p, attr)
+		return singleCodePhrase(&p, attr, peek)
 	case *rm.Composition:
-		return singleComposition(p, attr)
+		return singleComposition(p, attr, peek)
 	case rm.Composition:
-		return singleComposition(&p, attr)
+		return singleComposition(&p, attr, peek)
 	case *rm.Contact:
-		return singleContact(p, attr)
+		return singleContact(p, attr, peek)
 	case rm.Contact:
-		return singleContact(&p, attr)
+		return singleContact(&p, attr, peek)
 	case *rm.Contribution:
-		return singleContribution(p, attr)
+		return singleContribution(p, attr, peek)
 	case rm.Contribution:
-		return singleContribution(&p, attr)
+		return singleContribution(&p, attr, peek)
 	case *rm.DVBoolean:
-		return singleDVBoolean(p, attr)
+		return singleDVBoolean(p, attr, peek)
 	case rm.DVBoolean:
-		return singleDVBoolean(&p, attr)
+		return singleDVBoolean(&p, attr, peek)
 	case *rm.DVCodedText:
-		return singleDVCodedText(p, attr)
+		return singleDVCodedText(p, attr, peek)
 	case rm.DVCodedText:
-		return singleDVCodedText(&p, attr)
+		return singleDVCodedText(&p, attr, peek)
 	case *rm.DVCount:
-		return singleDVCount(p, attr)
+		return singleDVCount(p, attr, peek)
 	case rm.DVCount:
-		return singleDVCount(&p, attr)
+		return singleDVCount(&p, attr, peek)
 	case *rm.DVDate:
-		return singleDVDate(p, attr)
+		return singleDVDate(p, attr, peek)
 	case rm.DVDate:
-		return singleDVDate(&p, attr)
+		return singleDVDate(&p, attr, peek)
 	case *rm.DVDateTime:
-		return singleDVDateTime(p, attr)
+		return singleDVDateTime(p, attr, peek)
 	case rm.DVDateTime:
-		return singleDVDateTime(&p, attr)
+		return singleDVDateTime(&p, attr, peek)
 	case *rm.DVDuration:
-		return singleDVDuration(p, attr)
+		return singleDVDuration(p, attr, peek)
 	case rm.DVDuration:
-		return singleDVDuration(&p, attr)
+		return singleDVDuration(&p, attr, peek)
 	case *rm.DVEHRURI:
-		return singleDVEHRURI(p, attr)
+		return singleDVEHRURI(p, attr, peek)
 	case rm.DVEHRURI:
-		return singleDVEHRURI(&p, attr)
+		return singleDVEHRURI(&p, attr, peek)
 	case *rm.DVGeneralTimeSpecification:
-		return singleDVGeneralTimeSpecification(p, attr)
+		return singleDVGeneralTimeSpecification(p, attr, peek)
 	case rm.DVGeneralTimeSpecification:
-		return singleDVGeneralTimeSpecification(&p, attr)
+		return singleDVGeneralTimeSpecification(&p, attr, peek)
 	case *rm.DVIdentifier:
-		return singleDVIdentifier(p, attr)
+		return singleDVIdentifier(p, attr, peek)
 	case rm.DVIdentifier:
-		return singleDVIdentifier(&p, attr)
+		return singleDVIdentifier(&p, attr, peek)
 	case *rm.DVInterval[rm.DVOrdered]:
-		return singleDVIntervalDVOrdered(p, attr)
+		return singleDVIntervalDVOrdered(p, attr, peek)
 	case rm.DVInterval[rm.DVOrdered]:
-		return singleDVIntervalDVOrdered(&p, attr)
+		return singleDVIntervalDVOrdered(&p, attr, peek)
 	case *rm.DVInterval[rm.DVCount]:
-		return singleDVIntervalDVCount(p, attr)
+		return singleDVIntervalDVCount(p, attr, peek)
 	case rm.DVInterval[rm.DVCount]:
-		return singleDVIntervalDVCount(&p, attr)
+		return singleDVIntervalDVCount(&p, attr, peek)
 	case *rm.DVInterval[rm.DVDate]:
-		return singleDVIntervalDVDate(p, attr)
+		return singleDVIntervalDVDate(p, attr, peek)
 	case rm.DVInterval[rm.DVDate]:
-		return singleDVIntervalDVDate(&p, attr)
+		return singleDVIntervalDVDate(&p, attr, peek)
 	case *rm.DVInterval[rm.DVDateTime]:
-		return singleDVIntervalDVDateTime(p, attr)
+		return singleDVIntervalDVDateTime(p, attr, peek)
 	case rm.DVInterval[rm.DVDateTime]:
-		return singleDVIntervalDVDateTime(&p, attr)
+		return singleDVIntervalDVDateTime(&p, attr, peek)
 	case *rm.DVInterval[rm.DVDuration]:
-		return singleDVIntervalDVDuration(p, attr)
+		return singleDVIntervalDVDuration(p, attr, peek)
 	case rm.DVInterval[rm.DVDuration]:
-		return singleDVIntervalDVDuration(&p, attr)
+		return singleDVIntervalDVDuration(&p, attr, peek)
 	case *rm.DVInterval[rm.DVOrdinal]:
-		return singleDVIntervalDVOrdinal(p, attr)
+		return singleDVIntervalDVOrdinal(p, attr, peek)
 	case rm.DVInterval[rm.DVOrdinal]:
-		return singleDVIntervalDVOrdinal(&p, attr)
+		return singleDVIntervalDVOrdinal(&p, attr, peek)
 	case *rm.DVInterval[rm.DVProportion]:
-		return singleDVIntervalDVProportion(p, attr)
+		return singleDVIntervalDVProportion(p, attr, peek)
 	case rm.DVInterval[rm.DVProportion]:
-		return singleDVIntervalDVProportion(&p, attr)
+		return singleDVIntervalDVProportion(&p, attr, peek)
 	case *rm.DVInterval[rm.DVQuantity]:
-		return singleDVIntervalDVQuantity(p, attr)
+		return singleDVIntervalDVQuantity(p, attr, peek)
 	case rm.DVInterval[rm.DVQuantity]:
-		return singleDVIntervalDVQuantity(&p, attr)
+		return singleDVIntervalDVQuantity(&p, attr, peek)
 	case *rm.DVInterval[rm.DVScale]:
-		return singleDVIntervalDVScale(p, attr)
+		return singleDVIntervalDVScale(p, attr, peek)
 	case rm.DVInterval[rm.DVScale]:
-		return singleDVIntervalDVScale(&p, attr)
+		return singleDVIntervalDVScale(&p, attr, peek)
 	case *rm.DVInterval[rm.DVTime]:
-		return singleDVIntervalDVTime(p, attr)
+		return singleDVIntervalDVTime(p, attr, peek)
 	case rm.DVInterval[rm.DVTime]:
-		return singleDVIntervalDVTime(&p, attr)
+		return singleDVIntervalDVTime(&p, attr, peek)
 	case *rm.DVMultimedia:
-		return singleDVMultimedia(p, attr)
+		return singleDVMultimedia(p, attr, peek)
 	case rm.DVMultimedia:
-		return singleDVMultimedia(&p, attr)
+		return singleDVMultimedia(&p, attr, peek)
 	case *rm.DVOrdinal:
-		return singleDVOrdinal(p, attr)
+		return singleDVOrdinal(p, attr, peek)
 	case rm.DVOrdinal:
-		return singleDVOrdinal(&p, attr)
+		return singleDVOrdinal(&p, attr, peek)
 	case *rm.DVParsable:
-		return singleDVParsable(p, attr)
+		return singleDVParsable(p, attr, peek)
 	case rm.DVParsable:
-		return singleDVParsable(&p, attr)
+		return singleDVParsable(&p, attr, peek)
 	case *rm.DVPeriodicTimeSpecification:
-		return singleDVPeriodicTimeSpecification(p, attr)
+		return singleDVPeriodicTimeSpecification(p, attr, peek)
 	case rm.DVPeriodicTimeSpecification:
-		return singleDVPeriodicTimeSpecification(&p, attr)
+		return singleDVPeriodicTimeSpecification(&p, attr, peek)
 	case *rm.DVProportion:
-		return singleDVProportion(p, attr)
+		return singleDVProportion(p, attr, peek)
 	case rm.DVProportion:
-		return singleDVProportion(&p, attr)
+		return singleDVProportion(&p, attr, peek)
 	case *rm.DVQuantity:
-		return singleDVQuantity(p, attr)
+		return singleDVQuantity(p, attr, peek)
 	case rm.DVQuantity:
-		return singleDVQuantity(&p, attr)
+		return singleDVQuantity(&p, attr, peek)
 	case *rm.DVScale:
-		return singleDVScale(p, attr)
+		return singleDVScale(p, attr, peek)
 	case rm.DVScale:
-		return singleDVScale(&p, attr)
+		return singleDVScale(&p, attr, peek)
 	case *rm.DVState:
-		return singleDVState(p, attr)
+		return singleDVState(p, attr, peek)
 	case rm.DVState:
-		return singleDVState(&p, attr)
+		return singleDVState(&p, attr, peek)
 	case *rm.DVText:
-		return singleDVText(p, attr)
+		return singleDVText(p, attr, peek)
 	case rm.DVText:
-		return singleDVText(&p, attr)
+		return singleDVText(&p, attr, peek)
 	case *rm.DVTime:
-		return singleDVTime(p, attr)
+		return singleDVTime(p, attr, peek)
 	case rm.DVTime:
-		return singleDVTime(&p, attr)
+		return singleDVTime(&p, attr, peek)
 	case *rm.DVURI:
-		return singleDVURI(p, attr)
+		return singleDVURI(p, attr, peek)
 	case rm.DVURI:
-		return singleDVURI(&p, attr)
+		return singleDVURI(&p, attr, peek)
 	case *rm.EHR:
-		return singleEHR(p, attr)
+		return singleEHR(p, attr, peek)
 	case rm.EHR:
-		return singleEHR(&p, attr)
+		return singleEHR(&p, attr, peek)
 	case *rm.EHRAccess:
-		return singleEHRAccess(p, attr)
+		return singleEHRAccess(p, attr, peek)
 	case rm.EHRAccess:
-		return singleEHRAccess(&p, attr)
+		return singleEHRAccess(&p, attr, peek)
 	case *rm.EHRStatus:
-		return singleEHRStatus(p, attr)
+		return singleEHRStatus(p, attr, peek)
 	case rm.EHRStatus:
-		return singleEHRStatus(&p, attr)
+		return singleEHRStatus(&p, attr, peek)
 	case *rm.Element:
-		return singleElement(p, attr)
+		return singleElement(p, attr, peek)
 	case rm.Element:
-		return singleElement(&p, attr)
+		return singleElement(&p, attr, peek)
 	case *rm.Evaluation:
-		return singleEvaluation(p, attr)
+		return singleEvaluation(p, attr, peek)
 	case rm.Evaluation:
-		return singleEvaluation(&p, attr)
+		return singleEvaluation(&p, attr, peek)
 	case *rm.EventContext:
-		return singleEventContext(p, attr)
+		return singleEventContext(p, attr, peek)
 	case rm.EventContext:
-		return singleEventContext(&p, attr)
+		return singleEventContext(&p, attr, peek)
 	case *rm.FeederAudit:
-		return singleFeederAudit(p, attr)
+		return singleFeederAudit(p, attr, peek)
 	case rm.FeederAudit:
-		return singleFeederAudit(&p, attr)
+		return singleFeederAudit(&p, attr, peek)
 	case *rm.FeederAuditDetails:
-		return singleFeederAuditDetails(p, attr)
+		return singleFeederAuditDetails(p, attr, peek)
 	case rm.FeederAuditDetails:
-		return singleFeederAuditDetails(&p, attr)
+		return singleFeederAuditDetails(&p, attr, peek)
 	case *rm.Folder:
-		return singleFolder(p, attr)
+		return singleFolder(p, attr, peek)
 	case rm.Folder:
-		return singleFolder(&p, attr)
+		return singleFolder(&p, attr, peek)
 	case *rm.GenericEntry:
-		return singleGenericEntry(p, attr)
+		return singleGenericEntry(p, attr, peek)
 	case rm.GenericEntry:
-		return singleGenericEntry(&p, attr)
+		return singleGenericEntry(&p, attr, peek)
 	case *rm.GenericID:
-		return singleGenericID(p, attr)
+		return singleGenericID(p, attr, peek)
 	case rm.GenericID:
-		return singleGenericID(&p, attr)
+		return singleGenericID(&p, attr, peek)
 	case *rm.Group:
-		return singleGroup(p, attr)
+		return singleGroup(p, attr, peek)
 	case rm.Group:
-		return singleGroup(&p, attr)
+		return singleGroup(&p, attr, peek)
 	case *rm.HierObjectID:
-		return singleHierObjectID(p, attr)
+		return singleHierObjectID(p, attr, peek)
 	case rm.HierObjectID:
-		return singleHierObjectID(&p, attr)
+		return singleHierObjectID(&p, attr, peek)
 	case *rm.History[rm.ItemStructure]:
-		return singleHistoryItemStructure(p, attr)
+		return singleHistoryItemStructure(p, attr, peek)
 	case rm.History[rm.ItemStructure]:
-		return singleHistoryItemStructure(&p, attr)
+		return singleHistoryItemStructure(&p, attr, peek)
 	case *rm.History[rm.ItemList]:
-		return singleHistoryItemList(p, attr)
+		return singleHistoryItemList(p, attr, peek)
 	case rm.History[rm.ItemList]:
-		return singleHistoryItemList(&p, attr)
+		return singleHistoryItemList(&p, attr, peek)
 	case *rm.History[rm.ItemSingle]:
-		return singleHistoryItemSingle(p, attr)
+		return singleHistoryItemSingle(p, attr, peek)
 	case rm.History[rm.ItemSingle]:
-		return singleHistoryItemSingle(&p, attr)
+		return singleHistoryItemSingle(&p, attr, peek)
 	case *rm.History[rm.ItemTable]:
-		return singleHistoryItemTable(p, attr)
+		return singleHistoryItemTable(p, attr, peek)
 	case rm.History[rm.ItemTable]:
-		return singleHistoryItemTable(&p, attr)
+		return singleHistoryItemTable(&p, attr, peek)
 	case *rm.History[rm.ItemTree]:
-		return singleHistoryItemTree(p, attr)
+		return singleHistoryItemTree(p, attr, peek)
 	case rm.History[rm.ItemTree]:
-		return singleHistoryItemTree(&p, attr)
+		return singleHistoryItemTree(&p, attr, peek)
 	case *rm.ImportedVersion[any]:
-		return singleImportedVersionAny(p, attr)
+		return singleImportedVersionAny(p, attr, peek)
 	case rm.ImportedVersion[any]:
-		return singleImportedVersionAny(&p, attr)
+		return singleImportedVersionAny(&p, attr, peek)
 	case *rm.Instruction:
-		return singleInstruction(p, attr)
+		return singleInstruction(p, attr, peek)
 	case rm.Instruction:
-		return singleInstruction(&p, attr)
+		return singleInstruction(&p, attr, peek)
 	case *rm.InstructionDetails:
-		return singleInstructionDetails(p, attr)
+		return singleInstructionDetails(p, attr, peek)
 	case rm.InstructionDetails:
-		return singleInstructionDetails(&p, attr)
+		return singleInstructionDetails(&p, attr, peek)
 	case *rm.InternetID:
-		return singleInternetID(p, attr)
+		return singleInternetID(p, attr, peek)
 	case rm.InternetID:
-		return singleInternetID(&p, attr)
+		return singleInternetID(&p, attr, peek)
 	case *rm.IntervalEvent[rm.ItemStructure]:
-		return singleIntervalEventItemStructure(p, attr)
+		return singleIntervalEventItemStructure(p, attr, peek)
 	case rm.IntervalEvent[rm.ItemStructure]:
-		return singleIntervalEventItemStructure(&p, attr)
+		return singleIntervalEventItemStructure(&p, attr, peek)
 	case *rm.IntervalEvent[rm.ItemList]:
-		return singleIntervalEventItemList(p, attr)
+		return singleIntervalEventItemList(p, attr, peek)
 	case rm.IntervalEvent[rm.ItemList]:
-		return singleIntervalEventItemList(&p, attr)
+		return singleIntervalEventItemList(&p, attr, peek)
 	case *rm.IntervalEvent[rm.ItemSingle]:
-		return singleIntervalEventItemSingle(p, attr)
+		return singleIntervalEventItemSingle(p, attr, peek)
 	case rm.IntervalEvent[rm.ItemSingle]:
-		return singleIntervalEventItemSingle(&p, attr)
+		return singleIntervalEventItemSingle(&p, attr, peek)
 	case *rm.IntervalEvent[rm.ItemTable]:
-		return singleIntervalEventItemTable(p, attr)
+		return singleIntervalEventItemTable(p, attr, peek)
 	case rm.IntervalEvent[rm.ItemTable]:
-		return singleIntervalEventItemTable(&p, attr)
+		return singleIntervalEventItemTable(&p, attr, peek)
 	case *rm.IntervalEvent[rm.ItemTree]:
-		return singleIntervalEventItemTree(p, attr)
+		return singleIntervalEventItemTree(p, attr, peek)
 	case rm.IntervalEvent[rm.ItemTree]:
-		return singleIntervalEventItemTree(&p, attr)
+		return singleIntervalEventItemTree(&p, attr, peek)
 	case *rm.IsmTransition:
-		return singleIsmTransition(p, attr)
+		return singleIsmTransition(p, attr, peek)
 	case rm.IsmTransition:
-		return singleIsmTransition(&p, attr)
+		return singleIsmTransition(&p, attr, peek)
 	case *rm.ISOOID:
-		return singleISOOID(p, attr)
+		return singleISOOID(p, attr, peek)
 	case rm.ISOOID:
-		return singleISOOID(&p, attr)
+		return singleISOOID(&p, attr, peek)
 	case *rm.ItemList:
-		return singleItemList(p, attr)
+		return singleItemList(p, attr, peek)
 	case rm.ItemList:
-		return singleItemList(&p, attr)
+		return singleItemList(&p, attr, peek)
 	case *rm.ItemSingle:
-		return singleItemSingle(p, attr)
+		return singleItemSingle(p, attr, peek)
 	case rm.ItemSingle:
-		return singleItemSingle(&p, attr)
+		return singleItemSingle(&p, attr, peek)
 	case *rm.ItemTable:
-		return singleItemTable(p, attr)
+		return singleItemTable(p, attr, peek)
 	case rm.ItemTable:
-		return singleItemTable(&p, attr)
+		return singleItemTable(&p, attr, peek)
 	case *rm.ItemTag:
-		return singleItemTag(p, attr)
+		return singleItemTag(p, attr, peek)
 	case rm.ItemTag:
-		return singleItemTag(&p, attr)
+		return singleItemTag(&p, attr, peek)
 	case *rm.ItemTree:
-		return singleItemTree(p, attr)
+		return singleItemTree(p, attr, peek)
 	case rm.ItemTree:
-		return singleItemTree(&p, attr)
+		return singleItemTree(&p, attr, peek)
 	case *rm.Link:
-		return singleLink(p, attr)
+		return singleLink(p, attr, peek)
 	case rm.Link:
-		return singleLink(&p, attr)
+		return singleLink(&p, attr, peek)
 	case *rm.LocatableRef:
-		return singleLocatableRef(p, attr)
+		return singleLocatableRef(p, attr, peek)
 	case rm.LocatableRef:
-		return singleLocatableRef(&p, attr)
+		return singleLocatableRef(&p, attr, peek)
 	case *rm.ObjectRef:
-		return singleObjectRef(p, attr)
+		return singleObjectRef(p, attr, peek)
 	case rm.ObjectRef:
-		return singleObjectRef(&p, attr)
+		return singleObjectRef(&p, attr, peek)
 	case *rm.ObjectVersionID:
-		return singleObjectVersionID(p, attr)
+		return singleObjectVersionID(p, attr, peek)
 	case rm.ObjectVersionID:
-		return singleObjectVersionID(&p, attr)
+		return singleObjectVersionID(&p, attr, peek)
 	case *rm.Observation:
-		return singleObservation(p, attr)
+		return singleObservation(p, attr, peek)
 	case rm.Observation:
-		return singleObservation(&p, attr)
+		return singleObservation(&p, attr, peek)
 	case *rm.Organisation:
-		return singleOrganisation(p, attr)
+		return singleOrganisation(p, attr, peek)
 	case rm.Organisation:
-		return singleOrganisation(&p, attr)
+		return singleOrganisation(&p, attr, peek)
 	case *rm.OriginalVersion[any]:
-		return singleOriginalVersionAny(p, attr)
+		return singleOriginalVersionAny(p, attr, peek)
 	case rm.OriginalVersion[any]:
-		return singleOriginalVersionAny(&p, attr)
+		return singleOriginalVersionAny(&p, attr, peek)
 	case *rm.Participation:
-		return singleParticipation(p, attr)
+		return singleParticipation(p, attr, peek)
 	case rm.Participation:
-		return singleParticipation(&p, attr)
+		return singleParticipation(&p, attr, peek)
 	case *rm.PartyIdentified:
-		return singlePartyIdentified(p, attr)
+		return singlePartyIdentified(p, attr, peek)
 	case rm.PartyIdentified:
-		return singlePartyIdentified(&p, attr)
+		return singlePartyIdentified(&p, attr, peek)
 	case *rm.PartyIdentity:
-		return singlePartyIdentity(p, attr)
+		return singlePartyIdentity(p, attr, peek)
 	case rm.PartyIdentity:
-		return singlePartyIdentity(&p, attr)
+		return singlePartyIdentity(&p, attr, peek)
 	case *rm.PartyRef:
-		return singlePartyRef(p, attr)
+		return singlePartyRef(p, attr, peek)
 	case rm.PartyRef:
-		return singlePartyRef(&p, attr)
+		return singlePartyRef(&p, attr, peek)
 	case *rm.PartyRelated:
-		return singlePartyRelated(p, attr)
+		return singlePartyRelated(p, attr, peek)
 	case rm.PartyRelated:
-		return singlePartyRelated(&p, attr)
+		return singlePartyRelated(&p, attr, peek)
 	case *rm.PartyRelationship:
-		return singlePartyRelationship(p, attr)
+		return singlePartyRelationship(p, attr, peek)
 	case rm.PartyRelationship:
-		return singlePartyRelationship(&p, attr)
+		return singlePartyRelationship(&p, attr, peek)
 	case *rm.PartySelf:
-		return singlePartySelf(p, attr)
+		return singlePartySelf(p, attr, peek)
 	case rm.PartySelf:
-		return singlePartySelf(&p, attr)
+		return singlePartySelf(&p, attr, peek)
 	case *rm.Person:
-		return singlePerson(p, attr)
+		return singlePerson(p, attr, peek)
 	case rm.Person:
-		return singlePerson(&p, attr)
+		return singlePerson(&p, attr, peek)
 	case *rm.PointEvent[rm.ItemStructure]:
-		return singlePointEventItemStructure(p, attr)
+		return singlePointEventItemStructure(p, attr, peek)
 	case rm.PointEvent[rm.ItemStructure]:
-		return singlePointEventItemStructure(&p, attr)
+		return singlePointEventItemStructure(&p, attr, peek)
 	case *rm.PointEvent[rm.ItemList]:
-		return singlePointEventItemList(p, attr)
+		return singlePointEventItemList(p, attr, peek)
 	case rm.PointEvent[rm.ItemList]:
-		return singlePointEventItemList(&p, attr)
+		return singlePointEventItemList(&p, attr, peek)
 	case *rm.PointEvent[rm.ItemSingle]:
-		return singlePointEventItemSingle(p, attr)
+		return singlePointEventItemSingle(p, attr, peek)
 	case rm.PointEvent[rm.ItemSingle]:
-		return singlePointEventItemSingle(&p, attr)
+		return singlePointEventItemSingle(&p, attr, peek)
 	case *rm.PointEvent[rm.ItemTable]:
-		return singlePointEventItemTable(p, attr)
+		return singlePointEventItemTable(p, attr, peek)
 	case rm.PointEvent[rm.ItemTable]:
-		return singlePointEventItemTable(&p, attr)
+		return singlePointEventItemTable(&p, attr, peek)
 	case *rm.PointEvent[rm.ItemTree]:
-		return singlePointEventItemTree(p, attr)
+		return singlePointEventItemTree(p, attr, peek)
 	case rm.PointEvent[rm.ItemTree]:
-		return singlePointEventItemTree(&p, attr)
+		return singlePointEventItemTree(&p, attr, peek)
 	case *rm.PointInterval[any]:
-		return singlePointIntervalAny(p, attr)
+		return singlePointIntervalAny(p, attr, peek)
 	case rm.PointInterval[any]:
-		return singlePointIntervalAny(&p, attr)
+		return singlePointIntervalAny(&p, attr, peek)
 	case *rm.ProperInterval[any]:
-		return singleProperIntervalAny(p, attr)
+		return singleProperIntervalAny(p, attr, peek)
 	case rm.ProperInterval[any]:
-		return singleProperIntervalAny(&p, attr)
+		return singleProperIntervalAny(&p, attr, peek)
 	case *rm.ReferenceRange[rm.DVOrdered]:
-		return singleReferenceRangeDVOrdered(p, attr)
+		return singleReferenceRangeDVOrdered(p, attr, peek)
 	case rm.ReferenceRange[rm.DVOrdered]:
-		return singleReferenceRangeDVOrdered(&p, attr)
+		return singleReferenceRangeDVOrdered(&p, attr, peek)
 	case *rm.ReferenceRange[rm.DVCount]:
-		return singleReferenceRangeDVCount(p, attr)
+		return singleReferenceRangeDVCount(p, attr, peek)
 	case rm.ReferenceRange[rm.DVCount]:
-		return singleReferenceRangeDVCount(&p, attr)
+		return singleReferenceRangeDVCount(&p, attr, peek)
 	case *rm.ReferenceRange[rm.DVDate]:
-		return singleReferenceRangeDVDate(p, attr)
+		return singleReferenceRangeDVDate(p, attr, peek)
 	case rm.ReferenceRange[rm.DVDate]:
-		return singleReferenceRangeDVDate(&p, attr)
+		return singleReferenceRangeDVDate(&p, attr, peek)
 	case *rm.ReferenceRange[rm.DVDateTime]:
-		return singleReferenceRangeDVDateTime(p, attr)
+		return singleReferenceRangeDVDateTime(p, attr, peek)
 	case rm.ReferenceRange[rm.DVDateTime]:
-		return singleReferenceRangeDVDateTime(&p, attr)
+		return singleReferenceRangeDVDateTime(&p, attr, peek)
 	case *rm.ReferenceRange[rm.DVDuration]:
-		return singleReferenceRangeDVDuration(p, attr)
+		return singleReferenceRangeDVDuration(p, attr, peek)
 	case rm.ReferenceRange[rm.DVDuration]:
-		return singleReferenceRangeDVDuration(&p, attr)
+		return singleReferenceRangeDVDuration(&p, attr, peek)
 	case *rm.ReferenceRange[rm.DVOrdinal]:
-		return singleReferenceRangeDVOrdinal(p, attr)
+		return singleReferenceRangeDVOrdinal(p, attr, peek)
 	case rm.ReferenceRange[rm.DVOrdinal]:
-		return singleReferenceRangeDVOrdinal(&p, attr)
+		return singleReferenceRangeDVOrdinal(&p, attr, peek)
 	case *rm.ReferenceRange[rm.DVProportion]:
-		return singleReferenceRangeDVProportion(p, attr)
+		return singleReferenceRangeDVProportion(p, attr, peek)
 	case rm.ReferenceRange[rm.DVProportion]:
-		return singleReferenceRangeDVProportion(&p, attr)
+		return singleReferenceRangeDVProportion(&p, attr, peek)
 	case *rm.ReferenceRange[rm.DVQuantity]:
-		return singleReferenceRangeDVQuantity(p, attr)
+		return singleReferenceRangeDVQuantity(p, attr, peek)
 	case rm.ReferenceRange[rm.DVQuantity]:
-		return singleReferenceRangeDVQuantity(&p, attr)
+		return singleReferenceRangeDVQuantity(&p, attr, peek)
 	case *rm.ReferenceRange[rm.DVScale]:
-		return singleReferenceRangeDVScale(p, attr)
+		return singleReferenceRangeDVScale(p, attr, peek)
 	case rm.ReferenceRange[rm.DVScale]:
-		return singleReferenceRangeDVScale(&p, attr)
+		return singleReferenceRangeDVScale(&p, attr, peek)
 	case *rm.ReferenceRange[rm.DVTime]:
-		return singleReferenceRangeDVTime(p, attr)
+		return singleReferenceRangeDVTime(p, attr, peek)
 	case rm.ReferenceRange[rm.DVTime]:
-		return singleReferenceRangeDVTime(&p, attr)
+		return singleReferenceRangeDVTime(&p, attr, peek)
 	case *rm.ResourceAnnotations:
-		return singleResourceAnnotations(p, attr)
+		return singleResourceAnnotations(p, attr, peek)
 	case rm.ResourceAnnotations:
-		return singleResourceAnnotations(&p, attr)
+		return singleResourceAnnotations(&p, attr, peek)
 	case *rm.ResourceDescription:
-		return singleResourceDescription(p, attr)
+		return singleResourceDescription(p, attr, peek)
 	case rm.ResourceDescription:
-		return singleResourceDescription(&p, attr)
+		return singleResourceDescription(&p, attr, peek)
 	case *rm.ResourceDescriptionItem:
-		return singleResourceDescriptionItem(p, attr)
+		return singleResourceDescriptionItem(p, attr, peek)
 	case rm.ResourceDescriptionItem:
-		return singleResourceDescriptionItem(&p, attr)
+		return singleResourceDescriptionItem(&p, attr, peek)
 	case *rm.RevisionHistoryItem:
-		return singleRevisionHistoryItem(p, attr)
+		return singleRevisionHistoryItem(p, attr, peek)
 	case rm.RevisionHistoryItem:
-		return singleRevisionHistoryItem(&p, attr)
+		return singleRevisionHistoryItem(&p, attr, peek)
 	case *rm.Role:
-		return singleRole(p, attr)
+		return singleRole(p, attr, peek)
 	case rm.Role:
-		return singleRole(&p, attr)
+		return singleRole(&p, attr, peek)
 	case *rm.Section:
-		return singleSection(p, attr)
+		return singleSection(p, attr, peek)
 	case rm.Section:
-		return singleSection(&p, attr)
+		return singleSection(&p, attr, peek)
 	case *rm.TemplateID:
-		return singleTemplateID(p, attr)
+		return singleTemplateID(p, attr, peek)
 	case rm.TemplateID:
-		return singleTemplateID(&p, attr)
+		return singleTemplateID(&p, attr, peek)
 	case *rm.TerminologyID:
-		return singleTerminologyID(p, attr)
+		return singleTerminologyID(p, attr, peek)
 	case rm.TerminologyID:
-		return singleTerminologyID(&p, attr)
+		return singleTerminologyID(&p, attr, peek)
 	case *rm.TermMapping:
-		return singleTermMapping(p, attr)
+		return singleTermMapping(p, attr, peek)
 	case rm.TermMapping:
-		return singleTermMapping(&p, attr)
+		return singleTermMapping(&p, attr, peek)
 	case *rm.TranslationDetails:
-		return singleTranslationDetails(p, attr)
+		return singleTranslationDetails(p, attr, peek)
 	case rm.TranslationDetails:
-		return singleTranslationDetails(&p, attr)
+		return singleTranslationDetails(&p, attr, peek)
 	case *rm.Uuid:
-		return singleUuid(p, attr)
+		return singleUuid(p, attr, peek)
 	case rm.Uuid:
-		return singleUuid(&p, attr)
+		return singleUuid(&p, attr, peek)
 	case *rm.VersionedComposition:
-		return singleVersionedComposition(p, attr)
+		return singleVersionedComposition(p, attr, peek)
 	case rm.VersionedComposition:
-		return singleVersionedComposition(&p, attr)
+		return singleVersionedComposition(&p, attr, peek)
 	case *rm.VersionedEHRAccess:
-		return singleVersionedEHRAccess(p, attr)
+		return singleVersionedEHRAccess(p, attr, peek)
 	case rm.VersionedEHRAccess:
-		return singleVersionedEHRAccess(&p, attr)
+		return singleVersionedEHRAccess(&p, attr, peek)
 	case *rm.VersionedEHRStatus:
-		return singleVersionedEHRStatus(p, attr)
+		return singleVersionedEHRStatus(p, attr, peek)
 	case rm.VersionedEHRStatus:
-		return singleVersionedEHRStatus(&p, attr)
+		return singleVersionedEHRStatus(&p, attr, peek)
 	case *rm.VersionedFolder:
-		return singleVersionedFolder(p, attr)
+		return singleVersionedFolder(p, attr, peek)
 	case rm.VersionedFolder:
-		return singleVersionedFolder(&p, attr)
+		return singleVersionedFolder(&p, attr, peek)
 	case *rm.VersionedObject[any]:
-		return singleVersionedObjectAny(p, attr)
+		return singleVersionedObjectAny(p, attr, peek)
 	case rm.VersionedObject[any]:
-		return singleVersionedObjectAny(&p, attr)
+		return singleVersionedObjectAny(&p, attr, peek)
 	case *rm.VersionedParty:
-		return singleVersionedParty(p, attr)
+		return singleVersionedParty(p, attr, peek)
 	case rm.VersionedParty:
-		return singleVersionedParty(&p, attr)
+		return singleVersionedParty(&p, attr, peek)
 	case *rm.VersionTreeID:
-		return singleVersionTreeID(p, attr)
+		return singleVersionTreeID(p, attr, peek)
 	case rm.VersionTreeID:
-		return singleVersionTreeID(&p, attr)
+		return singleVersionTreeID(&p, attr, peek)
 	}
 	return nil, false, false
 }
 
-// multiple reads the container attribute attr of parent: its list, whether the list
-// is present, and whether parent's class declares attr as a container at
-// all.
-func multiple(parent any, attr string) (list, bool, bool) {
+// multiple reads the container attribute attr of parent: its items, boxed only when
+// box is set, its length, whether the list is present, and whether
+// parent's class declares attr as a container at all.
+func multiple(parent any, attr string, box bool) ([]any, int, bool, bool) {
 	switch p := parent.(type) {
 	case *rm.Action:
-		return multipleAction(p, attr)
+		return multipleAction(p, attr, box)
 	case rm.Action:
-		return multipleAction(&p, attr)
+		return multipleAction(&p, attr, box)
 	case *rm.Activity:
-		return multipleActivity(p, attr)
+		return multipleActivity(p, attr, box)
 	case rm.Activity:
-		return multipleActivity(&p, attr)
+		return multipleActivity(&p, attr, box)
 	case *rm.Address:
-		return multipleAddress(p, attr)
+		return multipleAddress(p, attr, box)
 	case rm.Address:
-		return multipleAddress(&p, attr)
+		return multipleAddress(&p, attr, box)
 	case *rm.AdminEntry:
-		return multipleAdminEntry(p, attr)
+		return multipleAdminEntry(p, attr, box)
 	case rm.AdminEntry:
-		return multipleAdminEntry(&p, attr)
+		return multipleAdminEntry(&p, attr, box)
 	case *rm.Agent:
-		return multipleAgent(p, attr)
+		return multipleAgent(p, attr, box)
 	case rm.Agent:
-		return multipleAgent(&p, attr)
+		return multipleAgent(&p, attr, box)
 	case *rm.Attestation:
-		return multipleAttestation(p, attr)
+		return multipleAttestation(p, attr, box)
 	case rm.Attestation:
-		return multipleAttestation(&p, attr)
+		return multipleAttestation(&p, attr, box)
 	case *rm.Capability:
-		return multipleCapability(p, attr)
+		return multipleCapability(p, attr, box)
 	case rm.Capability:
-		return multipleCapability(&p, attr)
+		return multipleCapability(&p, attr, box)
 	case *rm.Cluster:
-		return multipleCluster(p, attr)
+		return multipleCluster(p, attr, box)
 	case rm.Cluster:
-		return multipleCluster(&p, attr)
+		return multipleCluster(&p, attr, box)
 	case *rm.Composition:
-		return multipleComposition(p, attr)
+		return multipleComposition(p, attr, box)
 	case rm.Composition:
-		return multipleComposition(&p, attr)
+		return multipleComposition(&p, attr, box)
 	case *rm.Contact:
-		return multipleContact(p, attr)
+		return multipleContact(p, attr, box)
 	case rm.Contact:
-		return multipleContact(&p, attr)
+		return multipleContact(&p, attr, box)
 	case *rm.Contribution:
-		return multipleContribution(p, attr)
+		return multipleContribution(p, attr, box)
 	case rm.Contribution:
-		return multipleContribution(&p, attr)
+		return multipleContribution(&p, attr, box)
 	case *rm.DVCodedText:
-		return multipleDVCodedText(p, attr)
+		return multipleDVCodedText(p, attr, box)
 	case rm.DVCodedText:
-		return multipleDVCodedText(&p, attr)
+		return multipleDVCodedText(&p, attr, box)
 	case *rm.DVCount:
-		return multipleDVCount(p, attr)
+		return multipleDVCount(p, attr, box)
 	case rm.DVCount:
-		return multipleDVCount(&p, attr)
+		return multipleDVCount(&p, attr, box)
 	case *rm.DVDate:
-		return multipleDVDate(p, attr)
+		return multipleDVDate(p, attr, box)
 	case rm.DVDate:
-		return multipleDVDate(&p, attr)
+		return multipleDVDate(&p, attr, box)
 	case *rm.DVDateTime:
-		return multipleDVDateTime(p, attr)
+		return multipleDVDateTime(p, attr, box)
 	case rm.DVDateTime:
-		return multipleDVDateTime(&p, attr)
+		return multipleDVDateTime(&p, attr, box)
 	case *rm.DVDuration:
-		return multipleDVDuration(p, attr)
+		return multipleDVDuration(p, attr, box)
 	case rm.DVDuration:
-		return multipleDVDuration(&p, attr)
+		return multipleDVDuration(&p, attr, box)
 	case *rm.DVMultimedia:
-		return multipleDVMultimedia(p, attr)
+		return multipleDVMultimedia(p, attr, box)
 	case rm.DVMultimedia:
-		return multipleDVMultimedia(&p, attr)
+		return multipleDVMultimedia(&p, attr, box)
 	case *rm.DVOrdinal:
-		return multipleDVOrdinal(p, attr)
+		return multipleDVOrdinal(p, attr, box)
 	case rm.DVOrdinal:
-		return multipleDVOrdinal(&p, attr)
+		return multipleDVOrdinal(&p, attr, box)
 	case *rm.DVParagraph:
-		return multipleDVParagraph(p, attr)
+		return multipleDVParagraph(p, attr, box)
 	case rm.DVParagraph:
-		return multipleDVParagraph(&p, attr)
+		return multipleDVParagraph(&p, attr, box)
 	case *rm.DVProportion:
-		return multipleDVProportion(p, attr)
+		return multipleDVProportion(p, attr, box)
 	case rm.DVProportion:
-		return multipleDVProportion(&p, attr)
+		return multipleDVProportion(&p, attr, box)
 	case *rm.DVQuantity:
-		return multipleDVQuantity(p, attr)
+		return multipleDVQuantity(p, attr, box)
 	case rm.DVQuantity:
-		return multipleDVQuantity(&p, attr)
+		return multipleDVQuantity(&p, attr, box)
 	case *rm.DVScale:
-		return multipleDVScale(p, attr)
+		return multipleDVScale(p, attr, box)
 	case rm.DVScale:
-		return multipleDVScale(&p, attr)
+		return multipleDVScale(&p, attr, box)
 	case *rm.DVText:
-		return multipleDVText(p, attr)
+		return multipleDVText(p, attr, box)
 	case rm.DVText:
-		return multipleDVText(&p, attr)
+		return multipleDVText(&p, attr, box)
 	case *rm.DVTime:
-		return multipleDVTime(p, attr)
+		return multipleDVTime(p, attr, box)
 	case rm.DVTime:
-		return multipleDVTime(&p, attr)
+		return multipleDVTime(&p, attr, box)
 	case *rm.EHR:
-		return multipleEHR(p, attr)
+		return multipleEHR(p, attr, box)
 	case rm.EHR:
-		return multipleEHR(&p, attr)
+		return multipleEHR(&p, attr, box)
 	case *rm.EHRAccess:
-		return multipleEHRAccess(p, attr)
+		return multipleEHRAccess(p, attr, box)
 	case rm.EHRAccess:
-		return multipleEHRAccess(&p, attr)
+		return multipleEHRAccess(&p, attr, box)
 	case *rm.EHRStatus:
-		return multipleEHRStatus(p, attr)
+		return multipleEHRStatus(p, attr, box)
 	case rm.EHRStatus:
-		return multipleEHRStatus(&p, attr)
+		return multipleEHRStatus(&p, attr, box)
 	case *rm.Element:
-		return multipleElement(p, attr)
+		return multipleElement(p, attr, box)
 	case rm.Element:
-		return multipleElement(&p, attr)
+		return multipleElement(&p, attr, box)
 	case *rm.Evaluation:
-		return multipleEvaluation(p, attr)
+		return multipleEvaluation(p, attr, box)
 	case rm.Evaluation:
-		return multipleEvaluation(&p, attr)
+		return multipleEvaluation(&p, attr, box)
 	case *rm.EventContext:
-		return multipleEventContext(p, attr)
+		return multipleEventContext(p, attr, box)
 	case rm.EventContext:
-		return multipleEventContext(&p, attr)
+		return multipleEventContext(&p, attr, box)
 	case *rm.FeederAudit:
-		return multipleFeederAudit(p, attr)
+		return multipleFeederAudit(p, attr, box)
 	case rm.FeederAudit:
-		return multipleFeederAudit(&p, attr)
+		return multipleFeederAudit(&p, attr, box)
 	case *rm.Folder:
-		return multipleFolder(p, attr)
+		return multipleFolder(p, attr, box)
 	case rm.Folder:
-		return multipleFolder(&p, attr)
+		return multipleFolder(&p, attr, box)
 	case *rm.GenericEntry:
-		return multipleGenericEntry(p, attr)
+		return multipleGenericEntry(p, attr, box)
 	case rm.GenericEntry:
-		return multipleGenericEntry(&p, attr)
+		return multipleGenericEntry(&p, attr, box)
 	case *rm.Group:
-		return multipleGroup(p, attr)
+		return multipleGroup(p, attr, box)
 	case rm.Group:
-		return multipleGroup(&p, attr)
+		return multipleGroup(&p, attr, box)
 	case *rm.History[rm.ItemStructure]:
-		return multipleHistoryItemStructure(p, attr)
+		return multipleHistoryItemStructure(p, attr, box)
 	case rm.History[rm.ItemStructure]:
-		return multipleHistoryItemStructure(&p, attr)
+		return multipleHistoryItemStructure(&p, attr, box)
 	case *rm.History[rm.ItemList]:
-		return multipleHistoryItemList(p, attr)
+		return multipleHistoryItemList(p, attr, box)
 	case rm.History[rm.ItemList]:
-		return multipleHistoryItemList(&p, attr)
+		return multipleHistoryItemList(&p, attr, box)
 	case *rm.History[rm.ItemSingle]:
-		return multipleHistoryItemSingle(p, attr)
+		return multipleHistoryItemSingle(p, attr, box)
 	case rm.History[rm.ItemSingle]:
-		return multipleHistoryItemSingle(&p, attr)
+		return multipleHistoryItemSingle(&p, attr, box)
 	case *rm.History[rm.ItemTable]:
-		return multipleHistoryItemTable(p, attr)
+		return multipleHistoryItemTable(p, attr, box)
 	case rm.History[rm.ItemTable]:
-		return multipleHistoryItemTable(&p, attr)
+		return multipleHistoryItemTable(&p, attr, box)
 	case *rm.History[rm.ItemTree]:
-		return multipleHistoryItemTree(p, attr)
+		return multipleHistoryItemTree(p, attr, box)
 	case rm.History[rm.ItemTree]:
-		return multipleHistoryItemTree(&p, attr)
+		return multipleHistoryItemTree(&p, attr, box)
 	case *rm.Instruction:
-		return multipleInstruction(p, attr)
+		return multipleInstruction(p, attr, box)
 	case rm.Instruction:
-		return multipleInstruction(&p, attr)
+		return multipleInstruction(&p, attr, box)
 	case *rm.IntervalEvent[rm.ItemStructure]:
-		return multipleIntervalEventItemStructure(p, attr)
+		return multipleIntervalEventItemStructure(p, attr, box)
 	case rm.IntervalEvent[rm.ItemStructure]:
-		return multipleIntervalEventItemStructure(&p, attr)
+		return multipleIntervalEventItemStructure(&p, attr, box)
 	case *rm.IntervalEvent[rm.ItemList]:
-		return multipleIntervalEventItemList(p, attr)
+		return multipleIntervalEventItemList(p, attr, box)
 	case rm.IntervalEvent[rm.ItemList]:
-		return multipleIntervalEventItemList(&p, attr)
+		return multipleIntervalEventItemList(&p, attr, box)
 	case *rm.IntervalEvent[rm.ItemSingle]:
-		return multipleIntervalEventItemSingle(p, attr)
+		return multipleIntervalEventItemSingle(p, attr, box)
 	case rm.IntervalEvent[rm.ItemSingle]:
-		return multipleIntervalEventItemSingle(&p, attr)
+		return multipleIntervalEventItemSingle(&p, attr, box)
 	case *rm.IntervalEvent[rm.ItemTable]:
-		return multipleIntervalEventItemTable(p, attr)
+		return multipleIntervalEventItemTable(p, attr, box)
 	case rm.IntervalEvent[rm.ItemTable]:
-		return multipleIntervalEventItemTable(&p, attr)
+		return multipleIntervalEventItemTable(&p, attr, box)
 	case *rm.IntervalEvent[rm.ItemTree]:
-		return multipleIntervalEventItemTree(p, attr)
+		return multipleIntervalEventItemTree(p, attr, box)
 	case rm.IntervalEvent[rm.ItemTree]:
-		return multipleIntervalEventItemTree(&p, attr)
+		return multipleIntervalEventItemTree(&p, attr, box)
 	case *rm.IsmTransition:
-		return multipleIsmTransition(p, attr)
+		return multipleIsmTransition(p, attr, box)
 	case rm.IsmTransition:
-		return multipleIsmTransition(&p, attr)
+		return multipleIsmTransition(&p, attr, box)
 	case *rm.ItemList:
-		return multipleItemList(p, attr)
+		return multipleItemList(p, attr, box)
 	case rm.ItemList:
-		return multipleItemList(&p, attr)
+		return multipleItemList(&p, attr, box)
 	case *rm.ItemSingle:
-		return multipleItemSingle(p, attr)
+		return multipleItemSingle(p, attr, box)
 	case rm.ItemSingle:
-		return multipleItemSingle(&p, attr)
+		return multipleItemSingle(&p, attr, box)
 	case *rm.ItemTable:
-		return multipleItemTable(p, attr)
+		return multipleItemTable(p, attr, box)
 	case rm.ItemTable:
-		return multipleItemTable(&p, attr)
+		return multipleItemTable(&p, attr, box)
 	case *rm.ItemTree:
-		return multipleItemTree(p, attr)
+		return multipleItemTree(p, attr, box)
 	case rm.ItemTree:
-		return multipleItemTree(&p, attr)
+		return multipleItemTree(&p, attr, box)
 	case *rm.Observation:
-		return multipleObservation(p, attr)
+		return multipleObservation(p, attr, box)
 	case rm.Observation:
-		return multipleObservation(&p, attr)
+		return multipleObservation(&p, attr, box)
 	case *rm.Organisation:
-		return multipleOrganisation(p, attr)
+		return multipleOrganisation(p, attr, box)
 	case rm.Organisation:
-		return multipleOrganisation(&p, attr)
+		return multipleOrganisation(&p, attr, box)
 	case *rm.OriginalVersion[any]:
-		return multipleOriginalVersionAny(p, attr)
+		return multipleOriginalVersionAny(p, attr, box)
 	case rm.OriginalVersion[any]:
-		return multipleOriginalVersionAny(&p, attr)
+		return multipleOriginalVersionAny(&p, attr, box)
 	case *rm.PartyIdentified:
-		return multiplePartyIdentified(p, attr)
+		return multiplePartyIdentified(p, attr, box)
 	case rm.PartyIdentified:
-		return multiplePartyIdentified(&p, attr)
+		return multiplePartyIdentified(&p, attr, box)
 	case *rm.PartyIdentity:
-		return multiplePartyIdentity(p, attr)
+		return multiplePartyIdentity(p, attr, box)
 	case rm.PartyIdentity:
-		return multiplePartyIdentity(&p, attr)
+		return multiplePartyIdentity(&p, attr, box)
 	case *rm.PartyRelated:
-		return multiplePartyRelated(p, attr)
+		return multiplePartyRelated(p, attr, box)
 	case rm.PartyRelated:
-		return multiplePartyRelated(&p, attr)
+		return multiplePartyRelated(&p, attr, box)
 	case *rm.PartyRelationship:
-		return multiplePartyRelationship(p, attr)
+		return multiplePartyRelationship(p, attr, box)
 	case rm.PartyRelationship:
-		return multiplePartyRelationship(&p, attr)
+		return multiplePartyRelationship(&p, attr, box)
 	case *rm.Person:
-		return multiplePerson(p, attr)
+		return multiplePerson(p, attr, box)
 	case rm.Person:
-		return multiplePerson(&p, attr)
+		return multiplePerson(&p, attr, box)
 	case *rm.PointEvent[rm.ItemStructure]:
-		return multiplePointEventItemStructure(p, attr)
+		return multiplePointEventItemStructure(p, attr, box)
 	case rm.PointEvent[rm.ItemStructure]:
-		return multiplePointEventItemStructure(&p, attr)
+		return multiplePointEventItemStructure(&p, attr, box)
 	case *rm.PointEvent[rm.ItemList]:
-		return multiplePointEventItemList(p, attr)
+		return multiplePointEventItemList(p, attr, box)
 	case rm.PointEvent[rm.ItemList]:
-		return multiplePointEventItemList(&p, attr)
+		return multiplePointEventItemList(&p, attr, box)
 	case *rm.PointEvent[rm.ItemSingle]:
-		return multiplePointEventItemSingle(p, attr)
+		return multiplePointEventItemSingle(p, attr, box)
 	case rm.PointEvent[rm.ItemSingle]:
-		return multiplePointEventItemSingle(&p, attr)
+		return multiplePointEventItemSingle(&p, attr, box)
 	case *rm.PointEvent[rm.ItemTable]:
-		return multiplePointEventItemTable(p, attr)
+		return multiplePointEventItemTable(p, attr, box)
 	case rm.PointEvent[rm.ItemTable]:
-		return multiplePointEventItemTable(&p, attr)
+		return multiplePointEventItemTable(&p, attr, box)
 	case *rm.PointEvent[rm.ItemTree]:
-		return multiplePointEventItemTree(p, attr)
+		return multiplePointEventItemTree(p, attr, box)
 	case rm.PointEvent[rm.ItemTree]:
-		return multiplePointEventItemTree(&p, attr)
+		return multiplePointEventItemTree(&p, attr, box)
 	case *rm.ResourceDescription:
-		return multipleResourceDescription(p, attr)
+		return multipleResourceDescription(p, attr, box)
 	case rm.ResourceDescription:
-		return multipleResourceDescription(&p, attr)
+		return multipleResourceDescription(&p, attr, box)
 	case *rm.ResourceDescriptionItem:
-		return multipleResourceDescriptionItem(p, attr)
+		return multipleResourceDescriptionItem(p, attr, box)
 	case rm.ResourceDescriptionItem:
-		return multipleResourceDescriptionItem(&p, attr)
+		return multipleResourceDescriptionItem(&p, attr, box)
 	case *rm.RevisionHistory:
-		return multipleRevisionHistory(p, attr)
+		return multipleRevisionHistory(p, attr, box)
 	case rm.RevisionHistory:
-		return multipleRevisionHistory(&p, attr)
+		return multipleRevisionHistory(&p, attr, box)
 	case *rm.RevisionHistoryItem:
-		return multipleRevisionHistoryItem(p, attr)
+		return multipleRevisionHistoryItem(p, attr, box)
 	case rm.RevisionHistoryItem:
-		return multipleRevisionHistoryItem(&p, attr)
+		return multipleRevisionHistoryItem(&p, attr, box)
 	case *rm.Role:
-		return multipleRole(p, attr)
+		return multipleRole(p, attr, box)
 	case rm.Role:
-		return multipleRole(&p, attr)
+		return multipleRole(&p, attr, box)
 	case *rm.Section:
-		return multipleSection(p, attr)
+		return multipleSection(p, attr, box)
 	case rm.Section:
-		return multipleSection(&p, attr)
+		return multipleSection(&p, attr, box)
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // hash reads the Hash attribute attr of parent: the keys of its entries in
@@ -995,7 +996,7 @@ func hash(parent any, attr string) ([]string, []any, bool, bool) {
 }
 
 // singleAccessGroupRef reads the single-valued attributes of rm.AccessGroupRef.
-func singleAccessGroupRef(x *rm.AccessGroupRef, attr string) (any, bool, bool) {
+func singleAccessGroupRef(x *rm.AccessGroupRef, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1003,15 +1004,15 @@ func singleAccessGroupRef(x *rm.AccessGroupRef, attr string) (any, bool, bool) {
 	case "id":
 		return x.ID, x.ID != nil && !rm.IsTypedNil(x.ID), true
 	case "namespace":
-		return x.Namespace, x.Namespace != "", true
+		return leafValue(peek, x.Namespace), x.Namespace != "", true
 	case "type":
-		return x.Type, x.Type != "", true
+		return leafValue(peek, x.Type), x.Type != "", true
 	}
 	return nil, false, false
 }
 
 // singleAction reads the single-valued attributes of rm.Action.
-func singleAction(x *rm.Action, attr string) (any, bool, bool) {
+func singleAction(x *rm.Action, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1019,7 +1020,7 @@ func singleAction(x *rm.Action, attr string) (any, bool, bool) {
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "description":
 		return x.Description, x.Description != nil && !rm.IsTypedNil(x.Description), true
 	case "encoding":
@@ -1053,31 +1054,31 @@ func singleAction(x *rm.Action, attr string) (any, bool, bool) {
 }
 
 // multipleAction reads the containers of rm.Action.
-func multipleAction(x *rm.Action, attr string) (list, bool, bool) {
+func multipleAction(x *rm.Action, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	case "other_participations":
-		return boxPointers(x.OtherParticipations), x.OtherParticipations != nil, true
+		return boxPointers(box, x.OtherParticipations), len(x.OtherParticipations), x.OtherParticipations != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleActivity reads the single-valued attributes of rm.Activity.
-func singleActivity(x *rm.Activity, attr string) (any, bool, bool) {
+func singleActivity(x *rm.Activity, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
 	switch attr {
 	case "action_archetype_id":
-		return x.ActionArchetypeID, x.ActionArchetypeID != "", true
+		return leafValue(peek, x.ActionArchetypeID), x.ActionArchetypeID != "", true
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "description":
 		return x.Description, x.Description != nil && !rm.IsTypedNil(x.Description), true
 	case "feeder_audit":
@@ -1093,19 +1094,19 @@ func singleActivity(x *rm.Activity, attr string) (any, bool, bool) {
 }
 
 // multipleActivity reads the containers of rm.Activity.
-func multipleActivity(x *rm.Activity, attr string) (list, bool, bool) {
+func multipleActivity(x *rm.Activity, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleAddress reads the single-valued attributes of rm.Address.
-func singleAddress(x *rm.Address, attr string) (any, bool, bool) {
+func singleAddress(x *rm.Address, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1113,7 +1114,7 @@ func singleAddress(x *rm.Address, attr string) (any, bool, bool) {
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "details":
 		return x.Details, x.Details != nil && !rm.IsTypedNil(x.Details), true
 	case "feeder_audit":
@@ -1127,19 +1128,19 @@ func singleAddress(x *rm.Address, attr string) (any, bool, bool) {
 }
 
 // multipleAddress reads the containers of rm.Address.
-func multipleAddress(x *rm.Address, attr string) (list, bool, bool) {
+func multipleAddress(x *rm.Address, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleAdminEntry reads the single-valued attributes of rm.AdminEntry.
-func singleAdminEntry(x *rm.AdminEntry, attr string) (any, bool, bool) {
+func singleAdminEntry(x *rm.AdminEntry, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1147,7 +1148,7 @@ func singleAdminEntry(x *rm.AdminEntry, attr string) (any, bool, bool) {
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "data":
 		return x.Data, x.Data != nil && !rm.IsTypedNil(x.Data), true
 	case "encoding":
@@ -1171,21 +1172,21 @@ func singleAdminEntry(x *rm.AdminEntry, attr string) (any, bool, bool) {
 }
 
 // multipleAdminEntry reads the containers of rm.AdminEntry.
-func multipleAdminEntry(x *rm.AdminEntry, attr string) (list, bool, bool) {
+func multipleAdminEntry(x *rm.AdminEntry, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	case "other_participations":
-		return boxPointers(x.OtherParticipations), x.OtherParticipations != nil, true
+		return boxPointers(box, x.OtherParticipations), len(x.OtherParticipations), x.OtherParticipations != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleAgent reads the single-valued attributes of rm.Agent.
-func singleAgent(x *rm.Agent, attr string) (any, bool, bool) {
+func singleAgent(x *rm.Agent, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1193,7 +1194,7 @@ func singleAgent(x *rm.Agent, attr string) (any, bool, bool) {
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "details":
 		return x.Details, x.Details != nil && !rm.IsTypedNil(x.Details), true
 	case "feeder_audit":
@@ -1207,29 +1208,29 @@ func singleAgent(x *rm.Agent, attr string) (any, bool, bool) {
 }
 
 // multipleAgent reads the containers of rm.Agent.
-func multipleAgent(x *rm.Agent, attr string) (list, bool, bool) {
+func multipleAgent(x *rm.Agent, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "contacts":
-		return boxPointers(x.Contacts), x.Contacts != nil, true
+		return boxPointers(box, x.Contacts), len(x.Contacts), x.Contacts != nil, true
 	case "identities":
-		return boxPointers(x.Identities), x.Identities != nil, true
+		return boxPointers(box, x.Identities), len(x.Identities), x.Identities != nil, true
 	case "languages":
-		return boxValues(x.Languages), x.Languages != nil, true
+		return boxValues(box, x.Languages), len(x.Languages), x.Languages != nil, true
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	case "relationships":
-		return boxPointers(x.Relationships), x.Relationships != nil, true
+		return boxPointers(box, x.Relationships), len(x.Relationships), x.Relationships != nil, true
 	case "roles":
-		return boxPointers(x.Roles), x.Roles != nil, true
+		return boxPointers(box, x.Roles), len(x.Roles), x.Roles != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleArchetyped reads the single-valued attributes of rm.Archetyped.
-func singleArchetyped(x *rm.Archetyped, attr string) (any, bool, bool) {
+func singleArchetyped(x *rm.Archetyped, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1237,7 +1238,7 @@ func singleArchetyped(x *rm.Archetyped, attr string) (any, bool, bool) {
 	case "archetype_id":
 		return x.ArchetypeID, presentArchetypedID(x.ArchetypeID), true
 	case "rm_version":
-		return x.RMVersion, presentArchetypedRMVersion(x.RMVersion), true
+		return leafValue(peek, x.RMVersion), presentArchetypedRMVersion(x.RMVersion), true
 	case "template_id":
 		return x.TemplateID, x.TemplateID != nil, true
 	}
@@ -1245,19 +1246,19 @@ func singleArchetyped(x *rm.Archetyped, attr string) (any, bool, bool) {
 }
 
 // singleArchetypeID reads the single-valued attributes of rm.ArchetypeID.
-func singleArchetypeID(x *rm.ArchetypeID, attr string) (any, bool, bool) {
+func singleArchetypeID(x *rm.ArchetypeID, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
 	switch attr {
 	case "value":
-		return x.Value, x.Value != "", true
+		return leafValue(peek, x.Value), x.Value != "", true
 	}
 	return nil, false, false
 }
 
 // singleAttestation reads the single-valued attributes of rm.Attestation.
-func singleAttestation(x *rm.Attestation, attr string) (any, bool, bool) {
+func singleAttestation(x *rm.Attestation, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1271,13 +1272,13 @@ func singleAttestation(x *rm.Attestation, attr string) (any, bool, bool) {
 	case "description":
 		return x.Description, x.Description != nil && !rm.IsTypedNil(x.Description), true
 	case "is_pending":
-		return x.IsPending, true, true
+		return leafValue(peek, x.IsPending), true, true
 	case "proof":
 		return x.Proof, x.Proof != nil, true
 	case "reason":
 		return x.Reason, presentText(x.Reason), true
 	case "system_id":
-		return x.SystemID, x.SystemID != "", true
+		return leafValue(peek, x.SystemID), x.SystemID != "", true
 	case "time_committed":
 		return x.TimeCommitted, !isZeroDVDateTime(x.TimeCommitted), true
 	}
@@ -1285,19 +1286,19 @@ func singleAttestation(x *rm.Attestation, attr string) (any, bool, bool) {
 }
 
 // multipleAttestation reads the containers of rm.Attestation.
-func multipleAttestation(x *rm.Attestation, attr string) (list, bool, bool) {
+func multipleAttestation(x *rm.Attestation, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "items":
-		return boxPointers(x.Items), x.Items != nil, true
+		return boxPointers(box, x.Items), len(x.Items), x.Items != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleAuditDetails reads the single-valued attributes of rm.AuditDetails.
-func singleAuditDetails(x *rm.AuditDetails, attr string) (any, bool, bool) {
+func singleAuditDetails(x *rm.AuditDetails, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1309,7 +1310,7 @@ func singleAuditDetails(x *rm.AuditDetails, attr string) (any, bool, bool) {
 	case "description":
 		return x.Description, x.Description != nil && !rm.IsTypedNil(x.Description), true
 	case "system_id":
-		return x.SystemID, x.SystemID != "", true
+		return leafValue(peek, x.SystemID), x.SystemID != "", true
 	case "time_committed":
 		return x.TimeCommitted, !isZeroDVDateTime(x.TimeCommitted), true
 	}
@@ -1317,7 +1318,7 @@ func singleAuditDetails(x *rm.AuditDetails, attr string) (any, bool, bool) {
 }
 
 // singleCapability reads the single-valued attributes of rm.Capability.
-func singleCapability(x *rm.Capability, attr string) (any, bool, bool) {
+func singleCapability(x *rm.Capability, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1325,7 +1326,7 @@ func singleCapability(x *rm.Capability, attr string) (any, bool, bool) {
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "credentials":
 		return x.Credentials, x.Credentials != nil && !rm.IsTypedNil(x.Credentials), true
 	case "feeder_audit":
@@ -1341,19 +1342,19 @@ func singleCapability(x *rm.Capability, attr string) (any, bool, bool) {
 }
 
 // multipleCapability reads the containers of rm.Capability.
-func multipleCapability(x *rm.Capability, attr string) (list, bool, bool) {
+func multipleCapability(x *rm.Capability, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleCluster reads the single-valued attributes of rm.Cluster.
-func singleCluster(x *rm.Cluster, attr string) (any, bool, bool) {
+func singleCluster(x *rm.Cluster, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1361,7 +1362,7 @@ func singleCluster(x *rm.Cluster, attr string) (any, bool, bool) {
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "feeder_audit":
 		return x.FeederAudit, x.FeederAudit != nil, true
 	case "name":
@@ -1373,27 +1374,27 @@ func singleCluster(x *rm.Cluster, attr string) (any, bool, bool) {
 }
 
 // multipleCluster reads the containers of rm.Cluster.
-func multipleCluster(x *rm.Cluster, attr string) (list, bool, bool) {
+func multipleCluster(x *rm.Cluster, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "items":
-		return boxValues(x.Items), x.Items != nil, true
+		return boxValues(box, x.Items), len(x.Items), x.Items != nil, true
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleCodePhrase reads the single-valued attributes of rm.CodePhrase.
-func singleCodePhrase(x *rm.CodePhrase, attr string) (any, bool, bool) {
+func singleCodePhrase(x *rm.CodePhrase, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
 	switch attr {
 	case "code_string":
-		return x.CodeString, x.CodeString != "", true
+		return leafValue(peek, x.CodeString), x.CodeString != "", true
 	case "preferred_term":
 		return x.PreferredTerm, x.PreferredTerm != nil, true
 	case "terminology_id":
@@ -1403,7 +1404,7 @@ func singleCodePhrase(x *rm.CodePhrase, attr string) (any, bool, bool) {
 }
 
 // singleComposition reads the single-valued attributes of rm.Composition.
-func singleComposition(x *rm.Composition, attr string) (any, bool, bool) {
+func singleComposition(x *rm.Composition, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1411,7 +1412,7 @@ func singleComposition(x *rm.Composition, attr string) (any, bool, bool) {
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "category":
 		return x.Category, presentCodedText(x.Category), true
 	case "composer":
@@ -1433,21 +1434,21 @@ func singleComposition(x *rm.Composition, attr string) (any, bool, bool) {
 }
 
 // multipleComposition reads the containers of rm.Composition.
-func multipleComposition(x *rm.Composition, attr string) (list, bool, bool) {
+func multipleComposition(x *rm.Composition, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "content":
-		return boxValues(x.Content), x.Content != nil, true
+		return boxValues(box, x.Content), len(x.Content), x.Content != nil, true
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleContact reads the single-valued attributes of rm.Contact.
-func singleContact(x *rm.Contact, attr string) (any, bool, bool) {
+func singleContact(x *rm.Contact, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1455,7 +1456,7 @@ func singleContact(x *rm.Contact, attr string) (any, bool, bool) {
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "feeder_audit":
 		return x.FeederAudit, x.FeederAudit != nil, true
 	case "name":
@@ -1469,21 +1470,21 @@ func singleContact(x *rm.Contact, attr string) (any, bool, bool) {
 }
 
 // multipleContact reads the containers of rm.Contact.
-func multipleContact(x *rm.Contact, attr string) (list, bool, bool) {
+func multipleContact(x *rm.Contact, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "addresses":
-		return boxPointers(x.Addresses), x.Addresses != nil, true
+		return boxPointers(box, x.Addresses), len(x.Addresses), x.Addresses != nil, true
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleContribution reads the single-valued attributes of rm.Contribution.
-func singleContribution(x *rm.Contribution, attr string) (any, bool, bool) {
+func singleContribution(x *rm.Contribution, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1497,31 +1498,31 @@ func singleContribution(x *rm.Contribution, attr string) (any, bool, bool) {
 }
 
 // multipleContribution reads the containers of rm.Contribution.
-func multipleContribution(x *rm.Contribution, attr string) (list, bool, bool) {
+func multipleContribution(x *rm.Contribution, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "versions":
-		return boxValues(x.Versions), x.Versions != nil, true
+		return boxValues(box, x.Versions), len(x.Versions), x.Versions != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleDVBoolean reads the single-valued attributes of rm.DVBoolean.
-func singleDVBoolean(x *rm.DVBoolean, attr string) (any, bool, bool) {
+func singleDVBoolean(x *rm.DVBoolean, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
 	switch attr {
 	case "value":
-		return x.Value, true, true
+		return leafValue(peek, x.Value), true, true
 	}
 	return nil, false, false
 }
 
 // singleDVCodedText reads the single-valued attributes of rm.DVCodedText.
-func singleDVCodedText(x *rm.DVCodedText, attr string) (any, bool, bool) {
+func singleDVCodedText(x *rm.DVCodedText, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1537,25 +1538,25 @@ func singleDVCodedText(x *rm.DVCodedText, attr string) (any, bool, bool) {
 	case "language":
 		return x.Language, x.Language != nil, true
 	case "value":
-		return x.Value, x.Value != "", true
+		return leafValue(peek, x.Value), x.Value != "", true
 	}
 	return nil, false, false
 }
 
 // multipleDVCodedText reads the containers of rm.DVCodedText.
-func multipleDVCodedText(x *rm.DVCodedText, attr string) (list, bool, bool) {
+func multipleDVCodedText(x *rm.DVCodedText, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "mappings":
-		return boxPointers(x.Mappings), x.Mappings != nil, true
+		return boxPointers(box, x.Mappings), len(x.Mappings), x.Mappings != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleDVCount reads the single-valued attributes of rm.DVCount.
-func singleDVCount(x *rm.DVCount, attr string) (any, bool, bool) {
+func singleDVCount(x *rm.DVCount, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1565,7 +1566,7 @@ func singleDVCount(x *rm.DVCount, attr string) (any, bool, bool) {
 	case "accuracy_is_percent":
 		return x.AccuracyIsPercent, x.AccuracyIsPercent != nil, true
 	case "magnitude":
-		return x.Magnitude, true, true
+		return leafValue(peek, x.Magnitude), true, true
 	case "magnitude_status":
 		return x.MagnitudeStatus, x.MagnitudeStatus != nil, true
 	case "normal_range":
@@ -1577,19 +1578,19 @@ func singleDVCount(x *rm.DVCount, attr string) (any, bool, bool) {
 }
 
 // multipleDVCount reads the containers of rm.DVCount.
-func multipleDVCount(x *rm.DVCount, attr string) (list, bool, bool) {
+func multipleDVCount(x *rm.DVCount, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "other_reference_ranges":
-		return boxPointers(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
+		return boxPointers(box, x.OtherReferenceRanges), len(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleDVDate reads the single-valued attributes of rm.DVDate.
-func singleDVDate(x *rm.DVDate, attr string) (any, bool, bool) {
+func singleDVDate(x *rm.DVDate, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1603,25 +1604,25 @@ func singleDVDate(x *rm.DVDate, attr string) (any, bool, bool) {
 	case "normal_status":
 		return x.NormalStatus, x.NormalStatus != nil, true
 	case "value":
-		return x.Value, x.Value != "", true
+		return leafValue(peek, x.Value), x.Value != "", true
 	}
 	return nil, false, false
 }
 
 // multipleDVDate reads the containers of rm.DVDate.
-func multipleDVDate(x *rm.DVDate, attr string) (list, bool, bool) {
+func multipleDVDate(x *rm.DVDate, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "other_reference_ranges":
-		return boxPointers(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
+		return boxPointers(box, x.OtherReferenceRanges), len(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleDVDateTime reads the single-valued attributes of rm.DVDateTime.
-func singleDVDateTime(x *rm.DVDateTime, attr string) (any, bool, bool) {
+func singleDVDateTime(x *rm.DVDateTime, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1635,25 +1636,25 @@ func singleDVDateTime(x *rm.DVDateTime, attr string) (any, bool, bool) {
 	case "normal_status":
 		return x.NormalStatus, x.NormalStatus != nil, true
 	case "value":
-		return x.Value, x.Value != "", true
+		return leafValue(peek, x.Value), x.Value != "", true
 	}
 	return nil, false, false
 }
 
 // multipleDVDateTime reads the containers of rm.DVDateTime.
-func multipleDVDateTime(x *rm.DVDateTime, attr string) (list, bool, bool) {
+func multipleDVDateTime(x *rm.DVDateTime, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "other_reference_ranges":
-		return boxPointers(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
+		return boxPointers(box, x.OtherReferenceRanges), len(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleDVDuration reads the single-valued attributes of rm.DVDuration.
-func singleDVDuration(x *rm.DVDuration, attr string) (any, bool, bool) {
+func singleDVDuration(x *rm.DVDuration, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1669,37 +1670,37 @@ func singleDVDuration(x *rm.DVDuration, attr string) (any, bool, bool) {
 	case "normal_status":
 		return x.NormalStatus, x.NormalStatus != nil, true
 	case "value":
-		return x.Value, x.Value != "", true
+		return leafValue(peek, x.Value), x.Value != "", true
 	}
 	return nil, false, false
 }
 
 // multipleDVDuration reads the containers of rm.DVDuration.
-func multipleDVDuration(x *rm.DVDuration, attr string) (list, bool, bool) {
+func multipleDVDuration(x *rm.DVDuration, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "other_reference_ranges":
-		return boxPointers(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
+		return boxPointers(box, x.OtherReferenceRanges), len(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleDVEHRURI reads the single-valued attributes of rm.DVEHRURI.
-func singleDVEHRURI(x *rm.DVEHRURI, attr string) (any, bool, bool) {
+func singleDVEHRURI(x *rm.DVEHRURI, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
 	switch attr {
 	case "value":
-		return x.Value, x.Value != "", true
+		return leafValue(peek, x.Value), x.Value != "", true
 	}
 	return nil, false, false
 }
 
 // singleDVGeneralTimeSpecification reads the single-valued attributes of rm.DVGeneralTimeSpecification.
-func singleDVGeneralTimeSpecification(x *rm.DVGeneralTimeSpecification, attr string) (any, bool, bool) {
+func singleDVGeneralTimeSpecification(x *rm.DVGeneralTimeSpecification, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1711,7 +1712,7 @@ func singleDVGeneralTimeSpecification(x *rm.DVGeneralTimeSpecification, attr str
 }
 
 // singleDVIdentifier reads the single-valued attributes of rm.DVIdentifier.
-func singleDVIdentifier(x *rm.DVIdentifier, attr string) (any, bool, bool) {
+func singleDVIdentifier(x *rm.DVIdentifier, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1719,7 +1720,7 @@ func singleDVIdentifier(x *rm.DVIdentifier, attr string) (any, bool, bool) {
 	case "assigner":
 		return x.Assigner, x.Assigner != nil, true
 	case "id":
-		return x.ID, x.ID != "", true
+		return leafValue(peek, x.ID), x.ID != "", true
 	case "issuer":
 		return x.Issuer, x.Issuer != nil, true
 	case "type":
@@ -1729,7 +1730,7 @@ func singleDVIdentifier(x *rm.DVIdentifier, attr string) (any, bool, bool) {
 }
 
 // singleDVIntervalDVOrdered reads the single-valued attributes of rm.DVInterval[rm.DVOrdered].
-func singleDVIntervalDVOrdered(x *rm.DVInterval[rm.DVOrdered], attr string) (any, bool, bool) {
+func singleDVIntervalDVOrdered(x *rm.DVInterval[rm.DVOrdered], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1737,21 +1738,21 @@ func singleDVIntervalDVOrdered(x *rm.DVInterval[rm.DVOrdered], attr string) (any
 	case "lower":
 		return x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
 	case "lower_included":
-		return x.LowerIncluded, true, true
+		return leafValue(peek, x.LowerIncluded), true, true
 	case "lower_unbounded":
-		return x.LowerUnbounded, true, true
+		return leafValue(peek, x.LowerUnbounded), true, true
 	case "upper":
 		return x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
 	case "upper_included":
-		return x.UpperIncluded, true, true
+		return leafValue(peek, x.UpperIncluded), true, true
 	case "upper_unbounded":
-		return x.UpperUnbounded, true, true
+		return leafValue(peek, x.UpperUnbounded), true, true
 	}
 	return nil, false, false
 }
 
 // singleDVIntervalDVCount reads the single-valued attributes of rm.DVInterval[rm.DVCount].
-func singleDVIntervalDVCount(x *rm.DVInterval[rm.DVCount], attr string) (any, bool, bool) {
+func singleDVIntervalDVCount(x *rm.DVInterval[rm.DVCount], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1759,21 +1760,21 @@ func singleDVIntervalDVCount(x *rm.DVInterval[rm.DVCount], attr string) (any, bo
 	case "lower":
 		return x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
 	case "lower_included":
-		return x.LowerIncluded, true, true
+		return leafValue(peek, x.LowerIncluded), true, true
 	case "lower_unbounded":
-		return x.LowerUnbounded, true, true
+		return leafValue(peek, x.LowerUnbounded), true, true
 	case "upper":
 		return x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
 	case "upper_included":
-		return x.UpperIncluded, true, true
+		return leafValue(peek, x.UpperIncluded), true, true
 	case "upper_unbounded":
-		return x.UpperUnbounded, true, true
+		return leafValue(peek, x.UpperUnbounded), true, true
 	}
 	return nil, false, false
 }
 
 // singleDVIntervalDVDate reads the single-valued attributes of rm.DVInterval[rm.DVDate].
-func singleDVIntervalDVDate(x *rm.DVInterval[rm.DVDate], attr string) (any, bool, bool) {
+func singleDVIntervalDVDate(x *rm.DVInterval[rm.DVDate], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1781,21 +1782,21 @@ func singleDVIntervalDVDate(x *rm.DVInterval[rm.DVDate], attr string) (any, bool
 	case "lower":
 		return x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
 	case "lower_included":
-		return x.LowerIncluded, true, true
+		return leafValue(peek, x.LowerIncluded), true, true
 	case "lower_unbounded":
-		return x.LowerUnbounded, true, true
+		return leafValue(peek, x.LowerUnbounded), true, true
 	case "upper":
 		return x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
 	case "upper_included":
-		return x.UpperIncluded, true, true
+		return leafValue(peek, x.UpperIncluded), true, true
 	case "upper_unbounded":
-		return x.UpperUnbounded, true, true
+		return leafValue(peek, x.UpperUnbounded), true, true
 	}
 	return nil, false, false
 }
 
 // singleDVIntervalDVDateTime reads the single-valued attributes of rm.DVInterval[rm.DVDateTime].
-func singleDVIntervalDVDateTime(x *rm.DVInterval[rm.DVDateTime], attr string) (any, bool, bool) {
+func singleDVIntervalDVDateTime(x *rm.DVInterval[rm.DVDateTime], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1803,21 +1804,21 @@ func singleDVIntervalDVDateTime(x *rm.DVInterval[rm.DVDateTime], attr string) (a
 	case "lower":
 		return x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
 	case "lower_included":
-		return x.LowerIncluded, true, true
+		return leafValue(peek, x.LowerIncluded), true, true
 	case "lower_unbounded":
-		return x.LowerUnbounded, true, true
+		return leafValue(peek, x.LowerUnbounded), true, true
 	case "upper":
 		return x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
 	case "upper_included":
-		return x.UpperIncluded, true, true
+		return leafValue(peek, x.UpperIncluded), true, true
 	case "upper_unbounded":
-		return x.UpperUnbounded, true, true
+		return leafValue(peek, x.UpperUnbounded), true, true
 	}
 	return nil, false, false
 }
 
 // singleDVIntervalDVDuration reads the single-valued attributes of rm.DVInterval[rm.DVDuration].
-func singleDVIntervalDVDuration(x *rm.DVInterval[rm.DVDuration], attr string) (any, bool, bool) {
+func singleDVIntervalDVDuration(x *rm.DVInterval[rm.DVDuration], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1825,21 +1826,21 @@ func singleDVIntervalDVDuration(x *rm.DVInterval[rm.DVDuration], attr string) (a
 	case "lower":
 		return x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
 	case "lower_included":
-		return x.LowerIncluded, true, true
+		return leafValue(peek, x.LowerIncluded), true, true
 	case "lower_unbounded":
-		return x.LowerUnbounded, true, true
+		return leafValue(peek, x.LowerUnbounded), true, true
 	case "upper":
 		return x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
 	case "upper_included":
-		return x.UpperIncluded, true, true
+		return leafValue(peek, x.UpperIncluded), true, true
 	case "upper_unbounded":
-		return x.UpperUnbounded, true, true
+		return leafValue(peek, x.UpperUnbounded), true, true
 	}
 	return nil, false, false
 }
 
 // singleDVIntervalDVOrdinal reads the single-valued attributes of rm.DVInterval[rm.DVOrdinal].
-func singleDVIntervalDVOrdinal(x *rm.DVInterval[rm.DVOrdinal], attr string) (any, bool, bool) {
+func singleDVIntervalDVOrdinal(x *rm.DVInterval[rm.DVOrdinal], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1847,21 +1848,21 @@ func singleDVIntervalDVOrdinal(x *rm.DVInterval[rm.DVOrdinal], attr string) (any
 	case "lower":
 		return x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
 	case "lower_included":
-		return x.LowerIncluded, true, true
+		return leafValue(peek, x.LowerIncluded), true, true
 	case "lower_unbounded":
-		return x.LowerUnbounded, true, true
+		return leafValue(peek, x.LowerUnbounded), true, true
 	case "upper":
 		return x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
 	case "upper_included":
-		return x.UpperIncluded, true, true
+		return leafValue(peek, x.UpperIncluded), true, true
 	case "upper_unbounded":
-		return x.UpperUnbounded, true, true
+		return leafValue(peek, x.UpperUnbounded), true, true
 	}
 	return nil, false, false
 }
 
 // singleDVIntervalDVProportion reads the single-valued attributes of rm.DVInterval[rm.DVProportion].
-func singleDVIntervalDVProportion(x *rm.DVInterval[rm.DVProportion], attr string) (any, bool, bool) {
+func singleDVIntervalDVProportion(x *rm.DVInterval[rm.DVProportion], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1869,21 +1870,21 @@ func singleDVIntervalDVProportion(x *rm.DVInterval[rm.DVProportion], attr string
 	case "lower":
 		return x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
 	case "lower_included":
-		return x.LowerIncluded, true, true
+		return leafValue(peek, x.LowerIncluded), true, true
 	case "lower_unbounded":
-		return x.LowerUnbounded, true, true
+		return leafValue(peek, x.LowerUnbounded), true, true
 	case "upper":
 		return x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
 	case "upper_included":
-		return x.UpperIncluded, true, true
+		return leafValue(peek, x.UpperIncluded), true, true
 	case "upper_unbounded":
-		return x.UpperUnbounded, true, true
+		return leafValue(peek, x.UpperUnbounded), true, true
 	}
 	return nil, false, false
 }
 
 // singleDVIntervalDVQuantity reads the single-valued attributes of rm.DVInterval[rm.DVQuantity].
-func singleDVIntervalDVQuantity(x *rm.DVInterval[rm.DVQuantity], attr string) (any, bool, bool) {
+func singleDVIntervalDVQuantity(x *rm.DVInterval[rm.DVQuantity], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1891,21 +1892,21 @@ func singleDVIntervalDVQuantity(x *rm.DVInterval[rm.DVQuantity], attr string) (a
 	case "lower":
 		return x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
 	case "lower_included":
-		return x.LowerIncluded, true, true
+		return leafValue(peek, x.LowerIncluded), true, true
 	case "lower_unbounded":
-		return x.LowerUnbounded, true, true
+		return leafValue(peek, x.LowerUnbounded), true, true
 	case "upper":
 		return x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
 	case "upper_included":
-		return x.UpperIncluded, true, true
+		return leafValue(peek, x.UpperIncluded), true, true
 	case "upper_unbounded":
-		return x.UpperUnbounded, true, true
+		return leafValue(peek, x.UpperUnbounded), true, true
 	}
 	return nil, false, false
 }
 
 // singleDVIntervalDVScale reads the single-valued attributes of rm.DVInterval[rm.DVScale].
-func singleDVIntervalDVScale(x *rm.DVInterval[rm.DVScale], attr string) (any, bool, bool) {
+func singleDVIntervalDVScale(x *rm.DVInterval[rm.DVScale], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1913,21 +1914,21 @@ func singleDVIntervalDVScale(x *rm.DVInterval[rm.DVScale], attr string) (any, bo
 	case "lower":
 		return x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
 	case "lower_included":
-		return x.LowerIncluded, true, true
+		return leafValue(peek, x.LowerIncluded), true, true
 	case "lower_unbounded":
-		return x.LowerUnbounded, true, true
+		return leafValue(peek, x.LowerUnbounded), true, true
 	case "upper":
 		return x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
 	case "upper_included":
-		return x.UpperIncluded, true, true
+		return leafValue(peek, x.UpperIncluded), true, true
 	case "upper_unbounded":
-		return x.UpperUnbounded, true, true
+		return leafValue(peek, x.UpperUnbounded), true, true
 	}
 	return nil, false, false
 }
 
 // singleDVIntervalDVTime reads the single-valued attributes of rm.DVInterval[rm.DVTime].
-func singleDVIntervalDVTime(x *rm.DVInterval[rm.DVTime], attr string) (any, bool, bool) {
+func singleDVIntervalDVTime(x *rm.DVInterval[rm.DVTime], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1935,21 +1936,21 @@ func singleDVIntervalDVTime(x *rm.DVInterval[rm.DVTime], attr string) (any, bool
 	case "lower":
 		return x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
 	case "lower_included":
-		return x.LowerIncluded, true, true
+		return leafValue(peek, x.LowerIncluded), true, true
 	case "lower_unbounded":
-		return x.LowerUnbounded, true, true
+		return leafValue(peek, x.LowerUnbounded), true, true
 	case "upper":
 		return x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
 	case "upper_included":
-		return x.UpperIncluded, true, true
+		return leafValue(peek, x.UpperIncluded), true, true
 	case "upper_unbounded":
-		return x.UpperUnbounded, true, true
+		return leafValue(peek, x.UpperUnbounded), true, true
 	}
 	return nil, false, false
 }
 
 // singleDVMultimedia reads the single-valued attributes of rm.DVMultimedia.
-func singleDVMultimedia(x *rm.DVMultimedia, attr string) (any, bool, bool) {
+func singleDVMultimedia(x *rm.DVMultimedia, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1967,7 +1968,7 @@ func singleDVMultimedia(x *rm.DVMultimedia, attr string) (any, bool, bool) {
 	case "media_type":
 		return x.MediaType, presentCodePhrase(x.MediaType), true
 	case "size":
-		return x.Size, true, true
+		return leafValue(peek, x.Size), true, true
 	case "thumbnail":
 		return x.Thumbnail, x.Thumbnail != nil, true
 	case "uri":
@@ -1977,21 +1978,21 @@ func singleDVMultimedia(x *rm.DVMultimedia, attr string) (any, bool, bool) {
 }
 
 // multipleDVMultimedia reads the containers of rm.DVMultimedia.
-func multipleDVMultimedia(x *rm.DVMultimedia, attr string) (list, bool, bool) {
+func multipleDVMultimedia(x *rm.DVMultimedia, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "data":
-		return boxPointers(x.Data), x.Data != nil, true
+		return boxPointers(box, x.Data), len(x.Data), x.Data != nil, true
 	case "integrity_check":
-		return boxPointers(x.IntegrityCheck), x.IntegrityCheck != nil, true
+		return boxPointers(box, x.IntegrityCheck), len(x.IntegrityCheck), x.IntegrityCheck != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleDVOrdinal reads the single-valued attributes of rm.DVOrdinal.
-func singleDVOrdinal(x *rm.DVOrdinal, attr string) (any, bool, bool) {
+func singleDVOrdinal(x *rm.DVOrdinal, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2003,37 +2004,37 @@ func singleDVOrdinal(x *rm.DVOrdinal, attr string) (any, bool, bool) {
 	case "symbol":
 		return x.Symbol, presentCodedText(x.Symbol), true
 	case "value":
-		return x.Value, true, true
+		return leafValue(peek, x.Value), true, true
 	}
 	return nil, false, false
 }
 
 // multipleDVOrdinal reads the containers of rm.DVOrdinal.
-func multipleDVOrdinal(x *rm.DVOrdinal, attr string) (list, bool, bool) {
+func multipleDVOrdinal(x *rm.DVOrdinal, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "other_reference_ranges":
-		return boxPointers(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
+		return boxPointers(box, x.OtherReferenceRanges), len(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // multipleDVParagraph reads the containers of rm.DVParagraph.
-func multipleDVParagraph(x *rm.DVParagraph, attr string) (list, bool, bool) {
+func multipleDVParagraph(x *rm.DVParagraph, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "items":
-		return boxValues(x.Items), x.Items != nil, true
+		return boxValues(box, x.Items), len(x.Items), x.Items != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleDVParsable reads the single-valued attributes of rm.DVParsable.
-func singleDVParsable(x *rm.DVParsable, attr string) (any, bool, bool) {
+func singleDVParsable(x *rm.DVParsable, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2041,17 +2042,17 @@ func singleDVParsable(x *rm.DVParsable, attr string) (any, bool, bool) {
 	case "charset":
 		return x.Charset, x.Charset != nil, true
 	case "formalism":
-		return x.Formalism, x.Formalism != "", true
+		return leafValue(peek, x.Formalism), x.Formalism != "", true
 	case "language":
 		return x.Language, x.Language != nil, true
 	case "value":
-		return x.Value, x.Value != "", true
+		return leafValue(peek, x.Value), x.Value != "", true
 	}
 	return nil, false, false
 }
 
 // singleDVPeriodicTimeSpecification reads the single-valued attributes of rm.DVPeriodicTimeSpecification.
-func singleDVPeriodicTimeSpecification(x *rm.DVPeriodicTimeSpecification, attr string) (any, bool, bool) {
+func singleDVPeriodicTimeSpecification(x *rm.DVPeriodicTimeSpecification, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2063,7 +2064,7 @@ func singleDVPeriodicTimeSpecification(x *rm.DVPeriodicTimeSpecification, attr s
 }
 
 // singleDVProportion reads the single-valued attributes of rm.DVProportion.
-func singleDVProportion(x *rm.DVProportion, attr string) (any, bool, bool) {
+func singleDVProportion(x *rm.DVProportion, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2073,7 +2074,7 @@ func singleDVProportion(x *rm.DVProportion, attr string) (any, bool, bool) {
 	case "accuracy_is_percent":
 		return x.AccuracyIsPercent, x.AccuracyIsPercent != nil, true
 	case "denominator":
-		return x.Denominator, true, true
+		return leafValue(peek, x.Denominator), true, true
 	case "magnitude_status":
 		return x.MagnitudeStatus, x.MagnitudeStatus != nil, true
 	case "normal_range":
@@ -2081,32 +2082,32 @@ func singleDVProportion(x *rm.DVProportion, attr string) (any, bool, bool) {
 	case "normal_status":
 		return x.NormalStatus, x.NormalStatus != nil, true
 	case "numerator":
-		return x.Numerator, true, true
+		return leafValue(peek, x.Numerator), true, true
 	case "precision":
 		if x.Precision == nil {
 			return nil, false, true
 		}
-		return *x.Precision, true, true
+		return leafValue(peek, *x.Precision), true, true
 	case "type":
-		return x.Type, true, true
+		return leafValue(peek, x.Type), true, true
 	}
 	return nil, false, false
 }
 
 // multipleDVProportion reads the containers of rm.DVProportion.
-func multipleDVProportion(x *rm.DVProportion, attr string) (list, bool, bool) {
+func multipleDVProportion(x *rm.DVProportion, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "other_reference_ranges":
-		return boxPointers(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
+		return boxPointers(box, x.OtherReferenceRanges), len(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleDVQuantity reads the single-valued attributes of rm.DVQuantity.
-func singleDVQuantity(x *rm.DVQuantity, attr string) (any, bool, bool) {
+func singleDVQuantity(x *rm.DVQuantity, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2116,7 +2117,7 @@ func singleDVQuantity(x *rm.DVQuantity, attr string) (any, bool, bool) {
 	case "accuracy_is_percent":
 		return x.AccuracyIsPercent, x.AccuracyIsPercent != nil, true
 	case "magnitude":
-		return x.Magnitude, true, true
+		return leafValue(peek, x.Magnitude), true, true
 	case "magnitude_status":
 		return x.MagnitudeStatus, x.MagnitudeStatus != nil, true
 	case "normal_range":
@@ -2126,7 +2127,7 @@ func singleDVQuantity(x *rm.DVQuantity, attr string) (any, bool, bool) {
 	case "precision":
 		return x.Precision, x.Precision != nil, true
 	case "units":
-		return x.Units, x.Units != "", true
+		return leafValue(peek, x.Units), x.Units != "", true
 	case "units_display_name":
 		return x.UnitsDisplayName, x.UnitsDisplayName != nil, true
 	case "units_system":
@@ -2136,19 +2137,19 @@ func singleDVQuantity(x *rm.DVQuantity, attr string) (any, bool, bool) {
 }
 
 // multipleDVQuantity reads the containers of rm.DVQuantity.
-func multipleDVQuantity(x *rm.DVQuantity, attr string) (list, bool, bool) {
+func multipleDVQuantity(x *rm.DVQuantity, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "other_reference_ranges":
-		return boxPointers(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
+		return boxPointers(box, x.OtherReferenceRanges), len(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleDVScale reads the single-valued attributes of rm.DVScale.
-func singleDVScale(x *rm.DVScale, attr string) (any, bool, bool) {
+func singleDVScale(x *rm.DVScale, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2160,31 +2161,31 @@ func singleDVScale(x *rm.DVScale, attr string) (any, bool, bool) {
 	case "symbol":
 		return x.Symbol, presentCodedText(x.Symbol), true
 	case "value":
-		return x.Value, true, true
+		return leafValue(peek, x.Value), true, true
 	}
 	return nil, false, false
 }
 
 // multipleDVScale reads the containers of rm.DVScale.
-func multipleDVScale(x *rm.DVScale, attr string) (list, bool, bool) {
+func multipleDVScale(x *rm.DVScale, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "other_reference_ranges":
-		return boxPointers(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
+		return boxPointers(box, x.OtherReferenceRanges), len(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleDVState reads the single-valued attributes of rm.DVState.
-func singleDVState(x *rm.DVState, attr string) (any, bool, bool) {
+func singleDVState(x *rm.DVState, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
 	switch attr {
 	case "is_terminal":
-		return x.IsTerminal, true, true
+		return leafValue(peek, x.IsTerminal), true, true
 	case "value":
 		return x.Value, presentCodedText(x.Value), true
 	}
@@ -2192,7 +2193,7 @@ func singleDVState(x *rm.DVState, attr string) (any, bool, bool) {
 }
 
 // singleDVText reads the single-valued attributes of rm.DVText.
-func singleDVText(x *rm.DVText, attr string) (any, bool, bool) {
+func singleDVText(x *rm.DVText, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2206,25 +2207,25 @@ func singleDVText(x *rm.DVText, attr string) (any, bool, bool) {
 	case "language":
 		return x.Language, x.Language != nil, true
 	case "value":
-		return x.Value, x.Value != "", true
+		return leafValue(peek, x.Value), x.Value != "", true
 	}
 	return nil, false, false
 }
 
 // multipleDVText reads the containers of rm.DVText.
-func multipleDVText(x *rm.DVText, attr string) (list, bool, bool) {
+func multipleDVText(x *rm.DVText, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "mappings":
-		return boxPointers(x.Mappings), x.Mappings != nil, true
+		return boxPointers(box, x.Mappings), len(x.Mappings), x.Mappings != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleDVTime reads the single-valued attributes of rm.DVTime.
-func singleDVTime(x *rm.DVTime, attr string) (any, bool, bool) {
+func singleDVTime(x *rm.DVTime, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2238,37 +2239,37 @@ func singleDVTime(x *rm.DVTime, attr string) (any, bool, bool) {
 	case "normal_status":
 		return x.NormalStatus, x.NormalStatus != nil, true
 	case "value":
-		return x.Value, x.Value != "", true
+		return leafValue(peek, x.Value), x.Value != "", true
 	}
 	return nil, false, false
 }
 
 // multipleDVTime reads the containers of rm.DVTime.
-func multipleDVTime(x *rm.DVTime, attr string) (list, bool, bool) {
+func multipleDVTime(x *rm.DVTime, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "other_reference_ranges":
-		return boxPointers(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
+		return boxPointers(box, x.OtherReferenceRanges), len(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleDVURI reads the single-valued attributes of rm.DVURI.
-func singleDVURI(x *rm.DVURI, attr string) (any, bool, bool) {
+func singleDVURI(x *rm.DVURI, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
 	switch attr {
 	case "value":
-		return x.Value, x.Value != "", true
+		return leafValue(peek, x.Value), x.Value != "", true
 	}
 	return nil, false, false
 }
 
 // singleEHR reads the single-valued attributes of rm.EHR.
-func singleEHR(x *rm.EHR, attr string) (any, bool, bool) {
+func singleEHR(x *rm.EHR, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2290,25 +2291,25 @@ func singleEHR(x *rm.EHR, attr string) (any, bool, bool) {
 }
 
 // multipleEHR reads the containers of rm.EHR.
-func multipleEHR(x *rm.EHR, attr string) (list, bool, bool) {
+func multipleEHR(x *rm.EHR, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "compositions":
-		return boxValues(x.Compositions), x.Compositions != nil, true
+		return boxValues(box, x.Compositions), len(x.Compositions), x.Compositions != nil, true
 	case "contributions":
-		return boxValues(x.Contributions), x.Contributions != nil, true
+		return boxValues(box, x.Contributions), len(x.Contributions), x.Contributions != nil, true
 	case "folders":
-		return boxValues(x.Folders), x.Folders != nil, true
+		return boxValues(box, x.Folders), len(x.Folders), x.Folders != nil, true
 	case "tags":
-		return boxValues(x.Tags), x.Tags != nil, true
+		return boxValues(box, x.Tags), len(x.Tags), x.Tags != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleEHRAccess reads the single-valued attributes of rm.EHRAccess.
-func singleEHRAccess(x *rm.EHRAccess, attr string) (any, bool, bool) {
+func singleEHRAccess(x *rm.EHRAccess, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2316,7 +2317,7 @@ func singleEHRAccess(x *rm.EHRAccess, attr string) (any, bool, bool) {
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "feeder_audit":
 		return x.FeederAudit, x.FeederAudit != nil, true
 	case "name":
@@ -2330,19 +2331,19 @@ func singleEHRAccess(x *rm.EHRAccess, attr string) (any, bool, bool) {
 }
 
 // multipleEHRAccess reads the containers of rm.EHRAccess.
-func multipleEHRAccess(x *rm.EHRAccess, attr string) (list, bool, bool) {
+func multipleEHRAccess(x *rm.EHRAccess, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleEHRStatus reads the single-valued attributes of rm.EHRStatus.
-func singleEHRStatus(x *rm.EHRStatus, attr string) (any, bool, bool) {
+func singleEHRStatus(x *rm.EHRStatus, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2350,13 +2351,13 @@ func singleEHRStatus(x *rm.EHRStatus, attr string) (any, bool, bool) {
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "feeder_audit":
 		return x.FeederAudit, x.FeederAudit != nil, true
 	case "is_modifiable":
-		return x.IsModifiable, true, true
+		return leafValue(peek, x.IsModifiable), true, true
 	case "is_queryable":
-		return x.IsQueryable, true, true
+		return leafValue(peek, x.IsQueryable), true, true
 	case "name":
 		return x.Name, presentText(x.Name), true
 	case "other_details":
@@ -2370,19 +2371,19 @@ func singleEHRStatus(x *rm.EHRStatus, attr string) (any, bool, bool) {
 }
 
 // multipleEHRStatus reads the containers of rm.EHRStatus.
-func multipleEHRStatus(x *rm.EHRStatus, attr string) (list, bool, bool) {
+func multipleEHRStatus(x *rm.EHRStatus, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleElement reads the single-valued attributes of rm.Element.
-func singleElement(x *rm.Element, attr string) (any, bool, bool) {
+func singleElement(x *rm.Element, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2390,7 +2391,7 @@ func singleElement(x *rm.Element, attr string) (any, bool, bool) {
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "feeder_audit":
 		return x.FeederAudit, x.FeederAudit != nil, true
 	case "name":
@@ -2408,19 +2409,19 @@ func singleElement(x *rm.Element, attr string) (any, bool, bool) {
 }
 
 // multipleElement reads the containers of rm.Element.
-func multipleElement(x *rm.Element, attr string) (list, bool, bool) {
+func multipleElement(x *rm.Element, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleEvaluation reads the single-valued attributes of rm.Evaluation.
-func singleEvaluation(x *rm.Evaluation, attr string) (any, bool, bool) {
+func singleEvaluation(x *rm.Evaluation, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2428,7 +2429,7 @@ func singleEvaluation(x *rm.Evaluation, attr string) (any, bool, bool) {
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "data":
 		return x.Data, x.Data != nil && !rm.IsTypedNil(x.Data), true
 	case "encoding":
@@ -2456,21 +2457,21 @@ func singleEvaluation(x *rm.Evaluation, attr string) (any, bool, bool) {
 }
 
 // multipleEvaluation reads the containers of rm.Evaluation.
-func multipleEvaluation(x *rm.Evaluation, attr string) (list, bool, bool) {
+func multipleEvaluation(x *rm.Evaluation, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	case "other_participations":
-		return boxPointers(x.OtherParticipations), x.OtherParticipations != nil, true
+		return boxPointers(box, x.OtherParticipations), len(x.OtherParticipations), x.OtherParticipations != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleEventContext reads the single-valued attributes of rm.EventContext.
-func singleEventContext(x *rm.EventContext, attr string) (any, bool, bool) {
+func singleEventContext(x *rm.EventContext, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2492,19 +2493,19 @@ func singleEventContext(x *rm.EventContext, attr string) (any, bool, bool) {
 }
 
 // multipleEventContext reads the containers of rm.EventContext.
-func multipleEventContext(x *rm.EventContext, attr string) (list, bool, bool) {
+func multipleEventContext(x *rm.EventContext, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "participations":
-		return boxPointers(x.Participations), x.Participations != nil, true
+		return boxPointers(box, x.Participations), len(x.Participations), x.Participations != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleFeederAudit reads the single-valued attributes of rm.FeederAudit.
-func singleFeederAudit(x *rm.FeederAudit, attr string) (any, bool, bool) {
+func singleFeederAudit(x *rm.FeederAudit, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2520,21 +2521,21 @@ func singleFeederAudit(x *rm.FeederAudit, attr string) (any, bool, bool) {
 }
 
 // multipleFeederAudit reads the containers of rm.FeederAudit.
-func multipleFeederAudit(x *rm.FeederAudit, attr string) (list, bool, bool) {
+func multipleFeederAudit(x *rm.FeederAudit, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "feeder_system_item_ids":
-		return boxPointers(x.FeederSystemItemIds), x.FeederSystemItemIds != nil, true
+		return boxPointers(box, x.FeederSystemItemIds), len(x.FeederSystemItemIds), x.FeederSystemItemIds != nil, true
 	case "originating_system_item_ids":
-		return boxPointers(x.OriginatingSystemItemIds), x.OriginatingSystemItemIds != nil, true
+		return boxPointers(box, x.OriginatingSystemItemIds), len(x.OriginatingSystemItemIds), x.OriginatingSystemItemIds != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleFeederAuditDetails reads the single-valued attributes of rm.FeederAuditDetails.
-func singleFeederAuditDetails(x *rm.FeederAuditDetails, attr string) (any, bool, bool) {
+func singleFeederAuditDetails(x *rm.FeederAuditDetails, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2548,7 +2549,7 @@ func singleFeederAuditDetails(x *rm.FeederAuditDetails, attr string) (any, bool,
 	case "subject":
 		return x.Subject, x.Subject != nil && !rm.IsTypedNil(x.Subject), true
 	case "system_id":
-		return x.SystemID, x.SystemID != "", true
+		return leafValue(peek, x.SystemID), x.SystemID != "", true
 	case "time":
 		return x.Time, x.Time != nil, true
 	case "version_id":
@@ -2558,7 +2559,7 @@ func singleFeederAuditDetails(x *rm.FeederAuditDetails, attr string) (any, bool,
 }
 
 // singleFolder reads the single-valued attributes of rm.Folder.
-func singleFolder(x *rm.Folder, attr string) (any, bool, bool) {
+func singleFolder(x *rm.Folder, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2566,7 +2567,7 @@ func singleFolder(x *rm.Folder, attr string) (any, bool, bool) {
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "details":
 		return x.Details, x.Details != nil && !rm.IsTypedNil(x.Details), true
 	case "feeder_audit":
@@ -2580,23 +2581,23 @@ func singleFolder(x *rm.Folder, attr string) (any, bool, bool) {
 }
 
 // multipleFolder reads the containers of rm.Folder.
-func multipleFolder(x *rm.Folder, attr string) (list, bool, bool) {
+func multipleFolder(x *rm.Folder, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "folders":
-		return boxPointers(x.Folders), x.Folders != nil, true
+		return boxPointers(box, x.Folders), len(x.Folders), x.Folders != nil, true
 	case "items":
-		return boxValues(x.Items), x.Items != nil, true
+		return boxValues(box, x.Items), len(x.Items), x.Items != nil, true
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleGenericEntry reads the single-valued attributes of rm.GenericEntry.
-func singleGenericEntry(x *rm.GenericEntry, attr string) (any, bool, bool) {
+func singleGenericEntry(x *rm.GenericEntry, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2604,7 +2605,7 @@ func singleGenericEntry(x *rm.GenericEntry, attr string) (any, bool, bool) {
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "data":
 		return x.Data, x.Data != nil && !rm.IsTypedNil(x.Data), true
 	case "feeder_audit":
@@ -2618,33 +2619,33 @@ func singleGenericEntry(x *rm.GenericEntry, attr string) (any, bool, bool) {
 }
 
 // multipleGenericEntry reads the containers of rm.GenericEntry.
-func multipleGenericEntry(x *rm.GenericEntry, attr string) (list, bool, bool) {
+func multipleGenericEntry(x *rm.GenericEntry, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleGenericID reads the single-valued attributes of rm.GenericID.
-func singleGenericID(x *rm.GenericID, attr string) (any, bool, bool) {
+func singleGenericID(x *rm.GenericID, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
 	switch attr {
 	case "scheme":
-		return x.Scheme, x.Scheme != "", true
+		return leafValue(peek, x.Scheme), x.Scheme != "", true
 	case "value":
-		return x.Value, x.Value != "", true
+		return leafValue(peek, x.Value), x.Value != "", true
 	}
 	return nil, false, false
 }
 
 // singleGroup reads the single-valued attributes of rm.Group.
-func singleGroup(x *rm.Group, attr string) (any, bool, bool) {
+func singleGroup(x *rm.Group, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2652,7 +2653,7 @@ func singleGroup(x *rm.Group, attr string) (any, bool, bool) {
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "details":
 		return x.Details, x.Details != nil && !rm.IsTypedNil(x.Details), true
 	case "feeder_audit":
@@ -2666,41 +2667,41 @@ func singleGroup(x *rm.Group, attr string) (any, bool, bool) {
 }
 
 // multipleGroup reads the containers of rm.Group.
-func multipleGroup(x *rm.Group, attr string) (list, bool, bool) {
+func multipleGroup(x *rm.Group, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "contacts":
-		return boxPointers(x.Contacts), x.Contacts != nil, true
+		return boxPointers(box, x.Contacts), len(x.Contacts), x.Contacts != nil, true
 	case "identities":
-		return boxPointers(x.Identities), x.Identities != nil, true
+		return boxPointers(box, x.Identities), len(x.Identities), x.Identities != nil, true
 	case "languages":
-		return boxValues(x.Languages), x.Languages != nil, true
+		return boxValues(box, x.Languages), len(x.Languages), x.Languages != nil, true
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	case "relationships":
-		return boxPointers(x.Relationships), x.Relationships != nil, true
+		return boxPointers(box, x.Relationships), len(x.Relationships), x.Relationships != nil, true
 	case "roles":
-		return boxPointers(x.Roles), x.Roles != nil, true
+		return boxPointers(box, x.Roles), len(x.Roles), x.Roles != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleHierObjectID reads the single-valued attributes of rm.HierObjectID.
-func singleHierObjectID(x *rm.HierObjectID, attr string) (any, bool, bool) {
+func singleHierObjectID(x *rm.HierObjectID, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
 	switch attr {
 	case "value":
-		return x.Value, x.Value != "", true
+		return leafValue(peek, x.Value), x.Value != "", true
 	}
 	return nil, false, false
 }
 
 // singleHistoryItemStructure reads the single-valued attributes of rm.History[rm.ItemStructure].
-func singleHistoryItemStructure(x *rm.History[rm.ItemStructure], attr string) (any, bool, bool) {
+func singleHistoryItemStructure(x *rm.History[rm.ItemStructure], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2708,7 +2709,7 @@ func singleHistoryItemStructure(x *rm.History[rm.ItemStructure], attr string) (a
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "duration":
 		return x.Duration, x.Duration != nil, true
 	case "feeder_audit":
@@ -2728,21 +2729,21 @@ func singleHistoryItemStructure(x *rm.History[rm.ItemStructure], attr string) (a
 }
 
 // multipleHistoryItemStructure reads the containers of rm.History[rm.ItemStructure].
-func multipleHistoryItemStructure(x *rm.History[rm.ItemStructure], attr string) (list, bool, bool) {
+func multipleHistoryItemStructure(x *rm.History[rm.ItemStructure], attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "events":
-		return boxValues(x.Events), x.Events != nil, true
+		return boxValues(box, x.Events), len(x.Events), x.Events != nil, true
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleHistoryItemList reads the single-valued attributes of rm.History[rm.ItemList].
-func singleHistoryItemList(x *rm.History[rm.ItemList], attr string) (any, bool, bool) {
+func singleHistoryItemList(x *rm.History[rm.ItemList], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2750,7 +2751,7 @@ func singleHistoryItemList(x *rm.History[rm.ItemList], attr string) (any, bool, 
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "duration":
 		return x.Duration, x.Duration != nil, true
 	case "feeder_audit":
@@ -2770,21 +2771,21 @@ func singleHistoryItemList(x *rm.History[rm.ItemList], attr string) (any, bool, 
 }
 
 // multipleHistoryItemList reads the containers of rm.History[rm.ItemList].
-func multipleHistoryItemList(x *rm.History[rm.ItemList], attr string) (list, bool, bool) {
+func multipleHistoryItemList(x *rm.History[rm.ItemList], attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "events":
-		return boxValues(x.Events), x.Events != nil, true
+		return boxValues(box, x.Events), len(x.Events), x.Events != nil, true
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleHistoryItemSingle reads the single-valued attributes of rm.History[rm.ItemSingle].
-func singleHistoryItemSingle(x *rm.History[rm.ItemSingle], attr string) (any, bool, bool) {
+func singleHistoryItemSingle(x *rm.History[rm.ItemSingle], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2792,7 +2793,7 @@ func singleHistoryItemSingle(x *rm.History[rm.ItemSingle], attr string) (any, bo
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "duration":
 		return x.Duration, x.Duration != nil, true
 	case "feeder_audit":
@@ -2812,21 +2813,21 @@ func singleHistoryItemSingle(x *rm.History[rm.ItemSingle], attr string) (any, bo
 }
 
 // multipleHistoryItemSingle reads the containers of rm.History[rm.ItemSingle].
-func multipleHistoryItemSingle(x *rm.History[rm.ItemSingle], attr string) (list, bool, bool) {
+func multipleHistoryItemSingle(x *rm.History[rm.ItemSingle], attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "events":
-		return boxValues(x.Events), x.Events != nil, true
+		return boxValues(box, x.Events), len(x.Events), x.Events != nil, true
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleHistoryItemTable reads the single-valued attributes of rm.History[rm.ItemTable].
-func singleHistoryItemTable(x *rm.History[rm.ItemTable], attr string) (any, bool, bool) {
+func singleHistoryItemTable(x *rm.History[rm.ItemTable], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2834,7 +2835,7 @@ func singleHistoryItemTable(x *rm.History[rm.ItemTable], attr string) (any, bool
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "duration":
 		return x.Duration, x.Duration != nil, true
 	case "feeder_audit":
@@ -2854,21 +2855,21 @@ func singleHistoryItemTable(x *rm.History[rm.ItemTable], attr string) (any, bool
 }
 
 // multipleHistoryItemTable reads the containers of rm.History[rm.ItemTable].
-func multipleHistoryItemTable(x *rm.History[rm.ItemTable], attr string) (list, bool, bool) {
+func multipleHistoryItemTable(x *rm.History[rm.ItemTable], attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "events":
-		return boxValues(x.Events), x.Events != nil, true
+		return boxValues(box, x.Events), len(x.Events), x.Events != nil, true
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleHistoryItemTree reads the single-valued attributes of rm.History[rm.ItemTree].
-func singleHistoryItemTree(x *rm.History[rm.ItemTree], attr string) (any, bool, bool) {
+func singleHistoryItemTree(x *rm.History[rm.ItemTree], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2876,7 +2877,7 @@ func singleHistoryItemTree(x *rm.History[rm.ItemTree], attr string) (any, bool, 
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "duration":
 		return x.Duration, x.Duration != nil, true
 	case "feeder_audit":
@@ -2896,21 +2897,21 @@ func singleHistoryItemTree(x *rm.History[rm.ItemTree], attr string) (any, bool, 
 }
 
 // multipleHistoryItemTree reads the containers of rm.History[rm.ItemTree].
-func multipleHistoryItemTree(x *rm.History[rm.ItemTree], attr string) (list, bool, bool) {
+func multipleHistoryItemTree(x *rm.History[rm.ItemTree], attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "events":
-		return boxValues(x.Events), x.Events != nil, true
+		return boxValues(box, x.Events), len(x.Events), x.Events != nil, true
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleImportedVersionAny reads the single-valued attributes of rm.ImportedVersion[any].
-func singleImportedVersionAny(x *rm.ImportedVersion[any], attr string) (any, bool, bool) {
+func singleImportedVersionAny(x *rm.ImportedVersion[any], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2928,7 +2929,7 @@ func singleImportedVersionAny(x *rm.ImportedVersion[any], attr string) (any, boo
 }
 
 // singleInstruction reads the single-valued attributes of rm.Instruction.
-func singleInstruction(x *rm.Instruction, attr string) (any, bool, bool) {
+func singleInstruction(x *rm.Instruction, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2936,7 +2937,7 @@ func singleInstruction(x *rm.Instruction, attr string) (any, bool, bool) {
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "encoding":
 		return x.Encoding, presentCodePhrase(x.Encoding), true
 	case "expiry_time":
@@ -2968,29 +2969,29 @@ func singleInstruction(x *rm.Instruction, attr string) (any, bool, bool) {
 }
 
 // multipleInstruction reads the containers of rm.Instruction.
-func multipleInstruction(x *rm.Instruction, attr string) (list, bool, bool) {
+func multipleInstruction(x *rm.Instruction, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "activities":
-		return boxPointers(x.Activities), x.Activities != nil, true
+		return boxPointers(box, x.Activities), len(x.Activities), x.Activities != nil, true
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	case "other_participations":
-		return boxPointers(x.OtherParticipations), x.OtherParticipations != nil, true
+		return boxPointers(box, x.OtherParticipations), len(x.OtherParticipations), x.OtherParticipations != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleInstructionDetails reads the single-valued attributes of rm.InstructionDetails.
-func singleInstructionDetails(x *rm.InstructionDetails, attr string) (any, bool, bool) {
+func singleInstructionDetails(x *rm.InstructionDetails, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
 	switch attr {
 	case "activity_id":
-		return x.ActivityID, x.ActivityID != "", true
+		return leafValue(peek, x.ActivityID), x.ActivityID != "", true
 	case "instruction_id":
 		return x.InstructionID, !isZeroLocatableRef(x.InstructionID), true
 	case "wf_details":
@@ -3000,19 +3001,19 @@ func singleInstructionDetails(x *rm.InstructionDetails, attr string) (any, bool,
 }
 
 // singleInternetID reads the single-valued attributes of rm.InternetID.
-func singleInternetID(x *rm.InternetID, attr string) (any, bool, bool) {
+func singleInternetID(x *rm.InternetID, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
 	switch attr {
 	case "value":
-		return x.Value, x.Value != "", true
+		return leafValue(peek, x.Value), x.Value != "", true
 	}
 	return nil, false, false
 }
 
 // singleIntervalEventItemStructure reads the single-valued attributes of rm.IntervalEvent[rm.ItemStructure].
-func singleIntervalEventItemStructure(x *rm.IntervalEvent[rm.ItemStructure], attr string) (any, bool, bool) {
+func singleIntervalEventItemStructure(x *rm.IntervalEvent[rm.ItemStructure], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3020,7 +3021,7 @@ func singleIntervalEventItemStructure(x *rm.IntervalEvent[rm.ItemStructure], att
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "data":
 		return x.Data, x.Data != nil && !rm.IsTypedNil(x.Data), true
 	case "feeder_audit":
@@ -3044,19 +3045,19 @@ func singleIntervalEventItemStructure(x *rm.IntervalEvent[rm.ItemStructure], att
 }
 
 // multipleIntervalEventItemStructure reads the containers of rm.IntervalEvent[rm.ItemStructure].
-func multipleIntervalEventItemStructure(x *rm.IntervalEvent[rm.ItemStructure], attr string) (list, bool, bool) {
+func multipleIntervalEventItemStructure(x *rm.IntervalEvent[rm.ItemStructure], attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleIntervalEventItemList reads the single-valued attributes of rm.IntervalEvent[rm.ItemList].
-func singleIntervalEventItemList(x *rm.IntervalEvent[rm.ItemList], attr string) (any, bool, bool) {
+func singleIntervalEventItemList(x *rm.IntervalEvent[rm.ItemList], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3064,7 +3065,7 @@ func singleIntervalEventItemList(x *rm.IntervalEvent[rm.ItemList], attr string) 
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "data":
 		return x.Data, !isZeroItemList(x.Data), true
 	case "feeder_audit":
@@ -3088,19 +3089,19 @@ func singleIntervalEventItemList(x *rm.IntervalEvent[rm.ItemList], attr string) 
 }
 
 // multipleIntervalEventItemList reads the containers of rm.IntervalEvent[rm.ItemList].
-func multipleIntervalEventItemList(x *rm.IntervalEvent[rm.ItemList], attr string) (list, bool, bool) {
+func multipleIntervalEventItemList(x *rm.IntervalEvent[rm.ItemList], attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleIntervalEventItemSingle reads the single-valued attributes of rm.IntervalEvent[rm.ItemSingle].
-func singleIntervalEventItemSingle(x *rm.IntervalEvent[rm.ItemSingle], attr string) (any, bool, bool) {
+func singleIntervalEventItemSingle(x *rm.IntervalEvent[rm.ItemSingle], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3108,7 +3109,7 @@ func singleIntervalEventItemSingle(x *rm.IntervalEvent[rm.ItemSingle], attr stri
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "data":
 		return x.Data, !isZeroItemSingle(x.Data), true
 	case "feeder_audit":
@@ -3132,19 +3133,19 @@ func singleIntervalEventItemSingle(x *rm.IntervalEvent[rm.ItemSingle], attr stri
 }
 
 // multipleIntervalEventItemSingle reads the containers of rm.IntervalEvent[rm.ItemSingle].
-func multipleIntervalEventItemSingle(x *rm.IntervalEvent[rm.ItemSingle], attr string) (list, bool, bool) {
+func multipleIntervalEventItemSingle(x *rm.IntervalEvent[rm.ItemSingle], attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleIntervalEventItemTable reads the single-valued attributes of rm.IntervalEvent[rm.ItemTable].
-func singleIntervalEventItemTable(x *rm.IntervalEvent[rm.ItemTable], attr string) (any, bool, bool) {
+func singleIntervalEventItemTable(x *rm.IntervalEvent[rm.ItemTable], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3152,7 +3153,7 @@ func singleIntervalEventItemTable(x *rm.IntervalEvent[rm.ItemTable], attr string
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "data":
 		return x.Data, !isZeroItemTable(x.Data), true
 	case "feeder_audit":
@@ -3176,19 +3177,19 @@ func singleIntervalEventItemTable(x *rm.IntervalEvent[rm.ItemTable], attr string
 }
 
 // multipleIntervalEventItemTable reads the containers of rm.IntervalEvent[rm.ItemTable].
-func multipleIntervalEventItemTable(x *rm.IntervalEvent[rm.ItemTable], attr string) (list, bool, bool) {
+func multipleIntervalEventItemTable(x *rm.IntervalEvent[rm.ItemTable], attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleIntervalEventItemTree reads the single-valued attributes of rm.IntervalEvent[rm.ItemTree].
-func singleIntervalEventItemTree(x *rm.IntervalEvent[rm.ItemTree], attr string) (any, bool, bool) {
+func singleIntervalEventItemTree(x *rm.IntervalEvent[rm.ItemTree], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3196,7 +3197,7 @@ func singleIntervalEventItemTree(x *rm.IntervalEvent[rm.ItemTree], attr string) 
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "data":
 		return x.Data, !isZeroItemTree(x.Data), true
 	case "feeder_audit":
@@ -3220,19 +3221,19 @@ func singleIntervalEventItemTree(x *rm.IntervalEvent[rm.ItemTree], attr string) 
 }
 
 // multipleIntervalEventItemTree reads the containers of rm.IntervalEvent[rm.ItemTree].
-func multipleIntervalEventItemTree(x *rm.IntervalEvent[rm.ItemTree], attr string) (list, bool, bool) {
+func multipleIntervalEventItemTree(x *rm.IntervalEvent[rm.ItemTree], attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleIsmTransition reads the single-valued attributes of rm.IsmTransition.
-func singleIsmTransition(x *rm.IsmTransition, attr string) (any, bool, bool) {
+func singleIsmTransition(x *rm.IsmTransition, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3254,31 +3255,31 @@ func singleIsmTransition(x *rm.IsmTransition, attr string) (any, bool, bool) {
 }
 
 // multipleIsmTransition reads the containers of rm.IsmTransition.
-func multipleIsmTransition(x *rm.IsmTransition, attr string) (list, bool, bool) {
+func multipleIsmTransition(x *rm.IsmTransition, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "reason":
-		return boxValues(x.Reason), x.Reason != nil, true
+		return boxValues(box, x.Reason), len(x.Reason), x.Reason != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleISOOID reads the single-valued attributes of rm.ISOOID.
-func singleISOOID(x *rm.ISOOID, attr string) (any, bool, bool) {
+func singleISOOID(x *rm.ISOOID, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
 	switch attr {
 	case "value":
-		return x.Value, x.Value != "", true
+		return leafValue(peek, x.Value), x.Value != "", true
 	}
 	return nil, false, false
 }
 
 // singleItemList reads the single-valued attributes of rm.ItemList.
-func singleItemList(x *rm.ItemList, attr string) (any, bool, bool) {
+func singleItemList(x *rm.ItemList, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3286,7 +3287,7 @@ func singleItemList(x *rm.ItemList, attr string) (any, bool, bool) {
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "feeder_audit":
 		return x.FeederAudit, x.FeederAudit != nil, true
 	case "name":
@@ -3298,21 +3299,21 @@ func singleItemList(x *rm.ItemList, attr string) (any, bool, bool) {
 }
 
 // multipleItemList reads the containers of rm.ItemList.
-func multipleItemList(x *rm.ItemList, attr string) (list, bool, bool) {
+func multipleItemList(x *rm.ItemList, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "items":
-		return boxPointers(x.Items), x.Items != nil, true
+		return boxPointers(box, x.Items), len(x.Items), x.Items != nil, true
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleItemSingle reads the single-valued attributes of rm.ItemSingle.
-func singleItemSingle(x *rm.ItemSingle, attr string) (any, bool, bool) {
+func singleItemSingle(x *rm.ItemSingle, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3320,7 +3321,7 @@ func singleItemSingle(x *rm.ItemSingle, attr string) (any, bool, bool) {
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "feeder_audit":
 		return x.FeederAudit, x.FeederAudit != nil, true
 	case "item":
@@ -3334,19 +3335,19 @@ func singleItemSingle(x *rm.ItemSingle, attr string) (any, bool, bool) {
 }
 
 // multipleItemSingle reads the containers of rm.ItemSingle.
-func multipleItemSingle(x *rm.ItemSingle, attr string) (list, bool, bool) {
+func multipleItemSingle(x *rm.ItemSingle, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleItemTable reads the single-valued attributes of rm.ItemTable.
-func singleItemTable(x *rm.ItemTable, attr string) (any, bool, bool) {
+func singleItemTable(x *rm.ItemTable, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3354,7 +3355,7 @@ func singleItemTable(x *rm.ItemTable, attr string) (any, bool, bool) {
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "feeder_audit":
 		return x.FeederAudit, x.FeederAudit != nil, true
 	case "name":
@@ -3366,27 +3367,27 @@ func singleItemTable(x *rm.ItemTable, attr string) (any, bool, bool) {
 }
 
 // multipleItemTable reads the containers of rm.ItemTable.
-func multipleItemTable(x *rm.ItemTable, attr string) (list, bool, bool) {
+func multipleItemTable(x *rm.ItemTable, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	case "rows":
-		return boxPointers(x.Rows), x.Rows != nil, true
+		return boxPointers(box, x.Rows), len(x.Rows), x.Rows != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleItemTag reads the single-valued attributes of rm.ItemTag.
-func singleItemTag(x *rm.ItemTag, attr string) (any, bool, bool) {
+func singleItemTag(x *rm.ItemTag, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
 	switch attr {
 	case "key":
-		return x.Key, x.Key != "", true
+		return leafValue(peek, x.Key), x.Key != "", true
 	case "owner_id":
 		return x.OwnerID, x.OwnerID != nil && !rm.IsTypedNil(x.OwnerID), true
 	case "target":
@@ -3400,7 +3401,7 @@ func singleItemTag(x *rm.ItemTag, attr string) (any, bool, bool) {
 }
 
 // singleItemTree reads the single-valued attributes of rm.ItemTree.
-func singleItemTree(x *rm.ItemTree, attr string) (any, bool, bool) {
+func singleItemTree(x *rm.ItemTree, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3408,7 +3409,7 @@ func singleItemTree(x *rm.ItemTree, attr string) (any, bool, bool) {
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "feeder_audit":
 		return x.FeederAudit, x.FeederAudit != nil, true
 	case "name":
@@ -3420,21 +3421,21 @@ func singleItemTree(x *rm.ItemTree, attr string) (any, bool, bool) {
 }
 
 // multipleItemTree reads the containers of rm.ItemTree.
-func multipleItemTree(x *rm.ItemTree, attr string) (list, bool, bool) {
+func multipleItemTree(x *rm.ItemTree, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "items":
-		return boxValues(x.Items), x.Items != nil, true
+		return boxValues(box, x.Items), len(x.Items), x.Items != nil, true
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleLink reads the single-valued attributes of rm.Link.
-func singleLink(x *rm.Link, attr string) (any, bool, bool) {
+func singleLink(x *rm.Link, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3450,7 +3451,7 @@ func singleLink(x *rm.Link, attr string) (any, bool, bool) {
 }
 
 // singleLocatableRef reads the single-valued attributes of rm.LocatableRef.
-func singleLocatableRef(x *rm.LocatableRef, attr string) (any, bool, bool) {
+func singleLocatableRef(x *rm.LocatableRef, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3458,17 +3459,17 @@ func singleLocatableRef(x *rm.LocatableRef, attr string) (any, bool, bool) {
 	case "id":
 		return x.ID, x.ID != nil && !rm.IsTypedNil(x.ID), true
 	case "namespace":
-		return x.Namespace, x.Namespace != "", true
+		return leafValue(peek, x.Namespace), x.Namespace != "", true
 	case "path":
 		return x.Path, x.Path != nil, true
 	case "type":
-		return x.Type, x.Type != "", true
+		return leafValue(peek, x.Type), x.Type != "", true
 	}
 	return nil, false, false
 }
 
 // singleObjectRef reads the single-valued attributes of rm.ObjectRef.
-func singleObjectRef(x *rm.ObjectRef, attr string) (any, bool, bool) {
+func singleObjectRef(x *rm.ObjectRef, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3476,27 +3477,27 @@ func singleObjectRef(x *rm.ObjectRef, attr string) (any, bool, bool) {
 	case "id":
 		return x.ID, x.ID != nil && !rm.IsTypedNil(x.ID), true
 	case "namespace":
-		return x.Namespace, x.Namespace != "", true
+		return leafValue(peek, x.Namespace), x.Namespace != "", true
 	case "type":
-		return x.Type, x.Type != "", true
+		return leafValue(peek, x.Type), x.Type != "", true
 	}
 	return nil, false, false
 }
 
 // singleObjectVersionID reads the single-valued attributes of rm.ObjectVersionID.
-func singleObjectVersionID(x *rm.ObjectVersionID, attr string) (any, bool, bool) {
+func singleObjectVersionID(x *rm.ObjectVersionID, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
 	switch attr {
 	case "value":
-		return x.Value, x.Value != "", true
+		return leafValue(peek, x.Value), x.Value != "", true
 	}
 	return nil, false, false
 }
 
 // singleObservation reads the single-valued attributes of rm.Observation.
-func singleObservation(x *rm.Observation, attr string) (any, bool, bool) {
+func singleObservation(x *rm.Observation, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3504,7 +3505,7 @@ func singleObservation(x *rm.Observation, attr string) (any, bool, bool) {
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "data":
 		return x.Data, !isZeroHistoryItemStructure(x.Data), true
 	case "encoding":
@@ -3534,21 +3535,21 @@ func singleObservation(x *rm.Observation, attr string) (any, bool, bool) {
 }
 
 // multipleObservation reads the containers of rm.Observation.
-func multipleObservation(x *rm.Observation, attr string) (list, bool, bool) {
+func multipleObservation(x *rm.Observation, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	case "other_participations":
-		return boxPointers(x.OtherParticipations), x.OtherParticipations != nil, true
+		return boxPointers(box, x.OtherParticipations), len(x.OtherParticipations), x.OtherParticipations != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleOrganisation reads the single-valued attributes of rm.Organisation.
-func singleOrganisation(x *rm.Organisation, attr string) (any, bool, bool) {
+func singleOrganisation(x *rm.Organisation, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3556,7 +3557,7 @@ func singleOrganisation(x *rm.Organisation, attr string) (any, bool, bool) {
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "details":
 		return x.Details, x.Details != nil && !rm.IsTypedNil(x.Details), true
 	case "feeder_audit":
@@ -3570,29 +3571,29 @@ func singleOrganisation(x *rm.Organisation, attr string) (any, bool, bool) {
 }
 
 // multipleOrganisation reads the containers of rm.Organisation.
-func multipleOrganisation(x *rm.Organisation, attr string) (list, bool, bool) {
+func multipleOrganisation(x *rm.Organisation, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "contacts":
-		return boxPointers(x.Contacts), x.Contacts != nil, true
+		return boxPointers(box, x.Contacts), len(x.Contacts), x.Contacts != nil, true
 	case "identities":
-		return boxPointers(x.Identities), x.Identities != nil, true
+		return boxPointers(box, x.Identities), len(x.Identities), x.Identities != nil, true
 	case "languages":
-		return boxValues(x.Languages), x.Languages != nil, true
+		return boxValues(box, x.Languages), len(x.Languages), x.Languages != nil, true
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	case "relationships":
-		return boxPointers(x.Relationships), x.Relationships != nil, true
+		return boxPointers(box, x.Relationships), len(x.Relationships), x.Relationships != nil, true
 	case "roles":
-		return boxPointers(x.Roles), x.Roles != nil, true
+		return boxPointers(box, x.Roles), len(x.Roles), x.Roles != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleOriginalVersionAny reads the single-valued attributes of rm.OriginalVersion[any].
-func singleOriginalVersionAny(x *rm.OriginalVersion[any], attr string) (any, bool, bool) {
+func singleOriginalVersionAny(x *rm.OriginalVersion[any], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3619,21 +3620,21 @@ func singleOriginalVersionAny(x *rm.OriginalVersion[any], attr string) (any, boo
 }
 
 // multipleOriginalVersionAny reads the containers of rm.OriginalVersion[any].
-func multipleOriginalVersionAny(x *rm.OriginalVersion[any], attr string) (list, bool, bool) {
+func multipleOriginalVersionAny(x *rm.OriginalVersion[any], attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "attestations":
-		return boxPointers(x.Attestations), x.Attestations != nil, true
+		return boxPointers(box, x.Attestations), len(x.Attestations), x.Attestations != nil, true
 	case "other_input_version_uids":
-		return boxPointers(x.OtherInputVersionUids), x.OtherInputVersionUids != nil, true
+		return boxPointers(box, x.OtherInputVersionUids), len(x.OtherInputVersionUids), x.OtherInputVersionUids != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleParticipation reads the single-valued attributes of rm.Participation.
-func singleParticipation(x *rm.Participation, attr string) (any, bool, bool) {
+func singleParticipation(x *rm.Participation, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3651,7 +3652,7 @@ func singleParticipation(x *rm.Participation, attr string) (any, bool, bool) {
 }
 
 // singlePartyIdentified reads the single-valued attributes of rm.PartyIdentified.
-func singlePartyIdentified(x *rm.PartyIdentified, attr string) (any, bool, bool) {
+func singlePartyIdentified(x *rm.PartyIdentified, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3665,19 +3666,19 @@ func singlePartyIdentified(x *rm.PartyIdentified, attr string) (any, bool, bool)
 }
 
 // multiplePartyIdentified reads the containers of rm.PartyIdentified.
-func multiplePartyIdentified(x *rm.PartyIdentified, attr string) (list, bool, bool) {
+func multiplePartyIdentified(x *rm.PartyIdentified, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "identifiers":
-		return boxPointers(x.Identifiers), x.Identifiers != nil, true
+		return boxPointers(box, x.Identifiers), len(x.Identifiers), x.Identifiers != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singlePartyIdentity reads the single-valued attributes of rm.PartyIdentity.
-func singlePartyIdentity(x *rm.PartyIdentity, attr string) (any, bool, bool) {
+func singlePartyIdentity(x *rm.PartyIdentity, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3685,7 +3686,7 @@ func singlePartyIdentity(x *rm.PartyIdentity, attr string) (any, bool, bool) {
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "details":
 		return x.Details, x.Details != nil && !rm.IsTypedNil(x.Details), true
 	case "feeder_audit":
@@ -3699,19 +3700,19 @@ func singlePartyIdentity(x *rm.PartyIdentity, attr string) (any, bool, bool) {
 }
 
 // multiplePartyIdentity reads the containers of rm.PartyIdentity.
-func multiplePartyIdentity(x *rm.PartyIdentity, attr string) (list, bool, bool) {
+func multiplePartyIdentity(x *rm.PartyIdentity, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singlePartyRef reads the single-valued attributes of rm.PartyRef.
-func singlePartyRef(x *rm.PartyRef, attr string) (any, bool, bool) {
+func singlePartyRef(x *rm.PartyRef, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3719,15 +3720,15 @@ func singlePartyRef(x *rm.PartyRef, attr string) (any, bool, bool) {
 	case "id":
 		return x.ID, x.ID != nil && !rm.IsTypedNil(x.ID), true
 	case "namespace":
-		return x.Namespace, x.Namespace != "", true
+		return leafValue(peek, x.Namespace), x.Namespace != "", true
 	case "type":
-		return x.Type, x.Type != "", true
+		return leafValue(peek, x.Type), x.Type != "", true
 	}
 	return nil, false, false
 }
 
 // singlePartyRelated reads the single-valued attributes of rm.PartyRelated.
-func singlePartyRelated(x *rm.PartyRelated, attr string) (any, bool, bool) {
+func singlePartyRelated(x *rm.PartyRelated, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3743,19 +3744,19 @@ func singlePartyRelated(x *rm.PartyRelated, attr string) (any, bool, bool) {
 }
 
 // multiplePartyRelated reads the containers of rm.PartyRelated.
-func multiplePartyRelated(x *rm.PartyRelated, attr string) (list, bool, bool) {
+func multiplePartyRelated(x *rm.PartyRelated, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "identifiers":
-		return boxPointers(x.Identifiers), x.Identifiers != nil, true
+		return boxPointers(box, x.Identifiers), len(x.Identifiers), x.Identifiers != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singlePartyRelationship reads the single-valued attributes of rm.PartyRelationship.
-func singlePartyRelationship(x *rm.PartyRelationship, attr string) (any, bool, bool) {
+func singlePartyRelationship(x *rm.PartyRelationship, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3763,7 +3764,7 @@ func singlePartyRelationship(x *rm.PartyRelationship, attr string) (any, bool, b
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "details":
 		return x.Details, x.Details != nil && !rm.IsTypedNil(x.Details), true
 	case "feeder_audit":
@@ -3783,19 +3784,19 @@ func singlePartyRelationship(x *rm.PartyRelationship, attr string) (any, bool, b
 }
 
 // multiplePartyRelationship reads the containers of rm.PartyRelationship.
-func multiplePartyRelationship(x *rm.PartyRelationship, attr string) (list, bool, bool) {
+func multiplePartyRelationship(x *rm.PartyRelationship, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singlePartySelf reads the single-valued attributes of rm.PartySelf.
-func singlePartySelf(x *rm.PartySelf, attr string) (any, bool, bool) {
+func singlePartySelf(x *rm.PartySelf, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3807,7 +3808,7 @@ func singlePartySelf(x *rm.PartySelf, attr string) (any, bool, bool) {
 }
 
 // singlePerson reads the single-valued attributes of rm.Person.
-func singlePerson(x *rm.Person, attr string) (any, bool, bool) {
+func singlePerson(x *rm.Person, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3815,7 +3816,7 @@ func singlePerson(x *rm.Person, attr string) (any, bool, bool) {
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "details":
 		return x.Details, x.Details != nil && !rm.IsTypedNil(x.Details), true
 	case "feeder_audit":
@@ -3829,29 +3830,29 @@ func singlePerson(x *rm.Person, attr string) (any, bool, bool) {
 }
 
 // multiplePerson reads the containers of rm.Person.
-func multiplePerson(x *rm.Person, attr string) (list, bool, bool) {
+func multiplePerson(x *rm.Person, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "contacts":
-		return boxPointers(x.Contacts), x.Contacts != nil, true
+		return boxPointers(box, x.Contacts), len(x.Contacts), x.Contacts != nil, true
 	case "identities":
-		return boxPointers(x.Identities), x.Identities != nil, true
+		return boxPointers(box, x.Identities), len(x.Identities), x.Identities != nil, true
 	case "languages":
-		return boxValues(x.Languages), x.Languages != nil, true
+		return boxValues(box, x.Languages), len(x.Languages), x.Languages != nil, true
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	case "relationships":
-		return boxPointers(x.Relationships), x.Relationships != nil, true
+		return boxPointers(box, x.Relationships), len(x.Relationships), x.Relationships != nil, true
 	case "roles":
-		return boxPointers(x.Roles), x.Roles != nil, true
+		return boxPointers(box, x.Roles), len(x.Roles), x.Roles != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singlePointEventItemStructure reads the single-valued attributes of rm.PointEvent[rm.ItemStructure].
-func singlePointEventItemStructure(x *rm.PointEvent[rm.ItemStructure], attr string) (any, bool, bool) {
+func singlePointEventItemStructure(x *rm.PointEvent[rm.ItemStructure], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3859,7 +3860,7 @@ func singlePointEventItemStructure(x *rm.PointEvent[rm.ItemStructure], attr stri
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "data":
 		return x.Data, x.Data != nil && !rm.IsTypedNil(x.Data), true
 	case "feeder_audit":
@@ -3877,19 +3878,19 @@ func singlePointEventItemStructure(x *rm.PointEvent[rm.ItemStructure], attr stri
 }
 
 // multiplePointEventItemStructure reads the containers of rm.PointEvent[rm.ItemStructure].
-func multiplePointEventItemStructure(x *rm.PointEvent[rm.ItemStructure], attr string) (list, bool, bool) {
+func multiplePointEventItemStructure(x *rm.PointEvent[rm.ItemStructure], attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singlePointEventItemList reads the single-valued attributes of rm.PointEvent[rm.ItemList].
-func singlePointEventItemList(x *rm.PointEvent[rm.ItemList], attr string) (any, bool, bool) {
+func singlePointEventItemList(x *rm.PointEvent[rm.ItemList], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3897,7 +3898,7 @@ func singlePointEventItemList(x *rm.PointEvent[rm.ItemList], attr string) (any, 
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "data":
 		return x.Data, !isZeroItemList(x.Data), true
 	case "feeder_audit":
@@ -3915,19 +3916,19 @@ func singlePointEventItemList(x *rm.PointEvent[rm.ItemList], attr string) (any, 
 }
 
 // multiplePointEventItemList reads the containers of rm.PointEvent[rm.ItemList].
-func multiplePointEventItemList(x *rm.PointEvent[rm.ItemList], attr string) (list, bool, bool) {
+func multiplePointEventItemList(x *rm.PointEvent[rm.ItemList], attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singlePointEventItemSingle reads the single-valued attributes of rm.PointEvent[rm.ItemSingle].
-func singlePointEventItemSingle(x *rm.PointEvent[rm.ItemSingle], attr string) (any, bool, bool) {
+func singlePointEventItemSingle(x *rm.PointEvent[rm.ItemSingle], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3935,7 +3936,7 @@ func singlePointEventItemSingle(x *rm.PointEvent[rm.ItemSingle], attr string) (a
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "data":
 		return x.Data, !isZeroItemSingle(x.Data), true
 	case "feeder_audit":
@@ -3953,19 +3954,19 @@ func singlePointEventItemSingle(x *rm.PointEvent[rm.ItemSingle], attr string) (a
 }
 
 // multiplePointEventItemSingle reads the containers of rm.PointEvent[rm.ItemSingle].
-func multiplePointEventItemSingle(x *rm.PointEvent[rm.ItemSingle], attr string) (list, bool, bool) {
+func multiplePointEventItemSingle(x *rm.PointEvent[rm.ItemSingle], attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singlePointEventItemTable reads the single-valued attributes of rm.PointEvent[rm.ItemTable].
-func singlePointEventItemTable(x *rm.PointEvent[rm.ItemTable], attr string) (any, bool, bool) {
+func singlePointEventItemTable(x *rm.PointEvent[rm.ItemTable], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3973,7 +3974,7 @@ func singlePointEventItemTable(x *rm.PointEvent[rm.ItemTable], attr string) (any
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "data":
 		return x.Data, !isZeroItemTable(x.Data), true
 	case "feeder_audit":
@@ -3991,19 +3992,19 @@ func singlePointEventItemTable(x *rm.PointEvent[rm.ItemTable], attr string) (any
 }
 
 // multiplePointEventItemTable reads the containers of rm.PointEvent[rm.ItemTable].
-func multiplePointEventItemTable(x *rm.PointEvent[rm.ItemTable], attr string) (list, bool, bool) {
+func multiplePointEventItemTable(x *rm.PointEvent[rm.ItemTable], attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singlePointEventItemTree reads the single-valued attributes of rm.PointEvent[rm.ItemTree].
-func singlePointEventItemTree(x *rm.PointEvent[rm.ItemTree], attr string) (any, bool, bool) {
+func singlePointEventItemTree(x *rm.PointEvent[rm.ItemTree], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4011,7 +4012,7 @@ func singlePointEventItemTree(x *rm.PointEvent[rm.ItemTree], attr string) (any, 
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "data":
 		return x.Data, !isZeroItemTree(x.Data), true
 	case "feeder_audit":
@@ -4029,19 +4030,19 @@ func singlePointEventItemTree(x *rm.PointEvent[rm.ItemTree], attr string) (any, 
 }
 
 // multiplePointEventItemTree reads the containers of rm.PointEvent[rm.ItemTree].
-func multiplePointEventItemTree(x *rm.PointEvent[rm.ItemTree], attr string) (list, bool, bool) {
+func multiplePointEventItemTree(x *rm.PointEvent[rm.ItemTree], attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singlePointIntervalAny reads the single-valued attributes of rm.PointInterval[any].
-func singlePointIntervalAny(x *rm.PointInterval[any], attr string) (any, bool, bool) {
+func singlePointIntervalAny(x *rm.PointInterval[any], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4049,21 +4050,21 @@ func singlePointIntervalAny(x *rm.PointInterval[any], attr string) (any, bool, b
 	case "lower":
 		return x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
 	case "lower_included":
-		return x.LowerIncluded, true, true
+		return leafValue(peek, x.LowerIncluded), true, true
 	case "lower_unbounded":
-		return x.LowerUnbounded, true, true
+		return leafValue(peek, x.LowerUnbounded), true, true
 	case "upper":
 		return x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
 	case "upper_included":
-		return x.UpperIncluded, true, true
+		return leafValue(peek, x.UpperIncluded), true, true
 	case "upper_unbounded":
-		return x.UpperUnbounded, true, true
+		return leafValue(peek, x.UpperUnbounded), true, true
 	}
 	return nil, false, false
 }
 
 // singleProperIntervalAny reads the single-valued attributes of rm.ProperInterval[any].
-func singleProperIntervalAny(x *rm.ProperInterval[any], attr string) (any, bool, bool) {
+func singleProperIntervalAny(x *rm.ProperInterval[any], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4071,21 +4072,21 @@ func singleProperIntervalAny(x *rm.ProperInterval[any], attr string) (any, bool,
 	case "lower":
 		return x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
 	case "lower_included":
-		return x.LowerIncluded, true, true
+		return leafValue(peek, x.LowerIncluded), true, true
 	case "lower_unbounded":
-		return x.LowerUnbounded, true, true
+		return leafValue(peek, x.LowerUnbounded), true, true
 	case "upper":
 		return x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
 	case "upper_included":
-		return x.UpperIncluded, true, true
+		return leafValue(peek, x.UpperIncluded), true, true
 	case "upper_unbounded":
-		return x.UpperUnbounded, true, true
+		return leafValue(peek, x.UpperUnbounded), true, true
 	}
 	return nil, false, false
 }
 
 // singleReferenceRangeDVOrdered reads the single-valued attributes of rm.ReferenceRange[rm.DVOrdered].
-func singleReferenceRangeDVOrdered(x *rm.ReferenceRange[rm.DVOrdered], attr string) (any, bool, bool) {
+func singleReferenceRangeDVOrdered(x *rm.ReferenceRange[rm.DVOrdered], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4099,7 +4100,7 @@ func singleReferenceRangeDVOrdered(x *rm.ReferenceRange[rm.DVOrdered], attr stri
 }
 
 // singleReferenceRangeDVCount reads the single-valued attributes of rm.ReferenceRange[rm.DVCount].
-func singleReferenceRangeDVCount(x *rm.ReferenceRange[rm.DVCount], attr string) (any, bool, bool) {
+func singleReferenceRangeDVCount(x *rm.ReferenceRange[rm.DVCount], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4113,7 +4114,7 @@ func singleReferenceRangeDVCount(x *rm.ReferenceRange[rm.DVCount], attr string) 
 }
 
 // singleReferenceRangeDVDate reads the single-valued attributes of rm.ReferenceRange[rm.DVDate].
-func singleReferenceRangeDVDate(x *rm.ReferenceRange[rm.DVDate], attr string) (any, bool, bool) {
+func singleReferenceRangeDVDate(x *rm.ReferenceRange[rm.DVDate], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4127,7 +4128,7 @@ func singleReferenceRangeDVDate(x *rm.ReferenceRange[rm.DVDate], attr string) (a
 }
 
 // singleReferenceRangeDVDateTime reads the single-valued attributes of rm.ReferenceRange[rm.DVDateTime].
-func singleReferenceRangeDVDateTime(x *rm.ReferenceRange[rm.DVDateTime], attr string) (any, bool, bool) {
+func singleReferenceRangeDVDateTime(x *rm.ReferenceRange[rm.DVDateTime], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4141,7 +4142,7 @@ func singleReferenceRangeDVDateTime(x *rm.ReferenceRange[rm.DVDateTime], attr st
 }
 
 // singleReferenceRangeDVDuration reads the single-valued attributes of rm.ReferenceRange[rm.DVDuration].
-func singleReferenceRangeDVDuration(x *rm.ReferenceRange[rm.DVDuration], attr string) (any, bool, bool) {
+func singleReferenceRangeDVDuration(x *rm.ReferenceRange[rm.DVDuration], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4155,7 +4156,7 @@ func singleReferenceRangeDVDuration(x *rm.ReferenceRange[rm.DVDuration], attr st
 }
 
 // singleReferenceRangeDVOrdinal reads the single-valued attributes of rm.ReferenceRange[rm.DVOrdinal].
-func singleReferenceRangeDVOrdinal(x *rm.ReferenceRange[rm.DVOrdinal], attr string) (any, bool, bool) {
+func singleReferenceRangeDVOrdinal(x *rm.ReferenceRange[rm.DVOrdinal], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4169,7 +4170,7 @@ func singleReferenceRangeDVOrdinal(x *rm.ReferenceRange[rm.DVOrdinal], attr stri
 }
 
 // singleReferenceRangeDVProportion reads the single-valued attributes of rm.ReferenceRange[rm.DVProportion].
-func singleReferenceRangeDVProportion(x *rm.ReferenceRange[rm.DVProportion], attr string) (any, bool, bool) {
+func singleReferenceRangeDVProportion(x *rm.ReferenceRange[rm.DVProportion], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4183,7 +4184,7 @@ func singleReferenceRangeDVProportion(x *rm.ReferenceRange[rm.DVProportion], att
 }
 
 // singleReferenceRangeDVQuantity reads the single-valued attributes of rm.ReferenceRange[rm.DVQuantity].
-func singleReferenceRangeDVQuantity(x *rm.ReferenceRange[rm.DVQuantity], attr string) (any, bool, bool) {
+func singleReferenceRangeDVQuantity(x *rm.ReferenceRange[rm.DVQuantity], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4197,7 +4198,7 @@ func singleReferenceRangeDVQuantity(x *rm.ReferenceRange[rm.DVQuantity], attr st
 }
 
 // singleReferenceRangeDVScale reads the single-valued attributes of rm.ReferenceRange[rm.DVScale].
-func singleReferenceRangeDVScale(x *rm.ReferenceRange[rm.DVScale], attr string) (any, bool, bool) {
+func singleReferenceRangeDVScale(x *rm.ReferenceRange[rm.DVScale], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4211,7 +4212,7 @@ func singleReferenceRangeDVScale(x *rm.ReferenceRange[rm.DVScale], attr string) 
 }
 
 // singleReferenceRangeDVTime reads the single-valued attributes of rm.ReferenceRange[rm.DVTime].
-func singleReferenceRangeDVTime(x *rm.ReferenceRange[rm.DVTime], attr string) (any, bool, bool) {
+func singleReferenceRangeDVTime(x *rm.ReferenceRange[rm.DVTime], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4225,7 +4226,7 @@ func singleReferenceRangeDVTime(x *rm.ReferenceRange[rm.DVTime], attr string) (a
 }
 
 // singleResourceAnnotations reads the single-valued attributes of rm.ResourceAnnotations.
-func singleResourceAnnotations(x *rm.ResourceAnnotations, attr string) (any, bool, bool) {
+func singleResourceAnnotations(x *rm.ResourceAnnotations, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4250,7 +4251,7 @@ func hashResourceAnnotations(x *rm.ResourceAnnotations, attr string) ([]string, 
 }
 
 // singleResourceDescription reads the single-valued attributes of rm.ResourceDescription.
-func singleResourceDescription(x *rm.ResourceDescription, attr string) (any, bool, bool) {
+func singleResourceDescription(x *rm.ResourceDescription, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4258,7 +4259,7 @@ func singleResourceDescription(x *rm.ResourceDescription, attr string) (any, boo
 	case "details":
 		return x.Details, x.Details != nil, true
 	case "lifecycle_state":
-		return x.LifecycleState, x.LifecycleState != "", true
+		return leafValue(peek, x.LifecycleState), x.LifecycleState != "", true
 	case "original_author":
 		return x.OriginalAuthor, x.OriginalAuthor != nil, true
 	case "other_details":
@@ -4272,15 +4273,15 @@ func singleResourceDescription(x *rm.ResourceDescription, attr string) (any, boo
 }
 
 // multipleResourceDescription reads the containers of rm.ResourceDescription.
-func multipleResourceDescription(x *rm.ResourceDescription, attr string) (list, bool, bool) {
+func multipleResourceDescription(x *rm.ResourceDescription, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "other_contributors":
-		return boxPointers(x.OtherContributors), x.OtherContributors != nil, true
+		return boxPointers(box, x.OtherContributors), len(x.OtherContributors), x.OtherContributors != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // hashResourceDescription reads the Hash attributes of rm.ResourceDescription.
@@ -4306,7 +4307,7 @@ func hashResourceDescription(x *rm.ResourceDescription, attr string) ([]string, 
 }
 
 // singleResourceDescriptionItem reads the single-valued attributes of rm.ResourceDescriptionItem.
-func singleResourceDescriptionItem(x *rm.ResourceDescriptionItem, attr string) (any, bool, bool) {
+func singleResourceDescriptionItem(x *rm.ResourceDescriptionItem, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4322,7 +4323,7 @@ func singleResourceDescriptionItem(x *rm.ResourceDescriptionItem, attr string) (
 	case "other_details":
 		return x.OtherDetails, x.OtherDetails != nil, true
 	case "purpose":
-		return x.Purpose, x.Purpose != "", true
+		return leafValue(peek, x.Purpose), x.Purpose != "", true
 	case "use":
 		return x.Use, x.Use != nil, true
 	}
@@ -4330,15 +4331,15 @@ func singleResourceDescriptionItem(x *rm.ResourceDescriptionItem, attr string) (
 }
 
 // multipleResourceDescriptionItem reads the containers of rm.ResourceDescriptionItem.
-func multipleResourceDescriptionItem(x *rm.ResourceDescriptionItem, attr string) (list, bool, bool) {
+func multipleResourceDescriptionItem(x *rm.ResourceDescriptionItem, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "keywords":
-		return boxPointers(x.Keywords), x.Keywords != nil, true
+		return boxPointers(box, x.Keywords), len(x.Keywords), x.Keywords != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // hashResourceDescriptionItem reads the Hash attributes of rm.ResourceDescriptionItem.
@@ -4364,19 +4365,19 @@ func hashResourceDescriptionItem(x *rm.ResourceDescriptionItem, attr string) ([]
 }
 
 // multipleRevisionHistory reads the containers of rm.RevisionHistory.
-func multipleRevisionHistory(x *rm.RevisionHistory, attr string) (list, bool, bool) {
+func multipleRevisionHistory(x *rm.RevisionHistory, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "items":
-		return boxPointers(x.Items), x.Items != nil, true
+		return boxPointers(box, x.Items), len(x.Items), x.Items != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleRevisionHistoryItem reads the single-valued attributes of rm.RevisionHistoryItem.
-func singleRevisionHistoryItem(x *rm.RevisionHistoryItem, attr string) (any, bool, bool) {
+func singleRevisionHistoryItem(x *rm.RevisionHistoryItem, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4388,19 +4389,19 @@ func singleRevisionHistoryItem(x *rm.RevisionHistoryItem, attr string) (any, boo
 }
 
 // multipleRevisionHistoryItem reads the containers of rm.RevisionHistoryItem.
-func multipleRevisionHistoryItem(x *rm.RevisionHistoryItem, attr string) (list, bool, bool) {
+func multipleRevisionHistoryItem(x *rm.RevisionHistoryItem, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "audits":
-		return boxValues(x.Audits), x.Audits != nil, true
+		return boxValues(box, x.Audits), len(x.Audits), x.Audits != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleRole reads the single-valued attributes of rm.Role.
-func singleRole(x *rm.Role, attr string) (any, bool, bool) {
+func singleRole(x *rm.Role, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4408,7 +4409,7 @@ func singleRole(x *rm.Role, attr string) (any, bool, bool) {
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "details":
 		return x.Details, x.Details != nil && !rm.IsTypedNil(x.Details), true
 	case "feeder_audit":
@@ -4426,27 +4427,27 @@ func singleRole(x *rm.Role, attr string) (any, bool, bool) {
 }
 
 // multipleRole reads the containers of rm.Role.
-func multipleRole(x *rm.Role, attr string) (list, bool, bool) {
+func multipleRole(x *rm.Role, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "capabilities":
-		return boxPointers(x.Capabilities), x.Capabilities != nil, true
+		return boxPointers(box, x.Capabilities), len(x.Capabilities), x.Capabilities != nil, true
 	case "contacts":
-		return boxPointers(x.Contacts), x.Contacts != nil, true
+		return boxPointers(box, x.Contacts), len(x.Contacts), x.Contacts != nil, true
 	case "identities":
-		return boxPointers(x.Identities), x.Identities != nil, true
+		return boxPointers(box, x.Identities), len(x.Identities), x.Identities != nil, true
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	case "relationships":
-		return boxPointers(x.Relationships), x.Relationships != nil, true
+		return boxPointers(box, x.Relationships), len(x.Relationships), x.Relationships != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleSection reads the single-valued attributes of rm.Section.
-func singleSection(x *rm.Section, attr string) (any, bool, bool) {
+func singleSection(x *rm.Section, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4454,7 +4455,7 @@ func singleSection(x *rm.Section, attr string) (any, bool, bool) {
 	case "archetype_details":
 		return x.ArchetypeDetails, x.ArchetypeDetails != nil, true
 	case "archetype_node_id":
-		return x.ArchetypeNodeID, x.ArchetypeNodeID != "", true
+		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "feeder_audit":
 		return x.FeederAudit, x.FeederAudit != nil, true
 	case "name":
@@ -4466,51 +4467,51 @@ func singleSection(x *rm.Section, attr string) (any, bool, bool) {
 }
 
 // multipleSection reads the containers of rm.Section.
-func multipleSection(x *rm.Section, attr string) (list, bool, bool) {
+func multipleSection(x *rm.Section, attr string, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	switch attr {
 	case "items":
-		return boxValues(x.Items), x.Items != nil, true
+		return boxValues(box, x.Items), len(x.Items), x.Items != nil, true
 	case "links":
-		return boxPointers(x.Links), x.Links != nil, true
+		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, false, false
+	return nil, 0, false, false
 }
 
 // singleTemplateID reads the single-valued attributes of rm.TemplateID.
-func singleTemplateID(x *rm.TemplateID, attr string) (any, bool, bool) {
+func singleTemplateID(x *rm.TemplateID, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
 	switch attr {
 	case "value":
-		return x.Value, x.Value != "", true
+		return leafValue(peek, x.Value), x.Value != "", true
 	}
 	return nil, false, false
 }
 
 // singleTerminologyID reads the single-valued attributes of rm.TerminologyID.
-func singleTerminologyID(x *rm.TerminologyID, attr string) (any, bool, bool) {
+func singleTerminologyID(x *rm.TerminologyID, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
 	switch attr {
 	case "value":
-		return x.Value, x.Value != "", true
+		return leafValue(peek, x.Value), x.Value != "", true
 	}
 	return nil, false, false
 }
 
 // singleTermMapping reads the single-valued attributes of rm.TermMapping.
-func singleTermMapping(x *rm.TermMapping, attr string) (any, bool, bool) {
+func singleTermMapping(x *rm.TermMapping, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
 	switch attr {
 	case "match":
-		return x.Match, x.Match != "", true
+		return leafValue(peek, x.Match), x.Match != "", true
 	case "purpose":
 		return x.Purpose, x.Purpose != nil, true
 	case "target":
@@ -4520,7 +4521,7 @@ func singleTermMapping(x *rm.TermMapping, attr string) (any, bool, bool) {
 }
 
 // singleTranslationDetails reads the single-valued attributes of rm.TranslationDetails.
-func singleTranslationDetails(x *rm.TranslationDetails, attr string) (any, bool, bool) {
+func singleTranslationDetails(x *rm.TranslationDetails, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4557,19 +4558,19 @@ func hashTranslationDetails(x *rm.TranslationDetails, attr string) ([]string, []
 }
 
 // singleUuid reads the single-valued attributes of rm.Uuid.
-func singleUuid(x *rm.Uuid, attr string) (any, bool, bool) {
+func singleUuid(x *rm.Uuid, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
 	switch attr {
 	case "value":
-		return x.Value, x.Value != "", true
+		return leafValue(peek, x.Value), x.Value != "", true
 	}
 	return nil, false, false
 }
 
 // singleVersionedComposition reads the single-valued attributes of rm.VersionedComposition.
-func singleVersionedComposition(x *rm.VersionedComposition, attr string) (any, bool, bool) {
+func singleVersionedComposition(x *rm.VersionedComposition, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4585,7 +4586,7 @@ func singleVersionedComposition(x *rm.VersionedComposition, attr string) (any, b
 }
 
 // singleVersionedEHRAccess reads the single-valued attributes of rm.VersionedEHRAccess.
-func singleVersionedEHRAccess(x *rm.VersionedEHRAccess, attr string) (any, bool, bool) {
+func singleVersionedEHRAccess(x *rm.VersionedEHRAccess, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4601,7 +4602,7 @@ func singleVersionedEHRAccess(x *rm.VersionedEHRAccess, attr string) (any, bool,
 }
 
 // singleVersionedEHRStatus reads the single-valued attributes of rm.VersionedEHRStatus.
-func singleVersionedEHRStatus(x *rm.VersionedEHRStatus, attr string) (any, bool, bool) {
+func singleVersionedEHRStatus(x *rm.VersionedEHRStatus, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4617,7 +4618,7 @@ func singleVersionedEHRStatus(x *rm.VersionedEHRStatus, attr string) (any, bool,
 }
 
 // singleVersionedFolder reads the single-valued attributes of rm.VersionedFolder.
-func singleVersionedFolder(x *rm.VersionedFolder, attr string) (any, bool, bool) {
+func singleVersionedFolder(x *rm.VersionedFolder, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4633,7 +4634,7 @@ func singleVersionedFolder(x *rm.VersionedFolder, attr string) (any, bool, bool)
 }
 
 // singleVersionedObjectAny reads the single-valued attributes of rm.VersionedObject[any].
-func singleVersionedObjectAny(x *rm.VersionedObject[any], attr string) (any, bool, bool) {
+func singleVersionedObjectAny(x *rm.VersionedObject[any], attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4649,7 +4650,7 @@ func singleVersionedObjectAny(x *rm.VersionedObject[any], attr string) (any, boo
 }
 
 // singleVersionedParty reads the single-valued attributes of rm.VersionedParty.
-func singleVersionedParty(x *rm.VersionedParty, attr string) (any, bool, bool) {
+func singleVersionedParty(x *rm.VersionedParty, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4665,13 +4666,13 @@ func singleVersionedParty(x *rm.VersionedParty, attr string) (any, bool, bool) {
 }
 
 // singleVersionTreeID reads the single-valued attributes of rm.VersionTreeID.
-func singleVersionTreeID(x *rm.VersionTreeID, attr string) (any, bool, bool) {
+func singleVersionTreeID(x *rm.VersionTreeID, attr string, peek bool) (any, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
 	switch attr {
 	case "value":
-		return x.Value, x.Value != "", true
+		return leafValue(peek, x.Value), x.Value != "", true
 	}
 	return nil, false, false
 }
