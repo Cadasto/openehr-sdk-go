@@ -137,12 +137,12 @@ func TestCoverage_REQ171_UnevaluatedOverTheCorpus(t *testing.T) {
 		if !sortedOnce(floor) {
 			t.Errorf("ValidateRM(%s) Coverage.Unevaluated = %q, want it sorted with no repeat", doc.rel.Rel, floor)
 		}
-		for _, evaluated := range []string{"DV_TEXT.Mappings_valid", "ELEMENT.Inv_null_flavour_indicated", "CODE_PHRASE.Code_string_valid", "LOCATABLE.Archetype_node_id_valid", "DV_TEXT.Valid_value"} {
+		for _, evaluated := range []string{"DV_TEXT.Mappings_valid", "ELEMENT.Inv_null_flavour_indicated", "CODE_PHRASE.Code_string_valid", "LOCATABLE.Archetype_node_id_valid", "DV_TEXT.Valid_value", "LOCATABLE.Links_valid"} {
 			if slices.Contains(floor, evaluated) {
 				t.Errorf("ValidateRM(%s) Coverage.Unevaluated lists %s, which the RM rules evaluate", doc.rel.Rel, evaluated)
 			}
 		}
-		for _, want := range []string{"DV_TEXT.Formatting_valid", "LOCATABLE.Links_valid"} {
+		for _, want := range []string{"DV_TEXT.Formatting_valid", "LOCATABLE.Archetyped_valid"} {
 			if !slices.Contains(floor, want) {
 				t.Errorf("ValidateRM(%s) Coverage.Unevaluated = %q, want it to list %s", doc.rel.Rel, floor, want)
 			}

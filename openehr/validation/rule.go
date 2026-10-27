@@ -61,4 +61,7 @@ const (
 	ruleMappingsValid         = "DV_TEXT.Mappings_valid"
 	ruleTermMappingMatch      = "TERM_MAPPING.Match_valid"
 	ruleRMVersionValid        = "ARCHETYPED.Rm_version_valid"
+	ruleLinksValid            = "LOCATABLE.Links_valid"
+	ruleLocationValid         = "EVENT_CONTEXT.location_valid"
+	ruleEHRSchemeValid        = "DV_EHR_URI.Scheme_valid"
 )
