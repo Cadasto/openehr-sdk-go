@@ -716,8 +716,10 @@ func (v clockValue) field(i int) (int, bool) {
 	return v.time.Second, v.time.SecondKnown
 }
 
-// magnitude is the value's place in the order of the RM's Compare: days
-// for a date, clock-local seconds for a time or a date-time.
+// magnitude is the value's clock-local place in time, before its zone is
+// applied: days for a date, seconds for a time or a date-time. clockOrder
+// applies the zones itself, where the RM's Compare reads a zoned date-time
+// in UTC.
 func (v clockValue) magnitude(k clockKind) float64 {
 	switch k {
 	case clockDate:
