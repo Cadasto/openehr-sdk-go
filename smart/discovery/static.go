@@ -4,8 +4,12 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
+	"maps"
 	"net/url"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/internal/urlredact"
@@ -13,6 +17,10 @@ import (
 
 // StaticConfig is the input to NewStaticCatalog, a hand-built catalog
 // for openEHR backends that do not publish a discovery document.
+//
+// Printed with fmt or logged with log/slog, a StaticConfig shows every URL it
+// holds with its password masked: see [StaticConfig.String]. Its JSON
+// encoding is unchanged.
 type StaticConfig struct {
 	// BaseURL is the Platform base URL. Leave it empty when it is the same
 	// as Issuer; the catalog's BaseURL then takes the value of Issuer.
@@ -28,6 +36,65 @@ type StaticConfig struct {
 	ExpiresAt time.Time
 	// ETag may be left empty.
 	ETag string
+}
+
+// String describes c by its fields, with the password of every URL that
+// carries one masked as [url.URL.Redacted] masks it: BaseURL, Issuer, the
+// base URL and links of each service, and the auth endpoints. Each service is
+// shown by the text of [ServiceEntry.String], in the order of its key, Auth
+// by the text of [AuthEndpoints.String], and ExpiresAt in RFC 3339 form.
+//
+// String, GoString, Format and LogValue are methods of StaticConfig, because
+// [NewStaticCatalog] takes it as a value, so a *StaticConfig prints the same
+// way. fmt answers %T and %p without calling Format, and %p of a
+// StaticConfig value prints its fields, BaseURL and Issuer as written, so
+// never print a StaticConfig with %p.
+func (c StaticConfig) String() string {
+	var services strings.Builder
+	services.WriteString("map[")
+	for i, id := range slices.Sorted(maps.Keys(c.Services)) {
+		if i > 0 {
+			services.WriteString(", ")
+		}
+		fmt.Fprintf(&services, "%q: %s", id, c.Services[id].String())
+	}
+	services.WriteString("]")
+	return fmt.Sprintf("discovery.StaticConfig{BaseURL: %q, Issuer: %q, Services: %s, Auth: %s, ExpiresAt: %s, ETag: %q}",
+		urlredact.String(c.BaseURL), urlredact.String(c.Issuer), services.String(), c.Auth.String(),
+		c.ExpiresAt.Format(time.RFC3339Nano), c.ETag)
+}
+
+// GoString returns the text of [StaticConfig.String], so that printing c in
+// Go syntax shows no password either.
+func (c StaticConfig) GoString() string { return c.String() }
+
+// Format writes the text of [StaticConfig.String] for every fmt verb,
+// whatever its flags and width. With a nil f it does nothing.
+func (c StaticConfig) Format(f fmt.State, _ rune) {
+	if f == nil {
+		return
+	}
+	_, _ = io.WriteString(f, c.String())
+}
+
+// LogValue lets log/slog log c as a group of its fields, keyed by field
+// name, with every URL's password masked as [StaticConfig.String] masks it.
+// Services is a group keyed by service identifier, each entry logged as
+// [ServiceEntry.LogValue] logs it, and Auth is logged as
+// [AuthEndpoints.LogValue] logs it.
+func (c StaticConfig) LogValue() slog.Value {
+	services := make([]slog.Attr, 0, len(c.Services))
+	for _, id := range slices.Sorted(maps.Keys(c.Services)) {
+		services = append(services, slog.Attr{Key: id, Value: c.Services[id].LogValue()})
+	}
+	return slog.GroupValue(
+		slog.String("BaseURL", urlredact.String(c.BaseURL)),
+		slog.String("Issuer", urlredact.String(c.Issuer)),
+		slog.Attr{Key: "Services", Value: slog.GroupValue(services...)},
+		slog.Attr{Key: "Auth", Value: c.Auth.LogValue()},
+		slog.Time("ExpiresAt", c.ExpiresAt),
+		slog.String("ETag", c.ETag),
+	)
 }
 
 // NewStaticCatalog builds a ServiceCatalog without a network round

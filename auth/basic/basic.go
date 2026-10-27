@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"io"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
 )
@@ -17,6 +18,9 @@ const TokenType = "Basic"
 // Source returns a fixed Basic credential on every Token() call. There is
 // no token exchange or refresh; credentials are supplied at construction.
 // Source is safe for concurrent use.
+//
+// Printing a Source with any fmt verb shows its credential as "[redacted]":
+// see [Source.String].
 type Source struct {
 	token auth.Token
 }
@@ -36,6 +40,29 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 		return auth.Token{}, err
 	}
 	return s.token, nil
+}
+
+// String describes s by the text of [auth.Token.String] for its credential,
+// which shows the Basic payload as "[redacted]". A nil s gives "<nil>".
+func (s *Source) String() string {
+	if s == nil {
+		return "<nil>"
+	}
+	return "basic.Source{Token: " + s.token.String() + "}"
+}
+
+// GoString returns the text of [Source.String], so that printing s in Go
+// syntax shows no credential either.
+func (s *Source) GoString() string { return s.String() }
+
+// Format writes the text of [Source.String] for every fmt verb, whatever its
+// flags and width. Without it, fmt would print the unexported credential
+// field of s without calling its methods, the Basic payload included.
+func (s *Source) Format(f fmt.State, _ rune) {
+	if f == nil {
+		return
+	}
+	_, _ = io.WriteString(f, s.String())
 }
 
 // encodeToken builds the auth.Token transport/ forwards as

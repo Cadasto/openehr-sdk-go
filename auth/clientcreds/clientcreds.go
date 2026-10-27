@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"slices"
@@ -30,6 +31,11 @@ const grantClientCredentials = "client_credentials"
 // defaultRefreshThreshold is how long before its expiry the cached access
 // token counts as stale when the configuration sets no threshold.
 const defaultRefreshThreshold = 30 * time.Second
+
+// firstBackoff is how long the source holds back the next exchange after the
+// first transient failure in a row, while it serves the cached access token.
+// Each further failure doubles it.
+const firstBackoff = time.Second
 
 // Client authentication method names, as listed in a server's
 // token_endpoint_auth_methods_supported (RFC 8414).
@@ -65,6 +71,10 @@ const (
 // Config carries the constructor inputs. Use New(...Option) for the
 // idiomatic call site; Config is exposed for declarative configuration
 // (env, YAML).
+//
+// Printed with fmt or logged with log/slog, a Config shows its ClientSecret
+// and ClientAssertion as "[redacted]", and the password of each URL it shows
+// masked: see [Config.String] and [Config.LogValue].
 type Config struct {
 	// HTTPClient is the injected client used for token-endpoint calls.
 	// The token request never follows a redirect, whatever CheckRedirect
@@ -103,6 +113,71 @@ type Config struct {
 	// Issuer is the issuer URL recorded on the produced Token. Optional;
 	// when set it is round-tripped to Token.Issuer for audit.
 	Issuer string
+}
+
+// redacted is the text that stands for a credential when a value is printed
+// or logged.
+const redacted = "[redacted]"
+
+// redact returns redacted for a credential s that is set and "" for an empty
+// one.
+func redact(s string) string {
+	if s == "" {
+		return ""
+	}
+	return redacted
+}
+
+// String describes c with its ClientSecret shown as "[redacted]", or as ""
+// when it is empty, its ClientAssertion shown as "[redacted]", or as <nil>
+// when it has none, and the password of a TokenURL, Audience or Issuer that
+// carries one masked, as [url.URL.Redacted] masks it. The other fields are
+// shown as they are, except HTTPClient, which is left out.
+func (c Config) String() string {
+	assertion := "<nil>"
+	if c.ClientAssertion != nil {
+		assertion = redacted
+	}
+	return fmt.Sprintf("clientcreds.Config{TokenURL: %q, ClientID: %q, ClientSecret: %q, ClientAssertion: %s, Scope: %q, Audience: %q, AuthMethod: %d, RefreshThreshold: %s, Issuer: %q}",
+		urlredact.String(c.TokenURL), c.ClientID, redact(c.ClientSecret), assertion, c.Scope, urlredact.String(c.Audience), c.AuthMethod, c.RefreshThreshold, urlredact.String(c.Issuer))
+}
+
+// GoString returns the text of [Config.String], so that printing c in Go
+// syntax shows no credential either.
+func (c Config) GoString() string { return c.String() }
+
+// Format writes the text of [Config.String] for every fmt verb it is called
+// for, whatever the flags and width. fmt answers %T and %p without calling
+// it, and %p of a Config value prints its fields, so never print a Config
+// with %p.
+func (c Config) Format(f fmt.State, _ rune) {
+	if f == nil {
+		return
+	}
+	_, _ = io.WriteString(f, c.String())
+}
+
+// LogValue lets log/slog log c as a group of the fields [Config.String]
+// shows, keyed by field name, with the ClientSecret, the ClientAssertion and
+// the URLs replaced as String replaces them. Without it, the JSON handler
+// would encode the client secret, and the private key of a
+// [jwtbearer.ClaimsSigner] client assertion.
+func (c Config) LogValue() slog.Value {
+	assertion := slog.Any("ClientAssertion", nil)
+	if c.ClientAssertion != nil {
+		assertion = slog.String("ClientAssertion", redacted)
+	}
+	return slog.GroupValue(
+		slog.String("TokenURL", urlredact.String(c.TokenURL)),
+		slog.String("ClientID", c.ClientID),
+		slog.String("ClientSecret", redact(c.ClientSecret)),
+		assertion,
+		slog.String("Scope", c.Scope),
+		slog.String("Audience", urlredact.String(c.Audience)),
+		slog.Int("AuthMethod", int(c.AuthMethod)),
+		slog.Duration("RefreshThreshold", c.RefreshThreshold),
+		slog.String("Issuer", urlredact.String(c.Issuer)),
+	)
 }
 
 // Option mutates a Config during construction.
@@ -150,6 +225,10 @@ func WithClientAssertion(src jwtbearer.AssertionSource) Option {
 // Source is the client_credentials TokenSource. Safe for concurrent
 // use; concurrent Token() callers coalesce around one outgoing
 // exchange.
+//
+// Printing a Source with any fmt verb shows only its token URL, client ID and
+// issuer, never its client secret, its client assertion or the token it
+// holds: see [Source.String].
 type Source struct {
 	cfg      Config
 	tokenURL *url.URL
@@ -161,12 +240,51 @@ type Source struct {
 	mu       sync.Mutex
 	cur      auth.Token
 	inflight *exchange
+	// retryAt is when Token may send an exchange again after a transient
+	// failure left the cached access token to be served, never after its
+	// ExpiresAt; zero when no backoff holds. backoff is how long the next
+	// such failure holds the exchange back. setTokenLocked resets both.
+	retryAt time.Time
+	backoff time.Duration
+}
+
+// String describes s by three values fixed when s was built: its token URL
+// and its issuer, with the password of one that carries one masked, and its
+// client ID. It never shows the client secret, the client assertion or a
+// token, and it reads nothing an exchange changes, so it is safe to call
+// while other goroutines use s. A nil s gives "<nil>".
+func (s *Source) String() string {
+	if s == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("clientcreds.Source{TokenURL: %q, ClientID: %q, Issuer: %q}",
+		urlredact.String(s.cfg.TokenURL), s.cfg.ClientID, urlredact.String(s.cfg.Issuer))
+}
+
+// GoString returns the text of [Source.String], so that printing s in Go
+// syntax shows no credential either.
+func (s *Source) GoString() string { return s.String() }
+
+// Format writes the text of [Source.String] for every fmt verb, whatever its
+// flags and width. Without it, fmt would print the unexported fields of s
+// without calling their methods, the client secret and the held token
+// included.
+func (s *Source) Format(f fmt.State, _ rune) {
+	if f == nil {
+		return
+	}
+	_, _ = io.WriteString(f, s.String())
 }
 
 type exchange struct {
 	done  chan struct{}
 	token auth.Token
 	err   error
+	// held is the access token the exchange's callers get in place of err
+	// when serveHeld reports that the exchange failed transiently while held
+	// was still valid. Both are written before done is closed.
+	held      auth.Token
+	serveHeld bool
 	// abandoned reports that the exchange has no result for the callers
 	// waiting on it: it failed only because the context of the caller
 	// running it ended, or a panic unwound that caller before the result was
@@ -323,13 +441,27 @@ var _ auth.Reauther = (*Source)(nil)
 // from the HTTP client's RoundTripper or the assertion source for example,
 // goes up through the caller running it, unchanged, and the callers waiting
 // on that exchange start a new one the same way.
+//
+// An exchange that fails without being terminal (a server or network error,
+// a timeout, an answer the source cannot read, or an assertion it cannot
+// sign) leaves the cached token in place. While that token is not yet past
+// its ExpiresAt, Token then returns it without an error, and sends no new
+// exchange until a backoff ends: one second after the first such failure,
+// twice as long after each further failure in a row, and never later than
+// that ExpiresAt. Until then Token returns the cached token without a
+// request. A successful exchange ends the backoff. Past ExpiresAt the
+// failure is returned, matching [auth.ErrTokenExchangeFailed], and each call
+// tries again. The calls waiting on an exchange get the same outcome, the
+// cached token included; [Source.Reauth] gets the failure.
 func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 	for {
 		if err := ctx.Err(); err != nil {
 			return auth.Token{}, err
 		}
 		s.mu.Lock()
-		if !s.stale() {
+		if !s.stale() || time.Now().Before(s.retryAt) {
+			// The token is fresh, or a transient failure left it to be served
+			// until the backoff ends, which is no later than its ExpiresAt.
 			t := s.cur
 			s.mu.Unlock()
 			return t, nil
@@ -348,7 +480,7 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 			return auth.Token{}, ctx.Err()
 		}
 		if !ex.abandoned {
-			return ex.token, ex.err
+			return ex.outcome()
 		}
 		// The caller running ex gave up or panicked, and this caller's
 		// context is live: go round again to run a new exchange or wait on a
@@ -369,15 +501,19 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 // first, Reauth starts a new exchange rather than returning that caller's
 // cancellation. Reauth returns the exchange's error, which is an
 // [*auth.ExchangeError] wrapping [auth.ErrTokenExchangeFailed], or the
-// context's error when ctx ends first. A Reauth whose context has already
-// ended keeps the cached token. After a failed exchange no token is cached,
-// and the next Token call tries again.
+// context's error when ctx ends first. It exchanges even while a backoff
+// after a transient failure holds [Source.Token] back. A Reauth whose
+// context has already ended keeps the cached token. After a failed exchange
+// no token is cached, and the next Token call tries again.
 func (s *Source) Reauth(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 	s.mu.Lock()
-	s.cur = auth.Token{}
+	// Dropping the token also ends its backoff, so the exchange below is
+	// sent at once, and no exchange that ends afterwards can serve the
+	// token to this call.
+	s.setTokenLocked(auth.Token{})
 	s.mu.Unlock()
 	_, err := s.Token(ctx)
 	return err
@@ -397,15 +533,71 @@ func (s *Source) lead(ctx context.Context, ex *exchange) (auth.Token, error) {
 	defer s.release(ex)
 
 	tok, err := s.fetch(ctx)
-	if err == nil {
-		s.mu.Lock()
-		s.cur = tok
-		s.mu.Unlock()
+	abandoned := coalesce.EndedByContext(ctx, err)
+	s.mu.Lock()
+	switch {
+	case err == nil:
+		s.setTokenLocked(tok)
+	case !abandoned && !terminal(err) && s.backOffLocked():
+		// A transient failure, and the cached token is still valid: it is
+		// served in place of the failure until the backoff ends (REQ-063).
+		ex.held = s.cur
+		ex.serveHeld = true
 	}
+	// Out of flight in the same step, so a Reauth that drops the cached
+	// token after this decision sends an exchange of its own instead of
+	// joining this one; one that dropped it before has left no token to
+	// serve. Either way Reauth gets an exchange's failure.
+	if s.inflight == ex {
+		s.inflight = nil
+	}
+	s.mu.Unlock()
 	ex.token = tok
 	ex.err = err
-	ex.abandoned = coalesce.EndedByContext(ctx, err)
-	return tok, err
+	ex.abandoned = abandoned
+	return ex.outcome()
+}
+
+// terminal reports whether err is a permanent token-endpoint failure, as
+// [auth.ExchangeError.Terminal] decides it.
+func terminal(err error) bool {
+	exErr, ok := errors.AsType[*auth.ExchangeError](err)
+	return ok && exErr.Terminal()
+}
+
+// outcome returns what a caller of the exchange ex stands for gets: the
+// cached access token in place of a transient failure that left it to be
+// served, and otherwise the exchange's own token and error.
+func (ex *exchange) outcome() (auth.Token, error) {
+	if ex.serveHeld {
+		return ex.held, nil
+	}
+	return ex.token, ex.err
+}
+
+// setTokenLocked caches tok, a new token or none, and ends the backoff of
+// the token it replaces. The caller holds s.mu.
+func (s *Source) setTokenLocked(tok auth.Token) {
+	s.cur = tok
+	s.retryAt = time.Time{}
+	s.backoff = 0
+}
+
+// backOffLocked records an exchange that failed transiently. While the
+// cached access token is not yet past its ExpiresAt, it holds Token's next
+// exchange back until the backoff ends, never later than that ExpiresAt,
+// doubles the backoff for the next failure in a row, and reports true: the
+// token is to be served in place of the failure. The caller holds s.mu.
+func (s *Source) backOffLocked() bool {
+	now := time.Now()
+	left := s.cur.ExpiresAt.Sub(now)
+	if left <= 0 {
+		return false
+	}
+	wait := min(cmp.Or(s.backoff, firstBackoff), left)
+	s.retryAt = now.Add(wait)
+	s.backoff = 2 * wait
+	return true
 }
 
 // release takes ex out of flight, unless a newer exchange has replaced it

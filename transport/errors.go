@@ -188,8 +188,8 @@ type WireError struct {
 }
 
 // Error implements error. The returned string includes the HTTP status,
-// the openEHR error code, and the request route, all of which are
-// non-PHI fields.
+// the openEHR error code, quoted as a Go string, and the request route,
+// all of which are non-PHI fields.
 // The server message, the raw body and the Bearer challenge are
 // deliberately omitted so WireError values are safe to include in logs,
 // traces, and observer callbacks.
@@ -222,7 +222,10 @@ func (e *WireError) Error() string {
 		fmt.Fprintf(&b, " status=%d", e.StatusCode)
 	}
 	if e.OpenEHR != nil && e.OpenEHR.Code != "" {
-		fmt.Fprintf(&b, " code=%s", e.OpenEHR.Code)
+		// REQ-093: the code is the server's text, so it is quoted: a
+		// newline or a fragment that reads as another field stays inside
+		// the quotes.
+		fmt.Fprintf(&b, " code=%q", e.OpenEHR.Code)
 	}
 	return b.String()
 }

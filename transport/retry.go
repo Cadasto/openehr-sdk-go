@@ -34,11 +34,14 @@ type RetryPolicy struct {
 	// RetriableStatus enumerates HTTP statuses that trigger a retry.
 	// Default {502, 503, 504}.
 	RetriableStatus []int
-	// RetryNonIdempotent also retries a method that is not idempotent
-	// (RFC 9110 §9.2.2), such as POST or PATCH, when the status is
-	// retriable. GET, HEAD, OPTIONS, PUT and DELETE are retried without
-	// it. Defaults to false: the SDK does not retry non-idempotent
-	// methods unless the consumer opts in.
+	// RetryNonIdempotent also retries every write method, POST, PATCH,
+	// PUT and DELETE, when the status is retriable; without it only GET,
+	// HEAD and OPTIONS are retried. POST and PATCH are not idempotent
+	// (RFC 9110 §9.2.2). An openEHR PUT or DELETE names the version it
+	// changes (If-Match, a version uid), so a retry after a gateway error
+	// that hid a committed write would answer 412 or 409 for a write that
+	// succeeded. Defaults to false: the SDK does not retry a write unless
+	// the consumer opts in.
 	RetryNonIdempotent bool
 }
 
@@ -98,7 +101,7 @@ func (p RetryPolicy) retriableMethod(m string) bool {
 		return true
 	}
 	switch m {
-	case "GET", "HEAD", "OPTIONS", "PUT", "DELETE":
+	case "GET", "HEAD", "OPTIONS":
 		return true
 	default:
 		return false

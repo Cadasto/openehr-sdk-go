@@ -205,7 +205,9 @@ func TestTokenChangeNotCalledOnFailure(t *testing.T) { // REQ-063
 		return err
 	}
 	refresh := func(t *testing.T, src *smart.Source) error {
-		src.SetTokens(staleAccess("at-1"), "rt-1")
+		// Expired, so a failed refresh is returned rather than met by
+		// serving the held token.
+		src.SetTokens(expiredAccess("at-1"), "rt-1")
 		_, err := src.Token(t.Context())
 		return err
 	}

@@ -3,17 +3,27 @@ package smart
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"log/slog"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
 	"github.com/cadasto/openehr-sdk-go/internal/expiresin"
+	"github.com/cadasto/openehr-sdk-go/internal/urlredact"
 )
 
 // TokenResponse is the SMART token-endpoint payload. The
 // application-level smart/ package maps this into LaunchContext.
+//
+// Printed with fmt or logged with log/slog, a TokenResponse shows its access,
+// refresh and ID tokens as "[redacted]", in their fields and in Raw, and the
+// URLs it holds with their passwords masked: see [TokenResponse.String] and
+// [TokenResponse.LogValue]. Its JSON encoding is unchanged and carries the
+// tokens.
 type TokenResponse struct {
 	AccessToken string
 	TokenType   string
@@ -65,6 +75,125 @@ type TokenResponse struct {
 	// Tenant is the optional "tenant" launch-context parameter (SMART v2).
 	Tenant string
 	Raw    map[string]any
+}
+
+// redacted is the text that stands for a credential when a value is printed
+// or logged.
+const redacted = "[redacted]"
+
+// redact returns redacted for a credential s that is set and "" for an empty
+// one.
+func redact(s string) string {
+	if s == "" {
+		return ""
+	}
+	return redacted
+}
+
+// tokenMembers are the token-endpoint members that carry a credential
+// (RFC 6749 §5.1; OpenID Connect Core 1.0 §3.1.3.3).
+var tokenMembers = [...]string{"access_token", "refresh_token", "id_token"}
+
+// urlMembers are the token-endpoint and ID-token members whose value is a
+// URL (OpenID Connect Core 1.0 §2; SMART App Launch fhirUser and
+// smart_style_url).
+var urlMembers = [...]string{"iss", "fhirUser", "smart_style_url"}
+
+// maskedRaw returns a shallow copy of raw whose token members hold redacted
+// when they hold anything other than "" or null, and whose URL members that
+// hold a string hold it with the password masked. The keys are kept. A nil
+// raw gives nil, and raw itself is not changed.
+func maskedRaw(raw map[string]any) map[string]any {
+	masked := maps.Clone(raw)
+	for _, k := range tokenMembers {
+		if v, ok := masked[k]; ok && v != nil && v != "" {
+			masked[k] = redacted
+		}
+	}
+	for _, k := range urlMembers {
+		if v, ok := masked[k].(string); ok {
+			masked[k] = urlredact.String(v)
+		}
+	}
+	return masked
+}
+
+// maskedClaims returns a copy of c whose Issuer and FHIRUser URLs have their
+// passwords masked, or nil for a nil c. c is not changed.
+func maskedClaims(c *IDTokenClaims) *IDTokenClaims {
+	if c == nil {
+		return nil
+	}
+	masked := *c
+	masked.Issuer = urlredact.String(c.Issuer)
+	masked.FHIRUser = urlredact.String(c.FHIRUser)
+	return &masked
+}
+
+// String describes tr with its AccessToken, RefreshToken and IDToken, and
+// the access_token, refresh_token and id_token members of a copy of Raw,
+// replaced by "[redacted]", or left empty when they are empty. The password
+// of each URL it holds is masked, as [net/url.URL.Redacted] masks it:
+// FHIRUser, SMARTStyleURL, the Issuer and FHIRUser of IDTokenClaims, and the
+// iss, fhirUser and smart_style_url members of the copy of Raw. The other
+// fields are shown as they are; tr, its IDTokenClaims and its Raw are not
+// changed.
+func (tr TokenResponse) String() string {
+	banner := "<nil>"
+	if tr.NeedPatientBanner != nil {
+		banner = strconv.FormatBool(*tr.NeedPatientBanner)
+	}
+	return fmt.Sprintf("smart.TokenResponse{AccessToken: %q, TokenType: %q, ExpiresIn: %d, RefreshToken: %q, Scope: %q, IDToken: %q, "+
+		"IDTokenClaims: %+v, Patient: %q, Encounter: %q, FHIRUser: %q, EHRID: %q, EpisodeID: %q, Intent: %q, SMARTStyleURL: %q, "+
+		"NeedPatientBanner: %s, Tenant: %q, Raw: %v}",
+		redact(tr.AccessToken), tr.TokenType, tr.ExpiresIn, redact(tr.RefreshToken), tr.Scope, redact(tr.IDToken),
+		maskedClaims(tr.IDTokenClaims), tr.Patient, tr.Encounter, urlredact.String(tr.FHIRUser), tr.EHRID, tr.EpisodeID, tr.Intent,
+		urlredact.String(tr.SMARTStyleURL), banner, tr.Tenant, maskedRaw(tr.Raw))
+}
+
+// GoString returns the text of [TokenResponse.String], so that printing tr in
+// Go syntax shows no token either.
+func (tr TokenResponse) GoString() string { return tr.String() }
+
+// Format writes the text of [TokenResponse.String] for every fmt verb it is
+// called for, whatever the flags and width. fmt answers %T and %p without
+// calling it, and %p of a TokenResponse value prints its fields, so never
+// print a TokenResponse with %p.
+func (tr TokenResponse) Format(f fmt.State, _ rune) {
+	if f == nil {
+		return
+	}
+	_, _ = io.WriteString(f, tr.String())
+}
+
+// LogValue lets log/slog log tr as a group of its fields, keyed by field
+// name, with the tokens replaced and the URLs masked as
+// [TokenResponse.String] replaces and masks them. tr, its IDTokenClaims and
+// its Raw are not changed.
+func (tr TokenResponse) LogValue() slog.Value {
+	banner := slog.Any("NeedPatientBanner", nil)
+	if tr.NeedPatientBanner != nil {
+		banner = slog.Bool("NeedPatientBanner", *tr.NeedPatientBanner)
+	}
+	return slog.GroupValue(
+		slog.String("AccessToken", redact(tr.AccessToken)),
+		slog.String("TokenType", tr.TokenType),
+		slog.Int64("ExpiresIn", tr.ExpiresIn),
+		slog.String("RefreshToken", redact(tr.RefreshToken)),
+		slog.String("Scope", tr.Scope),
+		slog.String("IDToken", redact(tr.IDToken)),
+		slog.Any("IDTokenClaims", maskedClaims(tr.IDTokenClaims)),
+		slog.String("Patient", tr.Patient),
+		slog.String("Encounter", tr.Encounter),
+		slog.String("FHIRUser", urlredact.String(tr.FHIRUser)),
+		slog.String("EHRID", tr.EHRID),
+		slog.String("EpisodeID", tr.EpisodeID),
+		slog.String("Intent", tr.Intent),
+		slog.String("SMARTStyleURL", urlredact.String(tr.SMARTStyleURL)),
+		banner,
+		slog.String("Tenant", tr.Tenant),
+		slog.Any("Raw", maskedRaw(tr.Raw)),
+	)
 }
 
 // ParseTokenResponse decodes a token-endpoint JSON body into

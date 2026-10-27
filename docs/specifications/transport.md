@@ -55,7 +55,7 @@ client, err := transport.New(catalog,
 
 Rules:
 
-- Retries **MUST NOT** be applied to a method that is not idempotent (RFC 9110 §9.2.2), such as `POST` or `PATCH`, unless the policy sets `RetryNonIdempotent`. The SDK checks the method before it looks at the error or the status, so a token or network failure on such a request is not retried either.
+- Retries **MUST NOT** be applied to a write, `POST`, `PATCH`, `PUT` or `DELETE`, unless the policy sets `RetryNonIdempotent`; without it only `GET`, `HEAD` and `OPTIONS` are retried. `POST` and `PATCH` are not idempotent (RFC 9110 §9.2.2), and an openEHR `PUT` or `DELETE` names the version it changes (`If-Match`, a version uid), so a retry after a `502`, `503` or `504` that hid a committed write would answer `412` or `409` for a write that succeeded. The SDK checks the method before it looks at the error or the status, so a token or network failure on such a request is not retried either.
 - Retries **MUST** respect `ctx` cancellation: no attempt starts once `ctx` has ended.
 - The retry budget **MUST** be observable via the OTel span (`retry.attempt`, `retry.backoff_ms`).
 - Two requests **MUST NOT** be sent again, since every attempt would fail the same way: a request `Client.Do` refuses with `transport.ErrInsecureRedirect` ([§ REQ-092](#req-092--tls-posture) *No downgrade with a credential*), and a request that cannot be built (`http.NewRequestWithContext` refuses it).

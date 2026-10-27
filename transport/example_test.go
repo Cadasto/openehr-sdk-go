@@ -89,7 +89,7 @@ func ExampleWireError() {
 	// openEHR code: UNPROCESSABLE_ENTITY
 	// server message kept: false
 	// raw body kept: false
-	// transport: unprocessable entity (PUT /ehr/{ehr_id}/composition/{versioned_object_id}) status=422 code=UNPROCESSABLE_ENTITY
+	// transport: unprocessable entity (PUT /ehr/{ehr_id}/composition/{versioned_object_id}) status=422 code="UNPROCESSABLE_ENTITY"
 }
 
 // The ids the examples send. The fake server answers each versioned object

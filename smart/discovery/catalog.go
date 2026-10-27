@@ -1,8 +1,16 @@
 package discovery
 
 import (
+	"fmt"
+	"io"
+	"log/slog"
+	"maps"
 	"net/url"
+	"slices"
+	"strings"
 	"time"
+
+	"github.com/cadasto/openehr-sdk-go/internal/urlredact"
 )
 
 // ServiceCatalog is the resolved set of service base URLs for a
@@ -16,6 +24,11 @@ import (
 // its "iss" parameter. Issuer is the OpenID Connect issuer that signs ID
 // tokens. A Platform whose sign-in is handled by a separate identity
 // provider declares that provider's URL as its issuer, so the two differ.
+//
+// Printed with fmt or logged with log/slog, a *ServiceCatalog shows every
+// URL it holds with its password masked: see [ServiceCatalog.String]. Its
+// JSON encoding is unchanged and carries BaseURL and Issuer as written, so a
+// [Cache] can store a catalog and read it back.
 type ServiceCatalog struct {
 	// BaseURL is the Platform base URL the catalog was resolved from,
 	// exactly as the caller passed it to Resolver.Resolve or
@@ -84,7 +97,79 @@ func (c *ServiceCatalog) Stale(now time.Time) bool {
 	return !now.Before(c.ExpiresAt)
 }
 
+// String describes c by its exported fields, with the password of every URL
+// that carries one masked as [url.URL.Redacted] masks it: BaseURL, Issuer,
+// the base URL and links of each service, and the auth endpoints. Each
+// service is shown by the text of [ServiceEntry.String], in the order of its
+// key, Auth by the text of [AuthEndpoints.String], and ResolvedAt and
+// ExpiresAt in RFC 3339 form. A nil c gives "<nil>".
+//
+// String, GoString, Format and LogValue are methods of *ServiceCatalog,
+// because the [Resolver] and [NewStaticCatalog] hand out pointers. A
+// ServiceCatalog value copied out of one has none of them, and fmt and
+// log/slog then print its fields, BaseURL and Issuer as written, so print or
+// log the pointer.
+func (c *ServiceCatalog) String() string {
+	if c == nil {
+		return "<nil>"
+	}
+	var services strings.Builder
+	services.WriteString("map[")
+	for i, id := range slices.Sorted(maps.Keys(c.Services)) {
+		if i > 0 {
+			services.WriteString(", ")
+		}
+		fmt.Fprintf(&services, "%q: %s", id, c.Services[id].String())
+	}
+	services.WriteString("]")
+	return fmt.Sprintf("discovery.ServiceCatalog{BaseURL: %q, Issuer: %q, Services: %s, Auth: %s, ResolvedAt: %s, ExpiresAt: %s, ETag: %q}",
+		urlredact.String(c.BaseURL), urlredact.String(c.Issuer), services.String(), c.Auth.String(),
+		c.ResolvedAt.Format(time.RFC3339Nano), c.ExpiresAt.Format(time.RFC3339Nano), c.ETag)
+}
+
+// GoString returns the text of [ServiceCatalog.String], so that printing c
+// in Go syntax shows no password either.
+func (c *ServiceCatalog) GoString() string { return c.String() }
+
+// Format writes the text of [ServiceCatalog.String] for every fmt verb,
+// whatever its flags and width. Without it, fmt would print the fields of c,
+// BaseURL and Issuer as written. With a nil f it does nothing.
+func (c *ServiceCatalog) Format(f fmt.State, _ rune) {
+	if f == nil {
+		return
+	}
+	_, _ = io.WriteString(f, c.String())
+}
+
+// LogValue lets log/slog log c as a group of its exported fields, keyed by
+// field name, with every URL's password masked as [ServiceCatalog.String]
+// masks it. Services is a group keyed by service identifier, each entry
+// logged as [ServiceEntry.LogValue] logs it, and Auth is logged as
+// [AuthEndpoints.LogValue] logs it. A nil c logs as nil.
+func (c *ServiceCatalog) LogValue() slog.Value {
+	if c == nil {
+		return slog.AnyValue(nil)
+	}
+	services := make([]slog.Attr, 0, len(c.Services))
+	for _, id := range slices.Sorted(maps.Keys(c.Services)) {
+		services = append(services, slog.Attr{Key: id, Value: c.Services[id].LogValue()})
+	}
+	return slog.GroupValue(
+		slog.String("BaseURL", urlredact.String(c.BaseURL)),
+		slog.String("Issuer", urlredact.String(c.Issuer)),
+		slog.Attr{Key: "Services", Value: slog.GroupValue(services...)},
+		slog.Attr{Key: "Auth", Value: c.Auth.LogValue()},
+		slog.Time("ResolvedAt", c.ResolvedAt),
+		slog.Time("ExpiresAt", c.ExpiresAt),
+		slog.String("ETag", c.ETag),
+	)
+}
+
 // ServiceEntry is one resolved service in the catalog.
+//
+// Printed with fmt or logged with log/slog, a ServiceEntry shows its URLs
+// with their passwords masked: see [ServiceEntry.String]. Its JSON encoding
+// is unchanged.
 type ServiceEntry struct {
 	// ID is the canonical service identifier (e.g. "org.openehr.rest").
 	ID string
@@ -116,8 +201,56 @@ type ServiceEntry struct {
 	Capabilities []string
 }
 
+// String describes e by its fields, with the password of BaseURL,
+// Documentation and OpenAPI masked when one carries one, as
+// [url.URL.Redacted] masks it. A nil BaseURL is shown as "".
+//
+// String, GoString, Format and LogValue are methods of ServiceEntry, because
+// [ServiceCatalog.Service] hands out values, so a *ServiceEntry prints the
+// same way. fmt answers %T and %p without calling Format, and %p of a
+// ServiceEntry value prints its fields, Documentation and OpenAPI as
+// written, so never print a ServiceEntry with %p.
+func (e ServiceEntry) String() string {
+	return fmt.Sprintf("discovery.ServiceEntry{ID: %q, BaseURL: %q, Version: %q, SpecVersion: %q, Description: %q, "+
+		"Documentation: %q, OpenAPI: %q, Capabilities: %q}",
+		e.ID, e.BaseURL.Redacted(), e.Version, e.SpecVersion, e.Description,
+		urlredact.String(e.Documentation), urlredact.String(e.OpenAPI), e.Capabilities)
+}
+
+// GoString returns the text of [ServiceEntry.String], so that printing e in
+// Go syntax shows no password either.
+func (e ServiceEntry) GoString() string { return e.String() }
+
+// Format writes the text of [ServiceEntry.String] for every fmt verb,
+// whatever its flags and width. With a nil f it does nothing.
+func (e ServiceEntry) Format(f fmt.State, _ rune) {
+	if f == nil {
+		return
+	}
+	_, _ = io.WriteString(f, e.String())
+}
+
+// LogValue lets log/slog log e as a group of its fields, keyed by field
+// name, with the URLs masked as [ServiceEntry.String] masks them.
+func (e ServiceEntry) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("ID", e.ID),
+		slog.String("BaseURL", e.BaseURL.Redacted()),
+		slog.String("Version", e.Version),
+		slog.String("SpecVersion", e.SpecVersion),
+		slog.String("Description", e.Description),
+		slog.String("Documentation", urlredact.String(e.Documentation)),
+		slog.String("OpenAPI", urlredact.String(e.OpenAPI)),
+		slog.Any("Capabilities", e.Capabilities),
+	)
+}
+
 // AuthEndpoints carries the OAuth2 / OIDC endpoints from the SMART
 // configuration document.
+//
+// Printed with fmt or logged with log/slog, an AuthEndpoints shows each
+// endpoint with its password masked: see [AuthEndpoints.String]. Its JSON
+// encoding is unchanged.
 type AuthEndpoints struct {
 	AuthorizationEndpoint *url.URL
 	TokenEndpoint         *url.URL
@@ -170,6 +303,65 @@ type AuthEndpoints struct {
 	// auth/smart refuses a redirect that arrives without "iss".
 	AuthorizationResponseIssParameterSupported bool
 	Capabilities                               []string
+}
+
+// String describes a by its fields, with the password of each endpoint URL
+// that carries one masked as [url.URL.Redacted] masks it. A nil endpoint is
+// shown as "".
+//
+// String, GoString, Format and LogValue are methods of AuthEndpoints,
+// because a [ServiceCatalog] holds its endpoints as a value, so an
+// *AuthEndpoints prints the same way. fmt answers %T and %p without calling
+// Format, and %p of an AuthEndpoints value prints its fields, each endpoint
+// as an address.
+func (a AuthEndpoints) String() string {
+	return fmt.Sprintf("discovery.AuthEndpoints{AuthorizationEndpoint: %q, TokenEndpoint: %q, JWKSURI: %q, "+
+		"RegistrationEndpoint: %q, IntrospectionEndpoint: %q, RevocationEndpoint: %q, ManagementEndpoint: %q, "+
+		"ScopesSupported: %q, ResponseTypesSupported: %q, CodeChallengeMethodsSupported: %q, GrantTypesSupported: %q, "+
+		"TokenEndpointAuthMethodsSupported: %q, TokenEndpointAuthSigningAlgValuesSupported: %q, "+
+		"IDTokenSigningAlgValuesSupported: %q, AuthorizationResponseIssParameterSupported: %t, Capabilities: %q}",
+		a.AuthorizationEndpoint.Redacted(), a.TokenEndpoint.Redacted(), a.JWKSURI.Redacted(),
+		a.RegistrationEndpoint.Redacted(), a.IntrospectionEndpoint.Redacted(), a.RevocationEndpoint.Redacted(),
+		a.ManagementEndpoint.Redacted(),
+		a.ScopesSupported, a.ResponseTypesSupported, a.CodeChallengeMethodsSupported, a.GrantTypesSupported,
+		a.TokenEndpointAuthMethodsSupported, a.TokenEndpointAuthSigningAlgValuesSupported,
+		a.IDTokenSigningAlgValuesSupported, a.AuthorizationResponseIssParameterSupported, a.Capabilities)
+}
+
+// GoString returns the text of [AuthEndpoints.String], so that printing a in
+// Go syntax shows no password either.
+func (a AuthEndpoints) GoString() string { return a.String() }
+
+// Format writes the text of [AuthEndpoints.String] for every fmt verb,
+// whatever its flags and width. With a nil f it does nothing.
+func (a AuthEndpoints) Format(f fmt.State, _ rune) {
+	if f == nil {
+		return
+	}
+	_, _ = io.WriteString(f, a.String())
+}
+
+// LogValue lets log/slog log a as a group of its fields, keyed by field
+// name, with the endpoints masked as [AuthEndpoints.String] masks them.
+func (a AuthEndpoints) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("AuthorizationEndpoint", a.AuthorizationEndpoint.Redacted()),
+		slog.String("TokenEndpoint", a.TokenEndpoint.Redacted()),
+		slog.String("JWKSURI", a.JWKSURI.Redacted()),
+		slog.String("RegistrationEndpoint", a.RegistrationEndpoint.Redacted()),
+		slog.String("IntrospectionEndpoint", a.IntrospectionEndpoint.Redacted()),
+		slog.String("RevocationEndpoint", a.RevocationEndpoint.Redacted()),
+		slog.String("ManagementEndpoint", a.ManagementEndpoint.Redacted()),
+		slog.Any("ScopesSupported", a.ScopesSupported),
+		slog.Any("ResponseTypesSupported", a.ResponseTypesSupported),
+		slog.Any("CodeChallengeMethodsSupported", a.CodeChallengeMethodsSupported),
+		slog.Any("GrantTypesSupported", a.GrantTypesSupported),
+		slog.Any("TokenEndpointAuthMethodsSupported", a.TokenEndpointAuthMethodsSupported),
+		slog.Any("TokenEndpointAuthSigningAlgValuesSupported", a.TokenEndpointAuthSigningAlgValuesSupported),
+		slog.Any("IDTokenSigningAlgValuesSupported", a.IDTokenSigningAlgValuesSupported),
+		slog.Bool("AuthorizationResponseIssParameterSupported", a.AuthorizationResponseIssParameterSupported),
+		slog.Any("Capabilities", a.Capabilities),
+	)
 }
 
 // Service identifier constants. The SDK consumes only the openEHR

@@ -3,6 +3,7 @@ package contribution_test
 import (
 	"encoding/json"
 	"encoding/json/jsontext"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -335,6 +336,89 @@ func TestSubmissionMarshalJSONCanonical(t *testing.T) {
 	}
 	if _, hasVersions := got["versions"]; !hasVersions {
 		t.Errorf("missing top-level versions: %s", b)
+	}
+}
+
+// TestSubmissionOmitsTypedNilMandatorySlots pins REQ-052 on the contribution
+// write body: a composition whose mandatory polymorphic slots, name and
+// composer, hold a typed-nil pointer is written with neither member, never
+// with `null`, from every entry point that encodes a Submission. Commit
+// encodes through canjson.Marshal; a caller may also call MarshalJSON or
+// encoding/json directly.
+func TestSubmissionOmitsTypedNilMandatorySlots(t *testing.T) { // REQ-052, REQ-130
+	comp := rm.Composition{
+		ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1",
+		Name:            (*rm.DVText)(nil),
+		Composer:        (*rm.PartyIdentified)(nil),
+	}
+	sub := &contribution.Submission{
+		Audit: newAudit(),
+		Versions: []contribution.CommitVersion{contribution.WrapOriginalVersion(&rm.OriginalVersion[rm.Composition]{
+			CommitAudit:    newCommitAudit(),
+			UID:            rm.ObjectVersionID{Value: "1::cdr.example::1"},
+			LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},
+			Data:           &comp,
+		})},
+	}
+	encoders := []struct {
+		name   string
+		encode func() ([]byte, error)
+	}{
+		{name: "canjson.Marshal", encode: func() ([]byte, error) { return canjson.Marshal(sub) }},
+		{name: "Submission.MarshalJSON", encode: sub.MarshalJSON},
+		{name: "encoding/json.Marshal", encode: func() ([]byte, error) { return json.Marshal(sub) }},
+	}
+	for _, enc := range encoders {
+		t.Run(enc.name, func(t *testing.T) {
+			b, err := enc.encode()
+			if err != nil {
+				t.Fatalf("%s: %v", enc.name, err)
+			}
+			var got map[string]any
+			if err := json.Unmarshal(b, &got); err != nil {
+				t.Fatalf("%s wrote invalid JSON: %v\n%s", enc.name, err, b)
+			}
+			if nulls := nullMembers(got, ""); len(nulls) > 0 {
+				t.Errorf("%s wrote null at %v; a typed-nil slot must be left out\n%s", enc.name, nulls, b)
+			}
+			versions, _ := got["versions"].([]any)
+			if len(versions) != 1 {
+				t.Fatalf("%s: versions = %v, want one version\n%s", enc.name, got["versions"], b)
+			}
+			version, _ := versions[0].(map[string]any)
+			data, ok := version["data"].(map[string]any)
+			if !ok {
+				t.Fatalf("%s: versions[0].data = %v, want an object\n%s", enc.name, version["data"], b)
+			}
+			for _, member := range []string{"name", "composer"} {
+				if v, present := data[member]; present {
+					t.Errorf("%s: versions[0].data.%s = %v, want the member left out", enc.name, member, v)
+				}
+			}
+		})
+	}
+}
+
+// nullMembers returns the JSON pointer of every null value in v, a value
+// decoded into map[string]any and []any.
+func nullMembers(v any, at string) []string {
+	switch x := v.(type) {
+	case nil:
+		return []string{at}
+	case map[string]any:
+		var out []string
+		for k, e := range x {
+			out = append(out, nullMembers(e, at+"/"+k)...)
+		}
+		return out
+	case []any:
+		var out []string
+		for i, e := range x {
+			out = append(out, nullMembers(e, fmt.Sprintf("%s/%d", at, i))...)
+		}
+		return out
+	default:
+		return nil
 	}
 }
 

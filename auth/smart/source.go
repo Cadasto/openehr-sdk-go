@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"maps"
 	"net/http"
 	"net/url"
@@ -17,7 +18,6 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/auth"
 	"github.com/cadasto/openehr-sdk-go/auth/jwtbearer"
-	"github.com/cadasto/openehr-sdk-go/internal/coalesce"
 	"github.com/cadasto/openehr-sdk-go/internal/noredirect"
 	"github.com/cadasto/openehr-sdk-go/internal/urlredact"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
@@ -43,6 +43,15 @@ const (
 	// defaultRefreshThreshold is how long before its expiry the held access
 	// token counts as stale when the configuration sets no threshold.
 	defaultRefreshThreshold = 30 * time.Second
+	// refreshTimeout is how long a refresh request may run. The request does
+	// not end with the context of the call that started it, so that a
+	// refresh token the server has rotated is installed and reported; this
+	// bounds it instead.
+	refreshTimeout = 30 * time.Second
+	// firstBackoff is how long the source holds back the next refresh after
+	// the first transient failure in a row, while it serves the held access
+	// token. Each further failure doubles it.
+	firstBackoff = time.Second
 )
 
 // clientAssertionKey holds the asymmetric credential for private_key_jwt
@@ -59,6 +68,11 @@ type clientAssertionKey struct {
 // [FromConfig] keeps its own copy of Scopes, IDTokenTrustedAudiences and
 // Auth, with the URLs and lists Auth points to, so a change the caller makes
 // to them afterwards does not reach the source.
+//
+// Printed with fmt or logged with log/slog, a Config shows its ClientSecret
+// and the private key [WithClientAssertionKey] sets as "[redacted]", and the
+// password of each URL it shows masked: see [Config.String] and
+// [Config.LogValue].
 type Config struct {
 	// HTTPClient is the injected client used for token and JWKS calls. The
 	// token, refresh and revocation requests never follow a redirect,
@@ -102,8 +116,95 @@ type Config struct {
 	tokenChange func(context.Context, TokenChange)
 }
 
+// String describes c with its ClientSecret replaced by "[redacted]", or left
+// empty when it is empty, and the key [WithClientAssertionKey] sets shown by
+// its algorithm and key ID only. Auth is shown by its authorization and token
+// endpoints. RedirectURI, Audience, Issuer and the two endpoints are shown
+// with the password of one that carries one masked, as [url.URL.Redacted]
+// masks it. HTTPClient, JWKS and the token-change hook are left out; the
+// other fields are shown as they are.
+func (c Config) String() string {
+	return fmt.Sprintf("smart.Config{ClientID: %q, ClientSecret: %q, ClientAssertion: %s, RedirectURI: %q, Scopes: %q, Audience: %q, "+
+		"AuthorizationEndpoint: %q, TokenEndpoint: %q, Issuer: %q, RefreshThreshold: %s, IDTokenTrustedAudiences: %q}",
+		c.ClientID, redact(c.ClientSecret), c.clientAssertion.text(), urlredact.String(c.RedirectURI), c.Scopes, urlredact.String(c.Audience),
+		redactedURL(c.Auth.AuthorizationEndpoint), redactedURL(c.Auth.TokenEndpoint), urlredact.String(c.Issuer), c.RefreshThreshold, c.IDTokenTrustedAudiences)
+}
+
+// GoString returns the text of [Config.String], so that printing c in Go
+// syntax shows no credential either.
+func (c Config) GoString() string { return c.String() }
+
+// Format writes the text of [Config.String] for every fmt verb it is called
+// for, whatever the flags and width. fmt answers %T and %p without calling
+// it, and %p of a Config value prints its fields, so never print a Config
+// with %p.
+func (c Config) Format(f fmt.State, _ rune) {
+	if f == nil {
+		return
+	}
+	_, _ = io.WriteString(f, c.String())
+}
+
+// LogValue lets log/slog log c as a group of the fields [Config.String]
+// shows, keyed by field name, with the credentials and URLs replaced as
+// String replaces them.
+func (c Config) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("ClientID", c.ClientID),
+		slog.String("ClientSecret", redact(c.ClientSecret)),
+		c.clientAssertion.logAttr(),
+		slog.String("RedirectURI", urlredact.String(c.RedirectURI)),
+		slog.Any("Scopes", c.Scopes),
+		slog.String("Audience", urlredact.String(c.Audience)),
+		slog.String("AuthorizationEndpoint", redactedURL(c.Auth.AuthorizationEndpoint)),
+		slog.String("TokenEndpoint", redactedURL(c.Auth.TokenEndpoint)),
+		slog.String("Issuer", urlredact.String(c.Issuer)),
+		slog.Duration("RefreshThreshold", c.RefreshThreshold),
+		slog.Any("IDTokenTrustedAudiences", c.IDTokenTrustedAudiences),
+	)
+}
+
+// text describes k by its algorithm and key ID, with the signer shown as
+// "[redacted]". A nil k gives "<nil>".
+func (k *clientAssertionKey) text() string {
+	if k == nil {
+		return "<nil>"
+	}
+	signer := "<nil>"
+	if k.signer != nil {
+		signer = redacted
+	}
+	return fmt.Sprintf("{Signer: %s, Alg: %q, KeyID: %q}", signer, k.alg, k.kid)
+}
+
+// logAttr is the ClientAssertion attribute of [Config.LogValue]: a group of
+// the values text shows, or nil for a nil k.
+func (k *clientAssertionKey) logAttr() slog.Attr {
+	if k == nil {
+		return slog.Any("ClientAssertion", nil)
+	}
+	signer := slog.Any("Signer", nil)
+	if k.signer != nil {
+		signer = slog.String("Signer", redacted)
+	}
+	return slog.Attr{Key: "ClientAssertion", Value: slog.GroupValue(signer, slog.String("Alg", k.alg), slog.String("KeyID", k.kid))}
+}
+
+// redactedURL returns u with the password in its userinfo masked, or "" for a
+// nil u.
+func redactedURL(u *url.URL) string {
+	if u == nil {
+		return ""
+	}
+	return u.Redacted()
+}
+
 // TokenChange is what the source reports to the [WithTokenChange] hook when
 // its tokens change. [Source.Revoke] reports the zero TokenChange.
+//
+// Printed with fmt or logged with log/slog, a TokenChange shows its tokens as
+// "[redacted]": see [TokenChange.String]. Its JSON encoding is unchanged and
+// carries the tokens, so an application can store it.
 type TokenChange struct {
 	// Access is the access token the source now holds.
 	Access auth.Token
@@ -117,6 +218,39 @@ type TokenChange struct {
 	// down to a value nested inside Raw, the IDTokenClaims or
 	// NeedPatientBanner, does not reach the source.
 	Response TokenResponse
+}
+
+// String describes c by the text of [auth.Token.String] for Access and of
+// [TokenResponse.String] for Response, with RefreshToken replaced by
+// "[redacted]", or left empty when it is empty.
+func (c TokenChange) String() string {
+	return fmt.Sprintf("smart.TokenChange{Access: %s, RefreshToken: %q, Response: %s}",
+		c.Access.String(), redact(c.RefreshToken), c.Response.String())
+}
+
+// GoString returns the text of [TokenChange.String], so that printing c in Go
+// syntax shows no token either.
+func (c TokenChange) GoString() string { return c.String() }
+
+// Format writes the text of [TokenChange.String] for every fmt verb it is
+// called for, whatever the flags and width. fmt answers %T and %p without
+// calling it, and %p of a TokenChange value prints its fields, so never print
+// a TokenChange with %p.
+func (c TokenChange) Format(f fmt.State, _ rune) {
+	if f == nil {
+		return
+	}
+	_, _ = io.WriteString(f, c.String())
+}
+
+// LogValue lets log/slog log c as a group of Access, RefreshToken and
+// Response, with the tokens replaced as [TokenChange.String] replaces them.
+func (c TokenChange) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.Attr{Key: "Access", Value: c.Access.LogValue()},
+		slog.String("RefreshToken", redact(c.RefreshToken)),
+		slog.Attr{Key: "Response", Value: c.Response.LogValue()},
+	)
 }
 
 // Option mutates Config during construction.
@@ -237,7 +371,9 @@ func WithRefreshThreshold(d time.Duration) Option {
 //
 // The source calls fn without holding its lock, so fn may call the
 // source's methods. ctx is the context of the call that changed the tokens,
-// which may have ended by the time fn runs; a hook that must finish a write
+// for a refresh the call that started it, and it may have ended by the time
+// fn runs: a refresh goes on after that call gives up, and is then reported
+// from the refresh's own goroutine. A hook that must finish a write
 // regardless can use [context.WithoutCancel].
 //
 // fn sees the changes one at a time, in the order the source installed
@@ -253,9 +389,10 @@ func WithRefreshThreshold(d time.Duration) Option {
 // change, or a call reporting changes that others made), the panic goes up
 // through that call. The changes still waiting are then reported from a
 // new goroutine the source starts, so none of them waits for a later change
-// of tokens. No caller could recover a panic on that goroutine, so there
-// the source recovers it, drops the change fn panicked on, and goes on with
-// the rest.
+// of tokens. No caller could recover a panic on that goroutine, or on the
+// goroutine of a refresh whose starting call has returned, so there the
+// source recovers it, drops the change fn panicked on, and goes on with the
+// rest.
 func WithTokenChange(fn func(ctx context.Context, change TokenChange)) Option {
 	return func(cfg *Config) { cfg.tokenChange = fn }
 }
@@ -285,6 +422,12 @@ type Source struct {
 	// forceRefresh makes the held access token count as stale until new
 	// tokens replace it. Reauth sets it; setTokensLocked clears it.
 	forceRefresh bool
+	// retryAt is when Token may send a refresh again after a transient
+	// failure left the held access token to be served, never after its
+	// ExpiresAt; zero when no backoff holds. backoff is how long the next
+	// such failure holds the refresh back. setTokensLocked resets both.
+	retryAt time.Time
+	backoff time.Duration
 	// session counts the times a code exchange or SetTokens installed
 	// tokens or Revoke cleared them. A refresh records it when it starts
 	// and discards its result when it has changed by the time the refresh
@@ -298,14 +441,15 @@ type Source struct {
 }
 
 // String describes s by two values fixed when s was built: its client ID
-// and its issuer. It never shows the client secret, a token or a token
-// response, and it reads nothing a refresh changes, so it is safe to call
-// while other goroutines use s. A nil s gives "<nil>".
+// and its issuer, with the password of an issuer URL that carries one masked,
+// as [url.URL.Redacted] masks it. It never shows the client secret, a token
+// or a token response, and it reads nothing a refresh changes, so it is safe
+// to call while other goroutines use s. A nil s gives "<nil>".
 func (s *Source) String() string {
 	if s == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("smart.Source{ClientID: %q, Issuer: %q}", s.cfg.ClientID, s.cfg.Issuer)
+	return fmt.Sprintf("smart.Source{ClientID: %q, Issuer: %q}", s.cfg.ClientID, urlredact.String(s.cfg.Issuer))
 }
 
 // GoString returns the text of [Source.String], so that printing s in Go
@@ -315,7 +459,12 @@ func (s *Source) GoString() string { return s.String() }
 // Format writes the text of [Source.String] for every fmt verb, whatever its
 // flags and width. Without it, a verb such as %d or %x would print the
 // fields of s, which hold the client secret and the tokens.
-func (s *Source) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, s.String()) }
+func (s *Source) Format(f fmt.State, _ rune) {
+	if f == nil {
+		return
+	}
+	_, _ = io.WriteString(f, s.String())
+}
 
 // queueChangeLocked records change for the token-change hook, with the
 // context of the call that made it. The hook runs without s.mu, so it gets
@@ -397,12 +546,32 @@ func reportRecovering(report func()) {
 }
 
 // setTokensLocked replaces the held tokens. New tokens are not the ones a
-// Reauth asked to replace, so it also ends a forced refresh. The caller
-// holds s.mu.
+// Reauth asked to replace, so it also ends a forced refresh, and they end
+// the backoff of the tokens they replace. The caller holds s.mu.
 func (s *Source) setTokensLocked(access auth.Token, refresh string) {
 	s.cur = access
 	s.refresh = refresh
 	s.forceRefresh = false
+	s.retryAt = time.Time{}
+	s.backoff = 0
+}
+
+// backOffLocked records a refresh that failed transiently. While the held
+// access token is not yet past its ExpiresAt, and Reauth has not marked it
+// for refresh, it holds Token's next refresh back until the backoff ends,
+// never later than that ExpiresAt, doubles the backoff for the next failure
+// in a row, and reports true: the token is to be served in place of the
+// failure. The caller holds s.mu.
+func (s *Source) backOffLocked() bool {
+	now := time.Now()
+	left := s.cur.ExpiresAt.Sub(now)
+	if s.forceRefresh || left <= 0 {
+		return false
+	}
+	wait := min(cmp.Or(s.backoff, firstBackoff), left)
+	s.retryAt = now.Add(wait)
+	s.backoff = 2 * wait
+	return true
 }
 
 // withHeldScope returns prev, the session's last token response, with the
@@ -468,13 +637,34 @@ type tokenExchange struct {
 	// the session while the refresh ran, so its result was discarded and the
 	// callers waiting on it try again. It is written before done is closed.
 	superseded bool
+	// held is the access token the refresh's callers get in place of err,
+	// except a forced caller (Reauth, RefreshIfNeeded), when serveHeld
+	// reports that the refresh failed transiently while held was still
+	// valid. Both are written before done is closed.
+	held      auth.Token
+	serveHeld bool
 	// retry reports that the refresh has no result for the callers waiting
-	// on it: it failed only because the context of the call leading it
-	// ended, or a panic unwound that call before the result was published.
-	// A waiter whose own context is live tries again; one whose context has
+	// on it, because it panicked. The refresh does not end with the context
+	// of the call that started it, so that call giving up does not set it. A
+	// waiter whose own context is live tries again; one whose context has
 	// ended returns its own context's error. It is written before done is
 	// closed.
 	retry bool
+
+	// The fields below are guarded by Source.mu. They decide which of the
+	// call that started the refresh and the refresh's own goroutine reports
+	// the change to the token-change hook or raises the refresh's panic
+	// again, so that exactly one of them does.
+
+	// ended reports that the refresh's goroutine has published its outcome.
+	ended bool
+	// starterLeft reports that the call that started the refresh returned
+	// because its context ended first.
+	starterLeft bool
+	// raise reports that the refresh panicked while the call that started
+	// it was waiting, which then panics again with panicValue.
+	raise      bool
+	panicValue any
 }
 
 // New constructs a Source from clientID and discovery auth endpoints.
@@ -657,6 +847,11 @@ func NewFromCatalog(catalog *discovery.ServiceCatalog, clientID string, opts ...
 // example in the user's session, and pass it unchanged to
 // [Source.AuthorizeURL] and then to [Source.CompleteAuthorization] or
 // [Source.ExchangeAuthorizationCode].
+//
+// Printed with fmt or logged with log/slog, an AuthorizationRequest shows its
+// PKCE verifier as "[redacted]": see [AuthorizationRequest.String]. Its JSON
+// encoding is unchanged and carries the verifier, so it can be kept in a
+// session store.
 type AuthorizationRequest struct {
 	State string
 	// Launch is the launch value an EHR passed to the app (see
@@ -675,6 +870,43 @@ type AuthorizationRequest struct {
 	// and leaves it empty otherwise. The ID token returned by the code
 	// exchange has to carry the same value.
 	Nonce string
+}
+
+// String describes r with its PKCE shown by the text of [PKCEPair.String],
+// which replaces the verifier by "[redacted]", and the password of an Issuer
+// URL that carries one masked, as [url.URL.Redacted] masks it. The other
+// fields are shown as they are.
+func (r AuthorizationRequest) String() string {
+	return fmt.Sprintf("smart.AuthorizationRequest{State: %q, Launch: %q, PKCE: %s, Issuer: %q, Nonce: %q}",
+		r.State, r.Launch, r.PKCE.String(), urlredact.String(r.Issuer), r.Nonce)
+}
+
+// GoString returns the text of [AuthorizationRequest.String], so that
+// printing r in Go syntax shows no verifier either.
+func (r AuthorizationRequest) GoString() string { return r.String() }
+
+// Format writes the text of [AuthorizationRequest.String] for every fmt verb
+// it is called for, whatever the flags and width. fmt answers %T and %p
+// without calling it, and %p of an AuthorizationRequest value prints its
+// fields, so never print an AuthorizationRequest with %p.
+func (r AuthorizationRequest) Format(f fmt.State, _ rune) {
+	if f == nil {
+		return
+	}
+	_, _ = io.WriteString(f, r.String())
+}
+
+// LogValue lets log/slog log r as a group of its fields, keyed by field name,
+// with the PKCE verifier replaced and the Issuer masked as
+// [AuthorizationRequest.String] replaces and masks them.
+func (r AuthorizationRequest) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("State", r.State),
+		slog.String("Launch", r.Launch),
+		slog.Attr{Key: "PKCE", Value: r.PKCE.LogValue()},
+		slog.String("Issuer", urlredact.String(r.Issuer)),
+		slog.String("Nonce", r.Nonce),
+	)
 }
 
 // BeginAuthorization starts one launch: it generates the PKCE pair and
@@ -919,39 +1151,75 @@ func (s *Source) SetTokens(access auth.Token, refresh string) {
 // them in turn when they are stale, or, after Revoke, returns
 // [auth.ErrReauthRequired].
 //
-// Concurrent calls share one refresh, which runs under the context of the
-// call that started it. When that context ending is all that failed the
-// refresh, the calls waiting on it do not get that failure: each whose own
-// context is live tries again, sending a new refresh or waiting on a newer
-// one, and one whose context has ended returns its own context's error. Any
-// other failure reaches every waiting call. A panic in the refresh, from the
+// Concurrent calls share one refresh. It runs on a goroutine of its own,
+// with the values of the context of the call that started it but not its
+// cancellation or deadline, and for at most 30 seconds, so that a refresh
+// token the server has rotated is installed, and reported to the
+// [WithTokenChange] hook, even when that call gives up. A call whose context
+// ends first returns that context's error at once; the refresh goes on, and
+// the calls waiting on it get its result. A panic in the refresh, from the
 // HTTP client's RoundTripper or a client-assertion signer for example, goes
-// up through the call that started it, unchanged, and the calls waiting on
-// that refresh try again the same way.
+// up through the call that started it, unchanged, while that call waits, and
+// the calls waiting on the refresh try again: each whose own context is live
+// sends a new refresh or waits on a newer one, and one whose context has
+// ended returns its own context's error. When the call that started the
+// refresh has already returned, the panic is raised again on the refresh's
+// goroutine once the waiting calls are released, so it ends the program as
+// any unrecovered panic in a goroutine does. A refresh whose goroutine exits
+// through [runtime.Goexit] instead, from a RoundTripper that calls t.FailNow
+// for example, got no answer: it ends as a refresh failure that is not
+// terminal, as below, with an error matching [auth.ErrRefreshFailed], and
+// its callers are not released to try again.
+//
+// A refresh that fails without being terminal (a server or network error, a
+// timeout, an answer the source cannot read, or an ID token it refuses)
+// keeps both tokens. While the held access token is not yet past its
+// ExpiresAt, Token then returns that token without an error, and sends no
+// new refresh until a backoff ends: one second after the first such
+// failure, twice as long after each further failure in a row, and never
+// later than that ExpiresAt. Until then Token returns the held token without
+// a request. A successful refresh, a code exchange, [Source.SetTokens] or
+// [Source.Revoke] ends the backoff. Past ExpiresAt the failure is returned,
+// matching [auth.ErrRefreshFailed], and each call tries the refresh again. A
+// token that [Source.Reauth] marked for refresh is not served in place of a
+// failure. The calls waiting on a refresh get the same outcome, the held
+// token included; [Source.RefreshIfNeeded] and Reauth get the failure.
 func (s *Source) Token(ctx context.Context) (auth.Token, error) {
+	return s.token(ctx, false)
+}
+
+// token is Token. forced reports a call by Reauth or RefreshIfNeeded, which
+// refreshes during a backoff and gets the failure of a refresh that Token
+// would answer with the held token.
+func (s *Source) token(ctx context.Context, forced bool) (auth.Token, error) {
 	for {
-		tok, retry, err := s.tryToken(ctx)
+		tok, retry, err := s.tryToken(ctx, forced)
 		if !retry {
 			return tok, err
 		}
 		// The refresh this call led or waited on left it no result: a code
 		// exchange, SetTokens or Revoke replaced the session the refresh
-		// belonged to, or the call leading it gave up or panicked. Read what
-		// the source holds now. A further retry needs another such event
-		// meanwhile, so the loop does not spin.
+		// belonged to, or the refresh panicked. Read what the source holds
+		// now. A further retry needs another such event meanwhile: a new
+		// session, or a panic in a newer refresh, which goes up through the
+		// call that started that refresh or ends the program. A refresh
+		// whose goroutine exits through runtime.Goexit publishes a failure
+		// instead of a retry, so the loop does not spin.
 	}
 }
 
 // tryToken makes one attempt at Token. retry reports that the refresh it led
 // or waited on left it no result, because the session changed or because
-// the call leading the refresh gave up or panicked, so the caller tries
-// again against the current tokens.
-func (s *Source) tryToken(ctx context.Context) (tok auth.Token, retry bool, err error) {
+// the refresh panicked, so the caller tries again against the current
+// tokens.
+func (s *Source) tryToken(ctx context.Context, forced bool) (tok auth.Token, retry bool, err error) {
 	if err := ctx.Err(); err != nil {
 		return auth.Token{}, false, err
 	}
 	s.mu.Lock()
-	if !s.staleLocked() {
+	if !s.staleLocked() || (!forced && !s.forceRefresh && time.Now().Before(s.retryAt)) {
+		// The token is fresh, or a transient failure left it to be served
+		// until the backoff ends, which is no later than its ExpiresAt.
 		t := s.cur
 		s.mu.Unlock()
 		return t, false, nil
@@ -968,15 +1236,16 @@ func (s *Source) tryToken(ctx context.Context) (tok auth.Token, retry bool, err 
 		case ex.superseded:
 			return auth.Token{}, true, nil
 		case ex.retry:
-			// The leader's own context ended, or a panic unwound it: that
-			// outcome is not this caller's. Give up with this caller's own
-			// error when its context ended too, otherwise go round again.
+			// The refresh panicked: that outcome is not this caller's. Give
+			// up with this caller's own error when its context ended,
+			// otherwise go round again.
 			if err := ctx.Err(); err != nil {
 				return auth.Token{}, false, err
 			}
 			return auth.Token{}, true, nil
 		default:
-			return ex.token, false, ex.err
+			tok, err := ex.outcome(forced)
+			return tok, false, err
 		}
 	}
 	refreshTok := s.refresh
@@ -1008,63 +1277,167 @@ func (s *Source) tryToken(ctx context.Context) (tok auth.Token, retry bool, err 
 	s.inflight = ex
 	s.mu.Unlock()
 
-	tok, err = s.leadRefresh(ctx, ex, refreshTok, cur, binding)
-	if ex.superseded {
+	return s.leadRefresh(ctx, ex, refreshTok, cur, binding, forced)
+}
+
+// outcome returns what a caller of the refresh ex stands for gets: the held
+// access token in place of a transient failure that left it to be served,
+// unless forced reports a call by Reauth or RefreshIfNeeded, and otherwise
+// the refresh's own token and error.
+func (ex *tokenExchange) outcome(forced bool) (auth.Token, error) {
+	if ex.serveHeld && !forced {
+		return ex.held, nil
+	}
+	return ex.token, ex.err
+}
+
+// leadRefresh starts the refresh ex stands for on a goroutine of its own and
+// waits for it on behalf of the call that started it. refreshTok is the
+// refresh token to redeem, and cur and binding are the access token and the
+// identity the session held when the refresh began.
+//
+// When ctx ends first, leadRefresh returns ctx's error at once and leaves the
+// refresh to finish on its goroutine, which then reports the change to the
+// token-change hook itself. Otherwise the change is reported here, after
+// the waiters have their token, so a hook that panics does so in this call.
+// A panic in the refresh while this call waits is raised here again.
+func (s *Source) leadRefresh(ctx context.Context, ex *tokenExchange, refreshTok string, cur auth.Token, binding *idTokenBinding, forced bool) (auth.Token, bool, error) {
+	go s.runRefresh(ctx, ex, refreshTok, cur, binding)
+	select {
+	case <-ex.done:
+	case <-ctx.Done():
+		s.mu.Lock()
+		ended := ex.ended
+		ex.starterLeft = !ended
+		s.mu.Unlock()
+		if !ended {
+			return auth.Token{}, false, ctx.Err()
+		}
+		// The refresh published its outcome first, so it is this call's to
+		// report or raise; done closes right after.
+		<-ex.done
+	}
+	if ex.raise {
+		panic(ex.panicValue)
+	}
+	if ex.superseded || ex.retry {
 		return auth.Token{}, true, nil
 	}
 	// The waiters have their token; the change is reported after them, in
 	// the order it was installed whatever the hook does meanwhile.
 	s.deliverChanges()
+	tok, err := ex.outcome(forced)
 	return tok, false, err
 }
 
-// leadRefresh runs the refresh ex stands for on behalf of every caller
-// waiting on it, installs its result and publishes it to those callers.
-// refreshTok is the refresh token to redeem, and cur and binding are the
-// access token and the identity the session held when the refresh began.
+// runRefresh runs the refresh ex stands for, installs its result and
+// publishes it to the callers waiting on it. The request keeps the values of
+// ctx, the context of the call that started the refresh, but not its
+// cancellation or deadline, and is cut off after refreshTimeout.
 //
-// A panic in the refresh unwinds leadRefresh before the result is published.
-// The deferred release still takes ex out of flight and wakes the waiters,
-// with ex marked for retry so that they try again, and the panic goes on to
-// the caller as it was raised.
-func (s *Source) leadRefresh(ctx context.Context, ex *tokenExchange, refreshTok string, cur auth.Token, binding *idTokenBinding) (auth.Token, error) {
-	// ex stays marked for retry unless the refresh returns and its result
-	// is published below.
-	ex.retry = true
-	defer s.release(ex)
+// A panic in the refresh is recovered here, and every waiter is released to
+// try again. The call that started the refresh raises it again when it is
+// still waiting; when it has returned, nobody could recover the panic, so it
+// is raised again on this goroutine, which ends the program. A refresh
+// whose goroutine exits through runtime.Goexit instead ends as a refresh
+// failure that is not terminal (see endExitedRefresh).
+func (s *Source) runRefresh(ctx context.Context, ex *tokenExchange, refreshTok string, cur auth.Token, binding *idTokenBinding) {
+	rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), refreshTimeout)
+	defer cancel()
+	finished := false
+	defer func() {
+		if finished {
+			return
+		}
+		if v := recover(); v != nil {
+			s.endPanickedRefresh(ex, v)
+			return
+		}
+		// Not finished, yet nothing to recover: the goroutine is exiting
+		// through runtime.Goexit.
+		s.endExitedRefresh(ctx, ex, cur)
+	}()
 
-	tok, refreshedTR, next, err := s.refreshGrant(ctx, refreshTok, binding)
-	tok, err = s.installRefresh(ctx, ex, cur, tok, refreshedTR, next, err)
-	// The result is published before release closes done, so every waiter
-	// reads it (auth.md § Concurrency).
-	ex.token = tok
-	ex.err = err
-	ex.retry = coalesce.EndedByContext(ctx, err)
-	return tok, err
+	tok, refreshedTR, next, err := s.refreshGrant(rctx, refreshTok, binding)
+	report := s.installRefresh(ctx, ex, cur, tok, refreshedTR, next, err)
+	finished = true
+	// The result is published before done is closed, so every waiter reads
+	// it (auth.md § Concurrency).
+	close(ex.done)
+	if report {
+		// The call that started the refresh has returned, so this goroutine
+		// reports the change. No caller could recover a panic of the hook
+		// here, so reportChanges drops it.
+		s.reportChanges(true)
+	}
 }
 
-// release takes ex out of flight, unless a newer refresh has replaced it
-// there, then wakes the callers waiting on it. leadRefresh defers it, so it
-// runs exactly once per refresh, also when a panic unwinds leadRefresh.
-func (s *Source) release(ex *tokenExchange) {
+// endPanickedRefresh ends the refresh ex stands for after it panicked with
+// v, which is not nil: it takes ex out of flight and releases its waiters
+// to try again. It hands v to the call that started the refresh when that
+// call is still waiting, and otherwise panics with v itself.
+func (s *Source) endPanickedRefresh(ex *tokenExchange, v any) {
 	s.mu.Lock()
 	if s.inflight == ex {
 		s.inflight = nil
 	}
+	ex.retry = true
+	ex.ended = true
+	raiseHere := ex.starterLeft
+	if !raiseHere {
+		ex.raise = true
+		ex.panicValue = v
+	}
 	s.mu.Unlock()
+	close(ex.done)
+	if raiseHere {
+		panic(v)
+	}
+}
+
+// endExitedRefresh ends the refresh ex stands for when its goroutine exits
+// through runtime.Goexit, as one whose RoundTripper calls t.FailNow does.
+// The refresh got no answer, so it ends as a refresh failure that is not
+// terminal: installRefresh publishes an error matching
+// [auth.ErrRefreshFailed], or the held token where such a failure leaves it
+// to be served, and the backoff holds the next refresh back. Releasing the
+// callers to try again instead would start a new refresh that may exit the
+// same way, without end. cur and ctx are as for installRefresh.
+func (s *Source) endExitedRefresh(ctx context.Context, ex *tokenExchange, cur auth.Token) {
+	err := &auth.ExchangeError{Sentinel: auth.ErrRefreshFailed, Inner: errors.New("the refresh goroutine exited before the token endpoint answered")}
+	// A failure queues no token change, so there is nothing to report
+	// whether or not the call that started the refresh has returned.
+	s.installRefresh(ctx, ex, cur, auth.Token{}, TokenResponse{}, "", err)
 	close(ex.done)
 }
 
 // installRefresh installs what the refresh ex stands for returned: tok,
-// refreshedTR and refreshTok, or err. cur is the access token the session
-// held when the refresh began. It returns the token and error the callers
-// of the refresh get. When a code exchange, SetTokens or Revoke replaced the
-// session meanwhile, it installs nothing, marks ex superseded and returns no
-// error. It holds s.mu while it runs.
-func (s *Source) installRefresh(ctx context.Context, ex *tokenExchange, cur, tok auth.Token, refreshedTR TokenResponse, refreshTok string, err error) (auth.Token, error) {
+// refreshedTR and refreshTok, or err, and publishes on ex the token and error
+// the callers of the refresh get. cur is the access token the session held
+// when the refresh began, and ctx the context of the call that started the
+// refresh, which the token-change hook gets. When a code exchange, SetTokens
+// or Revoke replaced the session meanwhile, it installs nothing and marks ex
+// superseded. It takes ex out of flight, unless a newer refresh has replaced
+// it there, and reports whether the caller is to report the change to the
+// hook because the call that started the refresh has returned. The caller
+// closes ex.done next. It holds s.mu while it runs.
+func (s *Source) installRefresh(ctx context.Context, ex *tokenExchange, cur, tok auth.Token, refreshedTR TokenResponse, refreshTok string, err error) (report bool) {
 	s.mu.Lock()
-	// Deferred, so that a panic here leaves s.mu free for release.
+	// Deferred, so that a panic here leaves s.mu free for endPanickedRefresh.
 	defer s.mu.Unlock()
+	tok, err = s.installLocked(ctx, ex, cur, tok, refreshedTR, refreshTok, err)
+	ex.token = tok
+	ex.err = err
+	if s.inflight == ex {
+		s.inflight = nil
+	}
+	ex.ended = true
+	return ex.starterLeft
+}
+
+// installLocked is installRefresh's install step. It returns the token and
+// error the callers of the refresh get. The caller holds s.mu.
+func (s *Source) installLocked(ctx context.Context, ex *tokenExchange, cur, tok auth.Token, refreshedTR TokenResponse, refreshTok string, err error) (auth.Token, error) {
 	if s.session != ex.session {
 		// A code exchange, SetTokens or Revoke replaced the session while the
 		// refresh ran. Its result, success or failure, belongs to the old
@@ -1091,25 +1464,28 @@ func (s *Source) installRefresh(ctx context.Context, ex *tokenExchange, cur, tok
 			s.idBinding = bindingOf(refreshedTR.IDTokenClaims)
 		}
 		s.queueChangeLocked(ctx, TokenChange{Access: tok, RefreshToken: refreshTok, Response: s.lastTR})
-	} else {
+	} else if exErr, ok := errors.AsType[*auth.ExchangeError](err); ok && exErr.Terminal() {
 		// On a terminal failure clear the refresh token and the cached access
 		// token so that subsequent Token() calls deterministically return
-		// ErrReauthRequired without issuing another doomed POST. On transient
-		// failures (5xx, network, ctx) retain both so callers may retry
-		// (REQ-063).
-		ex2, ok := errors.AsType[*auth.ExchangeError](err)
-		if ok && ex2.Terminal() {
-			s.setTokensLocked(auth.Token{}, "")
-			err = &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: err}
-		}
+		// ErrReauthRequired without issuing another doomed POST (REQ-063).
+		s.setTokensLocked(auth.Token{}, "")
+		err = &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: err}
+	} else if s.backOffLocked() {
+		// A transient failure (5xx, network, timeout) keeps both tokens. The
+		// held access token is still valid, so it is served in place of the
+		// failure until the backoff ends (REQ-063).
+		ex.held = s.cur
+		ex.serveHeld = true
 	}
 	return tok, err
 }
 
 // RefreshIfNeeded refreshes the access token only when it is within the
 // configured threshold (i.e. stale) and a refresh token is present. It is a
-// no-op returning nil when the current token is still fresh. On failure it
-// returns the same error contract as Token.
+// no-op returning nil when the current token is still fresh. It refreshes
+// even while a backoff after a transient failure holds [Source.Token] back,
+// and returns the refresh's failure where Token would return the held token;
+// its errors are otherwise those of Token.
 func (s *Source) RefreshIfNeeded(ctx context.Context) error {
 	s.mu.Lock()
 	if !s.staleLocked() || s.refresh == "" {
@@ -1117,7 +1493,7 @@ func (s *Source) RefreshIfNeeded(ctx context.Context) error {
 		return nil
 	}
 	s.mu.Unlock()
-	_, err := s.Token(ctx)
+	_, err := s.token(ctx, true)
 	return err
 }
 
@@ -1130,8 +1506,10 @@ func (s *Source) RefreshIfNeeded(ctx context.Context) error {
 // ErrReauthRequired.
 //
 // Any other failed refresh (a server or network error, or an ID token the
-// source refuses) keeps both the access token and the refresh token, and the
-// access token stays stale, so the next [Source.Token] call tries the
+// source refuses) is returned and keeps both the access token and the
+// refresh token. Reauth refreshes even while a backoff after an earlier
+// transient failure holds [Source.Token] back. The access token stays stale
+// and is not served in place of a failure, so the next Token call tries the
 // refresh again. New tokens, from a refresh, a code exchange or
 // [Source.SetTokens], end the forced refresh.
 //
@@ -1157,7 +1535,7 @@ func (s *Source) Reauth(ctx context.Context) error {
 	// refresh leaves the source as it was.
 	s.forceRefresh = true
 	s.mu.Unlock()
-	_, err := s.Token(ctx)
+	_, err := s.token(ctx, true)
 	return err
 }
 
