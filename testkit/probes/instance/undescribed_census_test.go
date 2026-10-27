@@ -752,3 +752,119 @@ func sortedKeys(m map[string]any) []string {
 	slices.Sort(keys)
 	return keys
 }
+
+// censusRootOPT is a template whose root is an archetype root of rmType
+// with the attributes attrs.
+func censusRootOPT(rmType string, attrs ...string) string {
+	return `<?xml version="1.0" encoding="utf-8"?>
+<template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.openehr.org/v1">
+<language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
+<template_id><value>census_root</value></template_id><concept>census_root</concept>
+<definition><rm_type_name>` + rmType + `</rm_type_name><node_id>at0000</node_id>` + strings.Join(attrs, "") +
+		`<archetype_id><value>openEHR-EHR-` + rmType + `.census.v1</value></archetype_id></definition>
+</template>`
+}
+
+// censusList is a C_MULTIPLE_ATTRIBUTE name over children with an existence
+// of existence..1, or none where existence is -1, and a cardinality of
+// lower..*.
+func censusList(name string, existence, lower int, children ...string) string {
+	out := `<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>` + name + `</rm_attribute_name>`
+	if existence >= 0 {
+		out += fmt.Sprintf(`<existence><lower_included>true</lower_included><upper_included>true</upper_included>`+
+			`<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded>`+
+			`<lower>%d</lower><upper>1</upper></existence>`, existence)
+	}
+	return out + strings.Join(children, "") +
+		`<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval>` +
+		fmt.Sprintf(`<lower_included>true</lower_included><lower_unbounded>false</lower_unbounded>`+
+			`<upper_unbounded>true</upper_unbounded><lower>%d</lower></interval></cardinality></attributes>`, lower)
+}
+
+// TestREQ107_CensusLastResortFollowsTheGenerator checks the census's
+// reading of a top-up's last resort (REQ-107 § Contract What a visit
+// writes) against roots generated under Large and Medium from the template
+// they are read against. In each, the top-up has to build the optional
+// node that holds the one slot fill, so the census lists that fill below an
+// optional node and reports no violation:
+//
+//   - a SECTION's items, a list the RM keeps non-empty once present, at
+//     existence 1..1 and cardinality 0..*: their existence asks for a member
+//     the top-up takes from every source, the optional inner SECTION
+//     included, whose own items admit only a slot;
+//   - a CLUSTER's items at cardinality 2..* over an optional ELEMENT and an
+//     optional CLUSTER whose items admit only a slot: the ELEMENT is full
+//     after its own member, so the top-up takes the CLUSTER, the first child
+//     with room;
+//   - a CLUSTER's items over an optional CLUSTER whose items admit only a
+//     slot and an optional ELEMENT whose feeder_audit the template requires,
+//     which the generator cannot write: both need undescribed content, and
+//     the top-up takes the first.
+//
+// Read beside a template that leaves the SECTION's items optional, where
+// no top-up runs, the first root holds a violation.
+func TestREQ107_CensusLastResortFollowsTheGenerator(t *testing.T) {
+	slotCluster := func(nodeID string) string {
+		return censusOptional("CLUSTER", nodeID,
+			censusItems(`<children xsi:type="ARCHETYPE_SLOT"><rm_type_name>CLUSTER</rm_type_name><node_id>`+nodeID+`1</node_id></children>`))
+	}
+	innerSection := censusOptional("SECTION", "at0002", censusList("items", 1, 0,
+		`<children xsi:type="ARCHETYPE_SLOT"><rm_type_name>SECTION</rm_type_name><node_id>at0003</node_id></children>`))
+	sectionRoot := censusRootOPT("SECTION", censusList("items", 1, 0, innerSection))
+	cases := []struct {
+		name      string
+		generated string
+		against   string
+		violation bool
+	}{
+		{name: "a SECTION's items at existence 1..1", generated: sectionRoot, against: sectionRoot},
+		{
+			name:      "a SECTION's items read as optional",
+			generated: sectionRoot,
+			against:   censusRootOPT("SECTION", censusList("items", 0, 0, innerSection)),
+			violation: true,
+		},
+		{
+			name: "a full ELEMENT before the CLUSTER",
+			generated: censusRootOPT("CLUSTER", censusList("items", -1, 2,
+				censusOptional("ELEMENT", "at0001"), slotCluster("at0002"))),
+		},
+		{
+			name: "an ELEMENT whose feeder_audit the template requires after the CLUSTER",
+			generated: censusRootOPT("CLUSTER", censusList("items", -1, 1, slotCluster("at0002"),
+				censusOptional("ELEMENT", "at0003", `<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>feeder_audit</rm_attribute_name>`+
+					`<existence><lower_included>true</lower_included><upper_included>true</upper_included>`+
+					`<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>1</lower><upper>1</upper></existence>`+
+					`<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>FEEDER_AUDIT</rm_type_name><node_id></node_id></children></attributes>`))),
+		},
+	}
+	for _, tc := range cases {
+		against := tc.against
+		if against == "" {
+			against = tc.generated
+		}
+		generated := compileCensusOPT(t, tc.generated)
+		for _, policy := range []instance.Policy{instance.Large, instance.Medium} {
+			t.Run(fmt.Sprintf("%s/%s", tc.name, policy), func(t *testing.T) {
+				out, err := instance.Generate(t.Context(), generated, instance.Options{Policy: policy, Language: "en", Now: ratchetNow})
+				if err != nil {
+					t.Fatalf("Generate: %v", err)
+				}
+				findings, err := undescribedMembers(out, compileCensusOPT(t, against))
+				if err != nil {
+					t.Fatalf("undescribedMembers: %v", err)
+				}
+				if len(findings) != 1 {
+					t.Fatalf("undescribedMembers found %d members, want the one slot fill: %+v", len(findings), findings)
+				}
+				f := findings[0]
+				if f.member.kind != "slot" || !f.underOptional {
+					t.Errorf("finding %+v, want a slot fill below an optional node", f)
+				}
+				if f.holderOptional != tc.violation {
+					t.Errorf("finding %s: holderOptional = %t, want %t", f.member.line(), f.holderOptional, tc.violation)
+				}
+			})
+		}
+	}
+}
