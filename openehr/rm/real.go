@@ -5,6 +5,7 @@ import (
 	json "encoding/json/v2"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -25,12 +26,15 @@ type Real float64
 var _ encoding.TextUnmarshaler = (*Real)(nil)
 
 const (
-	// float64Digits is the number of significant decimal digits a float64
-	// gives back: a decimal literal of at most this many digits parses to a
-	// float64 that, written back correctly rounded to the literal's own digit
-	// count, is the literal again. Such a literal is lossy only when it
-	// underflows to zero, so the lossy test skips the write-back for it.
+	// float64Digits is the number of significant decimal digits a normal
+	// float64 gives back: a decimal literal of at most this many digits that
+	// parses to a float64 of magnitude at least minNormal, written back
+	// correctly rounded to the literal's own digit count, is the literal
+	// again, so the lossy test skips the write-back for it. Below minNormal a
+	// subnormal float64 keeps fewer digits, and such a literal is written back.
 	float64Digits = 15
+	// minNormal is 2^-1022, the smallest normal float64.
+	minNormal = 0x1p-1022
 	// maxExactDigits is the largest number of significant decimal digits in
 	// the exact value of any float64. A literal carrying more cannot denote a
 	// float64, so it is lossy without a write-back, which would otherwise
@@ -80,15 +84,17 @@ func significantDigits(s string) int {
 // denotes a value other than s's own.
 //
 // A literal with no significant digit, a zero, is never lossy. Nor is one of
-// at most float64Digits digits that parsed to a non-zero float64. That is the
-// decode hot path, and it costs one digit count and no allocation. A short
-// literal that parsed to zero underflowed, and the write-back finds it lossy.
+// at most float64Digits digits that parsed to a float64 of magnitude at least
+// minNormal. That is the decode hot path, and it costs one digit count and no
+// allocation. A short literal below minNormal goes to the write-back: a
+// subnormal keeps fewer digits, so 1.23e-322, which parses to 1.24e-322, is
+// lossy, and a literal that parsed to zero underflowed, which is lossy too.
 // A literal that is not decimal, such as the hexadecimal form or Inf, which
 // strconv.ParseFloat also reads, is never lossy: the rule governs decimal
 // literals.
 func lossy(s string, f float64) bool {
 	n := significantDigits(s)
-	if n == 0 || (n <= float64Digits && f != 0) {
+	if n == 0 || (n <= float64Digits && math.Abs(f) >= minNormal) {
 		return false
 	}
 	digits, point, ok := decimalForm(s)
