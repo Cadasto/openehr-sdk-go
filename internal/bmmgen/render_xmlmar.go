@@ -292,6 +292,9 @@ func renderMarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass, e
 
 	switch p := ef.Prop.(type) {
 	case *bmm.SingleProperty:
+		if el, ok := xmlIdentifierElement(plan, ef); ok {
+			return marshalXMLIdentifier(recv, goField, el.Name, goNameForRef(plan, el.Type), p.IsMandatory), nil
+		}
 		_, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
 		if kind == polySingle || kind == polySingleNarrow {
 			return marshalXMLPolySingle(recv, goField, elemName), nil
@@ -407,6 +410,21 @@ func marshalXMLStructOptional(recv, field, elem string) string {
 	return fmt.Sprintf(
 		"\tif %s.%s != nil {\n\t\tif err := _e.EncodeElement(%s.%s, xml.StartElement{Name: xml.Name{Local: %q}}); err != nil {\n\t\t\treturn err\n\t\t}\n\t}\n",
 		recv, field, recv, field, elem)
+}
+
+// marshalXMLIdentifier emits a String member as the element its class's
+// ITS-XML schema type declares in its place ([Target.XMLIdentifierElements]):
+// a value of the identifier Go type idType holding the string as its Value.
+// An optional member, held as a pointer, emits no element when nil.
+func marshalXMLIdentifier(recv, field, elem, idType string, mandatory bool) string {
+	if mandatory {
+		return fmt.Sprintf(
+			"\tif err := _e.EncodeElement(&%s{Value: %s.%s}, xml.StartElement{Name: xml.Name{Local: %q}}); err != nil {\n\t\treturn err\n\t}\n",
+			idType, recv, field, elem)
+	}
+	return fmt.Sprintf(
+		"\tif %s.%s != nil {\n\t\tif err := _e.EncodeElement(&%s{Value: *%s.%s}, xml.StartElement{Name: xml.Name{Local: %q}}); err != nil {\n\t\t\treturn err\n\t\t}\n\t}\n",
+		recv, field, idType, recv, field, elem)
 }
 
 func marshalXMLPolySingle(recv, field, elem string) string {

@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
@@ -58,6 +59,12 @@ func (c *CCodedText) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.NodeID); _err != nil {
 					return _err
 				}
+			case "terminology_id":
+				var _v rm.TerminologyID
+				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+					return _err
+				}
+				c.Terminology = _v.Value
 			case "terminology":
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.Terminology); _err != nil {
 					return _err

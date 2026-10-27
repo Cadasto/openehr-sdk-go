@@ -17,7 +17,10 @@ import (
 // every other element it does not read through its default arm, the text
 // between its child elements through its character-data arm, a Hash element
 // and the element of an Any member through their own arms, and a primitive
-// element through xmlunmatched.DecodeElement.
+// element through xmlunmatched.DecodeElement. The element an ITS-XML schema
+// type declares in place of a String member (Target.XMLIdentifierElements)
+// goes to the decoder's own DecodeElement as its identifier class, which
+// checks its own content.
 //
 // An arm may hand an element to the decoder's own DecodeElement only when the
 // member's class is one of those the two targets render a decoder for, which
@@ -60,7 +63,7 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 
 	for _, target := range []Target{TargetRM, TargetAOM14} {
 		plan := plans[target.GoPackage]
-		hashes, anys, params, octets := 0, 0, 0, 0
+		hashes, anys, params, octets, identifiers := 0, 0, 0, 0, 0
 		for _, f := range plan.Files {
 			classes, err := codecClassesIn(plan, f)
 			if err != nil {
@@ -87,6 +90,12 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 				}
 				for _, ef := range fields {
 					prop := ef.Prop.PropertyName()
+					if el, ok := xmlIdentifierElement(plan, ef); ok {
+						identifiers++
+						if arm := xmlCaseArm(src, el.Name); !strings.Contains(arm, "_dec.DecodeElement(") || !withDecoder[el.Type] {
+							t.Errorf("%s.%s is written as the %s element %s; its arm must hand the element to the decoder's own DecodeElement as a class with a generated decoder:\n%s", pc.BMMName, prop, el.Type, el.Name, arm)
+						}
+					}
 					arm := xmlCaseArm(src, prop)
 					switch {
 					case isHashProperty(ef.Prop):
@@ -127,8 +136,8 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 		if target.GoPackage == TargetRM.GoPackage && (hashes == 0 || params == 0 || octets == 0) {
 			t.Errorf("the RM target rendered %d Hash arms, %d generic-parameter arms and %d Octet arms; want the resource-metadata Hash members, VERSION<T>.data and DV_MULTIMEDIA.data covered", hashes, params, octets)
 		}
-		if target.GoPackage == TargetAOM14.GoPackage && anys == 0 {
-			t.Errorf("the AOM 1.4 target rendered no Any arm; want `assumed_value` and `EXPR_LEAF.item` covered")
+		if target.GoPackage == TargetAOM14.GoPackage && (anys == 0 || identifiers == 0) {
+			t.Errorf("the AOM 1.4 target rendered %d Any arms and %d identifier-element arms; want `assumed_value`, `EXPR_LEAF.item` and C_CODED_TEXT's `terminology_id` covered", anys, identifiers)
 		}
 	}
 }

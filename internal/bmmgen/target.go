@@ -67,6 +67,25 @@ type Target struct {
 	// child order from the schema type of that name. Canonical JSON keeps
 	// the BMM name. Empty when the schemas use the BMM names.
 	XMLTypeNames map[string]string
+	// XMLIdentifierElements maps a String member, keyed "CLASS.member" by
+	// the BMM names of the class that declares it and of the member, to the
+	// element the class's ITS-XML schema type declares in its place: one of
+	// another name, of an identifier class whose `value` holds the string.
+	// The XML encoder writes that element, the decoder reads it and the
+	// member's own element, and the child order places the member where
+	// the schema places the element. Canonical JSON keeps the member. Empty
+	// when the schemas declare each member under its own name.
+	XMLIdentifierElements map[string]XMLIdentifierElement
+}
+
+// XMLIdentifierElement is the element an ITS-XML schema type declares in
+// place of a String member ([Target.XMLIdentifierElements]).
+type XMLIdentifierElement struct {
+	// Name is the element's name, such as terminology_id.
+	Name string
+	// Type is the BMM name of the element's class, such as TERMINOLOGY_ID,
+	// whose `value` member holds the string.
+	Type string
 }
 
 // TargetRM is the RM generation target.
@@ -103,6 +122,11 @@ var TargetAOM14 = Target{
 		"C_CODED_TEXT": "C_CODE_PHRASE",
 		"C_ORDINAL":    "C_DV_ORDINAL",
 		"C_QUANTITY":   "C_DV_QUANTITY",
+	},
+	// Its C_CODE_PHRASE declares C_CODED_TEXT's terminology as the
+	// TERMINOLOGY_ID element terminology_id.
+	XMLIdentifierElements: map[string]XMLIdentifierElement{
+		"C_CODED_TEXT.terminology": {Name: "terminology_id", Type: "TERMINOLOGY_ID"},
 	},
 }
 

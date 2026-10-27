@@ -444,8 +444,9 @@ func placeOtherOnly(own, other []string) []string {
 }
 
 // xmlChildFields returns fields in the order pc's XML encoder writes them:
-// the ones its schema sequence names in that order, then the rest in the
-// order given. Without schemas the order given stands.
+// the ones its schema sequence names in that order, each by the name of the
+// element it is written as ([xmlElementName]), then the rest in the order
+// given. Without schemas the order given stands.
 func xmlChildFields(plan *Plan, pc *PlannedClass, fields []emittedField) ([]emittedField, error) {
 	if plan.xmlOrder == nil {
 		return fields, nil
@@ -455,7 +456,7 @@ func xmlChildFields(plan *Plan, pc *PlannedClass, fields []emittedField) ([]emit
 		return nil, fmt.Errorf("bmmgen: XML child order of %s: %w", pc.BMMName, err)
 	}
 	rank := func(f emittedField) int {
-		if i := slices.Index(seq, f.Prop.PropertyName()); i >= 0 {
+		if i := slices.Index(seq, xmlElementName(plan, f)); i >= 0 {
 			return i
 		}
 		return len(seq)

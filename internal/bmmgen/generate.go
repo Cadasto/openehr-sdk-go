@@ -222,6 +222,9 @@ func runTarget(opts Options, t Target, resolver wrappedResolver, schemas *itsXML
 			return tr, fmt.Errorf("bmmgen: %w", err)
 		}
 	}
+	if err := checkXMLIdentifierElements(plan); err != nil {
+		return tr, err
+	}
 	for _, f := range plan.Files {
 		if !safeFileBase(f.FileBase) {
 			return tr, fmt.Errorf("bmmgen: unsafe file base %q", f.FileBase)

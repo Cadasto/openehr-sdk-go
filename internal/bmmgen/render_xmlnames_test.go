@@ -2,6 +2,8 @@ package bmmgen
 
 import (
 	"context"
+	"io/fs"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -99,5 +101,93 @@ func TestRenderXMLNamesFileOnlyForNamedTargets(t *testing.T) {
 		if !strings.Contains(string(body), want) {
 			t.Errorf("RenderXMLNamesFile(aom14) lacks %s:\n%s", want, body)
 		}
+	}
+}
+
+// TestREQ056_CheckXMLIdentifierElements pins the identifier elements the
+// generator accepts for a target: the AOM 1.4 target's own pass, and each
+// one the codecs could not honour is refused (REQ-056).
+func TestREQ056_CheckXMLIdentifierElements(t *testing.T) {
+	if err := checkXMLIdentifierElements(aom14PlanWithSchemas(t)); err != nil {
+		t.Fatalf("checkXMLIdentifierElements(aom14) = %v; want nil", err)
+	}
+	const (
+		noMember = "no String member a concrete class of the aom14 target declares"
+		noClass  = "no class with a canonical-XML decoder and a String value"
+		noSchema = "not declared by the ITS-XML schema type of C_CODED_TEXT"
+	)
+	tid := XMLIdentifierElement{Name: "terminology_id", Type: "TERMINOLOGY_ID"}
+	for _, tc := range []struct {
+		name  string
+		elems map[string]XMLIdentifierElement
+		want  string
+	}{
+		{"unknown class", map[string]XMLIdentifierElement{"C_NO_SUCH_CLASS.terminology": tid}, noMember},
+		{"abstract class", map[string]XMLIdentifierElement{"C_OBJECT.node_id": tid}, noMember},
+		{"member an ancestor declares", map[string]XMLIdentifierElement{"C_CODED_TEXT.node_id": tid}, noMember},
+		{"member that is no String", map[string]XMLIdentifierElement{"C_CODED_TEXT.code_list": tid}, noMember},
+		{"element class without a value", map[string]XMLIdentifierElement{"C_CODED_TEXT.terminology": {Name: "terminology_id", Type: "CODE_PHRASE"}}, noClass},
+		{"element class the plan lacks", map[string]XMLIdentifierElement{"C_CODED_TEXT.terminology": {Name: "terminology_id", Type: "NO_SUCH_ID"}}, noClass},
+		{"element the schema type lacks", map[string]XMLIdentifierElement{"C_CODED_TEXT.terminology": {Name: "terminology", Type: "TERMINOLOGY_ID"}}, noSchema},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			plan := aom14PlanWithSchemas(t)
+			plan.Target.XMLIdentifierElements = tc.elems
+			err := checkXMLIdentifierElements(plan)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("checkXMLIdentifierElements(%v) = %v; want an error containing %q", tc.elems, err, tc.want)
+			}
+		})
+	}
+}
+
+// TestREQ056_RunChecksXMLNameTablesBeforeWriting pins that a run refuses a
+// target whose ITS-XML name tables the codecs could not honour before it
+// writes any file, so a refused run leaves the output tree as it was
+// (REQ-056).
+func TestREQ056_RunChecksXMLNameTablesBeforeWriting(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		target func() Target
+		want   string
+	}{
+		{
+			name: "identifier element the schema type lacks",
+			target: func() Target {
+				tg := TargetAOM14
+				tg.XMLIdentifierElements = map[string]XMLIdentifierElement{"C_CODED_TEXT.terminology": {Name: "terminology", Type: "TERMINOLOGY_ID"}}
+				return tg
+			},
+			want: "not declared by the ITS-XML schema type",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out := t.TempDir()
+			_, err := Run(Options{
+				ResourcesDir:  testResources,
+				ITSXMLDir:     testITSXML,
+				OutDir:        out,
+				Targets:       []Target{tc.target()},
+				SkipInventory: true,
+			})
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("Run = %v; want an error containing %q", err, tc.want)
+			}
+			var written []string
+			if err := filepath.WalkDir(out, func(path string, d fs.DirEntry, err error) error {
+				if err != nil {
+					return err
+				}
+				if !d.IsDir() {
+					written = append(written, path)
+				}
+				return nil
+			}); err != nil {
+				t.Fatalf("walking %s: %v", out, err)
+			}
+			if len(written) > 0 {
+				t.Errorf("a refused Run wrote %d files, among them %s; want none", len(written), written[0])
+			}
+		})
 	}
 }

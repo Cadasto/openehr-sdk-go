@@ -298,6 +298,19 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 
 	switch p := ef.Prop.(type) {
 	case *bmm.SingleProperty:
+		if el, ok := xmlIdentifierElement(plan, ef); ok {
+			// The element the schema declares in the member's place, then
+			// the member's own, which an older SDK wrote.
+			own := unmarshalXMLPrimitiveMandatory(recv, goField, elemName)
+			if !p.IsMandatory {
+				goType, _, err := singleTypeRef(plan, ef.Owner, p.TypeName)
+				if err != nil {
+					return "", err
+				}
+				own = unmarshalXMLPrimitiveOptionalLit(recv, goField, elemName, goType)
+			}
+			return unmarshalXMLIdentifier(recv, goField, el.Name, goNameForRef(plan, el.Type), p.IsMandatory) + own, nil
+		}
 		if p.TypeName == bmmAnyType {
 			// The codec cannot decode the content of an Any member: the
 			// element goes to xmlunmatched.SkipUnmatched, like a Hash member's.
@@ -615,6 +628,20 @@ func containerInnerName(td *bmm.ContainerType) string {
 		return inner.RootType
 	}
 	return ""
+}
+
+// unmarshalXMLIdentifier emits the decode case of the element an ITS-XML
+// schema type declares in place of a String member
+// ([Target.XMLIdentifierElements]): the element decodes as the identifier Go
+// type idType, which reads its own content, and its Value is the member's.
+func unmarshalXMLIdentifier(recv, field, elem, idType string, mandatory bool) string {
+	assign := fmt.Sprintf("%s.%s = _v.Value", recv, field)
+	if !mandatory {
+		assign = fmt.Sprintf("%s.%s = &_v.Value", recv, field)
+	}
+	return fmt.Sprintf(
+		"\t\t\tcase %q:\n\t\t\t\tvar _v %s\n\t\t\t\tif _err := _dec.DecodeElement(&_v, &_t); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s\n",
+		elem, idType, assign)
 }
 
 func unmarshalXMLStructMandatory(recv, field, elem string) string {

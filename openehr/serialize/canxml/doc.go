@@ -86,6 +86,10 @@
 //     the CODE_PHRASE shape the AOM 1.4 ITS-XML schema gives it, with the
 //     terminology identifier in a `value` child of `terminology_id`;
 //     decode also reads a plain text `terminology_id`.
+//   - The AOM 1.4 C_CODED_TEXT `terminology` is written as the
+//     `terminology_id` element the AM 1.4 schema type C_CODE_PHRASE
+//     declares in its place, the identifier in a `value` child; decode
+//     also reads a `terminology` element.
 //   - A member typed by a generic parameter that is instantiated with an
 //     interface, such as the `data` of ORIGINAL_VERSION<any>, is a
 //     polymorphic site and needs `xsi:type`, even when its element is

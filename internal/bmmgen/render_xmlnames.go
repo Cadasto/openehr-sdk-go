@@ -7,6 +7,8 @@ import (
 	"maps"
 	"slices"
 	"strings"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
 )
 
 // xmlNamesFile is the per-target file that holds the ITS-XML schema names
@@ -42,6 +44,89 @@ func checkXMLTypeNames(plan *Plan) error {
 		}
 	}
 	return nil
+}
+
+// checkXMLIdentifierElements refuses a target whose
+// [Target.XMLIdentifierElements] the codecs could not honour: a key that
+// names no String member a concrete class of the target declares, an element
+// class that has no canonical-XML decoder or no String `value`, and, when the
+// schemas are loaded, an element the schema type of the class does not
+// declare.
+func checkXMLIdentifierElements(plan *Plan) error {
+	elems := plan.Target.XMLIdentifierElements
+	for _, key := range slices.Sorted(maps.Keys(elems)) {
+		el := elems[key]
+		class, member, _ := strings.Cut(key, ".")
+		if !declaresStringMember(plan, class, member) {
+			return fmt.Errorf("bmmgen: XML identifier element of %s: no String member a concrete class of the %s target declares", key, plan.Target.GoPackage)
+		}
+		if !identifierClass(plan, el.Type) {
+			return fmt.Errorf("bmmgen: XML identifier element %s of %s: %s is no class with a canonical-XML decoder and a String value", el.Name, key, el.Type)
+		}
+		if plan.xmlOrder == nil || len(plan.xmlOrder.sets) == 0 {
+			continue
+		}
+		seq, err := plan.xmlOrder.sequenceFor(plan, class)
+		if err != nil {
+			return fmt.Errorf("bmmgen: XML identifier element of %s: %w", key, err)
+		}
+		if !slices.Contains(seq, el.Name) {
+			return fmt.Errorf("bmmgen: XML identifier element %s of %s is not declared by the ITS-XML schema type of %s", el.Name, key, class)
+		}
+	}
+	return nil
+}
+
+// declaresStringMember reports whether class is a concrete class the target
+// emits that declares member as a single String property.
+func declaresStringMember(plan *Plan, class, member string) bool {
+	pc, ok := plan.Classes[class]
+	if !ok || pc.External || !slices.Contains(plan.ConcreteClasses, pc) {
+		return false
+	}
+	sc, ok := pc.Class.(*bmm.SimpleClass)
+	if !ok {
+		return false
+	}
+	p, ok := sc.Properties[member].(*bmm.SingleProperty)
+	return ok && p.TypeName == "String"
+}
+
+// identifierClass reports whether name is a class with a generated
+// canonical-XML decoder whose `value`, declared or inherited, is a single
+// String property.
+func identifierClass(plan *Plan, name string) bool {
+	if decoding, err := xmlClassDecoding(plan, name); err != nil || decoding != xmlOwnDecoder {
+		return false
+	}
+	fields, err := effectiveFields(plan, plan.Classes[name])
+	if err != nil {
+		return false
+	}
+	for _, ef := range fields {
+		if p, ok := ef.Prop.(*bmm.SingleProperty); ok && p.Name == "value" {
+			return p.TypeName == "String"
+		}
+	}
+	return false
+}
+
+// xmlIdentifierElement returns the element the ITS-XML schema type of the
+// member ef's class declares in its place ([Target.XMLIdentifierElements]),
+// and whether it has one.
+func xmlIdentifierElement(plan *Plan, ef emittedField) (XMLIdentifierElement, bool) {
+	el, ok := plan.Target.XMLIdentifierElements[ef.OwnerName+"."+ef.Prop.PropertyName()]
+	return el, ok
+}
+
+// xmlElementName returns the name of the element canonical XML writes the
+// member ef as: the one its class's schema type declares in its place, or
+// else the member's own name.
+func xmlElementName(plan *Plan, ef emittedField) string {
+	if el, ok := xmlIdentifierElement(plan, ef); ok {
+		return el.Name
+	}
+	return ef.Prop.PropertyName()
 }
 
 // RenderXMLNamesFile renders <pkg>/xmlnames_gen.go for a target whose
