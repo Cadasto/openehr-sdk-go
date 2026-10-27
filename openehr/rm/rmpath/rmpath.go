@@ -69,12 +69,14 @@ func PathUnique(root rm.Locatable, path string) bool {
 
 // resolve walks root by the parsed path and returns the matching items.
 func resolve(root rm.Locatable, path string) ([]any, error) {
-	if isNilPointer(root) {
-		return nil, nil
-	}
+	// The path is read first, so a malformed one is refused whatever the
+	// root holds.
 	segs, err := parsePath(path)
 	if err != nil {
 		return nil, err
+	}
+	if root == nil || isNilPointer(root) {
+		return nil, nil
 	}
 	current := []any{root}
 	for _, seg := range segs {
@@ -131,8 +133,23 @@ func parsePath(path string) ([]segment, error) {
 		segs = append(segs, seg)
 		return nil
 	}
-	for i, r := range path {
-		switch r {
+	var quote byte // the quote of the string being read in a predicate, 0 outside one
+	for i := 0; i < len(path); i++ {
+		c := path[i]
+		if quote != 0 {
+			switch c {
+			case '\\':
+				i++ // the escaped character is part of the string
+			case quote:
+				quote = 0
+			}
+			continue
+		}
+		switch c {
+		case '\'', '"':
+			if depth > 0 {
+				quote = c
+			}
 		case '[':
 			depth++
 		case ']':
@@ -148,6 +165,9 @@ func parsePath(path string) ([]segment, error) {
 				start = i + 1
 			}
 		}
+	}
+	if quote != 0 {
+		return nil, fmt.Errorf("%w: unterminated string in %q", ErrPathSyntax, path)
 	}
 	if depth != 0 {
 		return nil, fmt.Errorf("%w: unterminated predicate in %q", ErrPathSyntax, path)
@@ -172,49 +192,125 @@ func parseSegment(raw string) (segment, error) {
 	if attr == "" {
 		return segment{}, fmt.Errorf("%w: predicate without attribute in %q", ErrPathSyntax, raw)
 	}
-	nodeID, name := parsePredicate(pred)
+	nodeID, name, err := parsePredicate(pred)
+	if err != nil {
+		return segment{}, fmt.Errorf("%w in %q", err, raw)
+	}
 	return segment{attr: attr, nodeID: nodeID, name: name}, nil
 }
 
-// parsePredicate interprets the text inside "[...]". It accepts a bare
-// archetype_node_id, a quoted name, "node,'name'" / "node and
-// name/value='name'", or a "name/value='x'" / "name='x'" expression.
-func parsePredicate(s string) (nodeID, name string) {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return "", ""
-	}
-	var parts []string
-	switch {
-	case strings.Contains(s, " and "):
-		parts = strings.Split(s, " and ")
-	default:
-		parts = strings.Split(s, ",")
-	}
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		switch {
-		case p == "":
+// parsePredicate interprets the text inside "[...]": a bare
+// archetype_node_id, a quoted name, or both, as "node,'name'" or
+// "node and name/value='name'"; the name may also be written
+// "name/value='name'" or "name='name'". Terms are separated by a comma or by
+// "and", in any case, outside quoted text, so a name may hold either. A
+// quoted name is read as AQL reads a string: a backslash makes the character
+// after it part of the name, so 'Patient\'s weight' is the name
+// Patient's weight. Any other predicate, such as two node ids, two names,
+// "or", or an operator other than "=", is refused with ErrPathSyntax: read
+// as one of these forms, it would match items it does not select.
+func parsePredicate(s string) (nodeID, name string, err error) {
+	haveID, haveName := false, false
+	rest := strings.TrimSpace(s)
+	for rest != "" {
+		var term string
+		term, rest = nextTerm(rest)
+		if term == "" {
 			continue
-		case strings.ContainsRune(p, '='): // name/value='x' or name='x'
-			_, val, _ := strings.Cut(p, "=")
-			name = unquote(strings.TrimSpace(val))
-		case isQuoted(p):
-			name = unquote(p)
-		default:
-			nodeID = p
+		}
+		if quoted, ok := quotedString(term); ok {
+			if haveName {
+				return "", "", fmt.Errorf("%w: two names in predicate %q", ErrPathSyntax, s)
+			}
+			name, haveName = quoted, true
+			continue
+		}
+		if lhs, rhs, ok := strings.Cut(term, "="); ok {
+			lhs, rhs = strings.TrimSpace(lhs), strings.TrimSpace(rhs)
+			if lhs != "name/value" && lhs != "name" {
+				return "", "", fmt.Errorf("%w: unsupported comparison %q in predicate %q", ErrPathSyntax, term, s)
+			}
+			if haveName {
+				return "", "", fmt.Errorf("%w: two names in predicate %q", ErrPathSyntax, s)
+			}
+			if quoted, ok := quotedString(rhs); ok {
+				rhs = quoted
+			} else if strings.ContainsAny(rhs, "='\" \t") {
+				return "", "", fmt.Errorf("%w: unsupported comparison %q in predicate %q", ErrPathSyntax, term, s)
+			}
+			name, haveName = rhs, true
+			continue
+		}
+		if strings.ContainsAny(term, "'\" \t\n") {
+			return "", "", fmt.Errorf("%w: unsupported term %q in predicate %q", ErrPathSyntax, term, s)
+		}
+		if haveID {
+			return "", "", fmt.Errorf("%w: two node ids in predicate %q", ErrPathSyntax, s)
+		}
+		nodeID, haveID = term, true
+	}
+	return nodeID, name, nil
+}
+
+// nextTerm returns the first term of the predicate text s, trimmed, and the
+// text after the separator that ends it: a comma, or "and" in any case with
+// white space on both sides, outside quoted text. parsePath has checked that
+// every quoted string is closed.
+func nextTerm(s string) (term, rest string) {
+	var quote byte
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if quote != 0 {
+			switch c {
+			case '\\':
+				i++
+			case quote:
+				quote = 0
+			}
+			continue
+		}
+		switch {
+		case c == '\'' || c == '"':
+			quote = c
+		case c == ',':
+			return strings.TrimSpace(s[:i]), s[i+1:]
+		case isSpace(c):
+			if after := strings.TrimLeft(s[i:], " \t\n\r"); len(after) > 3 && strings.EqualFold(after[:3], "and") && isSpace(after[3]) {
+				return strings.TrimSpace(s[:i]), after[4:]
+			}
 		}
 	}
-	return nodeID, name
+	return strings.TrimSpace(s), ""
 }
 
-func isQuoted(s string) bool {
-	return len(s) >= 2 && (s[0] == '\'' || s[0] == '"') && s[len(s)-1] == s[0]
-}
-
-func unquote(s string) string {
-	if isQuoted(s) {
-		return s[1 : len(s)-1]
+// quotedString reports whether s is one quoted string, in single or double
+// quotes, and returns its text with each backslash escape replaced by the
+// character it escapes.
+func quotedString(s string) (string, bool) {
+	if len(s) < 2 || (s[0] != '\'' && s[0] != '"') {
+		return "", false
 	}
-	return s
+	quote := s[0]
+	var b strings.Builder
+	for i := 1; i < len(s); i++ {
+		switch c := s[i]; c {
+		case '\\':
+			if i+1 == len(s) {
+				return "", false
+			}
+			i++
+			b.WriteByte(s[i])
+		case quote:
+			// The string ends here, and so must the term.
+			return b.String(), i == len(s)-1
+		default:
+			b.WriteByte(c)
+		}
+	}
+	return "", false
+}
+
+// isSpace reports whether c is ASCII white space.
+func isSpace(c byte) bool {
+	return c == ' ' || c == '\t' || c == '\n' || c == '\r'
 }

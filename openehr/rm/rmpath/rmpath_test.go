@@ -3,8 +3,10 @@ package rmpath_test
 import (
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rmpath"
 )
@@ -633,5 +635,108 @@ func TestItemAtPathEventContextAbsentAndDeferred(t *testing.T) {
 	none := &rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.ctx.v1", Name: rm.DVText{Value: "Ctx"}}
 	if _, err := rmpath.ItemAtPath(none, "/context/other_context"); !errors.Is(err, rmpath.ErrPathNotFound) {
 		t.Errorf("ItemAtPath(/context/other_context) with no context = %v, want ErrPathNotFound", err)
+	}
+}
+
+// namedItems builds a composition whose ITEM_LIST holds an ELEMENT named
+// by each of names, all with the node id at0004, and one ELEMENT at0009
+// named "Other", each valued with its own name.
+func namedItems(names ...string) *rm.Composition {
+	list := &rm.ItemList{ArchetypeNodeID: "at0010"}
+	for _, n := range append(names, "Other") {
+		id := "at0004"
+		if n == "Other" {
+			id = "at0009"
+		}
+		list.Items = append(list.Items, rm.Element{ArchetypeNodeID: id, Name: rm.DVText{Value: n}, Value: rm.DVText{Value: n}})
+	}
+	return &rm.Composition{
+		ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1",
+		Name:            rm.DVText{Value: "Report"},
+		Content: []rm.ContentItem{&rm.Evaluation{
+			ArchetypeNodeID: "openEHR-EHR-EVALUATION.problem.v1",
+			Name:            rm.DVText{Value: "Problem"},
+			Data:            list,
+		}},
+	}
+}
+
+const namedItemsBase = "/content[openEHR-EHR-EVALUATION.problem.v1]/data/items"
+
+// REQ-121 — a name predicate selects the item of that name whatever the name
+// holds: a comma, " and ", "=", a bracket, a slash, a quote or a backslash.
+// The predicate's separators and operators are read outside quoted text
+// only, and a backslash escape is read as AQL reads one, so the path the
+// compiled template writes for a named node (templatecompile.NamePredicate)
+// finds that node, as do the AQL and the quoted forms. Split the predicate
+// before reading its quotes, or leave the escapes in the name, and a row
+// finds nothing.
+func TestNamePredicateHoldsAnyCharacter(t *testing.T) {
+	t.Parallel()
+	names := []string{"Pulse and rhythm", "Weight, measured", "a=b", "x]y", "mg/dl", "Patient's weight", `C:\temp`, `ends in \`}
+	comp := namedItems(names...)
+	for _, name := range names {
+		quoted := strings.ReplaceAll(strings.ReplaceAll(name, `\`, `\\`), "'", `\'`)
+		for _, pred := range []string{
+			templatecompile.NamePredicate("at0004", name),
+			"at0004 and name/value='" + quoted + "'",
+			"at0004 AND name/value='" + quoted + "'",
+			"'" + quoted + "'",
+		} {
+			p := namedItemsBase + "[" + pred + "]/value"
+			got, err := rmpath.ItemAtPath(comp, p)
+			if err != nil {
+				t.Errorf("ItemAtPath(%q) = %v, want the ELEMENT named %q", p, err, name)
+				continue
+			}
+			if dv, ok := got.(rm.DVText); !ok || dv.Value != name {
+				t.Errorf("ItemAtPath(%q) = %#v, want the value %q", p, got, name)
+			}
+		}
+	}
+}
+
+// REQ-121 — a predicate the path grammar does not have is refused with
+// ErrPathSyntax, not read as a looser filter that selects items the path
+// does not name: a second node id (which AQL reads as a name code), "or", an
+// operator other than "=", two names, and a quoted name that is not closed.
+// Read the second id as the node id, or "!=" as "=", and a row answers with
+// the wrong items.
+func TestPredicateFormsRefused(t *testing.T) {
+	t.Parallel()
+	comp := namedItems("X", "Y")
+	for _, pred := range []string{
+		"at0004, at0009",
+		"at0004 or at0009",
+		"at0004 and name/value!='X'",
+		"at0004 and name/value>'X'",
+		"at0004 and archetype_node_id='at0004'",
+		"at0004,'X','Y'",
+		"'X' and name/value='Y'",
+		"at0004,'X",
+		"at0004,'X' trailing",
+	} {
+		p := namedItemsBase + "[" + pred + "]"
+		if got, err := rmpath.ItemsAtPath(comp, p); !errors.Is(err, rmpath.ErrPathSyntax) {
+			t.Errorf("ItemsAtPath(%q) = (%d items, %v), want ErrPathSyntax", p, len(got), err)
+		}
+	}
+}
+
+// REQ-121 — a path is read before its root, so a malformed path is refused
+// with ErrPathSyntax on a nil root too; and a nil root, typed or not, holds
+// no item, so even the empty path, which names the root, finds nothing.
+func TestNilRootReadsThePathFirst(t *testing.T) {
+	t.Parallel()
+	for _, root := range []rm.Locatable{nil, (*rm.Composition)(nil)} {
+		if _, err := rmpath.ItemsAtPath(root, "content["); !errors.Is(err, rmpath.ErrPathSyntax) {
+			t.Errorf("ItemsAtPath(%T nil root, malformed path) err = %v, want ErrPathSyntax", root, err)
+		}
+		if rmpath.PathExists(root, "") {
+			t.Errorf("PathExists(%T nil root, \"\") = true, want false", root)
+		}
+		if _, err := rmpath.ItemAtPath(root, ""); !errors.Is(err, rmpath.ErrPathNotFound) {
+			t.Errorf("ItemAtPath(%T nil root, \"\") err = %v, want ErrPathNotFound", root, err)
+		}
 	}
 }

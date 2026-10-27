@@ -23,6 +23,13 @@
 //	/attr[at0001,'systolic']    — both (comma- or " and "-separated;
 //	/attr[at0001 and name/value='systolic']   AQL-style also accepted)
 //
+// A quoted name may hold any character. The comma, "and" (in any case) and
+// "=" are read outside quoted text only, and a backslash makes the character
+// after it part of the name, as AQL and compiled template paths write it:
+// /attr[at0001,'Patient\'s weight'] names the item "Patient's weight". A
+// predicate outside these forms, such as two node ids, two names, "or" or an
+// operator other than "=", is refused with ErrPathSyntax.
+//
 // Resolution is reflection-free: a typed walker dispatches attribute
 // access per RM type. An empty path (or "/") denotes the root itself.
 //
