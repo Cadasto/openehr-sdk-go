@@ -981,8 +981,8 @@ const ehrScheme = "ehr"
 // rule reports at its node. A value with no scheme has none to compare, so
 // it is not reported here, and an empty one is the mandatory-presence
 // rule's. The diagnostic names the class and the attribute, never a value
-// (REQ-168), the scheme being part of the value; the value is carried in
-// Issue.Value.
+// (REQ-168), the scheme being part of the value, so the issue's Value stays
+// empty.
 func (f *findings) checkDVEHRURIScheme(value any, path issuePath) {
 	u, ok := asDVEHRURI(value)
 	if !ok {
@@ -998,7 +998,6 @@ func (f *findings) checkDVEHRURIScheme(value any, path issuePath) {
 		Layer:  LayerRM,
 		Rule:   ruleEHRSchemeValid,
 		Detail: "DV_EHR_URI.value must use the ehr scheme (RM Scheme_valid)",
-		Value:  constraints.Redact(u.Value),
 	})
 }
 

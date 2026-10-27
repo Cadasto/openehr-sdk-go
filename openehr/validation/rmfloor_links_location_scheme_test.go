@@ -254,9 +254,8 @@ func TestValidateRM_REQ112_DVEHRURISchemeWhereVisited(t *testing.T) {
 }
 
 // REQ-168 — each of the three findings names the class and the attribute in
-// its Detail and no value: the scheme is part of the URI's value, so the
-// Detail never carries it, and the value is held, redacted, in the issue's
-// Value. The other two read no value, so their Value is empty.
+// its Detail and no value, and its Value is empty: the scheme is part of the
+// URI's value, so neither the Detail nor the Value carries it.
 func TestValidateRM_REQ168_LinksLocationSchemeAreValueFree(t *testing.T) {
 	t.Parallel()
 	const marker = "zzmarkerscheme"
@@ -265,7 +264,6 @@ func TestValidateRM_REQ168_LinksLocationSchemeAreValueFree(t *testing.T) {
 		root  any
 		rule  string
 		names []string // the words the Detail must hold
-		value any      // what Value.Reveal must give
 	}{
 		{
 			name: "links", rule: linksValid, names: []string{"COMPOSITION", "links"},
@@ -277,8 +275,7 @@ func TestValidateRM_REQ168_LinksLocationSchemeAreValueFree(t *testing.T) {
 		},
 		{
 			name: "scheme", rule: schemeValid, names: []string{"DV_EHR_URI", "value"},
-			root:  decodeJSON[rm.DVEHRURI](t, ehrURI(marker+"://payload")),
-			value: marker + "://payload",
+			root: decodeJSON[rm.DVEHRURI](t, ehrURI(marker+"://payload")),
 		},
 	}
 	for _, tc := range tests {
@@ -300,8 +297,8 @@ func TestValidateRM_REQ168_LinksLocationSchemeAreValueFree(t *testing.T) {
 			if strings.Contains(iss.Detail, marker) || strings.Contains(iss.Detail, "payload") {
 				t.Errorf("issue under %s Detail = %q, want no part of the value (REQ-168)", tc.rule, iss.Detail)
 			}
-			if got := iss.Value.Reveal(); got != tc.value {
-				t.Errorf("issue under %s Value.Reveal() = %v, want %v", tc.rule, got, tc.value)
+			if got := iss.Value.Reveal(); got != nil {
+				t.Errorf("issue under %s Value.Reveal() = %v, want an empty Value (REQ-168)", tc.rule, got)
 			}
 		})
 	}
@@ -323,7 +320,7 @@ func TestValidate_REQ112_LinksLocationSchemeUnderATemplate(t *testing.T) {
 	if strings.Count(string(raw), head) != 1 {
 		t.Fatalf("vital_signs.json holds %d COMPOSITION heads, want 1 (fixture drift)", strings.Count(string(raw), head))
 	}
-	inject := func(members string) *rm.Composition {
+	inject := func(t *testing.T, members string) *rm.Composition {
 		return decodeJSON[rm.Composition](t, strings.Replace(string(raw), head, head+members, 1))
 	}
 	const context = `"context":{"start_time":{"value":"2026-01-01T00:00:00Z"},"setting":{"value":"other care","defining_code":{"terminology_id":{"value":"openehr"},"code_string":"238"}},"location":""},`
@@ -347,7 +344,7 @@ func TestValidate_REQ112_LinksLocationSchemeUnderATemplate(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			comp := inject(tc.members)
+			comp := inject(t, tc.members)
 			if got := identityKeys(withRule(validation.Validate(comp, c), tc.rule)); !slices.Equal(got, tc.want) {
 				t.Errorf("Validate(vital signs with %s, c) issues under %s = %q, want %q", tc.name, tc.rule, got, tc.want)
 			}
