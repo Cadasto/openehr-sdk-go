@@ -92,6 +92,20 @@ func TestREQ107_TopUpTakesAChildWithRoom(t *testing.T) {
 			want:     everyPolicyGets("at0001 'ELEMENT' DV_TEXT", "at0001 'ELEMENT' DV_COUNT"),
 		},
 		{
+			// As above, with an optional CLUSTER between them that needs
+			// undescribed content, since its items admit only a slot. The
+			// optional at0001 needs none, and the one earlier sibling that
+			// carries its identity is full, so the top-up takes it rather
+			// than the CLUSTER, the first child with room.
+			name:  "a described sibling of a full child's identity after an undescribed one",
+			lower: 2,
+			children: []string{
+				element("at0001", 1, 1, "DV_TEXT"), slotOnlyCluster("at0002", guardOccurrences01),
+				element("at0001", 0, 1, "DV_COUNT"),
+			},
+			want: everyPolicyGets("at0001 'ELEMENT' DV_TEXT", "at0001 'ELEMENT' DV_COUNT"),
+		},
+		{
 			// Two optional uses of one node id, named x and y. Medium skips
 			// y, whose identity x carries, and Required builds neither of
 			// its own; the top-up takes x, then y once x is full.

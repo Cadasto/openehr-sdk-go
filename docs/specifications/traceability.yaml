@@ -1619,6 +1619,7 @@ requirements:
       - openehr/instance/string_attr_party_name_test.go
       - openehr/instance/string_leaf_internal_test.go
       - openehr/instance/string_leaf_test.go
+      - openehr/instance/topup_room_test.go
       - openehr/instance/uid_source_nil_internal_test.go
       - openehr/instance/uids_test.go
       - openehr/instance/uncarried_mandatory_test.go

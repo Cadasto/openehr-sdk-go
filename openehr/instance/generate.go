@@ -1734,7 +1734,8 @@ func includedPerOPT(optNode *tcimpl.CompiledNode, attrName string) bool {
 // required sibling needs, which checkCardinalityRoom has proved exists.
 // The members stay in OPT order. The count the attribute needs
 // (remainingLowerNeeded) is met by the top-up below under every policy,
-// from the child topUpSeed names. Where only the attribute's
+// each member from the child topUpSeed names, which still has room under
+// its occurrences wherever one does. Where only the attribute's
 // existence asks for a member, the top-up builds one only of a child that
 // needs no undescribed content, and none where there is no such child.
 func (g *generator) materialiseMultiple(
@@ -1772,8 +1773,8 @@ func (g *generator) materialiseMultiple(
 			return fmt.Errorf("append %s.%s: %w", optNode.RMTypeName(), attr.Name(), err)
 		}
 	}
-	for range plan.topUp {
-		rmChild, err := g.buildChild(plan.seed)
+	for _, seed := range plan.topUp {
+		rmChild, err := g.buildChild(seed)
 		if err != nil {
 			return err
 		}
@@ -1793,16 +1794,15 @@ func (g *generator) materialiseMultiple(
 
 // memberPlan is what materialiseMultiple builds for a list: own holds, in
 // OPT order, the allowed child each member a child gets of its own is
-// built from, one entry per member, and topUp is the number of members the
-// top-up then adds, each built from seed.
+// built from, one entry per member, and topUp the allowed child each member
+// the top-up then adds is built from, in the order it adds them.
 type memberPlan struct {
 	own   []*tcimpl.CompiledNode
-	seed  *tcimpl.CompiledNode
-	topUp int
+	topUp []*tcimpl.CompiledNode
 }
 
 // members returns the number of members the plan builds.
-func (p memberPlan) members() int { return len(p.own) + p.topUp }
+func (p memberPlan) members() int { return len(p.own) + len(p.topUp) }
 
 // planMembers returns the members the walk builds for attr, a visited list
 // of optNode whose allowed children are children, without building any.
@@ -1812,8 +1812,9 @@ func (p memberPlan) members() int { return len(p.own) + p.topUp }
 // upper bound (memberCap), where the children that ask for members
 // (asksMember) take the room first and any other child only the room they
 // leave. The top-up then adds the members the attribute still needs
-// (remainingLowerNeeded), within the same bound, from the child topUpSeed
-// names, and none where it names none.
+// (remainingLowerNeeded), within the same bound, one at a time, each from
+// the child topUpSeed names given the members built so far, and stops where
+// it names none.
 func (g *generator) planMembers(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute, children []*tcimpl.CompiledNode) memberPlan {
 	var plan memberPlan
 	upperBound := memberCap(attr)
@@ -1861,7 +1862,7 @@ func (g *generator) planMembers(optNode *tcimpl.CompiledNode, attr *tcimpl.Compi
 	// skipped a child the lower bound still needs, or Required built no
 	// member of an optional child). Where the BMM, the cardinality or a
 	// child's occurrences asks for the member (not existenceOnly) and
-	// every OPT child is a slot, the seed is the first slot, and
+	// no child that is not a slot has room, the seed is the first slot, and
 	// buildChild synthesises a slot-shaped fill: an RM value of the slot's
 	// RMTypeName stamped (by stampSlotFill) with an archetype id drawn
 	// from the parsed REQ-103 include grammar, or from the RM-type-prefix
@@ -1869,17 +1870,51 @@ func (g *generator) planMembers(optNode *tcimpl.CompiledNode, attr *tcimpl.Compi
 	// existence asks for it, there is no seed unless a child needs no
 	// undescribed content (topUpSeed), and the attribute keeps no member.
 	needed := remainingLowerNeeded(attr, total)
-	if needed == 0 {
-		return plan
-	}
-	if plan.seed = g.topUpSeed(optNode, attr, children); plan.seed == nil {
-		return plan
-	}
 	if upperBound >= 0 {
 		needed = min(needed, max(upperBound-total, 0))
 	}
-	plan.topUp = needed
+	if needed == 0 {
+		return plan
+	}
+	built := builtPerChild(children, plan.own)
+	for range needed {
+		i := g.topUpSeed(optNode, attr, children, built)
+		if i < 0 {
+			break
+		}
+		plan.topUp = append(plan.topUp, children[i])
+		built[i]++
+	}
 	return plan
+}
+
+// builtPerChild returns, for each of children, the number of entries of own
+// that name it. own lists children in their order, each as many times as it
+// has members, as planMembers builds it, so one pass over both counts them.
+func builtPerChild(children, own []*tcimpl.CompiledNode) []int {
+	built := make([]int, len(children))
+	i := 0
+	for _, c := range own {
+		for children[i] != c {
+			i++
+		}
+		built[i]++
+	}
+	return built
+}
+
+// hasRoom reports whether child, an allowed child of a list, has room for
+// another member once built of its members are built: its occurrences
+// state no upper bound, or built is below it. A slot always has room, as the
+// parser does not read its occurrences (REQ-107 Known gap: slot
+// occurrences). The template validator binds an item to a child by the same
+// room (REQ-102 Structural — binding items).
+func hasRoom(child *tcimpl.CompiledNode, built int) bool {
+	if child.IsSlot() {
+		return true
+	}
+	occ := child.Occurrences()
+	return occ == nil || occ.UpperUnbounded() || built < occ.Upper()
 }
 
 // checkCardinalityRoom returns an error wrapping ErrConstraintUnsatisfiable
@@ -1972,27 +2007,38 @@ func (g *generator) stampSlotFill(rmValue any, slot *tcimpl.CompiledNode) bool {
 	return true
 }
 
-// topUpSeed returns the allowed child of attr whose members top attr up to
-// the count it needs: the first child that needs no content the OPT does
-// not describe and whose identity no earlier sibling carries
-// (firstDescribed), else the first that is not a slot, else the first slot.
-// Where only attr's existence asks for a member (existenceOnly), it returns
-// the first of these or nil, so the attribute gets no undescribed member: a
-// list with no member meets its existence. A list the RM makes non-empty
-// once present is not such a list (rmNonEmptyList): its existence asks for
-// a member, so it takes every source.
-func (g *generator) topUpSeed(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute, children []*tcimpl.CompiledNode) *tcimpl.CompiledNode {
-	if seed := g.firstDescribed(children); seed != nil {
-		return seed
+// topUpSeed returns the index, in children, the allowed children of attr, of
+// the child the next member of attr's top-up is built from, given built, the
+// number of members already built of each child, or -1 for none. It takes,
+// in OPT order, the first child that has room (hasRoom), needs no content the
+// OPT does not describe and whose identity no earlier sibling with room
+// carries (firstDescribed); else the first child that is not a slot and has
+// room; else the first slot, which always has room. Only where no child has
+// room, which an OPT whose cardinality lower bound exceeds what its
+// children's occurrences allow reaches, does it take the first child, past
+// its occurrences. Where only attr's existence asks for a member
+// (existenceOnly), it takes the first source alone, or none, so the attribute
+// gets no undescribed member: a list with no member meets its existence. A
+// list the RM makes non-empty once present is not such a list
+// (rmNonEmptyList): its existence asks for a member, so it takes every
+// source.
+func (g *generator) topUpSeed(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute, children []*tcimpl.CompiledNode, built []int) int {
+	if i := g.firstDescribed(children, built); i >= 0 {
+		return i
 	}
 	if existenceOnly(optNode, attr) {
-		return nil
+		return -1
 	}
-	if seed := firstNonSlot(children); seed != nil {
-		return seed
+	for i, c := range children {
+		if !c.IsSlot() && hasRoom(c, built[i]) {
+			return i
+		}
 	}
-	// Every child is a slot; children is not empty here.
-	return children[0]
+	if i := slices.IndexFunc(children, (*tcimpl.CompiledNode).IsSlot); i >= 0 {
+		return i
+	}
+	// No child has room, and none is a slot; children is not empty here.
+	return 0
 }
 
 // firstNonSlot returns the first OPT child that is not a slot, or

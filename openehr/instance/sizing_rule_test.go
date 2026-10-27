@@ -560,10 +560,12 @@ func TestREQ107_KeepsTheFirstOptionalSiblingOfEachIdentity(t *testing.T) {
 // Medium's skip leaves the top-up free. Where CLUSTER.items needs two
 // members and an optional root or ELEMENT yields to a required one after
 // it, the required child's member comes first, and the top-up then builds
-// one of the optional child, the first allowed child that is not a slot.
-// Where the optional ELEMENT yields to a required one before it, the top-up
-// builds a second member of the required one. Under Large the two members
-// are each sibling's own, so no top-up is needed.
+// one of the optional child, the first allowed child with room that needs
+// no undescribed content. Where the optional ELEMENT yields to a required
+// one before it, the required one is full after its own member, so the
+// top-up builds one of the optional ELEMENT, whose identity no earlier
+// sibling with room carries. Under Large the two members are each
+// sibling's own, so no top-up is needed.
 //
 // Where siblings share an identity and pin no name, the template validator
 // binds each member to the first of them that has room and under which it
@@ -573,11 +575,7 @@ func TestREQ107_KeepsTheFirstOptionalSiblingOfEachIdentity(t *testing.T) {
 // and its content is the required one's, the member built for the required
 // one validates under the optional one too and binds there, so the root
 // shows the known gap (checkTemplateValidator); under Large the optional
-// sibling's own member fills its one occurrence, and the root passes. Under
-// Medium, where the top-up repeats the required ELEMENT past its
-// occurrences, the extra member binds to the optional ELEMENT of its
-// node_id, which has room, and breaks that child's value constraint
-// (REQ-107 known gap, a top-up past a child's occurrences).
+// sibling's own member fills its one occurrence, and the root passes.
 func TestREQ107_OptionalSiblingBesideARequiredOne(t *testing.T) {
 	const clusterA, clusterB = "openEHR-EHR-CLUSTER.sibling_a.v1", "openEHR-EHR-CLUSTER.sibling_b.v1"
 	element := func(nodeID string, lower int, valueType string) string {
@@ -601,10 +599,6 @@ func TestREQ107_OptionalSiblingBesideARequiredOne(t *testing.T) {
 		// under Medium; none where it passes the template validator, as
 		// every root does under Large.
 		mediumGap []string
-		// mediumTopUpBreak is the one template error, "code path", by
-		// which the root shows the top-up gap under Medium; empty for
-		// none.
-		mediumTopUpBreak string
 	}{
 		{
 			name:     "required root then optional root",
@@ -679,14 +673,14 @@ func TestREQ107_OptionalSiblingBesideARequiredOne(t *testing.T) {
 		},
 		{
 			// Under Medium the optional ELEMENT yields to the required one
-			// before it, and the top-up builds a second member of the
-			// required one, the first allowed child that is not a slot.
-			name:             "required element then optional element, cardinality lower 2",
-			lower:            2,
-			children:         []string{element("at0001", 1, "DV_TEXT"), element("at0001", 0, "DV_COUNT")},
-			large:            []string{"DV_TEXT", "DV_COUNT"},
-			medium:           []string{"DV_TEXT", "DV_TEXT"},
-			mediumTopUpBreak: "rm_type_mismatch /items[2]/value",
+			// before it. The required one is full after its own member, so
+			// the top-up builds a member of the optional one, which the
+			// validator binds there, the first of the two with room.
+			name:     "required element then optional element, cardinality lower 2",
+			lower:    2,
+			children: []string{element("at0001", 1, "DV_TEXT"), element("at0001", 0, "DV_COUNT")},
+			large:    []string{"DV_TEXT", "DV_COUNT"},
+			medium:   []string{"DV_TEXT", "DV_COUNT"},
 		},
 	}
 	for _, tc := range cases {
@@ -709,12 +703,6 @@ func TestREQ107_OptionalSiblingBesideARequiredOne(t *testing.T) {
 						t.Errorf("CLUSTER.items members = %v, want %v", got, want)
 					}
 					noFloorErrors(t, out)
-					if tc.mediumTopUpBreak != "" && opts.Policy == instance.Medium {
-						if errs := templateErrors(out, c); len(errs) != 1 || errs[0].Code+" "+errs[0].Path != tc.mediumTopUpBreak {
-							t.Errorf("REQ-107 known gap, a top-up past a child's occurrences: Validate reports %s, want %s alone", issueSummary(errs), tc.mediumTopUpBreak)
-						}
-						return
-					}
 					checkTemplateValidator(t, out, c, gap...)
 				})
 			}

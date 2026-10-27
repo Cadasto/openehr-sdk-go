@@ -32,8 +32,8 @@ import (
 // whose members would all be undescribed or need undescribed content is
 // not visited (shouldVisit), except a composition's context, which RM
 // defaults write under every policy. Under every policy a top-up takes the
-// first child that needs none and whose identity no earlier sibling
-// carries, where the attribute has one. Where only the attribute's
+// first child with room that needs none and whose identity no earlier
+// sibling with room carries, where the attribute has one. Where only the attribute's
 // existence asks for the member, the top-up takes no other child, so the
 // attribute gets no undescribed member and is left with none where it has
 // no such child (topUpSeed): a list with no member meets its existence. A
@@ -201,17 +201,36 @@ func (g *generator) optionalUndescribed(child *tcimpl.CompiledNode) bool {
 	return !childRequired(child) && g.needsUndescribed(child)
 }
 
-// firstDescribed returns the first of children that needs no content the
-// template does not describe and whose identity no earlier sibling other
-// than a slot carries (identityCarriedBefore), or nil when there is none.
-// A slot always needs such content. A member of a child whose identity an
-// earlier sibling carries would be bound to that sibling, which describes
-// other content.
-func (g *generator) firstDescribed(children []*tcimpl.CompiledNode) *tcimpl.CompiledNode {
+// firstDescribed returns the index of the first of children that has room
+// (hasRoom), given built, the number of members already built of each, needs
+// no content the template does not describe, and whose identity no earlier
+// sibling other than a slot that still has room carries (identityRoomBefore),
+// or -1 when there is none. A slot always needs such content. A member of a
+// child whose identity an earlier sibling with room carries could be bound to
+// that sibling, which describes other content; where every earlier sibling
+// that carries it is full, the validator binds it to the first with room.
+func (g *generator) firstDescribed(children []*tcimpl.CompiledNode, built []int) int {
 	for i, c := range children {
-		if !g.needsUndescribed(c) && !identityCarriedBefore(children, i) {
-			return c
+		if hasRoom(c, built[i]) && !g.needsUndescribed(c) && !identityRoomBefore(children, i, built) {
+			return i
 		}
 	}
-	return nil
+	return -1
+}
+
+// identityRoomBefore reports whether a sibling before children[i], other
+// than a slot, that still has room (hasRoom, given built) carries its
+// identity (childIdentity, carriesIdentity). A child with no identity is
+// never carried.
+func identityRoomBefore(children []*tcimpl.CompiledNode, i int, built []int) bool {
+	id := childIdentity(children[i])
+	if id == "" {
+		return false
+	}
+	for j, sib := range children[:i] {
+		if !sib.IsSlot() && carriesIdentity(sib, id) && hasRoom(sib, built[j]) {
+			return true
+		}
+	}
+	return false
 }
