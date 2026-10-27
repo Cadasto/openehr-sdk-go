@@ -774,13 +774,22 @@ const maxXMLRequired = 64
 // xmlunmatched.Enter, rendered by [renderXMLClassVar] as a package-level var
 // named `xmlClass<GoName>`: the class's BMM name, the members the decoder
 // reads as XML attributes, the presence-checked mandatory members in the
-// Reference Model's declaration order, and the multi-valued members.
+// Reference Model's declaration order, the multi-valued members, and the
+// members the decoder also reads from a schema element of another name.
 type xmlClassDesc struct {
 	goName   string
 	name     string
 	attrs    []string
 	required []string
 	items    []string
+	elements []xmlElementOf
+}
+
+// xmlElementOf pairs a member with the element of another name canonical XML
+// writes it under ([Target.XMLIdentifierElements]), rendered as an
+// xmlunmatched.Element.
+type xmlElementOf struct {
+	member, name string
 }
 
 // xmlClassDescriptor builds the description of pc from its effective fields.
@@ -789,7 +798,10 @@ type xmlClassDesc struct {
 // an ancestor's members before the class's own, which rminfo's table shares;
 // the decoder's own field order puts the nearest ancestor first and is not
 // used. A class with more presence-checked members than the runtime holds
-// ([maxXMLRequired]) is refused.
+// ([maxXMLRequired]) is refused. Elements pairs each field the target writes
+// under a schema element of another name ([Target.XMLIdentifierElements])
+// with that element: the field stays in Required when it is mandatory, and
+// the runtime counts the element as its value.
 func xmlClassDescriptor(plan *Plan, pc *PlannedClass, fields []emittedField) (xmlClassDesc, error) {
 	d := xmlClassDesc{goName: pc.GoName, name: pc.BMMName}
 	for _, ef := range fields {
@@ -799,6 +811,9 @@ func xmlClassDescriptor(plan *Plan, pc *PlannedClass, fields []emittedField) (xm
 		}
 		if xmlMultiValued(ef.Prop) {
 			d.items = append(d.items, prop)
+		}
+		if el, ok := xmlIdentifierElement(plan, ef); ok {
+			d.elements = append(d.elements, xmlElementOf{member: prop, name: el.Name})
 		}
 	}
 	_, order := effectiveProperties(plan, pc.BMMName)
@@ -890,6 +905,16 @@ func renderXMLClassVar(d xmlClassDesc) string {
 			continue
 		}
 		fmt.Fprintf(&b, "\t%s: %s,\n", f.name, stringSliceLiteral(f.vals))
+	}
+	if len(d.elements) > 0 {
+		b.WriteString("\tElements: []xmlunmatched.Element{")
+		for i, e := range d.elements {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(&b, "{Member: %q, Name: %q}", e.member, e.name)
+		}
+		b.WriteString("},\n")
 	}
 	b.WriteString("}\n")
 	return b.String()

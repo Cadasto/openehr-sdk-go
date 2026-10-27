@@ -20,6 +20,7 @@ var xmlClassCCodedText = xmlunmatched.Class{
 	Name:     "C_CODED_TEXT",
 	Required: []string{"rm_type_name", "occurrences", "node_id", "terminology"},
 	Items:    []string{"code_list"},
+	Elements: []xmlunmatched.Element{{Member: "terminology", Name: "terminology_id"}},
 }
 
 // UnmarshalXML decodes canonical openEHR XML into CCodedText.

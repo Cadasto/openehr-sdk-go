@@ -18,11 +18,13 @@ import (
 // members read as XML attributes, Required the mandatory members a document
 // can carry, in the Reference Model's order with an ancestor's before the
 // class's own, minus the four interval boundary flags and
-// RESOURCE_DESCRIPTION.parent_resource, and Items the multi-valued members:
-// the container members and those typed by a generic List, Set or Array.
+// RESOURCE_DESCRIPTION.parent_resource, Items the multi-valued members:
+// the container members and those typed by a generic List, Set or Array, and
+// Elements each member the target writes under a schema element of another
+// name ([Target.XMLIdentifierElements]), which stays listed in Required.
 // No decoder calls CheckUnmatchedAttrs any more: Enter checks the attributes.
 func TestREQ175_RenderUnmarshalXMLClassDescriptor(t *testing.T) {
-	flagged, parentResource := 0, false
+	flagged, parentResource, renamed := 0, false, 0
 	for _, target := range []Target{TargetRM, TargetAOM14} {
 		plan, err := BuildPlanForTarget(context.Background(), target, bmm.FSResolver{Root: testResources})
 		if err != nil {
@@ -62,10 +64,14 @@ func TestREQ175_RenderUnmarshalXMLClassDescriptor(t *testing.T) {
 					t.Fatalf("xmlClassDescriptor(%s): %v", pc.BMMName, err)
 				}
 				var attrs, items, mandatory []string
+				var elements []xmlElementOf
 				for _, ef := range fields {
 					prop := ef.Prop.PropertyName()
 					if isXMLAttributeProperty(ef) {
 						attrs = append(attrs, prop)
+					}
+					if el, ok := target.XMLIdentifierElements[ef.OwnerName+"."+prop]; ok {
+						elements = append(elements, xmlElementOf{member: prop, name: el.Name})
 					}
 					switch p := ef.Prop.(type) {
 					case *bmm.ContainerProperty:
@@ -85,6 +91,10 @@ func TestREQ175_RenderUnmarshalXMLClassDescriptor(t *testing.T) {
 				if !slices.Equal(d.items, items) {
 					t.Errorf("%s descriptor Items = %q; want the multi-valued members %q", pc.BMMName, d.items, items)
 				}
+				if !slices.Equal(d.elements, elements) {
+					t.Errorf("%s descriptor Elements = %+v; want the members written under a schema element of another name %+v", pc.BMMName, d.elements, elements)
+				}
+				renamed += len(d.elements)
 				for _, name := range d.required {
 					if !slices.Contains(mandatory, name) {
 						t.Errorf("%s descriptor requires %q, which is not a mandatory member", pc.BMMName, name)
@@ -114,6 +124,9 @@ func TestREQ175_RenderUnmarshalXMLClassDescriptor(t *testing.T) {
 	}
 	if flagged == 0 || !parentResource {
 		t.Errorf("saw %d boundary flags and parent_resource %v among the mandatory members; want the interval classes and RESOURCE_DESCRIPTION covered", flagged, parentResource)
+	}
+	if renamed == 0 {
+		t.Error("saw no member written under a schema element of another name; want C_CODED_TEXT.terminology covered")
 	}
 }
 
@@ -173,6 +186,39 @@ func TestREQ175_XMLClassDescriptorOrderAndShape(t *testing.T) {
 	count, _ := describe("DV_COUNT")
 	if got, want := renderXMLClassVar(count), "// xmlClassDVCount describes DV_COUNT to the canonical-XML decode runtime.\nvar xmlClassDVCount = xmlunmatched.Class{\n\tName: \"DV_COUNT\",\n\tRequired: []string{\"magnitude\"},\n\tItems: []string{\"other_reference_ranges\"},\n}\n"; got != want {
 		t.Errorf("DV_COUNT descriptor renders as:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+// TestREQ175_XMLClassDescriptorElements pins the descriptor of C_CODED_TEXT,
+// whose terminology the AOM 1.4 target writes as the schema element
+// terminology_id: the member stays in Required, and Elements names the
+// element, so the runtime counts a terminology_id as the member's value.
+func TestREQ175_XMLClassDescriptorElements(t *testing.T) {
+	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, bmm.FSResolver{Root: testResources})
+	if err != nil {
+		t.Fatalf("BuildPlanForTarget: %v", err)
+	}
+	pc, ok := plan.Classes["C_CODED_TEXT"]
+	if !ok {
+		t.Fatal("plan has no class C_CODED_TEXT")
+	}
+	fields, err := effectiveFields(plan, pc)
+	if err != nil {
+		t.Fatalf("effectiveFields(C_CODED_TEXT): %v", err)
+	}
+	d, err := xmlClassDescriptor(plan, pc, fields)
+	if err != nil {
+		t.Fatalf("xmlClassDescriptor(C_CODED_TEXT): %v", err)
+	}
+	want := "// xmlClassCCodedText describes C_CODED_TEXT to the canonical-XML decode runtime.\n" +
+		"var xmlClassCCodedText = xmlunmatched.Class{\n" +
+		"\tName: \"C_CODED_TEXT\",\n" +
+		"\tRequired: []string{\"rm_type_name\", \"occurrences\", \"node_id\", \"terminology\"},\n" +
+		"\tItems: []string{\"code_list\"},\n" +
+		"\tElements: []xmlunmatched.Element{{Member: \"terminology\", Name: \"terminology_id\"}},\n" +
+		"}\n"
+	if got := renderXMLClassVar(d); got != want {
+		t.Errorf("C_CODED_TEXT descriptor renders as:\n%s\nwant:\n%s", got, want)
 	}
 }
 

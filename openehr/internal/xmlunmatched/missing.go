@@ -31,6 +31,26 @@ type Class struct {
 	// items of one list: the n-th child element of such a name is the item
 	// at position n-1 in the canonical-JSON form of the instance.
 	Items []string
+	// Elements names each member the decoder also reads from a child element
+	// of another name, the one the ITS-XML schema declares in its place:
+	// an element of a class whose own members hold the member's value, such
+	// as C_CODED_TEXT's terminology, a string written as the TERMINOLOGY_ID
+	// element terminology_id whose value holds it. Such an element gives the
+	// member a value when it carries every mandatory member of its own
+	// class. When it does not, the member is missing, named by its own
+	// pointer, and nothing inside the element is reported: the canonical-JSON
+	// form has no member of the element's name. A child element of the
+	// member's own name counts as before.
+	Elements []Element
+}
+
+// Element names the child element a member of a [Class] is read from when
+// its name is not the member's ([Class.Elements]).
+type Element struct {
+	// Member is the member's name in the Reference Model, such as terminology.
+	Member string
+	// Name is the element's local name, such as terminology_id.
+	Name string
 }
 
 // maxRequired is the most names a [Class] can list in Required: a frame
@@ -93,9 +113,12 @@ func (t *Tracker) enter(start xml.StartElement, c *Class) error {
 // whose text is empty or XML whitespace only. Nothing inside a nilled
 // element is reported: the member is reported once, by its parent, as a
 // null is in canonical JSON. A struct element with no content is a value,
-// and so is a Hash or Any element the codec does not model. The report is
-// the whole policy: no missing member refuses the decode, strict or not. A
-// nil fn asks for nothing.
+// and so is a Hash or Any element the codec does not model. A member the
+// class also reads from an element of another name ([Class.Elements]) has a
+// value when that element carries every member its own class requires;
+// otherwise the member is reported, by its own name, and nothing inside the
+// element is. The report is the whole policy: no missing member refuses the
+// decode, strict or not. A nil fn asks for nothing.
 func (t *Tracker) ReportMissing(fn func(pointer string)) {
 	t.missing = fn
 }
@@ -103,10 +126,18 @@ func (t *Tracker) ReportMissing(fn func(pointer string)) {
 // closing reports, when the decode asked, the mandatory members the element
 // whose frame is t.open[n-1] carried no value for, and then marks the
 // element as a value of its parent's member of that name when it carried
-// one. It runs as the element closes, before its frame is dropped.
+// one. An element the parent's class reads in place of a member of another
+// name ([Class.Elements]) reports nothing of its own, and is a value of that
+// member when it carries every member its own class requires. It runs as the
+// element closes, before its frame is dropped.
 func (t *Tracker) closing(n int) {
 	f := &t.open[n-1]
-	if f.class != nil && !f.nilled {
+	p := &t.open[n-2]
+	member, inPlace := f.name, false
+	if p.class != nil {
+		member, inPlace = p.class.memberOf(f.name)
+	}
+	if f.class != nil && !f.nilled && !inPlace {
 		var b strings.Builder
 		for i, name := range f.class.Required {
 			if f.seen&(1<<i) != 0 {
@@ -119,13 +150,33 @@ func (t *Tracker) closing(n int) {
 			t.missing(b.String())
 		}
 	}
-	p := &t.open[n-2]
 	if p.class == nil || f.nilled || (f.primitive && !f.hasText) {
 		return
 	}
-	if i := slices.Index(p.class.Required, f.name); i >= 0 {
+	if inPlace && f.class != nil && f.seen != f.class.allRequired() {
+		return
+	}
+	if i := slices.Index(p.class.Required, member); i >= 0 {
 		p.seen |= 1 << i
 	}
+}
+
+// memberOf returns the member a child element named local is a value of:
+// the member c reads in its place ([Class.Elements]) and true, or else the
+// name itself and false.
+func (c *Class) memberOf(local string) (string, bool) {
+	for _, e := range c.Elements {
+		if e.Name == local {
+			return e.Member, true
+		}
+	}
+	return local, false
+}
+
+// allRequired returns the seen word of an element that carries every member
+// c requires: one bit per name in c.Required.
+func (c *Class) allRequired() uint64 {
+	return ^uint64(0) >> (maxRequired - len(c.Required))
 }
 
 // writePointer writes the JSON Pointer of the element whose frame is

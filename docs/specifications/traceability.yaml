@@ -2556,6 +2556,7 @@ requirements:
     probes: [PROBE-110, PROBE-081]
     tests:
       - internal/bmmgen/render_xmlunmar_class_test.go
+      - openehr/aom/aom14/coded_text_terminology_xml_test.go
       - openehr/internal/xmlunmatched/document_internal_test.go
       - openehr/internal/xmlunmatched/missing_internal_test.go
       - openehr/rm/missing_members_test.go

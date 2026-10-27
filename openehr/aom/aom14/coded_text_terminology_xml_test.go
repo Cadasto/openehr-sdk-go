@@ -3,6 +3,7 @@ package aom14_test
 import (
 	"encoding/xml"
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
@@ -85,6 +86,42 @@ func TestREQ175_CodedTextTerminologyIDIsNotMissing(t *testing.T) {
 	}
 	if len(missing) != 0 {
 		t.Errorf("canxml.Unmarshal(%s) with WithMissing reported %q; want nothing", b, missing)
+	}
+}
+
+// TestREQ175_CodedTextTerminologyMissing pins what canxml.WithMissing reports
+// for C_CODED_TEXT.terminology in each shape a C_CODE_PHRASE child can carry
+// it (REQ-175, REQ-056): a `terminology_id` with a `value` and the older
+// `terminology` are present; an empty `terminology_id`, one whose `value` is
+// empty, and no element at all report the member once, by its canonical-JSON
+// pointer `/children/0/terminology`, and nothing inside `terminology_id`.
+func TestREQ175_CodedTextTerminologyMissing(t *testing.T) {
+	const missing = "/children/0/terminology"
+	for _, tc := range []struct {
+		name, terminology string
+		want              []string
+	}{
+		{"schema terminology_id", `<terminology_id><value>local</value></terminology_id>`, nil},
+		{"older terminology", `<terminology>local</terminology>`, nil},
+		{"empty terminology_id", `<terminology_id/>`, []string{missing}},
+		{"terminology_id with an empty value", `<terminology_id><value></value></terminology_id>`, []string{missing}},
+		{"no terminology", ``, []string{missing}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			doc := `<c_single_attribute xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">` +
+				`<rm_attribute_name>defining_code</rm_attribute_name><existence><lower>1</lower><upper>1</upper></existence>` +
+				`<children xsi:type="C_CODE_PHRASE"><rm_type_name>CODE_PHRASE</rm_type_name>` +
+				`<occurrences><lower>1</lower><upper>1</upper></occurrences><node_id>at0001</node_id>` + tc.terminology + `</children>` +
+				`</c_single_attribute>`
+			var got []string
+			var v aom14.CSingleAttribute
+			if err := canxml.Unmarshal([]byte(doc), &v, canxml.WithMissing(func(p string) { got = append(got, p) })); err != nil {
+				t.Fatalf("canxml.Unmarshal(%s) = %v; want nil", doc, err)
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("canxml.Unmarshal(%s) with WithMissing reported %q; want %q", doc, got, tc.want)
+			}
+		})
 	}
 }
 

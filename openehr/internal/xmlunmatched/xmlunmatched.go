@@ -54,7 +54,9 @@
 // out. The description each decoder hands [Enter], a [Class], names the
 // members the Reference Model requires of its class, and a tracked decode
 // given [Tracker.ReportMissing] reports, as each element closes, every one
-// of them the element carried no value for: no child element of that name
+// of them the element carried no value for: no child element of that name,
+// none of the other name the class reads it from (`terminology_id` for
+// C_CODED_TEXT's terminology) carrying its own class's mandatory members,
 // and no XML attribute of it where the class reads one; a child carrying
 // `xsi:nil="true"`; or a primitive child whose text is empty or XML
 // whitespace only. A struct element with no content, such as `<subject/>`,
