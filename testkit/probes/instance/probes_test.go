@@ -2,6 +2,7 @@ package instanceprobes_test
 
 import (
 	"context"
+	"math/rand/v2"
 	"os"
 	"strings"
 	"testing"
@@ -148,4 +149,78 @@ func compileRealWorldFixture(t *testing.T, name string) *templatecompile.Compile
 		t.Fatalf("Compile %s: %v", name, err)
 	}
 	return c
+}
+
+// TestProbe027FailsWhenAValidatorRefuses pins both checks PROBE-027 applies
+// to each generated instance: when ValidateComposition or ValidateRM refuses
+// it, the probe fails and names the policy/fill pair and the check, so
+// dropping either check fails this test (REQ-107).
+func TestProbe027FailsWhenAValidatorRefuses(t *testing.T) {
+	c := compileFixture(t, "vital_signs")
+	pass := func(*rm.Composition, *templatecompile.Compiled) validation.Result { return validation.Result{OK: true} }
+	passRM := func(*rm.Composition) validation.Result { return validation.Result{OK: true} }
+	refuse := validation.Result{OK: false, Issues: []validation.Issue{{Code: "stub", Path: "/", Detail: "refused by the test"}}}
+	cases := []struct {
+		name        string
+		composition func(*rm.Composition, *templatecompile.Compiled) validation.Result
+		rmCheck     func(*rm.Composition) validation.Result
+		want        string
+	}{
+		{
+			name:        "ValidateComposition refuses",
+			composition: func(*rm.Composition, *templatecompile.Compiled) validation.Result { return refuse },
+			rmCheck:     passRM,
+			want:        "[large/example] ValidateComposition produced 1 issue(s)",
+		},
+		{
+			name:        "ValidateRM refuses",
+			composition: pass,
+			rmCheck:     func(*rm.Composition) validation.Result { return refuse },
+			want:        "[large/example] ValidateRM produced 1 issue(s)",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r, err := instanceprobes.Probe027WithValidators(context.Background(), c, instance.Options{
+				Territory: "NL",
+				Composer:  testComposer(),
+			}, tc.composition, tc.rmCheck)
+			if err != nil {
+				t.Fatalf("Probe027: %v", err)
+			}
+			if r.Status != "fail" || !strings.Contains(r.Detail, tc.want) {
+				t.Errorf("Probe027 status=%q detail=%q, want status=\"fail\" and a detail naming %q", r.Status, r.Detail, tc.want)
+			}
+		})
+	}
+}
+
+// countingSource is a math/rand/v2 Source that counts its draws.
+type countingSource struct {
+	src   rand.Source
+	draws int
+}
+
+func (s *countingSource) Uint64() uint64 {
+	s.draws++
+	return s.src.Uint64()
+}
+
+// TestProbe027DrawsFromTheCallersValueSource pins PROBE-027's RandomFill
+// runs to the caller's Options.ValueSource, which its doc promises they draw
+// from (REQ-107).
+func TestProbe027DrawsFromTheCallersValueSource(t *testing.T) {
+	c := compileFixture(t, "vital_signs")
+	src := &countingSource{src: rand.NewPCG(1, 1)}
+	r, err := instanceprobes.Probe027GeneratedValidates(context.Background(), c, instance.Options{
+		Territory:   "NL",
+		Composer:    testComposer(),
+		ValueSource: src,
+	})
+	if err != nil {
+		t.Fatalf("Probe027: %v", err)
+	}
+	if r.Status != "pass" || src.draws == 0 {
+		t.Errorf("Probe027 with a caller's ValueSource: status=%q, %d draw(s) from it, want a pass that draws from it", r.Status, src.draws)
+	}
 }

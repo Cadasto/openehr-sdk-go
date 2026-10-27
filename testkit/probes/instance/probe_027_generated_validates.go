@@ -9,6 +9,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
@@ -27,6 +28,17 @@ import (
 // pass, Detail names each policy/fill pair the instance validated clean
 // under, in that order.
 func Probe027GeneratedValidates(ctx context.Context, c *templatecompile.Compiled, opts instance.Options) (Result, error) { // PROBE-027 (REQ-107)
+	return probe027(ctx, c, opts, validation.ValidateComposition, func(comp *rm.Composition) validation.Result {
+		return validation.ValidateRM(comp)
+	})
+}
+
+// probe027 is PROBE-027 with its two checks passed in, so a test can show
+// that the probe fails when either refuses an instance.
+func probe027(ctx context.Context, c *templatecompile.Compiled, opts instance.Options,
+	validateComposition func(*rm.Composition, *templatecompile.Compiled) validation.Result,
+	validateRM func(*rm.Composition) validation.Result,
+) (Result, error) {
 	r := Result{Probe: "PROBE-027"}
 	if c == nil || c.Root() == nil {
 		return r, errors.New("PROBE-027: nil compiled template")
@@ -57,12 +69,12 @@ func Probe027GeneratedValidates(ctx context.Context, c *templatecompile.Compiled
 				failures = append(failures, fmt.Sprintf("[%s] AsComposition: %v", label, err))
 				continue
 			}
-			if result := validation.ValidateComposition(comp, c); !result.OK {
+			if result := validateComposition(comp, c); !result.OK {
 				failures = append(failures, fmt.Sprintf("[%s] ValidateComposition produced %d issue(s): %s",
 					label, len(result.Issues), summariseIssues(result.Issues)))
 				continue
 			}
-			if result := validation.ValidateRM(comp); !result.OK {
+			if result := validateRM(comp); !result.OK {
 				failures = append(failures, fmt.Sprintf("[%s] ValidateRM produced %d issue(s): %s",
 					label, len(result.Issues), summariseIssues(result.Issues)))
 				continue
