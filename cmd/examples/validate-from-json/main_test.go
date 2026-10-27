@@ -99,3 +99,25 @@ func dropMagnitude(v any) int {
 	}
 	return n
 }
+
+// decoded must read a decode failure, and only that, as "no composition to
+// describe": removing the path or the code test makes a row below fail.
+func TestDecoded(t *testing.T) {
+	tests := []struct {
+		name   string
+		issues []validation.Issue
+		want   bool
+	}{
+		{name: "no issues", want: true},
+		{name: "a required member", issues: []validation.Issue{{Path: "/content/0/value/magnitude", Code: "required"}}, want: true},
+		{name: "a shape failure below the root", issues: []validation.Issue{{Path: "/content/0", Code: "invalid_shape"}}, want: true},
+		{name: "the decode failure at the root", issues: []validation.Issue{{Path: "/", Code: "invalid_shape"}}, want: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := decoded(validation.Result{Issues: tc.issues}); got != tc.want {
+				t.Errorf("decoded(%+v) = %v, want %v", tc.issues, got, tc.want)
+			}
+		})
+	}
+}

@@ -54,6 +54,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
@@ -145,11 +146,24 @@ func validateFiles(jsonPath, optPath string) (validation.Result, error) {
 	// and a member two checks find missing is one issue.
 	var composition rm.Composition
 	result := validation.ValidateJSON(body, &composition, compiled)
-	// composition holds the decoded value now, so the program reads it
-	// without decoding the bytes a second time.
-	fmt.Printf("composition          : archetype_node_id=%s content_items=%d\n",
-		composition.ArchetypeNodeID, len(composition.Content))
+	// composition holds the decoded value once the decode succeeded, so the
+	// program reads it without decoding the bytes a second time. A document
+	// that did not decode has no composition to describe: its one issue
+	// prints under validation.
+	if decoded(result) {
+		fmt.Printf("composition          : archetype_node_id=%s content_items=%d\n",
+			composition.ArchetypeNodeID, len(composition.Content))
+	}
 	return result, nil
+}
+
+// decoded reports whether the document decoded into the root value: a
+// decode failure is the one invalid_shape issue ValidateJSON reports at the
+// root path.
+func decoded(result validation.Result) bool {
+	return !slices.ContainsFunc(result.Issues, func(i validation.Issue) bool {
+		return i.Code == "invalid_shape" && i.Path == "/"
+	})
 }
 
 // report prints the validation result under name: the verdict, then one line
