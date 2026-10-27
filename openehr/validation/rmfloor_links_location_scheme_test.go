@@ -6,7 +6,7 @@ package validation_test
 // § Structural access, REQ-168. The floor reports a present-and-empty
 // `links` on a LOCATABLE and a present-and-empty `location` on an
 // EVENT_CONTEXT as rm_invariant at the attribute, and a DV_EHR_URI whose
-// value has a scheme other than `ehr` as rm_invariant at the value, with the
+// value has no `ehr` scheme as rm_invariant at the value, with the
 // invariant as the rule, at the root and nested, under a template as
 // without one. Presence is the generated access's reading, so a document
 // that leaves the attribute out or sends null draws nothing; only a decoded
@@ -160,10 +160,10 @@ func ehrURI(value string) string {
 }
 
 // REQ-112 DV_EHR_URI.Scheme_valid — `scheme.is_equal (Ehr_scheme)`: the floor
-// reports a DV_EHR_URI whose value has an RFC 3986 scheme other than `ehr`,
-// compared without regard to letter case, at the value itself. A value with
-// no scheme is not reported: it is no URI with another scheme, and an empty
-// one is the mandatory-presence rule's.
+// reports a DV_EHR_URI whose value's RFC 3986 scheme is not `ehr`, compared
+// without regard to letter case, at the value itself. A value with no scheme
+// has none equal to `ehr`, so it is reported too; an empty one is the
+// mandatory-presence rule's, so it draws nothing here.
 func TestValidateRM_REQ112_DVEHRURIScheme(t *testing.T) {
 	t.Parallel()
 	const bad = "rm_invariant / rm " + schemeValid
@@ -182,12 +182,15 @@ func TestValidateRM_REQ112_DVEHRURIScheme(t *testing.T) {
 		{name: "a scheme that starts with ehr", value: "ehr+x://y", want: []string{bad}},
 		{name: "a scheme with digits and dots", value: "a1.b-c+d:x", want: []string{bad}},
 		{name: "a scheme a letter long", value: "x:y", want: []string{bad}},
-		{name: "no colon", value: "ehr"},
-		{name: "a relative reference", value: "//example.org/x"},
-		{name: "a colon after a slash", value: "/x:y"},
-		{name: "a scheme starting with a digit", value: "1http://x"},
-		{name: "an empty scheme", value: ":x"},
-		{name: "a space in the scheme", value: "x y:z"},
+		{name: "no colon", value: "ehr", want: []string{bad}},
+		{name: "a relative reference", value: "//example.org/x", want: []string{bad}},
+		{name: "a colon after a slash", value: "/x:y", want: []string{bad}},
+		{name: "ehr after a slash", value: "x/ehr:y", want: []string{bad}},
+		{name: "a scheme starting with a digit", value: "1http://x", want: []string{bad}},
+		{name: "an empty scheme", value: ":x", want: []string{bad}},
+		{name: "a space in the scheme", value: "x y:z", want: []string{bad}},
+		{name: "a space before ehr", value: " ehr://x", want: []string{bad}},
+		{name: "a space alone", value: " ", want: []string{bad}},
 		{name: "empty", value: ""},
 	}
 	for _, tc := range tests {
@@ -203,7 +206,9 @@ func TestValidateRM_REQ112_DVEHRURIScheme(t *testing.T) {
 
 // REQ-112 DV_EHR_URI.Scheme_valid — the rule runs wherever the walk visits a
 // DV_EHR_URI: the target of a LINK under a LOCATABLE's `links`, an ELEMENT's
-// value, an ATTESTATION's items. Each is reported at the URI's own path.
+// value, an ATTESTATION's items, and a DV_EHR_URI sent where a DV_URI is
+// declared, a DV_TEXT's `hyperlink` and a DV_MULTIMEDIA's `uri`. Each is
+// reported at the URI's own path.
 func TestValidateRM_REQ112_DVEHRURISchemeWhereVisited(t *testing.T) {
 	t.Parallel()
 	link := func(target string) string {
@@ -229,6 +234,11 @@ func TestValidateRM_REQ112_DVEHRURISchemeWhereVisited(t *testing.T) {
 			root: decodeJSON[rm.Composition](t, lsComposition(`,"links":[`+link(ehrURI("ehr://x"))+`]`, ``)),
 		},
 		{
+			name: "a LINK target with no scheme",
+			root: decodeJSON[rm.Composition](t, lsComposition(`,"links":[`+link(ehrURI("example.org/ehr/123"))+`]`, ``)),
+			want: []string{"rm_invariant /links[1]/target rm " + schemeValid},
+		},
+		{
 			name: "an ELEMENT value",
 			root: decodeJSON[rm.Element](t, `{"_type":"ELEMENT","archetype_node_id":"at0001",`+lsName+`,"value":`+ehrURI("http://x")+`}`),
 			want: []string{"rm_invariant /value rm " + schemeValid},
@@ -241,6 +251,24 @@ func TestValidateRM_REQ112_DVEHRURISchemeWhereVisited(t *testing.T) {
 			name: "an ATTESTATION item",
 			root: decodeJSON[rm.Attestation](t, `{"_type":"ATTESTATION","items":[`+ehrURI("ehr://x")+`,`+ehrURI("urn:x")+`]}`),
 			want: []string{"rm_invariant /items[2] rm " + schemeValid},
+		},
+		{
+			name: "a DV_TEXT hyperlink",
+			root: decodeJSON[rm.DVText](t, `{"_type":"DV_TEXT","value":"v","hyperlink":`+ehrURI("http://x")+`}`),
+			want: []string{"rm_invariant /hyperlink rm " + schemeValid},
+		},
+		{
+			name: "an ehr DV_TEXT hyperlink",
+			root: decodeJSON[rm.DVText](t, `{"_type":"DV_TEXT","value":"v","hyperlink":`+ehrURI("ehr://x")+`}`),
+		},
+		{
+			name: "a DV_MULTIMEDIA uri",
+			root: decodeJSON[rm.DVMultimedia](t, `{"_type":"DV_MULTIMEDIA","media_type":{"terminology_id":{"value":"IANA_media-types"},"code_string":"text/plain"},"size":1,"uri":`+ehrURI("http://x")+`}`),
+			want: []string{"rm_invariant /uri rm " + schemeValid},
+		},
+		{
+			name: "an ehr DV_MULTIMEDIA uri",
+			root: decodeJSON[rm.DVMultimedia](t, `{"_type":"DV_MULTIMEDIA","media_type":{"terminology_id":{"value":"IANA_media-types"},"code_string":"text/plain"},"size":1,"uri":`+ehrURI("ehr://x")+`}`),
 		},
 	}
 	for _, tc := range tests {

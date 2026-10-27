@@ -975,21 +975,19 @@ func (f *findings) checkEventContextLocation(value any, path issuePath) {
 const ehrScheme = "ehr"
 
 // checkDVEHRURIScheme enforces the RM invariant `Scheme_valid:
-// scheme.is_equal (Ehr_scheme)` (REQ-112) on a DV_EHR_URI: a `value` that
-// has an RFC 3986 scheme ([uriScheme]) other than `ehr`, compared without
-// regard to letter case, is reported at the node itself, as the ISO 8601
-// rule reports at its node. A value with no scheme has none to compare, so
-// it is not reported here, and an empty one is the mandatory-presence
-// rule's. The diagnostic names the class and the attribute, never a value
-// (REQ-168), the scheme being part of the value, so the issue's Value stays
-// empty.
+// scheme.is_equal (Ehr_scheme)` (REQ-112) on a DV_EHR_URI: a `value` whose
+// RFC 3986 scheme ([uriScheme]) is not `ehr`, compared without regard to
+// letter case, is reported at the node itself, as the ISO 8601 rule reports
+// at its node. A value with no scheme has none equal to `ehr`, so it is
+// reported too; an empty one is the mandatory-presence rule's. The
+// diagnostic names the class and the attribute, never a value (REQ-168), the
+// scheme being part of the value, so the issue's Value stays empty.
 func (f *findings) checkDVEHRURIScheme(value any, path issuePath) {
 	u, ok := asDVEHRURI(value)
-	if !ok {
+	if !ok || u.Value == "" {
 		return
 	}
-	scheme, found := uriScheme(u.Value)
-	if !found || strings.EqualFold(scheme, ehrScheme) {
+	if scheme, found := uriScheme(u.Value); found && strings.EqualFold(scheme, ehrScheme) {
 		return
 	}
 	f.emit(Issue{
