@@ -279,6 +279,9 @@ func rotatingJWKS(t *testing.T, before, after []byte) (jwks *smart.JWKS, fetches
 		t.Fatal(err)
 	}
 	jwks.TTL = time.Hour
+	// No minimum refresh interval, so a token the cached key does not verify
+	// refreshes the set right after the seed.
+	jwks.MinRefreshInterval = 0
 	return jwks, fetches, func() { rotated.Store(true) }
 }
 
@@ -377,6 +380,7 @@ func TestValidateIDTokenWithoutKidRefetchOutageKeepsItsOwnError(t *testing.T) {
 		t.Fatal(err)
 	}
 	jwks.TTL = time.Hour
+	jwks.MinRefreshInterval = 0
 	if _, err := jwks.Key(t.Context(), ""); err != nil {
 		t.Fatalf("Key(no kid) error = %v, want nil", err)
 	}
@@ -387,5 +391,42 @@ func TestValidateIDTokenWithoutKidRefetchOutageKeepsItsOwnError(t *testing.T) {
 	// REQ-062: a failed refetch surfaces as the fetch error, never as the JWKS sentinel.
 	if err == nil || errors.Is(err, auth.ErrJWKSValidationFailed) || !strings.Contains(err.Error(), "jwks fetch: status 503") {
 		t.Fatalf("ValidateIDToken(no kid, rotated key, refetch answers 503) error = %v, want the fetch error, not ErrJWKSValidationFailed", err)
+	}
+}
+
+// TestREQ062_KidlessSignatureMissesFetchAtMostOncePerInterval pins REQ-062: a
+// token without a kid whose signature the cached signing key does not verify
+// refreshes the set only once the set is the minimum interval old, as a kid
+// miss does. Under NewJWKS's 30-second default, twenty such tokens right
+// after the seed fetch the set no more, and each is refused with
+// auth.ErrJWKSValidationFailed.
+func TestREQ062_KidlessSignatureMissesFetchAtMostOncePerInterval(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	cached, other := newRSAKey(t), newRSAKey(t)
+	set := keySetBody(t, publishedKey{key: cached})
+	var fetches atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		fetches.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(set)
+	}))
+	t.Cleanup(srv.Close)
+	jwks, err := smart.NewJWKS(srv.Client(), srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := jwks.Key(t.Context(), ""); err != nil {
+		t.Fatalf("Key(no kid) error = %v, want nil", err)
+	}
+
+	for i := range 20 {
+		_, err := smart.ValidateIDToken(t.Context(), joseSign(t, gojose.RS256, other, "", defaultIDClaims(now)), jwks,
+			"https://issuer.example", "client-id", "nonce-xyz", now, nil)
+		if !errors.Is(err, auth.ErrJWKSValidationFailed) {
+			t.Fatalf("ValidateIDToken(no kid, a key the set lacks) %d of 20 error = %v, want ErrJWKSValidationFailed", i+1, err)
+		}
+	}
+	if n := fetches.Load(); n != 1 {
+		t.Fatalf("20 kid-less tokens the cached key does not verify fetched the key set %d time(s), want 1: the seed alone", n)
 	}
 }

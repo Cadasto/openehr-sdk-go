@@ -143,8 +143,15 @@ func (j *JWKS) onlySigningKey(ctx context.Context) (json.RawMessage, error) {
 
 // refreshedSigningKey refreshes the set, sharing a refresh already in flight,
 // and returns its only signing key. It serves a token without a kid that the
-// cached key did not verify (REQ-062).
+// cached key did not verify (REQ-062). As for a kid miss, a set fetched less
+// than MinRefreshInterval ago is not fetched again: it fails at once.
 func (j *JWKS) refreshedSigningKey(ctx context.Context) (json.RawMessage, error) {
+	j.mu.Lock()
+	recent := !j.staleLocked() && j.fetchedWithinLocked(j.MinRefreshInterval)
+	j.mu.Unlock()
+	if recent {
+		return nil, fmt.Errorf("%w: the signing key of a key set fetched less than %v ago does not verify the token", auth.ErrJWKSValidationFailed, j.MinRefreshInterval)
+	}
 	if err := j.refresh(ctx); err != nil {
 		return nil, err
 	}
