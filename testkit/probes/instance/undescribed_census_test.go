@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
@@ -420,14 +421,17 @@ func undescribedMembers(root any, compiled *templatecompile.Compiled) ([]censusF
 		return nil, fmt.Errorf("json unmarshal: %w", err)
 	}
 	var out []censusFinding
-	censusWalk(compiled.Root(), tree, false, &out)
+	censusWalk(compiled.Root(), tree, false, false, &out)
 	return out, nil
 }
 
 // censusWalk visits the members of every attribute of value, the JSON
 // object bound to the template node node. underOptional reports whether
-// node or a node above it is optional.
-func censusWalk(node *templatecompile.CompiledNode, value map[string]any, underOptional bool, out *[]censusFinding) {
+// node or a node above it is optional, and lastResort whether node is the
+// child a top-up had to take (topUpLastResort). It binds every member of an
+// attribute before it walks below any, so the room each child has left is
+// known when it asks whether a member's node was a last resort.
+func censusWalk(node *templatecompile.CompiledNode, value map[string]any, underOptional, lastResort bool, out *[]censusFinding) {
 	for _, key := range sortedKeys(value) {
 		if key == "_type" || key == "archetype_node_id" || key == "archetype_details" {
 			continue
@@ -436,14 +440,23 @@ func censusWalk(node *templatecompile.CompiledNode, value map[string]any, underO
 		if node != nil {
 			attr = node.Attribute(key)
 		}
-		for _, member := range objects(value[key]) {
-			child, kind := censusBind(attr, member)
-			if kind != "" {
+		members := objects(value[key])
+		bound := make([]*templatecompile.CompiledNode, len(members))
+		kinds := make([]string, len(members))
+		built := make(map[*templatecompile.CompiledNode]int)
+		for i, member := range members {
+			bound[i], kinds[i] = censusBind(attr, member, built)
+			if bound[i] != nil {
+				built[bound[i]]++
+			}
+		}
+		for i, member := range members {
+			if kind := kinds[i]; kind != "" {
 				ident, _ := member["_type"].(string)
 				if kind == "slot" {
 					ident, _ = member["archetype_node_id"].(string)
 				}
-				holderOptional := node != nil && nodeOptional(node) && !topUpLastResort(node)
+				holderOptional := node != nil && nodeOptional(node) && !lastResort
 				*out = append(*out, censusFinding{
 					member:         undescribedMember{attr: holderPath(node) + "/" + key, kind: kind, ident: ident},
 					holderOptional: holderOptional,
@@ -451,28 +464,34 @@ func censusWalk(node *templatecompile.CompiledNode, value map[string]any, underO
 				})
 				continue
 			}
+			child := bound[i]
 			below := underOptional
 			if child != nil && nodeOptional(child) {
 				below = true
 			}
-			censusWalk(child, member, below, out)
+			censusWalk(child, member, below, child != nil && topUpLastResort(child, built), out)
 		}
 	}
 }
 
 // censusBind binds member, a JSON object in attr, to an allowed template
-// child of attr. It returns the child that describes member, or the kind
-// of undescribed member it is: "bmm" for a LOCATABLE in an attribute with
-// no allowed child, "slot" for one only a slot admits, and "unbound" for
-// one no child admits. A LOCATABLE binds among the children that carry its
+// child of attr, given built, the members of attr bound to each child
+// before it. It returns the child that describes member, or the kind of
+// undescribed member it is: "bmm" for a LOCATABLE in an attribute with no
+// allowed child, "slot" for one only a slot admits, and "unbound" for one
+// no child admits. A LOCATABLE binds among the children that carry its
 // archetype_node_id, ranked by its name as the template validator ranks
-// them (REQ-102 Structural — binding items): the first that pins that
-// name, else the first that pins none, else the first of them, so each of
-// the named uses of one archetype Large writes binds to its own child. A
-// member that is not a LOCATABLE binds to the first allowed child of its
-// RM type, else the first allowed child, else none, and is never
-// undescribed: only a LOCATABLE has a template node of its own.
-func censusBind(attr *templatecompile.CompiledAttribute, member map[string]any) (*templatecompile.CompiledNode, string) {
+// them (REQ-102 Structural — binding items): those that pin that name,
+// else those that pin none, else all of them; within the first rank that
+// holds one, it binds to the first child with room (censusRoom), else the
+// first of the rank, so each of the named uses of one archetype Large
+// writes binds to its own child, and a member past a full child binds to
+// the next one with room. The validator also tries each child's
+// constraints, which the census does not. A member that is not a LOCATABLE
+// binds to the first allowed child of its RM type, else the first allowed
+// child, else none, and is never undescribed: only a LOCATABLE has a
+// template node of its own.
+func censusBind(attr *templatecompile.CompiledAttribute, member map[string]any, built map[*templatecompile.CompiledNode]int) (*templatecompile.CompiledNode, string) {
 	children := allowedChildren(attr)
 	id, locatable := member["archetype_node_id"].(string)
 	if !locatable {
@@ -495,7 +514,7 @@ func censusBind(attr *templatecompile.CompiledAttribute, member map[string]any) 
 		name, _ = n["value"].(string)
 	}
 	slot := false
-	var named, unnamed, carrier *templatecompile.CompiledNode
+	var named, unnamed, carriers []*templatecompile.CompiledNode
 	for _, c := range children {
 		if c.IsSlot() {
 			slot = true
@@ -505,19 +524,23 @@ func censusBind(attr *templatecompile.CompiledAttribute, member map[string]any) 
 			continue
 		}
 		switch {
-		case c.NodeName() != "" && c.NodeName() == name && named == nil:
-			named = c
-		case c.NodeName() == "" && unnamed == nil:
-			unnamed = c
+		case c.NodeName() != "" && c.NodeName() == name:
+			named = append(named, c)
+		case c.NodeName() == "":
+			unnamed = append(unnamed, c)
 		}
-		if carrier == nil {
-			carrier = c
-		}
+		carriers = append(carriers, c)
 	}
-	for _, c := range []*templatecompile.CompiledNode{named, unnamed, carrier} {
-		if c != nil {
-			return c, ""
+	for _, rank := range [][]*templatecompile.CompiledNode{named, unnamed, carriers} {
+		if len(rank) == 0 {
+			continue
 		}
+		for _, c := range rank {
+			if censusRoom(c, built[c]) {
+				return c, ""
+			}
+		}
+		return rank[0], ""
 	}
 	if slot {
 		return nil, "slot"
@@ -586,16 +609,21 @@ func attrRequired(attr *templatecompile.CompiledAttribute) bool {
 	return attr.Required() || tcimpl.LowerAtLeastOne(attr.Existence()) || tcimpl.LowerAtLeastOne(attr.ChildMultiplicity())
 }
 
-// topUpLastResort reports whether node, an optional child, is the child a
+// topUpLastResort reports whether node, an optional child, is a child a
 // top-up takes when no other will do (REQ-107 § Contract What a visit
-// writes): its attribute is multi-valued and the BMM marks it mandatory or
-// its cardinality lower bound is at least 1, so a top-up builds a member
-// where no child got one of its own, node is the first allowed child that
-// is not a slot, and no allowed child that is not a slot needs no
-// undescribed content (needsNoUndescribed) and has an identity no earlier
-// sibling carries. Where only the attribute's existence asks for a member,
-// the top-up takes only a child that needs no undescribed content, so it
-// has no last resort. Nor has a list that only its cardinality lower bound
+// writes), given built, the members of its list bound to each child. Its
+// list is multi-valued and asks the top-up for a member beyond its
+// existence (topUpAsks), so a top-up builds members where the children's
+// own fall short; every child before node that is not a slot is full
+// (censusRoom), so node was the first child with room that is not a slot;
+// and no allowed child that needs no undescribed content
+// (needsNoUndescribed) still has room and has an identity that no earlier
+// sibling other than node carries while it has room, since the top-up would
+// have taken that child first. A child full now may have had room when the
+// top-up took node, but the room a child has never grows, so one with room
+// now had it then. Where only the list's existence asks for a member, the
+// top-up takes only a child that needs no undescribed content, so it has no
+// last resort. Nor has a list that only its cardinality lower bound
 // requires when every allowed child needs undescribed content: Large and
 // Medium do not visit it (REQ-107 Visit rule), so it gets no top-up
 // (visitedThoughUndescribed). A member built so is not one of node's own,
@@ -606,23 +634,53 @@ func attrRequired(attr *templatecompile.CompiledAttribute) bool {
 // gets a member of its own, so no top-up runs for it, and the parser does
 // not read a slot's occurrences (REQ-107 Known gap: slot occurrences).
 // Reading them would only exempt a node that no top-up builds.
-func topUpLastResort(node *templatecompile.CompiledNode) bool {
+func topUpLastResort(node *templatecompile.CompiledNode, built map[*templatecompile.CompiledNode]int) bool {
 	attr := parentAttribute(node)
-	if attr == nil || attr.Cardinality() != template.Multiple ||
-		(!attr.Required() && !tcimpl.LowerAtLeastOne(attr.ChildMultiplicity())) {
+	if attr == nil || node.IsSlot() || attr.Cardinality() != template.Multiple || !topUpAsks(node.Parent(), attr) {
 		return false
 	}
 	children := allowedChildren(attr)
-	first := slices.IndexFunc(children, func(c *templatecompile.CompiledNode) bool { return !c.IsSlot() })
-	if first < 0 || children[first] != node {
+	at := slices.Index(children, node)
+	if at < 0 {
 		return false
 	}
+	for _, c := range children[:at] {
+		if !c.IsSlot() && censusRoom(c, built[c]) {
+			return false
+		}
+	}
 	for i, c := range children {
-		if needsNoUndescribed(c) && !identityCarriedBefore(children, i) {
+		if needsNoUndescribed(c) && censusRoom(c, built[c]) && !identityHeldBefore(children, i, node, built) {
 			return false
 		}
 	}
 	return visitedThoughUndescribed(attr, children)
+}
+
+// topUpAsks reports whether the top-up of attr, a list of parent, asks for
+// a member beyond the list's existence: the BMM marks it mandatory, its
+// cardinality lower bound is at least 1, or it is a list the RM keeps
+// non-empty once present (rminfo.NonEmptyLists, with no alternative, as
+// the generator's rmNonEmptyList reads it), such as COMPOSITION.content or
+// SECTION.items, whose existence lower bound is at least 1.
+func topUpAsks(parent *templatecompile.CompiledNode, attr *templatecompile.CompiledAttribute) bool {
+	if attr.Required() || tcimpl.LowerAtLeastOne(attr.ChildMultiplicity()) {
+		return true
+	}
+	l, ok := rminfo.NonEmptyListOf(bmmtype.Class(parent.RMTypeName()), attr.Name())
+	return ok && l.Alternative == "" && tcimpl.LowerAtLeastOne(attr.Existence())
+}
+
+// censusRoom reports whether child, an allowed child of a list that n
+// members are bound to, has room for another: it is a slot, whose
+// occurrences the parser does not read, its occurrences state no upper
+// bound, or n is below it (REQ-102 Structural — binding items).
+func censusRoom(child *templatecompile.CompiledNode, n int) bool {
+	if child.IsSlot() {
+		return true
+	}
+	occ := child.Occurrences()
+	return occ == nil || occ.UpperUnbounded() || n < occ.Upper()
 }
 
 // visitedThoughUndescribed reports whether Large and Medium visit attr, a
@@ -646,7 +704,8 @@ func visitedThoughUndescribed(attr *templatecompile.CompiledAttribute, children 
 // needsNoUndescribed reports whether node needs no undescribed content, as
 // § Slot fills defines it: node is not a slot, and no attribute of its own
 // that is required, and that the template does not prohibit, can be given
-// only undescribed members. Such an attribute has no allowed child and an
+// only undescribed members or is one the generator cannot write
+// (unwritableRequired). Such an attribute has no allowed child and an
 // element type that is a LOCATABLE, or allows only slots. The census
 // compiles with the implicit attributes, so node carries every attribute
 // the BMM marks mandatory. A single-valued attribute with an allowed child
@@ -662,6 +721,9 @@ func needsNoUndescribed(node *templatecompile.CompiledNode) bool {
 		if !attrRequired(attr) || attrProhibited(attr) {
 			continue
 		}
+		if unwritableRequired(node, attr) {
+			return false
+		}
 		children := allowedChildren(attr)
 		if len(children) == 0 {
 			if locatableType(attr.RMTypeName()) {
@@ -674,6 +736,48 @@ func needsNoUndescribed(node *templatecompile.CompiledNode) bool {
 		}
 	}
 	return true
+}
+
+// unwritableRequired reports whether attr of node is an attribute the
+// generator has no writer for that the template requires, so the walk would
+// refuse it (REQ-107 Known gap: attributes the generator cannot write): a
+// LOCATABLE's links or feeder_audit, an EHR_ACCESS's settings, or a list
+// whose items the RM types as primitive values other than a DV_MULTIMEDIA's
+// data, which the BMM marks mandatory, whose existence lower bound is at
+// least 1, or which holds a mandatory child (tcimpl.MandatoryListChildren),
+// other than a list that only its existence asks a member of, as the
+// generator's writerNeeded reads it.
+func unwritableRequired(node *templatecompile.CompiledNode, attr *templatecompile.CompiledAttribute) bool {
+	class, name := bmmtype.Class(node.RMTypeName()), attr.Name()
+	isList, _ := rminfo.Default.IsContainer(class, name)
+	noWriter := false
+	switch {
+	case name == "links" || name == "feeder_audit":
+		h, ok := rminfo.Default.(rminfo.Hierarchy)
+		if ok {
+			site, declared := h.DeclaredOn(class, name)
+			noWriter = declared && site == "LOCATABLE"
+		}
+	case name == "settings":
+		noWriter = class == "EHR_ACCESS"
+	case isList && !(class == "DV_MULTIMEDIA" && name == "data"):
+		itemType, ok := rminfo.Default.AttributeRMType(class, name)
+		ar, reports := rminfo.Default.(rminfo.AbsenceReporter)
+		noWriter = ok && itemType != "" && itemType != "Hash" && reports && ar.AbsenceReason(itemType) == rminfo.AbsencePrimitive
+	}
+	if !noWriter {
+		return false
+	}
+	existence := tcimpl.LowerAtLeastOne(attr.Existence())
+	mandatoryChild := false
+	for range tcimpl.MandatoryListChildren(attr) {
+		mandatoryChild = true
+		break
+	}
+	if !attr.Required() && !existence && !mandatoryChild {
+		return false
+	}
+	return !isList || attr.Required() || tcimpl.AsksForMember(attr) || !existence
 }
 
 // attrProhibited reports whether the template prohibits attr, which the
@@ -699,12 +803,15 @@ func locatableType(rmType string) bool {
 	return known && conforms
 }
 
-// identityCarriedBefore reports whether a sibling before children[i], other
-// than a slot, carries its identity: its archetype id when it is an
-// archetype root, its node id otherwise. The validator binds a member to
-// the first child whose archetype id or node id it carries. A child with
-// no identity is never carried.
-func identityCarriedBefore(children []*templatecompile.CompiledNode, i int) bool {
+// identityHeldBefore reports whether a sibling before children[i], other
+// than a slot, carries its identity, its archetype id when it is an
+// archetype root and its node id otherwise, and is lastResort, the child a
+// top-up took, which had room then, or still has room (censusRoom, given
+// built). The validator binds a member to the first child that carries its
+// archetype id or node id and has room, so the generator's top-up passes
+// over a child whose identity such a sibling carries. A child with no
+// identity is never carried.
+func identityHeldBefore(children []*templatecompile.CompiledNode, i int, lastResort *templatecompile.CompiledNode, built map[*templatecompile.CompiledNode]int) bool {
 	id := children[i].ArchetypeID()
 	if id == "" {
 		id = children[i].NodeID()
@@ -713,7 +820,8 @@ func identityCarriedBefore(children []*templatecompile.CompiledNode, i int) bool
 		return false
 	}
 	return slices.ContainsFunc(children[:i], func(sib *templatecompile.CompiledNode) bool {
-		return !sib.IsSlot() && (sib.ArchetypeID() == id || sib.NodeID() == id)
+		return !sib.IsSlot() && (sib.ArchetypeID() == id || sib.NodeID() == id) &&
+			(sib == lastResort || censusRoom(sib, built[sib]))
 	})
 }
 
