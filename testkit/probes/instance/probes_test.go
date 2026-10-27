@@ -34,10 +34,15 @@ func testComposer() *rm.PartyIdentified {
 }
 
 // probe027PassDetail is the Detail of a PROBE-027 pass that generated and
-// validated under every policy the probe promises: Large, Medium and
-// Required.
+// validated under every policy the probe promises (Large, Medium and
+// Required), each with both value fills.
 func probe027PassDetail() string {
-	names := []string{instance.Large.String(), instance.Medium.String(), instance.Required.String()}
+	var names []string
+	for _, p := range []instance.Policy{instance.Large, instance.Medium, instance.Required} {
+		for _, f := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
+			names = append(names, p.String()+"/"+f.String())
+		}
+	}
 	return "validated clean under " + strings.Join(names, ", ")
 }
 
