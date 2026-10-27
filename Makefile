@@ -15,7 +15,7 @@ include make/help.mk
 
 COMPOSE         ?= docker compose
 COMPOSE_PROJECT ?= openehr-sdk-go
-LINT_IMAGE      ?= golangci/golangci-lint:v2.14.0-alpine
+LINT_IMAGE      ?= golangci/golangci-lint:v2.15.0-alpine
 DOCKER_MOUNT    = -v $(CURDIR):/app -w /app
 
 # ANTLR codegen (maintainer-only). The generator is Java, confined to the
@@ -29,7 +29,10 @@ AQL_GEN_DIR     := openehr/aql/parse/gen
 HOST_GO_OK   := $(shell command -v go >/dev/null 2>&1 && go version 2>/dev/null | grep -qE 'go1\.27(\.|$$|[[:space:]])' && echo yes)
 # Official golangci-lint binaries for this pin are built with Go 1.27; a
 # host binary compiled with an older toolchain cannot load a go 1.27.0 module.
-HOST_GLCI_OK := $(shell command -v golangci-lint >/dev/null 2>&1 && golangci-lint version 2>/dev/null | grep -qE 'built with go1\.27' && echo yes)
+# The host binary must also be the pinned version: another release reads
+# .golangci.yml differently, so `make lint` would disagree with CI.
+LINT_VERSION := $(patsubst v%-alpine,%,$(lastword $(subst :, ,$(LINT_IMAGE))))
+HOST_GLCI_OK := $(shell command -v golangci-lint >/dev/null 2>&1 && golangci-lint version 2>/dev/null | grep -qF 'version $(LINT_VERSION) built with go1.27' && echo yes)
 
 DOCKER_RUN = $(COMPOSE) -p $(COMPOSE_PROJECT) --profile dev run --rm --no-deps
 
