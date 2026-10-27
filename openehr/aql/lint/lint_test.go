@@ -922,3 +922,32 @@ func TestLintPathSuffixIsCanonical(t *testing.T) {
 		}
 	}
 }
+
+// TestLintArchetypePredicatedSegmentResolves pins REQ-109 § Layer 3's
+// predicate-aware descent through a segment that names its child by
+// archetype id: every archetype root's node id is at0000, so the descent
+// compares an archetype predicate with the child's archetype id, and an
+// AND-ed name or node id does not hide it; and a predicate that names no
+// child here stops the walk without a warning, as an unknown at-code does.
+// Compare it with the node id, or take the first sibling when no child
+// matches, and the walk lands in the blood pressure OBSERVATION and warns. A
+// path that does diverge below the named child still warns.
+func TestLintArchetypePredicatedSegmentResolves(t *testing.T) {
+	c := mustCompile(t, "vital_signs")
+	const tail = "/data[at0002]/events[at0003]/data[at0001]/item[at0004]/value/magnitude"
+	for _, pred := range []string{
+		"openEHR-EHR-OBSERVATION.body_temperature.v1",
+		"openEHR-EHR-OBSERVATION.body_temperature.v1, 'Body temperature'",
+		"openEHR-EHR-OBSERVATION.body_temperature.v1 and name/value='Body temperature'",
+		"openEHR-EHR-OBSERVATION.not_in_this_template.v1",
+	} {
+		q := "SELECT c/content[" + pred + "]" + tail + " AS t FROM COMPOSITION c[openEHR-EHR-COMPOSITION.encounter.v1]"
+		if r := lint.LintString(q, &lint.Options{Compiled: c}); has(r, "aql_path_not_in_template") {
+			t.Errorf("LintString(%q) = %v, want no aql_path_not_in_template", q, codes(r))
+		}
+	}
+	q := "SELECT c/content[openEHR-EHR-OBSERVATION.body_temperature.v1]/data[at0002]/eventz AS t FROM COMPOSITION c[openEHR-EHR-COMPOSITION.encounter.v1]"
+	if r := lint.LintString(q, &lint.Options{Compiled: c}); !has(r, "aql_path_not_in_template") {
+		t.Errorf("LintString(%q) = %v, want aql_path_not_in_template for the attribute the node lacks", q, codes(r))
+	}
+}
