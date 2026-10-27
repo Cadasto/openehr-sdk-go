@@ -293,6 +293,41 @@ func TestRealUnmarshalJSONLossyLiteral(t *testing.T) {
 	}
 }
 
+// TestRealUnmarshalJSONQuotedDecimalOnly pins the quoted form ADR 0004
+// admits for a Real (REQ-052): a decimal string. The other spellings
+// strconv.ParseFloat reads are refused as a malformed quoted literal, a
+// *strconv.NumError carrying strconv.ErrSyntax and no typereg.ErrInvalidShape,
+// and leave the receiver unchanged; every decimal form still decodes.
+//
+// Can-fail control: hand the quoted text straight to strconv.ParseFloat and
+// the NaN, Inf, hexadecimal and underscore rows decode.
+func TestRealUnmarshalJSONQuotedDecimalOnly(t *testing.T) {
+	for _, in := range []string{"NaN", "Inf", "-Inf", "+Infinity", "0x1p-2", "0x1.8p1", "1_000", "1e", "--5", ".", "1.2.3"} {
+		t.Run(in, func(t *testing.T) {
+			r := Real(80.5)
+			err := r.UnmarshalJSON([]byte(strconv.Quote(in)))
+			if !errors.Is(err, strconv.ErrSyntax) {
+				t.Fatalf("UnmarshalJSON(%q) err = %v, r = %v; want a refusal wrapping strconv.ErrSyntax", in, err, float64(r))
+			}
+			if _, ok := errors.AsType[*strconv.NumError](err); !ok {
+				t.Errorf("err = %v; want errors.AsType[*strconv.NumError] to reach it", err)
+			}
+			if errors.Is(err, typereg.ErrInvalidShape) {
+				t.Errorf("err = %v; a malformed quoted literal must not carry typereg.ErrInvalidShape", err)
+			}
+			if r != 80.5 {
+				t.Errorf("UnmarshalJSON(%q) wrote %v; want the receiver unchanged", in, float64(r))
+			}
+		})
+	}
+	for in, want := range map[string]float64{"72.5": 72.5, "+5": 5, ".5": 0.5, "5.": 5, "007": 7, "-1.5e+2": -150, "2E-1": 0.2} {
+		var r Real
+		if err := r.UnmarshalJSON([]byte(strconv.Quote(in))); err != nil || float64(r) != want {
+			t.Errorf("UnmarshalJSON(%q) = %v, r = %v; want %v", in, err, float64(r), want)
+		}
+	}
+}
+
 // TestRealUnmarshalJSONParseBeforeLossyTest pins the ORDER of the two
 // checks inside UnmarshalJSON: the literal is parsed first, so a
 // malformed or out-of-range value surfaces the parser's own typed error,

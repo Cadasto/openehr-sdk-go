@@ -244,6 +244,36 @@ var errLossyLiteral = errors.New("rm.Real: literal cannot be held in a float64 a
 // only inside its Is method, never while it builds the wrapper here.
 var errLossyShape = typereg.ClassifyShape(errLossyLiteral)
 
+// parseQuotedDecimal parses the content of a quoted Real literal. ADR 0004
+// admits a quoted decimal string only, so it refuses the other spellings
+// strconv.ParseFloat reads (hexadecimal, Inf, Infinity, NaN, and an
+// underscore between digits) with the *strconv.NumError ParseFloat gives a
+// malformed literal; a NaN or an infinity would also fail canjson encode.
+// A decimal string is an optional sign, digits with at most one decimal
+// point, and an optional exponent of an optional sign and digits.
+func parseQuotedDecimal(s string) (float64, error) {
+	mant, exp, hasExp := s, "", false
+	if k := strings.IndexAny(s, "eE"); k >= 0 {
+		mant, exp, hasExp = s[:k], s[k+1:], true
+	}
+	intPart, frac, _ := strings.Cut(trimSign(mant), ".")
+	if (intPart == "" && frac == "") ||
+		(intPart != "" && !isDigits(intPart)) ||
+		(frac != "" && !isDigits(frac)) ||
+		(hasExp && !isDigits(trimSign(exp))) {
+		return 0, &strconv.NumError{Func: "ParseFloat", Num: s, Err: strconv.ErrSyntax}
+	}
+	return strconv.ParseFloat(s, 64)
+}
+
+// trimSign drops one leading sign from s.
+func trimSign(s string) string {
+	if s != "" && (s[0] == '+' || s[0] == '-') {
+		return s[1:]
+	}
+	return s
+}
+
 // UnmarshalJSON accepts a JSON number or a decimal string. A lossy literal,
 // one the float64 it parses to does not give back at the literal's own count
 // of significant digits, fails rather than silently rounding; the error
@@ -288,7 +318,7 @@ func (r *Real) UnmarshalJSON(b []byte) error {
 		if err := json.Unmarshal(b, &s); err != nil {
 			return fmt.Errorf("rm.Real: %w", err)
 		}
-		f, err := strconv.ParseFloat(s, 64)
+		f, err := parseQuotedDecimal(s)
 		if err != nil {
 			// wire.md § REQ-052: the literal appears once, in the
 			// *strconv.NumError cause, and in the entry point's
