@@ -158,7 +158,9 @@ const observationLinksOPT = `<?xml version="1.0"?>
 // mark the declared links required; an OBSERVATION without a uid, whose
 // links are present and empty or absent, still draws nothing at /uid and
 // nothing at /links from Validate, neither a required nor a cardinality, as
-// ValidateRM, which no lookup reaches, draws nothing there.
+// ValidateRM, which no lookup reaches, draws nothing there. The one finding
+// at /links is the RM's own LOCATABLE Links_valid, on links that are present
+// and empty, which ValidateRM and both compiles report alike.
 func TestCompile_WithRMInfo_ShapesTheTemplateNotTheRMRules(t *testing.T) {
 	opt, err := template.ParseOPT(strings.NewReader(observationLinksOPT))
 	if err != nil {
@@ -192,10 +194,11 @@ func TestCompile_WithRMInfo_ShapesTheTemplateNotTheRMRules(t *testing.T) {
 		}
 	}
 	for _, tc := range []struct {
-		name string
-		obs  *rm.Observation
+		name  string
+		obs   *rm.Observation
+		empty bool // links is present and empty, which the RM's Links_valid reports
 	}{
-		{name: "links empty", obs: observation([]rm.Link{})},
+		{name: "links empty", obs: observation([]rm.Link{}), empty: true},
 		{name: "links absent", obs: observation(nil)},
 	} {
 		for _, path := range []string{"/uid", "/links"} {
@@ -204,10 +207,22 @@ func TestCompile_WithRMInfo_ShapesTheTemplateNotTheRMRules(t *testing.T) {
 				"Validate, the default compile":      validation.Validate(tc.obs, def),
 				"Validate, compiled with WithRMInfo": validation.Validate(tc.obs, custom),
 			} {
+				linksValid := 0
 				for _, iss := range r.Issues {
-					if iss.Path == path {
+					switch {
+					case iss.Path != path:
+					case path == "/links" && tc.empty && iss.Code == "rm_invariant" && iss.Layer == validation.LayerRM && iss.Rule == "LOCATABLE.Links_valid":
+						linksValid++
+					default:
 						t.Errorf("%s(OBSERVATION without a uid, %s) reports %s %s %s at %s, want nothing there: the RM leaves it optional", call, tc.name, iss.Code, iss.Layer, iss.Rule, path)
 					}
+				}
+				want := 0
+				if path == "/links" && tc.empty {
+					want = 1
+				}
+				if linksValid != want {
+					t.Errorf("%s(OBSERVATION without a uid, %s) reports LOCATABLE.Links_valid %d times at %s, want %d", call, tc.name, linksValid, path, want)
 				}
 			}
 		}

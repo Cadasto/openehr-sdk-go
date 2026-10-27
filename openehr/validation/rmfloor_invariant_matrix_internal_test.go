@@ -37,6 +37,10 @@ const (
 // value serves every archetype root.
 const archetypeDetailsMember = `"archetype_details":{"_type":"ARCHETYPED","archetype_id":{"_type":"ARCHETYPE_ID","value":"openEHR-EHR-OBSERVATION.x.v1"},"rm_version":"1.1.0"}`
 
+// ehrLinkJSON is a complete LINK to an item in an EHR, the member that keeps
+// LOCATABLE.Links_valid on a `links` that holds it.
+const ehrLinkJSON = `{"_type":"LINK","meaning":{"_type":"DV_TEXT","value":"m"},"type":{"_type":"DV_TEXT","value":"t"},"target":{"_type":"DV_EHR_URI","value":"ehr://example.org/x"}}`
+
 // codePhraseJSON returns a CODE_PHRASE holding code in the terminology id.
 func codePhraseJSON(id, code string) string {
 	return `{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"` + id + `"},"code_string":"` + code + `"}`
@@ -157,6 +161,7 @@ var invariantMatrix = map[string]matrixRow{
 	"DV_DATE.Value_valid":                   {breaking: `"value":"example"`, conforming: `"value":"2024-01-01"`},
 	"DV_DATE_TIME.Value_valid":              {breaking: `"value":"example"`, conforming: `"value":"2024-01-01T10:30:00Z"`},
 	"DV_DURATION.Value_valid":               {breaking: `"value":"example"`, conforming: `"value":"P1D"`},
+	"DV_EHR_URI.Scheme_valid":               {breaking: `"value":"http://example.org/x"`, conforming: `"value":"ehr://example.org/x"`},
 	"DV_INTERVAL.Limits_consistent":         {breaking: `"lower":{"_type":"DV_COUNT","magnitude":5},"upper":{"_type":"DV_COUNT","magnitude":1}`, conforming: `"lower":{"_type":"DV_COUNT","magnitude":5},"upper":{"_type":"DV_COUNT","magnitude":5}`, more: slices.Concat(intervalOrderPairs, intervalComparablePairs)},
 	"DV_PROPORTION.Fraction_validity":       {breaking: `"numerator":1.5,"denominator":2,"type":3`, conforming: `"numerator":1,"denominator":2,"type":3`, more: []matrixPair{{breaking: `"numerator":3,"denominator":2.5,"type":4`, conforming: `"numerator":3,"denominator":2,"type":4`}}},
 	"DV_PROPORTION.Percent_validity":        {breaking: `"numerator":1,"denominator":1,"type":2`, conforming: `"numerator":1,"denominator":100,"type":2`},
@@ -171,10 +176,12 @@ var invariantMatrix = map[string]matrixRow{
 	"ELEMENT.Inv_null_flavour_indicated":    {breaking: ``, conforming: `"value":{"_type":"DV_TEXT","value":"x"}`},
 	"ENTRY.Is_archetype_root":               {breaking: ``, conforming: archetypeDetailsMember},
 	"EVENT_CONTEXT.Participations_validity": {breaking: `"participations":[]`, conforming: `"participations":[{"_type":"PARTICIPATION","function":{"_type":"DV_TEXT","value":"x"},"performer":{"_type":"PARTY_SELF"}}]`},
+	"EVENT_CONTEXT.location_valid":          {breaking: `"location":""`, conforming: `"location":"ward A3"`},
 	"HISTORY.Events_valid":                  {breaking: ``, conforming: `"summary":{"_type":"ITEM_TREE","archetype_node_id":"at0001","name":{"_type":"DV_TEXT","value":"x"}}`, more: historyEventsPairs},
 	"INSTRUCTION.Activities_valid":          {breaking: `"activities":[]`, conforming: `"activities":[{"_type":"ACTIVITY","archetype_node_id":"at0001","name":{"_type":"DV_TEXT","value":"x"}}]`},
 	"Interval.Lower_included_valid":         {breaking: `"lower_unbounded":true,"lower_included":true`, conforming: `"lower_unbounded":true,"lower_included":false`},
 	"Interval.Upper_included_valid":         {breaking: `"upper_unbounded":true,"upper_included":true`, conforming: `"upper_unbounded":true,"upper_included":false`},
+	"LOCATABLE.Links_valid":                 {breaking: `"links":[]`, conforming: `"links":[` + ehrLinkJSON + `]`},
 	"PARTY.Is_archetype_root":               {breaking: ``, conforming: archetypeDetailsMember},
 	"PARTY_IDENTIFIED.Basic_validity":       {breaking: ``, conforming: `"name":"x"`},
 	"PARTY_IDENTIFIED.Identifiers_valid":    {breaking: `"identifiers":[]`, conforming: `"identifiers":[{"_type":"DV_IDENTIFIER","id":"x"}]`},

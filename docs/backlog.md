@@ -7,6 +7,7 @@ harvested_through: 2026-10-26T21:35:21Z
 Leftovers of merged branches: defects the branch that found them did not fix, and suggestions. Each line is a lead, not a finding: verify it before acting. Lines are grouped by theme so one delivery can take a whole group; the sentence under each heading says what such a delivery is. A delivery whose `Files` touch a line's path verifies it, and fixes it or finds it stale; the next `/sdd-triage --backlog` deletes what is settled. `sdd-pr harvest` and `sdd-pr flip --carry` add new lines under `## Unsorted`, defects first; the next `/sdd-triage --backlog` sorts them into a group. The file is kept at about 80 lines ([ai-workflow.md § Review](ai-workflow.md#review)). Edit freely.
 
 ## Unsorted
+- openehr/validation/rmfloor.go:1009 · Calling Scheme() on a decoded LINK target still hits the generated stub's panic "not implemented: DV_URI.scheme" (the allowed panic of bmm-conformance.md:286), though the new uriScheme computes it; make it Scheme()'s hand-written body via bmmgen's manuallyImplemented · by: go-reviewer · from: feat/rm-floor-links-location-scheme
 
 ## Tests: checks that cannot fail, and helpers the tree already has (REQ-107, PROBE-023, PROBE-027, REQ-083)
 Tests and probes in testkit/probes, openehr/instance, openehr/composition, openehr/template/constraints, cmd/examples and cadasto/admin: a check that stays green when its guard goes, a test the Go cache cannot see is stale, and hand-written comparisons wireequiv or the floor already give. Lane: maintenance. Size: S.
@@ -104,7 +105,7 @@ Code in openehr/rm/temporal_funcs.go and its REQ-123 sentences; the floor and th
 
 ## RM floor: the invariants not yet evaluated (REQ-112, REQ-171)
 The ledger is openehr/validation/invariants.json: each entry whose reason starts "Not yet evaluated" is a mechanical rule the floor could evaluate, and each one taken on adds a catalogue bullet, an evaluator and a PROBE-077 row. Lane: full. Size: L.
-- openehr/validation/invariants.json · 56 entries are out_of_scope with the reason 'Not yet evaluated' (DV_AMOUNT rules, DV_MULTIMEDIA Size_valid, the non-empty rules of ACTOR.roles, ENTRY.other_participations, PARTY.contacts and LOCATABLE.links, the change-control coded invariants, VERSION_TREE_ID branch rules and others); each non-empty rule is one listMemberRules line, but each also widens the REQ-102 carve-out (clinical-modeling.md:391), which names six lists · by: sdd-implementer · from: feat/validation-generated-access
+- openehr/validation/invariants.json · 53 entries are out_of_scope with the reason 'Not yet evaluated' (DV_AMOUNT rules, DV_MULTIMEDIA Size_valid, the non-empty rules of ACTOR.roles, ENTRY.other_participations and PARTY.contacts, the change-control coded invariants, VERSION_TREE_ID branch rules and others); each non-empty rule is one listMemberRules line, but each also widens the REQ-102 carve-out (clinical-modeling.md:391), which names six lists · by: sdd-implementer · from: feat/validation-generated-access
 
 ## Generated RM access: boxing and the precision special case (REQ-171)
 A generator change in internal/bmmgen on its own branch, measured with BenchmarkValidateComposition and the composition Set+Build benchmark, and checked against the walk's identity and cycle rules for any value that becomes pointer-shaped. Lane: maintenance. Size: M.

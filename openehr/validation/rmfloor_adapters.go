@@ -58,6 +58,22 @@ func asElement(value any) (rm.Element, bool) {
 	return rm.Element{}, false
 }
 
+// asDVEHRURI recovers a DV_EHR_URI value (by value or by pointer). It is
+// not a DV_URI: only the class whose Scheme_valid invariant fixes the scheme
+// matches.
+func asDVEHRURI(value any) (rm.DVEHRURI, bool) {
+	switch v := value.(type) {
+	case *rm.DVEHRURI:
+		if v == nil {
+			return rm.DVEHRURI{}, false
+		}
+		return *v, true
+	case rm.DVEHRURI:
+		return v, true
+	}
+	return rm.DVEHRURI{}, false
+}
+
 // asPartyIdentified recovers the PARTY_IDENTIFIED attributes (by value or by
 // pointer) from a PARTY_IDENTIFIED, or from a PARTY_RELATED, which inherits
 // them through its embedded PARTY_IDENTIFIED. Returns ok=false for a nil
