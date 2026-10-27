@@ -58,8 +58,8 @@ func StaticAssertion(jwt string) AssertionSource {
 }
 
 // ClaimsTemplate captures the RFC 7523 claim set the SDK signs on the
-// consumer's behalf. Iat/Exp/Jti are populated automatically by
-// ClaimsSigner unless overridden.
+// consumer's behalf. ClaimsSigner sets iat, exp and jti on every assertion
+// it signs.
 type ClaimsTemplate struct {
 	// Issuer is the "iss" claim, typically the client_id of the
 	// confidential client.
@@ -71,7 +71,9 @@ type ClaimsTemplate struct {
 	// Audience is the "aud" claim, typically the token endpoint URL.
 	Audience string
 	// Lifetime is how long the assertion is valid. The signer sets
-	// "iat" to now and "exp" to now+Lifetime. Defaults to 5 minutes.
+	// "iat" to now and "exp" to now+Lifetime. Zero means 5 minutes; a
+	// negative Lifetime, which would sign assertions already expired, is
+	// refused with auth.ErrInvalidConfig.
 	Lifetime time.Duration
 	// Extra carries any additional claims the deployment requires
 	// (e.g. "scope", "act"). Keys collide with iss/sub/aud/iat/exp/jti
@@ -225,8 +227,11 @@ func NewClaimsSigner(template ClaimsTemplate, signer crypto.Signer, opts ...Sign
 	if template.Audience == "" {
 		return nil, fmt.Errorf("%w: ClaimsTemplate.Audience is required", auth.ErrInvalidConfig)
 	}
+	if s.Template.Lifetime < 0 {
+		return nil, errNegativeLifetime(s.Template.Lifetime)
+	}
 	if s.Template.Lifetime == 0 {
-		s.Template.Lifetime = 5 * time.Minute
+		s.Template.Lifetime = defaultLifetime
 	}
 	if _, err := toJoseAlg(s.Algorithm); err != nil {
 		return nil, err
@@ -333,6 +338,14 @@ func (s *ClaimsSigner) Assertion(ctx context.Context) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
+	// A signer built without NewClaimsSigner gets the same lifetime rule.
+	lifetime := s.Template.Lifetime
+	switch {
+	case lifetime < 0:
+		return "", errNegativeLifetime(lifetime)
+	case lifetime == 0:
+		lifetime = defaultLifetime
+	}
 	now := time.Now()
 	jti, err := newJTI(s)
 	if err != nil {
@@ -350,7 +363,7 @@ func (s *ClaimsSigner) Assertion(ctx context.Context) (string, error) {
 	claims["sub"] = sub
 	claims["aud"] = s.Template.Audience
 	claims["iat"] = now.Unix()
-	claims["exp"] = now.Add(s.Template.Lifetime).Unix()
+	claims["exp"] = now.Add(lifetime).Unix()
 	claims["jti"] = jti
 
 	claimsBytes, err := json.Marshal(claims)
@@ -387,6 +400,15 @@ func (s *ClaimsSigner) Assertion(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("JWS compact serialize: %w", err)
 	}
 	return compact, nil
+}
+
+// defaultLifetime is the lifetime of an assertion whose template sets none.
+const defaultLifetime = 5 * time.Minute
+
+// errNegativeLifetime is the refusal of a template whose Lifetime is d,
+// below zero.
+func errNegativeLifetime(d time.Duration) error {
+	return fmt.Errorf("%w: ClaimsTemplate.Lifetime %s is negative, so every assertion would be expired when signed", auth.ErrInvalidConfig, d)
 }
 
 // toJoseAlg maps a JOSE algorithm string to the go-jose constant.
