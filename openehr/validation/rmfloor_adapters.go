@@ -315,12 +315,17 @@ func intervalBounds(value any) (lower, upper rm.DVOrdered, bounded bool) {
 //     one is not ordered and reports nothing here.
 //   - DV_DATE and DV_DURATION: always comparable; ordered by their Compare,
 //     which reads the magnitude of each parsed value ([temporalOrder]).
-//   - DV_TIME and DV_DATE_TIME: always comparable. Two values written with
-//     one time zone designator, or both with none, are ordered by their
-//     Compare ([temporalOrder]). Two values whose designators differ are
-//     ordered as instants, each by its magnitude less its zone's offset from
-//     UTC, partial values and leap seconds included ([instantOrder]). A value
-//     with a zone is not ordered against one without.
+//   - DV_TIME: always comparable. Two values written with one time zone
+//     designator, or both with none, are ordered by their Compare
+//     ([temporalOrder]). Two values whose designators differ are ordered as
+//     instants, each by its magnitude less its zone's offset from UTC,
+//     partial values and leap seconds included ([instantOrder]). A value with
+//     a zone is not ordered against one without.
+//   - DV_DATE_TIME: always comparable; ordered by its Compare
+//     ([temporalOrder]), whose magnitude reads a value with a zone in UTC,
+//     so two zoned values are ordered as instants, partial values and leap
+//     seconds included. A value with a zone is not ordered against one
+//     without.
 //
 // The generated IsStrictlyComparableTo and LessThan of the non-temporal types
 // are not called: they are stubs that panic.
@@ -369,8 +374,8 @@ func orderBounds(lower, upper rm.DVOrdered) (intervalOrder, bool) {
 		return temporalOrder(class, lo.Compare(hi), float64(lo.Magnitude()), float64(hi.Magnitude()), lo.ValidISO8601(), hi.ValidISO8601())
 	case "DV_DATE_TIME":
 		lo, hi := boundAs[rm.DVDateTime](lower), boundAs[rm.DVDateTime](upper)
-		if loZone, hiZone := lo.Timezone(), hi.Timezone(); loZone != hiZone {
-			return instantOrder(class, loZone, hiZone, lo.Magnitude(), hi.Magnitude())
+		if (lo.Timezone() == "") != (hi.Timezone() == "") {
+			return intervalOrder{}, false
 		}
 		return temporalOrder(class, lo.Compare(hi), lo.Magnitude(), hi.Magnitude(), lo.ValidISO8601(), hi.ValidISO8601())
 	case "DV_DURATION":
@@ -413,10 +418,11 @@ func numberOrder[N ~int32 | ~int64 | ~float64](class string, lower, upper N) int
 // it as zero), so a pair that holds one is not ordered. An empty value is
 // reported by the mandatory-presence rule, as `required` at the bound's
 // …/value; any other value the parse refuses, by the bound's own Value_valid.
-// The magnitude of a DV_TIME or a DV_DATE_TIME reads the clock in the value's
-// own time zone, so [orderBounds] sends two of them here only when they are
-// written with one zone designator, or both with none, and sends the others
-// to [instantOrder].
+// The magnitude of a DV_TIME reads the clock in the value's own time zone,
+// so [orderBounds] sends two of them here only when they are written with
+// one zone designator, or both with none, and sends the others to
+// [instantOrder]. The magnitude of a DV_DATE_TIME reads a value with a zone
+// in UTC, so two zoned date-times come here whatever their designators.
 func temporalOrder(class string, sign int, lowerMag, upperMag float64, lowerValid, upperValid bool) (intervalOrder, bool) {
 	if !lowerValid || !upperValid {
 		return intervalOrder{}, false
@@ -424,8 +430,8 @@ func temporalOrder(class string, sign int, lowerMag, upperMag float64, lowerVali
 	return intervalOrder{class: class, inverted: sign > 0, magnitudes: [2]float64{lowerMag, upperMag}}, true
 }
 
-// instantOrder orders two DV_TIME or two DV_DATE_TIME bounds of class whose
-// time zone designators, lowerZone and upperZone, differ. Their magnitudes,
+// instantOrder orders two DV_TIME bounds of class whose time zone
+// designators, lowerZone and upperZone, differ. Their magnitudes,
 // lowerMag and upperMag, read each clock in its own zone, so they are not
 // compared as they stand: each value is ordered by its magnitude less its
 // zone's offset from UTC, which is its clock read in UTC, and those are the
