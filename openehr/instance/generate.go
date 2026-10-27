@@ -232,7 +232,7 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 		// so the walk gets here only on a node it must build.
 		if noWriter(optNode, attr) {
 			return fmt.Errorf("%w: %s.%s at %s (required, but the generator has no writer for it)",
-				ErrConstraintUnsatisfiable, optNode.RMTypeName(), attr.Name(), optNode.AQLPath())
+				ErrConstraintUnsatisfiable, builtRMType(optNode), attr.Name(), optNode.AQLPath())
 		}
 		switch attr.Cardinality() {
 		case template.Single:
@@ -1009,7 +1009,7 @@ func (g *generator) materialiseSingle(
 	}
 	if isList {
 		if err := rmwrite.AppendMultiple(parentRM, attr.Name(), rmChild); err != nil {
-			return fmt.Errorf("append %s.%s: %w", optNode.RMTypeName(), attr.Name(), err)
+			return fmt.Errorf("append %s.%s: %w", builtRMType(optNode), attr.Name(), err)
 		}
 		return nil
 	}
@@ -1017,7 +1017,7 @@ func (g *generator) materialiseSingle(
 		return nil
 	}
 	if err := rmwrite.EnsureSingle(parentRM, attr.Name(), rmChild); err != nil {
-		return fmt.Errorf("attach %s.%s: %w", optNode.RMTypeName(), attr.Name(), err)
+		return fmt.Errorf("attach %s.%s: %w", builtRMType(optNode), attr.Name(), err)
 	}
 	return nil
 }
@@ -1898,7 +1898,7 @@ func (g *generator) materialiseMultiple(
 			return err
 		}
 		if err := rmwrite.AppendMultiple(parentRM, attr.Name(), rmChild); err != nil {
-			return fmt.Errorf("append %s.%s: %w", optNode.RMTypeName(), attr.Name(), err)
+			return fmt.Errorf("append %s.%s: %w", builtRMType(optNode), attr.Name(), err)
 		}
 	}
 	for _, seed := range plan.topUp {
@@ -2064,7 +2064,7 @@ func checkCardinalityRoom(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAtt
 		return nil
 	}
 	return fmt.Errorf("%w: %s.%s at %s: the occurrences lower bounds of its children add up to %d, past its cardinality upper bound %d",
-		ErrConstraintUnsatisfiable, optNode.RMTypeName(), attr.Name(), optNode.AQLPath(), asked, cm.Upper())
+		ErrConstraintUnsatisfiable, builtRMType(optNode), attr.Name(), optNode.AQLPath(), asked, cm.Upper())
 }
 
 // askedMembers returns the number of members children, the allowed children
