@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
 
@@ -55,6 +56,35 @@ func TestREQ056_CodedTextTerminologyDecodesBothShapes(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// TestREQ175_CodedTextTerminologyIDIsNotMissing pins that the canonical XML
+// the SDK writes for a C_CODED_TEXT, whose terminology is the AM 1.4
+// `terminology_id` element, reports no missing member when decoded with
+// canxml.WithMissing (REQ-175, REQ-056).
+func TestREQ175_CodedTextTerminologyIDIsNotMissing(t *testing.T) {
+	in := &aom14.CSingleAttribute{
+		RMAttributeName: "defining_code",
+		Existence:       rm.NewClosedInterval[aom14.Integer](1, 1),
+		Children: []aom14.CObject{&aom14.CCodedText{
+			RMTypeName:  "CODE_PHRASE",
+			Occurrences: rm.NewClosedInterval[aom14.Integer](1, 1),
+			NodeID:      "at0001",
+			Terminology: "local",
+		}},
+	}
+	b, err := canxml.Marshal(in)
+	if err != nil {
+		t.Fatalf("canxml.Marshal: %v", err)
+	}
+	var missing []string
+	var got aom14.CSingleAttribute
+	if err := canxml.Unmarshal(b, &got, canxml.WithMissing(func(p string) { missing = append(missing, p) })); err != nil {
+		t.Fatalf("canxml.Unmarshal(%s) = %v; want nil", b, err)
+	}
+	if len(missing) != 0 {
+		t.Errorf("canxml.Unmarshal(%s) with WithMissing reported %q; want nothing", b, missing)
 	}
 }
 
