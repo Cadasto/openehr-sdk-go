@@ -162,3 +162,73 @@ func TestREQ107_TopUpTakesAChildWithRoom(t *testing.T) {
 		}
 	}
 }
+
+// optRefusedElement is an optional ELEMENT at0001 whose feeder_audit the
+// OPT requires, which the generator has no writer for, so the walk refuses
+// a member of it.
+func optRefusedElement() string {
+	return optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0001", 0, 1,
+		optSingle("value", optNode("DV_TEXT", "")), optSingle("feeder_audit", optNode("FEEDER_AUDIT", "")))
+}
+
+// TestREQ107_TopUpPassesOverAChildTheWalkRefuses is the REQ-107 What a visit
+// writes check of a top-up whose list allows a slot and an optional child
+// the walk refuses a member of: an ELEMENT whose feeder_audit the template
+// requires, which the generator has no writer for, or an ADMIN_ENTRY the
+// template defines inline with no archetype id. The top-up passes over that
+// child and fills the slot, whether the slot comes before or after it, so
+// Generate returns a root that holds the slot's fill and passes the
+// template validator and the RM floor, under every policy, both value fills
+// and both compile modes.
+func TestREQ107_TopUpPassesOverAChildTheWalkRefuses(t *testing.T) {
+	cases := []struct {
+		name string
+		opt  string
+		// want is the archetype_node_id of the list's one member.
+		want string
+	}{
+		{
+			name: "a slot after an ELEMENT with a required feeder_audit",
+			opt:  optTemplate("CLUSTER", optCardinal("items", 1, -1, optRefusedElement(), optSlot("ELEMENT", "at0002"))),
+			want: "openEHR-EHR-ELEMENT.example.v1",
+		},
+		{
+			name: "a slot before an ELEMENT with a required feeder_audit",
+			opt:  optTemplate("CLUSTER", optCardinal("items", 1, -1, optSlot("ELEMENT", "at0002"), optRefusedElement())),
+			want: "openEHR-EHR-ELEMENT.example.v1",
+		},
+		{
+			name: "a slot after an inline ADMIN_ENTRY",
+			opt:  optTemplate("SECTION", optMultiple("items", optInlineAdminEntry(0), optSlot("OBSERVATION", "at0003"))),
+			want: "openEHR-EHR-OBSERVATION.example.v1",
+		},
+	}
+	for _, tc := range cases {
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, tc.opt, implicit)
+			for _, opts := range defaultsOptions() {
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, opts)
+					if err != nil {
+						t.Fatalf("Generate: %v", err)
+					}
+					var ids []string
+					switch v := out.(type) {
+					case *rm.Cluster:
+						for _, item := range v.Items {
+							ids = append(ids, nodeID(item))
+						}
+					case *rm.Section:
+						for _, item := range v.Items {
+							ids = append(ids, nodeID(item))
+						}
+					}
+					if want := []string{tc.want}; !slices.Equal(ids, want) {
+						t.Errorf("list members = %q, want %q", ids, want)
+					}
+					checkValid(t, out, c)
+				})
+			}
+		}
+	}
+}
