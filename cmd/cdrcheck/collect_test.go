@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
@@ -90,6 +91,49 @@ func TestRenamedOPT_RenamesTheTemplateIDOnly_REQ082(t *testing.T) {
 	}
 	if got, want := bytes.Count(b, []byte(">"+testTemplate+"<")), bytes.Count(raw, []byte(">"+testTemplate+"<"))-1; got != want {
 		t.Errorf("renamed OPT holds the old id %d times, want %d", got, want)
+	}
+}
+
+func TestRenamedTemplate_SignsTheBytesItWrites_REQ082(t *testing.T) {
+	t.Parallel()
+	raw, err := os.ReadFile(vendoredOPT())
+	if err != nil {
+		t.Fatal(err)
+	}
+	// An OPT that holds the credential text is written redacted.
+	opt := filepath.Join(t.TempDir(), "in.opt")
+	if err := os.WriteFile(opt, bytes.Replace(raw, []byte("<concept>Minimal evaluation</concept>"), []byte("<concept>op:s3cr3t</concept>"), 1), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tpl := templateRecord{TemplateID: testTemplate, File: opt, Kept: true}
+	r := &runner{s: &sink{dir: t.TempDir(), red: newRedactor([]cdrTarget{{name: "x", user: "op", pass: "s3cr3t"}})}, templates: []templateRecord{tpl}}
+	nt, err := r.renamedTemplate(tpl)
+	if err != nil {
+		t.Fatalf("renamedTemplate = %v", err)
+	}
+	written, err := os.ReadFile(nt.File)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(written, []byte("s3cr3t")) {
+		t.Fatalf("the renamed OPT holds the credential; want it written redacted")
+	}
+	if want := signatureOf(written); nt.Signature != want {
+		t.Errorf("renamed template signature = %s, want %s, the signature of the file the upload reads", nt.Signature, want)
+	}
+}
+
+func TestRenamedTemplate_RefusesAnIDAnotherTemplateHas_REQ082(t *testing.T) {
+	t.Parallel()
+	newID := testTemplate + renameSuffix
+	tpl := templateRecord{TemplateID: testTemplate, File: vendoredOPT(), Kept: true}
+	out := t.TempDir()
+	r := &runner{s: &sink{dir: out}, templates: []templateRecord{tpl, {TemplateID: newID, File: "other.opt", Kept: true}}}
+	if nt, err := r.renamedTemplate(tpl); err == nil || !strings.Contains(err.Error(), "another template") {
+		t.Fatalf("renamedTemplate with %s taken = %+v, %v, want a refusal naming another template", newID, nt, err)
+	}
+	if entries, _ := os.ReadDir(out); len(entries) != 0 {
+		t.Errorf("renamedTemplate wrote %d entries, want none for a refused rename", len(entries))
 	}
 }
 

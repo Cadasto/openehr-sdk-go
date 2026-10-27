@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -50,6 +51,10 @@ func TestRedactor_FindsTheCredentialInEveryForm_REQ082(t *testing.T) {
 		{name: `\n in the password, spelt out`, user: "op", pass: `p\nw`, text: `url http://op:p\nw@host/`, want: "url http://" + redacted + "@host/"},
 		{name: `\n in the password, JSON-escaped`, user: "op", pass: `p\nw`, text: `{"message":"op:p\\nw"}`, want: `{"message":"` + redacted + `"}`},
 		{name: "the credential right after a backslash", user: "tom", pass: "s3cr3t", text: `C:\tom:s3cr3t`, want: `C:\` + redacted},
+		// A URL's userinfo carries the pair percent-encoded, and a server
+		// may write the hex digits in either case.
+		{name: "user:pass percent-encoded in a URL", user: "op", pass: "p@ss", text: "url http://op:p%40ss@host/", want: "url http://" + redacted + "@host/"},
+		{name: "user:pass percent-encoded, lower-case hex", user: "op", pass: "p/s", text: "url http://op:p%2fs@host/", want: "url http://" + redacted + "@host/"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -211,6 +216,33 @@ func TestPrepareOut_DefaultIsANewDirectoryPerRun_REQ082(t *testing.T) {
 			t.Errorf("prepareOut(default) = %s, want a new directory under %s", dir, root)
 		}
 		seen[dir] = true
+	}
+}
+
+func TestExecute_ARefusedCDRClientClaimsNoDirectory_REQ082(t *testing.T) {
+	t.Parallel()
+	// loadConfig refuses a CDR with no base URL; execute's own check is
+	// newCDRClient's, whose catalog requires an issuer.
+	cases := []struct {
+		name string
+		cfg  func(dir string) config
+	}{
+		{name: "a named directory", cfg: func(dir string) config { return config{out: filepath.Join(dir, "out")} }},
+		{name: "the default directory", cfg: func(dir string) config { return config{outRoot: filepath.Join(dir, "out")} }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			cfg := tc.cfg(dir)
+			cfg.cdrs = []cdrTarget{{name: "x"}}
+			if err := execute(t.Context(), cfg, io.Discard); err == nil {
+				t.Fatal("execute with a CDR newCDRClient refuses = nil, want its error")
+			}
+			if entries, _ := os.ReadDir(dir); len(entries) != 0 {
+				t.Errorf("execute left %s holding %d entries, want none: no output directory is claimed", dir, len(entries))
+			}
+		})
 	}
 }
 

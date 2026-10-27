@@ -80,14 +80,25 @@ type runner struct {
 // interrupted or on an error, it then writes the summary of the records it
 // made, marked partial when it stopped early, and returns why it stopped.
 func execute(ctx context.Context, cfg config, stdout io.Writer) error {
+	// The clients are built before the output directory is claimed, so a
+	// CDR they refuse leaves no directory behind.
+	red := newRedactor(cfg.cdrs)
+	var clients []*cdrClient
+	for _, t := range cfg.cdrs {
+		c, err := newCDRClient(t, cfg.workers, red)
+		if err != nil {
+			return err
+		}
+		clients = append(clients, c)
+	}
 	dir, err := prepareOut(cfg)
 	if err != nil {
 		return err
 	}
 	ctx, stop := context.WithCancelCause(ctx)
 	defer stop(nil)
-	s := &sink{dir: dir, red: newRedactor(cfg.cdrs), log: stdout}
-	r := &runner{s: s, ids: newRunIDs(), workers: cfg.workers}
+	s := &sink{dir: dir, red: red, log: stdout}
+	r := &runner{s: s, clients: clients, ids: newRunIDs(), workers: cfg.workers}
 	info := runInfo{
 		Started:   time.Now().UTC().Format(time.RFC3339),
 		RunID:     r.ids.id(),
@@ -112,11 +123,6 @@ func execute(ctx context.Context, cfg config, stdout io.Writer) error {
 	s.logf("cdrcheck: output in %s, run %s", dir, info.RunID)
 
 	for _, t := range cfg.cdrs {
-		c, err := newCDRClient(t, cfg.workers, s.red)
-		if err != nil {
-			return err
-		}
-		r.clients = append(r.clients, c)
 		info.CDRs = append(info.CDRs, cdrRef{Name: t.name, Base: t.base})
 	}
 	// The run identifier is on disk before the first request, so every EHR
@@ -412,17 +418,26 @@ func (r *runner) uploadTemplate(ctx context.Context, t templateRecord) (*templat
 }
 
 // renamedTemplate writes t's OPT under its id plus renameSuffix to the
-// output directory and returns its record.
+// output directory and returns its record. It refuses an id another OPT of
+// the run already has.
 func (r *runner) renamedTemplate(t templateRecord) (templateRecord, error) {
+	newID := t.TemplateID + renameSuffix
+	for _, o := range r.templates {
+		if o.TemplateID == newID {
+			return templateRecord{}, fmt.Errorf("rename %s: %s is the id of another template (%s); remove one of them", t.TemplateID, newID, o.File)
+		}
+	}
 	raw, err := os.ReadFile(t.File)
 	if err != nil {
 		return templateRecord{}, fmt.Errorf("read OPT: %w", err)
 	}
-	newID := t.TemplateID + renameSuffix
 	b, err := renamedOPT(raw, newID)
 	if err != nil {
 		return templateRecord{}, fmt.Errorf("rename %s: %w", t.TemplateID, err)
 	}
+	// The sink redacts what it writes, and the uploads and the generator
+	// read the written file: the signature is of those bytes.
+	b = r.s.red.bytes(b)
 	rel, err := r.s.writeFile(path.Join("opts", fileName(newID)+".opt"), b)
 	if err != nil {
 		return templateRecord{}, err
