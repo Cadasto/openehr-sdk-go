@@ -2501,7 +2501,7 @@ requirements:
     title: Missing members on decode
     canonical: docs/specifications/wire.md#req-175--missing-members-on-decode
     status: draft
-    implementation: planned
+    implementation: landed
     packages: [openehr/serialize/canjson, openehr/serialize/canxml, internal/rmjsonwalk, openehr/internal/xmlunmatched, internal/bmmgen, openehr/rm, openehr/aom/aom14, openehr/validation]
     probes: [PROBE-110, PROBE-081]
     tests:
