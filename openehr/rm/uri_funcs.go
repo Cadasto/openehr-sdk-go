@@ -4,9 +4,10 @@ package rm
 //
 // Hand-written bodies for DV_URI's scheme, path, query and fragment_id,
 // whose generated stubs are suppressed (manual_impl.go). DV_EHR_URI embeds
-// DV_URI, so it answers them too. The validation floor's DV_EHR_URI
-// Scheme_valid rule reads Scheme, so the floor and these functions agree on
-// what a scheme is. See docs/specifications/rm-functions.md § REQ-120.
+// DV_URI and answers them through nil-safe methods of its own. The
+// validation floor's DV_EHR_URI Scheme_valid rule reads Scheme, so the floor
+// and these functions agree on what a scheme is. See
+// docs/specifications/rm-functions.md § REQ-120.
 
 import "strings"
 
@@ -36,9 +37,31 @@ func (d *DVURI) Query() string { return d.parts().query }
 // receiver and for a reference with no fragment or an empty one.
 func (d *DVURI) FragmentID() string { return d.parts().fragment }
 
-// The four functions above answer "" for a nil *DVURI. A DVEHRURI embeds its
-// DVURI by value, so calling them through a nil *DVEHRURI reads the embedded
-// field and panics like any nil pointer dereference.
+// Scheme returns the scheme of the URI reference in Value, as
+// [DVURI.Scheme] does, and "" for a nil receiver.
+func (d *DVEHRURI) Scheme() string { return d.uri().Scheme() }
+
+// Path returns the path of the URI reference in Value, as [DVURI.Path]
+// does, and "" for a nil receiver.
+func (d *DVEHRURI) Path() string { return d.uri().Path() }
+
+// Query returns the query of the URI reference in Value, as [DVURI.Query]
+// does, and "" for a nil receiver.
+func (d *DVEHRURI) Query() string { return d.uri().Query() }
+
+// FragmentID returns the fragment of the URI reference in Value, as
+// [DVURI.FragmentID] does, and "" for a nil receiver.
+func (d *DVEHRURI) FragmentID() string { return d.uri().FragmentID() }
+
+// uri returns the DVURI that d embeds, or nil for a nil d. The methods
+// DVEHRURI would otherwise take from its embedded DVURI read that field, so
+// a nil *DVEHRURI would panic before reaching DVURI's own nil check.
+func (d *DVEHRURI) uri() *DVURI {
+	if d == nil {
+		return nil
+	}
+	return &d.DVURI
+}
 
 // uriParts holds the components of a URI reference that DV_URI exposes. Each
 // is the text as written, with no percent-decoding, so a plain-text URI,

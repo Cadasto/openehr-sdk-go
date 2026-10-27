@@ -101,19 +101,26 @@ func TestREQ120_DVURIComponents(t *testing.T) {
 	}
 }
 
-// TestREQ120_DVURINilReceiver is the REQ-120 check that DV_URI's functions
-// answer a nil receiver with the empty string rather than a panic.
+// TestREQ120_DVURINilReceiver is the REQ-120 check that DV_URI's functions,
+// and DV_EHR_URI's that it inherits, answer a nil receiver with the empty
+// string rather than a panic. A typed-nil DV_EHR_URI can sit in a DATA_VALUE
+// slot such as ELEMENT.value.
 func TestREQ120_DVURINilReceiver(t *testing.T) {
 	t.Parallel()
 	var u *rm.DVURI
-	for _, c := range []struct{ fn, got string }{
-		{"Scheme", u.Scheme()},
-		{"Path", u.Path()},
-		{"Query", u.Query()},
-		{"FragmentID", u.FragmentID()},
+	var e *rm.DVEHRURI
+	for _, c := range []struct{ kind, fn, got string }{
+		{"DVURI", "Scheme", u.Scheme()},
+		{"DVURI", "Path", u.Path()},
+		{"DVURI", "Query", u.Query()},
+		{"DVURI", "FragmentID", u.FragmentID()},
+		{"DVEHRURI", "Scheme", e.Scheme()},
+		{"DVEHRURI", "Path", e.Path()},
+		{"DVEHRURI", "Query", e.Query()},
+		{"DVEHRURI", "FragmentID", e.FragmentID()},
 	} {
 		if c.got != "" {
-			t.Errorf("(*DVURI)(nil).%s() = %q, want \"\"", c.fn, c.got)
+			t.Errorf("(*%s)(nil).%s() = %q, want \"\"", c.kind, c.fn, c.got)
 		}
 	}
 }
