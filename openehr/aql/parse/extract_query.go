@@ -974,7 +974,11 @@ func standingComparison(sp gen.IStandardPredicateContext) *aql.Comparison {
 // pathPredicateOperandValue lifts a standing-predicate RHS operand into an
 // [aql.Value] — a primitive literal or a $parameter. A path-valued operand
 // (objectPath) or a node code (ID_CODE / AT_CODE) is not a scalar value and
-// returns nil, leaving [ClassExpr.PredicateComparison] nil.
+// returns nil, leaving [ClassExpr.PredicateComparison] nil. The one object
+// path that is a value is the bare keyword `true`, `false` or `null`: the SDK
+// lexer reads those as IDENTIFIER, so a boolean operand arrives as a
+// one-part path, and it is read as the literal, as [astExtractor.terminalAsValue]
+// reads it in a comparison ([keywordLiteralValue]).
 func pathPredicateOperandValue(c gen.IPathPredicateOperandContext) aql.Value {
 	if c == nil {
 		return nil
@@ -984,6 +988,13 @@ func pathPredicateOperandValue(c gen.IPathPredicateOperandContext) aql.Value {
 	}
 	if t := c.PARAMETER(); t != nil {
 		return aql.ParamValue{Name: strings.TrimPrefix(t.GetText(), "$")}
+	}
+	if op := c.ObjectPath(); op != nil {
+		if parts := op.AllPathPart(); len(parts) == 1 && parts[0].PathPredicate() == nil && parts[0].IDENTIFIER() != nil {
+			if v, ok := keywordLiteralValue(parts[0].IDENTIFIER().GetText()); ok {
+				return v
+			}
+		}
 	}
 	return nil
 }
