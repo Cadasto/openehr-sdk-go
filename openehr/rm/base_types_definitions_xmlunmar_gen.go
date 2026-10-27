@@ -14,6 +14,11 @@ import (
 
 // BMM package: org.openehr.base.base_types.definitions — canonical-XML UnmarshalXML companions
 
+// xmlClassBasicDefinitions describes BASIC_DEFINITIONS to the canonical-XML decode runtime.
+var xmlClassBasicDefinitions = xmlunmatched.Class{
+	Name: "BASIC_DEFINITIONS",
+}
+
 // UnmarshalXML decodes canonical openEHR XML into BasicDefinitions.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -24,7 +29,7 @@ import (
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (b *BasicDefinitions) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassBasicDefinitions); _err != nil {
 		return _err
 	}
 	for {
@@ -50,6 +55,11 @@ func (b *BasicDefinitions) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 	}
 }
 
+// xmlClassOpenehrDefinitions describes OPENEHR_DEFINITIONS to the canonical-XML decode runtime.
+var xmlClassOpenehrDefinitions = xmlunmatched.Class{
+	Name: "OPENEHR_DEFINITIONS",
+}
+
 // UnmarshalXML decodes canonical openEHR XML into OpenehrDefinitions.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -60,7 +70,7 @@ func (b *BasicDefinitions) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (o *OpenehrDefinitions) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassOpenehrDefinitions); _err != nil {
 		return _err
 	}
 	for {

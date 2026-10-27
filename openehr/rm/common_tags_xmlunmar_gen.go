@@ -14,6 +14,12 @@ import (
 
 // BMM package: org.openehr.rm.common.tags — canonical-XML UnmarshalXML companions
 
+// xmlClassItemTag describes ITEM_TAG to the canonical-XML decode runtime.
+var xmlClassItemTag = xmlunmatched.Class{
+	Name:     "ITEM_TAG",
+	Required: []string{"key", "target", "owner_id"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into ItemTag.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -24,7 +30,7 @@ import (
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (i *ItemTag) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassItemTag); _err != nil {
 		return _err
 	}
 	for {

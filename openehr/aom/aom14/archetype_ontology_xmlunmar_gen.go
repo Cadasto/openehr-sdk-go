@@ -14,6 +14,13 @@ import (
 
 // BMM package: org.openehr.am.aom14.archetype.ontology — canonical-XML UnmarshalXML companions
 
+// xmlClassArchetypeOntology describes ARCHETYPE_ONTOLOGY to the canonical-XML decode runtime.
+var xmlClassArchetypeOntology = xmlunmatched.Class{
+	Name:     "ARCHETYPE_ONTOLOGY",
+	Required: []string{"term_codes", "constraint_codes", "parent_archetype", "specialisation_depth", "term_attribute_names"},
+	Items:    []string{"term_codes", "constraint_codes", "terminologies_available", "term_attribute_names"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into ArchetypeOntology.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -24,7 +31,7 @@ import (
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *ArchetypeOntology) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassArchetypeOntology); _err != nil {
 		return _err
 	}
 	for {
@@ -82,6 +89,12 @@ func (a *ArchetypeOntology) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 	}
 }
 
+// xmlClassArchetypeTerm describes ARCHETYPE_TERM to the canonical-XML decode runtime.
+var xmlClassArchetypeTerm = xmlunmatched.Class{
+	Name:     "ARCHETYPE_TERM",
+	Required: []string{"code"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into ArchetypeTerm.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -92,7 +105,7 @@ func (a *ArchetypeOntology) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *ArchetypeTerm) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassArchetypeTerm); _err != nil {
 		return _err
 	}
 	for {

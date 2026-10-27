@@ -1,9 +1,10 @@
 package validation_test
 
-// rmfloor_bytes_test.go: PROBE-081 — REQ-112. The
-// presence-aware EHR_STATUS floor entry must flag an omitted (value-typed)
-// mandatory `subject` from JSON-key presence, without false-positiving on
-// a valid bare PARTY_SELF and without regressing the interface-typed
+// rmfloor_bytes_test.go: PROBE-081, REQ-112 § Value-typed mandatory
+// presence. The EHR_STATUS entry, ValidateJSON with no template under its
+// deprecated name, must flag an omitted (value-typed) mandatory `subject`
+// from the decode's report of missing members, without false-positiving on a
+// valid bare PARTY_SELF and without regressing the interface-typed
 // mandatories the value-based floor already catches.
 
 import (
@@ -298,11 +299,11 @@ func findingsOf(r validation.Result) []string {
 //     null and empty the same way, since they decode to one zero value: an
 //     empty archetype_id is `required` at archetype_id/value, an empty
 //     rm_version is `rm_version_valid`;
-//   - the Bytes entry also sees the JSON keys of the root's archetype_details,
-//     so an absent or null archetype_id or rm_version key is `required` at the
-//     attribute path. That finding replaces the value walk's finding at the
-//     same path (rm_version), and sits beside the deeper one it does not share
-//     a path with (archetype_id/value). One finding per path.
+//   - the Bytes entry reads the decode's report of missing members, so an
+//     absent or null archetype_id or rm_version is `required` at the
+//     attribute's own path, and nothing is reported below it: an absent
+//     rm_version is not `rm_version_valid`, and an absent archetype_id draws
+//     nothing at archetype_id/value. One finding per member.
 func TestValidateRMEHRStatus_ArchetypeDetails(t *testing.T) {
 	const (
 		detailsPath = "/archetype_details"
@@ -332,7 +333,7 @@ func TestValidateRMEHRStatus_ArchetypeDetails(t *testing.T) {
 			name:      "ARCHETYPED with no attributes",
 			details:   `{"_type": "ARCHETYPED"}`,
 			wantValue: []string{"required " + idValuePath, "rm_version_valid " + versionPath},
-			wantBytes: []string{"required " + idPath, "required " + idValuePath, "required " + versionPath},
+			wantBytes: []string{"required " + idPath, "required " + versionPath},
 		},
 		{
 			name:      "archetype_id value empty",
@@ -344,13 +345,13 @@ func TestValidateRMEHRStatus_ArchetypeDetails(t *testing.T) {
 			name:      "archetype_id absent",
 			details:   `{"_type": "ARCHETYPED", "rm_version": "1.1.0"}`,
 			wantValue: []string{"required " + idValuePath},
-			wantBytes: []string{"required " + idPath, "required " + idValuePath},
+			wantBytes: []string{"required " + idPath},
 		},
 		{
 			name:      "archetype_id null",
 			details:   `{"_type": "ARCHETYPED", "archetype_id": null, "rm_version": "1.1.0"}`,
 			wantValue: []string{"required " + idValuePath},
-			wantBytes: []string{"required " + idPath, "required " + idValuePath},
+			wantBytes: []string{"required " + idPath},
 		},
 		{
 			name:      "rm_version absent",
@@ -410,13 +411,14 @@ func TestValidateRMEHRStatus_ArchetypeDetails(t *testing.T) {
 	}
 }
 
-// TestValidateRMEHRStatusBytes_ArchetypeKeysRootOnly pins the scope of the
-// Bytes entry's ARCHETYPED key presence (REQ-112): it reads the root
-// EHR_STATUS's archetype_details only, as it does subject. An ARCHETYPED lower
-// down, here under other_details, gets the value walk's findings alone: its
-// absent rm_version is `rm_version_valid`, not `required`, and its absent
-// archetype_id adds no finding at archetype_id itself.
-func TestValidateRMEHRStatusBytes_ArchetypeKeysRootOnly(t *testing.T) {
+// TestValidateRMEHRStatusBytes_ArchetypeKeysAtEveryLevel pins the scope of
+// the Bytes entry's ARCHETYPED presence (REQ-112 § Value-typed mandatory
+// presence: presence is read at every level, the root no exception). An
+// ARCHETYPED lower down, here under other_details, is read as the root's is:
+// its absent archetype_id and rm_version are each `required` at their own
+// path, with nothing at archetype_id/value and no `rm_version_valid`, where
+// the value walk alone reports those two instead.
+func TestValidateRMEHRStatusBytes_ArchetypeKeysAtEveryLevel(t *testing.T) {
 	data := ehrStatusWithArchetypeDetails(completeArchetypeDetails)
 	nested := `"other_details": {"_type": "ITEM_TREE", "name": {"_type": "DV_TEXT", "value": "tree"},
 		"archetype_node_id": "openEHR-EHR-ITEM_TREE.status.v1",
@@ -425,11 +427,22 @@ func TestValidateRMEHRStatusBytes_ArchetypeKeysRootOnly(t *testing.T) {
 	data = []byte(strings.Replace(string(data), `"is_queryable"`, nested, 1))
 
 	want := []string{
-		"required /other_details/archetype_details/archetype_id/value",
-		"rm_version_valid /other_details/archetype_details/rm_version",
+		"required /other_details/archetype_details/archetype_id",
+		"required /other_details/archetype_details/rm_version",
 	}
 	if got := findingsOf(validation.ValidateRMEHRStatusBytes(data)); !slices.Equal(got, want) {
 		t.Errorf("ValidateRMEHRStatusBytes(nested ARCHETYPED with no attributes) findings = %q, want %q", got, want)
+	}
+	var status rm.EHRStatus
+	if err := canjson.Unmarshal(data, &status); err != nil {
+		t.Fatalf("canjson.Unmarshal: %v", err)
+	}
+	wantValue := []string{
+		"required /other_details/archetype_details/archetype_id/value",
+		"rm_version_valid /other_details/archetype_details/rm_version",
+	}
+	if got := findingsOf(validation.ValidateRMEHRStatus(&status)); !slices.Equal(got, wantValue) {
+		t.Errorf("ValidateRMEHRStatus(decoded nested ARCHETYPED with no attributes) findings = %q, want %q: the value alone cannot say what the document left out", got, wantValue)
 	}
 }
 

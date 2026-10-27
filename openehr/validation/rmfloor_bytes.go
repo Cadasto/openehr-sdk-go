@@ -1,196 +1,173 @@
 package validation
 
-// rmfloor_bytes.go: PROBE-081 — REQ-112 — the presence-aware EHR_STATUS
-// entry to the template-less RM floor. It closes the value-typed
-// mandatory-attribute blind spot that the value-based [ValidateRMEHRStatus]
-// structurally cannot, at the root EHR_STATUS:
+// rmfloor_bytes.go: REQ-112 § Value-typed mandatory presence, PROBE-081,
+// PROBE-110: the entries that decode a canonical-JSON or canonical-XML
+// document into an RM value and validate it with the decode's report of the
+// members the document leaves out (wire.md § REQ-175, ADR 0033), in one call.
+// A member held by value, a number, a boolean or a value struct such as
+// EHR_STATUS.subject (rm.PartySelf, whose only field is optional), decodes to
+// its zero value whether the document left it out or gave that value, so the
+// value-based floor cannot see it missing; the report can, at every level of
+// any root. A value built in Go has no report and still cannot say.
 //
-//   - EHR_STATUS.subject is typed rm.PartySelf — a value struct whose only
-//     field (external_ref) is optional — so an omitted subject and a valid
-//     bare PARTY_SELF decode to the *identical* Go zero value;
-//   - the root's ARCHETYPED archetype_id (rm.ArchetypeID) and rm_version
-//     (a string) are value-typed too, so an omitted one decodes to the same
-//     zero value as an empty one.
-//
-// Presence therefore cannot be read from the decoded value; only the
-// presence of the key in the source JSON carries it.
+// The package's own files do not import openehr/serialize (REQ-013), so each
+// entry runs the codec's default decode by the codec's own route:
+// encoding/json/v2 with typereg's hooks drives the generated JSON methods as
+// canjson.Unmarshal does, and xmlunmatched decodes the XML document as
+// canxml.Unmarshal does. The report comes from internal/rmjsonwalk and from
+// the xmlunmatched tracker, which serve the codecs' WithMissing options.
+// ValidateRMEHRStatusBytes, the entry written for the EHR_STATUS root where
+// the blind spot was found first, is kept as ValidateJSON with no template,
+// and deprecated.
 
 import (
-	"bytes"
 	"encoding/json/jsontext"
 	json "encoding/json/v2"
 
+	"github.com/cadasto/openehr-sdk-go/internal/rmjsonwalk"
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
+// ValidateJSON decodes data, one canonical-JSON document, into root and
+// validates root with the members the document leaves out, as a [Validator]
+// built with no options does ([Validator.ValidateJSON]).
+func ValidateJSON(data []byte, root any, c *templatecompile.Compiled) Result {
+	var v Validator
+	return v.ValidateJSON(data, root, c)
+}
+
+// ValidateJSON decodes data, one canonical-JSON document, into root, a
+// non-nil pointer to a Reference Model value the SDK registers, and
+// validates root in one call. It returns what v.Validate(root, c,
+// WithMissing(pointers)) returns, where pointers are the members the
+// Reference Model makes mandatory that the document leaves out or sends as
+// null, as the canonical-JSON codec's WithMissing option reports them: with
+// a nil c the Reference Model rules alone, with a compiled template the
+// template rules too. Each such member is reported as missing at its path,
+// so an omitted EHR_STATUS subject or DV_QUANTITY magnitude is `required`
+// there, which the decoded value alone cannot show.
+//
+// The decode is the codec's default: members the Reference Model does not
+// name are ignored, a member name given twice is refused, and root holds the
+// decoded value afterwards, so a caller that needs the value and the result
+// decodes once.
+//
+// Input that does not decode into root, malformed JSON or a document whose
+// root is not a JSON object, is one `invalid_shape` issue at "/" and a
+// not-OK [Result]. The decode error, whose text may quote the input, is in
+// the issue's Value and not in its Detail; JSON null raises no decode error,
+// so its issue's Value is empty. A nil root is `nil_root`, and a root that
+// is no registered Reference Model value `rm_type_unknown` at "/", as
+// [ValidateRM] reports them; data is not read then.
+func (v *Validator) ValidateJSON(data []byte, root any, c *templatecompile.Compiled) Result {
+	const entry = "ValidateJSON"
+	if _, guard, ok := rmRootGuard(entry, root); !ok {
+		return guard
+	}
+	missing, err := decodeJSONReporting(data, root)
+	if err != nil || jsontext.Value(data).Kind() != '{' {
+		return decodeFailure(entry, err)
+	}
+	return v.Validate(root, c, WithMissing(missing))
+}
+
+// decodeJSONReporting decodes data into root as canjson.Unmarshal does, then
+// walks data against the Reference Model, as canjson's WithMissing option
+// does, and returns the pointer of every missing member, or the first error
+// of the two. A root whose Go type gives the walk no RM value to start from
+// is not walked.
+func decodeJSONReporting(data []byte, root any) ([]string, error) {
+	if err := typereg.ClassifyDuplicate(json.Unmarshal(data, root, typereg.Unmarshalers())); err != nil {
+		return nil, err
+	}
+	model, err := rmjsonwalk.Default()
+	if err != nil {
+		return nil, err
+	}
+	start, ok := model.RootOf(root)
+	if !ok {
+		return nil, nil
+	}
+	var missing []string
+	err = model.Walk(data, start, rmjsonwalk.Hooks{Missing: func(pointer string) error {
+		missing = append(missing, pointer)
+		return nil
+	}})
+	return missing, err
+}
+
+// ValidateXML decodes data, one canonical-XML document, into root and
+// validates root with the members the document leaves out, as a [Validator]
+// built with no options does ([Validator.ValidateXML]).
+func ValidateXML(data []byte, root any, c *templatecompile.Compiled) Result {
+	var v Validator
+	return v.ValidateXML(data, root, c)
+}
+
+// ValidateXML decodes data, one canonical-XML document, into root, a
+// non-nil pointer to a Reference Model value the SDK registers, and
+// validates root in one call, as [Validator.ValidateJSON] does for canonical
+// JSON. The members it reads as missing are those the canonical-XML codec's
+// WithMissing option reports: a mandatory member with no element, one whose
+// element carries xsi:nil, and one whose element is primitive and holds no
+// text but XML whitespace. They are named as the canonical-JSON form of the
+// instance names them, so a document gives the same result in either
+// format.
+//
+// The decode is the codec's default, and root holds the decoded value
+// afterwards. Input that does not decode into root, malformed XML, content
+// before or after the root element other than what XML allows there, or a
+// root element that fails its decode, is one `invalid_shape` issue at "/"
+// and a not-OK [Result], with the decode error in the issue's Value and not
+// in its Detail. A nil root is `nil_root`, and a root that is no registered
+// Reference Model value `rm_type_unknown` at "/", as [ValidateRM] reports
+// them; data is not read then.
+func (v *Validator) ValidateXML(data []byte, root any, c *templatecompile.Compiled) Result {
+	const entry = "ValidateXML"
+	if _, guard, ok := rmRootGuard(entry, root); !ok {
+		return guard
+	}
+	var missing []string
+	t := xmlunmatched.NewTracker(nil, false)
+	t.ReportMissing(func(pointer string) { missing = append(missing, pointer) })
+	if err := xmlunmatched.Unmarshal(data, root, t); err != nil {
+		return decodeFailure(entry, err)
+	}
+	return v.Validate(root, c, WithMissing(missing))
+}
+
+// decodeFailure is the result of an entry that could not decode its input:
+// one `invalid_shape` issue at "/" whose Value holds err, whose text may
+// quote the input (REQ-168), and whose Detail names the entry alone. A nil
+// err, as JSON null raises none, leaves Value empty.
+func decodeFailure(entry string, err error) Result {
+	return resultFromIssues([]Issue{{
+		Path:     "/",
+		Code:     "invalid_shape",
+		Detail:   entry + ": the input does not decode into the root value",
+		Severity: Error,
+		Value:    constraints.Redact(err),
+	}})
+}
+
 // ValidateRMEHRStatusBytes validates a canonical-JSON EHR_STATUS against
-// the template-less RM floor, consulting JSON-key presence so
-// the value-typed mandatory `subject` is checked correctly.
+// the Reference Model rules alone, reading the members the document leaves
+// out. It returns what ValidateJSON(data, new(rm.EHRStatus), nil) returns:
+// an omitted or null `subject` is `required` at `/subject`, while a supplied
+// subject, even the bare `{"_type":"PARTY_SELF"}`, draws none, though both
+// decode to the same zero rm.PartySelf. The same holds for every member the
+// Reference Model makes mandatory, at every level of the document.
 //
-// It decodes data into a *rm.EHRStatus, runs the value-based
-// [ValidateRMEHRStatus] floor, and additionally emits `required` at
-// `/subject` when the top-level `subject` key is absent from the JSON.
-// That is the one signal the Go value cannot carry: a valid bare
-// `{"_type":"PARTY_SELF"}` and an omitted subject both decode to the zero
-// rm.PartySelf. A present-but-null `subject` (`"subject": null`) is
-// treated as absent: a null does not satisfy the mandatory attribute and
-// decodes to the same zero rm.PartySelf. A supplied subject, even the bare
-// form, yields no spurious `required`.
+// Input that does not decode into an EHR_STATUS, malformed JSON, a document
+// whose root is not a JSON object, or an object repeating a member name, is
+// one `invalid_shape` issue at "/", as [ValidateJSON] describes.
 //
-// It decides the root's ARCHETYPED key presence the same way. When the
-// top-level `archetype_details` is present, an absent or null `archetype_id`
-// key in it is `required` at `/archetype_details/archetype_id`, and an absent
-// or null `rm_version` key is `required` at `/archetype_details/rm_version`.
-// Both attributes are value-typed, so the value-based floor sees only their
-// zero values. A key-presence finding replaces the value-based finding at the
-// same path, so each path carries one finding: an absent `rm_version` is
-// `required`, not `rm_version_valid`, while an absent `archetype_id` is
-// `required` at `archetype_id` beside the value-based `required` at
-// `archetype_id/value`. Key presence is read at the root only: an
-// ARCHETYPED lower in the tree gets the value-based findings alone.
-//
-// Attributes the value-based floor already catches (the interface-,
-// pointer- and slice-typed mandatories, e.g. `name`, typed rm.DVTextLike)
-// remain flagged when absent; the per-RM-type invariant catalogue is
-// unchanged. Input that is not a well-formed JSON object (malformed, array,
-// scalar, null, or an object repeating a member name), or that fails
-// EHR_STATUS decode, surfaces a single
-// `invalid_shape` issue at `/` and a not-OK [Result]. When either decode
-// fails, the decode error, whose text may quote the input, is in that
-// issue's Value and not in its Detail; `null` input raises no decode error,
-// so its issue's Value is empty.
-//
-// The decode uses encoding/json/v2 directly rather than
-// openehr/serialize/canjson, which openehr/validation does not import:
-// the generated UnmarshalJSONFrom methods on the RM types carry the
-// codec, and typereg threads the polymorphic decode hooks, so no codec
-// entry point is needed. v2's defaults refuse a duplicate member name and
-// match member names case-sensitively, as canonical JSON requires; a
-// duplicate therefore surfaces as `invalid_shape` at `/` like any other
-// failed decode.
+// Deprecated: Use [ValidateJSON] with a new(rm.EHRStatus) and a nil
+// template, which returns the same result and works for every root.
 func ValidateRMEHRStatusBytes(data []byte) Result {
-	// Top-level key presence — the only signal that separates an omitted
-	// `subject` from a supplied bare PARTY_SELF. A non-object input
-	// (array/scalar/null/malformed, or a repeated member name) fails to
-	// unmarshal into the map (or yields a nil map for `null`) and is
-	// reported as an invalid shape.
-	var keys map[string]jsontext.Value
-	if err := json.Unmarshal(data, &keys); err != nil || keys == nil {
-		// As below, the decode error goes into Value (REQ-168). `null`
-		// decodes without one, and Redact(nil) leaves Value empty.
-		return resultFromIssues([]Issue{{
-			Path:     "/",
-			Code:     "invalid_shape",
-			Detail:   "ValidateRMEHRStatusBytes: input is not a well-formed JSON object",
-			Severity: Error,
-			Value:    constraints.Redact(err),
-		}})
-	}
-
-	var status rm.EHRStatus
-	if err := json.Unmarshal(data, &status); err != nil {
-		// The decode error's text may quote a literal from the input, so
-		// it goes into Value and stays out of Detail (REQ-168).
-		return resultFromIssues([]Issue{{
-			Path:     "/",
-			Code:     "invalid_shape",
-			Detail:   "ValidateRMEHRStatusBytes: EHR_STATUS decode failed",
-			Severity: Error,
-			Value:    constraints.Redact(err),
-		}})
-	}
-
-	r := ValidateRMEHRStatus(&status)
-
-	absent := rootKeyAbsences(keys)
-	if len(absent) == 0 {
-		return r
-	}
-	out := resultFromIssues(replaceAtPaths(r.Issues, absent))
-	out.Coverage = r.Coverage
-	return out
-}
-
-// rootKeyAbsences returns the `required` findings for the value-typed
-// mandatory attributes of the root EHR_STATUS whose key is absent or null:
-// `subject`, and, when `archetype_details` is present, its `archetype_id`
-// and `rm_version`. The value-based floor reads the zero value of each as
-// present, so only the key set can tell an omitted attribute from a supplied
-// one. A null does not satisfy a mandatory attribute and decodes to the same
-// zero value as an omitted one, so it counts as absent.
-func rootKeyAbsences(keys map[string]jsontext.Value) []Issue {
-	var out []Issue
-	if keyAbsent(keys, "subject") {
-		out = append(out, Issue{
-			Path:     "/subject",
-			Code:     "required",
-			Layer:    LayerRM,
-			Rule:     ruleMandatory,
-			Detail:   `RM-mandatory attribute "subject" is absent or null on EHR_STATUS`,
-			Severity: Error,
-		})
-	}
-	if keyAbsent(keys, "archetype_details") {
-		// No ARCHETYPED to read keys from; the value-based floor reports
-		// the absent archetype_details on the archetype root.
-		return out
-	}
-	var details map[string]jsontext.Value
-	if err := json.Unmarshal(keys["archetype_details"], &details); err != nil {
-		// Not expected: the EHR_STATUS decode has already accepted the
-		// member as an ARCHETYPED object. Report the shape rather than read
-		// keys from a member that has none.
-		return append(out, Issue{
-			Path:     "/archetype_details",
-			Code:     "invalid_shape",
-			Detail:   "ValidateRMEHRStatusBytes: archetype_details is not a JSON object",
-			Severity: Error,
-		})
-	}
-	for _, attr := range []string{"archetype_id", "rm_version"} {
-		if keyAbsent(details, attr) {
-			out = append(out, Issue{
-				Path:     "/archetype_details/" + attr,
-				Code:     "required",
-				Layer:    LayerRM,
-				Rule:     ruleMandatory,
-				Detail:   `RM-mandatory attribute "` + attr + `" is absent or null on ARCHETYPED`,
-				Severity: Error,
-			})
-		}
-	}
-	return out
-}
-
-// replaceAtPaths returns issues without the value walk's findings at the
-// path of one of replacements, followed by replacements. A key-presence
-// finding thereby takes the place of the value-based finding at its path. A
-// walk condition at such a path is kept: it says where the walk stopped or
-// turned back, not what it found there, and Coverage.Stopped lists the path
-// of each max_depth and max_nodes issue.
-func replaceAtPaths(issues, replacements []Issue) []Issue {
-	replaced := make(map[string]bool, len(replacements))
-	for _, r := range replacements {
-		replaced[r.Path] = true
-	}
-	out := make([]Issue, 0, len(issues)+len(replacements))
-	for _, i := range issues {
-		if !replaced[i.Path] || isWalkCondition(i.Code) {
-			out = append(out, i)
-		}
-	}
-	return append(out, replacements...)
-}
-
-// keyAbsent reports whether keys lacks key or holds it as JSON null.
-func keyAbsent(keys map[string]jsontext.Value, key string) bool {
-	raw, present := keys[key]
-	return !present || isJSONNull(raw)
-}
-
-// isJSONNull reports whether a raw JSON value is the literal `null` token
-// (tolerating surrounding whitespace).
-func isJSONNull(raw jsontext.Value) bool {
-	return bytes.Equal(bytes.TrimSpace(raw), []byte("null"))
+	return ValidateJSON(data, new(rm.EHRStatus), nil)
 }

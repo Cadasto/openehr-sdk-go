@@ -128,7 +128,8 @@
 // naming the text of an element, one item however many runs of text it
 // holds; the path names the item and carries none of its value. [WithStrict] refuses the decode at the first item with an
 // error wrapping [ErrUnknownElement] (and [ErrNamespace] for a foreign
-// element). Strict never refuses an absent element.
+// element). Strict never refuses an absent element: a mandatory one is a
+// missing member, which [WithMissing] reports (see below).
 //
 // An unknown `xsi:type` fails in every mode. The decoder reads the input
 // as a stream and checks content as it goes, so strict returns the first
@@ -139,13 +140,81 @@
 //
 // The options reach the generated UnmarshalXML methods, which encoding/xml
 // calls with nothing but the *xml.Decoder, through the decoder itself: a
-// decode given either option reads its input through a token source that
-// tracks the open elements, and registers its decoder with its own policy
-// while it runs. Concurrent decodes each have their own decoder and so
-// their own policy. The generated methods hand the content they do not
-// read to helpers in an internal package of the SDK, which look the
-// decoder up and, for an untracked decode, behave as encoding/xml does,
-// except for the errors below.
+// decode given [WithUnmatched], [WithStrict] or [WithMissing] reads its
+// input through a token source that tracks the open elements, and registers
+// its decoder with its own policy while it runs. Concurrent decodes each
+// have their own decoder and so their own policy. The generated methods
+// hand the content they do not read to helpers in an internal package of
+// the SDK, which look the decoder up and, for an untracked decode, behave
+// as encoding/xml does, except for the errors below.
+//
+// # Missing members
+//
+// A member is missing when the Reference Model makes the attribute mandatory
+// on the class its element decodes as, the class its `xsi:type` names, or
+// else the type the RM declares where it sits, as "Unmatched content" above
+// reads it, and the element carries no value for it: it has no child element
+// of that name, and no XML attribute of it where the ITS-XML schema carries
+// the attribute as one (`archetype_node_id`); the child it has carries
+// `xsi:nil="true"` (or `1`), whatever it holds; or the child is a primitive
+// element whose text is empty or XML whitespace only, which carries no
+// value, as an empty interval flag element does. The decoder cannot always
+// show that in the value it returns: a member the SDK holds by value, a
+// number, a boolean, a string or a value struct such as PARTY_SELF or
+// ARCHETYPE_ID, decodes to its zero value whether the input carried it or
+// not, so a DV_QUANTITY without its `magnitude` reads as one of 0 and an
+// EHR_STATUS without its `subject` reads as one with a bare PARTY_SELF.
+//
+// By default the decoder decodes an input with missing members as it decodes
+// one without: no error, each such member at its zero value. A missing
+// member is never a decode error in any mode: [WithStrict] covers unmatched
+// content only.
+//
+// [WithMissing] passes each missing member to a function, once, as the
+// decode streams: the members of one element as the element closes, in the
+// order the RM declares the attributes (an ancestor's before the class's
+// own), so the members of the elements inside it come first. The decode
+// returns the same value as the default. The member is named by its JSON
+// Pointer (RFC 6901) in the canonical-JSON form of the instance, from the
+// root of the value, such as
+// "/content/0/data/events/0/data/items/0/value/magnitude": the attribute's
+// name under the pointer of the element that lacks it, and each child
+// element of a multi-valued attribute by its position among its same-named
+// siblings, counted from 0. That is not the element path [WithUnmatched]
+// reports: a missing member is a member of the instance, not an item of the
+// document, so both codecs name it one way and a consumer of either format
+// hands the validators one list. The pointer carries no value from the
+// input.
+//
+// A member that carries a value is never missing, whatever the value: an
+// empty struct
+// element such as `<subject/>` or a bare `<subject xsi:type="PARTY_SELF"/>`,
+// `<magnitude>0</magnitude>`, an `archetype_node_id` written as an XML
+// attribute, and a `Hash` or `Any` element the codec does not model are
+// present, and whether such a value is valid is for the validators to say.
+// Canonical XML has no element for an empty list, so a mandatory list the
+// input leaves empty, a CLUSTER's `items`, is missing, where canonical
+// JSON's `[]` is present. Nothing inside a nilled element is reported: the
+// member is reported once, by its parent, as a `null` is in canonical JSON.
+// Three kinds of attribute are never missing: one no serialization carries,
+// which is every function the model computes, such as EVENT `offset`, and
+// RESOURCE_DESCRIPTION `parent_resource`; the four interval boundary flags,
+// which take their defaults when absent; and `xsi:type`, which names no
+// attribute.
+//
+// The check runs in the same pass over the input that serves
+// [WithUnmatched], through the description of its class each generated
+// decoder hands the runtime on entry, so the two options may be combined,
+// each with its own grammar, and every class the generated decoders read is
+// checked, the AOM 1.4 classes included, where canonical JSON checks the RM
+// classes only. A decode that fails makes no promise about which members it
+// reported before the failure. One member escapes the check: a primitive
+// already held in an interface-typed slot, which encoding/xml reads itself,
+// counts as a value even when its element is empty.
+//
+// The option changes nothing about what the decoder reads, and it is not
+// available on REST reads through the transport and client packages, which
+// decode with the default.
 //
 // # Primitive failures
 //
@@ -155,9 +224,9 @@
 // a DV_MULTIMEDIA `data` that is not base64, fails the decode in every mode
 // with a [DecodeError] whose Inner wraps [ErrInvalidShape] and the
 // conversion's own error. Its text names the element and carries none of
-// its text. [Unmarshal], and a [Decoder] given [WithUnmatched] or
-// [WithStrict], return it on its own with the element's path from the root
-// of the value, such as "/ehr_status[1]/is_queryable[1]". Without an
+// its text. [Unmarshal], and a [Decoder] given [WithUnmatched], [WithStrict]
+// or [WithMissing], return it on its own with the element's path from the
+// root of the value, such as "/ehr_status[1]/is_queryable[1]". Without an
 // option, [Unmarshal] decodes the input a second time to find that path,
 // once the first decode has failed so; a decode that succeeds never pays
 // for it. A [Decoder] given no option cannot read its stream again, so it

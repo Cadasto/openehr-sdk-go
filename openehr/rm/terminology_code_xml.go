@@ -18,6 +18,11 @@ var (
 	_ xml.Unmarshaler = (*TerminologyCode)(nil)
 )
 
+// xmlClassTerminologyCode describes TERMINOLOGY_CODE to the canonical-XML
+// decode runtime, as the generator describes each class it emits a decoder
+// for. The RM tables list no mandatory member for it, so none is required.
+var xmlClassTerminologyCode = xmlunmatched.Class{Name: "TERMINOLOGY_CODE"}
+
 // MarshalXML emits canonical openEHR XML for TerminologyCode in the shape the
 // AOM 1.4 ITS-XML schema gives `original_language`, a CODE_PHRASE:
 // `terminology_id` holds its identifier in a `value` child, then
@@ -61,7 +66,7 @@ func (t *TerminologyCode) MarshalXML(e *xml.Encoder, start xml.StartElement) err
 // between its child elements among it, is unmatched: skipped, or reported or
 // refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TerminologyCode) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error {
-	if err := xmlunmatched.CheckUnmatchedAttrs(dec, start); err != nil {
+	if err := xmlunmatched.Enter(dec, start, &xmlClassTerminologyCode); err != nil {
 		return err
 	}
 	for {

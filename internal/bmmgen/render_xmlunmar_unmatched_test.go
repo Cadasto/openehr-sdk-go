@@ -31,7 +31,7 @@ import (
 // content unreported.
 func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 	const (
-		attrs        = "\tif _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start"
+		attrs        = "\tif _err := xmlunmatched.Enter(_dec, _start, &xmlClass"
 		switchOnName = "\t\t\tswitch xmlunmatched.LocalName(_t.Name) {\n"
 		defaultArm   = "\t\t\tdefault:\n\t\t\t\tif _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {\n"
 		textArm      = "\t\tcase xml.CharData:\n\t\t\tif _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {\n"

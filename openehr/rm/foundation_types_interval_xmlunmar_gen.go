@@ -14,6 +14,11 @@ import (
 
 // BMM package: org.openehr.base.foundation_types.interval — canonical-XML UnmarshalXML companions
 
+// xmlClassInterval describes Interval to the canonical-XML decode runtime.
+var xmlClassInterval = xmlunmatched.Class{
+	Name: "Interval",
+}
+
 // UnmarshalXML decodes canonical openEHR XML into Interval.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -41,7 +46,7 @@ import (
 // An empty or whitespace-only flag element carries no boolean and reads as
 // a flag the document leaves out.
 func (i *Interval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassInterval); _err != nil {
 		return _err
 	}
 	var _seen intervalFlagsSeen
@@ -97,6 +102,11 @@ func (i *Interval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 	}
 }
 
+// xmlClassPointInterval describes Point_interval to the canonical-XML decode runtime.
+var xmlClassPointInterval = xmlunmatched.Class{
+	Name: "Point_interval",
+}
+
 // UnmarshalXML decodes canonical openEHR XML into PointInterval.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -119,7 +129,7 @@ func (i *Interval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 // An empty or whitespace-only flag element carries no boolean and reads as
 // a flag the document leaves out.
 func (p *PointInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassPointInterval); _err != nil {
 		return _err
 	}
 	var _seen intervalFlagsSeen
@@ -175,6 +185,11 @@ func (p *PointInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 	}
 }
 
+// xmlClassProperInterval describes Proper_interval to the canonical-XML decode runtime.
+var xmlClassProperInterval = xmlunmatched.Class{
+	Name: "Proper_interval",
+}
+
 // UnmarshalXML decodes canonical openEHR XML into ProperInterval.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -197,7 +212,7 @@ func (p *PointInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 // An empty or whitespace-only flag element carries no boolean and reads as
 // a flag the document leaves out.
 func (p *ProperInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassProperInterval); _err != nil {
 		return _err
 	}
 	var _seen intervalFlagsSeen

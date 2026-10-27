@@ -341,12 +341,14 @@ func TestValidateRMEHRStatusBytes_REQ171_KeepsCoverage(t *testing.T) {
 
 // subjectStopStatus is an EHR_STATUS that omits subject and whose name holds
 // enough TERM_MAPPINGs, with a formatting and one preferred_term beside
-// them, that the default visit limit falls exactly on the zero subject the
-// decode leaves: the path the key-presence check reports as required. Each
-// mapping costs the walk six visits: the mapping, its match, its target, the
-// target's code_string and terminology_id, and the value of that
-// TERMINOLOGY_ID, which the walk enters (REQ-171 Structural access); the
-// preferred mapping costs one more, for its preferred_term.
+// them, that the default visit limit falls exactly on the next value the
+// walk visits after archetype_details: the subject when the document gives
+// one, and is_queryable when it leaves the subject out, since the walk reads
+// a missing member as absent and does not visit it. Each mapping costs the
+// walk six visits: the mapping, its match, its target, the target's
+// code_string and terminology_id, and the value of that TERMINOLOGY_ID,
+// which the walk enters (REQ-171 Structural access); the preferred mapping
+// costs one more, for its preferred_term.
 func subjectStopStatus() []byte {
 	const mapping = `{"_type": "TERM_MAPPING", "match": "=", "target": {"_type": "CODE_PHRASE", "terminology_id": {"_type": "TERMINOLOGY_ID", "value": "SNOMED-CT"}, "code_string": "1"}}`
 	const preferred = `{"_type": "TERM_MAPPING", "match": "=", "target": {"_type": "CODE_PHRASE", "terminology_id": {"_type": "TERMINOLOGY_ID", "value": "SNOMED-CT"}, "code_string": "1", "preferred_term": "p"}}`
@@ -362,19 +364,25 @@ func subjectStopStatus() []byte {
 	}`)
 }
 
-// REQ-171 § Coverage, REQ-112 — when the visit limit falls on the path of an
-// absent key, the presence-aware EHR_STATUS entry keeps the max_nodes issue
-// there beside its own required, so the issue and Coverage.Stopped agree and
-// max_nodes is reported once.
-func TestValidateRMEHRStatusBytes_REQ171_KeepsAStopOnAnAbsentKey(t *testing.T) {
+// REQ-171 § Coverage, REQ-112 § Value-typed mandatory presence: a member
+// the document leaves out is read as absent and not entered, so it spends no
+// visit: where the visit limit would fall on a supplied subject, it falls on
+// the next value instead when the subject is left out. The presence-aware
+// EHR_STATUS entry then reports required at /subject and one max_nodes, at
+// the path Coverage.Stopped lists, so the issue and the coverage agree.
+func TestValidateRMEHRStatusBytes_REQ171_KeepsAStopBesideAnAbsentKey(t *testing.T) {
+	bare := validation.ValidateRMEHRStatusBytes([]byte(strings.Replace(string(subjectStopStatus()), `"is_modifiable"`, `"subject": {"_type": "PARTY_SELF"}, "is_modifiable"`, 1)))
+	if !slices.Equal(bare.Coverage.Stopped, []string{"/subject"}) {
+		t.Fatalf("precondition: with a bare subject Coverage.Stopped = %q, want [/subject]; the visit count of the recipe drifted, adjust the number of mappings", bare.Coverage.Stopped)
+	}
 	r := validation.ValidateRMEHRStatusBytes(subjectStopStatus())
-	if !slices.Equal(r.Coverage.Stopped, []string{"/subject"}) {
-		t.Fatalf("precondition: Coverage.Stopped = %q, want [/subject]; the visit count of the recipe drifted, adjust the number of mappings", r.Coverage.Stopped)
+	if !slices.Equal(r.Coverage.Stopped, []string{"/is_queryable"}) {
+		t.Errorf("ValidateRMEHRStatusBytes(subject left out) Coverage.Stopped = %q, want [/is_queryable]: the missing subject is not visited", r.Coverage.Stopped)
 	}
 	if got := pathsOf(r.Issues, "max_nodes"); !slices.Equal(got, r.Coverage.Stopped) {
-		t.Errorf("ValidateRMEHRStatusBytes(visit limit on /subject) reports max_nodes at %q, want once, at each path Coverage.Stopped lists (%q)", got, r.Coverage.Stopped)
+		t.Errorf("ValidateRMEHRStatusBytes(subject left out) reports max_nodes at %q, want once, at each path Coverage.Stopped lists (%q)", got, r.Coverage.Stopped)
 	}
 	if !containsIssue(r.Issues, "/subject", "required") {
-		t.Errorf("ValidateRMEHRStatusBytes(visit limit on /subject) issues = %q, want required at /subject", issueKeys(r.Issues))
+		t.Errorf("ValidateRMEHRStatusBytes(subject left out) issues = %q, want required at /subject", issueKeys(r.Issues))
 	}
 }

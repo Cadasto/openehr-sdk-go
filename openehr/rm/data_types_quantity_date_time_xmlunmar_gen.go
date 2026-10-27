@@ -14,6 +14,13 @@ import (
 
 // BMM package: org.openehr.rm.data_types.quantity.date_time — canonical-XML UnmarshalXML companions
 
+// xmlClassDVDate describes DV_DATE to the canonical-XML decode runtime.
+var xmlClassDVDate = xmlunmatched.Class{
+	Name:     "DV_DATE",
+	Required: []string{"value"},
+	Items:    []string{"other_reference_ranges"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into DVDate.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -24,7 +31,7 @@ import (
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVDate); _err != nil {
 		return _err
 	}
 	for {
@@ -82,6 +89,13 @@ func (d *DVDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 			return nil
 		}
 	}
+}
+
+// xmlClassDVDateTime describes DV_DATE_TIME to the canonical-XML decode runtime.
+var xmlClassDVDateTime = xmlunmatched.Class{
+	Name:     "DV_DATE_TIME",
+	Required: []string{"value"},
+	Items:    []string{"other_reference_ranges"},
 }
 
 // UnmarshalXML decodes canonical openEHR XML into DVDateTime.
@@ -94,7 +108,7 @@ func (d *DVDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVDateTime); _err != nil {
 		return _err
 	}
 	for {
@@ -154,6 +168,13 @@ func (d *DVDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 	}
 }
 
+// xmlClassDVDuration describes DV_DURATION to the canonical-XML decode runtime.
+var xmlClassDVDuration = xmlunmatched.Class{
+	Name:     "DV_DURATION",
+	Required: []string{"value"},
+	Items:    []string{"other_reference_ranges"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into DVDuration.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -164,7 +185,7 @@ func (d *DVDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVDuration); _err != nil {
 		return _err
 	}
 	for {
@@ -230,6 +251,13 @@ func (d *DVDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 	}
 }
 
+// xmlClassDVTime describes DV_TIME to the canonical-XML decode runtime.
+var xmlClassDVTime = xmlunmatched.Class{
+	Name:     "DV_TIME",
+	Required: []string{"value"},
+	Items:    []string{"other_reference_ranges"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into DVTime.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -240,7 +268,7 @@ func (d *DVDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVTime); _err != nil {
 		return _err
 	}
 	for {

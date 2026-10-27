@@ -14,6 +14,12 @@ import (
 
 // BMM package: org.openehr.am.aom14.archetype.constraint_model — canonical-XML UnmarshalXML companions
 
+// xmlClassArchetypeInternalRef describes ARCHETYPE_INTERNAL_REF to the canonical-XML decode runtime.
+var xmlClassArchetypeInternalRef = xmlunmatched.Class{
+	Name:     "ARCHETYPE_INTERNAL_REF",
+	Required: []string{"rm_type_name", "occurrences", "node_id", "target_path"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into ArchetypeInternalRef.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -24,7 +30,7 @@ import (
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *ArchetypeInternalRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassArchetypeInternalRef); _err != nil {
 		return _err
 	}
 	for {
@@ -66,6 +72,13 @@ func (a *ArchetypeInternalRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartE
 	}
 }
 
+// xmlClassArchetypeSlot describes ARCHETYPE_SLOT to the canonical-XML decode runtime.
+var xmlClassArchetypeSlot = xmlunmatched.Class{
+	Name:     "ARCHETYPE_SLOT",
+	Required: []string{"rm_type_name", "occurrences", "node_id"},
+	Items:    []string{"includes", "excludes"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into ArchetypeSlot.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -76,7 +89,7 @@ func (a *ArchetypeInternalRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartE
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *ArchetypeSlot) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassArchetypeSlot); _err != nil {
 		return _err
 	}
 	for {
@@ -126,6 +139,13 @@ func (a *ArchetypeSlot) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 	}
 }
 
+// xmlClassCComplexObject describes C_COMPLEX_OBJECT to the canonical-XML decode runtime.
+var xmlClassCComplexObject = xmlunmatched.Class{
+	Name:     "C_COMPLEX_OBJECT",
+	Required: []string{"rm_type_name", "occurrences", "node_id"},
+	Items:    []string{"attributes"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into CComplexObject.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -136,7 +156,7 @@ func (a *ArchetypeSlot) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CComplexObject) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCComplexObject); _err != nil {
 		return _err
 	}
 	for {
@@ -185,6 +205,13 @@ func (c *CComplexObject) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement
 	}
 }
 
+// xmlClassCMultipleAttribute describes C_MULTIPLE_ATTRIBUTE to the canonical-XML decode runtime.
+var xmlClassCMultipleAttribute = xmlunmatched.Class{
+	Name:     "C_MULTIPLE_ATTRIBUTE",
+	Required: []string{"rm_attribute_name", "existence", "cardinality"},
+	Items:    []string{"children"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into CMultipleAttribute.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -195,7 +222,7 @@ func (c *CComplexObject) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CMultipleAttribute) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCMultipleAttribute); _err != nil {
 		return _err
 	}
 	for {
@@ -239,6 +266,12 @@ func (c *CMultipleAttribute) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 	}
 }
 
+// xmlClassCPrimitiveObject describes C_PRIMITIVE_OBJECT to the canonical-XML decode runtime.
+var xmlClassCPrimitiveObject = xmlunmatched.Class{
+	Name:     "C_PRIMITIVE_OBJECT",
+	Required: []string{"rm_type_name", "occurrences", "node_id", "item"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into CPrimitiveObject.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -249,7 +282,7 @@ func (c *CMultipleAttribute) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CPrimitiveObject) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCPrimitiveObject); _err != nil {
 		return _err
 	}
 	for {
@@ -298,6 +331,13 @@ func (c *CPrimitiveObject) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 	}
 }
 
+// xmlClassCSingleAttribute describes C_SINGLE_ATTRIBUTE to the canonical-XML decode runtime.
+var xmlClassCSingleAttribute = xmlunmatched.Class{
+	Name:     "C_SINGLE_ATTRIBUTE",
+	Required: []string{"rm_attribute_name", "existence"},
+	Items:    []string{"children"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into CSingleAttribute.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -308,7 +348,7 @@ func (c *CPrimitiveObject) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CSingleAttribute) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCSingleAttribute); _err != nil {
 		return _err
 	}
 	for {
@@ -348,6 +388,12 @@ func (c *CSingleAttribute) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 	}
 }
 
+// xmlClassCardinality describes CARDINALITY to the canonical-XML decode runtime.
+var xmlClassCardinality = xmlunmatched.Class{
+	Name:     "CARDINALITY",
+	Required: []string{"interval", "is_ordered", "is_unique"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into Cardinality.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -358,7 +404,7 @@ func (c *CSingleAttribute) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *Cardinality) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCardinality); _err != nil {
 		return _err
 	}
 	for {
@@ -396,6 +442,12 @@ func (c *Cardinality) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 	}
 }
 
+// xmlClassConstraintRef describes CONSTRAINT_REF to the canonical-XML decode runtime.
+var xmlClassConstraintRef = xmlunmatched.Class{
+	Name:     "CONSTRAINT_REF",
+	Required: []string{"rm_type_name", "occurrences", "node_id", "reference"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into ConstraintRef.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -406,7 +458,7 @@ func (c *Cardinality) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *ConstraintRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassConstraintRef); _err != nil {
 		return _err
 	}
 	for {

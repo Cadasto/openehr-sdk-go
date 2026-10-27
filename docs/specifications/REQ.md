@@ -133,6 +133,7 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-172 | Typed 2xx body-read failure (retired) | [retired-requirements.md](retired-requirements.md#req-172--typed-2xx-body-read-failure) | deprecated | retired |
 | REQ-173 | Composition representation formats | [wire.md](wire.md#req-173--composition-representation-formats) | draft | landed |
 | REQ-174 | Versioned-object reads | [wire.md](wire.md#req-174--versioned-object-reads) | draft | landed |
+| REQ-175 | Missing members on decode | [wire.md](wire.md#req-175--missing-members-on-decode) | draft | landed |
 <!-- END GENERATED: registry -->
 
 **Impl.** column: `landed` (code + tests), `partial` (subset), `planned` (spec only), `retired` (a withdrawn requirement, **Stability** `deprecated`; its canonical link opens its entry in [retired-requirements.md](retired-requirements.md), which says where the rule went).

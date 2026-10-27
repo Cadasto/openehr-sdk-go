@@ -14,6 +14,12 @@ import (
 
 // BMM package: org.openehr.rm.data_types.text — canonical-XML UnmarshalXML companions
 
+// xmlClassCodePhrase describes CODE_PHRASE to the canonical-XML decode runtime.
+var xmlClassCodePhrase = xmlunmatched.Class{
+	Name:     "CODE_PHRASE",
+	Required: []string{"terminology_id", "code_string"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into CodePhrase.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -24,7 +30,7 @@ import (
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CodePhrase) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCodePhrase); _err != nil {
 		return _err
 	}
 	for {
@@ -64,6 +70,13 @@ func (c *CodePhrase) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 	}
 }
 
+// xmlClassDVCodedText describes DV_CODED_TEXT to the canonical-XML decode runtime.
+var xmlClassDVCodedText = xmlunmatched.Class{
+	Name:     "DV_CODED_TEXT",
+	Required: []string{"value", "defining_code"},
+	Items:    []string{"mappings"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into DVCodedText.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -74,7 +87,7 @@ func (c *CodePhrase) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVCodedText) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVCodedText); _err != nil {
 		return _err
 	}
 	for {
@@ -138,6 +151,13 @@ func (d *DVCodedText) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 	}
 }
 
+// xmlClassDVParagraph describes DV_PARAGRAPH to the canonical-XML decode runtime.
+var xmlClassDVParagraph = xmlunmatched.Class{
+	Name:     "DV_PARAGRAPH",
+	Required: []string{"items"},
+	Items:    []string{"items"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into DVParagraph.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -148,7 +168,7 @@ func (d *DVCodedText) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVParagraph) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVParagraph); _err != nil {
 		return _err
 	}
 	for {
@@ -180,6 +200,13 @@ func (d *DVParagraph) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 	}
 }
 
+// xmlClassDVText describes DV_TEXT to the canonical-XML decode runtime.
+var xmlClassDVText = xmlunmatched.Class{
+	Name:     "DV_TEXT",
+	Required: []string{"value"},
+	Items:    []string{"mappings"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into DVText.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -190,7 +217,7 @@ func (d *DVParagraph) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVText) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVText); _err != nil {
 		return _err
 	}
 	for {
@@ -250,6 +277,12 @@ func (d *DVText) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 	}
 }
 
+// xmlClassTermMapping describes TERM_MAPPING to the canonical-XML decode runtime.
+var xmlClassTermMapping = xmlunmatched.Class{
+	Name:     "TERM_MAPPING",
+	Required: []string{"match", "target"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into TermMapping.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -260,7 +293,7 @@ func (d *DVText) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TermMapping) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassTermMapping); _err != nil {
 		return _err
 	}
 	for {

@@ -294,7 +294,7 @@ func TestValidateRM_REQ112_REQ171_MaxDepthOncePerWalk(t *testing.T) {
 	}{
 		{
 			name:     "50 SECTIONs, each 3 deep, at depth 255",
-			validate: validation.ValidateRM,
+			validate: func(root any) validation.Result { return validation.ValidateRM(root) },
 			root:     fan,
 			// The 50 SECTIONs share at0001, so each is written by its
 			// position; the first one's name is the first node at the limit.

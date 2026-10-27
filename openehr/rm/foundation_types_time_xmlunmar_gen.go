@@ -14,6 +14,11 @@ import (
 
 // BMM package: org.openehr.base.foundation_types.time — canonical-XML UnmarshalXML companions
 
+// xmlClassISO8601Timezone describes Iso8601_timezone to the canonical-XML decode runtime.
+var xmlClassISO8601Timezone = xmlunmatched.Class{
+	Name: "Iso8601_timezone",
+}
+
 // UnmarshalXML decodes canonical openEHR XML into ISO8601Timezone.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -24,7 +29,7 @@ import (
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (i *ISO8601Timezone) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassISO8601Timezone); _err != nil {
 		return _err
 	}
 	for {
@@ -50,6 +55,11 @@ func (i *ISO8601Timezone) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElemen
 	}
 }
 
+// xmlClassTimeDefinitions describes Time_Definitions to the canonical-XML decode runtime.
+var xmlClassTimeDefinitions = xmlunmatched.Class{
+	Name: "Time_Definitions",
+}
+
 // UnmarshalXML decodes canonical openEHR XML into TimeDefinitions.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -60,7 +70,7 @@ func (i *ISO8601Timezone) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElemen
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TimeDefinitions) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassTimeDefinitions); _err != nil {
 		return _err
 	}
 	for {

@@ -32,19 +32,46 @@
 //     decoder and tracker, so concurrent decodes never see each other's
 //     policy.
 //   - The generated decoders call the helpers of this package where content
-//     goes unread: [CheckUnmatchedAttrs] on entry, [LocalName] for the name
-//     they switch on, [SkipUnmatched] in the arm for an element they do not
-//     read, [CheckUnmatchedText] for text between the elements they read,
-//     [DecodeElement] for an element decoded as text, [DecodeText] for one
-//     whose text they convert themselves, such as an interval boundary flag,
-//     [DecodeBase64] for an Octet list, and [DecodeParam] for a member typed
-//     by an open generic parameter. The hand-written TERMINOLOGY_CODE
-//     decoder calls the same helpers, [CheckUnmatchedTextBefore] for text
-//     it keeps until a child shows that the text is not its value, and
+//     goes unread: [Enter] on entry, with the description of their class,
+//     [LocalName] for the name they switch on, [SkipUnmatched] in the arm
+//     for an element they do not read, [CheckUnmatchedText] for text
+//     between the elements they read, [DecodeElement] for an element
+//     decoded as text, [DecodeText] for one whose text they convert
+//     themselves, such as an interval boundary flag, [DecodeBase64] for an
+//     Octet list, and [DecodeParam] for a member typed by an open generic
+//     parameter. The hand-written TERMINOLOGY_CODE decoder calls the same
+//     helpers, [CheckUnmatchedAttrs] for the attributes of its inner
+//     TERMINOLOGY_ID element, [CheckUnmatchedTextBefore] for text it keeps
+//     until a child shows that the text is not its value, and
 //     [SkipUnmatchedAfter] and [ApplyHeld] for an unmatched child after
 //     that text. canxml calls [DiscriminatorRead] where its dispatch reads a
 //     bare `type`. Each helper looks the decoder up; an untracked decode
 //     finds nothing and behaves as encoding/xml does, but for one thing.
+//
+// # Missing members
+//
+// The dual of unmatched content is a mandatory member the document leaves
+// out. The description each decoder hands [Enter], a [Class], names the
+// members the Reference Model requires of its class, and a tracked decode
+// given [Tracker.ReportMissing] reports, as each element closes, every one
+// of them the element carried no value for: no child element of that name
+// and no XML attribute of it where the class reads one; a child carrying
+// `xsi:nil="true"`; or a primitive child whose text is empty or XML
+// whitespace only. A struct element with no content, such as `<subject/>`,
+// is a value. Each member is named by its JSON Pointer in the canonical-JSON
+// form of the instance, so a consumer of either canonical format reads one
+// list. The report is the whole policy: a missing member is never a decode
+// error, and a decode that does not ask pays nothing for it.
+//
+// # Whole documents
+//
+// [Unmarshal] decodes one whole document, through a tracker or none: it
+// holds the input to one root element, refusing other content before and
+// after it as malformed input, and names a primitive failure by its path
+// from the root either way, decoding the input again when nothing tracked
+// the first decode. canxml.Unmarshal calls it with the tracker its options
+// build, or none, so that a caller of this package that needs no option
+// decodes a document by the same rule.
 //
 // # Primitive failures
 //
@@ -107,10 +134,14 @@ type Tracker struct {
 	report func(path string)
 	strict bool
 	// checked counts the elements whose content a decoder of the SDK has
-	// checked: each generated UnmarshalXML, through [CheckUnmatchedAttrs],
-	// and each primitive element [DecodeElement] reads as text. A rise
-	// across a decode shows that something read the element.
+	// checked: each generated UnmarshalXML, through [Enter], and each
+	// primitive element [DecodeElement] reads as text. A rise across a
+	// decode shows that something read the element.
 	checked int
+	// missing is the caller's hook for the mandatory members a document
+	// leaves out, set by [Tracker.ReportMissing]; nil when none asked, and
+	// then no element is checked for them.
+	missing func(pointer string)
 	// open holds one frame per element opened and not yet closed, after a
 	// first frame for the document itself, which counts the top-level
 	// elements of the value being decoded.
@@ -124,7 +155,10 @@ type Tracker struct {
 // earlier siblings of the same name plus one, the children it has opened so
 // far, counted by local name, whether dispatch read its bare `type`
 // attribute as the discriminator, and whether its text was found unmatched
-// already.
+// already. For the missing-member report it also keeps the description of
+// its class, once its decoder has entered, which of the class's mandatory
+// members it has a value for, and what the element carries: `xsi:nil`,
+// text other than whitespace, and whether a decoder read it as a primitive.
 //
 // The child counts sit in a short slice while the element has opened children
 // of few names, which is the canonical shape and costs no map. Once it opens
@@ -138,6 +172,11 @@ type frame struct {
 	byName        map[string]int // nil until the slice outgrows linearChildNames
 	discriminator bool
 	text          bool
+	class         *Class
+	seen          uint64 // a bit per class.Required member the element has a value for
+	nilled        bool   // the start element, or one around it, carried xsi:nil="true"
+	hasText       bool   // the element holds text other than XML whitespace
+	primitive     bool   // a decoder read the element's text as its value
 }
 
 // linearChildNames is the number of distinct child names a frame counts in its
@@ -151,7 +190,7 @@ const linearChildNames = 8
 // element is dropped rather than cleared, so a later narrow element never pays
 // for it.
 func (f *frame) open(local string, pos int) {
-	f.name, f.pos, f.children, f.byName, f.discriminator, f.text = local, pos, f.children[:0], nil, false, false
+	*f = frame{name: local, pos: pos, children: f.children[:0]}
 }
 
 // nameCount is how many children of one local name an element has opened.
@@ -230,11 +269,17 @@ func (t *Tracker) push(local string) {
 	t.open = append(t.open, frame{name: local, pos: pos})
 }
 
-// pop records that the decoder closed the innermost open element.
+// pop records that the decoder closed the innermost open element, after
+// reporting the mandatory members it left out when the decode asked.
 func (t *Tracker) pop() {
-	if len(t.open) > 1 {
-		t.open = t.open[:len(t.open)-1]
+	n := len(t.open)
+	if n <= 1 {
+		return
 	}
+	if t.missing != nil {
+		t.closing(n)
+	}
+	t.open = t.open[:n-1]
 }
 
 // count notes one more child named local and returns its position among the
@@ -384,6 +429,7 @@ func isXMLSpace(text []byte) bool {
 // names the element by its path from the root of the value.
 func (t *Tracker) decodeText(dec *xml.Decoder, start *xml.StartElement, v any) error {
 	at := t.here()
+	t.open[len(t.open)-1].primitive = true
 	if err := t.attrs(start.Attr, nil); err != nil {
 		return err
 	}
@@ -456,10 +502,18 @@ func (r *trackingReader) Token() (xml.Token, error) {
 	switch tk := tok.(type) {
 	case xml.StartElement:
 		r.t.push(tk.Name.Local)
+		if r.t.missing != nil {
+			n := len(r.t.open)
+			r.t.open[n-1].nilled = r.t.open[n-2].nilled || isNilled(tk.Attr)
+		}
 		tk.Attr = withoutNamespaceDecls(tk.Attr)
 		return tk, err
 	case xml.EndElement:
 		r.t.pop()
+	case xml.CharData:
+		if r.t.missing != nil && !isXMLSpace(tk) {
+			r.t.open[len(r.t.open)-1].hasText = true
+		}
 	}
 	return tok, err
 }
@@ -704,12 +758,15 @@ func SkipUnmatched(dec *xml.Decoder, start xml.StartElement) error {
 }
 
 // CheckUnmatchedAttrs applies the decode's policy for unmatched content to
-// the attributes of start that the generated decoder does not read: every
-// attribute but those in the XML Schema instance namespace (the `xsi:type`
+// the attributes of start that the decoder does not read: every attribute
+// but those in the XML Schema instance namespace (the `xsi:type`
 // discriminator, `xsi:schemaLocation`, `xsi:nil`, …), the namespace
 // declarations, those named in known, which are read in no namespace, and a
 // bare `type` that dispatch read as the discriminator ([DiscriminatorRead]).
-// start must be the token the decoder read last.
+// start must be the token the decoder read last. A decoder of a class calls
+// [Enter] instead, which checks the attributes the same way and describes
+// the class; CheckUnmatchedAttrs serves an element that is no class of its
+// own, such as the TERMINOLOGY_ID inside a hand-written TERMINOLOGY_CODE.
 //
 // By default it does nothing. A tracked decode reports the path of each such
 // attribute, in the order written, and a strict one refuses the first with an

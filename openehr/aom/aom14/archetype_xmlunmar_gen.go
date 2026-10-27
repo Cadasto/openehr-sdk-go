@@ -15,6 +15,13 @@ import (
 
 // BMM package: org.openehr.am.aom14.archetype — canonical-XML UnmarshalXML companions
 
+// xmlClassArchetype describes ARCHETYPE to the canonical-XML decode runtime.
+var xmlClassArchetype = xmlunmatched.Class{
+	Name:     "ARCHETYPE",
+	Required: []string{"original_language", "definition", "ontology", "archetype_id", "concept"},
+	Items:    []string{"invariants"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into Archetype.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -25,7 +32,7 @@ import (
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *Archetype) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassArchetype); _err != nil {
 		return _err
 	}
 	for {

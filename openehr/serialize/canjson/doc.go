@@ -18,7 +18,7 @@
 // the type registry under
 // [github.com/cadasto/openehr-sdk-go/openehr/rm/typereg], and the RM's
 // attribute lists in [github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo],
-// which the options for unmatched members read.
+// which the options for unmatched and missing members read.
 //
 // # Wire profile
 //
@@ -73,7 +73,10 @@
 //     producer's extension members. See "Unmatched members" below.
 //
 //   - Nil-pointer optional fields are emitted as absent (no key), not
-//     as `null`. Both absent and `null` are accepted on decode.
+//     as `null`. Both absent and `null` are accepted on decode, for an
+//     optional member and a mandatory one alike: a mandatory member the
+//     input leaves out, or sends as `null`, decodes to its zero value with
+//     no error, and [WithMissing] reports it. See "Missing members" below.
 //
 //   - Empty containers with BMM cardinality.lower == 0 are emitted as
 //     absent (omitempty), not as `[]`.
@@ -181,9 +184,9 @@
 //   - Malformed JSON is refused by the tokenizer as the value it
 //     malforms is decoded, except where a value is buffered first: a
 //     polymorphic slot is read whole before it is decoded, and so is each
-//     value a [Decoder] given [WithUnmatched] or [WithStrict] reads, so
-//     malformed bytes anywhere inside such a value are reported ahead of a
-//     shape failure inside it.
+//     value a [Decoder] given [WithUnmatched], [WithStrict] or [WithMissing]
+//     reads, so malformed bytes anywhere inside such a value are reported
+//     ahead of a shape failure inside it.
 //     No sentinel: the cause is the codec's own syntax or truncated-input
 //     error (a *jsontext.SyntacticError), except that [Decoder.Decode]
 //     reports an empty stream as io.EOF, unwrapped, and a truncated value
@@ -281,6 +284,59 @@
 // Neither option changes what the decoder reads, and neither is available
 // on REST reads through the transport and client packages, which decode
 // with the default.
+//
+// # Missing members
+//
+// A member is missing when the RM makes the attribute mandatory on the RM
+// type its object decodes as, read as "Unmatched members" above reads it,
+// and the input carries no value for it: the object has no member of that
+// name, or holds `null` there. The decoder cannot always show that in the
+// value it returns. A member the SDK holds by value, a number, a boolean, a
+// string or a value struct such as PARTY_SELF or ARCHETYPE_ID, decodes to
+// its zero value whether the input carried it or not, so a DV_QUANTITY
+// without its `magnitude` reads as one of 0 and an EHR_STATUS without its
+// `subject` reads as one with a bare PARTY_SELF.
+//
+// By default the decoder decodes an input with missing members as it decodes
+// one without: no error, each such member at its zero value. A missing
+// member is never a decode error in any mode: [WithStrict] covers unmatched
+// members only.
+//
+// [WithMissing] passes each missing member to a function, once, as a JSON
+// Pointer (RFC 6901) from the root of the value, such as
+// "/content/0/data/events/0/data/items/0/value/magnitude": the attribute's
+// name under the pointer of the object that lacks it, each item of a list
+// by its position counted from 0, each entry of a `Hash` by its key. The
+// pointer carries no value from the input. The members of one object are
+// reported as the object is read to its end, in the order the RM declares
+// the attributes, an ancestor's before the class's own, so the members of
+// the objects inside it come first. The decode returns the same value as
+// the default.
+//
+// A member that carries a value is never missing, whatever the value: an
+// empty string, a
+// zero, an empty list or object and a bare {"_type":"PARTY_SELF"} are
+// present, and whether such a value is valid is for the validators to say.
+// Three kinds of attribute are never missing: one no serialization carries,
+// which is every function the model computes, such as EVENT `offset`, and
+// RESOURCE_DESCRIPTION `parent_resource`; the four interval boundary flags,
+// which take their defaults when absent; and `_type`, which names no
+// attribute.
+//
+// The option checks the members once the decode has succeeded, in the same
+// pass over the input that serves [WithUnmatched], so the two options may be
+// combined and a decode that fails reports no member. What it checks is
+// what that pass reaches, as "Unmatched members" sets out: the RM values
+// reached from the decode target's own RM shape. A value of a class outside
+// the RM, such as an AOM 1.4 archetype, a BASE interval, a generic payload
+// the decoder holds as plain JSON and a `Hash` of plain values are not
+// checked, and nothing inside them is reported.
+//
+// The option changes nothing about what the decoder reads, and it is not
+// available on REST reads through the transport and client packages, which
+// decode with the default. The validators in openehr/validation read the
+// same report, so a caller that validates a decoded document need not call
+// the option itself.
 //
 // # Strict vs relaxed type dispatch
 //

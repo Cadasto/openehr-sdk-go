@@ -14,6 +14,12 @@ import (
 
 // BMM package: org.openehr.rm.data_types.uri — canonical-XML UnmarshalXML companions
 
+// xmlClassDVEHRURI describes DV_EHR_URI to the canonical-XML decode runtime.
+var xmlClassDVEHRURI = xmlunmatched.Class{
+	Name:     "DV_EHR_URI",
+	Required: []string{"value"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into DVEHRURI.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -24,7 +30,7 @@ import (
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVEHRURI) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVEHRURI); _err != nil {
 		return _err
 	}
 	for {
@@ -54,6 +60,12 @@ func (d *DVEHRURI) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 	}
 }
 
+// xmlClassDVURI describes DV_URI to the canonical-XML decode runtime.
+var xmlClassDVURI = xmlunmatched.Class{
+	Name:     "DV_URI",
+	Required: []string{"value"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into DVURI.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -64,7 +76,7 @@ func (d *DVEHRURI) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVURI) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVURI); _err != nil {
 		return _err
 	}
 	for {

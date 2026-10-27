@@ -434,6 +434,7 @@ requirements:
       - openehr/instance/instance_test.go
       - openehr/instance/polymorphic_roundtrip_test.go
       - openehr/internal/refused/refused_test.go
+      - openehr/internal/xmlunmatched/document_internal_test.go
       - openehr/rm/character_test.go
       - openehr/rm/character_text_test.go
       - openehr/rm/integer64_test.go
@@ -640,6 +641,7 @@ requirements:
       - internal/bmmgen/render_xmlmar_order_test.go
       - internal/rmaccess/interval_test.go
       - openehr/aom/aom14/interval_open_side_test.go
+      - openehr/internal/xmlunmatched/document_internal_test.go
       - openehr/rm/character_text_test.go
       - openehr/rm/interval_bound_test.go
       - openehr/serialize/canxml/child_order_test.go
@@ -647,6 +649,7 @@ requirements:
       - openehr/serialize/canxml/decode_test.go
       - openehr/serialize/canxml/interval_flag_defaults_test.go
       - openehr/serialize/canxml/interval_open_side_test.go
+      - openehr/serialize/canxml/missing_test.go
       - openehr/serialize/canxml/oneroot_test.go
       - openehr/serialize/canxml/primitive_error_test.go
       - openehr/serialize/canxml/roundtrip_test.go
@@ -1326,6 +1329,7 @@ requirements:
       - openehr/validation/issuepath_internal_test.go
       - openehr/validation/issuepath_test.go
       - openehr/validation/locatable_attributes_test.go
+      - openehr/validation/missing_members_test.go
       - openehr/validation/multi_nonlocatable_test.go
       - openehr/validation/noncomposition_test.go
       - openehr/validation/open_name_list_test.go
@@ -1713,8 +1717,11 @@ requirements:
       - internal/rmaccess
       - openehr/internal/rmnames
       - internal/rmroots
-    probes: [PROBE-077, PROBE-081]
+      - internal/rmjsonwalk
+      - openehr/internal/xmlunmatched
+    probes: [PROBE-077, PROBE-081, PROBE-110]
     tests:
+      - cmd/examples/validate-from-json/main_test.go
       - internal/bmmgen/container_bounds_test.go
       - internal/bmmgen/render_rminfo_functions_test.go
       - internal/iso8601/magnitude_test.go
@@ -1755,13 +1762,14 @@ requirements:
       - openehr/validation/issuepath_test.go
       - openehr/validation/limits_decoded_test.go
       - openehr/validation/limits_test.go
+      - openehr/validation/missing_internal_test.go
+      - openehr/validation/missing_members_test.go
       - openehr/validation/multi_nonlocatable_test.go
       - openehr/validation/noncomposition_test.go
       - openehr/validation/nonempty_lists_internal_test.go
       - openehr/validation/nonstorable_generic_test.go
       - openehr/validation/primitive_empty_part_test.go
       - openehr/validation/rmfloor_archetype_test.go
-      - openehr/validation/rmfloor_bytes_internal_test.go
       - openehr/validation/rmfloor_bytes_test.go
       - openehr/validation/rmfloor_chained_corpus_test.go
       - openehr/validation/rmfloor_chained_internal_test.go
@@ -2304,6 +2312,7 @@ requirements:
       - openehr/validation/binding_by_name_test.go
       - openehr/validation/godoc_class_test.go
       - openehr/validation/issuepath_test.go
+      - openehr/validation/missing_members_test.go
       - openehr/validation/prohibited_test.go
       - openehr/validation/rmfloor_interval_comparable_test.go
       - openehr/validation/rmfloor_interval_flags_test.go
@@ -2320,6 +2329,7 @@ requirements:
     tests:
       - internal/bmmgen/render_interval_bound_test.go
       - openehr/rm/interval_closed_test.go
+      - openehr/rm/missing_members_test.go
       - openehr/serialize/canjson/interval_flag_defaults_test.go
       - openehr/serialize/canjson/interval_unbounded_bound_test.go
       - openehr/serialize/canjson/roundtrip_test.go
@@ -2349,6 +2359,7 @@ requirements:
       - internal/rmjsonwalk/root_internal_test.go
       - internal/rmjsonwalk/root_test.go
       - internal/rmjsonwalk/walk_test.go
+      - openehr/internal/xmlunmatched/document_internal_test.go
       - openehr/serialize/canjson/unmatched_test.go
       - openehr/serialize/canxml/primitive_error_test.go
       - openehr/serialize/canxml/unmatched_test.go
@@ -2419,12 +2430,13 @@ requirements:
       - openehr/validation/limits_decoded_test.go
       - openehr/validation/limits_test.go
       - openehr/validation/locatable_attributes_test.go
+      - openehr/validation/missing_internal_test.go
+      - openehr/validation/missing_members_test.go
       - openehr/validation/noncomposition_test.go
       - openehr/validation/optional_list_counts_test.go
       - openehr/validation/primitive_empty_part_test.go
       - openehr/validation/prohibited_test.go
       - openehr/validation/registry_roots_test.go
-      - openehr/validation/rmfloor_bytes_internal_test.go
       - openehr/validation/rmfloor_chained_corpus_test.go
       - openehr/validation/rmfloor_chained_internal_test.go
       - openehr/validation/rmfloor_coded_test.go
@@ -2485,3 +2497,19 @@ requirements:
       - testkit/probes/versioned/probe_092_contribution_get.go
       - testkit/probes/versioned/probe_109_versioned_object_reads.go
       - testkit/probes/versioned/probes_test.go
+
+  - id: REQ-175
+    title: Missing members on decode
+    canonical: docs/specifications/wire.md#req-175--missing-members-on-decode
+    status: draft
+    implementation: landed
+    packages: [openehr/serialize/canjson, openehr/serialize/canxml, internal/rmjsonwalk, openehr/internal/xmlunmatched, internal/bmmgen, openehr/rm, openehr/aom/aom14, openehr/validation]
+    probes: [PROBE-110, PROBE-081]
+    tests:
+      - internal/bmmgen/render_xmlunmar_class_test.go
+      - openehr/internal/xmlunmatched/document_internal_test.go
+      - openehr/internal/xmlunmatched/missing_internal_test.go
+      - openehr/rm/missing_members_test.go
+      - openehr/serialize/canjson/missing_test.go
+      - openehr/serialize/canxml/missing_test.go
+      - openehr/validation/missing_members_test.go

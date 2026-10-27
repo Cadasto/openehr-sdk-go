@@ -87,9 +87,11 @@ func (l Layer) String() string {
 //
 // The instance validators are [Validator.Validate], [ValidateComposition],
 // [Validate], [ValidateDemographic], [ValidateFolder] and
-// [ValidateEHRStatus], and the template-less floor [ValidateRM],
+// [ValidateEHRStatus], the template-less floor [ValidateRM],
 // [ValidateRMFolder], [ValidateRMEHRStatus], [ValidateRMEHRAccess],
-// [ValidateRMDemographic] and [ValidateRMEHRStatusBytes]. On their issues
+// [ValidateRMDemographic] and [ValidateRMEHRStatusBytes], and the entries
+// that decode a document first, [ValidateJSON] and [ValidateXML] and their
+// [Validator] methods. On their issues
 // Path, Code, Layer, Rule, Detail and Severity never contain a value taken
 // from the instance: not the content of a data value (a node's own name
 // included), a code, units, a precision, an interval bound, nor the text of

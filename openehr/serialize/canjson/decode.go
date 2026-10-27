@@ -112,8 +112,9 @@ type DecodeError = poly.DecodeError
 
 // DecoderOption configures a decode, through [Unmarshal] or a [Decoder].
 // [WithUnmatched] and [WithStrict] say what happens to members the decode
-// does not read; [WithRelaxedTypeDispatch] switches the polymorphic-dispatch
-// policy from strict (default) to relaxed.
+// does not read; [WithMissing] reports the members the RM requires that the
+// input leaves out; [WithRelaxedTypeDispatch] switches the
+// polymorphic-dispatch policy from strict (default) to relaxed.
 type DecoderOption func(*decoderConfig)
 
 // decoderConfig holds the option-driven state of a decode. Kept
@@ -123,6 +124,7 @@ type decoderConfig struct {
 	relaxedTypeDispatch bool
 	unmatched           func(pointer string)
 	strict              bool
+	missing             func(pointer string)
 }
 
 // newDecoderConfig applies opts in order, skipping a nil option.
@@ -168,8 +170,9 @@ func WithRelaxedTypeDispatch(enabled bool) DecoderOption {
 // duplicate the same way. canjson keeps its own application here because
 // [Unmarshal] and [Decoder.Decode] accept non-RM targets, which never
 // travel through the registry, so the registry gate alone would not cover
-// them. [WithUnmatched] and [WithStrict] check nothing in a target whose
-// own shape is no RM class; a duplicate name in it is refused all the same.
+// them. [WithUnmatched], [WithStrict] and [WithMissing] check nothing in a
+// target whose own shape is no RM class; a duplicate name in it is refused
+// all the same.
 func classifyDecode(err error) error {
 	return typereg.ClassifyDuplicate(err)
 }
@@ -197,16 +200,18 @@ func classifyDecode(err error) error {
 //
 // A member the target does not read is ignored by default. [WithUnmatched]
 // reports each such member and [WithStrict] refuses the first, wrapping
-// [ErrUnknownMember]. Either option checks the members once the decode has
-// succeeded and changes nothing about the decode itself; with neither, no
-// member is checked.
+// [ErrUnknownMember]. A member the RM requires that the input leaves out, or
+// sends as `null`, decodes to its zero value and is no error in any mode;
+// [WithMissing] reports each such member. The options check the members once
+// the decode has succeeded, in one pass, and change nothing about the decode
+// itself; with none of them, no member is checked.
 //
 // The value v points to is unspecified after an error: a failed decode may
 // leave it partly written.
 func Unmarshal(data []byte, v any, opts ...DecoderOption) error {
 	err := classifyDecode(json.Unmarshal(data, v, typereg.Unmarshalers()))
 	if err == nil && len(opts) > 0 {
-		err = checkUnmatched(data, v, opts)
+		err = checkMembers(data, v, opts)
 	}
 	return entryError(err)
 }
@@ -223,8 +228,8 @@ type Decoder struct {
 
 // NewDecoder returns a [Decoder] that reads canonical-JSON values
 // from r. The options apply to every value it decodes; a JSON Pointer that
-// [WithUnmatched] or [WithStrict] reports is relative to the value being
-// decoded.
+// [WithUnmatched], [WithStrict] or [WithMissing] reports is relative to the
+// value being decoded.
 func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 	d := &Decoder{cfg: newDecoderConfig(opts)}
 	switch r.(type) {
@@ -286,9 +291,9 @@ func (rr *readRecorder) failed(err error) bool {
 // truncated value wraps a *jsontext.SyntacticError wrapping
 // io.ErrUnexpectedEOF in both.
 //
-// With [WithUnmatched] or [WithStrict], Decode first reads the whole next
-// value into the decoder's read buffer, then decodes those bytes as
-// [Unmarshal] does and checks their members, with no copy of its own.
+// With [WithUnmatched], [WithStrict] or [WithMissing], Decode first reads the
+// whole next value into the decoder's read buffer, then decodes those bytes
+// as [Unmarshal] does and checks their members, with no copy of its own.
 // Reading the value whole first changes which failure a bad value reports:
 // malformed bytes anywhere in the value come back ahead of a shape failure
 // earlier in it, and a shape failure's byte offset counts from the start of
@@ -308,7 +313,7 @@ func (d *Decoder) Decode(v any) error {
 	if err := classifyDecode(json.Unmarshal(raw, v, typereg.Unmarshalers())); err != nil {
 		return entryError(err)
 	}
-	return entryError(d.cfg.walkUnmatched(raw, v))
+	return entryError(d.cfg.walkMembers(raw, v))
 }
 
 // streamError returns err, an error from reading the stream, as

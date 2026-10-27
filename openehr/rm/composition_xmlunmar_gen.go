@@ -14,6 +14,14 @@ import (
 
 // BMM package: org.openehr.rm.composition — canonical-XML UnmarshalXML companions
 
+// xmlClassComposition describes COMPOSITION to the canonical-XML decode runtime.
+var xmlClassComposition = xmlunmatched.Class{
+	Name:     "COMPOSITION",
+	Attrs:    []string{"archetype_node_id"},
+	Required: []string{"name", "archetype_node_id", "language", "territory", "category", "composer"},
+	Items:    []string{"links", "content"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into Composition.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -24,7 +32,7 @@ import (
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *Composition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start, "archetype_node_id"); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassComposition); _err != nil {
 		return _err
 	}
 	for _, _a := range _start.Attr {
@@ -120,6 +128,13 @@ func (c *Composition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 	}
 }
 
+// xmlClassEventContext describes EVENT_CONTEXT to the canonical-XML decode runtime.
+var xmlClassEventContext = xmlunmatched.Class{
+	Name:     "EVENT_CONTEXT",
+	Required: []string{"start_time", "setting"},
+	Items:    []string{"participations"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into EventContext.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -130,7 +145,7 @@ func (c *Composition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (e *EventContext) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassEventContext); _err != nil {
 		return _err
 	}
 	for {

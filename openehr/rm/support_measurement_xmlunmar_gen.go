@@ -14,6 +14,11 @@ import (
 
 // BMM package: org.openehr.rm.support.measurement — canonical-XML UnmarshalXML companions
 
+// xmlClassMeasurementService describes MEASUREMENT_SERVICE to the canonical-XML decode runtime.
+var xmlClassMeasurementService = xmlunmatched.Class{
+	Name: "MEASUREMENT_SERVICE",
+}
+
 // UnmarshalXML decodes canonical openEHR XML into MeasurementService.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -24,7 +29,7 @@ import (
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (m *MeasurementService) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassMeasurementService); _err != nil {
 		return _err
 	}
 	for {

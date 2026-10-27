@@ -14,6 +14,12 @@ import (
 
 // BMM package: org.openehr.base.base_types.identification — canonical-XML UnmarshalXML companions
 
+// xmlClassAccessGroupRef describes ACCESS_GROUP_REF to the canonical-XML decode runtime.
+var xmlClassAccessGroupRef = xmlunmatched.Class{
+	Name:     "ACCESS_GROUP_REF",
+	Required: []string{"namespace", "type", "id"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into AccessGroupRef.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -24,7 +30,7 @@ import (
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *AccessGroupRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassAccessGroupRef); _err != nil {
 		return _err
 	}
 	for {
@@ -64,6 +70,12 @@ func (a *AccessGroupRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement
 	}
 }
 
+// xmlClassArchetypeID describes ARCHETYPE_ID to the canonical-XML decode runtime.
+var xmlClassArchetypeID = xmlunmatched.Class{
+	Name:     "ARCHETYPE_ID",
+	Required: []string{"value"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into ArchetypeID.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -74,7 +86,7 @@ func (a *AccessGroupRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *ArchetypeID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassArchetypeID); _err != nil {
 		return _err
 	}
 	for {
@@ -104,6 +116,12 @@ func (a *ArchetypeID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 	}
 }
 
+// xmlClassGenericID describes GENERIC_ID to the canonical-XML decode runtime.
+var xmlClassGenericID = xmlunmatched.Class{
+	Name:     "GENERIC_ID",
+	Required: []string{"value", "scheme"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into GenericID.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -114,7 +132,7 @@ func (a *ArchetypeID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (g *GenericID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassGenericID); _err != nil {
 		return _err
 	}
 	for {
@@ -148,6 +166,12 @@ func (g *GenericID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 	}
 }
 
+// xmlClassHierObjectID describes HIER_OBJECT_ID to the canonical-XML decode runtime.
+var xmlClassHierObjectID = xmlunmatched.Class{
+	Name:     "HIER_OBJECT_ID",
+	Required: []string{"value"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into HierObjectID.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -158,7 +182,7 @@ func (g *GenericID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (h *HierObjectID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassHierObjectID); _err != nil {
 		return _err
 	}
 	for {
@@ -188,6 +212,12 @@ func (h *HierObjectID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 	}
 }
 
+// xmlClassISOOID describes ISO_OID to the canonical-XML decode runtime.
+var xmlClassISOOID = xmlunmatched.Class{
+	Name:     "ISO_OID",
+	Required: []string{"value"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into ISOOID.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -198,7 +228,7 @@ func (h *HierObjectID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (i *ISOOID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassISOOID); _err != nil {
 		return _err
 	}
 	for {
@@ -226,6 +256,12 @@ func (i *ISOOID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 			return nil
 		}
 	}
+}
+
+// xmlClassInternetID describes INTERNET_ID to the canonical-XML decode runtime.
+var xmlClassInternetID = xmlunmatched.Class{
+	Name:     "INTERNET_ID",
+	Required: []string{"value"},
 }
 
 // UnmarshalXML decodes canonical openEHR XML into InternetID.
@@ -238,7 +274,7 @@ func (i *ISOOID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (i *InternetID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassInternetID); _err != nil {
 		return _err
 	}
 	for {
@@ -268,6 +304,12 @@ func (i *InternetID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 	}
 }
 
+// xmlClassLocatableRef describes LOCATABLE_REF to the canonical-XML decode runtime.
+var xmlClassLocatableRef = xmlunmatched.Class{
+	Name:     "LOCATABLE_REF",
+	Required: []string{"namespace", "type", "id"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into LocatableRef.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -278,7 +320,7 @@ func (i *InternetID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (l *LocatableRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassLocatableRef); _err != nil {
 		return _err
 	}
 	for {
@@ -324,6 +366,12 @@ func (l *LocatableRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 	}
 }
 
+// xmlClassObjectRef describes OBJECT_REF to the canonical-XML decode runtime.
+var xmlClassObjectRef = xmlunmatched.Class{
+	Name:     "OBJECT_REF",
+	Required: []string{"namespace", "type", "id"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into ObjectRef.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -334,7 +382,7 @@ func (l *LocatableRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (o *ObjectRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassObjectRef); _err != nil {
 		return _err
 	}
 	for {
@@ -374,6 +422,12 @@ func (o *ObjectRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 	}
 }
 
+// xmlClassObjectVersionID describes OBJECT_VERSION_ID to the canonical-XML decode runtime.
+var xmlClassObjectVersionID = xmlunmatched.Class{
+	Name:     "OBJECT_VERSION_ID",
+	Required: []string{"value"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into ObjectVersionID.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -384,7 +438,7 @@ func (o *ObjectRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (o *ObjectVersionID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassObjectVersionID); _err != nil {
 		return _err
 	}
 	for {
@@ -414,6 +468,12 @@ func (o *ObjectVersionID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElemen
 	}
 }
 
+// xmlClassPartyRef describes PARTY_REF to the canonical-XML decode runtime.
+var xmlClassPartyRef = xmlunmatched.Class{
+	Name:     "PARTY_REF",
+	Required: []string{"namespace", "type", "id"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into PartyRef.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -424,7 +484,7 @@ func (o *ObjectVersionID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElemen
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (p *PartyRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassPartyRef); _err != nil {
 		return _err
 	}
 	for {
@@ -464,6 +524,12 @@ func (p *PartyRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 	}
 }
 
+// xmlClassTemplateID describes TEMPLATE_ID to the canonical-XML decode runtime.
+var xmlClassTemplateID = xmlunmatched.Class{
+	Name:     "TEMPLATE_ID",
+	Required: []string{"value"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into TemplateID.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -474,7 +540,7 @@ func (p *PartyRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TemplateID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassTemplateID); _err != nil {
 		return _err
 	}
 	for {
@@ -502,6 +568,12 @@ func (t *TemplateID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 			return nil
 		}
 	}
+}
+
+// xmlClassTerminologyID describes TERMINOLOGY_ID to the canonical-XML decode runtime.
+var xmlClassTerminologyID = xmlunmatched.Class{
+	Name:     "TERMINOLOGY_ID",
+	Required: []string{"value"},
 }
 
 // UnmarshalXML decodes canonical openEHR XML into TerminologyID.
@@ -514,7 +586,7 @@ func (t *TemplateID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TerminologyID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassTerminologyID); _err != nil {
 		return _err
 	}
 	for {
@@ -544,6 +616,12 @@ func (t *TerminologyID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 	}
 }
 
+// xmlClassUuid describes UUID to the canonical-XML decode runtime.
+var xmlClassUuid = xmlunmatched.Class{
+	Name:     "UUID",
+	Required: []string{"value"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into Uuid.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -554,7 +632,7 @@ func (t *TerminologyID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (u *Uuid) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassUuid); _err != nil {
 		return _err
 	}
 	for {
@@ -584,6 +662,12 @@ func (u *Uuid) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 	}
 }
 
+// xmlClassVersionTreeID describes VERSION_TREE_ID to the canonical-XML decode runtime.
+var xmlClassVersionTreeID = xmlunmatched.Class{
+	Name:     "VERSION_TREE_ID",
+	Required: []string{"value"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into VersionTreeID.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -594,7 +678,7 @@ func (u *Uuid) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (v *VersionTreeID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassVersionTreeID); _err != nil {
 		return _err
 	}
 	for {

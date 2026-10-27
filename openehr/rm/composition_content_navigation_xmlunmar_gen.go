@@ -14,6 +14,14 @@ import (
 
 // BMM package: org.openehr.rm.composition.content.navigation — canonical-XML UnmarshalXML companions
 
+// xmlClassSection describes SECTION to the canonical-XML decode runtime.
+var xmlClassSection = xmlunmatched.Class{
+	Name:     "SECTION",
+	Attrs:    []string{"archetype_node_id"},
+	Required: []string{"name", "archetype_node_id"},
+	Items:    []string{"links", "items"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into Section.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -24,7 +32,7 @@ import (
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (s *Section) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start, "archetype_node_id"); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassSection); _err != nil {
 		return _err
 	}
 	for _, _a := range _start.Attr {

@@ -3,6 +3,7 @@ package rmjsonwalk
 import (
 	"bytes"
 	"encoding/json/jsontext"
+	"slices"
 )
 
 // Root is the RM shape a decode target gives a document's root: the JSON
@@ -27,11 +28,33 @@ type Root struct {
 	Bound string
 }
 
-// Unmatched walks the first JSON value in data and calls report with the JSON
-// Pointer (RFC 6901) of every unmatched member, once each, in the order the
-// members appear. A member is unmatched when its name is neither "_type" nor
-// an attribute of the RM type its object decodes as. A pointer names the
-// member and carries none of its value.
+// Hooks are the functions a [Model.Walk] calls for what it finds. Each takes
+// the JSON Pointer (RFC 6901) of a member, which names the member and
+// carries none of its value: its segments are member names, positions in a
+// JSON array counted from 0, and the keys of a Hash. A nil hook asks for
+// nothing, and the walk does no work for it. When a hook returns an error
+// the walk stops and returns that error.
+type Hooks struct {
+	// Unmatched is called for every unmatched member, once each, in the
+	// order the members appear. A member is unmatched when its name is
+	// neither "_type" nor an attribute of the RM type its object decodes
+	// as.
+	Unmatched func(pointer string) error
+	// Missing is called for every missing member, once each: an attribute
+	// the RM makes mandatory on the RM type an object decodes as, which the
+	// object has no member for or holds null at, as the attribute's name
+	// under the object's pointer. A member that carries a value other than
+	// null is never missing, whatever the value, and neither is an
+	// attribute no serialization
+	// carries, an interval boundary flag or "_type" (see [Model.required]).
+	// The members of one object are reported as the object closes, in the
+	// order the RM declares the attributes, an ancestor's before the
+	// class's own; the objects inside an object close first.
+	Missing func(pointer string) error
+}
+
+// Walk walks the first JSON value in data and calls the hooks in h for what
+// it finds, in one pass over the document.
 //
 // root says how the document's root holds its RM values. A value where root
 // expects a container of another JSON kind is skipped. A Hash attribute whose
@@ -43,20 +66,27 @@ type Root struct {
 // decoder reads it. It does not look inside an object of a class outside the
 // model, such as an AOM 1.4 class, nor inside an object whose type it cannot
 // read, a primitive value or a generic payload ([Attribute]), and nothing in
-// such a value is reported. A value of the wrong JSON kind for its attribute
-// is skipped, not reported: the decoder refuses it.
+// such a value is reported, missing members included. A value of the wrong
+// JSON kind for its attribute is skipped, not reported: the decoder refuses
+// it, and the member is present.
 //
-// report must not be nil. When it returns an error the walk stops and
-// returns that error. Any other error is a malformed document, reported by
+// An error other than a hook's own is a malformed document, reported by
 // encoding/json/jsontext under its default options; data the canonical-JSON
 // decoder accepted walks without one.
-func (m *Model) Unmatched(data []byte, root Root, report func(pointer string) error) error {
+func (m *Model) Walk(data []byte, root Root, h Hooks) error {
 	types, err := typeIndex(data)
 	if err != nil {
 		return err
 	}
-	w := &walk{m: m, types: types, report: report}
+	w := &walk{m: m, types: types, hooks: h}
 	return w.root(jsontext.NewDecoder(bytes.NewReader(data)), root.Nest, root)
+}
+
+// Unmatched is [Model.Walk] with report as the Unmatched hook alone: it calls
+// report with the pointer of every unmatched member, once each, in the order
+// the members appear. report must not be nil.
+func (m *Model) Unmatched(data []byte, root Root, report func(pointer string) error) error {
+	return m.Walk(data, root, Hooks{Unmatched: report})
 }
 
 // root reads the next value from dec as the containers nest still lists
@@ -149,11 +179,11 @@ func indexValue(dec *jsontext.Decoder, types map[int64]string) error {
 	return err
 }
 
-// walk is one pass of [Model.Unmatched] over a document.
+// walk is one pass of [Model.Walk] over a document.
 type walk struct {
-	m      *Model
-	types  map[int64]string
-	report func(pointer string) error
+	m     *Model
+	types map[int64]string
+	hooks Hooks
 }
 
 // value reads the next value from dec as one value of declared type declared,
@@ -168,6 +198,17 @@ func (w *walk) value(dec *jsontext.Decoder, declared, bound string) error {
 	}
 	typ, hasType := w.types[dec.InputOffset()]
 	rmType, err := w.m.Resolve(typ, hasType && typ != "", declared)
+	// With a Missing hook, required lists the presence-checked attributes
+	// of rmType and seen records which of them the object holds a value for.
+	// Without one both stay nil, and the loop below does nothing for them.
+	var (
+		required []string
+		seen     []bool
+	)
+	if err == nil && w.hooks.Missing != nil {
+		required = w.m.required(rmType)
+		seen = make([]bool, len(required))
+	}
 	for dec.PeekKind() != '}' {
 		tok, rerr := dec.ReadToken()
 		if rerr != nil {
@@ -181,12 +222,28 @@ func (w *walk) value(dec *jsontext.Decoder, declared, bound string) error {
 			}
 			continue
 		}
-		if merr := w.member(dec, rmType, tok.String(), bound); merr != nil {
+		name := tok.String()
+		if i := slices.Index(required, name); i >= 0 && dec.PeekKind() != 'n' {
+			seen[i] = true
+		}
+		if merr := w.member(dec, rmType, name, bound); merr != nil {
 			return merr
 		}
 	}
-	_, rerr := dec.ReadToken()
-	return rerr
+	if _, rerr := dec.ReadToken(); rerr != nil {
+		return rerr
+	}
+	// The object has closed: dec's pointer names it, and each required
+	// attribute it holds no value for is missing.
+	for i, attr := range required {
+		if seen[i] {
+			continue
+		}
+		if herr := w.hooks.Missing(string(dec.StackPointer()) + "/" + attr); herr != nil {
+			return herr
+		}
+	}
+	return nil
 }
 
 // member reads the value of the member name of an object of type rmType,
@@ -199,8 +256,10 @@ func (w *walk) member(dec *jsontext.Decoder, rmType, name, bound string) error {
 	attr, ok := w.m.Attribute(rmType, name, bound)
 	switch {
 	case !ok:
-		if err := w.report(string(dec.StackPointer())); err != nil {
-			return err
+		if w.hooks.Unmatched != nil {
+			if err := w.hooks.Unmatched(string(dec.StackPointer())); err != nil {
+				return err
+			}
 		}
 		return dec.SkipValue()
 	case attr.Payload, attr.Kind == KindPrimitive:

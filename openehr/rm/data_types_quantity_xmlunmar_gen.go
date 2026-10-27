@@ -14,6 +14,13 @@ import (
 
 // BMM package: org.openehr.rm.data_types.quantity — canonical-XML UnmarshalXML companions
 
+// xmlClassDVCount describes DV_COUNT to the canonical-XML decode runtime.
+var xmlClassDVCount = xmlunmatched.Class{
+	Name:     "DV_COUNT",
+	Required: []string{"magnitude"},
+	Items:    []string{"other_reference_ranges"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into DVCount.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -24,7 +31,7 @@ import (
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVCount) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVCount); _err != nil {
 		return _err
 	}
 	for {
@@ -90,6 +97,11 @@ func (d *DVCount) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 	}
 }
 
+// xmlClassDVInterval describes DV_INTERVAL to the canonical-XML decode runtime.
+var xmlClassDVInterval = xmlunmatched.Class{
+	Name: "DV_INTERVAL",
+}
+
 // UnmarshalXML decodes canonical openEHR XML into DVInterval.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -112,7 +124,7 @@ func (d *DVCount) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 // An empty or whitespace-only flag element carries no boolean and reads as
 // a flag the document leaves out.
 func (d *DVInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVInterval); _err != nil {
 		return _err
 	}
 	var _seen intervalFlagsSeen
@@ -172,6 +184,13 @@ func (d *DVInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 	}
 }
 
+// xmlClassDVOrdinal describes DV_ORDINAL to the canonical-XML decode runtime.
+var xmlClassDVOrdinal = xmlunmatched.Class{
+	Name:     "DV_ORDINAL",
+	Required: []string{"symbol", "value"},
+	Items:    []string{"other_reference_ranges"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into DVOrdinal.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -182,7 +201,7 @@ func (d *DVInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVOrdinal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVOrdinal); _err != nil {
 		return _err
 	}
 	for {
@@ -234,6 +253,13 @@ func (d *DVOrdinal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 	}
 }
 
+// xmlClassDVProportion describes DV_PROPORTION to the canonical-XML decode runtime.
+var xmlClassDVProportion = xmlunmatched.Class{
+	Name:     "DV_PROPORTION",
+	Required: []string{"numerator", "denominator", "type"},
+	Items:    []string{"other_reference_ranges"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into DVProportion.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -244,7 +270,7 @@ func (d *DVOrdinal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVProportion) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVProportion); _err != nil {
 		return _err
 	}
 	for {
@@ -324,6 +350,13 @@ func (d *DVProportion) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 	}
 }
 
+// xmlClassDVQuantity describes DV_QUANTITY to the canonical-XML decode runtime.
+var xmlClassDVQuantity = xmlunmatched.Class{
+	Name:     "DV_QUANTITY",
+	Required: []string{"magnitude", "units"},
+	Items:    []string{"other_reference_ranges"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into DVQuantity.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -334,7 +367,7 @@ func (d *DVProportion) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVQuantity) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVQuantity); _err != nil {
 		return _err
 	}
 	for {
@@ -422,6 +455,13 @@ func (d *DVQuantity) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 	}
 }
 
+// xmlClassDVScale describes DV_SCALE to the canonical-XML decode runtime.
+var xmlClassDVScale = xmlunmatched.Class{
+	Name:     "DV_SCALE",
+	Required: []string{"symbol", "value"},
+	Items:    []string{"other_reference_ranges"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into DVScale.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -432,7 +472,7 @@ func (d *DVQuantity) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVScale) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVScale); _err != nil {
 		return _err
 	}
 	for {
@@ -484,6 +524,12 @@ func (d *DVScale) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 	}
 }
 
+// xmlClassReferenceRange describes REFERENCE_RANGE to the canonical-XML decode runtime.
+var xmlClassReferenceRange = xmlunmatched.Class{
+	Name:     "REFERENCE_RANGE",
+	Required: []string{"meaning", "range"},
+}
+
 // UnmarshalXML decodes canonical openEHR XML into ReferenceRange.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.
@@ -494,7 +540,7 @@ func (d *DVScale) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (r *ReferenceRange[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassReferenceRange); _err != nil {
 		return _err
 	}
 	for {

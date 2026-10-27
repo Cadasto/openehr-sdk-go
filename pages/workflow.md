@@ -66,8 +66,10 @@ builder, the synthesiser, the validator, and AQL lint all accept.
 ### Check before you send
 `validation.ValidateComposition` checks the compiled OPT's constraints and the
 Reference Model's own rules in one call, and reports a defect both find once.
-`ValidateRM` checks the Reference Model's rules alone, for data no template
-governs.
+`ValidateJSON` and `ValidateXML` decode a canonical document and validate it in
+one call, so a mandatory number or boolean the document leaves out is reported
+too. `ValidateRM` checks the Reference Model's rules alone, for data no
+template governs.
 
 </div>
 

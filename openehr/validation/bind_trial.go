@@ -14,13 +14,14 @@ import (
 )
 
 // walkMark is how far the walk's records reach at one point: the issues, the
-// refusals, the coverage entries, the stops, reported or not, the values
-// refuted by a decided verdict and the classes visited. A trial returns the
-// records to its mark when what it found is withdrawn.
+// refusals, the members a decode's report named that the walk read as absent,
+// the coverage entries, the stops, reported or not, the values refuted by a
+// decided verdict and the classes visited. A trial returns the records to its
+// mark when what it found is withdrawn.
 type walkMark struct {
-	issues, refused, external, notInRM, stoppedAt, depthCuts, refuted int
-	depthStopped                                                      bool
-	visited                                                           indexSet
+	issues, refused, absent, external, notInRM, stoppedAt, depthCuts, refuted int
+	depthStopped                                                              bool
+	visited                                                                   indexSet
 }
 
 // mark returns how far the walk's records reach now.
@@ -28,6 +29,7 @@ func (e *engine) mark() walkMark {
 	return walkMark{
 		issues:       len(e.found.issues),
 		refused:      len(e.refused),
+		absent:       len(e.absent),
 		external:     len(e.external),
 		notInRM:      len(e.notInRM),
 		stoppedAt:    len(e.stoppedAt),
@@ -48,12 +50,14 @@ func (e *engine) rollback(m walkMark) {
 	e.depthStopped = m.depthStopped
 }
 
-// truncate withdraws the issues, the refusals, the coverage entries and the
-// classes visited the walk recorded since m, its stops apart.
+// truncate withdraws the issues, the refusals, the members read as absent,
+// the coverage entries and the classes visited the walk recorded since m, its
+// stops apart.
 func (e *engine) truncate(m walkMark) {
 	clear(e.found.issues[m.issues:])
 	e.found.issues = e.found.issues[:m.issues]
 	e.refused = e.refused[:m.refused]
+	e.absent = e.absent[:m.absent]
 	e.external = e.external[:m.external]
 	e.notInRM = e.notInRM[:m.notInRM]
 	e.found.visited = append(e.found.visited[:0], m.visited...)
@@ -62,11 +66,11 @@ func (e *engine) truncate(m walkMark) {
 // walkSegment is what the walk recorded during one trial, set aside while
 // the walk tries the next child.
 type walkSegment struct {
-	issues                              []Issue
-	refused, external, notInRM, stopped []string
-	depthCuts, refuted                  int
-	depthStopped                        bool
-	visited                             indexSet
+	issues                                      []Issue
+	refused, absent, external, notInRM, stopped []string
+	depthCuts, refuted                          int
+	depthStopped                                bool
+	visited                                     indexSet
 }
 
 // setAside withdraws what the walk recorded since m and returns it, so that
@@ -75,6 +79,7 @@ func (e *engine) setAside(m walkMark) walkSegment {
 	s := walkSegment{
 		issues:       slices.Clone(e.found.issues[m.issues:]),
 		refused:      slices.Clone(e.refused[m.refused:]),
+		absent:       slices.Clone(e.absent[m.absent:]),
 		external:     slices.Clone(e.external[m.external:]),
 		notInRM:      slices.Clone(e.notInRM[m.notInRM:]),
 		stopped:      slices.Clone(e.stoppedAt[m.stoppedAt:]),
@@ -92,6 +97,7 @@ func (e *engine) setAside(m walkMark) walkSegment {
 func (e *engine) restore(s walkSegment) {
 	e.found.issues = append(e.found.issues, s.issues...)
 	e.refused = append(e.refused, s.refused...)
+	e.absent = append(e.absent, s.absent...)
 	e.external = append(e.external, s.external...)
 	e.notInRM = append(e.notInRM, s.notInRM...)
 	e.stoppedAt = append(e.stoppedAt, s.stopped...)
@@ -116,6 +122,7 @@ func (e *engine) keepStops(m walkMark) {
 	e.truncate(walkMark{
 		issues:   len(kept),
 		refused:  m.refused,
+		absent:   m.absent,
 		external: m.external,
 		notInRM:  m.notInRM,
 		visited:  m.visited,
@@ -136,19 +143,22 @@ func (e *engine) validatesSince(m walkMark) bool {
 
 // trialKey is a node of the walk, its path apart, at which the walk tries a
 // value under a child: the value, held by pointer ([hasIdentity]), the RM
-// type it is read as, its role, its depth and the child. Whether the value
-// validates there depends on nothing else, its path only naming where its
-// findings are, so the walk decides it once per key ([engine.verdicts]). Nor
-// does it depend on the values the walk is inside ([engine].ancestry): a
-// value that reaches one of them lies on a cycle, so wherever the walk meets
-// it, its walk reports `cyclic_value`, an error, or stops at the depth limit
-// first, which fails the trial as well.
+// type it is read as, its role, its depth, the child, and the node of the
+// call's report of missing members that stands for it ([WithMissing]), nil
+// in a call with none, since the report changes how the value is read.
+// Whether the value validates there depends on nothing else, its path only
+// naming where its findings are, so the walk decides it once per key
+// ([engine.verdicts]). Nor does it depend on the values the walk is inside
+// ([engine].ancestry): a value that reaches one of them lies on a cycle, so
+// wherever the walk meets it, its walk reports `cyclic_value`, an error, or
+// stops at the depth limit first, which fails the trial as well.
 type trialKey struct {
-	value  any
-	rmType string
-	role   floorRole
-	depth  int
-	bound  *tcimpl.CompiledNode
+	value   any
+	rmType  string
+	role    floorRole
+	depth   int
+	bound   *tcimpl.CompiledNode
+	missing *missingNode
 }
 
 // verdict returns whether the value of n validates under n.bound, with
@@ -159,7 +169,7 @@ func (e *engine) verdict(n engineNode) (validates, decided bool) {
 	if e.verdicts == nil || !hasIdentity(n.value) {
 		return false, false
 	}
-	validates, decided = e.verdicts[trialKey{value: n.value, rmType: n.rmType, role: n.role, depth: n.depth, bound: n.bound}]
+	validates, decided = e.verdicts[trialKey{value: n.value, rmType: n.rmType, role: n.role, depth: n.depth, bound: n.bound, missing: n.missing}]
 	return validates, decided
 }
 
@@ -174,7 +184,7 @@ func (e *engine) decide(n engineNode, validates bool) {
 	if e.verdicts == nil {
 		e.verdicts = make(map[trialKey]bool)
 	}
-	e.verdicts[trialKey{value: n.value, rmType: n.rmType, role: n.role, depth: n.depth, bound: n.bound}] = validates
+	e.verdicts[trialKey{value: n.value, rmType: n.rmType, role: n.role, depth: n.depth, bound: n.bound, missing: n.missing}] = validates
 }
 
 // bindAmong binds a value to one of candidates, the children of one binding
@@ -285,17 +295,18 @@ func (e *engine) try(n engineNode, trial func(engineNode), keep bool) {
 	e.withdrawn--
 }
 
-// bindItems binds each of items, the items of the multi-valued attribute a
-// of node n, to one of children, the attribute's OPT children, and returns
-// for each item the child it binds to, nil when none does, and whether it
-// binds by its archetype_node_id ([bindsByNodeID]). An item binds among the
-// children of its rank ([itemRank]): a rank of one binds it to that child.
-// Where an item's rank holds two or more children, [engine.bindRanked]
-// rebinds the items of ranks of two or more, in item order, by
-// [engine.bindAmong]. The walk at attrPath, in role, is where those trials
-// run. Where the visit limit ends the walk inside a trial, bindItems
-// returns with the walk stopped and the binding not decided.
-func (e *engine) bindItems(n *engineNode, a *engineAttr, children []*tcimpl.CompiledNode, items []any, attrPath issuePath, role floorRole) (bound []*tcimpl.CompiledNode, byNodeID []bool) {
+// bindItems binds each of the items of r, the multi-valued attribute a of
+// node n as the walk read it, to one of children, the attribute's OPT
+// children, and returns for each item the child it binds to, nil when none
+// does, and whether it binds by its archetype_node_id ([bindsByNodeID]). An
+// item binds among the children of its rank ([itemRank]): a rank of one
+// binds it to that child. Where an item's rank holds two or more children,
+// [engine.bindRanked] rebinds the items of ranks of two or more, in item
+// order, by [engine.bindAmong]. The walk at attrPath, in role, is where
+// those trials run. Where the visit limit ends the walk inside a trial,
+// bindItems returns with the walk stopped and the binding not decided.
+func (e *engine) bindItems(n *engineNode, a *engineAttr, children []*tcimpl.CompiledNode, r *attrReading, attrPath issuePath, role floorRole) (bound []*tcimpl.CompiledNode, byNodeID []bool) {
+	items := r.items
 	bound = make([]*tcimpl.CompiledNode, len(items))
 	byNodeID = make([]bool, len(items))
 	parent := n.bound.RMTypeName()
@@ -310,14 +321,14 @@ func (e *engine) bindItems(n *engineNode, a *engineAttr, children []*tcimpl.Comp
 		ranked = ranked || len(rank) > 1
 	}
 	if ranked {
-		e.bindRanked(n, a, children, items, bound, byNodeID, attrPath, role)
+		e.bindRanked(n, a, children, r, bound, byNodeID, attrPath, role)
 	}
 	return bound, byNodeID
 }
 
-// bindRanked rebinds, in item order, each of items whose rank holds two or
-// more children by [engine.bindAmong], counting per child the items bound to
-// it before, so that a child has room while that count is below its
+// bindRanked rebinds, in item order, each of the items of r whose rank holds
+// two or more children by [engine.bindAmong], counting per child the items
+// bound to it before, so that a child has room while that count is below its
 // occurrences upper bound ([hasRoom]). bound holds each item bound to the
 // first child of its rank, and comes back with the binding; byNodeID holds
 // how each item binds. Each trial walks the item at the path the shared path
@@ -327,7 +338,8 @@ func (e *engine) bindItems(n *engineNode, a *engineAttr, children []*tcimpl.Comp
 // trials of an item, that path is not one the item has, and would change
 // with the limit: the stops kept from the trial are reported at attrPath,
 // the path of the list ([engine.stopAt]).
-func (e *engine) bindRanked(n *engineNode, a *engineAttr, children []*tcimpl.CompiledNode, items []any, bound []*tcimpl.CompiledNode, byNodeID []bool, attrPath issuePath, role floorRole) {
+func (e *engine) bindRanked(n *engineNode, a *engineAttr, children []*tcimpl.CompiledNode, r *attrReading, bound []*tcimpl.CompiledNode, byNodeID []bool, attrPath issuePath, role floorRole) {
+	items := r.items
 	from := len(e.preds)
 	e.preds = appendBoundPredicates(e.preds, items, bound, a.shape == shapeHash)
 	counts := make([]int, len(children))
@@ -335,7 +347,7 @@ func (e *engine) bindRanked(n *engineNode, a *engineAttr, children []*tcimpl.Com
 	for i, item := range items {
 		rank := itemRank(buf[:0], children, item, byNodeID[i])
 		if len(rank) > 1 {
-			at := engineNode{value: item, rmType: runtimeRMType(item, a.rmType), path: e.path.item(attrPath, e.preds[from+i]), role: role, depth: n.depth + 1}
+			at := engineNode{value: item, rmType: runtimeRMType(item, a.rmType), path: e.path.item(attrPath, e.preds[from+i]), role: role, depth: n.depth + 1, missing: r.itemMissing(i)}
 			issues, stops := len(e.found.issues), len(e.stoppedAt)
 			bound[i] = e.bindAmong(rank, func(j int) bool { return hasRoom(rank[j], counts[slices.Index(children, rank[j])]) }, at, e.walk, false)
 			if e.stopped {
