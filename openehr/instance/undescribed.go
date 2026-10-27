@@ -180,9 +180,9 @@ func (g *generator) membersUndescribed(node *tcimpl.CompiledNode, attr *tcimpl.C
 // materialiseImplicitMultiple builds.
 func (g *generator) bmmMemberLocatable(node *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
 	if attr.Cardinality() == template.Multiple {
-		return g.buildsLocatable(attr.RMTypeName())
+		return g.buildsLocatable(attrRMType(node, attr))
 	}
-	return g.buildsLocatable(attrType(node.RMTypeName(), attr.RMTypeName()))
+	return g.buildsLocatable(builtAttrType(node, attr))
 }
 
 // buildsLocatable reports whether the value the generator builds for the

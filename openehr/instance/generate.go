@@ -497,8 +497,9 @@ func walkSkips(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) boo
 		return true
 	}
 	// rminfo knows each class by its bare BMM name; the OPT may declare
-	// a generic instantiation (DV_INTERVAL<DV_QUANTITY>).
-	return rminfo.IsNonStorableAttr(bmmtype.Class(optNode.RMTypeName()), attr.Name())
+	// a generic instantiation (DV_INTERVAL<DV_QUANTITY>), or, for an
+	// untyped node, no type at all.
+	return rminfo.IsNonStorableAttr(nodeClass(optNode), attr.Name())
 }
 
 // nodeClass is the bare BMM class of the value the walk builds for
@@ -900,8 +901,32 @@ func attrTypedByRMClass(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttri
 	if !ok {
 		return false
 	}
-	_, known := h.IsAbstract(bmmtype.Class(attrType(optNode.RMTypeName(), attr.RMTypeName())))
+	_, known := h.IsAbstract(bmmtype.Class(builtAttrType(optNode, attr)))
 	return known
+}
+
+// builtAttrType returns the type of attr of optNode, read on the type the
+// walk builds for optNode (builtRMType), where a formal parameter takes its
+// actual type (attrType).
+func builtAttrType(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) string {
+	return attrType(builtRMType(optNode), attrRMType(optNode, attr))
+}
+
+// attrRMType returns the RM type of attr of optNode: the type the compile
+// gives it, which it reads on the type optNode names. An untyped node names
+// none, so the compile gives its attributes no type; such an attribute
+// takes the type the BMM declares for it on the type the walk builds for
+// optNode (builtRMType), as the compile would read it there.
+func attrRMType(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) string {
+	if declared := attr.RMTypeName(); declared != "" || strings.TrimSpace(optNode.RMTypeName()) != "" {
+		return declared
+	}
+	built := builtRMType(optNode)
+	declared, ok := rminfo.Default.AttributeRMType(bmmtype.Class(built), attr.Name())
+	if !ok {
+		return ""
+	}
+	return bmmtype.Substitute(built, declared)
 }
 
 // materialiseSingle synthesises and attaches one child under a
@@ -1056,7 +1081,7 @@ func (g *generator) materialiseImplicitSingle(
 	if g.fillCodeDefault(optNode, parentRM, attr.Name()) {
 		return nil
 	}
-	rmType := attrType(optNode.RMTypeName(), attr.RMTypeName())
+	rmType := builtAttrType(optNode, attr)
 	if rmType == "" {
 		return nil
 	}
@@ -2173,7 +2198,7 @@ func (g *generator) materialiseImplicitMultiple(
 	attr *tcimpl.CompiledAttribute,
 	parentRM any,
 ) error {
-	rmType := attr.RMTypeName()
+	rmType := attrRMType(optNode, attr)
 	// An optional attribute the OPT leaves empty stays empty. A child
 	// built from the BMM alone has no archetype to name, so an
 	// archetype-rooted one (COMPOSITION.content) would break the RM
@@ -2206,7 +2231,7 @@ func (g *generator) materialiseImplicitMultiple(
 // (existenceOnly), and otherwise the members it needs
 // (remainingLowerNeeded), within its cardinality upper bound (memberCap).
 func implicitMembers(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) int {
-	if attr.RMTypeName() == "" || existenceOnly(optNode, attr) {
+	if attrRMType(optNode, attr) == "" || existenceOnly(optNode, attr) {
 		return 0
 	}
 	needed := remainingLowerNeeded(attr, 0)
