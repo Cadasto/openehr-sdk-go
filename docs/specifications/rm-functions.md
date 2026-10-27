@@ -6,7 +6,7 @@ kind: specification
 
 **Status:** Draft
 
-Normative contract for the **derived / behavioural functions** the openEHR Reference Model defines on its identifier, `PATHABLE`/`LOCATABLE`, version-control, and temporal data-value classes — the operations that `bmmgen` emits as signatures from the pinned BMM but cannot implement from a schema (they carry algorithm, not just shape).
+Normative contract for the **derived / behavioural functions** the openEHR Reference Model defines on its identifier, URI, `PATHABLE`/`LOCATABLE`, version-control, and temporal data-value classes — the operations that `bmmgen` emits as signatures from the pinned BMM but cannot implement from a schema (they carry algorithm, not just shape).
 
 Covers REQ-120 through REQ-123. Structural RM rules (how the types are generated and shaped) are in [rm-modeling.md](rm-modeling.md) and [bmm-conformance.md](bmm-conformance.md); this spec governs the **runtime behaviour** of the functions on those types. Identifier lexical forms are authoritative in the openEHR BASE *Identification* package and the RM *Common* package; agents look them up there ([base_types identification](https://specifications.openehr.org/releases/BASE/development/base_types.html#_identification_package), [RM common](https://specifications.openehr.org/releases/RM/development/common.html)) rather than guess.
 
@@ -27,6 +27,7 @@ The SDK **MUST** expose the derived components of the openEHR identifier types f
 - `VERSION_TREE_ID` (lexical form `trunk_version [ '.' branch_number '.' branch_version ]`, 1 or 3 dot-separated parts): `trunk_version`, `branch_number`, `branch_version`, `is_branch` (true iff the 3-part branch form is present), and `is_first` (true iff the trunk version is `1`).
 - `ARCHETYPE_ID` (lexical form `rm_originator '-' rm_name '-' rm_entity '.' concept { '-' specialisation }* '.v' version_id`): `rm_originator`, `rm_name`, `rm_entity`, `qualified_rm_entity`, `domain_concept`, `specialisation`, and `version_id`.
 - `TERMINOLOGY_ID` (lexical form `name [ '(' version ')' ]`): `name` and `version_id`.
+- `DV_URI` (an RFC 3986 URI reference, `scheme ':' hier-part [ '?' query ] [ '#' fragment ]`): `scheme`, `path`, `query` and `fragment_id`, which `DV_EHR_URI` inherits. Each is the RFC 3986 component as written, not percent-decoded, or empty when the reference has none. A relative reference has no scheme, and the path leaves out the authority (the `//system_id` of an `ehr://` URI).
 
 `OBJECT_REF` / `PARTY_REF` and the `PARTY_PROXY` family **SHOULD** expose convenience accessors for their reference and identity components, and `LOCATABLE_REF` **SHOULD** provide `as_uri()` — the `ehr:`-scheme URI built from `namespace` + `id.value` + `path` — because callers otherwise rebuild these from the fields by hand.
 
@@ -34,7 +35,7 @@ Each fallible identifier form has one error-returning parser in `openehr/rm` (`P
 
 For a malformed identifier string, the `Parse…` function **MUST** return a non-nil error and the best-effort derivation methods **MUST** return a zero value; neither panics.
 
-**Acceptance:** for canonical and malformed sample strings of each form, `Parse…` round-trips the input and derived components equal the spec's lexical decomposition; malformed input yields an error from `Parse…` (no panic); best-effort methods never panic; the client version-uid helper produces identical results to the canonical parser.
+**Acceptance:** for canonical and malformed sample strings of each form, `Parse…` round-trips the input and derived components equal the spec's lexical decomposition; malformed input yields an error from `Parse…` (no panic); best-effort methods never panic; the client version-uid helper produces identical results to the canonical parser. The `DV_URI` functions split sample references with and without each component, and a `DV_EHR_URI` decoded from a `LINK` target answers them without a panic.
 
 **Out of scope:** validity *checking* of the embedded `UID` syntax beyond decomposition; generation of new identifiers (covered for instance synthesis by REQ-107). Of the recommended convenience accessors, only `LOCATABLE_REF.as_uri` exists; the `OBJECT_REF` / `PARTY_REF` / `PARTY_PROXY` ones are deferred, and the underlying fields are already directly accessible on the generated structs.
 
