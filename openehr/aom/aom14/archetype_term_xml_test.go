@@ -14,7 +14,8 @@ import (
 // TestREQ056_ArchetypeTermCodeDecodesFromAttribute pins that canonical XML
 // reads ARCHETYPE_TERM.code from the `code` attribute the AM 1.4 ITS-XML
 // schema declares (`xs:attribute name="code" use="required"`), in every
-// decode mode, and still reads a `code` child element an older SDK wrote.
+// decode mode, and still reads a `code` child element an older SDK wrote
+// (REQ-056).
 func TestREQ056_ArchetypeTermCodeDecodesFromAttribute(t *testing.T) {
 	cases := []struct {
 		name string
@@ -50,7 +51,8 @@ func TestREQ056_ArchetypeTermCodeDecodesFromAttribute(t *testing.T) {
 
 // TestREQ056_ArchetypeTermCodeEncodesAsAttribute pins that canonical XML
 // writes ARCHETYPE_TERM.code as the `code` attribute of the term's element,
-// the shape the AM 1.4 ITS-XML schema declares, and writes no `code` child.
+// the shape the AM 1.4 ITS-XML schema declares, and writes no `code` child
+// (REQ-056).
 func TestREQ056_ArchetypeTermCodeEncodesAsAttribute(t *testing.T) {
 	b, err := canxml.Marshal(&aom14.ArchetypeTerm{Code: "at0000"})
 	if err != nil {

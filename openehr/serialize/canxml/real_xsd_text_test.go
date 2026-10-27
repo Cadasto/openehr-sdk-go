@@ -15,7 +15,8 @@ import (
 // decode mode, that a DV_QUANTITY magnitude strconv.ParseFloat reads but the
 // xs:double lexical space lacks fails as a primitive element whose text does
 // not decode: a *canxml.DecodeError on the element's path that wraps
-// canxml.ErrInvalidShape, with a text that does not carry the literal.
+// canxml.ErrInvalidShape, with a text that does not carry the literal
+// (REQ-056).
 func TestUnmarshal_REQ056_RealTextOutsideXSDoubleIsRefused(t *testing.T) {
 	const path = "/dv_quantity[1]/magnitude[1]"
 	for _, lit := range []string{"0x1p-2", "1_000", "Inf", "Infinity", "nan"} {
@@ -43,7 +44,8 @@ func TestUnmarshal_REQ056_RealTextOutsideXSDoubleIsRefused(t *testing.T) {
 
 // TestUnmarshal_REQ056_RealTextInXSDoubleDecodes pins, in every decode mode,
 // that the special values and the decimal forms of the xs:double lexical
-// space strconv.ParseFloat also reads decode as a DV_QUANTITY magnitude.
+// space strconv.ParseFloat also reads decode as a DV_QUANTITY magnitude
+// (REQ-056).
 func TestUnmarshal_REQ056_RealTextInXSDoubleDecodes(t *testing.T) {
 	for _, tc := range []struct {
 		lit  string
@@ -75,7 +77,7 @@ func TestUnmarshal_REQ056_RealTextInXSDoubleDecodes(t *testing.T) {
 // TestMarshal_REQ056_RealSpecialValuesAreXSDouble pins that canonical XML
 // writes a DV_QUANTITY magnitude that is an infinity as INF or -INF and one
 // that is not a number as NaN, the xs:double spellings, and that the
-// document decodes back to the same value.
+// document decodes back to the same value (REQ-056).
 func TestMarshal_REQ056_RealSpecialValuesAreXSDouble(t *testing.T) {
 	for _, tc := range []struct {
 		in   float64

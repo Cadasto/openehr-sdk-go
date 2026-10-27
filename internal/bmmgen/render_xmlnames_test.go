@@ -25,7 +25,7 @@ func aom14PlanWithSchemas(t *testing.T) *Plan {
 
 // TestREQ056_CheckXMLTypeNames pins the schema names the generator accepts
 // for a target: the AOM 1.4 target's own pass, and each name the codecs
-// could not honour is refused.
+// could not honour is refused (REQ-056).
 func TestREQ056_CheckXMLTypeNames(t *testing.T) {
 	if err := checkXMLTypeNames(aom14PlanWithSchemas(t)); err != nil {
 		t.Fatalf("checkXMLTypeNames(aom14) = %v; want nil", err)
@@ -55,7 +55,8 @@ func TestREQ056_CheckXMLTypeNames(t *testing.T) {
 
 // TestREQ056_XMLSiteStart pins which polymorphic decode sites hand canxml the
 // start with schema names rewritten: a site that can hold a class with a
-// schema name, and no other, so the rest of the generated code is unchanged.
+// schema name, and no other, so the rest of the generated code is unchanged
+// (REQ-056).
 func TestREQ056_XMLSiteStart(t *testing.T) {
 	aom := aom14PlanWithSchemas(t)
 	rmPlan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})

@@ -45,7 +45,8 @@ func schemaTypeNameCases() []schemaTypeNameCase {
 
 // TestREQ056_AOM14SchemaTypeNamesDecode pins that a C_ATTRIBUTE child whose
 // `xsi:type` spells one of the three classes by its AM 1.4 ITS-XML schema
-// name, or by its BMM name, decodes to that class, in every decode mode.
+// name, or by its BMM name, decodes to that class, in every decode mode
+// (REQ-056).
 func TestREQ056_AOM14SchemaTypeNamesDecode(t *testing.T) {
 	for _, tc := range schemaTypeNameCases() {
 		for _, name := range []string{tc.schema, tc.bmm} {
@@ -74,7 +75,7 @@ func TestREQ056_AOM14SchemaTypeNamesDecode(t *testing.T) {
 
 // TestREQ056_AOM14SchemaTypeNamesEncode pins that canonical XML writes the
 // AM 1.4 ITS-XML schema name as the `xsi:type` of each of the three
-// classes, and that the output decodes back to the class.
+// classes, and that the output decodes back to the class (REQ-056).
 func TestREQ056_AOM14SchemaTypeNamesEncode(t *testing.T) {
 	for _, tc := range schemaTypeNameCases() {
 		t.Run(tc.bmm, func(t *testing.T) {

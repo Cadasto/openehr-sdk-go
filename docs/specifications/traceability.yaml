@@ -511,6 +511,7 @@ requirements:
       - testkit/fixtures/discover_test.go
       - testkit/probe/livecomposition_test.go
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
+      - testkit/probes/serialize/probe_030_empty_list_test.go
       - testkit/probes/serialize/probe_030_guard_internal_test.go
       - testkit/probes/serialize/probe_031_typereg_unknown_type.go
       - testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go
@@ -656,12 +657,16 @@ requirements:
     tests:
       - internal/bmmgen/render_interval_bound_test.go
       - internal/bmmgen/render_xmlmar_order_test.go
+      - internal/bmmgen/render_xmlnames_test.go
       - internal/rmaccess/interval_test.go
+      - openehr/aom/aom14/archetype_term_xml_test.go
       - openehr/aom/aom14/interval_open_side_test.go
+      - openehr/aom/aom14/schema_type_names_xml_test.go
       - openehr/internal/xmlunmatched/document_internal_test.go
       - openehr/rm/character_text_test.go
       - openehr/rm/interval_bound_test.go
       - openehr/rm/real_test.go
+      - openehr/rm/real_xsd_text_test.go
       - openehr/serialize/canxml/child_order_test.go
       - openehr/serialize/canxml/crossformat_test.go
       - openehr/serialize/canxml/decode_test.go
@@ -671,6 +676,7 @@ requirements:
       - openehr/serialize/canxml/oneroot_test.go
       - openehr/serialize/canxml/primitive_error_test.go
       - openehr/serialize/canxml/real_precision_test.go
+      - openehr/serialize/canxml/real_xsd_text_test.go
       - openehr/serialize/canxml/roundtrip_test.go
       - openehr/serialize/canxml/unmatched_test.go
       - testkit/conformance/crossformat/census_test.go

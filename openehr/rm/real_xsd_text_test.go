@@ -14,7 +14,7 @@ import (
 // TestREQ056_RealUnmarshalTextReadsXSDouble pins the forms of the xs:double
 // lexical space Real element text reads: a decimal number with an optional
 // sign, fraction and exponent, the special values INF, +INF, -INF and NaN,
-// and XML whitespace around any of them.
+// and XML whitespace around any of them (REQ-056).
 func TestREQ056_RealUnmarshalTextReadsXSDouble(t *testing.T) {
 	for _, tc := range []struct {
 		text string
@@ -53,7 +53,7 @@ func TestREQ056_RealUnmarshalTextReadsXSDouble(t *testing.T) {
 // not-a-number, and whitespace XML does not collapse. Each is refused with a
 // *strconv.NumError holding strconv.ErrSyntax, as text that spells no number
 // is, leaves the receiver as it was, and carries no canonical-JSON shape
-// sentinel.
+// sentinel (REQ-056).
 func TestREQ056_RealUnmarshalTextRefusesBeyondXSDouble(t *testing.T) {
 	for _, text := range []string{
 		"0x1p-2",    // hexadecimal
@@ -94,7 +94,7 @@ func TestREQ056_RealUnmarshalTextRefusesBeyondXSDouble(t *testing.T) {
 // an infinity as INF or -INF and a not-a-number as NaN, the xs:double
 // spellings, and a finite value as the shortest decimal that reads back as
 // the same float64, as encoding/xml writes a float64. Each reads back through
-// UnmarshalText.
+// UnmarshalText (REQ-056).
 func TestREQ056_RealMarshalTextWritesXSDouble(t *testing.T) {
 	for _, tc := range []struct {
 		in   float64
