@@ -938,7 +938,9 @@ func censusList(name string, existence, lower int, children ...string) string {
 //   - a CLUSTER's items over an optional CLUSTER whose items admit only a
 //     slot and an optional ELEMENT whose feeder_audit the template requires,
 //     which the generator cannot write: both need undescribed content, and
-//     the top-up takes the first.
+//     the top-up takes the first;
+//   - the same two children the other way round: the walk refuses the
+//     ELEMENT, so the top-up passes over it and takes the CLUSTER.
 //
 // Read beside a template that leaves the SECTION's items optional, where
 // no top-up runs, the first root holds a violation. So does a root
@@ -954,6 +956,10 @@ func TestREQ107_CensusLastResortFollowsTheGenerator(t *testing.T) {
 	slotCluster := func(nodeID string) string {
 		return censusOptional("CLUSTER", nodeID, slotItems(nodeID))
 	}
+	feederAuditElement := censusOptional("ELEMENT", "at0003", `<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>feeder_audit</rm_attribute_name>`+
+		`<existence><lower_included>true</lower_included><upper_included>true</upper_included>`+
+		`<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>1</lower><upper>1</upper></existence>`+
+		`<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>FEEDER_AUDIT</rm_type_name><node_id></node_id></children></attributes>`)
 	innerSection := censusOptional("SECTION", "at0002", censusList("items", 1, 0,
 		`<children xsi:type="ARCHETYPE_SLOT"><rm_type_name>SECTION</rm_type_name><node_id>at0003</node_id></children>`))
 	sectionRoot := censusRootOPT("SECTION", censusList("items", 1, 0, innerSection))
@@ -976,12 +982,12 @@ func TestREQ107_CensusLastResortFollowsTheGenerator(t *testing.T) {
 				censusOptional("ELEMENT", "at0001"), slotCluster("at0002"))),
 		},
 		{
-			name: "an ELEMENT whose feeder_audit the template requires after the CLUSTER",
-			generated: censusRootOPT("CLUSTER", censusList("items", -1, 1, slotCluster("at0002"),
-				censusOptional("ELEMENT", "at0003", `<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>feeder_audit</rm_attribute_name>`+
-					`<existence><lower_included>true</lower_included><upper_included>true</upper_included>`+
-					`<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>1</lower><upper>1</upper></existence>`+
-					`<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>FEEDER_AUDIT</rm_type_name><node_id></node_id></children></attributes>`))),
+			name:      "an ELEMENT whose feeder_audit the template requires after the CLUSTER",
+			generated: censusRootOPT("CLUSTER", censusList("items", -1, 1, slotCluster("at0002"), feederAuditElement)),
+		},
+		{
+			name:      "an ELEMENT whose feeder_audit the template requires before the CLUSTER",
+			generated: censusRootOPT("CLUSTER", censusList("items", -1, 1, feederAuditElement, slotCluster("at0002"))),
 		},
 		{
 			name: "a required CLUSTER after a required ELEMENT read as optional",
