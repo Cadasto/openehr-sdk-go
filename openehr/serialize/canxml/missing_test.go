@@ -254,6 +254,19 @@ func missingXMLRows() []missingXMLRow {
 			want:  []string{mxHistory + "/origin"},
 		},
 		{
+			// A nilled element is reported once, by its parent, whatever it
+			// holds, and nothing below it is: a DV_DATE_TIME holding an empty
+			// `value`, and a PARTY_IDENTIFIED holding a PARTY_REF that lacks
+			// its `namespace` and `type`, whose id lacks its `value` one level
+			// further down.
+			name: "nothing inside a nilled element that holds content",
+			edits: map[string]string{
+				mxHistory + "/origin": `<origin xsi:nil="true"><value></value></origin>`,
+				mxEntry + "/subject":  `<subject xsi:type="PARTY_IDENTIFIED" xsi:nil="true"><external_ref><id xsi:type="HIER_OBJECT_ID"/></external_ref></subject>`,
+			},
+			want: []string{mxHistory + "/origin", mxEntry + "/subject"},
+		},
+		{
 			// A primitive element with no text, or XML whitespace only, carries
 			// no value: a number, a string beside the fixture's `<units>kg</units>`,
 			// a boolean written self-closing, and a string holding a line break.
