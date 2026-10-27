@@ -78,7 +78,7 @@ make fmt     # gofumpt + goimports
 
 ### Hooks and IDE integration
 
-Nothing runs on commit, so run `make lint` yourself before opening a PR. If you use Claude Code, its format-on-save hook is described in [`.claude/CLAUDE.md`](.claude/CLAUDE.md).
+Nothing runs on commit, so run `make lint` yourself before opening a PR. If you use Claude Code, its format-on-save hook is described in [docs/ai-workflow.md § Hooks](docs/ai-workflow.md#hooks).
 
 ## Code style
 

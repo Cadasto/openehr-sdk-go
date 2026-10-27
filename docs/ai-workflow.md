@@ -33,6 +33,8 @@ Pair with the gopls-lsp plugin for code intelligence (defs/refs/rename/vulncheck
 
 The codebase-memory-mcp knowledge graph (or the `codebase-memory` skill) indexes the main checkout, not `.worktrees/`, so use it for structural questions about `main`: the architecture overview (`get_architecture`), hotspots, files that change together, and the callers of a distinctive name (`search_graph`, `trace_path`, `get_code_snippet`). It matches calls by bare name, so a common name such as `Run` or `Write` gives false callers. On a branch, `gopls` answers symbol questions. Run `index_repository` once if the project isn't indexed yet.
 
+The checked-in [`.claude/settings.json`](../.claude/settings.json) enables the project's Claude Code plugins: go-coding, sdd, superpowers, gopls-lsp, pr-review-toolkit, feature-dev and claude-md-management. Look there before assuming a skill is missing.
+
 ## openEHR ground truth (MCP / skills)
 
 This repo is an openEHR workspace. Before guessing an RM path, terminology code, or ITS-JSON shape, look it up with the openehr-assistant plugin. Load its skills with the Skill tool (`openehr-assistant:<name>`) and type its commands as `/<name>`:
@@ -81,7 +83,7 @@ When you add, rename, remove, or materially change a [`cmd/examples/`](../cmd/ex
 
 ## Hooks
 
-The Claude Code format-on-save hook is documented in [`.claude/CLAUDE.md`](../.claude/CLAUDE.md). `make fmt` is the authoritative full-tree pass.
+After a **Write** or **Edit** on a `*.go` file, Claude Code runs [`.claude/hooks/goformat-on-save.sh`](../.claude/hooks/goformat-on-save.sh), wired in [`.claude/settings.json`](../.claude/settings.json). It formats that one file with gofumpt and goimports, falls back to `gofmt -s`, does nothing when no formatter is installed, and skips `*_gen.go`. `make fmt` (`golangci-lint fmt` via the pinned image) is the authoritative full-tree pass.
 
 ## Review
 
