@@ -244,7 +244,7 @@ func (c *CMultipleAttribute) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 			case "children":
 				_v, _err := canxml.DecodeAs[CObject](_dec, xmlBMMTyped(_t))
 				if _err != nil {
-					return _err
+					return xmlWrittenType(_err, _t)
 				}
 				c.Children = append(c.Children, _v)
 			case "cardinality":
@@ -370,7 +370,7 @@ func (c *CSingleAttribute) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 			case "children":
 				_v, _err := canxml.DecodeAs[CObject](_dec, xmlBMMTyped(_t))
 				if _err != nil {
-					return _err
+					return xmlWrittenType(_err, _t)
 				}
 				c.Children = append(c.Children, _v)
 			default:

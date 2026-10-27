@@ -8,6 +8,7 @@ import (
 	"slices"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
 
 // xmlBMMNames maps the name the ITS-XML schemas give a class to the
@@ -39,6 +40,40 @@ func xmlBMMTyped(start xml.StartElement) xml.StartElement {
 		start.Attr = attrs
 	}
 	return start
+}
+
+// xmlWrittenType returns err, a failure of the polymorphic slot whose
+// element start opens, with the type the slot's envelope names spelled
+// as the document wrote it: the schema name in xmlBMMNames that
+// xmlBMMTyped read as the class's BMM name. It reads the discriminator
+// as canxml does, an `xsi:type` before a bare `type`. Any other error
+// is returned as it is; the envelope is copied, never changed.
+func xmlWrittenType(err error, start xml.StartElement) error {
+	// The slot's own envelope, which canxml returns unwrapped; one it
+	// wraps names a slot further in.
+	de, ok := err.(*canxml.DecodeError) //nolint:errorlint // the slot's own envelope only
+	if !ok || de == nil {
+		return err
+	}
+	written := ""
+	for _, a := range start.Attr {
+		if !xmlunmatched.IsDiscriminator(a.Name) {
+			continue
+		}
+		if a.Name.Space != "" || a.Name.Local != "type" {
+			written = a.Value
+			break
+		}
+		if written == "" {
+			written = a.Value
+		}
+	}
+	if name, ok := xmlBMMNames[written]; !ok || name != de.Type {
+		return err
+	}
+	out := *de
+	out.Type = written
+	return &out
 }
 
 // xmlSchemaTyped returns attrs with each `xsi:type` that names the class

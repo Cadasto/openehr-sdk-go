@@ -144,6 +144,7 @@ func RenderXMLNamesFile(plan *Plan) ([]byte, error) {
 	b.WriteString("\t\"encoding/xml\"\n")
 	b.WriteString("\t\"slices\"\n\n")
 	b.WriteString("\t\"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched\"\n")
+	b.WriteString("\t\"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml\"\n")
 	b.WriteString(")\n\n")
 
 	b.WriteString("// xmlBMMNames maps the name the ITS-XML schemas give a class to the\n")
@@ -177,6 +178,40 @@ func RenderXMLNamesFile(plan *Plan) ([]byte, error) {
 	b.WriteString("\treturn start\n")
 	b.WriteString("}\n\n")
 
+	b.WriteString("// xmlWrittenType returns err, a failure of the polymorphic slot whose\n")
+	b.WriteString("// element start opens, with the type the slot's envelope names spelled\n")
+	b.WriteString("// as the document wrote it: the schema name in xmlBMMNames that\n")
+	b.WriteString("// xmlBMMTyped read as the class's BMM name. It reads the discriminator\n")
+	b.WriteString("// as canxml does, an `xsi:type` before a bare `type`. Any other error\n")
+	b.WriteString("// is returned as it is; the envelope is copied, never changed.\n")
+	b.WriteString("func xmlWrittenType(err error, start xml.StartElement) error {\n")
+	b.WriteString("\t// The slot's own envelope, which canxml returns unwrapped; one it\n")
+	b.WriteString("\t// wraps names a slot further in.\n")
+	b.WriteString("\tde, ok := err.(*canxml.DecodeError) //nolint:errorlint // the slot's own envelope only\n")
+	b.WriteString("\tif !ok || de == nil {\n")
+	b.WriteString("\t\treturn err\n")
+	b.WriteString("\t}\n")
+	b.WriteString("\twritten := \"\"\n")
+	b.WriteString("\tfor _, a := range start.Attr {\n")
+	b.WriteString("\t\tif !xmlunmatched.IsDiscriminator(a.Name) {\n")
+	b.WriteString("\t\t\tcontinue\n")
+	b.WriteString("\t\t}\n")
+	b.WriteString("\t\tif a.Name.Space != \"\" || a.Name.Local != \"type\" {\n")
+	b.WriteString("\t\t\twritten = a.Value\n")
+	b.WriteString("\t\t\tbreak\n")
+	b.WriteString("\t\t}\n")
+	b.WriteString("\t\tif written == \"\" {\n")
+	b.WriteString("\t\t\twritten = a.Value\n")
+	b.WriteString("\t\t}\n")
+	b.WriteString("\t}\n")
+	b.WriteString("\tif name, ok := xmlBMMNames[written]; !ok || name != de.Type {\n")
+	b.WriteString("\t\treturn err\n")
+	b.WriteString("\t}\n")
+	b.WriteString("\tout := *de\n")
+	b.WriteString("\tout.Type = written\n")
+	b.WriteString("\treturn &out\n")
+	b.WriteString("}\n\n")
+
 	b.WriteString("// xmlSchemaTyped returns attrs with each `xsi:type` that names the class\n")
 	b.WriteString("// bmmName spelled schemaName, the name the ITS-XML schemas give it.\n")
 	b.WriteString("// attrs itself is not modified.\n")
@@ -204,18 +239,27 @@ func RenderXMLNamesFile(plan *Plan) ([]byte, error) {
 	return formatted, nil
 }
 
-// xmlSiteStart returns the expression a polymorphic decode site hands
-// canxml as the element's start: `xmlBMMTyped(_t)` when the site's Go
-// interface iface (or the narrow interface's parent) can hold a class with
-// an ITS-XML schema name, so that name resolves, and `_t` otherwise.
-func xmlSiteStart(plan *Plan, iface string) string {
+// xmlDispatchSite is how a polymorphic decode site of a generated decoder
+// calls canxml: start is the expression it hands canxml as the element's
+// start, and fail the expression it returns when the dispatch fails.
+type xmlDispatchSite struct {
+	start, fail string
+}
+
+// xmlSite returns the dispatch site of a polymorphic member whose Go
+// interface is iface (or the narrow interface of that parent). When the
+// interface can hold a class with an ITS-XML schema name, the site hands
+// canxml `xmlBMMTyped(_t)`, so that the name resolves, and returns a failure
+// through `xmlWrittenType`, so that the failure names the type as the
+// document wrote it. Any other site hands `_t` and returns `_err`.
+func xmlSite(plan *Plan, iface string) xmlDispatchSite {
 	iface = strings.TrimSuffix(iface, "Like")
 	for class := range plan.Target.XMLTypeNames {
 		for _, name := range nearestLineage(plan, class) {
 			if pc, ok := plan.Classes[name]; ok && (pc.GoName == iface || name == iface) {
-				return "xmlBMMTyped(_t)"
+				return xmlDispatchSite{start: "xmlBMMTyped(_t)", fail: "xmlWrittenType(_err, _t)"}
 			}
 		}
 	}
-	return "_t"
+	return xmlDispatchSite{start: "_t", fail: "_err"}
 }

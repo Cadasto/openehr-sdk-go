@@ -55,29 +55,32 @@ func TestREQ056_CheckXMLTypeNames(t *testing.T) {
 	}
 }
 
-// TestREQ056_XMLSiteStart pins which polymorphic decode sites hand canxml the
-// start with schema names rewritten: a site that can hold a class with a
+// TestREQ056_XMLSite pins which polymorphic decode sites hand canxml the
+// start with schema names rewritten, and return a failure with the type
+// named as the document wrote it: a site that can hold a class with a
 // schema name, and no other, so the rest of the generated code is unchanged
 // (REQ-056).
-func TestREQ056_XMLSiteStart(t *testing.T) {
+func TestREQ056_XMLSite(t *testing.T) {
 	aom := aom14PlanWithSchemas(t)
 	rmPlan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(rm): %v", err)
 	}
+	renamed := xmlDispatchSite{start: "xmlBMMTyped(_t)", fail: "xmlWrittenType(_err, _t)"}
+	plain := xmlDispatchSite{start: "_t", fail: "_err"}
 	for _, tc := range []struct {
 		plan  *Plan
 		iface string
-		want  string
+		want  xmlDispatchSite
 	}{
-		{aom, "CObject", "xmlBMMTyped(_t)"},
-		{aom, "CDomainType", "xmlBMMTyped(_t)"},
-		{aom, "CPrimitive", "_t"},
-		{aom, "ExprItem", "_t"},
-		{rmPlan, "DataValue", "_t"},
+		{aom, "CObject", renamed},
+		{aom, "CDomainType", renamed},
+		{aom, "CPrimitive", plain},
+		{aom, "ExprItem", plain},
+		{rmPlan, "DataValue", plain},
 	} {
-		if got := xmlSiteStart(tc.plan, tc.iface); got != tc.want {
-			t.Errorf("xmlSiteStart(%s, %s) = %q; want %q", tc.plan.Target.GoPackage, tc.iface, got, tc.want)
+		if got := xmlSite(tc.plan, tc.iface); got != tc.want {
+			t.Errorf("xmlSite(%s, %s) = %+v; want %+v", tc.plan.Target.GoPackage, tc.iface, got, tc.want)
 		}
 	}
 }
