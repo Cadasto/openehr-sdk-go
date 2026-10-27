@@ -242,7 +242,7 @@ func (c *CMultipleAttribute) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 					return _err
 				}
 			case "children":
-				_v, _err := canxml.DecodeAs[CObject](_dec, _t)
+				_v, _err := canxml.DecodeAs[CObject](_dec, xmlBMMTyped(_t))
 				if _err != nil {
 					return _err
 				}
@@ -368,7 +368,7 @@ func (c *CSingleAttribute) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 					return _err
 				}
 			case "children":
-				_v, _err := canxml.DecodeAs[CObject](_dec, _t)
+				_v, _err := canxml.DecodeAs[CObject](_dec, xmlBMMTyped(_t))
 				if _err != nil {
 					return _err
 				}

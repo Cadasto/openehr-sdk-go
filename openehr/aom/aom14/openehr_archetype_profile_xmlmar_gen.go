@@ -12,8 +12,9 @@ import (
 // BMM package: org.openehr.am.aom14.openehr_archetype_profile — canonical-XML MarshalXML companions
 
 // BMMName returns "C_CODED_TEXT" — the BMM class identifier used as the
-// `xsi:type` polymorphic discriminator in canonical XML and the
-// `_type` discriminator in canonical JSON.
+// `_type` discriminator in canonical JSON. Canonical XML writes the
+// `xsi:type` C_CODE_PHRASE, the name the ITS-XML schema gives the class,
+// and reads either name.
 func (c *CCodedText) BMMName() string { return "C_CODED_TEXT" }
 
 // MarshalXML emits canonical openEHR XML for CCodedText. The default
@@ -29,6 +30,7 @@ func (c *CCodedText) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("C_CODED_TEXT")}
 	}
+	_start.Attr = xmlSchemaTyped(_start.Attr, "C_CODED_TEXT", "C_CODE_PHRASE")
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
@@ -46,13 +48,13 @@ func (c *CCodedText) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 			return err
 		}
 	}
-	if err := _e.EncodeElement(c.Terminology, xml.StartElement{Name: xml.Name{Local: "terminology"}}); err != nil {
-		return err
-	}
 	if c.CodeList != nil {
 		if err := _e.EncodeElement(c.CodeList, xml.StartElement{Name: xml.Name{Local: "code_list"}}); err != nil {
 			return err
 		}
+	}
+	if err := _e.EncodeElement(c.Terminology, xml.StartElement{Name: xml.Name{Local: "terminology"}}); err != nil {
+		return err
 	}
 	if c.Reference != nil {
 		if err := _e.EncodeElement(*c.Reference, xml.StartElement{Name: xml.Name{Local: "reference"}}); err != nil {
@@ -66,8 +68,9 @@ func (c *CCodedText) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 }
 
 // BMMName returns "C_ORDINAL" — the BMM class identifier used as the
-// `xsi:type` polymorphic discriminator in canonical XML and the
-// `_type` discriminator in canonical JSON.
+// `_type` discriminator in canonical JSON. Canonical XML writes the
+// `xsi:type` C_DV_ORDINAL, the name the ITS-XML schema gives the class,
+// and reads either name.
 func (c *COrdinal) BMMName() string { return "C_ORDINAL" }
 
 // MarshalXML emits canonical openEHR XML for COrdinal. The default
@@ -83,6 +86,7 @@ func (c *COrdinal) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("C_ORDINAL")}
 	}
+	_start.Attr = xmlSchemaTyped(_start.Attr, "C_ORDINAL", "C_DV_ORDINAL")
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
@@ -112,8 +116,9 @@ func (c *COrdinal) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 }
 
 // BMMName returns "C_QUANTITY" — the BMM class identifier used as the
-// `xsi:type` polymorphic discriminator in canonical XML and the
-// `_type` discriminator in canonical JSON.
+// `_type` discriminator in canonical JSON. Canonical XML writes the
+// `xsi:type` C_DV_QUANTITY, the name the ITS-XML schema gives the class,
+// and reads either name.
 func (c *CQuantity) BMMName() string { return "C_QUANTITY" }
 
 // MarshalXML emits canonical openEHR XML for CQuantity. The default
@@ -129,6 +134,7 @@ func (c *CQuantity) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("C_QUANTITY")}
 	}
+	_start.Attr = xmlSchemaTyped(_start.Attr, "C_QUANTITY", "C_DV_QUANTITY")
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}

@@ -60,6 +60,13 @@ type Target struct {
 	// target's own. Empty leaves the encoders in the generator's property
 	// order.
 	ITSXMLSchemaSets [][]string
+	// XMLTypeNames maps the BMM name of a class to the name the target's
+	// own ITS-XML schema set gives it, for each class whose two names
+	// differ. The XML encoder writes the schema name as the class's
+	// `xsi:type`, the decoder reads either name, and the class takes its
+	// child order from the schema type of that name. Canonical JSON keeps
+	// the BMM name. Empty when the schemas use the BMM names.
+	XMLTypeNames map[string]string
 }
 
 // TargetRM is the RM generation target.
@@ -90,6 +97,13 @@ var TargetAOM14 = Target{
 	ExternalImport:     "github.com/cadasto/openehr-sdk-go/openehr/rm",
 	RegistryImport:     "github.com/cadasto/openehr-sdk-go/openehr/rm/typereg",
 	ITSXMLSchemaSets:   [][]string{itsXMLAMRoots, itsXMLRMRoots},
+	// The AM 1.4 OpenehrProfile.xsd names three openEHR-profile
+	// constraint classes after the data value they constrain.
+	XMLTypeNames: map[string]string{
+		"C_CODED_TEXT": "C_CODE_PHRASE",
+		"C_ORDINAL":    "C_DV_ORDINAL",
+		"C_QUANTITY":   "C_DV_QUANTITY",
+	},
 }
 
 // DefaultTargets is the set of targets emitted when the CLI is invoked

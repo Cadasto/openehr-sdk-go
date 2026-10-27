@@ -116,9 +116,10 @@ func nearestFirst(s *bmm.Schema, class string) []string {
 
 // schemaOrderProblems states, for one class, how the children its encoder
 // writes break the order the schema sets give, or nil when they keep it.
-// sets is the lookup order: the class takes the schema type of its own name,
-// or of its nearest ancestor, from the first set that has one. From that
-// type's sequence (own):
+// sets is the lookup order: the class takes the schema type of its schema
+// name (Target.XMLTypeNames) when it has one, else of its own name, or of its
+// nearest ancestor, from the first set that has one. From that type's
+// sequence (own):
 //
 //   - the children own declares come in own's order;
 //   - a child own does not declare but another set's type of the same name
@@ -129,8 +130,12 @@ func nearestFirst(s *bmm.Schema, class string) []string {
 func schemaOrderProblems(plan *Plan, sets []*xsdSet, class string, children []string, fields []emittedField) ([]string, error) {
 	var own, other []string
 	found := false
+	lineage := nearestFirst(plan.Schema, class)
+	if schema, ok := plan.Target.XMLTypeNames[class]; ok {
+		lineage = append([]string{schema}, lineage...)
+	}
 	for i, set := range sets {
-		for _, name := range nearestFirst(plan.Schema, class) {
+		for _, name := range lineage {
 			if !set.has(name) {
 				continue
 			}
@@ -223,8 +228,9 @@ func schemaOrderProblems(plan *Plan, sets []*xsdSet, class string, children []st
 // TestXMLEncodersFollowSchemaOrder runs the generator over both targets and
 // holds every XML encoder it emits to the vendored ITS-XML schemas: an RM
 // class looked up in the RM and BASE schemas, an AOM 1.4 class in the AM
-// schemas first, each by its own name or its nearest ancestor's, and a
-// property only the other set declares placed where that set puts it.
+// schemas first, each by its schema name, its own name or its nearest
+// ancestor's, and a property only the other set declares placed where that
+// set puts it.
 //
 // REQ-056: the encoder writes a class's children in the order of its ITS-XML
 // schema sequence.

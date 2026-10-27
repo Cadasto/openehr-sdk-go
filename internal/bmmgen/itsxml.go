@@ -369,7 +369,8 @@ func (s *itsXMLSchemas) orderFor(roots [][]string) (*xmlChildOrder, error) {
 }
 
 // sequenceFor returns the element names whose order class's encoder takes
-// from the schemas. The class takes the type of its own name, or of its
+// from the schemas. The class takes the type of its schema name
+// ([Target.XMLTypeNames]) when it has one, else of its own name, or of its
 // nearest ancestor, from the first set that declares one; the type's
 // extension bases come first. When another set declares a type of the same
 // name, each element only that set declares is placed right after the
@@ -377,6 +378,9 @@ func (s *itsXMLSchemas) orderFor(roots [][]string) (*xmlChildOrder, error) {
 // the class or an ancestor.
 func (o *xmlChildOrder) sequenceFor(plan *Plan, class string) ([]string, error) {
 	lineage := nearestLineage(plan, class)
+	if schema, ok := plan.Target.XMLTypeNames[class]; ok {
+		lineage = slices.Insert(lineage, 0, schema)
+	}
 	for i, set := range o.sets {
 		for _, name := range lineage {
 			if !set.has(name) {

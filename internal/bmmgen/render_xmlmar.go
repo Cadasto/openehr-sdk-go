@@ -154,10 +154,17 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 
 	// BMMName method. An abstract class (BASE Interval) is no polymorphic
 	// discriminator value, so it gets none.
+	schemaName, renamed := plan.Target.XMLTypeNames[pc.BMMName]
 	if !sc.IsAbstract() {
 		fmt.Fprintf(&b, "// BMMName returns %q — the BMM class identifier used as the\n", pc.BMMName)
-		b.WriteString("// `xsi:type` polymorphic discriminator in canonical XML and the\n")
-		b.WriteString("// `_type` discriminator in canonical JSON.\n")
+		if renamed {
+			b.WriteString("// `_type` discriminator in canonical JSON. Canonical XML writes the\n")
+			fmt.Fprintf(&b, "// `xsi:type` %s, the name the ITS-XML schema gives the class,\n", schemaName)
+			b.WriteString("// and reads either name.\n")
+		} else {
+			b.WriteString("// `xsi:type` polymorphic discriminator in canonical XML and the\n")
+			b.WriteString("// `_type` discriminator in canonical JSON.\n")
+		}
 		fmt.Fprintf(&b, "func (%s *%s%s) BMMName() string { return %q }\n\n", recv, pc.GoName, typeArgs, pc.BMMName)
 	}
 
@@ -187,6 +194,10 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 	b.WriteString("\tif _start.Name.Local == \"\" {\n")
 	fmt.Fprintf(&b, "\t\t_start.Name = xml.Name{Local: canxml.ElementName(%q)}\n", pc.BMMName)
 	b.WriteString("\t}\n")
+	if renamed {
+		// The polymorphic parent wrote the BMM name as `xsi:type`.
+		fmt.Fprintf(&b, "\t_start.Attr = xmlSchemaTyped(_start.Attr, %q, %q)\n", pc.BMMName, schemaName)
+	}
 	// Append attribute-typed properties.
 	for _, ef := range attrFields {
 		line := marshalXMLAttribute(recv, FieldName(ef.Prop.PropertyName()), ef.Prop.PropertyName())
