@@ -19,7 +19,9 @@ import (
 // the same OK outcome.
 //
 // It is scoped to COMPOSITION roots, the roots ValidateComposition
-// supports.
+// supports. It generates and validates once per policy: Large, Medium and
+// Required. On a pass, Detail names the policies the instance validated
+// clean under, in that order.
 func Probe027GeneratedValidates(ctx context.Context, c *templatecompile.Compiled, opts instance.Options) (Result, error) { // PROBE-027 (REQ-107)
 	r := Result{Probe: "PROBE-027"}
 	if c == nil || c.Root() == nil {
@@ -32,7 +34,7 @@ func Probe027GeneratedValidates(ctx context.Context, c *templatecompile.Compiled
 		return r, nil
 	}
 
-	var failures []string
+	var failures, validated []string
 	for _, policy := range []instance.Policy{instance.Large, instance.Medium, instance.Required} {
 		opts.Policy = policy
 		out, err := instance.Generate(ctx, c, opts)
@@ -49,7 +51,9 @@ func Probe027GeneratedValidates(ctx context.Context, c *templatecompile.Compiled
 		if !result.OK {
 			failures = append(failures, fmt.Sprintf("[%s] ValidateComposition produced %d issue(s): %s",
 				policy, len(result.Issues), summariseIssues(result.Issues)))
+			continue
 		}
+		validated = append(validated, policy.String())
 	}
 
 	if len(failures) > 0 {
@@ -58,6 +62,7 @@ func Probe027GeneratedValidates(ctx context.Context, c *templatecompile.Compiled
 		return r, nil
 	}
 	r.Status = "pass"
+	r.Detail = "validated clean under " + strings.Join(validated, ", ")
 	return r, nil
 }
 

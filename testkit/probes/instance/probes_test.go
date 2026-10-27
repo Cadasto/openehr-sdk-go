@@ -3,6 +3,7 @@ package instanceprobes_test
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
@@ -32,6 +33,16 @@ func testComposer() *rm.PartyIdentified {
 	return &rm.PartyIdentified{Name: &name}
 }
 
+// probe027PassDetail is the Detail of a PROBE-027 pass that generated and
+// validated under every policy the probe promises: Large, Medium and
+// Required.
+func probe027PassDetail() string {
+	names := []string{instance.Large.String(), instance.Medium.String(), instance.Required.String()}
+	return "validated clean under " + strings.Join(names, ", ")
+}
+
+// TestProbe027VitalSignsPasses pins a PROBE-027 pass on vital_signs.opt under
+// every policy the probe promises (REQ-107).
 func TestProbe027VitalSignsPasses(t *testing.T) {
 	c := compileFixture(t, "vital_signs")
 	r, err := instanceprobes.Probe027GeneratedValidates(context.Background(), c, instance.Options{
@@ -41,8 +52,8 @@ func TestProbe027VitalSignsPasses(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Probe027: %v", err)
 	}
-	if r.Status != "pass" {
-		t.Errorf("Probe027 status=%q detail=%q", r.Status, r.Detail)
+	if want := probe027PassDetail(); r.Status != "pass" || r.Detail != want {
+		t.Errorf("Probe027 status=%q detail=%q, want status=\"pass\" detail=%q", r.Status, r.Detail, want)
 	}
 }
 
@@ -54,7 +65,7 @@ func TestProbe027VitalSignsPasses(t *testing.T) {
 // the synthesiser routes via applyPrimitiveExample(child, parentDV)
 // so the DV wrapper's primary value channel ("P0D" for CDuration's
 // ExampleValue) lands BEFORE validation runs. PROBE-027 round-trips
-// clean on both vendored OPTs.
+// clean on both vendored OPTs, under every policy it promises (REQ-107).
 func TestProbe027ClinicalNotePasses(t *testing.T) {
 	c := compileFixture(t, "clinical_note")
 	r, err := instanceprobes.Probe027GeneratedValidates(context.Background(), c, instance.Options{
@@ -64,8 +75,8 @@ func TestProbe027ClinicalNotePasses(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Probe027: %v", err)
 	}
-	if r.Status != "pass" {
-		t.Errorf("Probe027 clinical_note status=%q detail=%q", r.Status, r.Detail)
+	if want := probe027PassDetail(); r.Status != "pass" || r.Detail != want {
+		t.Errorf("Probe027 clinical_note status=%q detail=%q, want status=\"pass\" detail=%q", r.Status, r.Detail, want)
 	}
 }
 
