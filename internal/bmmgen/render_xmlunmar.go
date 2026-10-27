@@ -29,7 +29,7 @@ import (
 // decode's policy for unmatched content: ignore it (the default), report
 // it, or refuse it. The description tells the same runtime what the
 // Reference Model requires of the class, so a decode that asks can learn
-// which mandatory members the document left out (ADR 0033).
+// which mandatory members the document left out.
 //
 // Returns (nil, nil) when the file has no concrete classes.
 //
