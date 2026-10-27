@@ -69,15 +69,19 @@ type TokenSource interface {
 // StaticTokenSource does not refresh. If t.ExpiresAt is in the past,
 // callers see authentication failures on the wire instead of a typed
 // refresh error.
+//
+// Printed with fmt, the source shows t as [Token.String] does. A value that
+// holds the source in an unexported field, as a transport client does,
+// prints the source's address, so neither shows t's Value.
 func StaticTokenSource(t Token) TokenSource {
-	return staticTokenSource{t: t}
+	return &staticTokenSource{t: t}
 }
 
 type staticTokenSource struct {
 	t Token
 }
 
-func (s staticTokenSource) Token(ctx context.Context) (Token, error) {
+func (s *staticTokenSource) Token(ctx context.Context) (Token, error) {
 	if err := ctx.Err(); err != nil {
 		return Token{}, err
 	}
@@ -86,16 +90,18 @@ func (s staticTokenSource) Token(ctx context.Context) (Token, error) {
 
 // String describes s by the text of [Token.String] for its token. fmt reads
 // the unexported field t without calling the token's methods, so without
-// String and Format a printed source would show the token's Value.
-func (s staticTokenSource) String() string {
+// String and Format a printed source would show the token's Value. fmt
+// calls no method of a value it reaches through an unexported field either,
+// so the sources are pointers: there fmt prints an address, not the fields.
+func (s *staticTokenSource) String() string {
 	return "auth.StaticTokenSource(" + s.t.String() + ")"
 }
 
 // GoString returns the text of String.
-func (s staticTokenSource) GoString() string { return s.String() }
+func (s *staticTokenSource) GoString() string { return s.String() }
 
 // Format writes the text of String for every fmt verb it is called for.
-func (s staticTokenSource) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, s.String()) }
+func (s *staticTokenSource) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, s.String()) }
 
 // AnonymousTokenSource returns a TokenSource that yields a zero-value
 // Token. transport/ treats a zero Token as "do not emit an Authorization
@@ -104,7 +110,7 @@ func (s staticTokenSource) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f
 // traffic (capabilities, health). The default transport TokenSource is
 // AnonymousTokenSource.
 func AnonymousTokenSource() TokenSource {
-	return staticTokenSource{}
+	return &staticTokenSource{}
 }
 
 // IsZero reports whether t is the zero Token (no value, no type).
