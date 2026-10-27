@@ -27,7 +27,7 @@ The Packages column lists the SDK packages each program imports, by short name (
 | [opt-parse](#opt-parse) | No | `template` | Parse an ADL 1.4 OPT, walk paths |
 | [primitive-validate](#primitive-validate) | No | `template`, `constraints` | Single values against one OPT leaf constraint |
 | [validate-composition](#validate-composition) | No | `template`, `templatecompile`, `validation`, `rm`, `terminology` | In-memory composition vs the RM and an OPT |
-| [validate-from-json](#validate-from-json) | No | `canjson`, `template`, `templatecompile`, `validation`, `rm` | Wire bytes → validate |
+| [validate-from-json](#validate-from-json) | No | `template`, `templatecompile`, `validation`, `rm` | Wire bytes → decode and validate in one call |
 | [generate-example](#generate-example) | No | `template`, `templatecompile`, `instance`, `canjson`, `rm` | OPT → generated RM instance → JSON |
 | [aql-build](#aql-build) | No | `aql`, `aql/contain` | Struct + verb builders → byte-identical AQL; nested CONTAINS + in-text paging; opt-in RM containment check |
 | [aql-parse-structured](#aql-parse-structured) | No | `aql`, `aql/parse` | Parse AQL → structured tree, print each clause, emit canonical text back |
@@ -183,7 +183,7 @@ Each violation carries a `Code`, the stable identifier a program branches on, an
 
 ### validate-composition
 
-**Purpose:** Build a composition in memory as plain Reference Model structs, compile an OPT, and validate the composition with one call, `validation.ValidateComposition`, which checks the template constraints and the RM floor together. This is the smallest validation path: no JSON, no HTTP, just typed RM values, a compiled template, and the list of issues the call returns. [validate-from-json](#validate-from-json) runs the same call on a decoded document and lists what each of the two checks covers.
+**Purpose:** Build a composition in memory as plain Reference Model structs, compile an OPT, and validate the composition with one call, `validation.ValidateComposition`, which checks the template constraints and the RM floor together. This is the smallest validation path: no JSON, no HTTP, just typed RM values, a compiled template, and the list of issues the call returns. [validate-from-json](#validate-from-json) runs the decode-and-validate entry, `validation.ValidateJSON`, on a document and lists what each check covers.
 
 ```bash
 go run ./cmd/examples/validate-composition
@@ -213,7 +213,7 @@ With `-invalid` the program clears the composition's category before validating,
 
 ### validate-from-json
 
-**Purpose:** Validate a COMPOSITION that arrives as canonical JSON, the way a CI check or an inbound gateway would: read the bytes, decode them into RM structs, compile the OPT, and validate with one call that lists every issue it finds.
+**Purpose:** Validate a COMPOSITION that arrives as canonical JSON, the way a CI check or an inbound gateway would: read the bytes, compile the OPT, and decode and validate the document with one call that lists every issue it finds.
 
 ```bash
 go run ./cmd/examples/validate-from-json
@@ -221,14 +221,15 @@ go run ./cmd/examples/validate-from-json -corpus           # demo data with expe
 go run ./cmd/examples/validate-from-json comp.json tmpl.opt # your own files
 ```
 
-**What the call checks:** `validation.ValidateComposition(&composition, compiled)` applies two layers of checks in one walk over the composition and returns their findings in one result.
+**What the call checks:** `validation.ValidateJSON(body, &composition, compiled)` decodes the bytes into an `rm.Composition`, reads the document for the members it leaves out, and applies two layers of checks in one walk over the composition, returning every finding in one result. `composition` holds the decoded value afterwards, so the program prints from it without decoding twice. A document that does not decode, such as malformed JSON or a root that is not a JSON object, is one `invalid_shape` issue at `/` and a failed result, with the decode error in the issue's `Value`.
 
 | Check | What it checks |
 |---|---|
 | Template constraints | What the OPT declares, node by node: existence, cardinality, RM type, archetype identity and value constraints |
 | RM floor | The openEHR Reference Model itself, over every part of the composition the template admits, the parts the OPT does not model included: the attributes the RM makes mandatory on every node, and the RM's own rules for each type, such as an ELEMENT carrying exactly one of a value or a null flavour, and every COMPOSITION and ENTRY carrying `archetype_details` |
+| Members the document leaves out | A mandatory number, boolean or value struct, such as `DV_QUANTITY.magnitude`, that the document leaves out or sends as `null`. It decodes to its zero value, so the decoded composition cannot show it absent; the call reads the document and reports it `required` at the member's path ([wire.md § REQ-175](specifications/wire.md#req-175--missing-members-on-decode)) |
 
-At each node the walk first asks whether the template admits the content there, then applies both layers, so the findings follow the document. Content the template refuses, such as an entry a slot does not allow, is reported once and not entered, so nothing inside it is checked; a rule of the node that holds it still reads it and reports at that node, as an ELEMENT carrying both a value and a prohibited null flavour shows. A missing attribute both layers require is reported once. An issue from the template or the Reference Model names its `Layer`; a guard such as `nil_root` and a walk condition such as `max_depth` carry none. A composition that passes is valid against the template and the Reference Model rules the floor checks. `validation.ValidateRM` runs the floor alone, for a root no template applies to.
+At each node the walk first asks whether the template admits the content there, then applies both layers, so the findings follow the document. Content the template refuses, such as an entry a slot does not allow, is reported once and not entered, so nothing inside it is checked; a rule of the node that holds it still reads it and reports at that node, as an ELEMENT carrying both a value and a prohibited null flavour shows. A missing attribute two checks find is reported once. An issue from the template or the Reference Model names its `Layer`; a guard such as `nil_root`, a walk condition such as `max_depth` and a document that does not decode carry none. A composition that passes is valid against the template and the Reference Model rules the floor checks. `validation.ValidateComposition` runs the two layers on a composition already in memory, where there is no document to read for the members it leaves out, and `validation.ValidateRM` runs the floor alone, for a root no template applies to.
 
 **Flags:**
 
@@ -237,25 +238,25 @@ At each node the walk first asks whether the template admits the content there, 
 | `-corpus` | Validate `testkit/corpus/compositions/vital_signs.json`, demo data that reports issues, instead of the clean local fixture |
 | `-cassette` | Deprecated spelling of `-corpus`, kept so older scripts keep working |
 
-The exit status lets the command gate a pipeline. It is 0 when validation reports no error, and 1 when it does or the program cannot run: a missing or unreadable file, a composition or OPT that does not parse, or the wrong number of file arguments. A bad flag exits with status 2. Both failure cases exit 1, but they print differently: a program error is logged on stderr and stops the run, while validation issues print on stdout under `validation`.
+The exit status lets the command gate a pipeline. It is 0 when validation reports no error, and 1 when it does. A composition that does not decode is one of those outcomes: its `invalid_shape` issue prints under `validation` and the status is 1. The status is also 1 when the program cannot run: a missing or unreadable file, an OPT that does not parse, or the wrong number of file arguments. A bad flag exits with status 2. Both failure cases exit 1, but they print differently: a program error is logged on stderr and stops the run, while validation issues print on stdout under `validation`.
 
 **Default JSON fixture:** `cmd/examples/validate-from-json/testdata/minimal_blood_pressure.json`, a hand-made composition that is valid against `vital_signs.opt`. Its generator, `gen_fixture.go` in the same directory, refuses to write a fixture that fails validation.
 
-**Packages:** `openehr/rm`, `openehr/serialize/canjson`, `openehr/template`, `openehr/templatecompile`, `openehr/validation`. **No `internal/` import.**
+**Packages:** `openehr/rm`, `openehr/template`, `openehr/templatecompile`, `openehr/validation`. **No `internal/` import.**
 
 **Sample output:**
 
 ```text
 json                 : minimal_blood_pressure.json (2928 bytes)
-composition          : archetype_node_id=openEHR-EHR-COMPOSITION.encounter.v1 content_items=1
 template             : vital_signs (vital_signs.opt)
+composition          : archetype_node_id=openEHR-EHR-COMPOSITION.encounter.v1 content_items=1
 validation           : OK, no issues
 result               : valid, no error found
 ```
 
-With `-corpus` validation reports 3 issues, one `path [code] detail` line each: a magnitude out of range and two units the template does not allow. All 3 come from the template constraints; the RM floor finds nothing wrong in this document. The document also leaves out the `items` lists of its state and protocol structures. The template gives those lists an existence of 1 but lets them hold no member, and canonical JSON leaves a list with no member out, so neither check reports them. The result line says the composition is not valid, and a note says the issues are expected. The two checks catch different things: the RM floor accepts those values, and the template does not. The reverse holds too: a composition with no `archetype_details` on its COMPOSITION or an ENTRY, or with an ELEMENT that has neither a value nor a null flavour, can meet the template constraints and fail on the RM floor. That is why the one call runs both.
+With `-corpus` validation reports 3 issues, one `path [code] detail` line each: a magnitude out of range (`primitive_out_of_range`) and two units the template does not allow (`primitive_unit_unknown`). All 3 come from the template constraints; the RM floor finds nothing wrong in this document, and it leaves out no member the Reference Model makes mandatory. The document does leave out the `items` lists of its state and protocol structures. The template gives those lists an existence of 1 but lets them hold no member, the Reference Model makes them optional, and canonical JSON leaves a list with no member out, so no check reports them. The result line says the composition is not valid, and a note says the issues are expected. The two checks catch different things: the RM floor accepts those values, and the template does not. The reverse holds too: a composition with no `archetype_details` on its COMPOSITION or an ENTRY, or with an ELEMENT that has neither a value nor a null flavour, can meet the template constraints and fail on the RM floor. That is why the one call runs both.
 
-**What to copy into your app:** the steps in order: `canjson.Unmarshal` (a document that is not well-formed canonical JSON fails here, before any validation runs), `template.ParseFileStrict` plus `templatecompile.Compile` once per template, then `validation.ValidateComposition`. Accept the document when the result is OK, map that to your exit status, and print `result.Issues`. Parse strictly in a validator: on an unknown node type that has attributes under it, `ParseFileStrict` refuses the template, while the lenient `ParseFile` keeps the node as a leaf and drops the constraints beneath it. The same compiled template also feeds the composition builder, the instance generator and the AQL lint.
+**What to copy into your app:** the steps in order: read the bytes, `template.ParseFileStrict` plus `templatecompile.Compile` once per template, then `validation.ValidateJSON(body, &composition, compiled)`, which decodes and validates in one call and leaves the decoded value in `composition`. A document that does not decode comes back as an `invalid_shape` issue at `/`, not as an error, so there is no separate decode step to handle. Accept the document when the result is OK, map that to your exit status, and print `result.Issues`. Decoding with `canjson.Unmarshal` and then calling `validation.ValidateComposition` would miss a mandatory number, boolean or value struct the document leaves out, because it decodes to its zero value. For canonical XML the same call is `validation.ValidateXML`. Parse strictly in a validator: on an unknown node type that has attributes under it, `ParseFileStrict` refuses the template, while the lenient `ParseFile` keeps the node as a leaf and drops the constraints beneath it. The same compiled template also feeds the composition builder, the instance generator and the AQL lint.
 
 ---
 
