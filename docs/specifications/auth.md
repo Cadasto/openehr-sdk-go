@@ -266,6 +266,8 @@ The SDK verifies ID tokens against the deployment's published JWKS, which it fet
 
 When an ID token's header carries no `kid`, the SDK **MUST** verify it with the set's only signing key, a key published without a `kid` included, when the set holds exactly one key whose `use`, if present, is `sig`, and **MUST** reject the token otherwise (OpenID Connect Core 1.0 §10.1 lets an issuer omit `kid` only when its set holds one signing key).
 
+A key whose `use` is present and is not `sig` **MUST NOT** verify an ID token, also when the token's `kid` names it: the SDK looks a `kid` up only among the set's signing keys, so such a token is refused as a `kid` the set does not hold. A key that publishes an `alg` **MUST NOT** verify a token whose header names another `alg` (RFC 8725 §3.1). Both refusals are decided on the token, so they match `auth.ErrJWKSValidationFailed` ([§ ID-token verification](#id-token-verification)).
+
 #### ID-token verification
 
 `auth/smart.ValidateIDToken` verifies the `id_token` signature against the deployment's JWKS and then applies the SDK's claim rules. The code exchange and the refresh verify the ID token they receive with it (§ REQ-064), and the top-level `smart` package re-exports it together with `IDTokenClaims`. The SDK delegates signature verification and JWK parsing to `github.com/coreos/go-oidc/v3`, which uses `go-jose/v4`.
