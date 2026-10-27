@@ -400,8 +400,8 @@ func multimedia(extra string) string {
 
 // TestREQ052_BuildRemovesEmptyMappingsAndMultimediaBytes pins that an empty
 // DV_TEXT mappings, DV_MULTIMEDIA data or DV_MULTIMEDIA integrity_check is
-// removed, while a non-empty one, and an empty container the section does not
-// name, is kept.
+// removed, while a non-empty one is kept. Other empty lists and maps are
+// TestREQ052_BuildRemovesAnEmptyOptionalList's.
 func TestREQ052_BuildRemovesEmptyMappingsAndMultimediaBytes(t *testing.T) {
 	runBuild(t, []buildCase{
 		{
@@ -434,13 +434,99 @@ func TestREQ052_BuildRemovesEmptyMappingsAndMultimediaBytes(t *testing.T) {
 			in:   multimedia(`,"data":"AQID"`),
 			want: multimedia(`,"data":"AQID"`),
 		},
-		{
-			name: "an empty container the section does not name is kept",
-			root: "ELEMENT",
-			in:   `{"_type":"ELEMENT","archetype_node_id":"at1","name":{"_type":"DV_TEXT","value":"n"},"links":[]}`,
-			want: `{"_type":"ELEMENT","archetype_node_id":"at1","name":{"_type":"DV_TEXT","value":"n"},"links":[]}`,
-		},
 	})
+}
+
+// emptyContainerCases are one input per kind of container member, each
+// empty: an optional list of RM objects at the root and below it, an
+// optional list of strings, a mandatory list, an optional map and a
+// mandatory map. want is the input's expected form, compared by wire
+// equivalence; target makes a decode target for the input.
+var emptyContainerCases = []struct {
+	name, root, in, want string
+	target               func() any
+}{
+	{
+		name:   "optional list of RM objects (LOCATABLE.links)",
+		root:   "ELEMENT",
+		in:     `{"_type":"ELEMENT","archetype_node_id":"at1","name":{"_type":"DV_TEXT","value":"n"},"value":{"_type":"DV_TEXT","value":"v"},"links":[]}`,
+		want:   `{"_type":"ELEMENT","archetype_node_id":"at1","name":{"_type":"DV_TEXT","value":"n"},"value":{"_type":"DV_TEXT","value":"v"}}`,
+		target: func() any { return new(rm.Element) },
+	},
+	{
+		name:   "optional list below the root",
+		root:   "CLUSTER",
+		in:     `{"_type":"CLUSTER","archetype_node_id":"at1","name":{"_type":"DV_TEXT","value":"c"},"items":[{"_type":"ELEMENT","archetype_node_id":"at2","name":{"_type":"DV_TEXT","value":"n"},"links":[]}]}`,
+		want:   `{"_type":"CLUSTER","archetype_node_id":"at1","name":{"_type":"DV_TEXT","value":"c"},"items":[{"_type":"ELEMENT","archetype_node_id":"at2","name":{"_type":"DV_TEXT","value":"n"}}]}`,
+		target: func() any { return new(rm.Cluster) },
+	},
+	{
+		name:   "optional list of strings (RESOURCE_DESCRIPTION_ITEM.keywords)",
+		root:   "RESOURCE_DESCRIPTION_ITEM",
+		in:     `{"_type":"RESOURCE_DESCRIPTION_ITEM","language":` + codePhrase + `,"purpose":"p","keywords":[]}`,
+		want:   `{"_type":"RESOURCE_DESCRIPTION_ITEM","language":` + codePhrase + `,"purpose":"p"}`,
+		target: func() any { return new(rm.ResourceDescriptionItem) },
+	},
+	{
+		name:   "mandatory list (CLUSTER.items) is kept",
+		root:   "CLUSTER",
+		in:     `{"_type":"CLUSTER","archetype_node_id":"at1","name":{"_type":"DV_TEXT","value":"c"},"items":[]}`,
+		want:   `{"_type":"CLUSTER","archetype_node_id":"at1","name":{"_type":"DV_TEXT","value":"c"},"items":[]}`,
+		target: func() any { return new(rm.Cluster) },
+	},
+	{
+		name:   "optional map (RESOURCE_DESCRIPTION_ITEM.other_details) is kept",
+		root:   "RESOURCE_DESCRIPTION_ITEM",
+		in:     `{"_type":"RESOURCE_DESCRIPTION_ITEM","language":` + codePhrase + `,"purpose":"p","other_details":{}}`,
+		want:   `{"_type":"RESOURCE_DESCRIPTION_ITEM","language":` + codePhrase + `,"purpose":"p","other_details":{}}`,
+		target: func() any { return new(rm.ResourceDescriptionItem) },
+	},
+	{
+		name:   "mandatory map (TRANSLATION_DETAILS.author) is kept",
+		root:   "TRANSLATION_DETAILS",
+		in:     `{"_type":"TRANSLATION_DETAILS","language":` + codePhrase + `,"author":{}}`,
+		want:   `{"_type":"TRANSLATION_DETAILS","language":` + codePhrase + `,"author":{}}`,
+		target: func() any { return new(rm.TranslationDetails) },
+	},
+}
+
+// TestREQ052_BuildRemovesAnEmptyOptionalList pins that the expected form
+// reads an empty list an optional attribute holds as absent, as the encoder
+// leaves it out, at the root or below it and whatever its values' type, and
+// keeps an empty mandatory list and an empty map, optional or not, which the
+// encoder writes.
+func TestREQ052_BuildRemovesAnEmptyOptionalList(t *testing.T) {
+	cases := make([]buildCase, 0, len(emptyContainerCases))
+	for _, tc := range emptyContainerCases {
+		cases = append(cases, buildCase{name: tc.name, root: tc.root, in: tc.in, want: tc.want})
+	}
+	runBuild(t, cases)
+}
+
+// TestREQ052_EmptyContainerRoundTripMatchesTheExpectedForm holds the expected
+// form and the codec together on each empty container kind: the input decodes
+// with canjson, re-encodes, and the output is wire-equivalent to the input's
+// expected form, the comparison PROBE-030's input leg makes (REQ-052).
+func TestREQ052_EmptyContainerRoundTripMatchesTheExpectedForm(t *testing.T) {
+	for _, tc := range emptyContainerCases {
+		t.Run(tc.name, func(t *testing.T) {
+			v := tc.target()
+			if err := canjson.Unmarshal([]byte(tc.in), v); err != nil {
+				t.Fatalf("canjson.Unmarshal(%s) error: %v", tc.in, err)
+			}
+			out, err := canjson.Marshal(v)
+			if err != nil {
+				t.Fatalf("canjson.Marshal error: %v", err)
+			}
+			want, err := expectedform.BuildFor([]byte(tc.in), v)
+			if err != nil {
+				t.Fatalf("BuildFor(%s) error: %v", tc.in, err)
+			}
+			if ok, diff := wireequiv.Equivalent(want, out); !ok {
+				t.Errorf("re-encode of %s = %s, want it wire-equivalent to the expected form %s: %s", tc.in, out, want, diff)
+			}
+		})
+	}
 }
 
 // TestREQ052_BuildLeavesAGenericPayloadAlone pins that inside a generic
