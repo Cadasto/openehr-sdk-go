@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -31,8 +32,9 @@ const SpecVersionPin = "1.1.0"
 // WithWellKnownPath when constructing the Resolver.
 const WellKnownPath = "/.well-known/smart-configuration"
 
-// DefaultTTL is applied when the response to a discovery fetch carries no
-// positive Cache-Control max-age.
+// DefaultTTL is applied when the response to a discovery fetch declares no
+// TTL: its Cache-Control has no no-store, no-cache or valid max-age
+// directive, and it has no Expires field (RFC 9111 §4.2.1).
 const DefaultTTL = 15 * time.Minute
 
 // openIDConfigurationPath is the OpenID Connect discovery path, appended
@@ -145,10 +147,11 @@ func WithAcceptedSpecVersions(versions ...string) Option {
 }
 
 // WithDefaultTTL overrides DefaultTTL, the cache TTL applied when the
-// response to a discovery fetch carries no positive Cache-Control max-age.
-// A d of 0 or less means such a catalog never expires: its ExpiresAt is
-// the zero time, so Resolve keeps returning it from the cache until Refresh
-// fetches it again.
+// response to a discovery fetch declares none: no Cache-Control no-store,
+// no-cache or valid max-age, and no Expires. A d of 0 or less means such a
+// catalog never expires: its ExpiresAt is the zero time, so Resolve keeps
+// returning it from the cache until Refresh fetches it again. A TTL the
+// response declares, 0 included, applies whatever d is.
 func WithDefaultTTL(d time.Duration) Option {
 	return func(cfg *resolverConfig) { cfg.defaultTTL = d }
 }
@@ -320,13 +323,13 @@ func (r *Resolver) Resolve(ctx context.Context, baseURL string) (*ServiceCatalog
 //
 // When the cached catalog carries an ETag, the request is conditional. A
 // 304 Not Modified keeps the cached document, services and auth members,
-// and renews the expiry from the response's Cache-Control max-age or the
-// default TTL. It does so only once the catalog passes the same checks as
-// a new document: this Resolver's validation, and the issuer check against
-// the issuer's OpenID configuration. A new document replaces the cached
-// catalog. When the refresh fails, the cached catalog is dropped, so the
-// next Resolve fetches again and reports the error if that fetch fails
-// too. There are two exceptions, which leave the cached catalog as it was: a
+// and renews the expiry from the TTL the 304 declares in Cache-Control or
+// Expires, or the default TTL when it declares none. It does so only once
+// the catalog passes the same checks as a new document: this Resolver's
+// validation, and the issuer check against the issuer's OpenID
+// configuration. A new document replaces the cached catalog. When the
+// refresh fails, the cached catalog is dropped, so the next Resolve fetches
+// again and reports the error if that fetch fails too. There are two exceptions, which leave the cached catalog as it was: a
 // refresh that failed only because the caller's own context ended, which
 // says nothing about the Platform, and a refresh that panicked. Until the
 // refresh completes, Resolve keeps returning the cached catalog while it is
@@ -650,8 +653,8 @@ func (r *Resolver) checkCached(baseURL string, cat *ServiceCatalog) error {
 
 // renewed returns a copy of cached that is fresh again after a 304 Not
 // Modified: the same document, services and auth members, the same
-// jwks_uri as written, a new ResolvedAt, and an ExpiresAt from the
-// response's Cache-Control max-age, or the default TTL. cached itself is
+// jwks_uri as written, a new ResolvedAt, and an ExpiresAt from the TTL the
+// response declares, or the default TTL (computeExpiry). cached itself is
 // not changed, because callers may hold it.
 func renewed(cached *ServiceCatalog, h http.Header, ttl time.Duration) *ServiceCatalog {
 	c := *cached
@@ -777,29 +780,96 @@ func joinURL(rawBase, path string) (*url.URL, error) {
 	return doc, nil
 }
 
-// computeExpiry returns when a catalog resolved at now expires. It reads only
-// the max-age directive of Cache-Control (RFC 9111 §5.2.2.1): a positive
-// max-age gives now plus that many seconds. Otherwise, when there is no
-// max-age, or it is 0 or does not parse, fallback applies: now plus
-// fallback, or the zero time, which never expires, when fallback is 0 or
-// negative. Expires, Age and the other Cache-Control directives, no-store
-// and no-cache included, are not read.
+// maxDeclaredTTL is the longest TTL the resolver takes from a response,
+// 2^31 seconds: RFC 9111 §1.2.2 lets a cache read a larger delta-seconds
+// value, or a calculation that overflows, as this one.
+const maxDeclaredTTL = time.Duration(1<<31) * time.Second
+
+// computeExpiry returns when a catalog resolved at now expires: now plus the
+// TTL the response declares (declaredTTL), or, when it declares none, now
+// plus fallback. A declared TTL of 0 returns now, so the catalog is stale at
+// once and its next use fetches it again, conditionally when it has an ETag.
+// A declared TTL never gives the zero time, which means the catalog never
+// expires; only fallback does that, when it is 0 or negative.
 func computeExpiry(h http.Header, fallback time.Duration, now time.Time) time.Time {
-	cc := h.Get("Cache-Control")
-	if cc != "" {
-		for part := range strings.SplitSeq(cc, ",") {
-			p := strings.TrimSpace(strings.ToLower(part))
-			if rest, ok := strings.CutPrefix(p, "max-age="); ok {
-				if d, err := time.ParseDuration(rest + "s"); err == nil && d > 0 {
-					return now.Add(d)
-				}
-			}
-		}
+	if ttl, ok := declaredTTL(h, now); ok {
+		return now.Add(ttl)
 	}
 	if fallback <= 0 {
 		return time.Time{}
 	}
 	return now.Add(fallback)
+}
+
+// declaredTTL returns the TTL h declares, the freshness lifetime of RFC 9111
+// §4.2.1, and false when h declares none. The first rule that applies wins:
+//
+//   - a no-store or no-cache directive anywhere in Cache-Control, in any case
+//     and with or without an argument, declares 0 (RFC 9111 §5.2.2.4,
+//     §5.2.2.5);
+//   - the first max-age directive whose argument is delta-seconds, decimal
+//     digits only, declares that many seconds (RFC 9111 §5.2.2.1); an
+//     argument such as "5m", "-1", "1.5" or "" is ignored, as if the
+//     directive were absent;
+//   - an Expires field declares its time minus the time of the Date field,
+//     or of now when Date is absent or not an HTTP-date, and 0 when that is
+//     not positive or Expires is not an HTTP-date (RFC 9111 §5.3).
+//
+// Directive names are matched without regard to case, and an argument is
+// read in its token or its quoted-string form (RFC 9111 §5.2). Cache-Control
+// is read from every field line. A TTL past maxDeclaredTTL is capped there.
+// The Age field and the other directives are not read.
+func declaredTTL(h http.Header, now time.Time) (time.Duration, bool) {
+	maxAge, hasMaxAge := time.Duration(0), false
+	for _, field := range h.Values("Cache-Control") {
+		for directive := range strings.SplitSeq(field, ",") {
+			name, arg, _ := strings.Cut(strings.TrimSpace(directive), "=")
+			switch strings.ToLower(name) {
+			case "no-store", "no-cache":
+				return 0, true
+			case "max-age":
+				if !hasMaxAge {
+					maxAge, hasMaxAge = deltaSeconds(arg)
+				}
+			}
+		}
+	}
+	if hasMaxAge {
+		return maxAge, true
+	}
+	expiresField := h.Values("Expires")
+	if len(expiresField) == 0 {
+		return 0, false
+	}
+	expires, err := http.ParseTime(expiresField[0])
+	if err != nil {
+		// An invalid Expires, such as "0", is a time in the past.
+		return 0, true
+	}
+	date := now
+	if d, err := http.ParseTime(h.Get("Date")); err == nil {
+		date = d
+	}
+	return min(max(expires.Sub(date), 0), maxDeclaredTTL), true
+}
+
+// deltaSeconds reads arg, the argument of a max-age directive, as
+// delta-seconds (RFC 9111 §1.2.2): one or more decimal digits, also when
+// written as a quoted string. A value past maxDeclaredTTL reads as
+// maxDeclaredTTL. ok is false for anything else, a sign or a unit included.
+func deltaSeconds(arg string) (ttl time.Duration, ok bool) {
+	if len(arg) >= 2 && arg[0] == '"' && arg[len(arg)-1] == '"' {
+		arg = arg[1 : len(arg)-1]
+	}
+	// 32 bits hold maxDeclaredTTL's 2^31 seconds, and a parse that wide
+	// lets a reader, and a static check, see that n fits a Duration.
+	n, err := strconv.ParseUint(arg, 10, 32)
+	if err != nil && !errors.Is(err, strconv.ErrRange) {
+		return 0, false
+	}
+	// On ErrRange n is the largest uint32, so the cap below applies.
+	const maxSeconds = uint64(maxDeclaredTTL / time.Second)
+	return time.Duration(min(n, maxSeconds)) * time.Second, true
 }
 
 // smartConfigWire mirrors the SMART configuration document shape (plus

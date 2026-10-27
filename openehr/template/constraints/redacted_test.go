@@ -581,3 +581,28 @@ func TestREQ168_RedactedEqualAgreesWithEquality(t *testing.T) {
 		})
 	}
 }
+
+// TestREQ025_FormatWithNilStateDoesNotPanic pins REQ-025 (idiom.md § No
+// panics): Format called directly with a nil fmt.State returns without a
+// panic, for the zero value of every type of constraints that has a Format
+// method.
+func TestREQ025_FormatWithNilStateDoesNotPanic(t *testing.T) { // REQ-025
+	t.Parallel()
+	tests := []struct {
+		name string
+		v    fmt.Formatter
+	}{
+		{name: "constraints.Redacted", v: constraints.Redacted{}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			defer func() {
+				if r := recover(); r != nil {
+					t.Errorf("%s: Format(nil, 'v') panicked: %v", tc.name, r)
+				}
+			}()
+			tc.v.Format(nil, 'v')
+		})
+	}
+}

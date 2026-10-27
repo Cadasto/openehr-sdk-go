@@ -2,6 +2,8 @@ package smart
 
 import (
 	"cmp"
+	"fmt"
+	"io"
 	"log/slog"
 	"maps"
 )
@@ -18,6 +20,12 @@ const (
 
 // PrincipalIdentity carries tenant-scoped principal claims when the
 // deployment issues them on the ID token.
+//
+// Printed with fmt, a PrincipalIdentity shows the tokens its Raw holds as
+// "[redacted]", and the iss, fhirUser and smart_style_url members of Raw
+// with their passwords masked: see [PrincipalIdentity.String]. Logged with log/slog, a
+// *PrincipalIdentity shows them the same way: see
+// [PrincipalIdentity.LogValue].
 type PrincipalIdentity struct {
 	UID  string
 	Type PrincipalType
@@ -27,20 +35,50 @@ type PrincipalIdentity struct {
 	// versa). Nested values are not deep-copied. When the claims come from
 	// the token-endpoint body, Raw holds its members verbatim, the access
 	// and refresh tokens included, so it must not be printed or logged as it
-	// is; log the *PrincipalIdentity itself, whose LogValue masks them.
+	// is; print or log the *PrincipalIdentity itself, whose String and
+	// LogValue mask them.
 	Raw map[string]any
+}
+
+// String describes p with Raw shown as a copy whose access_token,
+// refresh_token and id_token members keep their keys but have their values
+// replaced by "[redacted]", and whose iss, fhirUser and smart_style_url
+// members, when they hold a URL, have its password masked as
+// [net/url.URL.Redacted] masks it. UID and Type are shown as they are; p and
+// its Raw are not changed. A PrincipalIdentity value copied out of a
+// *PrincipalIdentity prints the same way.
+func (p PrincipalIdentity) String() string {
+	return fmt.Sprintf("smart.PrincipalIdentity{UID: %q, Type: %q, Raw: %v}", p.UID, p.Type, maskedTokens(p.Raw))
+}
+
+// GoString returns the text of [PrincipalIdentity.String], so that printing p
+// in Go syntax shows no token either.
+func (p PrincipalIdentity) GoString() string { return p.String() }
+
+// Format writes the text of [PrincipalIdentity.String] for every fmt verb it
+// is called for, whatever the flags and width. fmt answers %T and %p without
+// calling it, and %p of a PrincipalIdentity value prints its fields, so never
+// print a PrincipalIdentity with %p.
+func (p PrincipalIdentity) Format(f fmt.State, _ rune) {
+	if f == nil {
+		return
+	}
+	_, _ = io.WriteString(f, p.String())
 }
 
 // LogValue lets log/slog log p without the tokens Raw can hold. It logs UID,
 // Type and a copy of Raw as a group, keyed by field name; in the copy the
 // access_token, refresh_token and id_token members keep their keys but have
-// their values replaced by the same fixed marker. p itself is not changed. A
-// nil p logs as nil, as slog logs any nil pointer.
+// their values replaced by "[redacted]", and the URL members are masked as
+// [PrincipalIdentity.String] masks them. p itself is not changed. A nil p
+// logs as nil, as slog logs any nil pointer.
 //
 // The masking applies to a *PrincipalIdentity, such as the one
 // [LaunchContext].Principal holds. A PrincipalIdentity value copied out of
-// it (*p) and logged as it is does not go through LogValue, so the tokens in
-// its Raw are logged: log the pointer instead.
+// it (*p) and logged as it is does not go through LogValue: slog's text
+// handler prints it with the text of [PrincipalIdentity.String], which masks
+// the same members, but its JSON handler encodes its fields, tokens included.
+// Log the pointer instead.
 func (p *PrincipalIdentity) LogValue() slog.Value {
 	if p == nil {
 		return slog.AnyValue(nil)

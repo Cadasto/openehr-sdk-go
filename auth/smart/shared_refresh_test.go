@@ -81,7 +81,7 @@ const (
 var errTransportBug = errors.New("transport bug")
 
 // scriptedSource is a public-client source whose requests srv answers.
-func scriptedSource(t *testing.T, srv *scriptedServer, opts ...smart.Option) *smart.Source {
+func scriptedSource(t *testing.T, srv http.RoundTripper, opts ...smart.Option) *smart.Source {
 	t.Helper()
 	src, err := newSource("client-id", discovery.AuthEndpoints{
 		AuthorizationEndpoint: discovery.MustParseURL("https://idp.test/authorize"),
@@ -108,18 +108,23 @@ func scriptedJWKS(t *testing.T, srv *scriptedServer) *smart.JWKS {
 }
 
 // TestREQ026_RefreshLeaderCancelDoesNotFailWaiters pins REQ-026 (idiom.md §
-// Concurrency) with REQ-063: when the call leading a shared refresh gives up
-// and that alone fails the refresh, a call waiting on it with a live context
-// does not get the leader's cancellation. It refreshes again and gets the
-// new token.
+// Concurrency) with REQ-063: when the call leading a shared refresh gives up,
+// it returns its own cancellation at once, and the refresh goes on, so a
+// call waiting on it with a live context gets the new token from that one
+// request.
 func TestREQ026_RefreshLeaderCancelDoesNotFailWaiters(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
+		release := make(chan struct{})
 		srv := &scriptedServer{arrived: make(chan struct{}, 1)}
 		srv.refresh = func(r *http.Request, n int) (*http.Response, error) {
 			if n == 1 {
-				// The leader's refresh is held until the leader gives up.
-				<-r.Context().Done()
-				return nil, r.Context().Err()
+				// The refresh is held until the test releases it; a request
+				// whose context ends is abandoned, as a real client does.
+				select {
+				case <-release:
+				case <-r.Context().Done():
+					return nil, r.Context().Err()
+				}
 			}
 			return scriptedAnswer(r, http.StatusOK, freshTokenBody), nil
 		}
@@ -137,6 +142,8 @@ func TestREQ026_RefreshLeaderCancelDoesNotFailWaiters(t *testing.T) {
 		wg.Go(func() { waitTok, waitErr = src.Token(t.Context()) })
 		synctest.Wait() // the second call waits on the leader's refresh
 		cancelLead()
+		synctest.Wait() // the leader has returned; the refresh is still out
+		close(release)
 		wg.Wait()
 
 		if !errors.Is(leadErr, context.Canceled) {
@@ -145,16 +152,17 @@ func TestREQ026_RefreshLeaderCancelDoesNotFailWaiters(t *testing.T) {
 		if waitErr != nil || waitTok.Value != "at-new" {
 			t.Errorf("waiting Token() = (%q, %v), want (at-new, nil): the leader's cancellation is not the waiter's", waitTok.Value, waitErr)
 		}
-		if n, _ := srv.counts(); n != 2 {
-			t.Errorf("refresh requests = %d, want 2 (the cancelled one, the waiter's own)", n)
+		if n, _ := srv.counts(); n != 1 {
+			t.Errorf("refresh requests = %d, want 1 (the refresh outlives the leader's cancellation)", n)
 		}
 	})
 }
 
 // TestREQ026_RefreshFailureReachesWaitersAfterLeaderCancel pins REQ-026 with
 // REQ-063: a refresh that fails for a reason of its own reaches the calls
-// waiting on it, even when the leader's context ended meanwhile. Only a
-// failure the leader's ending caused stays the leader's.
+// waiting on it, even when the leader's context ended meanwhile. The leader
+// itself returns its own cancellation at once. The held token has expired,
+// so the failure is not met by serving it.
 func TestREQ026_RefreshFailureReachesWaitersAfterLeaderCancel(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		release := make(chan struct{})
@@ -164,7 +172,7 @@ func TestREQ026_RefreshFailureReachesWaitersAfterLeaderCancel(t *testing.T) {
 			return scriptedAnswer(r, http.StatusServiceUnavailable, outageBody), nil
 		}
 		src := scriptedSource(t, srv)
-		src.SetTokens(staleAccess("at-old"), "rt-0")
+		src.SetTokens(expiredAccess("at-old"), "rt-0")
 
 		leadCtx, cancelLead := context.WithCancel(t.Context())
 		var (
@@ -180,14 +188,12 @@ func TestREQ026_RefreshFailureReachesWaitersAfterLeaderCancel(t *testing.T) {
 		close(release)
 		wg.Wait()
 
-		for _, c := range []struct {
-			call string
-			err  error
-		}{{"leading Token()", leadErr}, {"waiting Token()", waitErr}} {
-			ex, ok := errors.AsType[*auth.ExchangeError](c.err)
-			if !ok || ex.StatusCode != http.StatusServiceUnavailable || !errors.Is(c.err, auth.ErrRefreshFailed) {
-				t.Errorf("%s error = %v, want the 503 refresh failure", c.call, c.err)
-			}
+		if !errors.Is(leadErr, context.Canceled) {
+			t.Errorf("leading Token() error = %v, want context.Canceled", leadErr)
+		}
+		ex, ok := errors.AsType[*auth.ExchangeError](waitErr)
+		if !ok || ex.StatusCode != http.StatusServiceUnavailable || !errors.Is(waitErr, auth.ErrRefreshFailed) {
+			t.Errorf("waiting Token() error = %v, want the 503 refresh failure", waitErr)
 		}
 		if n, _ := srv.counts(); n != 1 {
 			t.Errorf("refresh requests = %d, want 1 (one shared refresh)", n)

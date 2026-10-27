@@ -488,6 +488,59 @@ func TestRetryOptIntoNonIdempotent(t *testing.T) {
 	}
 }
 
+// TestRetryPUTAndDELETEOnlyUnderRetryNonIdempotent pins that a PUT or a DELETE
+// answered 503 is sent once by default and retried only when the policy sets
+// RetryNonIdempotent. An openEHR PUT or DELETE names the version it changes,
+// so a retry after a gateway error that hid a committed write would answer 412
+// or 409 for a write that succeeded. The GET case is the contrast: it is still
+// retried without the opt-in.
+func TestRetryPUTAndDELETEOnlyUnderRetryNonIdempotent(t *testing.T) { // REQ-091
+	const attempts = 3
+	cases := []struct {
+		method        string
+		nonIdempotent bool
+		wantHits      int32
+	}{
+		{method: http.MethodPut, wantHits: 1},
+		{method: http.MethodDelete, wantHits: 1},
+		{method: http.MethodPut, nonIdempotent: true, wantHits: attempts},
+		{method: http.MethodDelete, nonIdempotent: true, wantHits: attempts},
+		{method: http.MethodGet, wantHits: attempts},
+	}
+	for _, tc := range cases {
+		t.Run(fmt.Sprintf("%s/RetryNonIdempotent=%t", tc.method, tc.nonIdempotent), func(t *testing.T) {
+			var hits atomic.Int32
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				hits.Add(1)
+				w.WriteHeader(http.StatusServiceUnavailable)
+			}))
+			defer srv.Close()
+			c, err := New(
+				newCatalog(t, srv),
+				WithHTTPClient(srv.Client()),
+				WithRetry(RetryPolicy{
+					MaxAttempts:        attempts,
+					InitialBackoff:     time.Millisecond,
+					RetryNonIdempotent: tc.nonIdempotent,
+				}),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req := &Request{Method: tc.method, Path: "/ehr/abc/composition/def", IfMatch: "def::node::1"}
+			if tc.method == http.MethodPut {
+				req.Body = []byte(`{}`)
+			}
+			if _, err := c.Do(t.Context(), req); !errors.Is(err, ErrServerError) {
+				t.Errorf("Do(%s) error = %v, want one matching ErrServerError", tc.method, err)
+			}
+			if got := hits.Load(); got != tc.wantHits {
+				t.Errorf("%s answered 503 with RetryNonIdempotent=%t hit the server %d times, want %d", tc.method, tc.nonIdempotent, got, tc.wantHits)
+			}
+		})
+	}
+}
+
 func TestRetryDisabledByDefault(t *testing.T) {
 	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -884,6 +937,40 @@ func TestWireErrorDefaultOmitsMessageAndRawBody(t *testing.T) {
 	// RawBody must be empty by default.
 	if len(we.RawBody) != 0 {
 		t.Errorf("RawBody = %d bytes; default client must not preserve raw body (PHI)", len(we.RawBody))
+	}
+}
+
+// TestWireErrorQuotesTheServerCode pins that WireError.Error writes the
+// openEHR code as a quoted Go string. The code is the server's text, so
+// written as it came it could put a newline into the error string and the
+// logs that print it, or text that reads as another field of the error.
+func TestWireErrorQuotesTheServerCode(t *testing.T) { // REQ-093
+	cases := []struct {
+		name string
+		code string
+		want string
+	}{
+		{name: "plain code", code: "NOT_FOUND", want: ` code="NOT_FOUND"`},
+		{name: "newline", code: "A\nB", want: ` code="A\nB"`},
+		{name: "text that reads as a field", code: "X status=200", want: ` code="X status=200"`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			we := &WireError{
+				Sentinel:   ErrNotFound,
+				Method:     http.MethodGet,
+				Route:      "/ehr/{ehr_id}",
+				StatusCode: http.StatusNotFound,
+				OpenEHR:    &OpenEHRErrorDetail{Code: tc.code},
+			}
+			got := we.Error()
+			if strings.ContainsAny(got, "\r\n") {
+				t.Errorf("WireError{OpenEHR.Code: %q}.Error() = %q, want no line break", tc.code, got)
+			}
+			if !strings.HasSuffix(got, tc.want) {
+				t.Errorf("WireError{OpenEHR.Code: %q}.Error() = %q, want it to end with %q", tc.code, got, tc.want)
+			}
+		})
 	}
 }
 
