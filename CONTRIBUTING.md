@@ -82,7 +82,7 @@ Nothing runs on commit, so run `make lint` yourself before opening a PR. If you 
 
 ## Code style
 
-The detailed, normative idiom spec is [`docs/specifications/idiom.md`](docs/specifications/idiom.md). It covers context propagation, `*http.Client` injection, functional options, generics-no-reflection, error wrapping / typed errors, concurrency, imports & naming, and public-API stability. Formatting, lint, and commit conventions are in [AGENTS.md § Code style and conventions](AGENTS.md#code-style-and-conventions). Read those first. The points below trip up most PRs:
+The detailed, normative idiom spec is [`docs/specifications/idiom.md`](docs/specifications/idiom.md). It covers context propagation, `*http.Client` injection, functional options, generics-no-reflection, error wrapping / typed errors, concurrency, imports & naming, and public-API stability. Commit conventions are in [AGENTS.md § Code style and conventions](AGENTS.md#code-style-and-conventions), and the format and lint commands in [§ Tooling & workflow](AGENTS.md#tooling--workflow). Read those first. The points below trip up most PRs:
 
 - **Building-block independence (REQ-013)**: the openEHR building-block packages and the AQL blocks are usable standalone, with no `transport/` or `auth/` import. The exact package set and each package's import rule are in the table in [`docs/specifications/module-layout.md` § REQ-013](docs/specifications/module-layout.md#req-013--building-block-independence).
 - **No reflection** beyond the exceptions in [idiom.md § API conventions](docs/specifications/idiom.md#api-conventions): `_type` dispatch goes through the type registry, and generics are fine.
