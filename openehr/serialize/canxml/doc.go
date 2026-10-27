@@ -165,8 +165,10 @@
 // on the class its element decodes as, the class its `xsi:type` names, or
 // else the type the RM declares where it sits, as "Unmatched content" above
 // reads it, and the element carries no value for it: it has no child element
-// of that name, and no XML attribute of it where the ITS-XML schema carries
-// the attribute as one (`archetype_node_id`); the child it has carries
+// of that name, nor one the AM 1.4 schema declares in its place
+// (`terminology_id` for a C_CODE_PHRASE's terminology) holding a value, and
+// no XML attribute of it where the ITS-XML schema carries the attribute as
+// one (`archetype_node_id`, an ARCHETYPE_TERM's `code`); the child it has carries
 // `xsi:nil="true"` (or `1`), whatever it holds; or the child is a primitive
 // element whose text is empty or XML whitespace only, which carries no
 // value, as an empty interval flag element does. The decoder cannot always
