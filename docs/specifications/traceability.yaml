@@ -213,10 +213,13 @@ requirements:
     packages: [smart/discovery, transport, auth/clientcreds, auth/jwtbearer, auth/smart, internal/coalesce]
     tests:
       - auth/clientcreds/reauth_test.go
+      - auth/clientcreds/renewal_backoff_test.go
       - auth/clientcreds/shared_exchange_test.go
       - auth/jwtbearer/reauth_test.go
+      - auth/jwtbearer/renewal_backoff_test.go
       - auth/jwtbearer/shared_exchange_test.go
       - auth/jwtbearer/template_copy_test.go
+      - auth/smart/detached_refresh_test.go
       - auth/smart/own_copy_test.go
       - auth/smart/print_test.go
       - auth/smart/response_copy_test.go
@@ -419,7 +422,7 @@ requirements:
     canonical: docs/specifications/wire.md#req-052
     status: draft
     implementation: landed
-    packages: [openehr/serialize/canjson, openehr/rm, openehr/rm/typereg, openehr/internal/refused, openehr/internal/xmlunmatched, openehr/aom/aom14, testkit/corpus, testkit/fixtures, testkit/wireequiv, testkit/expectedform]
+    packages: [openehr/serialize/canjson, openehr/rm, openehr/rm/typereg, openehr/internal/refused, openehr/internal/xmlunmatched, openehr/aom/aom14, openehr/client/ehr/contribution, testkit/corpus, testkit/fixtures, testkit/wireequiv, testkit/expectedform]
     probes: [PROBE-030, PROBE-031, PROBE-038, PROBE-105]
     tests:
       - internal/bmmgen/render_interval_bound_test.go
@@ -431,6 +434,7 @@ requirements:
       - internal/v1_rm_decode_guard_test.go
       - openehr/aom/aom14/interval_open_side_test.go
       - openehr/client/demographic/versioned_test.go
+      - openehr/client/ehr/contribution/submission_test.go
       - openehr/instance/instance_test.go
       - openehr/instance/polymorphic_roundtrip_test.go
       - openehr/internal/refused/refused_test.go
@@ -709,17 +713,23 @@ requirements:
     canonical: docs/specifications/auth.md#req-060
     status: draft
     implementation: landed
-    packages: [auth, auth/clientcreds, auth/jwtbearer, auth/smart, internal/noredirect, transport]
+    packages: [auth, auth/basic, auth/clientcreds, auth/jwtbearer, auth/smart, smart, internal/noredirect, transport]
     tests:
+      - auth/basic/print_test.go
+      - auth/clientcreds/print_test.go
       - auth/clientcreds/redirect_test.go
       - auth/clientcreds/token_type_test.go
+      - auth/jwtbearer/print_test.go
       - auth/jwtbearer/redirect_test.go
       - auth/jwtbearer/token_type_test.go
+      - auth/smart/credential_print_test.go
       - auth/smart/redact_test.go
       - auth/smart/redirect_test.go
       - auth/smart/smart_test.go
+      - auth/token_print_test.go
       - auth/tokensource_test.go
       - internal/noredirect/noredirect_test.go
+      - smart/print_test.go
       - transport/client_test.go
       - transport/diagnostics_internal_test.go
 
@@ -779,12 +789,15 @@ requirements:
       - auth/clientcreds/expires_in_test.go
       - auth/clientcreds/reauth_test.go
       - auth/clientcreds/refresh_threshold_test.go
+      - auth/clientcreds/renewal_backoff_test.go
       - auth/clientcreds/shared_exchange_test.go
       - auth/errors_test.go
       - auth/jwtbearer/expires_in_test.go
       - auth/jwtbearer/reauth_test.go
       - auth/jwtbearer/refresh_threshold_test.go
+      - auth/jwtbearer/renewal_backoff_test.go
       - auth/jwtbearer/shared_exchange_test.go
+      - auth/smart/detached_refresh_test.go
       - auth/smart/expires_in_test.go
       - auth/smart/reauth_test.go
       - auth/smart/redact_test.go
@@ -793,6 +806,7 @@ requirements:
       - auth/smart/refresh_failure_test.go
       - auth/smart/refresh_idtoken_test.go
       - auth/smart/refresh_threshold_test.go
+      - auth/smart/renewal_backoff_test.go
       - auth/smart/response_copy_test.go
       - auth/smart/restored_scope_test.go
       - auth/smart/revoke_test.go
@@ -832,6 +846,7 @@ requirements:
       - smart/launch_seam_test.go
       - smart/launch_test.go
       - smart/log_value_test.go
+      - smart/print_test.go
 
   - id: REQ-065
     title: Per-client tenant binding (retired)
@@ -862,6 +877,7 @@ requirements:
     tests:
       - smart/launch_test.go
       - smart/log_value_test.go
+      - smart/print_test.go
       - testkit/probes/auth/probe_008_principal_claims.go
       - testkit/probes/auth/probes_test.go
 
@@ -1991,6 +2007,7 @@ requirements:
     probes: [PROBE-084]
     tests:
       - openehr/client/ehr/contribution/builder_test.go
+      - openehr/client/ehr/contribution/submission_test.go
       - openehr/client/ehr/contribution/version_shadow_internal_test.go
       - openehr/client/ehr/contribution/version_test.go
       - testkit/probes/versioned/probe_072_contribution_submission_shape.go
