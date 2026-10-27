@@ -83,6 +83,41 @@ func Class(name string) string {
 	return strings.TrimSpace(class)
 }
 
+// Param returns the class name and the one generic parameter of a type name
+// that has exactly one, as [Split] reads them: "DV_INTERVAL<DV_QUANTITY>"
+// gives "DV_INTERVAL" and "DV_QUANTITY". ok is false for a name Split refuses,
+// a name without parameters and a name with more than one. Unlike Split, it
+// builds no parameter list.
+func Param(name string) (class, param string, ok bool) {
+	if plain(name) {
+		return "", "", false
+	}
+	name = strings.TrimSpace(name)
+	if !wellFormed(name) {
+		return "", "", false
+	}
+	open := strings.IndexByte(name, '<')
+	if open < 0 {
+		return "", "", false
+	}
+	// wellFormed guarantees the name ends with the bracket that closes open.
+	inner := name[open+1 : len(name)-1]
+	depth := 0
+	for i := range len(inner) {
+		switch inner[i] {
+		case '<':
+			depth++
+		case '>':
+			depth--
+		case ',':
+			if depth == 0 {
+				return "", "", false
+			}
+		}
+	}
+	return strings.TrimSpace(name[:open]), strings.TrimSpace(inner), true
+}
+
 // Substitute returns the type an attribute has on a value of the type named
 // owner, given the type that the attribute's class declares. When declared is
 // one of the class's formal generic parameters and owner supplies it, the
