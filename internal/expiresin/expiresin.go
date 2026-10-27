@@ -21,7 +21,7 @@ const Max = 100 * 365 * 24 * 60 * 60
 // beyond the int64 range, counts as its whole seconds rounded down. Every
 // form is then kept between -Max and Max, so the result always turns into a
 // time.Duration of that many seconds without overflow. A negative value
-// stays negative, so a caller can tell it gives no expiry. ok is false when
+// stays negative; callers read zero or below as a lifetime of zero. ok is false when
 // s is not a number, or is one a float64 cannot hold (it reads as NaN or
 // ±Inf).
 func Seconds(s string) (secs int64, ok bool) {

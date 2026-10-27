@@ -174,7 +174,7 @@ Each entry says what its probe checks and which requirement it satisfies; the re
 #### PROBE-006 — JWKS rotation transparent to caller
 
 - **Title:** A signing-key rotation on the authorization server triggers exactly one JWKS refresh in the SDK; subsequent requests succeed without consumer intervention.
-- **Preconditions:** A cached JWKS does not contain the `kid` of the issued token (simulating rotation).
+- **Preconditions:** A cached JWKS does not contain the `kid` of the issued token (simulating rotation), and is at least `JWKS.MinRefreshInterval` old; the probe sets that interval to zero, so the miss right after the seed counts as one.
 - **Wire assertion:** SDK fetches JWKS once, validates the token, and proceeds. No double-refresh, no double-validation failure surfaced.
 - **Modes:** Sandbox, Cassette.
 - **Status:** Implemented (Sandbox) — signs an id_token with a rotated key whose `kid` the seeded JWKS cache lacks, and checks that `smart.ValidateIDToken` recovers through exactly one refresh (the seed plus one fetch on the miss) and validates the token.
