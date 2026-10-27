@@ -403,3 +403,46 @@ func TestREQ107_UntypedChildRefusalNamesItsType(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ107_IntervalBoundsOfTwoTypesAreRefused is the REQ-107 Errors check
+// of a DV_INTERVAL over an abstract DV_ORDERED class whose two bounds name
+// types no one interval holds: the walk builds the interval over the type
+// its lower bound names, and the upper bound's type is not that type nor
+// one of its descendants, so Generate returns an error wrapping
+// ErrConstraintUnsatisfiable and no root, under every policy and both
+// compile modes. So does a bound whose type is not a descendant of the
+// interval's parameter at all.
+func TestREQ107_IntervalBoundsOfTwoTypesAreRefused(t *testing.T) {
+	cases := []struct {
+		name   string
+		opt    string
+		detail string
+	}{
+		{
+			name: "a DV_DATE lower and a DV_DATE_TIME upper of a DV_INTERVAL<DV_TEMPORAL>",
+			opt: optTemplate("ELEMENT", optSingle("value", optAbstractInterval("DV_TEMPORAL",
+				optSingle("lower", optNode("DV_DATE", "")), optSingle("upper", optNode("DV_DATE_TIME", ""))))),
+			detail: "DV_INTERVAL<DV_DATE>.upper at /value: a DV_DATE_TIME bound in an interval over DV_DATE",
+		},
+		{
+			name: "a DV_COUNT lower of a DV_INTERVAL<DV_TEMPORAL>",
+			opt: optTemplate("ELEMENT", optSingle("value", optAbstractInterval("DV_TEMPORAL",
+				optSingle("lower", optNode("DV_COUNT", ""))))),
+			detail: "DV_INTERVAL<DV_DATE>.lower at /value: a DV_COUNT bound in an interval over DV_DATE",
+		},
+	}
+	for _, tc := range cases {
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, tc.opt, implicit)
+			for _, policy := range everyPolicy {
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v", tc.name, implicit, policy), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, Now: defaultsNow})
+					checkUnsatisfiableDetail(t, "Generate", err, tc.detail)
+					if out != nil {
+						t.Errorf("Generate returned %T with the error, want no root", out)
+					}
+				})
+			}
+		}
+	}
+}
