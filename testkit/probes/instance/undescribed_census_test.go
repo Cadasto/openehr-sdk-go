@@ -475,7 +475,7 @@ func censusWalk(node *templatecompile.CompiledNode, value map[string]any, underO
 			if child != nil && nodeOptional(child) {
 				below = true
 			}
-			censusWalk(child, member, below, child != nil && topUpLastResort(child, built), out)
+			censusWalk(child, member, below, child != nil && topUpLastResort(child, built, len(members)), out)
 		}
 	}
 }
@@ -617,11 +617,14 @@ func attrRequired(attr *templatecompile.CompiledAttribute) bool {
 
 // topUpLastResort reports whether node, an optional child, is a child a
 // top-up takes when no other will do (REQ-107 § Contract What a visit
-// writes), given built, the members of its list bound to each child. Its
-// list is multi-valued and asks the top-up for a member beyond its
-// existence (topUpAsks), so a top-up builds members where the children's
-// own fall short; every child before node that is not a slot is full
-// (censusRoom), so node was the first child with room that is not a slot;
+// writes), given built, the members of its list bound to each child, and
+// held, the members the list holds. Its list is multi-valued and asks the
+// top-up for a member beyond its existence (topUpAsks), so a top-up builds
+// members where the children's own fall short; the list holds no more
+// members than the top-up fills it up to (topUpTarget), since a top-up adds
+// none past that count, so a list that holds more got no top-up; every
+// child before node that is not a slot is full (censusRoom), so node was
+// the first child with room that is not a slot;
 // and no allowed child that needs no undescribed content
 // (needsNoUndescribed) still has room and has an identity that no earlier
 // sibling other than node carries while it has room, since the top-up would
@@ -640,9 +643,12 @@ func attrRequired(attr *templatecompile.CompiledAttribute) bool {
 // gets a member of its own, so no top-up runs for it, and the parser does
 // not read a slot's occurrences (REQ-107 Known gap: slot occurrences).
 // Reading them would only exempt a node that no top-up builds.
-func topUpLastResort(node *templatecompile.CompiledNode, built map[*templatecompile.CompiledNode]int) bool {
+func topUpLastResort(node *templatecompile.CompiledNode, built map[*templatecompile.CompiledNode]int, held int) bool {
 	attr := parentAttribute(node)
 	if attr == nil || node.IsSlot() || attr.Cardinality() != template.Multiple || !topUpAsks(node.Parent(), attr) {
+		return false
+	}
+	if held > topUpTarget(attr) {
 		return false
 	}
 	children := allowedChildren(attr)
@@ -675,6 +681,25 @@ func topUpAsks(parent *templatecompile.CompiledNode, attr *templatecompile.Compi
 	}
 	l, ok := rminfo.NonEmptyListOf(bmmtype.Class(parent.RMTypeName()), attr.Name())
 	return ok && l.Alternative == "" && tcimpl.LowerAtLeastOne(attr.Existence())
+}
+
+// topUpTarget returns the number of members a top-up fills attr, a list,
+// up to (REQ-107 § Contract What a visit writes): its cardinality lower
+// bound, or 1 where that is 0 and the list is required, since the BMM
+// marks it mandatory, its existence lower bound is at least 1, or an
+// allowed child that is not a slot has an occurrences lower bound of at
+// least 1.
+func topUpTarget(attr *templatecompile.CompiledAttribute) int {
+	if cm := attr.ChildMultiplicity(); cm != nil && !cm.LowerUnbounded() && cm.Lower() > 0 {
+		return cm.Lower()
+	}
+	if attr.Required() || tcimpl.LowerAtLeastOne(attr.Existence()) {
+		return 1
+	}
+	for range tcimpl.MandatoryListChildren(attr) {
+		return 1
+	}
+	return 0
 }
 
 // censusRoom reports whether child, an allowed child of a list that n
