@@ -25,6 +25,7 @@ type publishedKey struct {
 	key *rsa.PrivateKey
 	kid string // empty publishes the key without a kid
 	use string // empty publishes the key without a use
+	alg string // empty publishes the key without an alg
 }
 
 // keySetBody marshals the public halves of keys as a JWKS document.
@@ -32,7 +33,7 @@ func keySetBody(t *testing.T, keys ...publishedKey) []byte {
 	t.Helper()
 	set := gojose.JSONWebKeySet{Keys: []gojose.JSONWebKey{}}
 	for _, k := range keys {
-		set.Keys = append(set.Keys, gojose.JSONWebKey{Key: &k.key.PublicKey, KeyID: k.kid, Use: k.use})
+		set.Keys = append(set.Keys, gojose.JSONWebKey{Key: &k.key.PublicKey, KeyID: k.kid, Use: k.use, Algorithm: k.alg})
 	}
 	body, err := json.Marshal(set)
 	if err != nil {
