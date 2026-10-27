@@ -1721,6 +1721,7 @@ requirements:
       - openehr/internal/xmlunmatched
     probes: [PROBE-077, PROBE-081, PROBE-110]
     tests:
+      - cmd/examples/validate-from-json/main_test.go
       - internal/bmmgen/container_bounds_test.go
       - internal/bmmgen/render_rminfo_functions_test.go
       - internal/iso8601/magnitude_test.go
