@@ -256,10 +256,13 @@ var ErrSlotFillUnsupported = errors.New("instance.Generate: required slot fill c
 // constraint, for example a C_STRING whose pattern and list admit no
 // string; a list the walk visits whose children's occurrences lower bounds
 // add up past its cardinality upper bound, so that no instance holds every
-// member they ask for (ADL 1.4 VCOC, AOM 2 VACMCO); or an attribute the template requires
+// member they ask for (ADL 1.4 VCOC, AOM 2 VACMCO); an attribute the template requires
 // that the generator has no writer for, such as a LOCATABLE's feeder_audit
 // or links, other than a list that only its existence or its cardinality
-// asks a member of. The error names the RM type, the attribute and the OPT path,
+// asks a member of; or a bound of a DV_INTERVAL over an abstract ordered
+// class that the interval the generator builds cannot hold, such as a
+// DV_DATE_TIME upper bound after a DV_DATE lower bound of a
+// DV_INTERVAL<DV_TEMPORAL>. The error names the RM type, the attribute and the OPT path,
 // and Generate returns no root. It is never wrapped together with
 // [ErrSlotFillUnsupported], which concerns slots only, nor with
 // [ErrArchetypeIDMissing], which concerns archetype roots only.

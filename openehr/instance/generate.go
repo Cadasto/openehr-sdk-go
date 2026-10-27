@@ -49,11 +49,13 @@ import (
 // when it has none, or refuses it with [ErrSlotFillUnsupported].
 //
 // A list whose children's occurrences lower bounds add up past its
-// cardinality upper bound, where the walk visits it, and an attribute the
+// cardinality upper bound, where the walk visits it, an attribute the
 // template requires that the generator has no writer for, such as a
 // LOCATABLE's feeder_audit or links, other than a list that only its
-// existence or its cardinality asks a member of, make Generate return an
-// error wrapping [ErrConstraintUnsatisfiable] and no root. A list that sits
+// existence or its cardinality asks a member of, and the two bounds of a
+// DV_INTERVAL over an abstract ordered class where they name types no one
+// interval holds, make Generate return an error wrapping
+// [ErrConstraintUnsatisfiable] and no root. A list that sits
 // in an optional node the policy builds no member of, as Required builds
 // none of an optional child, is not visited, and the root leaves it out. An
 // optional node that holds such an attribute is content the template does
@@ -1003,7 +1005,11 @@ func (g *generator) materialiseSingle(
 		}
 		return nil
 	}
-	rmChild, err := g.buildChild(bindingAlternative(children, builtRMType(children[0])))
+	built := builtRMType(children[0])
+	if err := intervalBoundFits(optNode, attr, built); err != nil {
+		return err
+	}
+	rmChild, err := g.buildChild(bindingAlternative(children, built))
 	if err != nil {
 		return err
 	}
@@ -1020,6 +1026,29 @@ func (g *generator) materialiseSingle(
 		return fmt.Errorf("attach %s.%s: %w", builtRMType(optNode), attr.Name(), err)
 	}
 	return nil
+}
+
+// intervalBoundFits returns an error wrapping ErrConstraintUnsatisfiable
+// where attr is the lower or upper of optNode, a DV_INTERVAL over an
+// abstract DV_ORDERED class that the walk builds over a concrete descendant
+// of it (concreteInterval), and built, the type the walk builds for the
+// bound, is neither that descendant nor one of its own: no one interval
+// holds both bounds, as with a DV_DATE lower and a DV_DATE_TIME upper of a
+// DV_INTERVAL<DV_TEMPORAL>, or the bound is of a type outside the class.
+func intervalBoundFits(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute, built string) error {
+	if name := attr.Name(); name != "lower" && name != "upper" {
+		return nil
+	}
+	if _, abstract := abstractIntervalParameter(strings.TrimSpace(optNode.RMTypeName())); !abstract {
+		return nil
+	}
+	interval := builtRMType(optNode)
+	_, params, ok := bmmtype.Split(interval)
+	if !ok || len(params) != 1 || descendsFrom(built, params[0]) {
+		return nil
+	}
+	return fmt.Errorf("%w: %s.%s at %s: a %s bound in an interval over %s",
+		ErrConstraintUnsatisfiable, interval, attr.Name(), optNode.AQLPath(), built, params[0])
 }
 
 // rmDeclaresList reports whether the pinned RM declares attrName a list on
