@@ -111,9 +111,10 @@ func longestExact(t *testing.T) string {
 // not decimal is never lossy.
 //
 // Can-fail control: skip the write-back and the 16-digit and longer rows
-// that are lossy pass as clean; skip it for every non-zero float64 and the
-// short subnormal rows that are lossy pass; drop the underflow arm and
-// 1e-400 passes; lower maxExactDigits and the 767-digit row is refused.
+// that are lossy pass as clean; skip it for every short literal that parsed
+// to a non-zero float64 and the short subnormal rows that are lossy pass;
+// skip it for every short literal, zero included, and 1e-400 passes too;
+// lower maxExactDigits and the 767-digit row is refused.
 func TestLossy(t *testing.T) {
 	exact := longestExact(t)
 	mant, exp, _ := strings.Cut(exact, "e")
