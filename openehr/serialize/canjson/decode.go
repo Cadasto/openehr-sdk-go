@@ -85,7 +85,7 @@ var ErrInvalidShape = typereg.ErrInvalidShape
 // document wrote it, in two cases: a number or string of the right JSON kind
 // that its Go type cannot hold, and a value one of the SDK's primitive codecs
 // refused (a quoted literal rm.Real, rm.Integer or rm.Integer64 could not
-// parse, an rm.Real number past its 17-digit budget, an rm.Character string
+// parse, a lossy rm.Real number, an rm.Character string
 // that is not exactly one character or number that names no usable code
 // point). Value is empty
 // for any other failure, among them a value of the wrong JSON kind for its

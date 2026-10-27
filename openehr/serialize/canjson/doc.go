@@ -92,29 +92,23 @@
 //     strings; the codec does not parse them to time.Time.
 //
 //   - Numeric magnitudes use IEEE 754 double-precision JSON numbers
-//     (no silent float32 coercion). A wire value that exceeds JSON's
-//     number precision fails decode with a typed error instead of being
-//     silently rounded. The SDK defines that condition as a literal
-//     carrying more than 17 significant decimal digits, float64's
-//     shortest-round-trip maximum. This is a digit-count budget, not an
-//     exactness test, and it is wrong in both directions: a literal past
-//     17 digits can still be exactly representable in float64 and is
-//     refused anyway (18446744073709551616, 2^64, is exact yet carries
-//     20 significant digits), while a shorter literal can be
-//     binary-inexact and decode unreported: an integer past 2^53 (e.g.
-//     9007199254740993, 16 digits, decodes to 9007199254740992) or any
-//     decimal fraction that is not a power of two (0.1 included). A
-//     general exactness check would classify both cases correctly but
-//     would also reject 0.1, which would over-report; the 17-digit
-//     budget is cheap, deterministic, and never reports a short clinical
-//     literal. In practice an out-of-range magnitude (e.g. 1e400) fails
-//     with a typed error, a *json.SemanticError, reachable with
-//     errors.As through the generated decode-method wrapper, and a
-//     magnitude past 17 significant decimal digits, such as
-//     0.1234567890123456789, fails decode wrapping [ErrInvalidShape]
-//     instead of rounding to the nearest float64. A malformed or
-//     out-of-range literal reports its own parse/range error first, so
-//     the budget applies only once a literal has parsed.
+//     (no silent float32 coercion). A lossy literal fails decode with a
+//     typed error instead of being silently rounded. A literal is lossy
+//     when the float64 it parses to, written back correctly rounded to
+//     as many significant decimal digits as the literal carries, denotes
+//     another value. 9007199254740993 (2^53+1, which parses to
+//     9007199254740992), 1.2345678901234567890 and 1e-400 (which
+//     underflows to zero) are lossy, and each fails decode wrapping
+//     [ErrInvalidShape], bare or quoted. A literal of at most 15
+//     significant digits that does not underflow is never lossy, so 0.1
+//     decodes although no float64 holds it exactly. A longer literal the
+//     float64 gives back at its own precision decodes too:
+//     18446744073709551616 (2^64), and 0.10000000000000001, the 17-digit
+//     spelling of 0.1. An out-of-range magnitude (e.g. 1e400) fails with
+//     its own typed error, a *json.SemanticError, reachable with
+//     errors.As through the generated decode-method wrapper. A malformed
+//     or out-of-range literal reports its own parse/range error first, so
+//     the lossy test applies only once a literal has parsed.
 //
 // # Error classification
 //
@@ -162,8 +156,8 @@
 //     hold, such as 3.5 for an rm.Integer64 or 2147483648 for an
 //     rm.Integer;
 //   - a value one of the SDK's primitive codecs refused: a quoted literal
-//     rm.Real, rm.Integer or rm.Integer64 could not parse, an rm.Real
-//     number past its 17-digit budget, and an rm.Character string that is
+//     rm.Real, rm.Integer or rm.Integer64 could not parse, a lossy
+//     rm.Real number, and an rm.Character string that is
 //     not exactly one character or number that names no usable code point.
 //
 // Value is empty for any other failure: a value of the wrong JSON kind for
@@ -229,7 +223,7 @@
 //     sentinel. A lone surrogate or invalid UTF-8 does not reach
 //     rm.Character on this path: the tokenizer refuses it first, so it is
 //     malformed input carrying no sentinel, the same treatment as
-//     malformed JSON above. On rm.Real only the precision refusal carries
+//     malformed JSON above. On rm.Real only the lossy-literal refusal carries
 //     the sentinel; on rm.Integer and rm.Integer64 none does. An empty
 //     input carries no sentinel on any of the four, and neither does a
 //     strconv or encoding/json/v2 parse or range failure beneath rm.Real,
