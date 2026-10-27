@@ -2376,8 +2376,12 @@ func (g *generator) makeChild(child *tcimpl.CompiledNode) (any, error) {
 		return nil, fmt.Errorf("makeChild %s: %w", child.RMTypeName(), err)
 	}
 	if built := rmTypeOf(rmChild); !child.IsSlot() && child.ArchetypeID() == "" && rmroots.IsArchetypeRoot(built) {
-		declared := child.RMTypeName()
-		if strings.TrimSpace(declared) != built {
+		declared := strings.TrimSpace(child.RMTypeName())
+		switch {
+		case declared == "":
+			// An untyped child is named after the type it is built as.
+			declared = built
+		case declared != built:
 			// An abstract declared type is built as a concrete class.
 			declared += " (built as " + built + ")"
 		}
