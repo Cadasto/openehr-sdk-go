@@ -487,6 +487,7 @@ requirements:
       - openehr/serialize/canjson/valuefree_test.go
       - openehr/serialize/canxml/interval_open_side_test.go
       - openehr/serialize/canxml/primitive_error_test.go
+      - openehr/serialize/canxml/real_precision_test.go
       - openehr/serialize/canxml/typed_nil_bound_test.go
       - openehr/serialize/canxml/unmatched_test.go
       - openehr/serialize/canxml/valuefree_test.go
@@ -656,6 +657,7 @@ requirements:
       - openehr/internal/xmlunmatched/document_internal_test.go
       - openehr/rm/character_text_test.go
       - openehr/rm/interval_bound_test.go
+      - openehr/rm/real_test.go
       - openehr/serialize/canxml/child_order_test.go
       - openehr/serialize/canxml/crossformat_test.go
       - openehr/serialize/canxml/decode_test.go
@@ -664,6 +666,7 @@ requirements:
       - openehr/serialize/canxml/missing_test.go
       - openehr/serialize/canxml/oneroot_test.go
       - openehr/serialize/canxml/primitive_error_test.go
+      - openehr/serialize/canxml/real_precision_test.go
       - openehr/serialize/canxml/roundtrip_test.go
       - openehr/serialize/canxml/unmatched_test.go
       - testkit/conformance/crossformat/census_test.go
