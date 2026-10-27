@@ -224,26 +224,26 @@ func TestRenderRMAccessFile_REQ171_Readings(t *testing.T) {
 		{"singleDVCount", "magnitude", "return leafValue(peek, x.Magnitude), true, true"},
 		{"singleEHRStatus", "is_modifiable", "return leafValue(peek, x.IsModifiable), true, true"},
 		{"singleComposition", "name", "return x.Name, presentText(x.Name), true"},
-		{"singleComposition", "category", "return x.Category, presentCodedText(x.Category), true"},
-		{"singleComposition", "language", "return x.Language, presentCodePhrase(x.Language), true"},
+		{"singleComposition", "category", "return &x.Category, presentCodedText(x.Category), true"},
+		{"singleComposition", "language", "return &x.Language, presentCodePhrase(x.Language), true"},
 		{"singleElement", "null_reason", "return x.NullReason, x.NullReason != nil && !rm.IsTypedNil(x.NullReason), true"},
 		{"singleAuditDetails", "description", "return x.Description, x.Description != nil && !rm.IsTypedNil(x.Description), true"},
-		{"singleRole", "performer", "return x.Performer, !isZeroPartyRef(x.Performer), true"},
-		{"singlePartyRelationship", "source", "return x.Source, !isZeroPartyRef(x.Source), true"},
-		{"singleInstructionDetails", "instruction_id", "return x.InstructionID, !isZeroLocatableRef(x.InstructionID), true"},
-		{"singleEventContext", "start_time", "return x.StartTime, !isZeroDVDateTime(x.StartTime), true"},
-		{"singleObservation", "data", "return x.Data, !isZeroHistoryItemStructure(x.Data), true"},
-		{"singleDVIntervalDVQuantity", "lower", "return x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true"},
+		{"singleRole", "performer", "return &x.Performer, !isZeroPartyRef(x.Performer), true"},
+		{"singlePartyRelationship", "source", "return &x.Source, !isZeroPartyRef(x.Source), true"},
+		{"singleInstructionDetails", "instruction_id", "return &x.InstructionID, !isZeroLocatableRef(x.InstructionID), true"},
+		{"singleEventContext", "start_time", "return &x.StartTime, !isZeroDVDateTime(x.StartTime), true"},
+		{"singleObservation", "data", "return &x.Data, !isZeroHistoryItemStructure(x.Data), true"},
+		{"singleDVIntervalDVQuantity", "lower", "return &x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true"},
 		{"singleDVIntervalDVOrdered", "upper", "return x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true"},
-		{"singleEHRStatus", "subject", "return x.Subject, presentEHRStatusSubject(x.Subject), true"},
-		{"singleArchetyped", "archetype_id", "return x.ArchetypeID, presentArchetypedID(x.ArchetypeID), true"},
+		{"singleEHRStatus", "subject", "return &x.Subject, presentEHRStatusSubject(x.Subject), true"},
+		{"singleArchetyped", "archetype_id", "return &x.ArchetypeID, presentArchetypedID(x.ArchetypeID), true"},
 		{"singleArchetyped", "rm_version", "return leafValue(peek, x.RMVersion), presentArchetypedRMVersion(x.RMVersion), true"},
 		{"singleItemSingle", "item", "return &x.Item, !isZeroElement(x.Item), true"},
 		{"singleReferenceRangeDVQuantity", "range", "return &x.Range, !isZeroDVIntervalDVOrdered(x.Range), true"},
 		{"singleIsmTransition", "careflow_step", "if x.CareflowStep == nil {\n\treturn nil, false, true\n}\nreturn *x.CareflowStep, true, true"},
 		{"singleDVProportion", "precision", "if x.Precision == nil {\n\treturn nil, false, true\n}\nreturn leafValue(peek, *x.Precision), true, true"},
 		{"singleOriginalVersionAny", "data", "if x.Data == nil {\n\treturn nil, false, true\n}\nreturn *x.Data, true, true"},
-		{"singleCodePhrase", "terminology_id", "return x.TerminologyID, !isZeroTerminologyID(x.TerminologyID), true"},
+		{"singleCodePhrase", "terminology_id", "return &x.TerminologyID, !isZeroTerminologyID(x.TerminologyID), true"},
 		{"multipleComposition", "content", "return boxValues(box, x.Content), len(x.Content), x.Content != nil, true"},
 		{"multipleItemList", "items", "return boxPointers(box, x.Items), len(x.Items), x.Items != nil, true"},
 		{"singleResourceDescription", "details", "return x.Details, x.Details != nil, true"},
@@ -413,7 +413,7 @@ func TestRenderRMAccessFile_REQ171_ReferencesReadByTheirZeroTest(t *testing.T) {
 		}
 		checked = append(checked, s.class+"."+s.attr.name)
 		field := "x." + s.attr.field
-		if want := fmt.Sprintf("return %s, !isZero%s(%s), true", field, s.attr.typ.suffix(), field); s.body != want {
+		if want := fmt.Sprintf("return &%s, !isZero%s(%s), true", field, s.attr.typ.suffix(), field); s.body != want {
 			t.Errorf("single %s case %q:\n%s\nwant the zero test of %s:\n%s", s.arm, s.attr.name, s.body, s.attr.declared, want)
 		}
 	}

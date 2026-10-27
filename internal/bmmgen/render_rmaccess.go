@@ -99,7 +99,9 @@ const (
 // accessShapes keeps, for six attributes of five classes, the shape the
 // validation walks and the composition builder read, where it differs from
 // the field's own: ITEM_SINGLE item and REFERENCE_RANGE range come back as a
-// pointer into the parent (the builder writes through the first);
+// pointer into the parent, as every other class held by value does
+// ([rmaccessGen.writeSingle]), and are listed so a change of their field
+// fails generation;
 // ISM_TRANSITION careflow_step and transition come back as the DV_CODED_TEXT
 // they point to, and DV_PROPORTION precision as its Integer, the one optional
 // primitive handed back dereferenced: the others come back as the pointer,
@@ -644,7 +646,9 @@ func leafField(t *goType) bool {
 // writeSingle writes the reader of arm's single-valued attributes. A field
 // that holds a primitive leaf ([leafField]) is handed back through leafValue,
 // which, when the reader is called to peek, gives leafMarker{} in place of the
-// value, so the value is not boxed.
+// value, so the value is not boxed. A field that holds a class by value is
+// handed back as a pointer into the parent: the composition builder writes
+// through it, and a copy would also cost an allocation per read.
 func (g *rmaccessGen) writeSingle(b *bytes.Buffer, arm *accessArm, attrs []*accessAttr) error {
 	q := arm.typ.qualified()
 	fmt.Fprintf(b, "\n// single%s reads the single-valued attributes of %s.\n", arm.typ.suffix(), q)
@@ -665,8 +669,14 @@ func (g *rmaccessGen) writeSingle(b *bytes.Buffer, arm *accessArm, attrs []*acce
 		switch shape := g.shapes[arm.class.BMMName][a.name]; shape {
 		case shapeField:
 			value := field
-			if leafField(a.typ) {
+			switch {
+			case leafField(a.typ):
 				value = fmt.Sprintf("leafValue(peek, %s)", field)
+			case a.kind == accessStruct:
+				// A class held by value comes back as a pointer into the
+				// parent, as shapeAddress hands it back: a copy would cost
+				// an allocation, and a write through it would be lost.
+				value = "&" + field
 			}
 			fmt.Fprintf(b, "\t\treturn %s, %s, true\n", value, present)
 		case shapeAddress:

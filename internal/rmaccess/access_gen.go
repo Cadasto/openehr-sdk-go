@@ -1024,7 +1024,7 @@ func singleAction(x *rm.Action, attr string, peek bool) (any, bool, bool) {
 	case "description":
 		return x.Description, x.Description != nil && !rm.IsTypedNil(x.Description), true
 	case "encoding":
-		return x.Encoding, presentCodePhrase(x.Encoding), true
+		return &x.Encoding, presentCodePhrase(x.Encoding), true
 	case "feeder_audit":
 		return x.FeederAudit, x.FeederAudit != nil, true
 	case "guideline_id":
@@ -1032,9 +1032,9 @@ func singleAction(x *rm.Action, attr string, peek bool) (any, bool, bool) {
 	case "instruction_details":
 		return x.InstructionDetails, x.InstructionDetails != nil, true
 	case "ism_transition":
-		return x.IsmTransition, !isZeroIsmTransition(x.IsmTransition), true
+		return &x.IsmTransition, !isZeroIsmTransition(x.IsmTransition), true
 	case "language":
-		return x.Language, presentCodePhrase(x.Language), true
+		return &x.Language, presentCodePhrase(x.Language), true
 	case "name":
 		return x.Name, presentText(x.Name), true
 	case "protocol":
@@ -1044,7 +1044,7 @@ func singleAction(x *rm.Action, attr string, peek bool) (any, bool, bool) {
 	case "subject":
 		return x.Subject, x.Subject != nil && !rm.IsTypedNil(x.Subject), true
 	case "time":
-		return x.Time, !isZeroDVDateTime(x.Time), true
+		return &x.Time, !isZeroDVDateTime(x.Time), true
 	case "uid":
 		return x.UID, x.UID != nil && !rm.IsTypedNil(x.UID), true
 	case "workflow_id":
@@ -1152,11 +1152,11 @@ func singleAdminEntry(x *rm.AdminEntry, attr string, peek bool) (any, bool, bool
 	case "data":
 		return x.Data, x.Data != nil && !rm.IsTypedNil(x.Data), true
 	case "encoding":
-		return x.Encoding, presentCodePhrase(x.Encoding), true
+		return &x.Encoding, presentCodePhrase(x.Encoding), true
 	case "feeder_audit":
 		return x.FeederAudit, x.FeederAudit != nil, true
 	case "language":
-		return x.Language, presentCodePhrase(x.Language), true
+		return &x.Language, presentCodePhrase(x.Language), true
 	case "name":
 		return x.Name, presentText(x.Name), true
 	case "provider":
@@ -1236,7 +1236,7 @@ func singleArchetyped(x *rm.Archetyped, attr string, peek bool) (any, bool, bool
 	}
 	switch attr {
 	case "archetype_id":
-		return x.ArchetypeID, presentArchetypedID(x.ArchetypeID), true
+		return &x.ArchetypeID, presentArchetypedID(x.ArchetypeID), true
 	case "rm_version":
 		return leafValue(peek, x.RMVersion), presentArchetypedRMVersion(x.RMVersion), true
 	case "template_id":
@@ -1266,7 +1266,7 @@ func singleAttestation(x *rm.Attestation, attr string, peek bool) (any, bool, bo
 	case "attested_view":
 		return x.AttestedView, x.AttestedView != nil, true
 	case "change_type":
-		return x.ChangeType, presentCodedText(x.ChangeType), true
+		return &x.ChangeType, presentCodedText(x.ChangeType), true
 	case "committer":
 		return x.Committer, x.Committer != nil && !rm.IsTypedNil(x.Committer), true
 	case "description":
@@ -1280,7 +1280,7 @@ func singleAttestation(x *rm.Attestation, attr string, peek bool) (any, bool, bo
 	case "system_id":
 		return leafValue(peek, x.SystemID), x.SystemID != "", true
 	case "time_committed":
-		return x.TimeCommitted, !isZeroDVDateTime(x.TimeCommitted), true
+		return &x.TimeCommitted, !isZeroDVDateTime(x.TimeCommitted), true
 	}
 	return nil, false, false
 }
@@ -1304,7 +1304,7 @@ func singleAuditDetails(x *rm.AuditDetails, attr string, peek bool) (any, bool, 
 	}
 	switch attr {
 	case "change_type":
-		return x.ChangeType, presentCodedText(x.ChangeType), true
+		return &x.ChangeType, presentCodedText(x.ChangeType), true
 	case "committer":
 		return x.Committer, x.Committer != nil && !rm.IsTypedNil(x.Committer), true
 	case "description":
@@ -1312,7 +1312,7 @@ func singleAuditDetails(x *rm.AuditDetails, attr string, peek bool) (any, bool, 
 	case "system_id":
 		return leafValue(peek, x.SystemID), x.SystemID != "", true
 	case "time_committed":
-		return x.TimeCommitted, !isZeroDVDateTime(x.TimeCommitted), true
+		return &x.TimeCommitted, !isZeroDVDateTime(x.TimeCommitted), true
 	}
 	return nil, false, false
 }
@@ -1398,7 +1398,7 @@ func singleCodePhrase(x *rm.CodePhrase, attr string, peek bool) (any, bool, bool
 	case "preferred_term":
 		return x.PreferredTerm, x.PreferredTerm != nil, true
 	case "terminology_id":
-		return x.TerminologyID, !isZeroTerminologyID(x.TerminologyID), true
+		return &x.TerminologyID, !isZeroTerminologyID(x.TerminologyID), true
 	}
 	return nil, false, false
 }
@@ -1414,7 +1414,7 @@ func singleComposition(x *rm.Composition, attr string, peek bool) (any, bool, bo
 	case "archetype_node_id":
 		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "category":
-		return x.Category, presentCodedText(x.Category), true
+		return &x.Category, presentCodedText(x.Category), true
 	case "composer":
 		return x.Composer, x.Composer != nil && !rm.IsTypedNil(x.Composer), true
 	case "context":
@@ -1422,11 +1422,11 @@ func singleComposition(x *rm.Composition, attr string, peek bool) (any, bool, bo
 	case "feeder_audit":
 		return x.FeederAudit, x.FeederAudit != nil, true
 	case "language":
-		return x.Language, presentCodePhrase(x.Language), true
+		return &x.Language, presentCodePhrase(x.Language), true
 	case "name":
 		return x.Name, presentText(x.Name), true
 	case "territory":
-		return x.Territory, presentCodePhrase(x.Territory), true
+		return &x.Territory, presentCodePhrase(x.Territory), true
 	case "uid":
 		return x.UID, x.UID != nil && !rm.IsTypedNil(x.UID), true
 	}
@@ -1492,7 +1492,7 @@ func singleContribution(x *rm.Contribution, attr string, peek bool) (any, bool, 
 	case "audit":
 		return x.Audit, x.Audit != nil && !rm.IsTypedNil(x.Audit), true
 	case "uid":
-		return x.UID, !isZeroHierObjectID(x.UID), true
+		return &x.UID, !isZeroHierObjectID(x.UID), true
 	}
 	return nil, false, false
 }
@@ -1528,7 +1528,7 @@ func singleDVCodedText(x *rm.DVCodedText, attr string, peek bool) (any, bool, bo
 	}
 	switch attr {
 	case "defining_code":
-		return x.DefiningCode, presentCodePhrase(x.DefiningCode), true
+		return &x.DefiningCode, presentCodePhrase(x.DefiningCode), true
 	case "encoding":
 		return x.Encoding, x.Encoding != nil, true
 	case "formatting":
@@ -1706,7 +1706,7 @@ func singleDVGeneralTimeSpecification(x *rm.DVGeneralTimeSpecification, attr str
 	}
 	switch attr {
 	case "value":
-		return x.Value, !isZeroDVParsable(x.Value), true
+		return &x.Value, !isZeroDVParsable(x.Value), true
 	}
 	return nil, false, false
 }
@@ -1758,13 +1758,13 @@ func singleDVIntervalDVCount(x *rm.DVInterval[rm.DVCount], attr string, peek boo
 	}
 	switch attr {
 	case "lower":
-		return x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
+		return &x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
 	case "lower_included":
 		return leafValue(peek, x.LowerIncluded), true, true
 	case "lower_unbounded":
 		return leafValue(peek, x.LowerUnbounded), true, true
 	case "upper":
-		return x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
+		return &x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
 	case "upper_included":
 		return leafValue(peek, x.UpperIncluded), true, true
 	case "upper_unbounded":
@@ -1780,13 +1780,13 @@ func singleDVIntervalDVDate(x *rm.DVInterval[rm.DVDate], attr string, peek bool)
 	}
 	switch attr {
 	case "lower":
-		return x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
+		return &x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
 	case "lower_included":
 		return leafValue(peek, x.LowerIncluded), true, true
 	case "lower_unbounded":
 		return leafValue(peek, x.LowerUnbounded), true, true
 	case "upper":
-		return x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
+		return &x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
 	case "upper_included":
 		return leafValue(peek, x.UpperIncluded), true, true
 	case "upper_unbounded":
@@ -1802,13 +1802,13 @@ func singleDVIntervalDVDateTime(x *rm.DVInterval[rm.DVDateTime], attr string, pe
 	}
 	switch attr {
 	case "lower":
-		return x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
+		return &x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
 	case "lower_included":
 		return leafValue(peek, x.LowerIncluded), true, true
 	case "lower_unbounded":
 		return leafValue(peek, x.LowerUnbounded), true, true
 	case "upper":
-		return x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
+		return &x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
 	case "upper_included":
 		return leafValue(peek, x.UpperIncluded), true, true
 	case "upper_unbounded":
@@ -1824,13 +1824,13 @@ func singleDVIntervalDVDuration(x *rm.DVInterval[rm.DVDuration], attr string, pe
 	}
 	switch attr {
 	case "lower":
-		return x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
+		return &x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
 	case "lower_included":
 		return leafValue(peek, x.LowerIncluded), true, true
 	case "lower_unbounded":
 		return leafValue(peek, x.LowerUnbounded), true, true
 	case "upper":
-		return x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
+		return &x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
 	case "upper_included":
 		return leafValue(peek, x.UpperIncluded), true, true
 	case "upper_unbounded":
@@ -1846,13 +1846,13 @@ func singleDVIntervalDVOrdinal(x *rm.DVInterval[rm.DVOrdinal], attr string, peek
 	}
 	switch attr {
 	case "lower":
-		return x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
+		return &x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
 	case "lower_included":
 		return leafValue(peek, x.LowerIncluded), true, true
 	case "lower_unbounded":
 		return leafValue(peek, x.LowerUnbounded), true, true
 	case "upper":
-		return x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
+		return &x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
 	case "upper_included":
 		return leafValue(peek, x.UpperIncluded), true, true
 	case "upper_unbounded":
@@ -1868,13 +1868,13 @@ func singleDVIntervalDVProportion(x *rm.DVInterval[rm.DVProportion], attr string
 	}
 	switch attr {
 	case "lower":
-		return x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
+		return &x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
 	case "lower_included":
 		return leafValue(peek, x.LowerIncluded), true, true
 	case "lower_unbounded":
 		return leafValue(peek, x.LowerUnbounded), true, true
 	case "upper":
-		return x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
+		return &x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
 	case "upper_included":
 		return leafValue(peek, x.UpperIncluded), true, true
 	case "upper_unbounded":
@@ -1890,13 +1890,13 @@ func singleDVIntervalDVQuantity(x *rm.DVInterval[rm.DVQuantity], attr string, pe
 	}
 	switch attr {
 	case "lower":
-		return x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
+		return &x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
 	case "lower_included":
 		return leafValue(peek, x.LowerIncluded), true, true
 	case "lower_unbounded":
 		return leafValue(peek, x.LowerUnbounded), true, true
 	case "upper":
-		return x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
+		return &x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
 	case "upper_included":
 		return leafValue(peek, x.UpperIncluded), true, true
 	case "upper_unbounded":
@@ -1912,13 +1912,13 @@ func singleDVIntervalDVScale(x *rm.DVInterval[rm.DVScale], attr string, peek boo
 	}
 	switch attr {
 	case "lower":
-		return x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
+		return &x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
 	case "lower_included":
 		return leafValue(peek, x.LowerIncluded), true, true
 	case "lower_unbounded":
 		return leafValue(peek, x.LowerUnbounded), true, true
 	case "upper":
-		return x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
+		return &x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
 	case "upper_included":
 		return leafValue(peek, x.UpperIncluded), true, true
 	case "upper_unbounded":
@@ -1934,13 +1934,13 @@ func singleDVIntervalDVTime(x *rm.DVInterval[rm.DVTime], attr string, peek bool)
 	}
 	switch attr {
 	case "lower":
-		return x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
+		return &x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true
 	case "lower_included":
 		return leafValue(peek, x.LowerIncluded), true, true
 	case "lower_unbounded":
 		return leafValue(peek, x.LowerUnbounded), true, true
 	case "upper":
-		return x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
+		return &x.Upper, presentIntervalBound(x.UpperUnbounded, x.Upper), true
 	case "upper_included":
 		return leafValue(peek, x.UpperIncluded), true, true
 	case "upper_unbounded":
@@ -1966,7 +1966,7 @@ func singleDVMultimedia(x *rm.DVMultimedia, attr string, peek bool) (any, bool, 
 	case "language":
 		return x.Language, x.Language != nil, true
 	case "media_type":
-		return x.MediaType, presentCodePhrase(x.MediaType), true
+		return &x.MediaType, presentCodePhrase(x.MediaType), true
 	case "size":
 		return leafValue(peek, x.Size), true, true
 	case "thumbnail":
@@ -2002,7 +2002,7 @@ func singleDVOrdinal(x *rm.DVOrdinal, attr string, peek bool) (any, bool, bool) 
 	case "normal_status":
 		return x.NormalStatus, x.NormalStatus != nil, true
 	case "symbol":
-		return x.Symbol, presentCodedText(x.Symbol), true
+		return &x.Symbol, presentCodedText(x.Symbol), true
 	case "value":
 		return leafValue(peek, x.Value), true, true
 	}
@@ -2058,7 +2058,7 @@ func singleDVPeriodicTimeSpecification(x *rm.DVPeriodicTimeSpecification, attr s
 	}
 	switch attr {
 	case "value":
-		return x.Value, !isZeroDVParsable(x.Value), true
+		return &x.Value, !isZeroDVParsable(x.Value), true
 	}
 	return nil, false, false
 }
@@ -2159,7 +2159,7 @@ func singleDVScale(x *rm.DVScale, attr string, peek bool) (any, bool, bool) {
 	case "normal_status":
 		return x.NormalStatus, x.NormalStatus != nil, true
 	case "symbol":
-		return x.Symbol, presentCodedText(x.Symbol), true
+		return &x.Symbol, presentCodedText(x.Symbol), true
 	case "value":
 		return leafValue(peek, x.Value), true, true
 	}
@@ -2187,7 +2187,7 @@ func singleDVState(x *rm.DVState, attr string, peek bool) (any, bool, bool) {
 	case "is_terminal":
 		return leafValue(peek, x.IsTerminal), true, true
 	case "value":
-		return x.Value, presentCodedText(x.Value), true
+		return &x.Value, presentCodedText(x.Value), true
 	}
 	return nil, false, false
 }
@@ -2279,13 +2279,13 @@ func singleEHR(x *rm.EHR, attr string, peek bool) (any, bool, bool) {
 	case "ehr_access":
 		return x.EHRAccess, x.EHRAccess != nil && !rm.IsTypedNil(x.EHRAccess), true
 	case "ehr_id":
-		return x.EHRID, !isZeroHierObjectID(x.EHRID), true
+		return &x.EHRID, !isZeroHierObjectID(x.EHRID), true
 	case "ehr_status":
 		return x.EHRStatus, x.EHRStatus != nil && !rm.IsTypedNil(x.EHRStatus), true
 	case "system_id":
-		return x.SystemID, !isZeroHierObjectID(x.SystemID), true
+		return &x.SystemID, !isZeroHierObjectID(x.SystemID), true
 	case "time_created":
-		return x.TimeCreated, !isZeroDVDateTime(x.TimeCreated), true
+		return &x.TimeCreated, !isZeroDVDateTime(x.TimeCreated), true
 	}
 	return nil, false, false
 }
@@ -2363,7 +2363,7 @@ func singleEHRStatus(x *rm.EHRStatus, attr string, peek bool) (any, bool, bool) 
 	case "other_details":
 		return x.OtherDetails, x.OtherDetails != nil && !rm.IsTypedNil(x.OtherDetails), true
 	case "subject":
-		return x.Subject, presentEHRStatusSubject(x.Subject), true
+		return &x.Subject, presentEHRStatusSubject(x.Subject), true
 	case "uid":
 		return x.UID, x.UID != nil && !rm.IsTypedNil(x.UID), true
 	}
@@ -2433,13 +2433,13 @@ func singleEvaluation(x *rm.Evaluation, attr string, peek bool) (any, bool, bool
 	case "data":
 		return x.Data, x.Data != nil && !rm.IsTypedNil(x.Data), true
 	case "encoding":
-		return x.Encoding, presentCodePhrase(x.Encoding), true
+		return &x.Encoding, presentCodePhrase(x.Encoding), true
 	case "feeder_audit":
 		return x.FeederAudit, x.FeederAudit != nil, true
 	case "guideline_id":
 		return x.GuidelineID, x.GuidelineID != nil && !rm.IsTypedNil(x.GuidelineID), true
 	case "language":
-		return x.Language, presentCodePhrase(x.Language), true
+		return &x.Language, presentCodePhrase(x.Language), true
 	case "name":
 		return x.Name, presentText(x.Name), true
 	case "protocol":
@@ -2485,9 +2485,9 @@ func singleEventContext(x *rm.EventContext, attr string, peek bool) (any, bool, 
 	case "other_context":
 		return x.OtherContext, x.OtherContext != nil && !rm.IsTypedNil(x.OtherContext), true
 	case "setting":
-		return x.Setting, presentCodedText(x.Setting), true
+		return &x.Setting, presentCodedText(x.Setting), true
 	case "start_time":
-		return x.StartTime, !isZeroDVDateTime(x.StartTime), true
+		return &x.StartTime, !isZeroDVDateTime(x.StartTime), true
 	}
 	return nil, false, false
 }
@@ -2515,7 +2515,7 @@ func singleFeederAudit(x *rm.FeederAudit, attr string, peek bool) (any, bool, bo
 	case "original_content":
 		return x.OriginalContent, x.OriginalContent != nil && !rm.IsTypedNil(x.OriginalContent), true
 	case "originating_system_audit":
-		return x.OriginatingSystemAudit, !isZeroFeederAuditDetails(x.OriginatingSystemAudit), true
+		return &x.OriginatingSystemAudit, !isZeroFeederAuditDetails(x.OriginatingSystemAudit), true
 	}
 	return nil, false, false
 }
@@ -2717,7 +2717,7 @@ func singleHistoryItemStructure(x *rm.History[rm.ItemStructure], attr string, pe
 	case "name":
 		return x.Name, presentText(x.Name), true
 	case "origin":
-		return x.Origin, !isZeroDVDateTime(x.Origin), true
+		return &x.Origin, !isZeroDVDateTime(x.Origin), true
 	case "period":
 		return x.Period, x.Period != nil, true
 	case "summary":
@@ -2759,7 +2759,7 @@ func singleHistoryItemList(x *rm.History[rm.ItemList], attr string, peek bool) (
 	case "name":
 		return x.Name, presentText(x.Name), true
 	case "origin":
-		return x.Origin, !isZeroDVDateTime(x.Origin), true
+		return &x.Origin, !isZeroDVDateTime(x.Origin), true
 	case "period":
 		return x.Period, x.Period != nil, true
 	case "summary":
@@ -2801,7 +2801,7 @@ func singleHistoryItemSingle(x *rm.History[rm.ItemSingle], attr string, peek boo
 	case "name":
 		return x.Name, presentText(x.Name), true
 	case "origin":
-		return x.Origin, !isZeroDVDateTime(x.Origin), true
+		return &x.Origin, !isZeroDVDateTime(x.Origin), true
 	case "period":
 		return x.Period, x.Period != nil, true
 	case "summary":
@@ -2843,7 +2843,7 @@ func singleHistoryItemTable(x *rm.History[rm.ItemTable], attr string, peek bool)
 	case "name":
 		return x.Name, presentText(x.Name), true
 	case "origin":
-		return x.Origin, !isZeroDVDateTime(x.Origin), true
+		return &x.Origin, !isZeroDVDateTime(x.Origin), true
 	case "period":
 		return x.Period, x.Period != nil, true
 	case "summary":
@@ -2885,7 +2885,7 @@ func singleHistoryItemTree(x *rm.History[rm.ItemTree], attr string, peek bool) (
 	case "name":
 		return x.Name, presentText(x.Name), true
 	case "origin":
-		return x.Origin, !isZeroDVDateTime(x.Origin), true
+		return &x.Origin, !isZeroDVDateTime(x.Origin), true
 	case "period":
 		return x.Period, x.Period != nil, true
 	case "summary":
@@ -2921,7 +2921,7 @@ func singleImportedVersionAny(x *rm.ImportedVersion[any], attr string, peek bool
 	case "contribution":
 		return x.Contribution, x.Contribution != nil && !rm.IsTypedNil(x.Contribution), true
 	case "item":
-		return x.Item, !isZeroOriginalVersionAny(x.Item), true
+		return &x.Item, !isZeroOriginalVersionAny(x.Item), true
 	case "signature":
 		return x.Signature, x.Signature != nil, true
 	}
@@ -2939,7 +2939,7 @@ func singleInstruction(x *rm.Instruction, attr string, peek bool) (any, bool, bo
 	case "archetype_node_id":
 		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "encoding":
-		return x.Encoding, presentCodePhrase(x.Encoding), true
+		return &x.Encoding, presentCodePhrase(x.Encoding), true
 	case "expiry_time":
 		return x.ExpiryTime, x.ExpiryTime != nil, true
 	case "feeder_audit":
@@ -2947,7 +2947,7 @@ func singleInstruction(x *rm.Instruction, attr string, peek bool) (any, bool, bo
 	case "guideline_id":
 		return x.GuidelineID, x.GuidelineID != nil && !rm.IsTypedNil(x.GuidelineID), true
 	case "language":
-		return x.Language, presentCodePhrase(x.Language), true
+		return &x.Language, presentCodePhrase(x.Language), true
 	case "name":
 		return x.Name, presentText(x.Name), true
 	case "narrative":
@@ -2993,7 +2993,7 @@ func singleInstructionDetails(x *rm.InstructionDetails, attr string, peek bool) 
 	case "activity_id":
 		return leafValue(peek, x.ActivityID), x.ActivityID != "", true
 	case "instruction_id":
-		return x.InstructionID, !isZeroLocatableRef(x.InstructionID), true
+		return &x.InstructionID, !isZeroLocatableRef(x.InstructionID), true
 	case "wf_details":
 		return x.WfDetails, x.WfDetails != nil && !rm.IsTypedNil(x.WfDetails), true
 	}
@@ -3027,7 +3027,7 @@ func singleIntervalEventItemStructure(x *rm.IntervalEvent[rm.ItemStructure], att
 	case "feeder_audit":
 		return x.FeederAudit, x.FeederAudit != nil, true
 	case "math_function":
-		return x.MathFunction, presentCodedText(x.MathFunction), true
+		return &x.MathFunction, presentCodedText(x.MathFunction), true
 	case "name":
 		return x.Name, presentText(x.Name), true
 	case "sample_count":
@@ -3035,11 +3035,11 @@ func singleIntervalEventItemStructure(x *rm.IntervalEvent[rm.ItemStructure], att
 	case "state":
 		return x.State, x.State != nil && !rm.IsTypedNil(x.State), true
 	case "time":
-		return x.Time, !isZeroDVDateTime(x.Time), true
+		return &x.Time, !isZeroDVDateTime(x.Time), true
 	case "uid":
 		return x.UID, x.UID != nil && !rm.IsTypedNil(x.UID), true
 	case "width":
-		return x.Width, !isZeroDVDuration(x.Width), true
+		return &x.Width, !isZeroDVDuration(x.Width), true
 	}
 	return nil, false, false
 }
@@ -3067,11 +3067,11 @@ func singleIntervalEventItemList(x *rm.IntervalEvent[rm.ItemList], attr string, 
 	case "archetype_node_id":
 		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "data":
-		return x.Data, !isZeroItemList(x.Data), true
+		return &x.Data, !isZeroItemList(x.Data), true
 	case "feeder_audit":
 		return x.FeederAudit, x.FeederAudit != nil, true
 	case "math_function":
-		return x.MathFunction, presentCodedText(x.MathFunction), true
+		return &x.MathFunction, presentCodedText(x.MathFunction), true
 	case "name":
 		return x.Name, presentText(x.Name), true
 	case "sample_count":
@@ -3079,11 +3079,11 @@ func singleIntervalEventItemList(x *rm.IntervalEvent[rm.ItemList], attr string, 
 	case "state":
 		return x.State, x.State != nil && !rm.IsTypedNil(x.State), true
 	case "time":
-		return x.Time, !isZeroDVDateTime(x.Time), true
+		return &x.Time, !isZeroDVDateTime(x.Time), true
 	case "uid":
 		return x.UID, x.UID != nil && !rm.IsTypedNil(x.UID), true
 	case "width":
-		return x.Width, !isZeroDVDuration(x.Width), true
+		return &x.Width, !isZeroDVDuration(x.Width), true
 	}
 	return nil, false, false
 }
@@ -3111,11 +3111,11 @@ func singleIntervalEventItemSingle(x *rm.IntervalEvent[rm.ItemSingle], attr stri
 	case "archetype_node_id":
 		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "data":
-		return x.Data, !isZeroItemSingle(x.Data), true
+		return &x.Data, !isZeroItemSingle(x.Data), true
 	case "feeder_audit":
 		return x.FeederAudit, x.FeederAudit != nil, true
 	case "math_function":
-		return x.MathFunction, presentCodedText(x.MathFunction), true
+		return &x.MathFunction, presentCodedText(x.MathFunction), true
 	case "name":
 		return x.Name, presentText(x.Name), true
 	case "sample_count":
@@ -3123,11 +3123,11 @@ func singleIntervalEventItemSingle(x *rm.IntervalEvent[rm.ItemSingle], attr stri
 	case "state":
 		return x.State, x.State != nil && !rm.IsTypedNil(x.State), true
 	case "time":
-		return x.Time, !isZeroDVDateTime(x.Time), true
+		return &x.Time, !isZeroDVDateTime(x.Time), true
 	case "uid":
 		return x.UID, x.UID != nil && !rm.IsTypedNil(x.UID), true
 	case "width":
-		return x.Width, !isZeroDVDuration(x.Width), true
+		return &x.Width, !isZeroDVDuration(x.Width), true
 	}
 	return nil, false, false
 }
@@ -3155,11 +3155,11 @@ func singleIntervalEventItemTable(x *rm.IntervalEvent[rm.ItemTable], attr string
 	case "archetype_node_id":
 		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "data":
-		return x.Data, !isZeroItemTable(x.Data), true
+		return &x.Data, !isZeroItemTable(x.Data), true
 	case "feeder_audit":
 		return x.FeederAudit, x.FeederAudit != nil, true
 	case "math_function":
-		return x.MathFunction, presentCodedText(x.MathFunction), true
+		return &x.MathFunction, presentCodedText(x.MathFunction), true
 	case "name":
 		return x.Name, presentText(x.Name), true
 	case "sample_count":
@@ -3167,11 +3167,11 @@ func singleIntervalEventItemTable(x *rm.IntervalEvent[rm.ItemTable], attr string
 	case "state":
 		return x.State, x.State != nil && !rm.IsTypedNil(x.State), true
 	case "time":
-		return x.Time, !isZeroDVDateTime(x.Time), true
+		return &x.Time, !isZeroDVDateTime(x.Time), true
 	case "uid":
 		return x.UID, x.UID != nil && !rm.IsTypedNil(x.UID), true
 	case "width":
-		return x.Width, !isZeroDVDuration(x.Width), true
+		return &x.Width, !isZeroDVDuration(x.Width), true
 	}
 	return nil, false, false
 }
@@ -3199,11 +3199,11 @@ func singleIntervalEventItemTree(x *rm.IntervalEvent[rm.ItemTree], attr string, 
 	case "archetype_node_id":
 		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "data":
-		return x.Data, !isZeroItemTree(x.Data), true
+		return &x.Data, !isZeroItemTree(x.Data), true
 	case "feeder_audit":
 		return x.FeederAudit, x.FeederAudit != nil, true
 	case "math_function":
-		return x.MathFunction, presentCodedText(x.MathFunction), true
+		return &x.MathFunction, presentCodedText(x.MathFunction), true
 	case "name":
 		return x.Name, presentText(x.Name), true
 	case "sample_count":
@@ -3211,11 +3211,11 @@ func singleIntervalEventItemTree(x *rm.IntervalEvent[rm.ItemTree], attr string, 
 	case "state":
 		return x.State, x.State != nil && !rm.IsTypedNil(x.State), true
 	case "time":
-		return x.Time, !isZeroDVDateTime(x.Time), true
+		return &x.Time, !isZeroDVDateTime(x.Time), true
 	case "uid":
 		return x.UID, x.UID != nil && !rm.IsTypedNil(x.UID), true
 	case "width":
-		return x.Width, !isZeroDVDuration(x.Width), true
+		return &x.Width, !isZeroDVDuration(x.Width), true
 	}
 	return nil, false, false
 }
@@ -3244,7 +3244,7 @@ func singleIsmTransition(x *rm.IsmTransition, attr string, peek bool) (any, bool
 		}
 		return *x.CareflowStep, true, true
 	case "current_state":
-		return x.CurrentState, presentCodedText(x.CurrentState), true
+		return &x.CurrentState, presentCodedText(x.CurrentState), true
 	case "transition":
 		if x.Transition == nil {
 			return nil, false, true
@@ -3443,7 +3443,7 @@ func singleLink(x *rm.Link, attr string, peek bool) (any, bool, bool) {
 	case "meaning":
 		return x.Meaning, presentText(x.Meaning), true
 	case "target":
-		return x.Target, !isZeroDVEHRURI(x.Target), true
+		return &x.Target, !isZeroDVEHRURI(x.Target), true
 	case "type":
 		return x.Type, presentText(x.Type), true
 	}
@@ -3507,15 +3507,15 @@ func singleObservation(x *rm.Observation, attr string, peek bool) (any, bool, bo
 	case "archetype_node_id":
 		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "data":
-		return x.Data, !isZeroHistoryItemStructure(x.Data), true
+		return &x.Data, !isZeroHistoryItemStructure(x.Data), true
 	case "encoding":
-		return x.Encoding, presentCodePhrase(x.Encoding), true
+		return &x.Encoding, presentCodePhrase(x.Encoding), true
 	case "feeder_audit":
 		return x.FeederAudit, x.FeederAudit != nil, true
 	case "guideline_id":
 		return x.GuidelineID, x.GuidelineID != nil && !rm.IsTypedNil(x.GuidelineID), true
 	case "language":
-		return x.Language, presentCodePhrase(x.Language), true
+		return &x.Language, presentCodePhrase(x.Language), true
 	case "name":
 		return x.Name, presentText(x.Name), true
 	case "protocol":
@@ -3608,13 +3608,13 @@ func singleOriginalVersionAny(x *rm.OriginalVersion[any], attr string, peek bool
 		}
 		return *x.Data, true, true
 	case "lifecycle_state":
-		return x.LifecycleState, presentCodedText(x.LifecycleState), true
+		return &x.LifecycleState, presentCodedText(x.LifecycleState), true
 	case "preceding_version_uid":
 		return x.PrecedingVersionUID, x.PrecedingVersionUID != nil, true
 	case "signature":
 		return x.Signature, x.Signature != nil, true
 	case "uid":
-		return x.UID, !isZeroObjectVersionID(x.UID), true
+		return &x.UID, !isZeroObjectVersionID(x.UID), true
 	}
 	return nil, false, false
 }
@@ -3738,7 +3738,7 @@ func singlePartyRelated(x *rm.PartyRelated, attr string, peek bool) (any, bool, 
 	case "name":
 		return x.Name, x.Name != nil, true
 	case "relationship":
-		return x.Relationship, presentCodedText(x.Relationship), true
+		return &x.Relationship, presentCodedText(x.Relationship), true
 	}
 	return nil, false, false
 }
@@ -3772,9 +3772,9 @@ func singlePartyRelationship(x *rm.PartyRelationship, attr string, peek bool) (a
 	case "name":
 		return x.Name, presentText(x.Name), true
 	case "source":
-		return x.Source, !isZeroPartyRef(x.Source), true
+		return &x.Source, !isZeroPartyRef(x.Source), true
 	case "target":
-		return x.Target, !isZeroPartyRef(x.Target), true
+		return &x.Target, !isZeroPartyRef(x.Target), true
 	case "time_validity":
 		return x.TimeValidity, x.TimeValidity != nil, true
 	case "uid":
@@ -3870,7 +3870,7 @@ func singlePointEventItemStructure(x *rm.PointEvent[rm.ItemStructure], attr stri
 	case "state":
 		return x.State, x.State != nil && !rm.IsTypedNil(x.State), true
 	case "time":
-		return x.Time, !isZeroDVDateTime(x.Time), true
+		return &x.Time, !isZeroDVDateTime(x.Time), true
 	case "uid":
 		return x.UID, x.UID != nil && !rm.IsTypedNil(x.UID), true
 	}
@@ -3900,7 +3900,7 @@ func singlePointEventItemList(x *rm.PointEvent[rm.ItemList], attr string, peek b
 	case "archetype_node_id":
 		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "data":
-		return x.Data, !isZeroItemList(x.Data), true
+		return &x.Data, !isZeroItemList(x.Data), true
 	case "feeder_audit":
 		return x.FeederAudit, x.FeederAudit != nil, true
 	case "name":
@@ -3908,7 +3908,7 @@ func singlePointEventItemList(x *rm.PointEvent[rm.ItemList], attr string, peek b
 	case "state":
 		return x.State, x.State != nil && !rm.IsTypedNil(x.State), true
 	case "time":
-		return x.Time, !isZeroDVDateTime(x.Time), true
+		return &x.Time, !isZeroDVDateTime(x.Time), true
 	case "uid":
 		return x.UID, x.UID != nil && !rm.IsTypedNil(x.UID), true
 	}
@@ -3938,7 +3938,7 @@ func singlePointEventItemSingle(x *rm.PointEvent[rm.ItemSingle], attr string, pe
 	case "archetype_node_id":
 		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "data":
-		return x.Data, !isZeroItemSingle(x.Data), true
+		return &x.Data, !isZeroItemSingle(x.Data), true
 	case "feeder_audit":
 		return x.FeederAudit, x.FeederAudit != nil, true
 	case "name":
@@ -3946,7 +3946,7 @@ func singlePointEventItemSingle(x *rm.PointEvent[rm.ItemSingle], attr string, pe
 	case "state":
 		return x.State, x.State != nil && !rm.IsTypedNil(x.State), true
 	case "time":
-		return x.Time, !isZeroDVDateTime(x.Time), true
+		return &x.Time, !isZeroDVDateTime(x.Time), true
 	case "uid":
 		return x.UID, x.UID != nil && !rm.IsTypedNil(x.UID), true
 	}
@@ -3976,7 +3976,7 @@ func singlePointEventItemTable(x *rm.PointEvent[rm.ItemTable], attr string, peek
 	case "archetype_node_id":
 		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "data":
-		return x.Data, !isZeroItemTable(x.Data), true
+		return &x.Data, !isZeroItemTable(x.Data), true
 	case "feeder_audit":
 		return x.FeederAudit, x.FeederAudit != nil, true
 	case "name":
@@ -3984,7 +3984,7 @@ func singlePointEventItemTable(x *rm.PointEvent[rm.ItemTable], attr string, peek
 	case "state":
 		return x.State, x.State != nil && !rm.IsTypedNil(x.State), true
 	case "time":
-		return x.Time, !isZeroDVDateTime(x.Time), true
+		return &x.Time, !isZeroDVDateTime(x.Time), true
 	case "uid":
 		return x.UID, x.UID != nil && !rm.IsTypedNil(x.UID), true
 	}
@@ -4014,7 +4014,7 @@ func singlePointEventItemTree(x *rm.PointEvent[rm.ItemTree], attr string, peek b
 	case "archetype_node_id":
 		return leafValue(peek, x.ArchetypeNodeID), x.ArchetypeNodeID != "", true
 	case "data":
-		return x.Data, !isZeroItemTree(x.Data), true
+		return &x.Data, !isZeroItemTree(x.Data), true
 	case "feeder_audit":
 		return x.FeederAudit, x.FeederAudit != nil, true
 	case "name":
@@ -4022,7 +4022,7 @@ func singlePointEventItemTree(x *rm.PointEvent[rm.ItemTree], attr string, peek b
 	case "state":
 		return x.State, x.State != nil && !rm.IsTypedNil(x.State), true
 	case "time":
-		return x.Time, !isZeroDVDateTime(x.Time), true
+		return &x.Time, !isZeroDVDateTime(x.Time), true
 	case "uid":
 		return x.UID, x.UID != nil && !rm.IsTypedNil(x.UID), true
 	}
@@ -4315,7 +4315,7 @@ func singleResourceDescriptionItem(x *rm.ResourceDescriptionItem, attr string, p
 	case "copyright":
 		return x.Copyright, x.Copyright != nil, true
 	case "language":
-		return x.Language, presentCodePhrase(x.Language), true
+		return &x.Language, presentCodePhrase(x.Language), true
 	case "misuse":
 		return x.Misuse, x.Misuse != nil, true
 	case "original_resource_uri":
@@ -4383,7 +4383,7 @@ func singleRevisionHistoryItem(x *rm.RevisionHistoryItem, attr string, peek bool
 	}
 	switch attr {
 	case "version_id":
-		return x.VersionID, !isZeroObjectVersionID(x.VersionID), true
+		return &x.VersionID, !isZeroObjectVersionID(x.VersionID), true
 	}
 	return nil, false, false
 }
@@ -4417,7 +4417,7 @@ func singleRole(x *rm.Role, attr string, peek bool) (any, bool, bool) {
 	case "name":
 		return x.Name, presentText(x.Name), true
 	case "performer":
-		return x.Performer, !isZeroPartyRef(x.Performer), true
+		return &x.Performer, !isZeroPartyRef(x.Performer), true
 	case "time_validity":
 		return x.TimeValidity, x.TimeValidity != nil, true
 	case "uid":
@@ -4515,7 +4515,7 @@ func singleTermMapping(x *rm.TermMapping, attr string, peek bool) (any, bool, bo
 	case "purpose":
 		return x.Purpose, x.Purpose != nil, true
 	case "target":
-		return x.Target, presentCodePhrase(x.Target), true
+		return &x.Target, presentCodePhrase(x.Target), true
 	}
 	return nil, false, false
 }
@@ -4531,7 +4531,7 @@ func singleTranslationDetails(x *rm.TranslationDetails, attr string, peek bool) 
 	case "author":
 		return x.Author, x.Author != nil, true
 	case "language":
-		return x.Language, presentCodePhrase(x.Language), true
+		return &x.Language, presentCodePhrase(x.Language), true
 	case "other_details":
 		return x.OtherDetails, x.OtherDetails != nil, true
 	}
@@ -4578,9 +4578,9 @@ func singleVersionedComposition(x *rm.VersionedComposition, attr string, peek bo
 	case "owner_id":
 		return x.OwnerID, x.OwnerID != nil && !rm.IsTypedNil(x.OwnerID), true
 	case "time_created":
-		return x.TimeCreated, !isZeroDVDateTime(x.TimeCreated), true
+		return &x.TimeCreated, !isZeroDVDateTime(x.TimeCreated), true
 	case "uid":
-		return x.UID, !isZeroHierObjectID(x.UID), true
+		return &x.UID, !isZeroHierObjectID(x.UID), true
 	}
 	return nil, false, false
 }
@@ -4594,9 +4594,9 @@ func singleVersionedEHRAccess(x *rm.VersionedEHRAccess, attr string, peek bool) 
 	case "owner_id":
 		return x.OwnerID, x.OwnerID != nil && !rm.IsTypedNil(x.OwnerID), true
 	case "time_created":
-		return x.TimeCreated, !isZeroDVDateTime(x.TimeCreated), true
+		return &x.TimeCreated, !isZeroDVDateTime(x.TimeCreated), true
 	case "uid":
-		return x.UID, !isZeroHierObjectID(x.UID), true
+		return &x.UID, !isZeroHierObjectID(x.UID), true
 	}
 	return nil, false, false
 }
@@ -4610,9 +4610,9 @@ func singleVersionedEHRStatus(x *rm.VersionedEHRStatus, attr string, peek bool) 
 	case "owner_id":
 		return x.OwnerID, x.OwnerID != nil && !rm.IsTypedNil(x.OwnerID), true
 	case "time_created":
-		return x.TimeCreated, !isZeroDVDateTime(x.TimeCreated), true
+		return &x.TimeCreated, !isZeroDVDateTime(x.TimeCreated), true
 	case "uid":
-		return x.UID, !isZeroHierObjectID(x.UID), true
+		return &x.UID, !isZeroHierObjectID(x.UID), true
 	}
 	return nil, false, false
 }
@@ -4626,9 +4626,9 @@ func singleVersionedFolder(x *rm.VersionedFolder, attr string, peek bool) (any, 
 	case "owner_id":
 		return x.OwnerID, x.OwnerID != nil && !rm.IsTypedNil(x.OwnerID), true
 	case "time_created":
-		return x.TimeCreated, !isZeroDVDateTime(x.TimeCreated), true
+		return &x.TimeCreated, !isZeroDVDateTime(x.TimeCreated), true
 	case "uid":
-		return x.UID, !isZeroHierObjectID(x.UID), true
+		return &x.UID, !isZeroHierObjectID(x.UID), true
 	}
 	return nil, false, false
 }
@@ -4642,9 +4642,9 @@ func singleVersionedObjectAny(x *rm.VersionedObject[any], attr string, peek bool
 	case "owner_id":
 		return x.OwnerID, x.OwnerID != nil && !rm.IsTypedNil(x.OwnerID), true
 	case "time_created":
-		return x.TimeCreated, !isZeroDVDateTime(x.TimeCreated), true
+		return &x.TimeCreated, !isZeroDVDateTime(x.TimeCreated), true
 	case "uid":
-		return x.UID, !isZeroHierObjectID(x.UID), true
+		return &x.UID, !isZeroHierObjectID(x.UID), true
 	}
 	return nil, false, false
 }
@@ -4658,9 +4658,9 @@ func singleVersionedParty(x *rm.VersionedParty, attr string, peek bool) (any, bo
 	case "owner_id":
 		return x.OwnerID, x.OwnerID != nil && !rm.IsTypedNil(x.OwnerID), true
 	case "time_created":
-		return x.TimeCreated, !isZeroDVDateTime(x.TimeCreated), true
+		return &x.TimeCreated, !isZeroDVDateTime(x.TimeCreated), true
 	case "uid":
-		return x.UID, !isZeroHierObjectID(x.UID), true
+		return &x.UID, !isZeroHierObjectID(x.UID), true
 	}
 	return nil, false, false
 }

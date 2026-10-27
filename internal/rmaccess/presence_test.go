@@ -511,12 +511,14 @@ func TestPresence_REQ171_ReferencesHeldByValue(t *testing.T) {
 	}
 }
 
-// TestAccess_REQ171_Shapes pins the six attributes, of five classes, whose
-// value comes back in another shape than the field's own, and the boxing of
-// list items: a list of values as pointers into its backing array, a list of
-// interfaces as it is. CODE_PHRASE terminology_id comes back as the
-// TERMINOLOGY_ID it holds, as any other value held by value, so a walk goes
-// below it.
+// TestAccess_REQ171_Shapes pins the shapes values come back in where they
+// are not the field's own: a class held by value, ITEM_SINGLE item,
+// REFERENCE_RANGE range, CODE_PHRASE terminology_id, COMPOSITION category and
+// ACTION ism_transition among them, as a pointer to the parent's own field,
+// so a walk goes below it and a write through it reaches the parent; the four
+// attributes handed back dereferenced; and the boxing of list items, a list
+// of values as pointers into its backing array, a list of interfaces as it
+// is. Hand a class held by value back as a copy and the pointer rows fail.
 func TestAccess_REQ171_Shapes(t *testing.T) {
 	precision := rm.Integer(2)
 	step := rm.DVCodedText{Value: "step"}
@@ -554,9 +556,20 @@ func TestAccess_REQ171_Shapes(t *testing.T) {
 		t.Errorf("Single(ORIGINAL_VERSION without data, data) = (%#v, %t), want (nil, false)", v, present)
 	}
 
-	terminology := rm.TerminologyID{Value: "openehr"}
-	if v, present := Single(&rm.CodePhrase{TerminologyID: terminology}, "terminology_id"); v != any(terminology) || !present || !Covers(v) {
-		t.Errorf("Single(CODE_PHRASE, terminology_id) = (%#v, %t), want the TERMINOLOGY_ID it holds, present", v, present)
+	// A class held by value comes back as a pointer to the parent's own
+	// field, so a write through it, such as the composition builder's,
+	// reaches the parent.
+	phrase := &rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}}
+	if v, present := Single(phrase, "terminology_id"); v != &phrase.TerminologyID || !present || !Covers(v) {
+		t.Errorf("Single(CODE_PHRASE, terminology_id) = (%#v, %t), want a pointer to the TERMINOLOGY_ID it holds, present", v, present)
+	}
+	comp := &rm.Composition{Category: rm.DVCodedText{Value: "event"}}
+	if v, _ := Single(comp, "category"); v != &comp.Category {
+		t.Errorf("Single(COMPOSITION, category) = %T %p, want a pointer to the parent's category %p", v, v, &comp.Category)
+	}
+	action := &rm.Action{IsmTransition: rm.IsmTransition{CurrentState: step}}
+	if v, _ := Single(action, "ism_transition"); v != &action.IsmTransition {
+		t.Errorf("Single(ACTION, ism_transition) = %T %p, want a pointer to the parent's transition %p", v, v, &action.IsmTransition)
 	}
 	if v, present := Single(&rm.CodePhrase{}, "terminology_id"); v != nil || present {
 		t.Errorf("Single(CODE_PHRASE without a terminology, terminology_id) = (%#v, %t), want (nil, false)", v, present)

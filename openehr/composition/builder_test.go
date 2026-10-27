@@ -855,3 +855,68 @@ func TestREQ101_SetRefusesValueNoAlternativeAllows(t *testing.T) {
 		})
 	}
 }
+
+// REQ-101 — Set at a path that runs through an attribute holding a class by
+// value, such as ACTION ism_transition or COMPOSITION category, writes the
+// value into the composition Build returns. The builder reaches such a class
+// as a pointer into its parent; reached as a copy, Build would refuse the
+// path, or the write would land in the copy and be lost without an error.
+func TestSetThroughAClassHeldByValue(t *testing.T) {
+	t.Parallel()
+	coded := func(text, code string) *rm.DVCodedText {
+		return &rm.DVCodedText{Value: text, DefiningCode: rm.CodePhrase{CodeString: code, TerminologyID: rm.TerminologyID{Value: "openehr"}}}
+	}
+	cases := []struct {
+		name, template, path string
+		value                any
+		read                 func(*rm.Composition) string
+		want                 string
+	}{
+		{
+			name: "ACTION ism_transition current_state", template: "sdk_crosscheck_unwritten.v1",
+			path:  "/content[openEHR-EHR-ACTION.sdk_unwritten.v1]/ism_transition/current_state",
+			value: coded("completed", "532"),
+			read: func(c *rm.Composition) string {
+				for _, item := range c.Content {
+					if a, ok := item.(*rm.Action); ok {
+						return a.IsmTransition.CurrentState.DefiningCode.CodeString
+					}
+				}
+				return "no ACTION"
+			},
+			want: "532",
+		},
+		{
+			name: "COMPOSITION category defining_code", template: "vital_signs",
+			path:  "/category/defining_code",
+			value: &rm.CodePhrase{CodeString: "433", TerminologyID: rm.TerminologyID{Value: "openehr"}, PreferredTerm: new("event")},
+			read: func(c *rm.Composition) string {
+				if c.Category.DefiningCode.PreferredTerm == nil {
+					return "no preferred term"
+				}
+				return *c.Category.DefiningCode.PreferredTerm
+			},
+			want: "event",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			b, err := composition.NewBuilder(t.Context(), compileFixture(t, tc.template),
+				composition.WithTerritory("NL"), composition.WithComposer(testComposer()))
+			if err != nil {
+				t.Fatalf("NewBuilder(%s): %v", tc.template, err)
+			}
+			if err := b.Set(tc.path, tc.value); err != nil {
+				t.Fatalf("Set(%s): %v", tc.path, err)
+			}
+			built, err := b.Build()
+			if err != nil {
+				t.Fatalf("Build after Set(%s): %v", tc.path, err)
+			}
+			if got := tc.read(built); got != tc.want {
+				t.Errorf("after Set(%s), the built composition holds %q, want %q", tc.path, got, tc.want)
+			}
+		})
+	}
+}
