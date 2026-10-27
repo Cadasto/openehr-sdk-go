@@ -266,18 +266,24 @@ func (d *DVDateTime) IsPartial() bool {
 }
 
 // Magnitude returns the number of seconds since the calendar origin
-// 0001-01-01T00:00:00. The value is clock-local (the timezone offset is
-// not normalized away, per the openEHR definition). A malformed value
-// returns 0.
+// 0001-01-01T00:00:00Z, as the openEHR definition gives it. A value with a
+// timezone is read in UTC, so one instant written in two zones has one
+// magnitude; a value without a timezone counts its clock time. A malformed
+// value returns 0.
 func (d *DVDateTime) Magnitude() float64 {
 	dp, tp, err := d.split()
 	if err != nil {
 		return 0
 	}
-	return iso8601.DateTimeMagnitude(dp, tp)
+	mag := iso8601.DateTimeMagnitude(dp, tp)
+	if utc, zoned := iso8601.UTCMagnitude(mag, tp.Zone); zoned {
+		return utc
+	}
+	return mag
 }
 
-// Compare orders this date-time against other by magnitude.
+// Compare orders this date-time against other by magnitude, so two values
+// with a timezone are ordered as instants.
 func (d *DVDateTime) Compare(other DVDateTime) int { return cmpFloat(d.Magnitude(), other.Magnitude()) }
 
 // LessThan reports whether this date-time precedes other.
