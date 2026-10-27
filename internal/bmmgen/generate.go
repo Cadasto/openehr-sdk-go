@@ -222,6 +222,12 @@ func runTarget(opts Options, t Target, resolver wrappedResolver, schemas *itsXML
 			return tr, fmt.Errorf("bmmgen: %w", err)
 		}
 	}
+	// The ITS-XML name tables are checked before any file is written, the
+	// type names first: an identifier element's class takes its schema
+	// type from them.
+	if err := checkXMLTypeNames(plan); err != nil {
+		return tr, err
+	}
 	if err := checkXMLIdentifierElements(plan); err != nil {
 		return tr, err
 	}
@@ -426,9 +432,6 @@ func runTarget(opts Options, t Target, resolver wrappedResolver, schemas *itsXML
 
 	// ITS-XML schema names, one file per target whose classes have any;
 	// the target's XML codecs call the helpers it declares.
-	if err := checkXMLTypeNames(plan); err != nil {
-		return tr, err
-	}
 	namesBody, err := RenderXMLNamesFile(plan)
 	if err != nil {
 		return tr, err
