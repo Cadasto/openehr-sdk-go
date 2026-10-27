@@ -215,11 +215,27 @@ func (StarExpr) isSelectExpr() {}
 // `Star` is true for the `COUNT(*)` aggregate form (Args is empty in
 // that case); `Distinct` is true when the aggregate carried the
 // `DISTINCT` keyword (`COUNT(DISTINCT path)`).
+//
+// Raw is the call's source text as written, which the openEHR result
+// schema needs as the column name when a projection carries no `AS`
+// alias. It is read-side fidelity only:
+//
+//   - it is populated by [ParseQuery], for a projected call and for a
+//     call nested as a function-call argument, and is empty on a
+//     FunctionCall a caller constructed, so it must not be treated as
+//     required;
+//   - emission renders the call from Name, Args, Distinct and Star,
+//     never from Raw.
+//
+// The two therefore differ whenever the source was not already canonical:
+// `length( c/name/value )` yields Name `LENGTH` with Raw
+// `length( c/name/value )`, and emits as `LENGTH(c/name/value)`.
 type FunctionCall struct {
 	Name     string
 	Args     []SelectExpr
 	Distinct bool
 	Star     bool
+	Raw      string
 }
 
 func (FunctionCall) isSelectExpr() {}

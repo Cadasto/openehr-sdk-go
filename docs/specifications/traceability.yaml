@@ -1908,6 +1908,7 @@ requirements:
       - openehr/aql/parse/predicate_guard_test.go
       - openehr/aql/parse/predicate_parity_test.go
       - openehr/aql/parse/predicate_structure_test.go
+      - openehr/aql/parse/query_test.go
       - openehr/aql/parse/roundtrip_test.go
       - openehr/aql/parse/value_position_parity_test.go
       - openehr/aql/predicate_test.go
