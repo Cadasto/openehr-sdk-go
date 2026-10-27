@@ -1346,6 +1346,7 @@ requirements:
       - openehr/validation/rmfloor_chained_test.go
       - openehr/validation/rmfloor_cycle_test.go
       - openehr/validation/rmfloor_generated_access_test.go
+      - openehr/validation/rmfloor_links_location_scheme_test.go
       - openehr/validation/rmfloor_nonempty_lists_test.go
       - openehr/validation/rmfloor_ordered_test.go
       - openehr/validation/rmfloor_test.go
@@ -1785,6 +1786,7 @@ requirements:
       - openehr/validation/rmfloor_invariant_matrix_internal_test.go
       - openehr/validation/rmfloor_ism_transition_test.go
       - openehr/validation/rmfloor_limit_internal_test.go
+      - openehr/validation/rmfloor_links_location_scheme_test.go
       - openehr/validation/rmfloor_nil_item_test.go
       - openehr/validation/rmfloor_nonempty_lists_test.go
       - openehr/validation/rmfloor_nonstorable_test.go
@@ -2316,6 +2318,7 @@ requirements:
       - openehr/validation/rmfloor_interval_comparable_test.go
       - openehr/validation/rmfloor_interval_flags_test.go
       - openehr/validation/rmfloor_interval_order_test.go
+      - openehr/validation/rmfloor_links_location_scheme_test.go
       - openehr/validation/rmfloor_proportion_test.go
       - openehr/validation/value_free_test.go
   - id: REQ-169
@@ -2444,6 +2447,7 @@ requirements:
       - openehr/validation/rmfloor_interval_order_test.go
       - openehr/validation/rmfloor_invariant_matrix_internal_test.go
       - openehr/validation/rmfloor_limit_internal_test.go
+      - openehr/validation/rmfloor_links_location_scheme_test.go
       - openehr/validation/rmfloor_nil_item_test.go
       - openehr/validation/rmfloor_nonempty_lists_test.go
       - openehr/validation/rmfloor_presence_readings_test.go
