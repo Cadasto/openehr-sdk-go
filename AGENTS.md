@@ -1,6 +1,6 @@
 # AGENTS.md
 
-**Entry point for every coding agent and contributor.** Pair with [`README.md`](README.md); Claude Code also loads [`.claude/CLAUDE.md`](.claude/CLAUDE.md) (Claude-specific notes only).
+**Entry point for every coding agent and contributor.** Pair with [`README.md`](README.md). Claude Code loads this file at session start only while the repository has no `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md`, so do not add one: Claude-specific notes go in § Tooling & workflow.
 
 ## Project
 
@@ -40,8 +40,8 @@ Reading order — the specialized docs are **canonical**; defer to them rather t
 - **Godoc is for SDK users.** Package docs and doc comments on exported identifiers carry no spec-process identifiers (REQ, ADR, STRAND, plan or spec paths) and no RFC-2119 capitals. State the behaviour a caller needs in plain English. A probe's own `PROBE-NNN` id and public openEHR specification citations are fine.
 - **`REQ`/`PROBE` is the feature register; there is no `SDK-GAP` identifier.** A discovered gap is worked under a REQ (extend or create via `sdd-specify`) with a `PROBE` for wire conformance. No GAP-style label appears anywhere — not in plan filenames, `traceability.yaml`, test names, `doc.go`, or normative prose ([ADR 0012](docs/adr/0012-retire-sdk-gap-identifier.md)).
 - Keep [`cmd/examples/`](cmd/examples/) docs in sync **in the same PR** as the program — checklist in [ai-workflow.md § Examples](docs/ai-workflow.md#examples).
-- **Backlog size.** [`docs/backlog.md`](docs/backlog.md) is kept at about 80 lines ([ai-workflow.md § Review](docs/ai-workflow.md#review)), which outranks the 40 built into the sdd plugin's hook and its `/sdd-triage --backlog` consolidation.
-- **Retiring a requirement.** Its entry moves to [retired-requirements.md](docs/specifications/retired-requirements.md) and its canonical link follows ([specifications/README.md § Editing rules](docs/specifications/README.md#editing-rules)), which outranks the sdd plugin's default of keeping the section in its topic spec.
+- **Backlog size.** [`docs/backlog.md`](docs/backlog.md) is kept at about 80 lines ([ai-workflow.md § Review](docs/ai-workflow.md#review)), which outranks the 40 built into the sdd plugin's hook and its `/sdd-triage --backlog` consolidation: the hook's session-start line "over the 40 it should hold" is informational until the count passes 80.
+- **Retiring a requirement.** Its entry moves to [retired-requirements.md](docs/specifications/retired-requirements.md) and the map row's `canonical` points there ([specifications/README.md § Editing rules](docs/specifications/README.md#editing-rules)). This outranks the sdd plugin's default, which `/sdd-specify` otherwise follows, of keeping the section in its topic spec.
 - **Write short.** Lead with the result; a finding is one sentence of about 30 words, a PR body about 450 words; quote only the output that proves a claim.
 
 **Descriptor & process.** The `sdd-*` skills read [`docs/.sdd.yaml`](docs/.sdd.yaml) first; the lanes, the ladder and the Definition of Ready / Done are in [`docs/development-process.md`](docs/development-process.md), and the SDD-vs-superpowers split in [development-process.md § superpowers + SDD](docs/development-process.md#superpowers--sdd). Plans go in [`docs/plans/`](docs/plans/), never a parallel `docs/superpowers/` tree. They are committed working notes outside the traceability chain: no generator or map reads them, though the drift gate checks them like any other document ([plans/README.md](docs/plans/README.md)); brainstorming docs are narrative input, not a normative source.
@@ -118,6 +118,8 @@ Rationale and the wider picture: [architecture.md § Dependencies](docs/architec
 **Agent tooling:** a review of a Go diff goes through the plugin's `go-reviewer` agent, or the reviewer loads the same focused skills itself when the workflow already provides a single reviewer seat (the SDD subagent-driven loop does). `go-lint-setup` is never needed here: golangci-lint v2 is already pinned (`make lint`). Also: **gopls** (code intelligence; from a worktree, run it in the shell) and **codebase-memory-mcp** (structure and impact questions about `main`) — see [ai-workflow.md § Recommended tooling](docs/ai-workflow.md#recommended-tooling-claude-code--cursor).
 
 **Local agent config:** personal permission grants belong in the gitignored `.claude/settings.local.json` — never add a `permissions` block to the checked-in `.claude/settings.json` (shared hook/plugin config only).
+
+**Claude Code:** after a **Write** or **Edit** on a `*.go` file, [`.claude/settings.json`](.claude/settings.json) runs [`.claude/hooks/goformat-on-save.sh`](.claude/hooks/goformat-on-save.sh) (gofumpt + goimports on that file; falls back to `gofmt -s`; no-op if none on host; skips `*_gen.go`); `make fmt` / `make ci` are the full-tree checks (`golangci-lint fmt` via the pinned image). The same file enables the project plugins (go-coding, sdd, superpowers, gopls-lsp, pr-review-toolkit, feature-dev, claude-md-management): look there before assuming a skill is missing.
 
 ## openEHR knowledge
 

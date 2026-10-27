@@ -81,7 +81,7 @@ When you add, rename, remove, or materially change a [`cmd/examples/`](../cmd/ex
 
 ## Hooks
 
-The Claude Code format-on-save hook is documented in [`.claude/CLAUDE.md`](../.claude/CLAUDE.md). `make fmt` is the authoritative full-tree pass.
+The Claude Code format-on-save hook is documented in [AGENTS.md § Tooling & workflow](../AGENTS.md#tooling--workflow). `make fmt` is the authoritative full-tree pass.
 
 ## Review
 
