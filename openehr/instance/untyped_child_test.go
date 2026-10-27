@@ -163,9 +163,11 @@ func observationWithProtocol(protocol string) string {
 // it builds it as, wherever it reads a node's type: whether its attribute
 // is typed by an RM class, so that an AOM primitive short name under it is
 // built as its DV wrapper; which of its attributes the RM computes rather
-// than stores; the type of an attribute the template names with no child;
-// and whether such an attribute can only hold content the template does
-// not describe. Each template holds one untyped child, and the root
+// than stores; which of them the RM makes mandatory, so that one the
+// template makes optional is visited under every policy; the type of an
+// attribute the template names with no child; and whether such an
+// attribute can only hold content the template does not describe. Each
+// template holds one untyped child, and the root
 // Generate returns for it is the root it returns for the same template
 // with the child typed as the walk builds it, which passes the template
 // validator and the RM floor, under every policy, both value fills and both
@@ -200,6 +202,13 @@ func TestREQ107_UntypedChildIsReadAsTheTypeItIsBuiltAs(t *testing.T) {
 			opt: func(rmType string) string {
 				return historyOf(optNode(rmType, "at0002",
 					optOptionalSingleOver("offset", optNode("DV_DURATION", "")), optSingle("data", emptyTree)))
+			},
+		},
+		{
+			name:  "a POINT_EVENT whose mandatory data the template makes optional",
+			typed: "POINT_EVENT",
+			opt: func(rmType string) string {
+				return historyOf(optNode(rmType, "at0002", optOptionalSingleOver("data", emptyTree)))
 			},
 		},
 		{
