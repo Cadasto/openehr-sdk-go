@@ -179,7 +179,8 @@ type submissionJSON struct {
 // options the RM types use, whichever package calls MarshalJSON, so a
 // polymorphic RM slot in a version's data that holds a typed-nil pointer
 // is left out, as canjson.Marshal leaves it out, never written as `null`.
-// `<`, `>` and `&` are written literally, as canjson.Marshal writes them.
+// Called directly or through canjson.Marshal, it writes `<`, `>` and `&`
+// literally; encoding/json.Marshal escapes them in what it returns.
 func (s *Submission) MarshalJSON() ([]byte, error) {
 	if err := s.Validate(); err != nil {
 		return nil, err

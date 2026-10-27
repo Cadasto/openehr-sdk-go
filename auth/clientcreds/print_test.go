@@ -85,8 +85,6 @@ func printProblems(v any, secrets, shown []string) []string {
 	return problems
 }
 
-// TestREQ060_PrintsNoCredential pins REQ-060: a jwtbearer.Config, a
-// *jwtbearer.ClaimsSigner and a *jwtbearer.Source holding a token, printed
 // TestREQ060_PrintsNoCredential pins REQ-060: a clientcreds.Config and a
 // *clientcreds.Source holding a token, printed with any fmt verb or logged
 // through log/slog, show no client secret, no client assertion, no access

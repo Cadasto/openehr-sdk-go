@@ -27,7 +27,7 @@ func outage(r *http.Request, _ int) (*http.Response, error) {
 
 // nearExpirySource returns a source holding tok-1, which expires 10 seconds
 // from now and so lies inside the default 30-second refresh threshold, and
-// whose later token requests answer serves.
+// whose later token requests are answered by answer.
 func nearExpirySource(t *testing.T, answer func(r *http.Request, n int) (*http.Response, error)) (*clientcreds.Source, *scriptedTransport) {
 	t.Helper()
 	rt := &scriptedTransport{answer: func(r *http.Request, n int) (*http.Response, error) {
