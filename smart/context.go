@@ -2,8 +2,11 @@ package smart
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"log/slog"
 	"maps"
+	"strconv"
 )
 
 type launchContextKey struct{}
@@ -11,6 +14,11 @@ type launchContextKey struct{}
 // LaunchContext is the application-level SMART launch surface,
 // populated from a token-endpoint response via
 // [LaunchContextFromTokenResponse].
+//
+// Printed with fmt, a LaunchContext shows the tokens its Raw and its
+// Principal's Raw hold as "[redacted]": see [LaunchContext.String]. Logged
+// with log/slog, a *LaunchContext shows them the same way: see
+// [LaunchContext.LogValue].
 type LaunchContext struct {
 	// FHIR-compat launch-context claims.
 	Patient   string
@@ -58,21 +66,54 @@ type LaunchContext struct {
 	// nested values are not deep-copied. Mutating it does not affect the
 	// originating TokenResponse. Raw holds the token-endpoint members
 	// verbatim, the access, refresh and ID tokens included, so it must not
-	// be printed or logged as it is; log the *LaunchContext itself, whose
-	// LogValue masks them.
+	// be printed or logged as it is; print or log the *LaunchContext itself,
+	// whose String and LogValue mask them.
 	Raw map[string]any
 }
+
+// String describes lc with Raw and Principal's Raw shown as copies whose
+// access_token, refresh_token and id_token members keep their keys but have
+// their values replaced by "[redacted]". Principal is shown by the text of
+// [PrincipalIdentity.String], IDToken by its claims and the other fields as
+// they are; lc and its Raw are not changed. A LaunchContext value copied out
+// of a *LaunchContext prints the same way.
+func (lc LaunchContext) String() string {
+	principal := "<nil>"
+	if lc.Principal != nil {
+		principal = lc.Principal.String()
+	}
+	banner := "<nil>"
+	if lc.NeedPatientBanner != nil {
+		banner = strconv.FormatBool(*lc.NeedPatientBanner)
+	}
+	return fmt.Sprintf("smart.LaunchContext{Patient: %q, Encounter: %q, User: %q, Scopes: %q, IDToken: %+v, Issuer: %q, Principal: %s, "+
+		"EHRID: %q, EpisodeID: %q, Intent: %q, SMARTStyleURL: %q, NeedPatientBanner: %s, Tenant: %q, Raw: %v}",
+		lc.Patient, lc.Encounter, lc.User, lc.Scopes, lc.IDToken, lc.Issuer, principal,
+		lc.EHRID, lc.EpisodeID, lc.Intent, lc.SMARTStyleURL, banner, lc.Tenant, maskedTokens(lc.Raw))
+}
+
+// GoString returns the text of [LaunchContext.String], so that printing lc in
+// Go syntax shows no token either.
+func (lc LaunchContext) GoString() string { return lc.String() }
+
+// Format writes the text of [LaunchContext.String] for every fmt verb it is
+// called for, whatever the flags and width. fmt answers %T and %p without
+// calling it, and %p of a LaunchContext value prints its fields, so never
+// print a LaunchContext with %p.
+func (lc LaunchContext) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, lc.String()) }
 
 // LogValue lets log/slog log lc without its tokens. It logs the fields of lc
 // as a group, keyed by field name, with Raw and Principal's Raw as copies
 // whose access_token, refresh_token and id_token members keep their keys but
-// have their values replaced by the same fixed marker. lc itself is not
-// changed. A nil lc logs as nil, as slog logs any nil pointer.
+// have their values replaced by "[redacted]". lc itself is not changed. A nil
+// lc logs as nil, as slog logs any nil pointer.
 //
 // The masking applies to a *LaunchContext, such as the one
 // [LaunchContextFromTokenResponse] or [LaunchContextFromContext] hands out. A
 // LaunchContext value copied out of it (*lc) and logged as it is does not go
-// through LogValue, so its tokens are logged: log the pointer instead.
+// through LogValue: slog's text handler prints it with the text of
+// [LaunchContext.String], which masks the same members, but its JSON handler
+// encodes its fields, tokens included. Log the pointer instead.
 func (lc *LaunchContext) LogValue() slog.Value {
 	if lc == nil {
 		return slog.AnyValue(nil)
@@ -107,8 +148,9 @@ func (lc *LaunchContext) LogValue() slog.Value {
 // (RFC 6749 §5.1; OpenID Connect Core 1.0 §3.1.3.3).
 var tokenMembers = [...]string{"access_token", "refresh_token", "id_token"}
 
-// tokenMask stands in for the value of a token member in a log line.
-const tokenMask = "[REDACTED]"
+// tokenMask stands in for the value of a token member when a value is
+// printed or logged.
+const tokenMask = "[redacted]"
 
 // maskedTokens returns a shallow copy of raw whose token members, when
 // present, hold tokenMask. A nil raw gives nil.
