@@ -814,8 +814,8 @@ func bindingAlternative(children []*tcimpl.CompiledNode, built string) *tcimpl.C
 // type it names, or its concrete substitute (concreteFor). An untyped node,
 // which names no type, is built as the type the BMM declares for the
 // attribute that holds it (untypedRMType), and a DV_INTERVAL over an
-// abstract parameter other than DV_ORDERED as an interval over a concrete
-// descendant of that parameter (concreteInterval).
+// abstract DV_ORDERED class other than DV_ORDERED itself as an interval
+// over a concrete descendant of that class (concreteInterval).
 func builtRMType(node *tcimpl.CompiledNode) string {
 	declared := strings.TrimSpace(node.RMTypeName())
 	if declared == "" {
@@ -862,14 +862,15 @@ func untypedRMType(node *tcimpl.CompiledNode) string {
 }
 
 // concreteInterval returns the interval the walk builds for node, a
-// DV_INTERVAL over param, an abstract class other than DV_ORDERED: the
-// interval over the type the OPT names for its lower bound, else for its
-// upper bound, where that type descends from param and the generator builds
-// an interval over it, so the bound the walk builds fits the interval, and
-// otherwise over the first concrete descendant of param in name order
-// (concreteIntervalParameter). The type a bound names is that of its first
-// allowed alternative, whose type the walk builds (bindingAlternative); an
-// untyped one names none. It is "" where param has no such descendant.
+// DV_INTERVAL over param, an abstract DV_ORDERED class other than
+// DV_ORDERED itself: the interval over the type the OPT names for its lower
+// bound, else for its upper bound, where that type descends from param and
+// the generator builds an interval over it, so the bound the walk builds
+// fits the interval, and otherwise over the first concrete descendant of
+// param in name order (concreteIntervalParameter). The type a bound names
+// is that of its first allowed alternative, whose type the walk builds
+// (bindingAlternative); an untyped one names none. It is "" where param has
+// no such descendant.
 func concreteInterval(node *tcimpl.CompiledNode, param string) string {
 	for _, bound := range [...]string{"lower", "upper"} {
 		attr := node.Attribute(bound)
@@ -2321,7 +2322,8 @@ func rmNonEmptyList(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute
 // CARE_ENTRY, ENTRY, LOCATABLE) resolve to a documented concrete
 // substitute — see [concreteFor] — an untyped child to the type the BMM
 // declares for its attribute, and a DV_INTERVAL over an abstract
-// parameter to an interval over a concrete descendant ([builtRMType]).
+// DV_ORDERED class to an interval over a concrete descendant
+// ([builtRMType]).
 //
 // A child that would be an archetype root, but for which the OPT
 // names no archetype id, is refused with [ErrArchetypeIDMissing]. A

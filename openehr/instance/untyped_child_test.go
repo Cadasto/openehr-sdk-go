@@ -43,8 +43,8 @@ func valueTypeName(v rm.DataValue) string {
 // DV_TEXT for an ELEMENT's value, typed DATA_VALUE, and an ELEMENT for a
 // CLUSTER's items, typed ITEM. A child of an abstract data-value class,
 // such as DV_QUANTIFIED, is built as its first concrete descendant in name
-// order. A DV_INTERVAL over an abstract parameter
-// other than DV_ORDERED is built over a concrete descendant of it: the type
+// order. A DV_INTERVAL over an abstract DV_ORDERED class other than
+// DV_ORDERED itself is built over a concrete descendant of it: the type
 // the OPT names for a bound where that is one, and otherwise the first in
 // name order, DV_COUNT for DV_QUANTIFIED and DV_AMOUNT. Each root passes
 // the template validator and the RM floor, under every policy, both value

@@ -88,8 +88,10 @@ var intervalOver = map[string]func() any{
 
 // abstractIntervalParameter returns the parameter of declared, a
 // DV_INTERVAL the generator builds no interval over as written because its
-// parameter is an abstract class other than DV_ORDERED, such as
-// DV_INTERVAL<DV_QUANTIFIED>. ok is false for any other declared type.
+// parameter is an abstract DV_ORDERED class other than DV_ORDERED itself,
+// such as DV_INTERVAL<DV_QUANTIFIED>. ok is false for any other declared
+// type, an interval over an abstract class that is no DV_ORDERED, such as
+// DATA_VALUE, included: the RM admits no such parameter.
 func abstractIntervalParameter(declared string) (param string, ok bool) {
 	if !strings.HasPrefix(declared, "DV_INTERVAL") {
 		return "", false
@@ -106,7 +108,7 @@ func abstractIntervalParameter(declared string) (param string, ok bool) {
 		return "", false
 	}
 	abstract, known := h.IsAbstract(params[0])
-	return params[0], known && abstract
+	return params[0], known && abstract && descendsFrom(params[0], "DV_ORDERED")
 }
 
 // concreteIntervalParameter returns the concrete descendant of param, an
