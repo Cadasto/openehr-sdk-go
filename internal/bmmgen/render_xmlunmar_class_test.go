@@ -18,7 +18,8 @@ import (
 // members read as XML attributes, Required the mandatory members a document
 // can carry, in the Reference Model's order with an ancestor's before the
 // class's own, minus the four interval boundary flags and
-// RESOURCE_DESCRIPTION.parent_resource, and Items the multi-valued members.
+// RESOURCE_DESCRIPTION.parent_resource, and Items the multi-valued members:
+// the container members and those typed by a generic List, Set or Array.
 // No decoder calls CheckUnmatchedAttrs any more: Enter checks the attributes.
 func TestREQ175_RenderUnmarshalXMLClassDescriptor(t *testing.T) {
 	flagged, parentResource := 0, false
@@ -66,8 +67,13 @@ func TestREQ175_RenderUnmarshalXMLClassDescriptor(t *testing.T) {
 					if isXMLAttributeProperty(ef) {
 						attrs = append(attrs, prop)
 					}
-					if _, ok := ef.Prop.(*bmm.ContainerProperty); ok {
+					switch p := ef.Prop.(type) {
+					case *bmm.ContainerProperty:
 						items = append(items, prop)
+					case *bmm.GenericProperty:
+						if p.TypeDef != nil && slices.Contains([]string{"List", "Set", "Array"}, p.TypeDef.RootType) {
+							items = append(items, prop)
+						}
 					}
 					if mandatoryProperty(ef.Prop) {
 						mandatory = append(mandatory, prop)
@@ -77,7 +83,7 @@ func TestREQ175_RenderUnmarshalXMLClassDescriptor(t *testing.T) {
 					t.Errorf("%s descriptor Attrs = %q; want the XML-attribute members %q", pc.BMMName, d.attrs, attrs)
 				}
 				if !slices.Equal(d.items, items) {
-					t.Errorf("%s descriptor Items = %q; want the container members %q", pc.BMMName, d.items, items)
+					t.Errorf("%s descriptor Items = %q; want the multi-valued members %q", pc.BMMName, d.items, items)
 				}
 				for _, name := range d.required {
 					if !slices.Contains(mandatory, name) {

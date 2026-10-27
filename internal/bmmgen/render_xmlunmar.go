@@ -438,8 +438,13 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 	case *bmm.GenericProperty:
 		// Hash<K,V> at the property type level — Go maps it to
 		// map[K]V. v1 defers XML emission/decoding (see canxml/doc.go).
-		if p.TypeDef != nil && containerKinds[p.TypeDef.RootType] {
+		if p.TypeDef != nil && p.TypeDef.RootType == "Hash" {
 			return unmarshalXMLHashTODO(elemName), nil
+		}
+		// List<T>, Set<T> or Array<T> at the property type level — Go
+		// holds it as []T, or *[]T when optional: one element per item.
+		if p.TypeDef != nil && containerKinds[p.TypeDef.RootType] {
+			return unmarshalXMLGenericList(plan, recv, goField, elemName, ef.Owner, p)
 		}
 		if p.TypeDef != nil {
 			decoding, err := xmlClassDecoding(plan, p.TypeDef.RootType)
@@ -682,6 +687,51 @@ func unmarshalXMLPolySlice(recv, field, elem, ifaceName, start string) string {
 		elem, ifaceName, start, recv, field, recv, field)
 }
 
+// unmarshalXMLGenericList emits the decode case of a member typed by a
+// generic List, Set or Array of one item type, held as []T, or as *[]T when
+// optional, which the case allocates on the first item. Each element is one
+// item, decoded as a container property's item of that type is and
+// appended. An item the case cannot decode alone, an interface, a generic
+// parameter or an Octet, is refused at generation: no such member exists,
+// and a container property's item of those kinds needs `xsi:type`
+// dispatch or a base64 element.
+func unmarshalXMLGenericList(plan *Plan, recv, field, elem string, owner *bmm.SimpleClass, p *bmm.GenericProperty) (string, error) {
+	params := p.TypeDef.GenericParameters
+	if len(params) != 1 {
+		return "", fmt.Errorf("generic %s with %d parameters; want one item type", p.TypeDef.RootType, len(params))
+	}
+	itemName := containerInnerName(&bmm.ContainerType{ContainerType: p.TypeDef.RootType, TypeDef: params[0]})
+	if itemName == bmmOctetType || isOpenParam(owner, itemName) || isInterfaceTypeRef(plan, itemName) {
+		return "", fmt.Errorf("generic %s<%s>: canonical XML decodes no such item alone", p.TypeDef.RootType, itemName)
+	}
+	itemType, err := typeRef(plan, owner, params[0])
+	if err != nil {
+		return "", err
+	}
+	decode := "xmlunmatched.DecodeElement(_dec, &_t, &_v)"
+	if !isPrimitive(itemName) {
+		decoding, err := xmlClassDecoding(plan, itemName)
+		if err != nil {
+			return "", err
+		}
+		switch decoding {
+		case xmlNoDecoder:
+			return unmarshalXMLNoDecoder(elem, itemName), nil
+		case xmlOwnDecoder:
+			decode = "_dec.DecodeElement(&_v, &_t)"
+		case xmlTextDecoder:
+		}
+	}
+	appendItem := fmt.Sprintf("\t\t\t\t%s.%s = append(%s.%s, _v)\n", recv, field, recv, field)
+	if !p.IsMandatory {
+		appendItem = fmt.Sprintf("\t\t\t\tif %s.%s == nil {\n\t\t\t\t\t%s.%s = new([]%s)\n\t\t\t\t}\n\t\t\t\t*%s.%s = append(*%s.%s, _v)\n",
+			recv, field, recv, field, itemType, recv, field, recv, field)
+	}
+	return fmt.Sprintf(
+		"\t\t\tcase %q:\n\t\t\t\tvar _v %s\n\t\t\t\tif _err := %s; _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n%s",
+		elem, itemType, decode, appendItem), nil
+}
+
 func unmarshalXMLStructSlice(recv, field, elem, innerType string) string {
 	return fmt.Sprintf(
 		"\t\t\tcase %q:\n\t\t\t\tvar _v %s\n\t\t\t\tif _err := _dec.DecodeElement(&_v, &_t); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s.%s = append(%s.%s, _v)\n",
@@ -746,7 +796,7 @@ func xmlClassDescriptor(plan *Plan, pc *PlannedClass, fields []emittedField) (xm
 		if isXMLAttributeProperty(ef) {
 			d.attrs = append(d.attrs, prop)
 		}
-		if _, ok := ef.Prop.(*bmm.ContainerProperty); ok {
+		if xmlMultiValued(ef.Prop) {
 			d.items = append(d.items, prop)
 		}
 	}
@@ -757,6 +807,19 @@ func xmlClassDescriptor(plan *Plan, pc *PlannedClass, fields []emittedField) (xm
 	}
 	d.required = required
 	return d, nil
+}
+
+// xmlMultiValued reports whether prop is a multi-valued member, whose items
+// canonical XML writes as one element each: a container property, or a
+// property typed by a generic List, Set or Array.
+func xmlMultiValued(prop bmm.Property) bool {
+	switch p := prop.(type) {
+	case *bmm.ContainerProperty:
+		return true
+	case *bmm.GenericProperty:
+		return p.TypeDef != nil && containerKinds[p.TypeDef.RootType] && p.TypeDef.RootType != "Hash"
+	}
+	return false
 }
 
 // xmlRequiredMembers returns the presence-checked members among fields, the
