@@ -128,6 +128,29 @@ func concreteIntervalParameter(param string) string {
 	return ""
 }
 
+// firstConcreteDataValue returns the first concrete descendant, in name
+// order, of rmType when the pinned BMM knows it as an abstract data-value
+// class that concreteFor's table does not name, such as DV_QUANTIFIED,
+// DV_ORDERED or DV_TEMPORAL, and "" otherwise. Other abstract classes keep
+// failing as unknown RM types, as before.
+func firstConcreteDataValue(rmType string) string {
+	h, ok := rminfo.Default.(rminfo.Hierarchy)
+	if !ok {
+		return ""
+	}
+	if abstract, known := h.IsAbstract(rmType); !known || !abstract {
+		return ""
+	}
+	if conforms, known := h.ConformsTo(rmType, "DATA_VALUE"); !known || !conforms {
+		return ""
+	}
+	descendants, _ := h.ConcreteDescendants(rmType)
+	if len(descendants) == 0 {
+		return ""
+	}
+	return descendants[0]
+}
+
 // descendsFrom reports whether the pinned BMM knows sub as rmType or one
 // of its descendants.
 func descendsFrom(sub, rmType string) bool {

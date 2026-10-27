@@ -2380,6 +2380,9 @@ func concreteFor(rmType string) string {
 	case "INTEGER":
 		return "DV_COUNT"
 	}
+	if d := firstConcreteDataValue(rmType); d != "" {
+		return d
+	}
 	return rmType
 }
 
