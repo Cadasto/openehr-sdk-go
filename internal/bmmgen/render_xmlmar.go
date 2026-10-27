@@ -137,10 +137,10 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 	}
 	_ = typeParams // reserved — generic type parameter list lives on the receiver via typeArgs
 
-	// Partition fields: properties emitted as XML attributes
-	// (currently `archetype_node_id` on every LOCATABLE descendant,
-	// per the openEHR ITS-XML XSDs) come before the start token;
-	// element-typed properties come inside.
+	// Partition fields: properties emitted as XML attributes per the
+	// openEHR ITS-XML XSDs ([isXMLAttributeProperty]: `archetype_node_id`
+	// on every LOCATABLE descendant and the AOM 1.4 ARCHETYPE_TERM.code)
+	// come before the start token; element-typed properties come inside.
 	var attrFields, elemFields []emittedField
 	for _, ef := range fields {
 		if isXMLAttributeProperty(ef) {
