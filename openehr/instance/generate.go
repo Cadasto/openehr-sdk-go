@@ -53,11 +53,14 @@ import (
 // template requires that the generator has no writer for, such as a
 // LOCATABLE's feeder_audit or links, other than a list that only its
 // existence or its cardinality asks a member of, make Generate return an
-// error wrapping [ErrConstraintUnsatisfiable] and no root. A list that sits in
-// an optional node the policy builds no member of, as Required builds
-// none of an optional child, is not visited, and the root leaves it out. Where the template leaves
-// such an attribute optional, it is left out, as is an attribute the
-// node's RM class does not have, whatever the template asks of it.
+// error wrapping [ErrConstraintUnsatisfiable] and no root. A list that sits
+// in an optional node the policy builds no member of, as Required builds
+// none of an optional child, is not visited, and the root leaves it out. An
+// optional node that holds such an attribute is content the template does
+// not describe, so no policy builds a member of it unless a top-up has no
+// other child to take. Where the template leaves such an attribute
+// optional, it is left out, as is an attribute the node's RM class does not
+// have, whatever the template asks of it.
 func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (any, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -223,7 +226,10 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 		}
 		// visits lets through an attribute the generator has no writer for
 		// only where the template or the RM requires it, and nothing the
-		// walk can build satisfies that requirement.
+		// walk can build satisfies that requirement. Under Large and Medium
+		// an optional node that holds one is not built of its own, since it
+		// needs content the template does not describe (needsUndescribed),
+		// so the walk gets here only on a node it must build.
 		if noWriter(optNode, attr) {
 			return fmt.Errorf("%w: %s.%s at %s (required, but the generator has no writer for it)",
 				ErrConstraintUnsatisfiable, optNode.RMTypeName(), attr.Name(), optNode.AQLPath())
