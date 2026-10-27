@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
+	"github.com/cadasto/openehr-sdk-go/internal/rmroots"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
@@ -623,8 +624,9 @@ func attrRequired(attr *templatecompile.CompiledAttribute) bool {
 // members where the children's own fall short; the list holds no more
 // members than the top-up fills it up to (topUpTarget), since a top-up adds
 // none past that count, so a list that holds more got no top-up; every
-// child before node that is not a slot is full (censusRoom), so node was
-// the first child with room that is not a slot;
+// child before node that is not a slot is full (censusRoom) or one the walk
+// refuses (censusRefused), which the top-up passes over, so node was the
+// first child with room that is not a slot and that the walk builds;
 // and no allowed child that needs no undescribed content
 // (needsNoUndescribed) still has room and has an identity that no earlier
 // sibling other than node carries while it has room, since the top-up would
@@ -657,7 +659,7 @@ func topUpLastResort(node *templatecompile.CompiledNode, built map[*templatecomp
 		return false
 	}
 	for _, c := range children[:at] {
-		if !c.IsSlot() && censusRoom(c, built[c]) {
+		if !c.IsSlot() && censusRoom(c, built[c]) && !censusRefused(c) {
 			return false
 		}
 	}
@@ -702,6 +704,36 @@ func topUpTarget(attr *templatecompile.CompiledAttribute) int {
 	return 0
 }
 
+// censusRefused reports whether the walk refuses a member of node, a child
+// that is not a slot, for what node holds itself, so a top-up passes over
+// it (REQ-107 § Contract What a visit writes): node is an object of a class
+// that is always an archetype root for which the template names no
+// archetype id, or an attribute of its own that the template does not
+// prohibit is one the generator cannot write and the template requires
+// (unwritableRequired).
+func censusRefused(node *templatecompile.CompiledNode) bool {
+	if node.IsSlot() {
+		return false
+	}
+	if unnamedRoot(node) {
+		return true
+	}
+	for _, attr := range node.Attributes() {
+		if !attrProhibited(attr) && unwritableRequired(node, attr) {
+			return true
+		}
+	}
+	return false
+}
+
+// unnamedRoot reports whether node, a child that is not a slot, is an
+// object of a class that is always an archetype root for which the template
+// names no archetype id, which REQ-107 § Slot fills reads as content the
+// template does not describe.
+func unnamedRoot(node *templatecompile.CompiledNode) bool {
+	return node.ArchetypeID() == "" && rmroots.IsArchetypeRoot(bmmtype.Class(node.RMTypeName()))
+}
+
 // censusRoom reports whether child, an allowed child of a list that n
 // members are bound to, has room for another: it is a slot, whose
 // occurrences the parser does not read, its occurrences state no upper
@@ -733,7 +765,9 @@ func visitedThoughUndescribed(attr *templatecompile.CompiledAttribute, children 
 }
 
 // needsNoUndescribed reports whether node needs no undescribed content, as
-// § Slot fills defines it: node is not a slot, and no attribute of its own
+// § Slot fills defines it: node is not a slot or an object of a class that
+// is always an archetype root for which the template names no archetype id
+// (unnamedRoot), and no attribute of its own
 // that is required, and that the template does not prohibit, can be given
 // only undescribed members or is one the generator cannot write
 // (unwritableRequired). Such an attribute has no allowed child and an
@@ -745,7 +779,7 @@ func visitedThoughUndescribed(attr *templatecompile.CompiledAttribute, children 
 // be a slot: where the census cannot tell, it reads a sibling as needing
 // none, so it reports a violation rather than grant an exemption.
 func needsNoUndescribed(node *templatecompile.CompiledNode) bool {
-	if node.IsSlot() {
+	if node.IsSlot() || unnamedRoot(node) {
 		return false
 	}
 	for _, attr := range node.Attributes() {
@@ -940,7 +974,11 @@ func censusList(name string, existence, lower int, children ...string) string {
 //     which the generator cannot write: both need undescribed content, and
 //     the top-up takes the first;
 //   - the same two children the other way round: the walk refuses the
-//     ELEMENT, so the top-up passes over it and takes the CLUSTER.
+//     ELEMENT, so the top-up passes over it and takes the CLUSTER;
+//   - a SECTION's items at existence 1..1 over an optional ADMIN_ENTRY the
+//     template defines inline with no archetype id, which the walk refuses,
+//     and the optional inner SECTION: the top-up passes over the entry and
+//     takes the SECTION.
 //
 // Read beside a template that leaves the SECTION's items optional, where
 // no top-up runs, the first root holds a violation. So does a root
@@ -988,6 +1026,13 @@ func TestREQ107_CensusLastResortFollowsTheGenerator(t *testing.T) {
 		{
 			name:      "an ELEMENT whose feeder_audit the template requires before the CLUSTER",
 			generated: censusRootOPT("CLUSTER", censusList("items", -1, 1, feederAuditElement, slotCluster("at0002"))),
+		},
+		{
+			name: "an inline ADMIN_ENTRY before a SECTION",
+			generated: censusRootOPT("SECTION", censusList("items", 1, 0,
+				censusOptional("ADMIN_ENTRY", "at0004", `<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>data</rm_attribute_name>`+
+					`<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>ITEM_TREE</rm_type_name><node_id>at0005</node_id></children></attributes>`),
+				innerSection)),
 		},
 		{
 			name: "a required CLUSTER after a required ELEMENT read as optional",
