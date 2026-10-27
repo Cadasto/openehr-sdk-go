@@ -248,17 +248,17 @@ type Source struct {
 	backoff time.Duration
 }
 
-// String describes s by three values fixed when s was built: its token URL,
-// with the password of one that carries one masked, its client ID and its
-// issuer. It never shows the client secret, the client assertion or a token,
-// and it reads nothing an exchange changes, so it is safe to call while
-// other goroutines use s. A nil s gives "<nil>".
+// String describes s by three values fixed when s was built: its token URL
+// and its issuer, with the password of one that carries one masked, and its
+// client ID. It never shows the client secret, the client assertion or a
+// token, and it reads nothing an exchange changes, so it is safe to call
+// while other goroutines use s. A nil s gives "<nil>".
 func (s *Source) String() string {
 	if s == nil {
 		return "<nil>"
 	}
 	return fmt.Sprintf("clientcreds.Source{TokenURL: %q, ClientID: %q, Issuer: %q}",
-		urlredact.String(s.cfg.TokenURL), s.cfg.ClientID, s.cfg.Issuer)
+		urlredact.String(s.cfg.TokenURL), s.cfg.ClientID, urlredact.String(s.cfg.Issuer))
 }
 
 // GoString returns the text of [Source.String], so that printing s in Go

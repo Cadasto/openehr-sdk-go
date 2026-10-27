@@ -90,8 +90,8 @@ func printProblems(v any, secrets, shown []string) []string {
 // TestREQ060_PrintsNoCredential pins REQ-060: a jwtbearer.Config, a
 // *jwtbearer.ClaimsSigner and a *jwtbearer.Source holding a token, printed
 // with any fmt verb or logged through log/slog, show no access token, no
-// private key and no password of the token URL. Config and ClaimsSigner show
-// their credential as [redacted] and their other fields as they are.
+// private key and no password of a URL they hold. Config and ClaimsSigner
+// show their credential as [redacted] and their other fields as they are.
 func TestREQ060_PrintsNoCredential(t *testing.T) { // REQ-060
 	t.Parallel()
 	const (
@@ -129,6 +129,19 @@ func TestREQ060_PrintsNoCredential(t *testing.T) { // REQ-060
 	}
 	if tok, err := src.Token(t.Context()); err != nil || tok.Value != access {
 		t.Fatalf("Token() = (%q, %v), want (%q, nil)", tok.Value, err, access)
+	}
+	issuerSrc, err := jwtbearer.New("https://idp.example/token", signer, jwtbearer.WithHTTPClient(srv.Client()),
+		jwtbearer.WithClientID("client-id"), jwtbearer.WithIssuer("https://iss:"+urlPassword+"@idp.example"))
+	if err != nil {
+		t.Fatalf("jwtbearer.New: %v", err)
+	}
+	urlSigner, err := jwtbearer.NewClaimsSigner(jwtbearer.ClaimsTemplate{
+		Issuer:   "https://iss:" + urlPassword + "@client.example",
+		Subject:  "client-id",
+		Audience: "https://svc:" + urlPassword + "@idp.example/token",
+	}, key, jwtbearer.WithKeyID("kid-1"))
+	if err != nil {
+		t.Fatalf("NewClaimsSigner: %v", err)
 	}
 
 	tests := []struct {
@@ -176,6 +189,22 @@ func TestREQ060_PrintsNoCredential(t *testing.T) { // REQ-060
 			v:       src,
 			secrets: []string{access, privateD, urlPassword},
 			shown:   []string{tokenURL.Host, "client-id", "https://idp.example"},
+		},
+		{
+			name:    "*ClaimsSigner with a password in its issuer and audience",
+			v:       urlSigner,
+			secrets: []string{privateD, urlPassword},
+			shown: []string{
+				redactedMarker, "client-id",
+				"https://iss:" + urlMask + "@client.example",
+				"https://svc:" + urlMask + "@idp.example/token",
+			},
+		},
+		{
+			name:    "*Source with a password in its issuer",
+			v:       issuerSrc,
+			secrets: []string{privateD, urlPassword},
+			shown:   []string{"idp.example/token", "client-id", "https://iss:" + urlMask + "@idp.example"},
 		},
 	}
 	for _, tc := range tests {

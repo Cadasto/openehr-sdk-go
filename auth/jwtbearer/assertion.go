@@ -21,6 +21,7 @@ import (
 	"github.com/go-jose/go-jose/v4/cryptosigner"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
+	"github.com/cadasto/openehr-sdk-go/internal/urlredact"
 )
 
 // AssertionSource produces a signed JWT bearer assertion for a single
@@ -110,15 +111,18 @@ type ClaimsSigner struct {
 }
 
 // String describes s with its Signer, the private key, shown as
-// "[redacted]", or as <nil> when it has none. The Template, Algorithm and
-// KeyID are shown as they are. A nil s gives "<nil>".
+// "[redacted]", or as <nil> when it has none. The Issuer and Audience of the
+// Template are shown with the password of one that carries one masked, as
+// [net/url.URL.Redacted] masks it: the audience is typically the token
+// endpoint URL. The rest of the Template, the Algorithm and the KeyID are
+// shown as they are. A nil s gives "<nil>".
 func (s *ClaimsSigner) String() string {
 	if s == nil {
 		return "<nil>"
 	}
 	t := s.Template
 	return fmt.Sprintf("jwtbearer.ClaimsSigner{Template: jwtbearer.ClaimsTemplate{Issuer: %q, Subject: %q, Audience: %q, Lifetime: %s, Extra: %v}, Signer: %s, Algorithm: %q, KeyID: %q}",
-		t.Issuer, t.Subject, t.Audience, t.Lifetime, t.Extra, credentialText(s.Signer != nil), s.Algorithm, s.KeyID)
+		urlredact.String(t.Issuer), t.Subject, urlredact.String(t.Audience), t.Lifetime, t.Extra, credentialText(s.Signer != nil), s.Algorithm, s.KeyID)
 }
 
 // GoString returns the text of [ClaimsSigner.String], so that printing s in
@@ -135,9 +139,9 @@ func (s *ClaimsSigner) Format(f fmt.State, _ rune) {
 }
 
 // LogValue lets log/slog log s as a group of the fields [ClaimsSigner.String]
-// shows, keyed by field name, with the Signer replaced as String replaces it.
-// Without it, the JSON handler would encode the private key's fields. A nil s
-// logs as nil.
+// shows, keyed by field name, with the Signer replaced and the Issuer and
+// Audience masked as String replaces and masks them. Without it, the JSON
+// handler would encode the private key's fields. A nil s logs as nil.
 func (s *ClaimsSigner) LogValue() slog.Value {
 	if s == nil {
 		return slog.AnyValue(nil)
@@ -145,9 +149,9 @@ func (s *ClaimsSigner) LogValue() slog.Value {
 	t := s.Template
 	return slog.GroupValue(
 		slog.Attr{Key: "Template", Value: slog.GroupValue(
-			slog.String("Issuer", t.Issuer),
+			slog.String("Issuer", urlredact.String(t.Issuer)),
 			slog.String("Subject", t.Subject),
-			slog.String("Audience", t.Audience),
+			slog.String("Audience", urlredact.String(t.Audience)),
 			slog.Duration("Lifetime", t.Lifetime),
 			slog.Any("Extra", t.Extra),
 		)},
