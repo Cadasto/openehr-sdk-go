@@ -84,15 +84,39 @@ func printedCatalog() *discovery.ServiceCatalog {
 	}
 }
 
+// printedStaticConfig returns a static configuration with every exported field
+// set, whose base URL, issuer, service and auth endpoint URLs all carry
+// catalogPass.
+func printedStaticConfig() discovery.StaticConfig {
+	return discovery.StaticConfig{
+		BaseURL:   "https://cdr:" + catalogPass + "@cdr.example/openehr",
+		Issuer:    "https://idp:" + catalogPass + "@idp.example",
+		Services:  map[string]discovery.ServiceEntry{discovery.ServiceIDOpenEHRRest: printedEntry()},
+		Auth:      printedAuth(),
+		ExpiresAt: time.Date(2026, 10, 27, 13, 0, 0, 0, time.UTC),
+		ETag:      `"static-v1"`,
+	}
+}
+
 // TestREQ060_CatalogPrintsNoURLPassword pins REQ-060 (auth.md § REQ-060): a
-// *discovery.ServiceCatalog, a discovery.ServiceEntry and a
-// discovery.AuthEndpoints, printed with any fmt verb, nested in a struct or a
-// slice, or logged through log/slog, show the password of every URL they hold
-// masked. Every verb writes the text of String, which names every exported
-// field, and slog logs every exported field. A nil catalog prints and logs as
-// nil, and an empty one prints without failing.
+// *discovery.ServiceCatalog, a discovery.ServiceEntry, a
+// discovery.AuthEndpoints and a discovery.StaticConfig, printed with any fmt
+// verb, nested in a struct or a slice, or logged through log/slog, show the
+// password of every URL they hold masked. Every verb writes the text of
+// String, which names every exported field, and slog logs every exported
+// field. A nil catalog prints and logs as nil, and an empty one prints
+// without failing.
 func TestREQ060_CatalogPrintsNoURLPassword(t *testing.T) { // REQ-060
 	t.Parallel()
+	staticShown := []string{
+		"discovery.StaticConfig{",
+		"https://cdr:" + urlMask + "@cdr.example/openehr",
+		"https://idp:" + urlMask + "@idp.example",
+		"https://svc:" + urlMask + "@cdr.example/openehr/v1",
+		"https://token:" + urlMask + "@idp.example/token",
+		"2026-10-27T13:00:00Z",
+		"static-v1",
+	}
 	tests := []struct {
 		name  string
 		v     any
@@ -148,6 +172,16 @@ func TestREQ060_CatalogPrintsNoURLPassword(t *testing.T) { // REQ-060
 			},
 		},
 		{
+			name:  "discovery.StaticConfig",
+			v:     printedStaticConfig(),
+			shown: staticShown,
+		},
+		{
+			name:  "*discovery.StaticConfig",
+			v:     new(printedStaticConfig()),
+			shown: staticShown,
+		},
+		{
 			name:  "empty *discovery.ServiceCatalog",
 			v:     &discovery.ServiceCatalog{},
 			shown: []string{"discovery.ServiceCatalog{"},
@@ -156,6 +190,11 @@ func TestREQ060_CatalogPrintsNoURLPassword(t *testing.T) { // REQ-060
 			name:  "empty discovery.AuthEndpoints",
 			v:     discovery.AuthEndpoints{},
 			shown: []string{"discovery.AuthEndpoints{"},
+		},
+		{
+			name:  "empty discovery.StaticConfig",
+			v:     discovery.StaticConfig{},
+			shown: []string{"discovery.StaticConfig{"},
 		},
 	}
 	for _, tc := range tests {
@@ -280,18 +319,20 @@ func catalogPrintProblems(v any, shown []string) []string {
 // TestREQ060_CatalogJSONUnchanged pins REQ-060 (auth.md § REQ-060): the
 // methods that mask a URL's password when a catalog is printed or logged
 // leave its JSON encoding alone. A *discovery.ServiceCatalog, a
-// discovery.ServiceEntry and a discovery.AuthEndpoints encode as the same
-// fields without those methods do, the base URL keeps its password, and the
-// catalog decodes back to a value that encodes the same, so a Cache can store
-// catalogs as JSON.
+// discovery.ServiceEntry, a discovery.AuthEndpoints and a
+// discovery.StaticConfig encode as the same fields without those methods do,
+// the base URL keeps its password, and the catalog decodes back to a value
+// that encodes the same, so a Cache can store catalogs as JSON.
 func TestREQ060_CatalogJSONUnchanged(t *testing.T) { // REQ-060
 	t.Parallel()
 	type plainCatalog discovery.ServiceCatalog
 	type plainEntry discovery.ServiceEntry
 	type plainAuth discovery.AuthEndpoints
+	type plainStatic discovery.StaticConfig
 	cat := printedCatalog()
 	entry := printedEntry()
 	auth := printedAuth()
+	static := printedStaticConfig()
 	pairs := []struct {
 		name        string
 		typed, bare any
@@ -299,6 +340,7 @@ func TestREQ060_CatalogJSONUnchanged(t *testing.T) { // REQ-060
 		{name: "*discovery.ServiceCatalog", typed: cat, bare: (*plainCatalog)(cat)},
 		{name: "discovery.ServiceEntry", typed: entry, bare: plainEntry(entry)},
 		{name: "discovery.AuthEndpoints", typed: auth, bare: plainAuth(auth)},
+		{name: "discovery.StaticConfig", typed: static, bare: plainStatic(static)},
 	}
 	for _, p := range pairs {
 		got, err := json.Marshal(p.typed)
@@ -339,8 +381,8 @@ func TestREQ060_CatalogJSONUnchanged(t *testing.T) { // REQ-060
 
 // TestREQ025_FormatWithNilStateDoesNotPanic pins REQ-025 (idiom.md § No
 // panics): Format called directly with a nil fmt.State returns without a
-// panic, for a ServiceCatalog, a nil one included, a ServiceEntry and an
-// AuthEndpoints.
+// panic, for a ServiceCatalog, a nil one included, a ServiceEntry, an
+// AuthEndpoints and a StaticConfig.
 func TestREQ025_FormatWithNilStateDoesNotPanic(t *testing.T) { // REQ-025
 	t.Parallel()
 	tests := []struct {
@@ -351,6 +393,7 @@ func TestREQ025_FormatWithNilStateDoesNotPanic(t *testing.T) { // REQ-025
 		{name: "nil *discovery.ServiceCatalog", v: (*discovery.ServiceCatalog)(nil)},
 		{name: "discovery.ServiceEntry", v: discovery.ServiceEntry{}},
 		{name: "discovery.AuthEndpoints", v: discovery.AuthEndpoints{}},
+		{name: "discovery.StaticConfig", v: discovery.StaticConfig{}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
