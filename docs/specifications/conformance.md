@@ -62,6 +62,7 @@ The `cadasto/` extras have no openEHR specification: their wire contract is the 
 `cadasto/admin` exposes deployment liveness/readiness probes (`Live`, `Ready`, `ReadyBody`) with a wire contract independent of the (planned) Cadasto platform API surface. They are distinct from the ITS-REST Admin client, `openehr/client/admin`.
 
 - **Default paths** `DefaultLivePath = "/health/live"`, `DefaultReadyPath = "/health/ready"`, each overridable per call via `WithLivePath` / `WithReadyPath` (e.g. `/healthz`).
+- **Guards.** A path that is empty or does not start with `/` returns `ErrInvalidPath`, and a nil `*transport.Client` an error matching `transport.ErrInvalidConfig`; either way no request is sent.
 - **URL derivation.** The probe URL derives from the **origin (scheme + host) of the openEHR REST service entry** — the openEHR REST API path prefix is **NOT** inherited.
 - **Public / no auth.** Health endpoints are public: the SDK **MUST NOT** send an `Authorization` header on a probe.
 - **Status mapping** (`errors.Is`-compatible): `2xx → nil`; `401 → transport.ErrUnauthorized`; `403 → transport.ErrForbidden`; `404 → transport.ErrNotFound`; `5xx → transport.ErrServerError`. Other non-2xx codes (400, 405, 408, 429, …) surface as a plain formatted error with no sentinel.
