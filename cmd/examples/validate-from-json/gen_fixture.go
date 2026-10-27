@@ -4,10 +4,11 @@
 // testdata/minimal_blood_pressure.json. After changing it, rerun it from this
 // directory with go run gen_fixture.go.
 //
-// The composition it writes round-trips through canjson and is valid against
-// vital_signs.opt: validation.ValidateComposition, which checks the template
-// constraints and the RM floor in one call, reports no error. The generator
-// refuses to write a fixture that fails it.
+// The generator checks the document it is about to write, not the
+// composition it built. validation.ValidateJSON decodes the encoded bytes and
+// checks, in one call, the members the document leaves out, the constraints of
+// vital_signs.opt and the RM floor. The generator refuses to write a fixture
+// that does not decode or that the call reports an error on.
 package main
 
 import (
@@ -26,9 +27,7 @@ import (
 
 func main() {
 	compiled := compileVitalSigns()
-	comp := minimalComposition()
-	requireValid("built composition", comp, compiled)
-	b, err := canjson.Marshal(comp)
+	b, err := canjson.Marshal(minimalComposition())
 	if err != nil {
 		panic(err)
 	}
@@ -36,11 +35,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	var back rm.Composition
-	if err := canjson.Unmarshal(b, &back); err != nil {
-		panic(err)
-	}
-	requireValid("round-tripped composition", &back, compiled)
+	requireValid(b, compiled)
 	if err := os.MkdirAll("testdata", 0o755); err != nil {
 		panic(err)
 	}
@@ -50,18 +45,21 @@ func main() {
 	fmt.Printf("wrote testdata/minimal_blood_pressure.json (%d bytes)\n", len(b))
 }
 
-// requireValid stops the generator, listing every issue, unless comp is
-// valid against the template constraints and the RM floor.
-func requireValid(label string, comp *rm.Composition, compiled *templatecompile.Compiled) {
-	result := validation.ValidateComposition(comp, compiled)
+// requireValid stops the generator, listing every issue, unless doc, the
+// canonical JSON about to be written, decodes into a COMPOSITION that is valid
+// against the template constraints and the RM floor and leaves out no member
+// the Reference Model makes mandatory.
+func requireValid(doc []byte, compiled *templatecompile.Compiled) {
+	var back rm.Composition
+	result := validation.ValidateJSON(doc, &back, compiled)
 	if result.OK {
 		return
 	}
-	fmt.Printf("%s is not valid:\n", label)
+	fmt.Println("the encoded composition is not valid:")
 	for _, i := range result.Issues {
 		fmt.Printf("  %s [%s] %s\n", i.Path, i.Code, i.Detail)
 	}
-	panic(label + " is not valid")
+	panic("the encoded composition is not valid")
 }
 
 // patchPartyProxyDiscriminators fixes empty composer/subject objects emitted

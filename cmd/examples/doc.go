@@ -17,8 +17,9 @@
 //   - primitive-validate: check single values against one OPT leaf constraint
 //   - validate-composition: validate an in-memory composition with one call,
 //     against an OPT's constraints and the Reference Model (the RM floor)
-//   - validate-from-json: decode canonical JSON, then validate it against the
-//     RM floor and an OPT's constraints
+//   - validate-from-json: decode canonical JSON and validate it, the members
+//     the document leaves out included, against the RM floor and an OPT's
+//     constraints in one call
 //   - generate-example: generate an RM instance from an OPT and print it as JSON
 //   - aql-build: build AQL with the struct and verb builders, nested CONTAINS
 //     with in-text paging, and the opt-in RM containment check
