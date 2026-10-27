@@ -339,7 +339,7 @@ In the first section the verb style gives its clauses in a different order on pu
 
 **Purpose:** Parse AQL text into the structured query tree (`parse.Query`) that `openehr/aql/parse` returns, print each clause of that tree, and emit the tree back to canonical text with `Query.Emit()`. It is the read-side mirror of `aql.Builder`: the builder goes from Go values to text, the parser from text to Go values. The tree covers the whole grammar the SDK accepts, including the deprecated `SELECT TOP n [FORWARD|BACKWARD]` clause. The one shape it cannot hold is a numeric literal outside the range of the Go value it maps to (an integer beyond `int64`, a real beyond `float64`); `ParseQuery` reports that with `aql.ErrIncompleteAST` rather than silently dropping a clause.
 
-With no argument the program walks three queries: the representative one below; one that mixes `*` with column projections, a projected literal and function calls under a FROM-root `OR`; and one with the deprecated `SELECT TOP` clause plus two literals whose source text differs from their canonical rendering (`1.50` → `1.5`, `"quoted"` → `'quoted'`). The openEHR result set names an unaliased column by its expression text, so `parse.LiteralExpr.Raw` keeps what was written while emission stays canonical. Pass your own query as the argument to walk that instead.
+With no argument the program walks three queries: the representative one below; one that mixes `*` with column projections, a projected literal and function calls under a FROM-root `OR`; and one with the deprecated `SELECT TOP` clause plus two literals and a function call whose source text differs from their canonical rendering (`1.50` → `1.5`, `"quoted"` → `'quoted'`, `length( c/name/value )` → `LENGTH(c/name/value)`). The openEHR result set names an unaliased column by its expression text, so `parse.LiteralExpr.Raw` and `parse.FunctionCall.Raw` keep what was written while emission stays canonical. Pass your own query as the argument to walk that instead.
 
 ```bash
 go run ./cmd/examples/aql-parse-structured
@@ -402,10 +402,10 @@ structured AST:
 canonical emission:
   SELECT *, 1 AS rank, LENGTH(c/name/value) FROM COMPOSITION c OR EHR e WHERE LENGTH(c/name/value) > $min AND c/uid/value = c/name/value
 
---- deprecated SELECT TOP and literal source text ---
+--- deprecated SELECT TOP and projection source text ---
 
 input AQL:
-  SELECT TOP 5 BACKWARD c/uid/value, 1.50, "quoted"
+  SELECT TOP 5 BACKWARD c/uid/value, 1.50, "quoted", length( c/name/value )
   FROM COMPOSITION c
   ORDER BY c/uid/value DESC
 
@@ -414,12 +414,13 @@ structured AST:
     [0] c/uid/value
     [1] 1.5 (real) (source text: 1.50)
     [2] 'quoted' (string) (source text: "quoted")
+    [3] LENGTH(c/name/value) (source text: length( c/name/value ))
   FROM COMPOSITION c
   ORDER BY:
     [0] c/uid/value DESC
 
 canonical emission:
-  SELECT TOP 5 BACKWARD c/uid/value, 1.5, 'quoted' FROM COMPOSITION c ORDER BY c/uid/value DESC
+  SELECT TOP 5 BACKWARD c/uid/value, 1.5, 'quoted', LENGTH(c/name/value) FROM COMPOSITION c ORDER BY c/uid/value DESC
 ```
 
 The type tags in parentheses (`(param)`, `(string)`, `(func)`, `(path)`) are added by the program to make the tree readable; the wire form of each value comes from `aql.FormatValue`, so quoting and escaping match what the emitter writes.
@@ -863,7 +864,7 @@ Without the variables the program falls back to two marked placeholders, `exampl
 
 **What to copy into your app:**
 
-1. Read the client id and secret from the environment, filled from your secret store. Never take them from command-line flags, which other users on the host can read in the process list, and never log them or the token.
+1. Read the client id and secret from the environment, filled from your secret store. Never take them from command-line flags, which other users on the host can read in the process list, and never log them or the token. The SDK's own values are safe to log: an `auth.Token`, a token source and a transport client print and log without the credential they hold ([§ REQ-060](specifications/auth.md#req-060)), but the strings your program reads are plain text.
 2. Build one `*http.Client` with its own `Timeout`, bound each run with `context.WithTimeout`, and pass the same client to the token source and to the transport.
 3. `clientcreds.NewFromCatalog(catalog, id, secret, clientcreds.WithHTTPClient(hc), clientcreds.WithScope(scope))`. It takes the token endpoint and the issuer from the catalog. At startup, it refuses a grant or a client authentication method that the catalog says the server does not accept. With only a token URL and no catalog, use `clientcreds.New(id, secret, tokenURL, ...)`. Build openEHR scopes with `auth.OpenEHRScope{...}.Token()`, which checks the syntax.
 4. `transport.New(catalog, transport.WithHTTPClient(hc), transport.WithTokenSource(src), transport.WithReauthOn401(src))`. The source keeps a token until it is within 30 seconds of expiry, and `clientcreds.WithRefreshThreshold` changes that window. `WithReauthOn401` fetches a fresh token once when the server answers 401 to a token it no longer accepts.

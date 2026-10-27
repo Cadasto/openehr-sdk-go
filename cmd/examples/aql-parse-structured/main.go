@@ -49,11 +49,13 @@ WHERE LENGTH(c/name/value) > $min AND c/uid/value = c/name/value`
 // an SDK does not author the queries it is handed; the linter is what reports
 // the deprecation.
 //
-// `1.50` and `"quoted"` are literals whose source text differs from the
-// canonical rendering (`1.5`, `'quoted'`). The tree keeps the text as written
-// in parse.LiteralExpr.Raw, because the openEHR result set names an unaliased
-// column by its expression text, while emission stays canonical.
-const deprecatedTopQuery = `SELECT TOP 5 BACKWARD c/uid/value, 1.50, "quoted"
+// `1.50` and `"quoted"` are literals, and `length( c/name/value )` is a
+// function call, whose source text differs from the canonical rendering
+// (`1.5`, `'quoted'`, `LENGTH(c/name/value)`). The tree keeps the text as
+// written in parse.LiteralExpr.Raw and parse.FunctionCall.Raw, because the
+// openEHR result set names an unaliased column by its expression text, while
+// emission stays canonical.
+const deprecatedTopQuery = `SELECT TOP 5 BACKWARD c/uid/value, 1.50, "quoted", length( c/name/value )
 FROM COMPOSITION c
 ORDER BY c/uid/value DESC`
 
@@ -79,7 +81,7 @@ func run() error {
 		return err
 	}
 	fmt.Println()
-	fmt.Println("--- deprecated SELECT TOP and literal source text ---")
+	fmt.Println("--- deprecated SELECT TOP and projection source text ---")
 	fmt.Println()
 	return parseAndPrint(deprecatedTopQuery)
 }
@@ -176,7 +178,13 @@ func describeSelectExpr(expr parse.SelectExpr) string {
 		}
 		return describeValue(v.Value)
 	case parse.FunctionCall:
-		return describeFunctionCall(v)
+		// Raw is the call as written, kept for the same reason as a
+		// literal's; show it only when it differs from the rendering.
+		text := describeFunctionCall(v)
+		if v.Raw != "" && v.Raw != text {
+			return fmt.Sprintf("%s (source text: %s)", text, v.Raw)
+		}
+		return text
 	}
 	return fmt.Sprintf("<out-of-catalogue SelectExpr %T>", expr)
 }
