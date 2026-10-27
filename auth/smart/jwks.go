@@ -30,10 +30,12 @@ type JWKS struct {
 	// until a lookup misses: it never goes stale by time.
 	TTL time.Duration
 
-	mu   sync.Mutex
-	keys map[string]json.RawMessage // keys published with a kid, by kid
-	// signing holds every key whose use, if present, is "sig", with or
-	// without a kid, in document order. A lookup without a kid reads it.
+	mu sync.Mutex
+	// keys holds the signing keys published with a kid, by kid. A signing
+	// key is one whose use, if present, is "sig".
+	keys map[string]json.RawMessage
+	// signing holds every signing key, with or without a kid, in document
+	// order. A lookup without a kid reads it.
 	signing   []json.RawMessage
 	fetchedAt time.Time
 	inflight  *jwksRefresh
@@ -69,13 +71,14 @@ func NewJWKS(httpClient *http.Client, uri string) (*JWKS, error) {
 	}, nil
 }
 
-// Key returns the JWK document for kid. On cache miss the JWKS document
-// is refreshed once before failing.
+// Key returns the signing key the set publishes under kid, as a JWK
+// document. A signing key is one whose use, if present, is "sig", so a key
+// published for encryption is never returned. On cache miss the JWKS
+// document is refreshed once before failing.
 //
 // An empty kid asks for the key that verifies a token whose header carries
-// no kid: the set's only signing key. A signing key is one whose use, if
-// present, is "sig", published with or without a kid. When the set holds
-// no signing key or more than one, Key fails with
+// no kid: the set's only signing key, published with or without a kid. When
+// the set holds no signing key or more than one, Key fails with
 // [auth.ErrJWKSValidationFailed]. It fetches the set when the cache is empty
 // or older than TTL, but does not refresh it on that failure.
 func (j *JWKS) Key(ctx context.Context, kid string) (json.RawMessage, error) {
@@ -257,10 +260,13 @@ func (j *JWKS) fetch(ctx context.Context) error {
 		if err := json.Unmarshal(raw, &meta); err != nil || meta == nil {
 			continue
 		}
-		// A key without a kid is kept for a token without a kid (REQ-062).
-		if meta.Use == nil || meta.Use == "sig" {
-			signing = append(signing, raw)
+		// Only a signing key verifies a token, whether the token's kid names
+		// it or the token has no kid. A key without a kid is kept for a token
+		// without a kid (REQ-062).
+		if meta.Use != nil && meta.Use != "sig" {
+			continue
 		}
+		signing = append(signing, raw)
 		if meta.Kid != "" {
 			keys[meta.Kid] = raw
 		}
