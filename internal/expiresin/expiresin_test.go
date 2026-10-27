@@ -9,8 +9,9 @@ import (
 // TestREQ063_SecondsReadsEveryJSONNumberForm pins REQ-063 (auth.md § Token
 // refresh) at the reader of expires_in: every number, an integer included,
 // is rounded down and bounded by Max either way, so its conversion to int64
-// and then to a time.Duration is defined, and what is not a finite number,
-// NaN and ±Inf included, is refused.
+// and then to a time.Duration is defined, a number too large for a float64
+// counting as the bound on its side, and what is not a number, NaN and Inf
+// included, is refused.
 func TestREQ063_SecondsReadsEveryJSONNumberForm(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -32,7 +33,8 @@ func TestREQ063_SecondsReadsEveryJSONNumberForm(t *testing.T) {
 		{in: "-3153600001", want: -expiresin.Max, wantOK: true},
 		{in: "-9223372036854775808", want: -expiresin.Max, wantOK: true},
 		{in: "-1e300", want: -expiresin.Max, wantOK: true},
-		{in: "1e400"},
+		{in: "1e400", want: expiresin.Max, wantOK: true},
+		{in: "-1e400", want: -expiresin.Max, wantOK: true},
 		{in: "NaN"},
 		{in: "Inf"},
 		{in: "-Inf"},

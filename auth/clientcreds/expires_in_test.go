@@ -86,7 +86,8 @@ var expiresInForms = []struct {
 	{name: "smallest int64", expiresIn: `-9223372036854775808`},
 	{name: "missing", expiresIn: ``, none: true},
 	{name: "null", expiresIn: `null`, none: true},
-	{name: "beyond float64", expiresIn: `1e400`, none: true},
+	{name: "beyond float64", expiresIn: `1e400`, want: hundredYears},
+	{name: "negative beyond float64", expiresIn: `-1e400`},
 	{name: "not a number", expiresIn: `"soon"`, wantErr: true},
 }
 

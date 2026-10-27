@@ -89,7 +89,8 @@ var expiresInForms = []struct {
 	{name: "smallest int64", expiresIn: `-9223372036854775808`},
 	{name: "missing", expiresIn: ``, none: true},
 	{name: "null", expiresIn: `null`, none: true},
-	{name: "beyond float64", expiresIn: `1e400`, none: true},
+	{name: "beyond float64", expiresIn: `1e400`, want: hundredYears},
+	{name: "negative beyond float64", expiresIn: `-1e400`},
 	{name: "not a number", expiresIn: `"soon"`, wantErr: true},
 }
 
@@ -198,7 +199,8 @@ func TestREQ063_TokenResponseExpiresInConvertsToADuration(t *testing.T) {
 		{expiresIn: `-5`, want: -5},
 		{expiresIn: `-9223372036854775808`, want: -maxSeconds},
 		{expiresIn: `-1e300`, want: -maxSeconds},
-		{expiresIn: `1e400`, want: 0},
+		{expiresIn: `1e400`, want: maxSeconds},
+		{expiresIn: `-1e400`, want: -maxSeconds},
 	}
 	for _, tc := range tests {
 		tr, err := smart.ParseTokenResponse([]byte(`{"access_token":"at","expires_in":` + tc.expiresIn + `}`))
@@ -227,7 +229,8 @@ func TestREQ063_TokenResponseTellsAMissingExpiresInFromZero(t *testing.T) {
 		{expiresIn: `-5`, want: -5, wantHas: true},
 		{expiresIn: ``},
 		{expiresIn: `null`},
-		{expiresIn: `1e400`},
+		{expiresIn: `1e400`, want: int64(hundredYears / time.Second), wantHas: true},
+		{expiresIn: `-1e400`, want: -int64(hundredYears / time.Second), wantHas: true},
 	}
 	for _, tc := range tests {
 		tr, err := smart.ParseTokenResponse([]byte(expiresInBody("at", tc.expiresIn)))
