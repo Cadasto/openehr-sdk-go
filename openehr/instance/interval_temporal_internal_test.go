@@ -34,6 +34,23 @@ func TestREQ107_TemporalBoundsCompareAsInstants(t *testing.T) {
 			want: [2]string{"2026-10-02T00:00:00+02:00", "2026-10-01T23:00:00Z"},
 		},
 		{
+			// 01:00 UTC then 00:30 UTC: inverted by less than the lower
+			// bound's offset, so reading that offset twice would put the
+			// pair in order.
+			name:  "date-time: zoned lower after UTC upper, within its offset, swapped",
+			apply: orderDateTimes,
+			lower: "2026-01-01T06:00:00+05:00", upper: "2026-01-01T00:30:00Z",
+			want: [2]string{"2026-01-01T00:30:00Z", "2026-01-01T06:00:00+05:00"},
+		},
+		{
+			// 00:30 UTC then 01:00 UTC: in order, and reading the upper
+			// bound's offset twice would invert the pair.
+			name:  "date-time: UTC lower before zoned upper, within its offset, left alone",
+			apply: orderDateTimes,
+			lower: "2026-01-01T00:30:00Z", upper: "2026-01-01T06:00:00+05:00",
+			want: [2]string{"2026-01-01T00:30:00Z", "2026-01-01T06:00:00+05:00"},
+		},
+		{
 			name:  "date-time: zoned and zoneless, left alone",
 			apply: orderDateTimes,
 			lower: "2026-10-02T00:00:00", upper: "2026-10-01T00:00:00Z",

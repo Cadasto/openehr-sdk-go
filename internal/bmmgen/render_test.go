@@ -234,6 +234,12 @@ func TestManualImplementationSkip(t *testing.T) {
 		"common_archetyped":             {"not implemented: PATHABLE.item_at_path", "not implemented: PATHABLE.path_unique"},
 		"common_change_control":         {"not implemented: VERSION.is_branch"},
 		"data_types_quantity_date_time": {"not implemented: DV_DATE.magnitude", "not implemented: DV_DURATION.less_than"},
+		"data_types_uri": {
+			"not implemented: DV_URI.scheme",
+			"not implemented: DV_URI.path",
+			"not implemented: DV_URI.query",
+			"not implemented: DV_URI.fragment_id",
+		},
 	}
 	for fileBase, msgs := range suppressed {
 		src := render(fileBase)

@@ -1979,6 +1979,7 @@ requirements:
       - openehr/aql/lint/semantic_test.go
       - openehr/client/ehr/ids_test.go
       - openehr/rm/identification_funcs_test.go
+      - openehr/rm/uri_funcs_test.go
 
   - id: REQ-121
     title: Locatable path read access
