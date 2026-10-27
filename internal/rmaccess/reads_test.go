@@ -155,10 +155,11 @@ func TestAccess_REQ102_REQ110_ReadsTheTemplateWalkAttributes(t *testing.T) {
 		{name: "empty ACTION instruction_details", parent: rm.Action{}, attr: "instruction_details"},
 
 		// ISM_TRANSITION: current_state once it carries a value, careflow_step
-		// and transition once set.
+		// and transition once set, as the pointer the field holds, so a write
+		// through it reaches the transition.
 		{name: "ISM_TRANSITION current_state", parent: rm.IsmTransition{CurrentState: step}, attr: "current_state", present: true, want: step, byAddress: true},
-		{name: "ISM_TRANSITION careflow_step", parent: rm.IsmTransition{CareflowStep: &step}, attr: "careflow_step", present: true, want: step},
-		{name: "ISM_TRANSITION transition", parent: rm.IsmTransition{Transition: &step}, attr: "transition", present: true, want: step},
+		{name: "ISM_TRANSITION careflow_step", parent: rm.IsmTransition{CareflowStep: &step}, attr: "careflow_step", present: true, want: &step},
+		{name: "ISM_TRANSITION transition", parent: rm.IsmTransition{Transition: &step}, attr: "transition", present: true, want: &step},
 		{name: "empty ISM_TRANSITION current_state", parent: rm.IsmTransition{}, attr: "current_state"},
 		{name: "empty ISM_TRANSITION careflow_step", parent: rm.IsmTransition{}, attr: "careflow_step"},
 		{name: "empty ISM_TRANSITION transition", parent: rm.IsmTransition{}, attr: "transition"},

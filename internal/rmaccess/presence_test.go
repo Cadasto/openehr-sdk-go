@@ -515,10 +515,12 @@ func TestPresence_REQ171_ReferencesHeldByValue(t *testing.T) {
 // are not the field's own: a class held by value, ITEM_SINGLE item,
 // REFERENCE_RANGE range, CODE_PHRASE terminology_id, COMPOSITION category and
 // ACTION ism_transition among them, as a pointer to the parent's own field,
-// so a walk goes below it and a write through it reaches the parent; the four
-// attributes handed back dereferenced; and the boxing of list items, a list
-// of values as pointers into its backing array, a list of interfaces as it
-// is. Hand a class held by value back as a copy and the pointer rows fail.
+// so a walk goes below it and a write through it reaches the parent;
+// ISM_TRANSITION careflow_step and transition as the pointer the field holds,
+// for the same reason; the two attributes handed back dereferenced; and the
+// boxing of list items, a list of values as pointers into its backing array,
+// a list of interfaces as it is. Hand a class held by value, or the careflow
+// step, back as a copy and the pointer rows fail.
 func TestAccess_REQ171_Shapes(t *testing.T) {
 	precision := rm.Integer(2)
 	step := rm.DVCodedText{Value: "step"}
@@ -532,9 +534,8 @@ func TestAccess_REQ171_Shapes(t *testing.T) {
 		t.Errorf("Single(REFERENCE_RANGE, range) = %T, want a pointer to the parent's range", v)
 	}
 	for _, attr := range []string{"careflow_step", "transition"} {
-		v, _ := Single(&rm.IsmTransition{CareflowStep: &step, Transition: &step}, attr)
-		if got, ok := v.(rm.DVCodedText); !ok || got.Value != step.Value {
-			t.Errorf("Single(ISM_TRANSITION, %s) = %#v, want the DV_CODED_TEXT it points to", attr, v)
+		if v, _ := Single(&rm.IsmTransition{CareflowStep: &step, Transition: &step}, attr); v != &step {
+			t.Errorf("Single(ISM_TRANSITION, %s) = %#v, want the pointer the field holds", attr, v)
 		}
 	}
 	if v, _ := Single(&rm.DVProportion{Precision: &precision}, "precision"); v != any(precision) {

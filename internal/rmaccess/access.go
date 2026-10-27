@@ -19,11 +19,10 @@ import (
 // A pointer, an interface and a primitive come back as the field holds them.
 // A class held by value comes back as a pointer into parent, so reading it
 // copies nothing and a write through it reaches parent; parent held by value
-// is itself a copy, so such a write reaches only that copy. Four attributes
-// of three classes come back in another shape: ISM_TRANSITION careflow_step
-// and transition as the DV_CODED_TEXT they point to, DV_PROPORTION precision
-// as its Integer, and ORIGINAL_VERSION data as the value its pointer holds,
-// so a walk can enter the payload of a version built in Go. A Hash attribute
+// is itself a copy, so such a write reaches only that copy. Two attributes
+// of two classes come back in another shape: DV_PROPORTION precision as its
+// Integer, and ORIGINAL_VERSION data as the value its pointer holds, so a
+// walk can enter the payload of a version built in Go. A Hash attribute
 // comes back as its Go map, or the pointer to it, whole; [Hash] reads its
 // entries, with the same presence.
 func Single(parent any, attr string) (value any, present bool) {

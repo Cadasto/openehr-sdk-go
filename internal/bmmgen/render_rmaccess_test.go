@@ -240,7 +240,7 @@ func TestRenderRMAccessFile_REQ171_Readings(t *testing.T) {
 		{"singleArchetyped", "rm_version", "return leafValue(peek, x.RMVersion), presentArchetypedRMVersion(x.RMVersion), true"},
 		{"singleItemSingle", "item", "return &x.Item, !isZeroElement(x.Item), true"},
 		{"singleReferenceRangeDVQuantity", "range", "return &x.Range, !isZeroDVIntervalDVOrdered(x.Range), true"},
-		{"singleIsmTransition", "careflow_step", "if x.CareflowStep == nil {\n\treturn nil, false, true\n}\nreturn *x.CareflowStep, true, true"},
+		{"singleIsmTransition", "careflow_step", "return x.CareflowStep, x.CareflowStep != nil, true"},
 		{"singleDVProportion", "precision", "if x.Precision == nil {\n\treturn nil, false, true\n}\nreturn leafValue(peek, *x.Precision), true, true"},
 		{"singleOriginalVersionAny", "data", "if x.Data == nil {\n\treturn nil, false, true\n}\nreturn *x.Data, true, true"},
 		{"singleCodePhrase", "terminology_id", "return &x.TerminologyID, !isZeroTerminologyID(x.TerminologyID), true"},

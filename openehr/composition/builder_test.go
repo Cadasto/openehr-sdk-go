@@ -858,9 +858,11 @@ func TestREQ101_SetRefusesValueNoAlternativeAllows(t *testing.T) {
 
 // REQ-101 — Set at a path that runs through an attribute holding a class by
 // value, such as ACTION ism_transition or COMPOSITION category, writes the
-// value into the composition Build returns. The builder reaches such a class
-// as a pointer into its parent; reached as a copy, Build would refuse the
-// path, or the write would land in the copy and be lost without an error.
+// value into the composition Build returns, as does a path through the
+// DV_CODED_TEXT an ISM_TRANSITION careflow_step points to. The builder reaches
+// such a class as a pointer into its parent, and the careflow step as its own
+// pointer; reached as a copy, Build would refuse the path, or the write would
+// land in the copy and be lost without an error.
 func TestSetThroughAClassHeldByValue(t *testing.T) {
 	t.Parallel()
 	coded := func(text, code string) *rm.DVCodedText {
@@ -885,6 +887,23 @@ func TestSetThroughAClassHeldByValue(t *testing.T) {
 				return "no ACTION"
 			},
 			want: "532",
+		},
+		{
+			name: "ACTION ism_transition careflow_step defining_code", template: "sdk_crosscheck_unwritten.v1",
+			path:  "/content[openEHR-EHR-ACTION.sdk_unwritten.v1]/ism_transition/careflow_step/defining_code",
+			value: &rm.CodePhrase{CodeString: "at0003", TerminologyID: rm.TerminologyID{Value: "local"}},
+			read: func(c *rm.Composition) string {
+				for _, item := range c.Content {
+					if a, ok := item.(*rm.Action); ok {
+						if a.IsmTransition.CareflowStep == nil {
+							return "no careflow_step"
+						}
+						return a.IsmTransition.CareflowStep.DefiningCode.CodeString
+					}
+				}
+				return "no ACTION"
+			},
+			want: "at0003",
 		},
 		{
 			name: "COMPOSITION category defining_code", template: "vital_signs",

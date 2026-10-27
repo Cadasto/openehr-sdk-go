@@ -3239,17 +3239,11 @@ func singleIsmTransition(x *rm.IsmTransition, attr string, peek bool) (any, bool
 	}
 	switch attr {
 	case "careflow_step":
-		if x.CareflowStep == nil {
-			return nil, false, true
-		}
-		return *x.CareflowStep, true, true
+		return x.CareflowStep, x.CareflowStep != nil, true
 	case "current_state":
 		return &x.CurrentState, presentCodedText(x.CurrentState), true
 	case "transition":
-		if x.Transition == nil {
-			return nil, false, true
-		}
-		return *x.Transition, true, true
+		return x.Transition, x.Transition != nil, true
 	}
 	return nil, false, false
 }
