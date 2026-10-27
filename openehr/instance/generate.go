@@ -708,9 +708,10 @@ var itemStructureContent = map[string]string{
 // binding tiers name (bindingAlternative), and its content list gets no
 // member where that child does not carry it, the walk does not visit it
 // (visits), or the members the walk builds for it are none: those of its
-// allowed children (planMembers), or, where it has none, those of its BMM
-// type (implicitMembers), which a list whose RM type is unknown, such as
-// the items of an ITEM_STRUCTURE, does not get. A list whose children ask
+// allowed children (planMembers), or one where the template writes the list
+// as a single attribute (materialiseSingle), or, where it has no allowed
+// child, those of its BMM type (implicitMembers), which a list whose RM type
+// is unknown, such as the items of an ITEM_STRUCTURE, does not get. A list whose children ask
 // for more members than its cardinality upper bound admits
 // (checkCardinalityRoom) is refused by the walk, not left empty, so the
 // structure is visited and Generate returns that error. shouldVisit asks
@@ -733,12 +734,14 @@ func (g *generator) holdsNoItem(attr *tcimpl.CompiledAttribute) bool {
 	if list == nil || !g.visits(child, list) {
 		return true
 	}
-	if list.Cardinality() != template.Multiple {
-		return false
-	}
 	members := tcimpl.AllowedChildNodes(list)
 	if len(members) == 0 {
 		return implicitMembers(child, list) == 0
+	}
+	if list.Cardinality() != template.Multiple {
+		// The template writes the list as a single attribute, which the walk
+		// writes as the list, with the one member its alternatives give.
+		return false
 	}
 	if checkCardinalityRoom(child, list, members) != nil {
 		return false
@@ -826,6 +829,13 @@ func attrTypedByRMClass(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttri
 // RM value materialised from the attribute's BMM type so the
 // resulting tree satisfies REQ-102 v2's "required attribute absent"
 // check without the OPT pinning structure for every BMM mandatory.
+//
+// An attribute the RM declares a list, which the template writes as a
+// single attribute (COMPOSITION.content or ITEM_TREE.items as a
+// C_SINGLE_ATTRIBUTE), is written as that list, as the template validator
+// reads it: the value built from its alternatives is its one member, and
+// with no alternative it gets the members a list with no child gets
+// (materialiseImplicitMultiple).
 func (g *generator) materialiseSingle(
 	optNode *tcimpl.CompiledNode,
 	attr *tcimpl.CompiledAttribute,
@@ -836,18 +846,18 @@ func (g *generator) materialiseSingle(
 	// (attrProhibited), unless the BMM marks it mandatory: then it gets
 	// here and is built as one the OPT leaves silent.
 	children := tcimpl.AllowedChildNodes(attr)
+	isList := rmDeclaresList(parentRM, attr.Name())
 	if len(children) == 0 {
-		// An attribute the RM declares a list, which the template writes
-		// as a single attribute (COMPOSITION.content as a
-		// C_SINGLE_ATTRIBUTE), is read as that list, as the template
-		// validator reads it. Where the BMM does not mark it mandatory,
-		// only its existence asks for a member, so it gets none: a list
-		// with no member meets its existence. A list the RM makes non-empty
-		// once present does not: at an existence of 1 or more it gets the
-		// member its BMM type gives, as a list the OPT writes so does
+		// An attribute the RM declares a list is read as that list. Where
+		// the BMM marks it mandatory, as it does PERSON.identities, it gets
+		// the member its BMM type gives. Where the BMM does not, only its
+		// existence asks for a member, so it gets none: a list with no
+		// member meets its existence. A list the RM makes non-empty once
+		// present does not: at an existence of 1 or more it gets the member
+		// its BMM type gives too, as a list the OPT writes so does
 		// (materialiseImplicitMultiple), which refuses an archetype root.
-		if !attr.Required() && rmDeclaresList(parentRM, attr.Name()) {
-			if !rmNonEmptyList(optNode, attr) || !tcimpl.LowerAtLeastOne(attr.Existence()) {
+		if isList {
+			if !attr.Required() && (!rmNonEmptyList(optNode, attr) || !tcimpl.LowerAtLeastOne(attr.Existence())) {
 				return nil
 			}
 			return g.materialiseImplicitMultiple(optNode, attr, parentRM)
@@ -882,6 +892,12 @@ func (g *generator) materialiseSingle(
 	rmChild, err := g.buildChild(bindingAlternative(children, builtRMType(children[0])))
 	if err != nil {
 		return err
+	}
+	if isList {
+		if err := rmwrite.AppendMultiple(parentRM, attr.Name(), rmChild); err != nil {
+			return fmt.Errorf("append %s.%s: %w", optNode.RMTypeName(), attr.Name(), err)
+		}
+		return nil
 	}
 	if replacesTerminology(parentRM, attr.Name(), rmChild) {
 		return nil
@@ -974,11 +990,9 @@ func (g *generator) materialiseImplicitSingle(
 	// must not be an archetype root: an optional attribute gets nothing,
 	// and a required one is refused, as in materialiseImplicitMultiple.
 	// No attribute the pinned RM declares single-valued has such a
-	// default. A template that writes a list as a single attribute, such
-	// as COMPOSITION.content, reaches this only where the BMM marks the
-	// list mandatory: materialiseSingle reads any other as the list the
-	// RM declares and builds it no member. No list the pinned RM marks
-	// mandatory holds archetype roots, so the refusal is a backstop.
+	// default, and a template that writes a list as a single attribute,
+	// such as COMPOSITION.content, never reaches this: materialiseSingle
+	// writes it as the list the RM declares. So the refusal is a backstop.
 	if built := rmTypeOf(rmChild); rmroots.IsArchetypeRoot(built) {
 		if !isRequired(attr) {
 			return nil
