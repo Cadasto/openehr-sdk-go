@@ -771,23 +771,20 @@ func TestUnmarshalOverflowIsATypedError(t *testing.T) {
 }
 
 // TestUnmarshalMantissaPrecisionLossIsATypedError pins the half of
-// REQ-052's floating-point clause that used to be open: a magnitude
-// carrying more significant digits than float64 holds (here 19) now
-// fails rather than rounding silently, wrapping canjson.ErrInvalidShape
-// so a caller can classify it with errors.Is alone — closed by
-// PR 145. It replaces the retired TestUnmarshalMantissaPrecisionLossIsSilent,
-// which pinned the gap before it closed. rm.Real's own significant-digit trigger
-// is unit-tested directly in openehr/rm/real_test.go; this only proves
-// DV_QUANTITY.magnitude inherits it through the ordinary struct-field
-// decode path — no per-field path wrapping exists for a scalar Real
-// field today (only polymorphic slots and whole-value `_type` mismatches
-// attach a *typereg.DecodeError), so this test does not assert one.
+// REQ-052's floating-point clause that used to be open: a lossy magnitude,
+// here 19 significant digits the float64 it parses to does not give back,
+// fails rather than rounding silently, wrapping canjson.ErrInvalidShape so
+// a caller can classify it with errors.Is alone. It replaces the retired
+// TestUnmarshalMantissaPrecisionLossIsSilent, which pinned the gap before
+// it closed. rm.Real's own lossy test is unit-tested directly in
+// openehr/rm/real_test.go; this only proves DV_QUANTITY.magnitude inherits
+// it through the ordinary struct-field decode path.
 func TestUnmarshalMantissaPrecisionLossIsATypedError(t *testing.T) {
 	const in = `{"_type":"DV_QUANTITY","magnitude":0.1234567890123456789,"units":"kg"}`
 	var q rm.DVQuantity
 	err := canjson.Unmarshal([]byte(in), &q)
 	if err == nil {
-		t.Fatalf("Unmarshal(%s) = nil; want a precision error (gap closed)", in)
+		t.Fatalf("Unmarshal(%s) = nil; want a lossy-literal refusal (gap closed)", in)
 	}
 	if !errors.Is(err, canjson.ErrInvalidShape) {
 		t.Errorf("err = %v; want errors.Is(err, canjson.ErrInvalidShape)", err)
@@ -858,7 +855,7 @@ func TestUnmarshalMantissaPrecisionLossInheritedByDVProportion(t *testing.T) {
 	var p rm.DVProportion
 	err := canjson.Unmarshal([]byte(in), &p)
 	if err == nil {
-		t.Fatalf("Unmarshal(%s) = nil; want a precision error", in)
+		t.Fatalf("Unmarshal(%s) = nil; want a lossy-literal refusal", in)
 	}
 	if !errors.Is(err, canjson.ErrInvalidShape) {
 		t.Errorf("err = %v; want errors.Is(err, canjson.ErrInvalidShape)", err)

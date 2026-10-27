@@ -1,6 +1,7 @@
 package rm
 
 import (
+	"encoding"
 	json "encoding/json/v2"
 	"errors"
 	"fmt"
@@ -13,42 +14,36 @@ import (
 
 // Real is the BMM Real primitive. Upstream CDR canonical JSON sometimes
 // emits decimal magnitudes as quoted strings; decode accepts both forms.
+// Canonical XML reads it through [Real.UnmarshalText]. Either decode refuses
+// a lossy literal, one a float64 cannot hold at the precision it is written
+// to, rather than round it.
 type Real float64
 
-// maxSignificantDigits is the digit-count budget this SDK uses to
-// decide that a decimal literal carries more precision than it will
-// accept (REQ-052's "rather than silently rounding" decode clause; see
-// significantDigits). 17 is float64's shortest-round-trip maximum: every
-// float64 can be printed with at most 17 significant decimal digits and
-// read back identically.
-//
-// It is a digit-count budget, NOT an exactness test, and
-// docs/specifications/wire.md § Floating-point precision records that it
-// is wrong in both directions:
-//
-//   - False positive — a literal past 17 digits can still be exactly
-//     representable and is refused anyway. 18446744073709551616 (2^64)
-//     is exact in float64 yet carries 20 significant digits, so the
-//     budget refuses it.
-//   - False negative — a shorter literal can be binary-inexact and is
-//     accepted unreported. 9007199254740993 (2^53+1, 16 digits) decodes
-//     to 9007199254740992, and any decimal fraction that is not a power
-//     of two (0.1 included) is binary-inexact regardless of digit count.
-//
-// Classifying both correctly would need an exactness check (big.Float),
-// which the plan rejected because it would also reject 0.1 and every
-// other ordinary binary-inexact clinical literal. >17 is chosen instead
-// as a cheap, deterministic budget that never reports a short clinical
-// literal; it is not a losslessness guarantee.
-const maxSignificantDigits = 17
+// The canonical-XML codec reaches a Real element through this interface, so
+// a signature drift would silently fall back to encoding/xml's plain float
+// handling and lose the lossy-literal refusal. Pin it at compile time.
+var _ encoding.TextUnmarshaler = (*Real)(nil)
+
+const (
+	// float64Digits is the number of significant decimal digits a float64
+	// gives back: a decimal literal of at most this many digits parses to a
+	// float64 that, written back correctly rounded to the literal's own digit
+	// count, is the literal again. Such a literal is lossy only when it
+	// underflows to zero, so the lossy test skips the write-back for it.
+	float64Digits = 15
+	// maxExactDigits is the largest number of significant decimal digits in
+	// the exact value of any float64. A literal carrying more cannot denote a
+	// float64, so it is lossy without a write-back, which would otherwise
+	// grow with the literal.
+	maxExactDigits = 767
+)
 
 // significantDigits counts the significant decimal digits in a numeric
 // literal s — either a bare JSON number or the content of a quoted
 // decimal string. Only the mantissa counts: a leading sign, the decimal
 // point, and any exponent part are excluded, as are leading zeros before
 // the first nonzero digit and trailing zeros at the end of the digit
-// run. Used to apply the maxSignificantDigits budget (REQ-052) — it
-// counts digits and makes no claim about representability.
+// run. It is the digit count the lossy test writes a literal back to.
 func significantDigits(s string) int {
 	if i := strings.IndexAny(s, "eE"); i >= 0 {
 		s = s[:i]
@@ -79,19 +74,155 @@ func significantDigits(s string) int {
 	return digits
 }
 
-// errPrecisionLoss is the refusal, carrying typereg.ErrInvalidShape, of a
-// decimal literal that exceeds maxSignificantDigits. Kept in one place (both
-// UnmarshalJSON branches share it) so the sentinel and the value-free
-// message text (REQ-093) cannot drift between them. Each refusal returns it
+// lossy reports whether the literal s, which strconv.ParseFloat or
+// encoding/json/v2 parsed to f, is lossy: whether f, written back
+// correctly rounded to as many significant decimal digits as s carries,
+// denotes a value other than s's own.
+//
+// A literal with no significant digit, a zero, is never lossy. Nor is one of
+// at most float64Digits digits that parsed to a non-zero float64. That is the
+// decode hot path, and it costs one digit count and no allocation. A short
+// literal that parsed to zero underflowed, and the write-back finds it lossy.
+// A literal that is not decimal, such as the hexadecimal form or Inf, which
+// strconv.ParseFloat also reads, is never lossy: the rule governs decimal
+// literals.
+func lossy(s string, f float64) bool {
+	n := significantDigits(s)
+	if n == 0 || (n <= float64Digits && f != 0) {
+		return false
+	}
+	digits, point, ok := decimalForm(s)
+	if !ok {
+		return false
+	}
+	if n > maxExactDigits {
+		return true
+	}
+	var buf [64]byte
+	back, backPoint, _ := decimalForm(string(strconv.AppendFloat(buf[:0], f, 'e', n-1, 64)))
+	return point != backPoint || !sameDigits(digits, back)
+}
+
+// decimalForm reads s as a decimal literal: an optional sign, digits with at
+// most one decimal point, and an optional exponent, with an underscore
+// allowed between digits as strconv.ParseFloat allows it. It returns the run
+// of s from its first non-zero digit to its last, and point, where the
+// value's decimal point sits: the value is 0.<the run's digits> × 10^point.
+// A zero returns an empty run. ok is false when s is not a decimal literal,
+// such as the hexadecimal form, Inf or NaN.
+func decimalForm(s string) (run string, point int64, ok bool) {
+	if s != "" && (s[0] == '+' || s[0] == '-') {
+		s = s[1:]
+	}
+	mant, exp, hasExp := s, "", false
+	if k := strings.IndexAny(s, "eE"); k >= 0 {
+		mant, exp, hasExp = s[:k], s[k+1:], true
+	}
+	// n counts the digits read, lead those before the first non-zero digit,
+	// and before those before the decimal point.
+	var n, lead, before int64
+	first, last, hasPoint := -1, -1, false
+	for i := range len(mant) {
+		switch c := mant[i]; {
+		case c >= '1' && c <= '9':
+			if first < 0 {
+				first, lead = i, n
+			}
+			last = i
+			n++
+		case c == '0':
+			n++
+		case c == '.' && !hasPoint:
+			hasPoint, before = true, n
+		case c == '_':
+		default:
+			return "", 0, false
+		}
+	}
+	if n == 0 {
+		return "", 0, false
+	}
+	if !hasPoint {
+		before = n
+	}
+	var e int64
+	if hasExp {
+		if e, ok = exponent(exp); !ok {
+			return "", 0, false
+		}
+	}
+	if first < 0 {
+		return "", 0, true
+	}
+	return mant[first : last+1], before - lead + e, true
+}
+
+// exponent reads the exponent part of a decimal literal, after its `e`: an
+// optional sign and at least one digit, with an underscore allowed between
+// digits. It stops growing at maxExponent, which already puts any non-zero
+// literal far outside the float64 range, so the arithmetic cannot overflow.
+func exponent(s string) (int64, bool) {
+	digits, neg := strings.CutPrefix(s, "-")
+	if !neg {
+		digits = strings.TrimPrefix(digits, "+")
+	}
+	var e int64
+	seen := false
+	for _, c := range []byte(digits) {
+		switch {
+		case c >= '0' && c <= '9':
+			seen = true
+			if e <= maxExponent {
+				e = e*10 + int64(c-'0')
+			}
+		case c == '_':
+		default:
+			return 0, false
+		}
+	}
+	if neg {
+		e = -e
+	}
+	return e, seen
+}
+
+// sameDigits reports whether the runs a and b hold the same decimal digits
+// in the same order, skipping any other byte, a decimal point or an
+// underscore, between them.
+func sameDigits(a, b string) bool {
+	i, j := 0, 0
+	for {
+		for i < len(a) && (a[i] < '0' || a[i] > '9') {
+			i++
+		}
+		for j < len(b) && (b[j] < '0' || b[j] > '9') {
+			j++
+		}
+		if i == len(a) || j == len(b) {
+			return i == len(a) && j == len(b)
+		}
+		if a[i] != b[j] {
+			return false
+		}
+		i++
+		j++
+	}
+}
+
+// errLossyLiteral is the refusal of a lossy literal, kept in one place so
+// that both decodes and the value-free message text cannot drift apart. It
+// carries no shape sentinel, so [Real.UnmarshalText] returns it as it is:
+// canonical XML classifies the refusal itself, with canxml.ErrInvalidShape.
+var errLossyLiteral = errors.New("rm.Real: literal cannot be held in a float64 at its own precision")
+
+// errLossyShape is errLossyLiteral carrying typereg.ErrInvalidShape, the
+// refusal both [Real.UnmarshalJSON] branches return. Each refusal returns it
 // inside a per-call refused.Literal carrier holding the literal for the entry
 // point's DecodeError.Value; the carrier's message is this one and one
-// errors.Unwrap step reaches it, so errors.Is(err, errPrecisionLoss) holds.
+// errors.Unwrap step reaches it, so errors.Is(err, errLossyLiteral) holds.
 //
-// The text names the digit budget rather than claiming the value is
-// unrepresentable, because for the budget's documented false positive
-// (2^64) that claim is simply false — see maxSignificantDigits. The
-// sentinel is attached with typereg.ClassifyShape, which leaves the message
-// exactly as written: REQ-052 requires the failure's message to be
+// The sentinel is attached with typereg.ClassifyShape, which leaves the
+// message exactly as written: REQ-052 requires the failure's message to be
 // unchanged by the classification, and a fmt.Errorf("%w: %w") wrap would
 // splice the sentinel's own prose into it.
 //
@@ -99,14 +230,15 @@ func significantDigits(s string) int {
 // safe: typereg's own package-level vars (ErrInvalidShape included)
 // initialise before this rm var, and ClassifyShape reads the sentinel
 // only inside its Is method, never while it builds the wrapper here.
-var errPrecisionLoss = typereg.ClassifyShape(fmt.Errorf("rm.Real: literal carries more than %d significant decimal digits", maxSignificantDigits))
+var errLossyShape = typereg.ClassifyShape(errLossyLiteral)
 
-// UnmarshalJSON accepts a JSON number or a decimal string. A literal
-// carrying more than 17 significant digits fails rather than silently
-// rounding; the error message does not echo the value. A JSON null is a
-// no-op per the encoding/json convention for Unmarshaler ("approximate
-// the behavior of Unmarshal itself"), leaving the receiver unchanged
-// rather than writing the zero value, as rm.Character does.
+// UnmarshalJSON accepts a JSON number or a decimal string. A lossy literal,
+// one the float64 it parses to does not give back at the literal's own count
+// of significant digits, fails rather than silently rounding; the error
+// message does not echo the value. A JSON null is a no-op per the
+// encoding/json convention for Unmarshaler ("approximate the behavior of
+// Unmarshal itself"), leaving the receiver unchanged rather than writing the
+// zero value, as rm.Character does.
 //
 // The two checks run in this order. The literal is parsed first, into a
 // temporary, and a parse or range failure is returned as it comes:
@@ -114,16 +246,16 @@ var errPrecisionLoss = typereg.ClassifyShape(fmt.Errorf("rm.Real: literal carrie
 // *json.SemanticError (or a *jsontext.SyntacticError for a malformed
 // literal) from the bare arm, each reachable with errors.As and each
 // staying outside typereg.ErrInvalidShape. Only a literal that parsed is
-// then measured against the 17-digit limit, and only a literal that
-// passed both is assigned to the receiver. Reversing the order would report
-// "1e400" or "123456789012345678x" as precision loss, which is a
-// misdiagnosis: the value never parsed at all.
+// then tested for loss, and only a literal that passed both is assigned to
+// the receiver. Reversing the order would report "1e400" or
+// "123456789012345678x" as a lossy literal, which is a misdiagnosis: the
+// value never parsed at all.
 //
 // Two refusals also carry the literal's JSON text as the document wrote it,
 // quotes included for a quoted literal, which a canjson entry point holds in
-// DecodeError.Value: a quoted literal that does not parse, and a literal past
-// the 17-digit limit. The text adds nothing to the message, which names a
-// quoted literal once, in the strconv cause.
+// DecodeError.Value: a quoted literal that does not parse, and a lossy
+// literal. The text adds nothing to the message, which names a quoted
+// literal once, in the strconv cause.
 //
 // A nil receiver is refused with an error rather than dereferenced. That
 // refusal carries typereg.ErrNilReceiver, not typereg.ErrInvalidShape,
@@ -151,8 +283,8 @@ func (r *Real) UnmarshalJSON(b []byte) error {
 			// written. The prefix does not repeat it.
 			return refused.Literal(b, fmt.Errorf("rm.Real: parse quoted literal: %w", err))
 		}
-		if significantDigits(s) > maxSignificantDigits {
-			return refused.Literal(b, errPrecisionLoss)
+		if lossy(s, f) {
+			return refused.Literal(b, errLossyShape)
 		}
 		*r = Real(f)
 		return nil
@@ -161,8 +293,50 @@ func (r *Real) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &f); err != nil {
 		return fmt.Errorf("rm.Real: %w", err)
 	}
-	if significantDigits(string(b)) > maxSignificantDigits {
-		return refused.Literal(b, errPrecisionLoss)
+	if lossy(string(b), f) {
+		return refused.Literal(b, errLossyShape)
+	}
+	*r = Real(f)
+	return nil
+}
+
+// UnmarshalText implements [encoding.TextUnmarshaler] so that canonical XML
+// element content is held to the lossy-literal rule canonical JSON applies.
+// The generated canonical-XML decoder reaches a Real element through
+// xmlunmatched, which hands its text to this method.
+//
+// Text reads as encoding/xml reads a float64 element without this method:
+// empty text is 0, whitespace around the number is trimmed, and the rest
+// goes to strconv.ParseFloat, whose *strconv.NumError is returned as it
+// comes for text that does not spell a number, whitespace alone and a quoted
+// number among them. A number that parsed and is lossy is refused with a
+// value-free error.
+//
+// Neither refusal carries typereg.ErrInvalidShape: that sentinel's own text
+// names canonical JSON. canxml classifies the refusal itself: it comes back
+// in a canxml.DecodeError that names the element's path and wraps
+// canxml.ErrInvalidShape. A nil receiver is refused rather than
+// dereferenced, on the same terms as [Real.UnmarshalJSON].
+//
+// encoding/json prefers [Real.UnmarshalJSON] over this method for every JSON
+// value, so the JSON surface is unchanged by its presence. Real has no
+// MarshalText: encode writes it as encoding/xml writes a float64.
+func (r *Real) UnmarshalText(text []byte) error {
+	if r == nil {
+		return fmt.Errorf("rm.Real: %w", typereg.ErrNilReceiver)
+	}
+	if len(text) == 0 {
+		*r = 0
+		return nil
+	}
+	s := strings.TrimSpace(string(text))
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		// Unwrapped, so the refusal reads exactly as encoding/xml's own did.
+		return err
+	}
+	if lossy(s, f) {
+		return errLossyLiteral
 	}
 	*r = Real(f)
 	return nil

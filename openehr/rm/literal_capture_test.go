@@ -85,7 +85,7 @@ func TestQuotedLiteralRefusal_REQ052_CarriesTheLiteral(t *testing.T) {
 
 // TestPrimitiveRefusal_REQ052_CarriesTheLiteral pins the other refusals of
 // the SDK's primitive codecs that hand a decode entry point the literal
-// (REQ-052): rm.Real past its 17-digit budget, bare or quoted, and
+// (REQ-052): a lossy rm.Real literal, bare or quoted, and
 // rm.Character for a string that is not exactly one character or a number
 // that names no usable code point. Each carries the JSON text as written
 // while its message stays as it was and it still carries
@@ -105,18 +105,18 @@ func TestPrimitiveRefusal_REQ052_CarriesTheLiteral(t *testing.T) {
 		carried string // "" when the refusal carries no literal
 	}{
 		{
-			name:    "Real past its digit budget, bare",
+			name:    "lossy Real, bare",
 			in:      `0.1234567890123456789`,
 			decode:  decodeReal,
-			message: "rm.Real: literal carries more than 17 significant decimal digits",
+			message: "rm.Real: literal cannot be held in a float64 at its own precision",
 			carried: `0.1234567890123456789`,
 		},
 		{
-			name:    "Real past its digit budget, quoted",
-			in:      `"18446744073709551616"`,
+			name:    "lossy Real, quoted",
+			in:      `"9007199254740993"`,
 			decode:  decodeReal,
-			message: "rm.Real: literal carries more than 17 significant decimal digits",
-			carried: `"18446744073709551616"`,
+			message: "rm.Real: literal cannot be held in a float64 at its own precision",
+			carried: `"9007199254740993"`,
 		},
 		{
 			name:    "Character of two characters, escaped",

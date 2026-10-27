@@ -177,14 +177,14 @@ func TestUnmarshal_REQ052_ValueFreeDecodeErrors(t *testing.T) {
 // TestUnmarshal_REQ052_PrimitiveRefusalsKeepTheLiteralInValue is REQ-052's
 // acceptance line for the SDK's own primitive codecs: decoded with
 // canjson.Unmarshal, and with a canjson.Decoder in every decode mode,
-// Value.Reveal() returns the refused literal, as the document wrote it, for an
-// rm.Real number past its digit budget and for a value rm.Character refuses,
+// Value.Reveal() returns the refused literal, as the document wrote it, for a
+// lossy rm.Real number and for a value rm.Character refuses,
 // two characters or a number naming no usable code point, and nothing for a
 // value of the wrong JSON kind or for
 // a DV_MULTIMEDIA byte field whose string is not valid base64. In every case
 // Error() names the pointer and carries none of the document's values.
 //
-// Can-fail control: return rm.Real's digit-budget refusal, rm.Character's
+// Can-fail control: return rm.Real's lossy-literal refusal, rm.Character's
 // one-character refusal or its code-point refusal without the literal and the
 // matching rows' Value assertions fail.
 func TestUnmarshal_REQ052_PrimitiveRefusalsKeepTheLiteralInValue(t *testing.T) {
@@ -202,7 +202,7 @@ func TestUnmarshal_REQ052_PrimitiveRefusalsKeepTheLiteralInValue(t *testing.T) {
 		value   any      // want Value.Reveal()
 	}{
 		{
-			name:    "Real past its digit budget, a number",
+			name:    "lossy Real, a number",
 			in:      `{"_type":"DV_QUANTITY","magnitude":0.1234567890123456789,"units":"kg"}`,
 			targets: concreteAndSlot(func() any { return new(rm.DVQuantity) }),
 			pointer: "/magnitude",
@@ -210,12 +210,12 @@ func TestUnmarshal_REQ052_PrimitiveRefusalsKeepTheLiteralInValue(t *testing.T) {
 			value:   "0.1234567890123456789",
 		},
 		{
-			name:    "Real past its digit budget, a quoted number",
-			in:      `{"_type":"DV_QUANTITY","magnitude":"18446744073709551616","units":"kg"}`,
+			name:    "lossy Real, a quoted number",
+			in:      `{"_type":"DV_QUANTITY","magnitude":"9007199254740993","units":"kg"}`,
 			targets: concreteAndSlot(func() any { return new(rm.DVQuantity) }),
 			pointer: "/magnitude",
-			absent:  []string{"18446744073709551616", "1844674407"},
-			value:   `"18446744073709551616"`,
+			absent:  []string{"9007199254740993", "9007199254"},
+			value:   `"9007199254740993"`,
 		},
 		{
 			name:    "Character of two characters",
@@ -554,7 +554,7 @@ func TestUnmarshal_REQ052_DecodeErrorKeepsEveryCause(t *testing.T) {
 			path: "/magnitude", value: `"99999999999999999999"`,
 		},
 		{
-			name: "Real past its digit budget", in: `{"_type":"DV_QUANTITY","magnitude":0.1234567890123456789,"units":"kg"}`, target: func() any { return new(rm.DVQuantity) },
+			name: "lossy Real", in: `{"_type":"DV_QUANTITY","magnitude":0.1234567890123456789,"units":"kg"}`, target: func() any { return new(rm.DVQuantity) },
 			is: []error{canjson.ErrInvalidShape}, as: []func(error) bool{isSemantic},
 			path: "/magnitude", value: "0.1234567890123456789",
 		},
@@ -665,10 +665,10 @@ func TestUnmarshal_REQ052_SDKMessagesStayInDecodeErrorText(t *testing.T) {
 		want   []string
 	}{
 		{
-			name:   "Real past its digit budget",
+			name:   "lossy Real",
 			in:     `{"_type":"DV_QUANTITY","magnitude":0.1234567890123456789,"units":"kg"}`,
 			target: func() any { return new(rm.DVQuantity) },
-			want:   []string{"canjson: DV_QUANTITY: ", "rm.Real: literal carries more than 17 significant decimal digits"},
+			want:   []string{"canjson: DV_QUANTITY: ", "rm.Real: literal cannot be held in a float64 at its own precision"},
 		},
 		{
 			name:   "quoted Real literal",
