@@ -696,12 +696,36 @@ func TestNamePredicateHoldsAnyCharacter(t *testing.T) {
 	}
 }
 
+// REQ-121 — an empty quoted name is a name filter like any other: it selects
+// the item whose name is empty, not every item the node id selects. Read ”
+// as "no name given" and both rows answer with every sibling.
+func TestEmptyNamePredicateSelectsTheEmptyName(t *testing.T) {
+	t.Parallel()
+	comp := namedItems("X", "")
+	for _, pred := range []string{"at0004 and name/value=''", "at0004,''", "''"} {
+		p := namedItemsBase + "[" + pred + "]/value"
+		got, err := rmpath.ItemsAtPath(comp, p)
+		if err != nil {
+			t.Errorf("ItemsAtPath(%q) = %v, want the value of the one ELEMENT with an empty name", p, err)
+			continue
+		}
+		if len(got) != 1 {
+			t.Errorf("ItemsAtPath(%q) = %d items, want 1", p, len(got))
+			continue
+		}
+		if dv, ok := got[0].(rm.DVText); !ok || dv.Value != "" {
+			t.Errorf("ItemsAtPath(%q) = %#v, want the empty DV_TEXT of the ELEMENT with an empty name", p, got[0])
+		}
+	}
+}
+
 // REQ-121 — a predicate the path grammar does not have is refused with
 // ErrPathSyntax, not read as a looser filter that selects items the path
 // does not name: a second node id (which AQL reads as a name code), "or", an
-// operator other than "=", two names, and a quoted name that is not closed.
-// Read the second id as the node id, or "!=" as "=", and a row answers with
-// the wrong items.
+// operator other than "=", quoted or not, a comparison with nothing after
+// "=", two names, and a quoted name that is not closed. Read the second id as
+// the node id, "!=" as "=", or an unquoted name/value>X as a node id, and a
+// row answers with the wrong items or none.
 func TestPredicateFormsRefused(t *testing.T) {
 	t.Parallel()
 	comp := namedItems("X", "Y")
@@ -710,6 +734,10 @@ func TestPredicateFormsRefused(t *testing.T) {
 		"at0004 or at0009",
 		"at0004 and name/value!='X'",
 		"at0004 and name/value>'X'",
+		"name/value>X",
+		"at0004<X",
+		"at0004 and name/value<X",
+		"at0004 and name/value=",
 		"at0004 and archetype_node_id='at0004'",
 		"at0004,'X','Y'",
 		"'X' and name/value='Y'",

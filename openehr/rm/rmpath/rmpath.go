@@ -26,7 +26,8 @@ var (
 type segment struct {
 	attr   string
 	nodeID string // archetype_node_id predicate ("" = no filter)
-	name   string // name/value predicate ("" = no filter)
+	name   string // name/value predicate, read only when named is set
+	named  bool   // the predicate names the item, possibly with an empty name
 }
 
 // ItemAtPath returns the single item at a unique path. It returns
@@ -102,7 +103,7 @@ func matchesPredicate(child any, seg segment) bool {
 	if seg.nodeID != "" && nodeIDOf(child) != seg.nodeID {
 		return false
 	}
-	if seg.name != "" && nameValueOf(child) != seg.name {
+	if seg.named && nameValueOf(child) != seg.name {
 		return false
 	}
 	return true
@@ -192,11 +193,12 @@ func parseSegment(raw string) (segment, error) {
 	if attr == "" {
 		return segment{}, fmt.Errorf("%w: predicate without attribute in %q", ErrPathSyntax, raw)
 	}
-	nodeID, name, err := parsePredicate(pred)
+	seg, err := parsePredicate(pred)
 	if err != nil {
 		return segment{}, fmt.Errorf("%w in %q", err, raw)
 	}
-	return segment{attr: attr, nodeID: nodeID, name: name}, nil
+	seg.attr = attr
+	return seg, nil
 }
 
 // parsePredicate interprets the text inside "[...]": a bare
@@ -206,11 +208,15 @@ func parseSegment(raw string) (segment, error) {
 // "and", in any case, outside quoted text, so a name may hold either. A
 // quoted name is read as AQL reads a string: a backslash makes the character
 // after it part of the name, so 'Patient\'s weight' is the name
-// Patient's weight. Any other predicate, such as two node ids, two names,
-// "or", or an operator other than "=", is refused with ErrPathSyntax: read
-// as one of these forms, it would match items it does not select.
-func parsePredicate(s string) (nodeID, name string, err error) {
-	haveID, haveName := false, false
+// Patient's weight, and the empty name ” selects only an item whose name is
+// empty. Any other predicate, such as two node ids, two names, "or", or an
+// operator other than "=", is refused with ErrPathSyntax: read as one of
+// these forms, it would match items it does not select. So is a node id
+// holding a character no at-code or archetype id has, such as the "<" of
+// name/value<'X' written without quotes.
+func parsePredicate(s string) (segment, error) {
+	var seg segment
+	haveID := false
 	rest := strings.TrimSpace(s)
 	for rest != "" {
 		var term string
@@ -219,37 +225,53 @@ func parsePredicate(s string) (nodeID, name string, err error) {
 			continue
 		}
 		if quoted, ok := quotedString(term); ok {
-			if haveName {
-				return "", "", fmt.Errorf("%w: two names in predicate %q", ErrPathSyntax, s)
+			if seg.named {
+				return segment{}, fmt.Errorf("%w: two names in predicate %q", ErrPathSyntax, s)
 			}
-			name, haveName = quoted, true
+			seg.name, seg.named = quoted, true
 			continue
 		}
 		if lhs, rhs, ok := strings.Cut(term, "="); ok {
 			lhs, rhs = strings.TrimSpace(lhs), strings.TrimSpace(rhs)
 			if lhs != "name/value" && lhs != "name" {
-				return "", "", fmt.Errorf("%w: unsupported comparison %q in predicate %q", ErrPathSyntax, term, s)
+				return segment{}, fmt.Errorf("%w: unsupported comparison %q in predicate %q", ErrPathSyntax, term, s)
 			}
-			if haveName {
-				return "", "", fmt.Errorf("%w: two names in predicate %q", ErrPathSyntax, s)
+			if seg.named {
+				return segment{}, fmt.Errorf("%w: two names in predicate %q", ErrPathSyntax, s)
 			}
 			if quoted, ok := quotedString(rhs); ok {
 				rhs = quoted
-			} else if strings.ContainsAny(rhs, "='\" \t") {
-				return "", "", fmt.Errorf("%w: unsupported comparison %q in predicate %q", ErrPathSyntax, term, s)
+			} else if rhs == "" || strings.ContainsAny(rhs, "='\" \t") {
+				return segment{}, fmt.Errorf("%w: unsupported comparison %q in predicate %q", ErrPathSyntax, term, s)
 			}
-			name, haveName = rhs, true
+			seg.name, seg.named = rhs, true
 			continue
 		}
-		if strings.ContainsAny(term, "'\" \t\n") {
-			return "", "", fmt.Errorf("%w: unsupported term %q in predicate %q", ErrPathSyntax, term, s)
+		if !isNodeID(term) {
+			return segment{}, fmt.Errorf("%w: unsupported term %q in predicate %q", ErrPathSyntax, term, s)
 		}
 		if haveID {
-			return "", "", fmt.Errorf("%w: two node ids in predicate %q", ErrPathSyntax, s)
+			return segment{}, fmt.Errorf("%w: two node ids in predicate %q", ErrPathSyntax, s)
 		}
-		nodeID, haveID = term, true
+		seg.nodeID, haveID = term, true
 	}
-	return nodeID, name, nil
+	return seg, nil
+}
+
+// isNodeID reports whether term holds only the characters of an at-code
+// (at0004, at0004.1), an archetype id (openEHR-EHR-OBSERVATION.bmi.v1) or a
+// namespaced one (org.openehr::openEHR-EHR-...): letters, digits, ".", "-",
+// "_" and ":".
+func isNodeID(term string) bool {
+	for i := 0; i < len(term); i++ {
+		switch c := term[i]; {
+		case 'a' <= c && c <= 'z', 'A' <= c && c <= 'Z', '0' <= c && c <= '9':
+		case c == '.' || c == '-' || c == '_' || c == ':':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // nextTerm returns the first term of the predicate text s, trimmed, and the
