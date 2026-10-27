@@ -309,23 +309,26 @@ func optElementOccurring(nodeID string, lower int, attrs ...string) string {
 
 // TestREQ107_IntervalOverAnUnorderedTypeIsRefused is the REQ-107 check of
 // the known gap on generic types: a DV_INTERVAL over a type that is no
-// DV_ORDERED class, here DV_TEXT, cannot be built, and Generate returns an
-// error wrapping rmwrite.ErrUnknownRMType and no root, under every policy
-// and both compile modes.
+// DV_ORDERED class, the concrete DV_TEXT or the abstract DATA_VALUE, which
+// has DV_ORDERED classes among its descendants, cannot be built, and
+// Generate returns an error wrapping rmwrite.ErrUnknownRMType and no root,
+// under every policy and both compile modes.
 func TestREQ107_IntervalOverAnUnorderedTypeIsRefused(t *testing.T) {
-	opt := optTemplate("ELEMENT", optSingle("value", optAbstractInterval("DV_TEXT")))
-	for _, implicit := range []bool{true, false} {
-		c := compileOPTText(t, opt, implicit)
-		for _, policy := range everyPolicy {
-			t.Run(fmt.Sprintf("implicit=%t/%v", implicit, policy), func(t *testing.T) {
-				out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, Now: defaultsNow})
-				if !errors.Is(err, rmwrite.ErrUnknownRMType) {
-					t.Errorf("Generate error = %v, want one wrapping rmwrite.ErrUnknownRMType", err)
-				}
-				if out != nil {
-					t.Errorf("Generate returned %T with the error, want no root", out)
-				}
-			})
+	for _, param := range []string{"DV_TEXT", "DATA_VALUE"} {
+		opt := optTemplate("ELEMENT", optSingle("value", optAbstractInterval(param)))
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, opt, implicit)
+			for _, policy := range everyPolicy {
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v", param, implicit, policy), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, Now: defaultsNow})
+					if !errors.Is(err, rmwrite.ErrUnknownRMType) {
+						t.Errorf("Generate error = %v, want one wrapping rmwrite.ErrUnknownRMType", err)
+					}
+					if out != nil {
+						t.Errorf("Generate returned %T with the error, want no root", out)
+					}
+				})
+			}
 		}
 	}
 }
