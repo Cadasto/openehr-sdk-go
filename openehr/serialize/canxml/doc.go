@@ -63,7 +63,11 @@
 //   - ISO 8601 dates/times/durations are passed through as element
 //     text content; the codec does not parse them.
 //   - Numeric magnitudes use IEEE 754 double-precision (same as
-//     canonical JSON); decode also accepts quoted decimal strings.
+//     canonical JSON). A Real element whose text is a lossy literal,
+//     one the float64 it parses to does not give back at the literal's
+//     own count of significant digits, fails decode as a primitive
+//     failure (see Primitive failures below). Element text is not
+//     quoted: a quoted number is text that does not spell its type.
 //   - Compact XML (no insignificant inter-element whitespace) is the
 //     byte-equality target for round-trip tests. The encoder always
 //     emits compact form; [MarshalIndent] is for human inspection
@@ -220,13 +224,14 @@
 //
 // The text of a primitive element that does not decode as its type, such
 // as a boolean written `maybe`, a whole number written `2.5`, a number out
-// of its type's range, a `TERM_MAPPING.match` that is not one character or
-// a DV_MULTIMEDIA `data` that is not base64, fails the decode in every mode
-// with a [DecodeError] whose Inner wraps [ErrInvalidShape] and the
-// conversion's own error. Its text names the element and carries none of
-// its text. [Unmarshal], and a [Decoder] given [WithUnmatched], [WithStrict]
-// or [WithMissing], return it on its own with the element's path from the
-// root of the value, such as "/ehr_status[1]/is_queryable[1]". Without an
+// of its type's range, a lossy Real, a `TERM_MAPPING.match` that is not one
+// character or a DV_MULTIMEDIA `data` that is not base64, fails the decode
+// in every mode with a [DecodeError] whose Inner wraps [ErrInvalidShape]
+// and the conversion's own error. Its text names the element and carries
+// none of its text. [Unmarshal], and a [Decoder] given [WithUnmatched],
+// [WithStrict] or [WithMissing], return it on its own with the element's
+// path from the root of the value, such as
+// "/ehr_status[1]/is_queryable[1]". Without an
 // option, [Unmarshal] decodes the input a second time to find that path,
 // once the first decode has failed so; a decode that succeeds never pays
 // for it. A [Decoder] given no option cannot read its stream again, so it

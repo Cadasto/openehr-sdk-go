@@ -1,6 +1,7 @@
 package rm
 
 import (
+	"bytes"
 	"encoding"
 	json "encoding/json/v2"
 	"errors"
@@ -104,6 +105,7 @@ func (c *Character) UnmarshalJSON(b []byte) error {
 	if c == nil {
 		return fmt.Errorf("rm.Character: %w", typereg.ErrNilReceiver)
 	}
+	b = bytes.Trim(b, jsonSpace)
 	if len(b) == 0 {
 		return errors.New("rm.Character: empty input")
 	}

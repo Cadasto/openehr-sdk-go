@@ -771,27 +771,82 @@ func TestUnmarshalOverflowIsATypedError(t *testing.T) {
 }
 
 // TestUnmarshalMantissaPrecisionLossIsATypedError pins the half of
-// REQ-052's floating-point clause that used to be open: a magnitude
-// carrying more significant digits than float64 holds (here 19) now
-// fails rather than rounding silently, wrapping canjson.ErrInvalidShape
-// so a caller can classify it with errors.Is alone — closed by
-// PR 145. It replaces the retired TestUnmarshalMantissaPrecisionLossIsSilent,
-// which pinned the gap before it closed. rm.Real's own significant-digit trigger
-// is unit-tested directly in openehr/rm/real_test.go; this only proves
-// DV_QUANTITY.magnitude inherits it through the ordinary struct-field
-// decode path — no per-field path wrapping exists for a scalar Real
-// field today (only polymorphic slots and whole-value `_type` mismatches
-// attach a *typereg.DecodeError), so this test does not assert one.
+// REQ-052's floating-point clause that used to be open: a lossy magnitude,
+// here 19 significant digits the float64 it parses to does not give back,
+// fails rather than rounding silently, wrapping canjson.ErrInvalidShape so
+// a caller can classify it with errors.Is alone. It replaces the retired
+// TestUnmarshalMantissaPrecisionLossIsSilent, which pinned the gap before
+// it closed. rm.Real's own lossy test is unit-tested directly in
+// openehr/rm/real_test.go; this only proves DV_QUANTITY.magnitude inherits
+// it through the ordinary struct-field decode path.
 func TestUnmarshalMantissaPrecisionLossIsATypedError(t *testing.T) {
 	const in = `{"_type":"DV_QUANTITY","magnitude":0.1234567890123456789,"units":"kg"}`
 	var q rm.DVQuantity
 	err := canjson.Unmarshal([]byte(in), &q)
 	if err == nil {
-		t.Fatalf("Unmarshal(%s) = nil; want a precision error (gap closed)", in)
+		t.Fatalf("Unmarshal(%s) = nil; want a lossy-literal refusal (gap closed)", in)
 	}
 	if !errors.Is(err, canjson.ErrInvalidShape) {
 		t.Errorf("err = %v; want errors.Is(err, canjson.ErrInvalidShape)", err)
 	}
+}
+
+// TestUnmarshal_REQ052_LossyRealLiteralAcceptance is the canonical-JSON half
+// of the acceptance in wire.md § Floating-point precision (REQ-052). A lossy
+// DV_QUANTITY magnitude, bare or quoted, is refused wrapping
+// canjson.ErrInvalidShape, with a text that does not carry the literal. A
+// magnitude that is not lossy decodes to the float64 nearest the literal,
+// however many digits it spells. 1e400 keeps its range error.
+//
+// Can-fail control: drop rm.Real's lossy test and the refused rows decode;
+// count digits against a fixed budget instead and 9007199254740993 or 1e-400
+// decodes, or 18446744073709551616 is refused; skip the write-back for every
+// short literal that parsed to a non-zero float64 and the subnormal 1.23e-322
+// decodes.
+func TestUnmarshal_REQ052_LossyRealLiteralAcceptance(t *testing.T) {
+	quantity := func(lit string) []byte {
+		return []byte(`{"_type":"DV_QUANTITY","magnitude":` + lit + `,"units":"kg"}`)
+	}
+	for _, lit := range []string{`9007199254740993`, `1.2345678901234567890`, `1.23e-322`, `1e-400`, `"9007199254740993"`} {
+		t.Run("refused "+lit, func(t *testing.T) {
+			var q rm.DVQuantity
+			err := canjson.Unmarshal(quantity(lit), &q)
+			if err == nil {
+				t.Fatalf("canjson.Unmarshal(magnitude %s) = nil, magnitude %v; want a lossy-literal refusal", lit, q.Magnitude)
+			}
+			if !errors.Is(err, canjson.ErrInvalidShape) {
+				t.Errorf("canjson.Unmarshal(magnitude %s) err = %v; want errors.Is(_, canjson.ErrInvalidShape)", lit, err)
+			}
+			if bare := strings.Trim(lit, `"`); strings.Contains(err.Error(), bare) {
+				t.Errorf("canjson.Unmarshal(magnitude %s) err = %q; it carries the literal", lit, err)
+			}
+		})
+	}
+	for _, lit := range []string{`18446744073709551616`, `0.10000000000000001`, `0.1000000000000000055511151231257827`, `1.10`, `72.5`, `5e-324`, `2.2250738585072014e-308`} {
+		t.Run("decodes "+lit, func(t *testing.T) {
+			want, err := strconv.ParseFloat(lit, 64)
+			if err != nil {
+				t.Fatalf("strconv.ParseFloat(%s) = %v", lit, err)
+			}
+			var q rm.DVQuantity
+			if err := canjson.Unmarshal(quantity(lit), &q); err != nil {
+				t.Fatalf("canjson.Unmarshal(magnitude %s) = %v; want it decoded", lit, err)
+			}
+			if float64(q.Magnitude) != want {
+				t.Errorf("canjson.Unmarshal(magnitude %s) magnitude = %v; want the nearest float64, %v", lit, float64(q.Magnitude), want)
+			}
+		})
+	}
+	t.Run("range error 1e400", func(t *testing.T) {
+		var q rm.DVQuantity
+		err := canjson.Unmarshal(quantity(`1e400`), &q)
+		if se, ok := errors.AsType[*jsonv2.SemanticError](err); !ok || se == nil {
+			t.Fatalf("canjson.Unmarshal(magnitude 1e400) err = %v (%T); want a *json.SemanticError reachable with errors.As", err, err)
+		}
+		if strings.Contains(err.Error(), "rm.Real: literal") {
+			t.Errorf("canjson.Unmarshal(magnitude 1e400) err = %q; want the range error, not the lossy-literal refusal", err)
+		}
+	})
 }
 
 // TestUnmarshalMantissaPrecisionLossInheritedByDVProportion is the same
@@ -802,7 +857,7 @@ func TestUnmarshalMantissaPrecisionLossInheritedByDVProportion(t *testing.T) {
 	var p rm.DVProportion
 	err := canjson.Unmarshal([]byte(in), &p)
 	if err == nil {
-		t.Fatalf("Unmarshal(%s) = nil; want a precision error", in)
+		t.Fatalf("Unmarshal(%s) = nil; want a lossy-literal refusal", in)
 	}
 	if !errors.Is(err, canjson.ErrInvalidShape) {
 		t.Errorf("err = %v; want errors.Is(err, canjson.ErrInvalidShape)", err)

@@ -123,13 +123,13 @@ func TestDecodeError_REQ052_TextCarriesNoValue(t *testing.T) {
 		},
 		{
 			name:   "an SDK codec's message",
-			cause:  errors.New("rm.Real: literal carries more than 17 significant decimal digits"),
-			keep:   []string{"decode /a: rm.Real: literal carries more than 17 significant decimal digits"},
+			cause:  errors.New("rm.Real: literal cannot be held in a float64 at its own precision"),
+			keep:   []string{"decode /a: rm.Real: literal cannot be held in a float64 at its own precision"},
 			absent: nil,
 		},
 		{
 			name:   "a message that only begins like an SDK codec's",
-			cause:  errors.New("rm.Real: literal carries more than 17 significant decimal digits: 3.5"),
+			cause:  errors.New("rm.Real: literal cannot be held in a float64 at its own precision: 3.5"),
 			keep:   []string{"cause withheld"},
 			absent: []string{"3.5", "rm.Real"},
 		},

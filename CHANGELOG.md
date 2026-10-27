@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking: `rm.Real` decode refuses a lossy literal, one a float64 cannot hold at its written precision, replacing the 17-digit budget (REQ-052, REQ-056).** Canonical JSON and XML refuse `9007199254740993` and accept `18446744073709551616`.
+
 ## [0.42.0] - 2026-10-27
 
 Forty-second `v0.x` minor: the canonical decoders report the mandatory members a document leaves out and the validators read that report, the RM floor evaluates three more invariants, canonical XML follows the ITS-XML schemas, and auth values print and log without their credentials. **Breaking:** `Validate`, `Validator.Validate` and `ValidateRM` take variadic options, the RM floor and canonical XML refuse inputs they accepted, and `transport` retries PUT and DELETE only under `RetryNonIdempotent`.

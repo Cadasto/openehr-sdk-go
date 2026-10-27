@@ -487,7 +487,7 @@ var (
 		`canxml: invalid XML shape`,
 		`(?:lower|upper)_unbounded is false but the interval gives no (?:lower|upper) bound, which a bound held by value cannot leave out`,
 		`rm\.(?:Integer|Integer64|Real|Character): empty input`,
-		`rm\.Real: literal carries more than [0-9]+ significant decimal digits`,
+		`rm\.Real: literal cannot be held in a float64 at its own precision`,
 		`value is not valid UTF-8`,
 		`must be exactly one character, got [0-9]+`,
 		`rm\.Character: number is not a usable code point`,

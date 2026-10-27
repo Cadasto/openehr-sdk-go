@@ -60,9 +60,10 @@ var (
 	ErrNilArgument = errors.New("typereg: nil argument")
 	// ErrInvalidShape classifies a JSON-level shape failure (valid JSON
 	// that is the wrong shape for the target type) or a hand-written
-	// primitive codec's refusal of a value it will not accept: rm.Real
-	// past its 17-significant-digit budget (a digit count, not a
-	// representability test), rm.Character not exactly one character.
+	// primitive codec's refusal of a value it will not accept in canonical
+	// JSON: a lossy rm.Real literal, one a float64 cannot hold at the
+	// precision it is written to, and an rm.Character not exactly one
+	// character.
 	// It is usually attached by [WrapShapeError] from inside a
 	// generated UnmarshalJSONFrom method; the hand-written codecs attach it
 	// directly through their own message-preserving wrapper. Its message names

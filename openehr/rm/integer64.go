@@ -1,6 +1,7 @@
 package rm
 
 import (
+	"bytes"
 	json "encoding/json/v2"
 	"errors"
 	"fmt"
@@ -51,6 +52,7 @@ func (i *Integer64) UnmarshalJSON(b []byte) error {
 	if i == nil {
 		return fmt.Errorf("rm.Integer64: %w", typereg.ErrNilReceiver)
 	}
+	b = bytes.Trim(b, jsonSpace)
 	if len(b) == 0 {
 		return errors.New("rm.Integer64: empty input")
 	}
