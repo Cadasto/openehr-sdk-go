@@ -2140,11 +2140,13 @@ func (g *generator) stampSlotFill(rmValue any, slot *tcimpl.CompiledNode) bool {
 // number of members already built of each child, or -1 for none. It takes,
 // in OPT order, the first child that has room (hasRoom), needs no content the
 // OPT does not describe and whose identity no earlier sibling with room
-// carries (firstDescribed); else the first child that is not a slot and has
-// room; else the first slot, which always has room. Only where no child has
-// room, which an OPT whose cardinality lower bound exceeds what its
-// children's occurrences allow reaches, does it take the first child, past
-// its occurrences. Where only attr's existence asks for a member
+// carries (firstDescribed); else the first child that is not a slot, has
+// room and is not one the walk refuses (walkRefuses); else the first slot,
+// which always has room; else the first child that is not a slot and has
+// room, which the walk refuses, so Generate returns that error. Only where no
+// child has room, which an OPT whose cardinality lower bound exceeds what
+// its children's occurrences allow reaches, does it take the first child,
+// past its occurrences. Where only attr's existence asks for a member
 // (existenceOnly), it takes the first source alone, or none, so the attribute
 // gets no undescribed member: a list with no member meets its existence. A
 // list the RM makes non-empty once present is not such a list
@@ -2157,13 +2159,23 @@ func (g *generator) topUpSeed(optNode *tcimpl.CompiledNode, attr *tcimpl.Compile
 	if existenceOnly(optNode, attr) {
 		return -1
 	}
+	refused := -1
 	for i, c := range children {
-		if !c.IsSlot() && hasRoom(c, built[i]) {
+		if c.IsSlot() || !hasRoom(c, built[i]) {
+			continue
+		}
+		if !walkRefuses(c) {
 			return i
+		}
+		if refused < 0 {
+			refused = i
 		}
 	}
 	if i := slices.IndexFunc(children, (*tcimpl.CompiledNode).IsSlot); i >= 0 {
 		return i
+	}
+	if refused >= 0 {
+		return refused
 	}
 	// No child has room, and none is a slot; children is not empty here.
 	return 0

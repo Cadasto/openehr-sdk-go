@@ -162,6 +162,17 @@ func TestREQ107_AttributeWithoutWriterIsVisitedOnlyWhereRequired(t *testing.T) {
 			detail: "ELEMENT.feeder_audit at /items[at0001] (required, but the generator has no writer for it)",
 		},
 		{
+			// The cardinality asks for two members, the required at0001 is
+			// full after its own, and the list allows no slot, so the top-up
+			// takes the optional at0002, which the walk refuses, rather than
+			// repeat at0001 past its occurrences.
+			name: "feeder_audit at existence 1..1 of an optional ELEMENT a top-up takes after a full one",
+			opt: optTemplate("CLUSTER", optCardinal("items", 2, -1, optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0001", 1, 1),
+				optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0002", 0, 1,
+					optSingle("feeder_audit", optNode("FEEDER_AUDIT", ""))))),
+			detail: "ELEMENT.feeder_audit at /items[at0002] (required, but the generator has no writer for it)",
+		},
+		{
 			name:   "links over a 1..1 LINK",
 			opt:    optTemplate("CLUSTER", optListWithin("links", 0, 1, optLink(1, 1))),
 			detail: "CLUSTER.links at / (required, but the generator has no writer for it)",

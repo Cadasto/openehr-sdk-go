@@ -149,6 +149,32 @@ func unnamedArchetypeRoot(node *tcimpl.CompiledNode) bool {
 	return !node.IsSlot() && node.ArchetypeID() == "" && rmroots.IsArchetypeRoot(nodeClass(node))
 }
 
+// walkRefuses reports whether the walk refuses a member of node, a template
+// child that is not a slot, for what node itself holds: node is an unnamed
+// archetype root, which makeChild refuses with ErrArchetypeIDMissing, or an
+// attribute of its own is one the generator has no writer for that the walk
+// would visit (visits), which walkNode refuses with
+// ErrConstraintUnsatisfiable. Like needsUndescribed, which holds wherever
+// this does, it reads node's own attributes only. A slot is never refused
+// here: the slot-fill rule decides whether its fill can be built.
+func walkRefuses(node *tcimpl.CompiledNode) bool {
+	if node.IsSlot() {
+		return false
+	}
+	if unnamedArchetypeRoot(node) {
+		return true
+	}
+	if node.PrimitiveConstraint() != nil {
+		return false
+	}
+	for _, attr := range tcimpl.NodeAttributes(node) {
+		if !walkSkips(node, attr) && noWriter(node, attr) && writerNeeded(node, attr) {
+			return true
+		}
+	}
+	return false
+}
+
 // membersUndescribed reports whether every member the walk would build for
 // attr of node is undescribed or needs undescribed content. With no allowed
 // template child, the member is built from the attribute's BMM type, which
