@@ -36,6 +36,10 @@ func (d *DVURI) Query() string { return d.parts().query }
 // receiver and for a reference with no fragment or an empty one.
 func (d *DVURI) FragmentID() string { return d.parts().fragment }
 
+// The four functions above answer "" for a nil *DVURI. A DVEHRURI embeds its
+// DVURI by value, so calling them through a nil *DVEHRURI reads the embedded
+// field and panics like any nil pointer dereference.
+
 // uriParts holds the components of a URI reference that DV_URI exposes. Each
 // is the text as written, with no percent-decoding, so a plain-text URI,
 // which the RM admits, splits as its encoded form would.
