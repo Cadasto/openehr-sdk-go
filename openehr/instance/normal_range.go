@@ -608,7 +608,7 @@ func settleOrdinalNormal(opt *tcimpl.CompiledNode, o *rm.DVOrdinal, end normalEn
 	return normalRule[ordinalKey]{
 		bounds:  bounds,
 		value:   value,
-		compare: ordinalScaleIn("").compare,
+		compare: ordinalScale.compare,
 		steps: normalSteps[ordinalKey]{
 			rebase: func(b ordinalKey) ordinalKey { return withValue(b.value) },
 			near:   func(k ordinalKey, up bool) (ordinalKey, bool) { return fromInteger(integerSteps.near(k.value, up)) },

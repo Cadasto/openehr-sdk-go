@@ -96,7 +96,7 @@ import (
 // for one, falls back to the example value without a signal), so the
 // bounds are then left as they are, and the interval breaks
 // Limits_consistent.
-func orderIntervalBounds(optNode *tcimpl.CompiledNode, rmValue any, lang string) {
+func orderIntervalBounds(optNode *tcimpl.CompiledNode, rmValue any) {
 	shareComparable(optNode, rmValue)
 	switch iv := rmValue.(type) {
 	case *rm.DVInterval[rm.DVCount]:
@@ -112,10 +112,10 @@ func orderIntervalBounds(optNode *tcimpl.CompiledNode, rmValue any, lang string)
 	case *rm.DVInterval[rm.DVProportion]:
 		orderConcrete(&iv.Interval, optNode, proportionScale, proportionKeyOf, setProportionKey)
 	case *rm.DVInterval[rm.DVOrdinal]:
-		orderConcrete(&iv.Interval, optNode, ordinalScaleIn(lang), ordinalKeyOf, setOrdinalKey)
+		orderConcrete(&iv.Interval, optNode, ordinalScale, ordinalKeyOf, setOrdinalKey)
 	case *rm.DVInterval[rm.DVOrdered]:
 		if bothBounded(&iv.Interval) {
-			orderOrderedBounds(optNode, &iv.Interval, lang)
+			orderOrderedBounds(optNode, &iv.Interval)
 		}
 	}
 }
@@ -140,9 +140,8 @@ func orderConcrete[T any, K any](iv *rm.Interval[T], optNode *tcimpl.CompiledNod
 // orderOrderedBounds orders a DV_INTERVAL<DV_ORDERED> whose two bounds are
 // the same comparable type, in value or pointer form. A pointer bound is
 // changed in place and a value bound is replaced, so each keeps its form.
-// A mixed or missing pair is left alone. lang is the language of an
-// ordinal symbol's text.
-func orderOrderedBounds(optNode *tcimpl.CompiledNode, iv *rm.Interval[rm.DVOrdered], lang string) {
+// A mixed or missing pair is left alone.
+func orderOrderedBounds(optNode *tcimpl.CompiledNode, iv *rm.Interval[rm.DVOrdered]) {
 	if orderOrderedAs(iv, optNode, countScale, asCount, countKeyOf, setCountKey, setOrderedCount) {
 		return
 	}
@@ -161,7 +160,7 @@ func orderOrderedBounds(optNode *tcimpl.CompiledNode, iv *rm.Interval[rm.DVOrder
 	if orderOrderedAs(iv, optNode, proportionScale, asProportion, proportionKeyOf, setProportionKey, setOrderedProportion) {
 		return
 	}
-	orderOrderedAs(iv, optNode, ordinalScaleIn(lang), asOrdinal, ordinalKeyOf, setOrdinalKey, setOrderedOrdinal)
+	orderOrderedAs(iv, optNode, ordinalScale, asOrdinal, ordinalKeyOf, setOrdinalKey, setOrderedOrdinal)
 }
 
 // orderOrderedAs orders iv when both bounds are T. It reports whether
@@ -931,23 +930,20 @@ func setOrdinalKey(o *rm.DVOrdinal, k ordinalKey) {
 	o.Symbol = k.symbol
 }
 
-// ordinalScaleIn orders DV_ORDINAL bounds by Value. The OPT constrains a
+// ordinalScale orders DV_ORDINAL bounds by Value. The OPT constrains a
 // DV_ORDINAL bound as one C_DV_ORDINAL on the bound node itself, or on the
 // nodes of its value and symbol attributes where it builds the bound as a
-// C_COMPLEX_OBJECT. lang is the language of the text of a symbol the
-// extreme replacement writes (ordinalEnd).
-func ordinalScaleIn(lang string) scale[ordinalKey] {
-	return scale[ordinalKey]{
-		compare: func(a, b ordinalKey) (int, bool) { return compareOrdered(a.value, b.value), true },
-		fits:    ordinalFits,
-		lowest: func(node *tcimpl.CompiledNode, like ordinalKey) (ordinalKey, bool) {
-			return ordinalEnd(node, like, true, lang)
-		},
-		highest: func(node *tcimpl.CompiledNode, like ordinalKey) (ordinalKey, bool) {
-			return ordinalEnd(node, like, false, lang)
-		},
-		adopt: ordinalAdopt,
-	}
+// C_COMPLEX_OBJECT.
+var ordinalScale = scale[ordinalKey]{
+	compare: func(a, b ordinalKey) (int, bool) { return compareOrdered(a.value, b.value), true },
+	fits:    ordinalFits,
+	lowest: func(node *tcimpl.CompiledNode, like ordinalKey) (ordinalKey, bool) {
+		return ordinalEnd(node, like, true)
+	},
+	highest: func(node *tcimpl.CompiledNode, like ordinalKey) (ordinalKey, bool) {
+		return ordinalEnd(node, like, false)
+	},
+	adopt: ordinalAdopt,
 }
 
 // ordinalFits reports whether k suits a side's bound node. When the node
@@ -982,7 +978,7 @@ func ordinalFits(node *tcimpl.CompiledNode, k ordinalKey) bool {
 // or highest value of the C_INTEGER on its value (integerEndOf) with like's
 // symbol, the side's own, which its constraint on the symbol admitted; there
 // is none where that C_INTEGER has no end.
-func ordinalEnd(node *tcimpl.CompiledNode, like ordinalKey, low bool, lang string) (ordinalKey, bool) {
+func ordinalEnd(node *tcimpl.CompiledNode, like ordinalKey, low bool) (ordinalKey, bool) {
 	c, ok := primitiveOf(node).(constraints.CDvOrdinal)
 	if !ok {
 		n, ok := integerEndOf(bindingChild(node, "value"), low)
@@ -1008,7 +1004,7 @@ func ordinalEnd(node *tcimpl.CompiledNode, like ordinalKey, low bool, lang strin
 		return ordinalKey{}, false
 	}
 	symbol := ordinalSymbolText(best.Symbol)
-	useTermText(node, &symbol, lang)
+	useTermText(node, &symbol)
 	return ordinalKey{value: int64(best.Value), symbol: symbol}, true
 }
 

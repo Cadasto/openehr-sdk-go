@@ -243,7 +243,7 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	if err := g.writeRMNeeded(optNode, rmValue); err != nil {
 		return err
 	}
-	orderIntervalBounds(optNode, rmValue, g.opts.Language)
+	orderIntervalBounds(optNode, rmValue)
 	settleIntervalEndpoints(optNode, rmValue)
 	if err := settleAccuracy(optNode, rmValue); err != nil {
 		return err
@@ -2373,7 +2373,7 @@ func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any
 				CodeString:    ex.CodeString,
 				TerminologyID: rm.TerminologyID{Value: ex.Terminology},
 			}
-			useCodedText(leaf, v, g.opts.Language)
+			useCodedText(leaf, v)
 			return nil
 		default:
 			return fmt.Errorf("DV_CODED_TEXT example value is %T, want CodedTermRef or string", ex)
@@ -2405,7 +2405,7 @@ func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any
 			return err
 		}
 		// The C_DV_ORDINAL lists the symbol's code, not its text.
-		useTermText(leaf, &v.Symbol, g.opts.Language)
+		useTermText(leaf, &v.Symbol)
 		return nil
 	case *rm.DVMultimedia:
 		// A C_INTEGER on size; settleMultimedia replaces it with the
@@ -2889,7 +2889,7 @@ func (g *generator) finishValue(opt *tcimpl.CompiledNode, rmValue any) {
 		// careflow step, a COMPOSITION's category, a PARTY_RELATED's
 		// relationship, a PARTICIPATION's function or mode, a TERM_MAPPING's
 		// purpose, and so on.
-		useCodedText(opt, v, g.opts.Language)
+		useCodedText(opt, v)
 	case *rm.Cluster:
 		// CLUSTER.items is RM-mandatory. ITEM_TREE.items and ITEM_LIST.items
 		// are optional, so they get no member here: the walk gives them one

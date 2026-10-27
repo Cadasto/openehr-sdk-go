@@ -205,14 +205,14 @@ func TestREQ107_EveryGroupTiedAttributeTakesItsGroupRubric(t *testing.T) {
 			node := codedNode(t, key.class, key.attr)
 			for concept := range group.All() {
 				v := coded(concept.Code)
-				useCodedText(node, &v, "en")
+				useCodedText(node, &v)
 				if v.Value != concept.Rubric {
 					t.Errorf("openehr::%s = %q, want its rubric %q in the group %q", concept.Code, v.Value, concept.Rubric, group.Name())
 				}
 			}
 			foreign := foreignCode(t, group)
 			v := coded(foreign)
-			if useCodedText(node, &v, "en"); v.Value != "example" {
+			if useCodedText(node, &v); v.Value != "example" {
 				t.Errorf("openehr::%s, which the group %q does not have, = %q, want the walk's \"example\"", foreign, group.Name(), v.Value)
 			}
 		})
@@ -220,7 +220,7 @@ func TestREQ107_EveryGroupTiedAttributeTakesItsGroupRubric(t *testing.T) {
 	t.Run("ELEMENT.value", func(t *testing.T) {
 		node := codedNode(t, "ELEMENT", "value")
 		v := coded("271")
-		if useCodedText(node, &v, "en"); v.Value != "example" {
+		if useCodedText(node, &v); v.Value != "example" {
 			t.Errorf("ELEMENT value openehr::271 = %q, want the walk's \"example\": the RM ties ELEMENT.value to no group", v.Value)
 		}
 	})

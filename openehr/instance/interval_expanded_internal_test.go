@@ -114,11 +114,11 @@ func TestREQ107_OrdinalBoundBuiltPerAttributeFitsItsConstraint(t *testing.T) {
 	})
 	t.Run("ends keep the side's own symbol", func(t *testing.T) {
 		like := ordinalKey{value: 6, symbol: localCoded("at0002")}
-		got, ok := ordinalEnd(node, like, true, "en")
+		got, ok := ordinalEnd(node, like, true)
 		if want := (ordinalKey{value: 5, symbol: like.symbol}); describeOrdinalKey(got) != describeOrdinalKey(want) || !ok {
 			t.Errorf("ordinalEnd(low) = %s, %t, want %s, true", describeOrdinalKey(got), ok, describeOrdinalKey(want))
 		}
-		if got, ok := ordinalEnd(expandedOrdinalNode(t, intUpToBody(20), "at0001"), like, true, "en"); ok {
+		if got, ok := ordinalEnd(expandedOrdinalNode(t, intUpToBody(20), "at0001"), like, true); ok {
 			t.Errorf("ordinalEnd(low) of a range with no lower end = %s, true, want false", describeOrdinalKey(got))
 		}
 	})
