@@ -4,6 +4,8 @@ import (
 	jsonv1 "encoding/json"
 	"encoding/json/jsontext"
 	json "encoding/json/v2"
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -30,15 +32,16 @@ func TestDecodeSlotInPlaceGate(t *testing.T) {
 	caller := json.JoinUnmarshalers(set.all, json.UnmarshalFromFunc(func(dec *jsontext.Decoder, _ *fakeBox) error { return dec.SkipValue() }))
 	const slot = `{"_type":"DV_TEXT","value":"x"}`
 	cases := []struct {
-		name    string
-		doc     string
-		lead    int // tokens to read before the slot
-		opts    []json.Options
-		handled bool
+		name       string
+		doc        string
+		lead       int  // tokens to read before the slot
+		afterComma bool // read the first element whole, so the slot is the second
+		opts       []json.Options
+		handled    bool
 	}{
 		{name: "buffered identity, after a name", doc: `{"value":` + slot + `}`, lead: 2, opts: []json.Options{set.bufferedOpt}, handled: true},
 		{name: "buffered identity, first array element", doc: `{"items":[` + slot + `]}`, lead: 3, opts: []json.Options{set.bufferedOpt}, handled: true},
-		{name: "buffered identity, after a comma", doc: `{"items":[` + slot + ` , ` + slot + `]}`, lead: 3, opts: []json.Options{set.bufferedOpt}, handled: true},
+		{name: "buffered identity, after a comma", doc: `{"items":[` + slot + ` , ` + slot + `]}`, lead: 3, afterComma: true, opts: []json.Options{set.bufferedOpt}, handled: true},
 		{name: "the aggregate itself", doc: `{"value":` + slot + `}`, lead: 2, opts: []json.Options{json.WithUnmarshalers(set.all)}},
 		{name: "no hooks", doc: `{"value":` + slot + `}`, lead: 2},
 		{name: "a caller's hooks", doc: `{"value":` + slot + `}`, lead: 2, opts: []json.Options{json.WithUnmarshalers(caller)}},
@@ -55,7 +58,7 @@ func TestDecodeSlotInPlaceGate(t *testing.T) {
 					t.Fatalf("ReadToken before the slot of %s: %v", tc.doc, err)
 				}
 			}
-			if tc.name == "buffered identity, after a comma" {
+			if tc.afterComma {
 				if _, err := dec.ReadValue(); err != nil {
 					t.Fatalf("ReadValue of the first element of %s: %v", tc.doc, err)
 				}
@@ -77,6 +80,30 @@ func TestDecodeSlotInPlaceGate(t *testing.T) {
 			}
 			if raw, err := dec.ReadValue(); err != nil || !strings.HasPrefix(tc.doc[before:], ":"+string(raw)) {
 				t.Errorf("ReadValue after the refusal at %s = (%s, %v), want the whole slot", tc.doc, raw, err)
+			}
+		})
+	}
+}
+
+// TestSettleSlotErrorSettlesASharedFailureOnce pins that a failure above a
+// chain that splits into several causes takes the slot's own positions once,
+// as it does above a single cause (REQ-052): the causes share it, and a second
+// settling would take the slot's pointer and offset off it again.
+func TestSettleSlotErrorSettlesASharedFailureOnce(t *testing.T) {
+	cases := []struct {
+		name  string
+		inner error
+	}{
+		{name: "one cause", inner: errors.New("a")},
+		{name: "two causes", inner: errors.Join(errors.New("a"), errors.New("b"))},
+		{name: "two causes by %w", inner: fmt.Errorf("%w: %w", errors.New("a"), errors.New("b"))},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := &json.SemanticError{JSONPointer: "/s/s/x", ByteOffset: 300, Err: tc.inner}
+			settleSlotError(e, "/s", 100)
+			if e.JSONPointer != "/s/x" || e.ByteOffset != 200 {
+				t.Errorf("settleSlotError(%s at (/s/s/x, 300), /s, 100) placed it at (%s, %d), want (/s/x, 200)", tc.name, e.JSONPointer, e.ByteOffset)
 			}
 		})
 	}

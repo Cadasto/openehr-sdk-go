@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -650,7 +649,10 @@ func settleSlotError(err error, prefix string, start int64) {
 }
 
 // settleLinks settles err's chain for [settleSlotError]. above holds the
-// semantic failures already passed on the way down.
+// semantic failures already passed on the way down. Where the chain splits
+// into several causes, those failures sit above every one of them, so the
+// first cause settles them and the others pass them by: settling one twice
+// would take prefix and start off it twice.
 func settleLinks(err error, above []*json.SemanticError, prefix string, start int64) {
 	rebase := func() {
 		for _, e := range above {
@@ -693,8 +695,11 @@ func settleLinks(err error, above []*json.SemanticError, prefix string, start in
 		case interface{ Unwrap() error }:
 			err = u.Unwrap()
 		case interface{ Unwrap() []error }:
-			for _, cause := range u.Unwrap() {
-				settleLinks(cause, slices.Clone(above), prefix, start)
+			for i, cause := range u.Unwrap() {
+				if i > 0 {
+					above = nil
+				}
+				settleLinks(cause, above, prefix, start)
 			}
 			return
 		default:
