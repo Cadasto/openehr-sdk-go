@@ -8,8 +8,8 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 )
 
-// TestREQ052_EmptyListRuleChecksOptionality pins that the empty-list rule
-// turns on whether the attribute is optional, not on its class or name: on a
+// TestREQ052_EmptyListRuleChecksOptionality pins that the REQ-052 empty-list
+// rule turns on whether the attribute is optional, not on its class or name: on a
 // synthetic class, an empty list and an empty byte list an optional attribute
 // holds are dropped, as the encoder leaves them out, and the same two held by
 // mandatory attributes are kept, as the encoder writes them. The class and
