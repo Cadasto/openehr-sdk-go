@@ -11,10 +11,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strings"
 	"sync"
 	"unicode/utf16"
 	"unicode/utf8"
@@ -29,8 +31,10 @@ const redacted = "[redacted]"
 // itself; a CDR can, by echoing the request's Authorization header or a URL
 // with userinfo in its error text, and that text is kept and written.
 //
-// It removes the forms a credential takes on the wire: user:pass and its
-// base64 encoding, which is what a Basic Authorization header carries. Each
+// It removes the forms a credential takes on the wire: user:pass, the same
+// pair percent-encoded as a URL's userinfo (op:p%40ss, its hex digits in
+// upper or lower case), and the pair's base64 encoding, which is what a
+// Basic Authorization header carries. Each
 // is found spelt out, byte for byte, or JSON-escaped, in whole or in part, as
 // a CDR's JSON encoder or the run's own may write it: \/, \", \\, the other
 // short escapes and \uXXXX (a surrogate pair included) each read as the
@@ -43,6 +47,11 @@ const redacted = "[redacted]"
 type redactor struct {
 	secrets []secret // longest first, so one inside another is never left half-replaced
 }
+
+// percentHex matches a percent-encoded octet with upper-case hex digits, the
+// form url.Userinfo writes; RFC 3986 §2.1 lets a server write them in lower
+// case.
+var percentHex = regexp.MustCompile(`%[0-9A-F]{2}`)
 
 // secret is one credential form, as its bytes and as its characters.
 type secret struct {
@@ -57,7 +66,14 @@ func newRedactor(cdrs []cdrTarget) redactor {
 			continue
 		}
 		pair := c.user + ":" + c.pass
-		for _, form := range []string{pair, base64.StdEncoding.EncodeToString([]byte(pair))} {
+		forms := []string{pair, base64.StdEncoding.EncodeToString([]byte(pair))}
+		if ui := url.UserPassword(c.user, c.pass).String(); ui != pair {
+			forms = append(forms, ui)
+			if lower := percentHex.ReplaceAllStringFunc(ui, strings.ToLower); lower != ui {
+				forms = append(forms, lower)
+			}
+		}
+		for _, form := range forms {
 			r.secrets = append(r.secrets, secret{raw: []byte(form), runes: []rune(form)})
 		}
 	}

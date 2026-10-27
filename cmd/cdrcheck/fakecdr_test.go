@@ -53,7 +53,8 @@ type fakeCDR struct {
 	// the fake holds, in place of a 409; its text says the id exists
 	// already.
 	dupStatus int
-	// example is served for every template the fake holds.
+	// example is served for every template the fake holds, each template_id
+	// in it set to the id asked for.
 	example []byte
 
 	mu          sync.Mutex
@@ -76,6 +77,10 @@ type postedDoc struct {
 const fakeBase = "/openehr/v1"
 
 var fakeTemplateID = regexp.MustCompile(`(?s)<template_id>\s*<value>(.*?)</value>`)
+
+// fakeExampleID matches a template_id's value in a JSON example, up to its
+// closing quote; the first group is all that comes before the value.
+var fakeExampleID = regexp.MustCompile(`("template_id"\s*:\s*\{[^{}]*?"value"\s*:\s*")[^"]*"`)
 
 func newFakeCDR(t *testing.T) *fakeCDR {
 	t.Helper()
@@ -171,7 +176,9 @@ func (f *fakeCDR) serve(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(f.example)
+		_, _ = w.Write(fakeExampleID.ReplaceAllFunc(f.example, func(m []byte) []byte {
+			return slices.Concat(fakeExampleID.FindSubmatch(m)[1], []byte(id+`"`))
+		}))
 	case r.Method == http.MethodGet && strings.HasPrefix(p, tplRoute+"/"):
 		stored, ok := f.templates[strings.TrimPrefix(p, tplRoute+"/")]
 		if !ok {

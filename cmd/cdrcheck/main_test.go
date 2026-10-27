@@ -942,6 +942,68 @@ func TestRun_SupersededUploadsKeptAndUncounted_REQ082(t *testing.T) {
 	}
 }
 
+func TestRun_ExamplesOfARenamedTemplateNameTheNewID_REQ082(t *testing.T) {
+	t.Parallel()
+	opt, err := os.ReadFile(vendoredOPT())
+	if err != nil {
+		t.Fatal(err)
+	}
+	eb, fe := newFakeCDR(t), newFakeCDR(t)
+	// FerroEHR holds other content, so the run goes on under the new id. A
+	// fake's example names the template it was asked for.
+	fe.templates[testTemplate] = bytes.Replace(opt, []byte("<concept>Minimal evaluation</concept>"), []byte("<concept>Another template</concept>"), 1)
+	eb.example, fe.example = vendoredExample(t), vendoredExample(t)
+	e := env{
+		envTemplates:            templateDir(t, nil, vendoredOPT()),
+		"OPENEHR_LIVE_EHRBASE":  eb.url(),
+		"OPENEHR_LIVE_FERROEHR": fe.url(),
+		envAllowMutating:        "1",
+	}
+	_, _, out, err := runFor(t, e)
+	if err != nil {
+		t.Fatalf("run = %v", err)
+	}
+	newID := testTemplate + renameSuffix
+	fetched := map[string]int{}
+	for _, x := range readJSONL[exampleRecord](t, out, "examples.jsonl") {
+		if x.File == "" {
+			continue
+		}
+		fetched[x.CDR]++
+		raw, err := os.ReadFile(filepath.Join(out, x.File))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var doc struct {
+			ArchetypeDetails struct {
+				TemplateID struct {
+					Value string `json:"value"`
+				} `json:"template_id"`
+			} `json:"archetype_details"`
+		}
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			t.Fatalf("%s: %v", x.File, err)
+		}
+		if got := doc.ArchetypeDetails.TemplateID.Value; x.TemplateID != newID || got != newID {
+			t.Errorf("%s's example %s is recorded under %s and names %s, want both %s", x.CDR, x.File, x.TemplateID, got, newID)
+		}
+	}
+	for _, cdr := range []string{"ehrbase", "ferroehr"} {
+		if fetched[cdr] == 0 {
+			t.Errorf("%s: no example fetched, want its examples of %s", cdr, newID)
+		}
+	}
+	// Each CDR gets the SDK's documents and every CDR's examples, crossed;
+	// none names the original id.
+	for name, f := range map[string]*fakeCDR{"ehrbase": eb, "ferroehr": fe} {
+		for _, p := range f.state().posted {
+			if bytes.Contains(p.body, []byte(`"`+testTemplate+`"`)) {
+				t.Errorf("%s got a composition of %s, want every composition under %s", name, testTemplate, newID)
+			}
+		}
+	}
+}
+
 func TestRun_OtherContentUnderTheNewIDLeavesThatCDROut_REQ082(t *testing.T) {
 	t.Parallel()
 	opt, err := os.ReadFile(vendoredOPT())

@@ -41,12 +41,12 @@ var attributeGroups = func() map[classAttribute]*terminology.Group {
 // it (useTermText). A code the group has no rubric for, a code of an
 // attribute the RM ties to no group, and a code the archetype defines no
 // term for keep the text the walk wrote. A nil node leaves v alone.
-func useCodedText(node *tcimpl.CompiledNode, v *rm.DVCodedText, lang string) {
+func useCodedText(node *tcimpl.CompiledNode, v *rm.DVCodedText) {
 	if node == nil {
 		return
 	}
 	if v.DefiningCode.TerminologyID.Value != terminology.ID {
-		useTermText(node, v, lang)
+		useTermText(node, v)
 		return
 	}
 	group := nodeGroup(node)
@@ -80,9 +80,9 @@ func nodeGroup(node *tcimpl.CompiledNode) *terminology.Group {
 // useTermText sets the text of v, a coded text the walk built under node,
 // to the text of the term that node's own archetype, its nearest enclosing
 // archetype root, defines for its code (termText), where node admits that
-// text (takeText). lang is the language asked for: an OPT carries one
-// document language, whose term a language it has no translation for gets
-// too, so the term is the same in every lang. A code its own archetype
+// text (takeText). The text is the same whatever Options.Language asks for:
+// an OPT carries one document language, whose term a language it has no
+// translation for gets too. A code its own archetype
 // defines no term for keeps its text, even where an enclosing archetype
 // defines the same code, since that term names another concept; so does
 // an openehr code, whose text is its rubric. A locatable's name whose
@@ -90,11 +90,10 @@ func nodeGroup(node *tcimpl.CompiledNode) *terminology.Group {
 // (useListedCode). For an ordinal's symbol node is the C_DV_ORDINAL, which
 // constrains the symbol's code and not its text. A nil node leaves v
 // alone.
-func useTermText(node *tcimpl.CompiledNode, v *rm.DVCodedText, lang string) {
+func useTermText(node *tcimpl.CompiledNode, v *rm.DVCodedText) {
 	if node == nil {
 		return
 	}
-	_ = lang // one document language per OPT; see above.
 	text, ok := termText(node, v.DefiningCode)
 	if !ok {
 		return

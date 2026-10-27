@@ -44,7 +44,7 @@ func TestREQ107_OrdinalOrderKeepsEachSidesPairs(t *testing.T) {
 	}
 	iv := &rm.DVInterval[rm.DVOrdinal]{}
 	iv.Lower, iv.Upper = ord(2, "C"), ord(1, "B")
-	orderIntervalBounds(node, iv, "en")
+	orderIntervalBounds(node, iv)
 
 	lowerNode, upperNode := boundNodes(node)
 	for side, b := range map[string]struct {

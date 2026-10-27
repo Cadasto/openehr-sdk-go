@@ -117,7 +117,7 @@ func TestOrderIntervalBoundsCount(t *testing.T) {
 			iv := &rm.DVInterval[rm.DVCount]{}
 			iv.Lower.Magnitude, iv.Upper.Magnitude = rm.Integer64(tc.bounds[0]), rm.Integer64(tc.bounds[1])
 			iv.LowerUnbounded = tc.lowerOpen
-			orderIntervalBounds(node, iv, "en")
+			orderIntervalBounds(node, iv)
 			if got := [2]int64{int64(iv.Lower.Magnitude), int64(iv.Upper.Magnitude)}; got != tc.want {
 				t.Errorf("orderIntervalBounds(%v) = %v, want %v", tc.bounds, got, tc.want)
 			}
@@ -204,7 +204,7 @@ func TestOrderIntervalBoundsQuantity(t *testing.T) {
 			setQuantityKey(&iv.Lower, tc.bounds[0])
 			setQuantityKey(&iv.Upper, tc.bounds[1])
 			iv.LowerUnbounded = tc.lowerOpen
-			orderIntervalBounds(node, iv, "en")
+			orderIntervalBounds(node, iv)
 			if got := [2]quantityKey{quantityKeyOf(iv.Lower), quantityKeyOf(iv.Upper)}; got != tc.want {
 				t.Errorf("orderIntervalBounds(%v) = %v, want %v", tc.bounds, got, tc.want)
 			}
@@ -304,7 +304,7 @@ func TestOrderIntervalBoundsOrdered(t *testing.T) {
 			iv := &rm.DVInterval[rm.DVOrdered]{}
 			iv.Lower, iv.Upper = tc.lower, tc.upper
 			iv.LowerUnbounded = tc.lowerOpen
-			orderIntervalBounds(tc.node, iv, "en")
+			orderIntervalBounds(tc.node, iv)
 			if got := [2]string{describeBound(iv.Lower), describeBound(iv.Upper)}; got != tc.want {
 				t.Errorf("orderIntervalBounds = %q, want %q", got, tc.want)
 			}
@@ -373,7 +373,7 @@ func TestOrderIntervalBoundsTemporal(t *testing.T) {
 		lower, upper := &rm.DVDate{Value: "2020-06-01"}, &rm.DVDate{Value: "2020-01-01"}
 		iv := &rm.DVInterval[rm.DVOrdered]{}
 		iv.Lower, iv.Upper = lower, upper
-		orderIntervalBounds(nil, iv, "en")
+		orderIntervalBounds(nil, iv)
 		if lower.Value != "2020-01-01" || upper.Value != "2020-06-01" {
 			t.Errorf("pointer dates after ordering = (%q, %q), want (%q, %q)", lower.Value, upper.Value, "2020-01-01", "2020-06-01")
 		}
@@ -382,7 +382,7 @@ func TestOrderIntervalBoundsTemporal(t *testing.T) {
 		iv := &rm.DVInterval[rm.DVOrdered]{}
 		iv.Lower = rm.DVDateTime{Value: "2020-06-01T00:00:00Z"}
 		iv.Upper = rm.DVDateTime{Value: "2020-01-01T00:00:00Z"}
-		orderIntervalBounds(nil, iv, "en")
+		orderIntervalBounds(nil, iv)
 		if got := [2]string{orderedString(iv.Lower), orderedString(iv.Upper)}; got != [2]string{"2020-01-01T00:00:00Z", "2020-06-01T00:00:00Z"} {
 			t.Errorf("orderIntervalBounds = %q, want swapped date-times", got)
 		}
@@ -401,7 +401,7 @@ func orderDates(lo, hi string, open bool) (string, string) {
 	iv := &rm.DVInterval[rm.DVDate]{}
 	iv.Lower.Value, iv.Upper.Value = lo, hi
 	iv.LowerUnbounded = open
-	orderIntervalBounds(nil, iv, "en")
+	orderIntervalBounds(nil, iv)
 	return iv.Lower.Value, iv.Upper.Value
 }
 
@@ -409,7 +409,7 @@ func orderTimes(lo, hi string, open bool) (string, string) {
 	iv := &rm.DVInterval[rm.DVTime]{}
 	iv.Lower.Value, iv.Upper.Value = lo, hi
 	iv.LowerUnbounded = open
-	orderIntervalBounds(nil, iv, "en")
+	orderIntervalBounds(nil, iv)
 	return iv.Lower.Value, iv.Upper.Value
 }
 
@@ -417,7 +417,7 @@ func orderDateTimes(lo, hi string, open bool) (string, string) {
 	iv := &rm.DVInterval[rm.DVDateTime]{}
 	iv.Lower.Value, iv.Upper.Value = lo, hi
 	iv.LowerUnbounded = open
-	orderIntervalBounds(nil, iv, "en")
+	orderIntervalBounds(nil, iv)
 	return iv.Lower.Value, iv.Upper.Value
 }
 
@@ -529,7 +529,7 @@ func TestOrderIntervalBoundsProportion(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			iv := &rm.DVInterval[rm.DVProportion]{}
 			iv.Lower, iv.Upper = tc.bounds[0], tc.bounds[1]
-			orderIntervalBounds(tc.node, iv, "en")
+			orderIntervalBounds(tc.node, iv)
 			if got, want := [2][3]float64{proportionParts(iv.Lower), proportionParts(iv.Upper)}, [2][3]float64{proportionParts(tc.want[0]), proportionParts(tc.want[1])}; got != want {
 				t.Errorf("orderIntervalBounds(%v) = %v, want %v", tc.bounds, got, want)
 			}
@@ -540,7 +540,7 @@ func TestOrderIntervalBoundsProportion(t *testing.T) {
 		upper := &rm.DVProportion{Numerator: 1, Denominator: 4}
 		iv := &rm.DVInterval[rm.DVOrdered]{}
 		iv.Lower, iv.Upper = lower, upper
-		orderIntervalBounds(nil, iv, "en")
+		orderIntervalBounds(nil, iv)
 		if lower.Denominator != 4 || upper.Denominator != 2 {
 			t.Errorf("pointer proportions after ordering = (%v, %v), want denominators 4 and 2", lower.Denominator, upper.Denominator)
 		}
@@ -603,7 +603,7 @@ func TestOrderIntervalBoundsOrdinal(t *testing.T) {
 			iv := &rm.DVInterval[rm.DVOrdinal]{}
 			iv.Lower, iv.Upper = tc.bounds[0], tc.bounds[1]
 			iv.LowerUnbounded = tc.lowerOpen
-			orderIntervalBounds(tc.node, iv, "en")
+			orderIntervalBounds(tc.node, iv)
 			if got, want := [2][2]string{ordinalParts(iv.Lower), ordinalParts(iv.Upper)}, [2][2]string{ordinalParts(tc.want[0]), ordinalParts(tc.want[1])}; got != want {
 				t.Errorf("orderIntervalBounds = %q, want %q", got, want)
 			}
@@ -613,7 +613,7 @@ func TestOrderIntervalBoundsOrdinal(t *testing.T) {
 		lower, upper := &rm.DVOrdinal{Value: 3}, &rm.DVOrdinal{Value: 1}
 		iv := &rm.DVInterval[rm.DVOrdered]{}
 		iv.Lower, iv.Upper = lower, upper
-		orderIntervalBounds(nil, iv, "en")
+		orderIntervalBounds(nil, iv)
 		if lower.Value != 1 || upper.Value != 3 {
 			t.Errorf("pointer ordinals after ordering = (%d, %d), want (1, 3)", lower.Value, upper.Value)
 		}
