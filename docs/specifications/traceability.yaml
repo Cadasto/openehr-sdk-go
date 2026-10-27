@@ -148,12 +148,17 @@ requirements:
     canonical: docs/specifications/idiom.md#errors-req-025
     status: draft
     implementation: landed
-    packages: [transport, auth, smart/discovery, openehr/client/ehr, openehr/client/ehr/contribution, openehr/client/system, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain, openehr/client/query, openehr/rm/typereg, openehr/rm, openehr/aom/aom14, internal/bmmgen]
+    packages: [transport, auth, auth/basic, auth/clientcreds, auth/jwtbearer, auth/smart, smart, smart/discovery, openehr/client/ehr, openehr/client/ehr/contribution, openehr/client/system, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain, openehr/client/query, openehr/rm/typereg, openehr/rm, openehr/aom/aom14, openehr/template/constraints, internal/bmmgen]
     tests:
+      - auth/basic/print_test.go
+      - auth/clientcreds/print_test.go
       - auth/clientcreds/shared_exchange_test.go
+      - auth/jwtbearer/print_test.go
       - auth/jwtbearer/shared_exchange_test.go
       - auth/nilautherror_test.go
+      - auth/smart/print_test.go
       - auth/smart/shared_refresh_test.go
+      - auth/tokensource_test.go
       - cadasto/admin/probes_test.go
       - internal/option_guard_test.go
       - openehr/aql/contain/nilrelation_test.go
@@ -186,14 +191,17 @@ requirements:
       - openehr/serialize/simplified/context_test.go
       - openehr/serialize/simplified/mediatype_fuzz_test.go
       - openehr/serialize/simplified/mediatype_test.go
+      - openehr/template/constraints/redacted_test.go
       - openehr/terminology/property_units_test.go
       - openehr/terminology/terminology_test.go
       - sandbox/nilhandler_test.go
+      - smart/discovery/catalog_print_test.go
       - smart/discovery/memory_cache_test.go
       - smart/discovery/new_resolver_test.go
       - smart/discovery/nildiscoveryerror_test.go
       - smart/discovery/plaintext_document_test.go
       - smart/log_value_test.go
+      - smart/print_test.go
       - testkit/probe/run_test.go
       - testkit/probes/aql/probe_097_semantic_lint.go
       - testkit/probes/aql/probes_test.go
@@ -713,7 +721,7 @@ requirements:
     canonical: docs/specifications/auth.md#req-060
     status: draft
     implementation: landed
-    packages: [auth, auth/basic, auth/clientcreds, auth/jwtbearer, auth/smart, smart, internal/noredirect, transport]
+    packages: [auth, auth/basic, auth/clientcreds, auth/jwtbearer, auth/smart, smart, smart/discovery, internal/noredirect, transport]
     tests:
       - auth/basic/print_test.go
       - auth/clientcreds/print_test.go
@@ -729,9 +737,12 @@ requirements:
       - auth/token_print_test.go
       - auth/tokensource_test.go
       - internal/noredirect/noredirect_test.go
+      - smart/discovery/catalog_print_test.go
       - smart/print_test.go
+      - transport/client_print_test.go
       - transport/client_test.go
       - transport/diagnostics_internal_test.go
+      - transport/token_source_print_test.go
 
   - id: REQ-061
     title: SMART-on-openEHR PKCE
