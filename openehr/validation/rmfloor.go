@@ -76,28 +76,39 @@ import (
 // lists the path of each of the two, and the [Limits] of a [Validator] set
 // both.
 //
+// A member held by value, a number, a boolean or a value struct such as an
+// EHR_STATUS subject or an ARCHETYPED archetype_id, holds its zero value
+// whether the document left it out or gave that value, so the value alone
+// cannot say it is missing. A caller that decoded root with a codec's report
+// of missing members passes it as [WithMissing], and each member the report
+// names is read as absent: an omitted magnitude, subject or rm_version is
+// then `required` at its path. Without the option, such a member reads as
+// present. [ValidateJSON] and [ValidateXML] decode a document and validate
+// it with its report in one call.
+//
 // ValidateRM returns what a [Validator] built with no options returns from
-// Validate(root, nil).
+// Validate(root, nil, opts...).
 //
 // A nil root surfaces a single `nil_root` issue with an empty path and is
 // reported as not-OK. An unknown RM root type (a Go value outside the
 // closed RM set) surfaces `rm_type_unknown` at "/"; the walk cannot descend
 // further but does not panic.
-func ValidateRM(root any) Result {
+func ValidateRM(root any, opts ...ValidateOption) Result {
 	var v Validator
-	return v.Validate(root, nil)
+	return v.Validate(root, nil, opts...)
 }
 
 // rmRootGuard returns the RM type of root, the type the RM rules alone read
 // it as, with ok set. For a nil root, and for one outside the closed RM set,
 // it returns instead the result those rules report for it, a single
-// `nil_root` or `rm_type_unknown` issue, with ok unset.
-func rmRootGuard(root any) (rmType string, guard Result, ok bool) {
+// `nil_root` or `rm_type_unknown` issue whose detail names the entry, with
+// ok unset.
+func rmRootGuard(entry string, root any) (rmType string, guard Result, ok bool) {
 	if root == nil || rmaccess.IsTypedNilPointer(root) {
 		return "", resultFromIssues([]Issue{{
 			Path:     "",
 			Code:     "nil_root",
-			Detail:   "ValidateRM: root is nil",
+			Detail:   entry + ": root is nil",
 			Severity: Error,
 		}}), false
 	}
@@ -106,7 +117,7 @@ func rmRootGuard(root any) (rmType string, guard Result, ok bool) {
 		return "", resultFromIssues([]Issue{{
 			Path:     "/",
 			Code:     "rm_type_unknown",
-			Detail:   fmt.Sprintf("ValidateRM: root Go type %T is outside the closed RM set; cannot descend", root),
+			Detail:   fmt.Sprintf("%s: root Go type %T is outside the closed RM set; cannot descend", entry, root),
 			Severity: Error,
 		}}), false
 	}
@@ -127,14 +138,15 @@ func ValidateRMFolder(folder *rm.Folder) Result {
 // Delegates to [ValidateRM]; a nil status surfaces `nil_ehr_status`, with an
 // empty path.
 //
-// It cannot flag an omitted value-typed mandatory `subject` (typed
-// rm.PartySelf, whose zero value is indistinguishable from an absent one):
-// use [ValidateRMEHRStatusBytes], which decides subject presence from the
-// source JSON key set. The same holds for the root's archetype_details: an
-// omitted `rm_version` decodes to an empty one, so this entry reports it as
-// `rm_version_valid` where [ValidateRMEHRStatusBytes] reports `required`,
-// and an omitted `archetype_id` is reported only at `archetype_id/value`,
-// without the Bytes entry's `required` at `archetype_id`.
+// It reads the status as the Go value holds it, so it cannot flag an
+// omitted `subject` (typed rm.PartySelf, whose zero value is the valid bare
+// PARTY_SELF), and it reads an ARCHETYPED's omitted `rm_version` as an empty
+// one, `rm_version_valid`, and an omitted `archetype_id` as one with an empty
+// value, `required` at `archetype_id/value`. A caller that decodes the status
+// validates it with [ValidateJSON] or [ValidateXML], or passes the codec's
+// report to [ValidateRM] with [WithMissing]: an omitted subject is then
+// `required` at `/subject`, an omitted rm_version `required` at its path,
+// and an omitted archetype_id `required` at `archetype_id` alone.
 func ValidateRMEHRStatus(status *rm.EHRStatus) Result {
 	if status == nil {
 		return resultFromIssues([]Issue{{Path: "", Code: "nil_ehr_status", Detail: "ValidateRMEHRStatus: status is nil", Severity: Error}})
@@ -204,17 +216,6 @@ func childRole(class string, role floorRole, attr string) floorRole {
 		return roleArchetypedID
 	}
 	return roleNone
-}
-
-// isWalkCondition reports whether code is a walk condition: max_depth,
-// max_nodes or cyclic_value, an issue that says where the walk stopped or
-// turned back rather than judge the value there.
-func isWalkCondition(code string) bool {
-	switch code {
-	case "max_depth", "max_nodes", "cyclic_value":
-		return true
-	}
-	return false
 }
 
 // emit appends i to the issues found. Every issue of an RM rule is an

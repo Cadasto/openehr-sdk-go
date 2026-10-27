@@ -49,8 +49,9 @@ import (
 //
 // Validate behaves as a [Validator] built with no options, apart from a nil
 // compiled template: Validate reports it, where [Validator.Validate] applies
-// the Reference Model rules alone.
-func Validate(root any, c *templatecompile.Compiled) Result {
+// the Reference Model rules alone. opts are those of [Validator.Validate],
+// such as [WithMissing].
+func Validate(root any, c *templatecompile.Compiled, opts ...ValidateOption) Result {
 	if root == nil || rmaccess.IsTypedNilPointer(root) {
 		return nilRootResult()
 	}
@@ -63,7 +64,7 @@ func Validate(root any, c *templatecompile.Compiled) Result {
 		}})
 	}
 	var v Validator
-	return v.Validate(root, c)
+	return v.Validate(root, c, opts...)
 }
 
 // nilRootResult is the guard a template-driven validation returns for a nil

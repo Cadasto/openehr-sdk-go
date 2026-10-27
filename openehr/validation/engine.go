@@ -15,6 +15,7 @@ package validation
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
@@ -30,7 +31,8 @@ import (
 
 // runEngine validates root in one walk, with the compiled template c when it
 // is not nil, within lim, each zero or negative field of which stands for its
-// default.
+// default, and with what opts give the call: the members a decode reported
+// the document leaves out ([WithMissing]).
 //
 // With a nil c the walk applies the Reference Model rules alone, every
 // attribute unconstrained, under the guards [ValidateRM] describes: a nil
@@ -46,21 +48,22 @@ import (
 // does not constrain is walked with the Reference Model rules alone. A root outside the closed RM set is checked
 // against the template's root node and then reported as `rm_type_unknown`
 // at "/", as [Validate] reports it.
-func runEngine(root any, c *templatecompile.Compiled, lim Limits) Result {
-	r, _ := engineWalk(root, c, lim)
+func runEngine(root any, c *templatecompile.Compiled, lim Limits, opts ...ValidateOption) Result {
+	r, _ := engineWalk(root, c, lim, opts...)
 	return r
 }
 
 // engineWalk runs the walk [runEngine] describes and returns its result with
 // the engine's final state, or a nil engine when a guard refused the call.
-func engineWalk(root any, c *templatecompile.Compiled, lim Limits) (Result, *engine) {
+func engineWalk(root any, c *templatecompile.Compiled, lim Limits, opts ...ValidateOption) (Result, *engine) {
+	missing := newCallConfig(opts).missing
 	if c == nil {
-		rmType, guard, ok := rmRootGuard(root)
+		rmType, guard, ok := rmRootGuard("ValidateRM", root)
 		if !ok {
 			return guard, nil
 		}
 		e := newEngine(lim)
-		e.walk(engineNode{value: root, rmType: rmType})
+		e.walk(engineNode{value: root, rmType: rmType, missing: missing})
 		return e.result(), e
 	}
 	if root == nil || rmaccess.IsTypedNilPointer(root) {
@@ -76,7 +79,7 @@ func engineWalk(root any, c *templatecompile.Compiled, lim Limits) (Result, *eng
 	}
 	e := newEngine(lim)
 	rmType, _, known := rmTypeInfo(root)
-	e.walk(engineNode{value: root, rmType: rmType, bound: c.Root()})
+	e.walk(engineNode{value: root, rmType: rmType, bound: c.Root(), missing: missing})
 	if !known {
 		e.found.emit(Issue{
 			Path:     "/",
@@ -121,6 +124,16 @@ type engine struct {
 	// not enter; an item bound to a child the template does not allow is
 	// reported by that child's occurrences.
 	refused []string
+	// absent holds, in walk order, the path of each attribute a decode's
+	// report names ([WithMissing]) that the walk read as absent and reported
+	// as a missing mandatory attribute. A node's rules may read below the
+	// node, so the findings of the rules of the node the attribute is on,
+	// and of every node above it, at or below such a path are withdrawn once
+	// that node's attributes are visited, as a finding inside refused content
+	// is: the absence is the one report for the member
+	// ([engine.withdrawInside]). Nil until one is met, so a call with no
+	// report records none.
+	absent []string
 	// ancestry holds the values with an identity ([hasIdentity]) the walk is
 	// inside, outermost first: the one record a cycle is detected against.
 	ancestry []any
@@ -197,6 +210,12 @@ type engineNode struct {
 	// template does not reach, and so on every node of a walk with no
 	// template.
 	bound *tcimpl.CompiledNode
+	// missing is the node of the call's report of missing members
+	// ([WithMissing]) that stands for this node, nil where the report names
+	// nothing at or below it, and so on every node of a call with no report.
+	// An attribute's node is the child by the attribute's name, a list
+	// item's the child by its position, a Hash entry's the child by its key.
+	missing *missingNode
 }
 
 // engineAttr is one attribute the walk visits at a node.
@@ -261,8 +280,17 @@ type attrReading struct {
 	// items holds the items of a list or the entries of a Hash, in key
 	// order; nil for a counted list and a single-valued attribute.
 	items []any
+	// keys holds the keys of the entries of a Hash, in the order of items,
+	// as the generated access returns them beside the entries; nil for every
+	// other shape.
+	keys []string
 	// value is the value of a present single-valued attribute.
 	value any
+	// missing is the node of the call's report of missing members that
+	// stands for the attribute ([engineNode].missing): what the report names
+	// below the attribute, nil where it names nothing there. It is set by
+	// the walk, not read from the value.
+	missing *missingNode
 }
 
 // readAttribute reads the attribute a of value, by its shape.
@@ -275,8 +303,8 @@ func readAttribute(value any, a *engineAttr) attrReading {
 		n, present := rmaccess.Len(value, a.name)
 		return attrReading{present: present, count: n}
 	case shapeHash:
-		_, entries, present := rmaccess.Hash(value, a.name)
-		return attrReading{present: present, count: len(entries), items: entries}
+		keys, entries, present := rmaccess.Hash(value, a.name)
+		return attrReading{present: present, count: len(entries), items: entries, keys: keys}
 	case shapeSingle:
 		v, present := rmaccess.Single(value, a.name)
 		if present && v != nil && !rmaccess.IsTypedNilPointer(v) {
@@ -284,6 +312,20 @@ func readAttribute(value any, a *engineAttr) attrReading {
 		}
 	}
 	return attrReading{}
+}
+
+// itemMissing returns the node of the call's report that stands for the item
+// at index i of the items of r: an entry of a Hash by its key, an item of a
+// list by its position. Nil, at no cost, where the report names nothing
+// below the attribute.
+func (r *attrReading) itemMissing(i int) *missingNode {
+	if r.missing == nil {
+		return nil
+	}
+	if r.keys != nil {
+		return r.missing.child(r.keys[i])
+	}
+	return r.missing.child(strconv.Itoa(i))
 }
 
 // visitedAt reports whether the walk visits a at node n, which it reads as
@@ -425,6 +467,14 @@ func primitiveLeaf(value any, a *engineAttr) bool {
 // A value constraint that leaves an empty part of the value to the RM rules
 // is settled once the attributes are visited too ([engine.settle]); its
 // findings are at the node's own path, never at or below refused content.
+//
+// An attribute a decode's report names ([WithMissing]) is read as absent
+// where the walk visits it ([engine.visitAttribute]), and its absence is
+// then the one report for the member: a finding of the node's rules, or of
+// the rules of a node above it, at or below the attribute's path, read from
+// the Go value there, is withdrawn once the node's attributes are visited,
+// as a finding inside refused content is ([engine].absent). A finding of
+// theirs at the node's own path stays.
 func (e *engine) visit(n engineNode) {
 	if !e.spendVisit(n.path, n.rmType) {
 		return
@@ -458,7 +508,7 @@ func (e *engine) visit(n engineNode) {
 		}
 		return
 	}
-	refusedFrom := len(e.refused)
+	refusedFrom, absentFrom := len(e.refused), len(e.absent)
 	e.visitAttributes(n, class, entry)
 	if held != nil {
 		e.settle(held)
@@ -467,28 +517,34 @@ func (e *engine) visit(n engineNode) {
 		rulesTo = e.withdrawGivenWay(n, rulesFrom, rulesTo)
 	}
 	if refusals := e.refused[refusedFrom:]; len(refusals) > 0 && rulesTo > rulesFrom {
-		e.withdrawInside(rulesFrom, rulesTo, refusals)
+		rulesTo = e.withdrawInside(rulesFrom, rulesTo, refusals)
+	}
+	if absent := e.absent[absentFrom:]; len(absent) > 0 && rulesTo > rulesFrom {
+		e.withdrawInside(rulesFrom, rulesTo, absent)
 	}
 }
 
 // withdrawInside removes, from the issues the walk reported at positions
-// from up to to, each one whose path is at or below one of refusals, the
-// paths of content the template refused ([isAtOrBelow]); the issues after
-// to keep their order.
-func (e *engine) withdrawInside(from, to int, refusals []string) {
+// from up to to, each one whose path is at or below one of under, the paths
+// of content the template refused or of an attribute a decode's report named
+// ([isAtOrBelow]), and returns where the issues kept from that range now
+// end; the issues after to keep their order.
+func (e *engine) withdrawInside(from, to int, under []string) int {
 	issues := e.found.issues
 	kept := issues[:from]
 	for _, iss := range issues[from:to] {
-		if !slices.ContainsFunc(refusals, func(r string) bool { return isAtOrBelow(iss.Path, r) }) {
+		if !slices.ContainsFunc(under, func(u string) bool { return isAtOrBelow(iss.Path, u) }) {
 			kept = append(kept, iss)
 		}
 	}
 	if len(kept) == to {
-		return
+		return to
 	}
+	end := len(kept)
 	kept = append(kept, issues[to:]...)
 	clear(issues[len(kept):])
 	e.found.issues = kept
+	return end
 }
 
 // isAtOrBelow reports whether the issue path path is under, or lies below
@@ -872,12 +928,31 @@ func shapeFrom(container, primitiveItems, hash bool) attrShape {
 // ([engine.spendLeafVisit]): walking it would do nothing more. The
 // attribute's path is pushed onto the walk's path stack and written only
 // where something records it ([issuePath]).
+//
+// An attribute the call's report of missing members names ([WithMissing])
+// is read as absent, whatever the value holds there, so it is reported as
+// any absent attribute is and not entered. Where the walk reports it as a
+// missing mandatory attribute, its path is recorded so that no rule of a
+// node above reports at or below it ([engine].absent). Where the attribute
+// is not mandatory on the node, a part of a reference whose own rule reports
+// it or one the node's role lets be blank, that rule reports from the value
+// as before. The report names the item of a list or the entry of a Hash
+// below the attribute by its position or its key ([attrReading.itemMissing]).
 func (e *engine) visitAttribute(n *engineNode, class string, a *engineAttr) {
 	r := readAttribute(n.value, a)
+	reported := false
+	if n.missing != nil {
+		if r.missing = n.missing.child(a.name); r.missing.marked() {
+			r, reported = attrReading{}, true
+		}
+	}
 	if !visitedAt(a, r.present) {
 		return
 	}
 	attrPath := e.path.attribute(n.path, a.name)
+	if reported && a.mandatory {
+		e.absent = append(e.absent, attrPath.String())
+	}
 	if a.decl == nil && primitiveLeaf(r.value, a) {
 		// Walking a primitive leaf would only spend its visit (REQ-171
 		// visit limit). Only a present single value is read into r.value,
@@ -922,7 +997,7 @@ func (e *engine) visitAttribute(n *engineNode, class string, a *engineAttr) {
 func (e *engine) walkUnconstrained(n *engineNode, a *engineAttr, r *attrReading, attrPath issuePath, role floorRole) {
 	switch a.shape {
 	case shapeSingle:
-		e.walk(engineNode{value: r.value, rmType: runtimeRMType(r.value, a.rmType), path: attrPath, role: role, depth: n.depth + 1})
+		e.walk(engineNode{value: r.value, rmType: runtimeRMType(r.value, a.rmType), path: attrPath, role: role, depth: n.depth + 1, missing: r.missing})
 	case shapeList:
 		if !slices.ContainsFunc(r.items, walkedOrNil) {
 			return
@@ -939,12 +1014,12 @@ func (e *engine) walkUnconstrained(n *engineNode, a *engineAttr, r *attrReading,
 				}
 				continue
 			}
-			e.walkItem(n, item, a.rmType, path, role)
+			e.walkItem(n, item, a.rmType, path, role, r.itemMissing(i))
 		}
 		e.preds = e.preds[:from]
 	case shapeHash:
 		for i, entry := range r.items {
-			e.walkItem(n, entry, a.rmType, e.path.item(attrPath, entryPredicate(i)), role)
+			e.walkItem(n, entry, a.rmType, e.path.item(attrPath, entryPredicate(i)), role, r.itemMissing(i))
 		}
 	case shapeCounted:
 		// Nothing is below the items of a list of a primitive type.
@@ -952,14 +1027,15 @@ func (e *engine) walkUnconstrained(n *engineNode, a *engineAttr, r *attrReading,
 }
 
 // walkItem walks item, an item of a list or an entry of a Hash of node n
-// whose declared RM type is rmType, at path, in role, with the RM rules
-// alone, when it is a value of a registered RM class; any other item has
-// nothing below it to walk.
-func (e *engine) walkItem(n *engineNode, item any, rmType string, path issuePath, role floorRole) {
+// whose declared RM type is rmType, at path, in role, with missing the node
+// of the call's report that stands for it, with the RM rules alone, when it
+// is a value of a registered RM class; any other item has nothing below it
+// to walk.
+func (e *engine) walkItem(n *engineNode, item any, rmType string, path issuePath, role floorRole, missing *missingNode) {
 	if !rmaccess.Covers(item) {
 		return
 	}
-	e.walk(engineNode{value: item, rmType: runtimeRMType(item, rmType), path: path, role: role, depth: n.depth + 1})
+	e.walk(engineNode{value: item, rmType: runtimeRMType(item, rmType), path: path, role: role, depth: n.depth + 1, missing: missing})
 }
 
 // walkedOrNil reports whether item, an item of a list no template node
@@ -996,7 +1072,7 @@ func (e *engine) visitDeclaredSingle(n *engineNode, a *engineAttr, r *attrReadin
 	}
 	children := allowedChildren(a.decl)
 	if len(children) == 0 {
-		e.walk(engineNode{value: r.value, rmType: runtimeRMType(r.value, a.rmType), path: attrPath, role: role, depth: n.depth + 1})
+		e.walk(engineNode{value: r.value, rmType: runtimeRMType(r.value, a.rmType), path: attrPath, role: role, depth: n.depth + 1, missing: r.missing})
 		return
 	}
 	var buf [4]*tcimpl.CompiledNode
@@ -1005,7 +1081,7 @@ func (e *engine) visitDeclaredSingle(n *engineNode, a *engineAttr, r *attrReadin
 		e.refuse(typeRefusal(a.decl, children, r.value, attrPath))
 		return
 	}
-	at := engineNode{value: r.value, rmType: runtimeRMType(r.value, a.rmType), path: attrPath, role: role, depth: n.depth + 1, bound: tier[0]}
+	at := engineNode{value: r.value, rmType: runtimeRMType(r.value, a.rmType), path: attrPath, role: role, depth: n.depth + 1, bound: tier[0], missing: r.missing}
 	if len(tier) == 1 {
 		e.admitSingle(a.decl, at)
 		return
@@ -1075,7 +1151,7 @@ func (e *engine) visitDeclaredItems(n *engineNode, a *engineAttr, r *attrReading
 	from := len(e.preds)
 	if len(children) > 0 && a.shape != shapeCounted {
 		var byNodeID []bool
-		bound, byNodeID = e.bindItems(n, a, children, r.items, attrPath, role)
+		bound, byNodeID = e.bindItems(n, a, children, r, attrPath, role)
 		if e.stopped {
 			return // the visit limit ended the walk inside a trial
 		}
@@ -1125,7 +1201,7 @@ func (e *engine) visitDeclaredItems(n *engineNode, a *engineAttr, r *attrReading
 			if !admitted[i] {
 				continue
 			}
-			e.walk(engineNode{value: item, rmType: runtimeRMType(item, a.rmType), path: e.path.item(attrPath, e.preds[from+i]), role: role, depth: n.depth + 1, bound: bound[i]})
+			e.walk(engineNode{value: item, rmType: runtimeRMType(item, a.rmType), path: e.path.item(attrPath, e.preds[from+i]), role: role, depth: n.depth + 1, bound: bound[i], missing: r.itemMissing(i)})
 		}
 	}
 	e.preds = e.preds[:from]

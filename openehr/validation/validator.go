@@ -83,10 +83,11 @@ func WithLimits(l Limits) Option {
 
 // Validator validates in-memory Reference Model values, with the template
 // rules of a compiled template when the caller gives one, and the Reference
-// Model rules always. It holds its settings only: build it once with [New]
-// and share it between goroutines; nothing a call does changes it. The zero
-// Validator, and a nil *Validator, behave as one built by New with no
-// options.
+// Model rules always. It holds its settings only, never what belongs to one
+// call: a decode's report of the members a document leaves out travels with
+// the call, as [WithMissing]. Build it once with [New] and share it between
+// goroutines; nothing a call does changes it. The zero Validator, and a nil
+// *Validator, behave as one built by New with no options.
 //
 // The package-level functions, [Validate], [ValidateComposition],
 // [ValidateRM] and the others, behave as a Validator built with no options.
@@ -125,12 +126,20 @@ func (v *Validator) limitsOrDefault() Limits {
 // Model rules in the same walk, as [Validate] describes, under the guards
 // [Validate] describes. The limits of v bound the walk. Built with no
 // options, v returns what [ValidateRM] returns for a nil c, its guards
-// included, and what [Validate] returns for a compiled template.
+// included, and what [Validate] returns for a compiled template, given the
+// same opts.
+//
+// A value built in Go cannot say which of its members a document left out:
+// a number, a boolean or a value struct holds its zero value either way. A
+// caller that decoded root with a codec's report of missing members passes
+// it as [WithMissing], so that each member it names is read as absent;
+// [Validator.ValidateJSON] and [Validator.ValidateXML] decode and validate
+// in one call.
 //
 // [Result.Coverage] lists each path where a limit stopped the walk, with a
 // template each node the template binds to a CONSTRAINT_REF, and the
 // Reference Model invariants of the classes the walk visited that the
 // validator does not evaluate.
-func (v *Validator) Validate(root any, c *templatecompile.Compiled) Result {
-	return runEngine(root, c, v.limitsOrDefault())
+func (v *Validator) Validate(root any, c *templatecompile.Compiled, opts ...ValidateOption) Result {
+	return runEngine(root, c, v.limitsOrDefault(), opts...)
 }

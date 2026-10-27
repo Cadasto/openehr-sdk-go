@@ -97,6 +97,24 @@
 //     change-control and resource-description classes and
 //     EXTRACT_PARTICIPATION.
 //
+// The walk reads presence from the value, and a member held by value, a
+// number, a boolean or a value struct such as an EHR_STATUS subject or an
+// ARCHETYPED archetype_id, holds its zero value whether a document left it
+// out or gave that value. Only the decode can tell the two apart.
+// [ValidateJSON] and [ValidateXML] decode a canonical-JSON or canonical-XML
+// document into a root and validate it with the members the document leaves
+// out, in one call, and [WithMissing] hands the report of a codec's own
+// missing-member option to [ValidateRM], [Validate] or [Validator.Validate].
+// Each member the report names is read as absent, whatever the value holds
+// there: it is `required` at its path, the one finding there, and nothing is
+// reported below it, at any depth of the document.
+//
+//	var status rm.EHRStatus
+//	r := validation.ValidateJSON(body, &status, nil)
+//
+// A value built in Go has no such report, so a member held by value that it
+// leaves unset reads as present.
+//
 // With a template the same rules run on every node the template admits,
 // the nodes it does not constrain included, and on no content it refuses.
 // Their findings come in the one [Result], in the order the walk found
