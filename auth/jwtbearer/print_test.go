@@ -18,6 +18,9 @@ import (
 // redactedMarker is the text a credential prints and logs as.
 const redactedMarker = "[redacted]"
 
+// urlMask is the text url.URL.Redacted writes in place of a URL's password.
+const urlMask = "xxxxx"
+
 // printVerbs are the fmt verbs, with flags and widths, that must all print the
 // text of a value's String method.
 var printVerbs = []string{"%v", "%+v", "%#v", "%s", "%q", "%d", "%x", "%X", "%t", "%20v", "%-20s", "%+q", "%#x"}
@@ -145,6 +148,22 @@ func TestREQ060_PrintsNoCredential(t *testing.T) { // REQ-060
 			},
 			secrets: []string{privateD, urlPassword},
 			shown:   []string{redactedMarker, "idp.example/token", "system/*.read", "client-id", "https://idp.example"},
+		},
+		{
+			name: "Config with a password in its issuer and audience",
+			v: jwtbearer.Config{
+				TokenURL:  "https://idp.example/token",
+				Assertion: signer,
+				Audience:  "https://aud:" + urlPassword + "@api.example",
+				Issuer:    "https://iss:" + urlPassword + "@idp.example",
+				ClientID:  "client-id",
+			},
+			secrets: []string{privateD, urlPassword},
+			shown: []string{
+				redactedMarker, "client-id",
+				"https://aud:" + urlMask + "@api.example",
+				"https://iss:" + urlMask + "@idp.example",
+			},
 		},
 		{
 			name:    "*ClaimsSigner",

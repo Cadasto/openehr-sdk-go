@@ -73,8 +73,8 @@ const (
 // (env, YAML).
 //
 // Printed with fmt or logged with log/slog, a Config shows its ClientSecret
-// and ClientAssertion as "[redacted]": see [Config.String] and
-// [Config.LogValue].
+// and ClientAssertion as "[redacted]", and the password of each URL it shows
+// masked: see [Config.String] and [Config.LogValue].
 type Config struct {
 	// HTTPClient is the injected client used for token-endpoint calls.
 	// The token request never follows a redirect, whatever CheckRedirect
@@ -130,16 +130,16 @@ func redact(s string) string {
 
 // String describes c with its ClientSecret shown as "[redacted]", or as ""
 // when it is empty, its ClientAssertion shown as "[redacted]", or as <nil>
-// when it has none, and the password of a TokenURL that carries one masked.
-// The other fields are shown as they are, except HTTPClient, which is left
-// out.
+// when it has none, and the password of a TokenURL, Audience or Issuer that
+// carries one masked, as [url.URL.Redacted] masks it. The other fields are
+// shown as they are, except HTTPClient, which is left out.
 func (c Config) String() string {
 	assertion := "<nil>"
 	if c.ClientAssertion != nil {
 		assertion = redacted
 	}
 	return fmt.Sprintf("clientcreds.Config{TokenURL: %q, ClientID: %q, ClientSecret: %q, ClientAssertion: %s, Scope: %q, Audience: %q, AuthMethod: %d, RefreshThreshold: %s, Issuer: %q}",
-		urlredact.String(c.TokenURL), c.ClientID, redact(c.ClientSecret), assertion, c.Scope, c.Audience, c.AuthMethod, c.RefreshThreshold, c.Issuer)
+		urlredact.String(c.TokenURL), c.ClientID, redact(c.ClientSecret), assertion, c.Scope, urlredact.String(c.Audience), c.AuthMethod, c.RefreshThreshold, urlredact.String(c.Issuer))
 }
 
 // GoString returns the text of [Config.String], so that printing c in Go
@@ -159,7 +159,7 @@ func (c Config) Format(f fmt.State, _ rune) {
 
 // LogValue lets log/slog log c as a group of the fields [Config.String]
 // shows, keyed by field name, with the ClientSecret, the ClientAssertion and
-// the TokenURL replaced as String replaces them. Without it, the JSON handler
+// the URLs replaced as String replaces them. Without it, the JSON handler
 // would encode the client secret, and the private key of a
 // [jwtbearer.ClaimsSigner] client assertion.
 func (c Config) LogValue() slog.Value {
@@ -173,10 +173,10 @@ func (c Config) LogValue() slog.Value {
 		slog.String("ClientSecret", redact(c.ClientSecret)),
 		assertion,
 		slog.String("Scope", c.Scope),
-		slog.String("Audience", c.Audience),
+		slog.String("Audience", urlredact.String(c.Audience)),
 		slog.Int("AuthMethod", int(c.AuthMethod)),
 		slog.Duration("RefreshThreshold", c.RefreshThreshold),
-		slog.String("Issuer", c.Issuer),
+		slog.String("Issuer", urlredact.String(c.Issuer)),
 	)
 }
 

@@ -70,8 +70,9 @@ type clientAssertionKey struct {
 // to them afterwards does not reach the source.
 //
 // Printed with fmt or logged with log/slog, a Config shows its ClientSecret
-// and the private key [WithClientAssertionKey] sets as "[redacted]": see
-// [Config.String] and [Config.LogValue].
+// and the private key [WithClientAssertionKey] sets as "[redacted]", and the
+// password of each URL it shows masked: see [Config.String] and
+// [Config.LogValue].
 type Config struct {
 	// HTTPClient is the injected client used for token and JWKS calls. The
 	// token, refresh and revocation requests never follow a redirect,
@@ -118,14 +119,15 @@ type Config struct {
 // String describes c with its ClientSecret replaced by "[redacted]", or left
 // empty when it is empty, and the key [WithClientAssertionKey] sets shown by
 // its algorithm and key ID only. Auth is shown by its authorization and token
-// endpoints, with the password of one that carries one masked. HTTPClient,
-// JWKS and the token-change hook are left out; the other fields are shown as
-// they are.
+// endpoints. RedirectURI, Audience, Issuer and the two endpoints are shown
+// with the password of one that carries one masked, as [url.URL.Redacted]
+// masks it. HTTPClient, JWKS and the token-change hook are left out; the
+// other fields are shown as they are.
 func (c Config) String() string {
 	return fmt.Sprintf("smart.Config{ClientID: %q, ClientSecret: %q, ClientAssertion: %s, RedirectURI: %q, Scopes: %q, Audience: %q, "+
 		"AuthorizationEndpoint: %q, TokenEndpoint: %q, Issuer: %q, RefreshThreshold: %s, IDTokenTrustedAudiences: %q}",
-		c.ClientID, redact(c.ClientSecret), c.clientAssertion.text(), c.RedirectURI, c.Scopes, c.Audience,
-		redactedURL(c.Auth.AuthorizationEndpoint), redactedURL(c.Auth.TokenEndpoint), c.Issuer, c.RefreshThreshold, c.IDTokenTrustedAudiences)
+		c.ClientID, redact(c.ClientSecret), c.clientAssertion.text(), urlredact.String(c.RedirectURI), c.Scopes, urlredact.String(c.Audience),
+		redactedURL(c.Auth.AuthorizationEndpoint), redactedURL(c.Auth.TokenEndpoint), urlredact.String(c.Issuer), c.RefreshThreshold, c.IDTokenTrustedAudiences)
 }
 
 // GoString returns the text of [Config.String], so that printing c in Go
@@ -144,19 +146,19 @@ func (c Config) Format(f fmt.State, _ rune) {
 }
 
 // LogValue lets log/slog log c as a group of the fields [Config.String]
-// shows, keyed by field name, with the credentials and endpoints replaced as
+// shows, keyed by field name, with the credentials and URLs replaced as
 // String replaces them.
 func (c Config) LogValue() slog.Value {
 	return slog.GroupValue(
 		slog.String("ClientID", c.ClientID),
 		slog.String("ClientSecret", redact(c.ClientSecret)),
 		c.clientAssertion.logAttr(),
-		slog.String("RedirectURI", c.RedirectURI),
+		slog.String("RedirectURI", urlredact.String(c.RedirectURI)),
 		slog.Any("Scopes", c.Scopes),
-		slog.String("Audience", c.Audience),
+		slog.String("Audience", urlredact.String(c.Audience)),
 		slog.String("AuthorizationEndpoint", redactedURL(c.Auth.AuthorizationEndpoint)),
 		slog.String("TokenEndpoint", redactedURL(c.Auth.TokenEndpoint)),
-		slog.String("Issuer", c.Issuer),
+		slog.String("Issuer", urlredact.String(c.Issuer)),
 		slog.Duration("RefreshThreshold", c.RefreshThreshold),
 		slog.Any("IDTokenTrustedAudiences", c.IDTokenTrustedAudiences),
 	)

@@ -19,6 +19,9 @@ import (
 // redactedMarker is the text a credential prints and logs as.
 const redactedMarker = "[redacted]"
 
+// urlMask is the text url.URL.Redacted writes in place of a URL's password.
+const urlMask = "xxxxx"
+
 // printProblems prints v through String and GoString, with every verb of
 // printVerbs, nested in a struct and a slice, and through the text and JSON
 // handlers of log/slog. It returns one line for each output that shows one of
@@ -171,6 +174,23 @@ func TestREQ060_PrintsNoCredential(t *testing.T) { // REQ-060
 			v:       secretConfig,
 			secrets: []string{credSecret, credURLPass},
 			shown:   []string{redactedMarker, "client-id", "https://app.example/callback", "launch/patient", testAudience, "https://idp.example/authorize", "idp.example/token"},
+		},
+		{
+			name: "Config with a password in its issuer, audience and redirect URI",
+			v: smart.Config{
+				ClientID:     "client-id",
+				ClientSecret: credSecret,
+				RedirectURI:  "https://app:" + credURLPass + "@app.example/callback",
+				Audience:     "https://aud:" + credURLPass + "@cdr.example/openehr",
+				Issuer:       "https://iss:" + credURLPass + "@idp.example",
+			},
+			secrets: []string{credSecret, credURLPass},
+			shown: []string{
+				redactedMarker, "client-id",
+				"https://app:" + urlMask + "@app.example/callback",
+				"https://aud:" + urlMask + "@cdr.example/openehr",
+				"https://iss:" + urlMask + "@idp.example",
+			},
 		},
 		{
 			name:    "*Config with a client assertion key",

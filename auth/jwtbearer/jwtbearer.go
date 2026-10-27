@@ -37,8 +37,9 @@ const firstBackoff = time.Second
 // idiomatic call site; Config is exposed for declarative configuration.
 //
 // Printed with fmt or logged with log/slog, a Config shows its Assertion as
-// "[redacted]": see [Config.String] and [Config.LogValue]. A [ClaimsSigner]
-// assertion holds a private key.
+// "[redacted]", and the password of each URL it shows masked: see
+// [Config.String] and [Config.LogValue]. A [ClaimsSigner] assertion holds a
+// private key.
 type Config struct {
 	// HTTPClient is the injected client used for token-endpoint calls.
 	// The token request never follows a redirect, whatever CheckRedirect
@@ -86,12 +87,13 @@ func credentialAttr(key string, set bool) slog.Attr {
 }
 
 // String describes c with its Assertion shown as "[redacted]", or as <nil>
-// when it has none, and with the password of a TokenURL that carries one
-// masked. The other fields are shown as they are, except HTTPClient, which is
-// left out.
+// when it has none, and with the password of a TokenURL, Audience or Issuer
+// that carries one masked, as [url.URL.Redacted] masks it. The other fields
+// are shown as they are, except HTTPClient, which is left out.
 func (c Config) String() string {
 	return fmt.Sprintf("jwtbearer.Config{TokenURL: %q, Assertion: %s, Scope: %q, Audience: %q, RefreshThreshold: %s, Issuer: %q, ClientID: %q}",
-		urlredact.String(c.TokenURL), credentialText(c.Assertion != nil), c.Scope, c.Audience, c.RefreshThreshold, c.Issuer, c.ClientID)
+		urlredact.String(c.TokenURL), credentialText(c.Assertion != nil), c.Scope, urlredact.String(c.Audience), c.RefreshThreshold,
+		urlredact.String(c.Issuer), c.ClientID)
 }
 
 // GoString returns the text of [Config.String], so that printing c in Go
@@ -110,16 +112,16 @@ func (c Config) Format(f fmt.State, _ rune) {
 }
 
 // LogValue lets log/slog log c as a group of the fields [Config.String]
-// shows, keyed by field name, with the Assertion and the TokenURL replaced
-// as String replaces them.
+// shows, keyed by field name, with the Assertion and the URLs replaced as
+// String replaces them.
 func (c Config) LogValue() slog.Value {
 	return slog.GroupValue(
 		slog.String("TokenURL", urlredact.String(c.TokenURL)),
 		credentialAttr("Assertion", c.Assertion != nil),
 		slog.String("Scope", c.Scope),
-		slog.String("Audience", c.Audience),
+		slog.String("Audience", urlredact.String(c.Audience)),
 		slog.Duration("RefreshThreshold", c.RefreshThreshold),
-		slog.String("Issuer", c.Issuer),
+		slog.String("Issuer", urlredact.String(c.Issuer)),
 		slog.String("ClientID", c.ClientID),
 	)
 }
