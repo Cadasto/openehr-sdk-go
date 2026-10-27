@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"maps"
 	"strconv"
+
+	"github.com/cadasto/openehr-sdk-go/internal/urlredact"
 )
 
 type launchContextKey struct{}
@@ -16,9 +18,9 @@ type launchContextKey struct{}
 // [LaunchContextFromTokenResponse].
 //
 // Printed with fmt, a LaunchContext shows the tokens its Raw and its
-// Principal's Raw hold as "[redacted]": see [LaunchContext.String]. Logged
-// with log/slog, a *LaunchContext shows them the same way: see
-// [LaunchContext.LogValue].
+// Principal's Raw hold as "[redacted]", and the URLs it holds with their
+// passwords masked: see [LaunchContext.String]. Logged with log/slog, a
+// *LaunchContext shows them the same way: see [LaunchContext.LogValue].
 type LaunchContext struct {
 	// FHIR-compat launch-context claims.
 	Patient   string
@@ -73,10 +75,14 @@ type LaunchContext struct {
 
 // String describes lc with Raw and Principal's Raw shown as copies whose
 // access_token, refresh_token and id_token members keep their keys but have
-// their values replaced by "[redacted]". Principal is shown by the text of
-// [PrincipalIdentity.String], IDToken by its claims and the other fields as
-// they are; lc and its Raw are not changed. A LaunchContext value copied out
-// of a *LaunchContext prints the same way.
+// their values replaced by "[redacted]". The password of each URL lc holds is
+// masked, as [net/url.URL.Redacted] masks it: User, Issuer, SMARTStyleURL,
+// the Issuer and FHIRUser of IDToken, and the iss, fhirUser and
+// smart_style_url members of the copies of Raw and Principal's Raw.
+// Principal is shown by the text of [PrincipalIdentity.String], IDToken by
+// its claims and the other fields as they are; lc, its IDToken and its Raw
+// are not changed. A LaunchContext value copied out of a *LaunchContext
+// prints the same way.
 func (lc LaunchContext) String() string {
 	principal := "<nil>"
 	if lc.Principal != nil {
@@ -88,8 +94,8 @@ func (lc LaunchContext) String() string {
 	}
 	return fmt.Sprintf("smart.LaunchContext{Patient: %q, Encounter: %q, User: %q, Scopes: %q, IDToken: %+v, Issuer: %q, Principal: %s, "+
 		"EHRID: %q, EpisodeID: %q, Intent: %q, SMARTStyleURL: %q, NeedPatientBanner: %s, Tenant: %q, Raw: %v}",
-		lc.Patient, lc.Encounter, lc.User, lc.Scopes, lc.IDToken, lc.Issuer, principal,
-		lc.EHRID, lc.EpisodeID, lc.Intent, lc.SMARTStyleURL, banner, lc.Tenant, maskedTokens(lc.Raw))
+		lc.Patient, lc.Encounter, urlredact.String(lc.User), lc.Scopes, maskedClaims(lc.IDToken), urlredact.String(lc.Issuer), principal,
+		lc.EHRID, lc.EpisodeID, lc.Intent, urlredact.String(lc.SMARTStyleURL), banner, lc.Tenant, maskedTokens(lc.Raw))
 }
 
 // GoString returns the text of [LaunchContext.String], so that printing lc in
@@ -110,8 +116,9 @@ func (lc LaunchContext) Format(f fmt.State, _ rune) {
 // LogValue lets log/slog log lc without its tokens. It logs the fields of lc
 // as a group, keyed by field name, with Raw and Principal's Raw as copies
 // whose access_token, refresh_token and id_token members keep their keys but
-// have their values replaced by "[redacted]". lc itself is not changed. A nil
-// lc logs as nil, as slog logs any nil pointer.
+// have their values replaced by "[redacted]", and with the URLs masked as
+// [LaunchContext.String] masks them. lc itself is not changed. A nil lc logs
+// as nil, as slog logs any nil pointer.
 //
 // The masking applies to a *LaunchContext, such as the one
 // [LaunchContextFromTokenResponse] or [LaunchContextFromContext] hands out. A
@@ -134,15 +141,15 @@ func (lc *LaunchContext) LogValue() slog.Value {
 	return slog.GroupValue(
 		slog.String("Patient", lc.Patient),
 		slog.String("Encounter", lc.Encounter),
-		slog.String("User", lc.User),
+		slog.String("User", urlredact.String(lc.User)),
 		slog.Any("Scopes", lc.Scopes),
-		slog.Any("IDToken", lc.IDToken),
-		slog.String("Issuer", lc.Issuer),
+		slog.Any("IDToken", maskedClaims(lc.IDToken)),
+		slog.String("Issuer", urlredact.String(lc.Issuer)),
 		principal,
 		slog.String("EHRID", lc.EHRID),
 		slog.String("EpisodeID", lc.EpisodeID),
 		slog.String("Intent", lc.Intent),
-		slog.String("SMARTStyleURL", lc.SMARTStyleURL),
+		slog.String("SMARTStyleURL", urlredact.String(lc.SMARTStyleURL)),
 		banner,
 		slog.String("Tenant", lc.Tenant),
 		slog.Any("Raw", maskedTokens(lc.Raw)),
@@ -153,12 +160,18 @@ func (lc *LaunchContext) LogValue() slog.Value {
 // (RFC 6749 §5.1; OpenID Connect Core 1.0 §3.1.3.3).
 var tokenMembers = [...]string{"access_token", "refresh_token", "id_token"}
 
+// urlMembers are the token-endpoint and ID-token members whose value is a
+// URL (OpenID Connect Core 1.0 §2; SMART App Launch fhirUser and
+// smart_style_url).
+var urlMembers = [...]string{"iss", "fhirUser", "smart_style_url"}
+
 // tokenMask stands in for the value of a token member when a value is
 // printed or logged.
 const tokenMask = "[redacted]"
 
 // maskedTokens returns a shallow copy of raw whose token members, when
-// present, hold tokenMask. A nil raw gives nil.
+// present, hold tokenMask, and whose URL members that hold a string hold it
+// with the password masked. A nil raw gives nil.
 func maskedTokens(raw map[string]any) map[string]any {
 	masked := maps.Clone(raw)
 	for _, k := range tokenMembers {
@@ -166,7 +179,24 @@ func maskedTokens(raw map[string]any) map[string]any {
 			masked[k] = tokenMask
 		}
 	}
+	for _, k := range urlMembers {
+		if v, ok := masked[k].(string); ok {
+			masked[k] = urlredact.String(v)
+		}
+	}
 	return masked
+}
+
+// maskedClaims returns a copy of c whose Issuer and FHIRUser URLs have their
+// passwords masked, or nil for a nil c. c is not changed.
+func maskedClaims(c *IDTokenClaims) *IDTokenClaims {
+	if c == nil {
+		return nil
+	}
+	masked := *c
+	masked.Issuer = urlredact.String(c.Issuer)
+	masked.FHIRUser = urlredact.String(c.FHIRUser)
+	return &masked
 }
 
 // WithLaunchContext attaches lc to ctx for downstream handlers.

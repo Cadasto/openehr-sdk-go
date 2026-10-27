@@ -22,7 +22,8 @@ const (
 // deployment issues them on the ID token.
 //
 // Printed with fmt, a PrincipalIdentity shows the tokens its Raw holds as
-// "[redacted]": see [PrincipalIdentity.String]. Logged with log/slog, a
+// "[redacted]", and the iss, fhirUser and smart_style_url members of Raw
+// with their passwords masked: see [PrincipalIdentity.String]. Logged with log/slog, a
 // *PrincipalIdentity shows them the same way: see
 // [PrincipalIdentity.LogValue].
 type PrincipalIdentity struct {
@@ -41,8 +42,10 @@ type PrincipalIdentity struct {
 
 // String describes p with Raw shown as a copy whose access_token,
 // refresh_token and id_token members keep their keys but have their values
-// replaced by "[redacted]". UID and Type are shown as they are; p and its Raw
-// are not changed. A PrincipalIdentity value copied out of a
+// replaced by "[redacted]", and whose iss, fhirUser and smart_style_url
+// members, when they hold a URL, have its password masked as
+// [net/url.URL.Redacted] masks it. UID and Type are shown as they are; p and
+// its Raw are not changed. A PrincipalIdentity value copied out of a
 // *PrincipalIdentity prints the same way.
 func (p PrincipalIdentity) String() string {
 	return fmt.Sprintf("smart.PrincipalIdentity{UID: %q, Type: %q, Raw: %v}", p.UID, p.Type, maskedTokens(p.Raw))
@@ -66,7 +69,8 @@ func (p PrincipalIdentity) Format(f fmt.State, _ rune) {
 // LogValue lets log/slog log p without the tokens Raw can hold. It logs UID,
 // Type and a copy of Raw as a group, keyed by field name; in the copy the
 // access_token, refresh_token and id_token members keep their keys but have
-// their values replaced by "[redacted]". p itself is not changed. A nil p
+// their values replaced by "[redacted]", and the URL members are masked as
+// [PrincipalIdentity.String] masks them. p itself is not changed. A nil p
 // logs as nil, as slog logs any nil pointer.
 //
 // The masking applies to a *PrincipalIdentity, such as the one

@@ -2,6 +2,7 @@ package smart_test
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -167,6 +168,68 @@ func TestREQ060_PrincipalIdentityPrintsNoToken(t *testing.T) { // REQ-060, REQ-0
 			t.Errorf("fmt.Sprintf(%%+v, a nil *PrincipalIdentity) = %q, want <nil>", got)
 		}
 	})
+}
+
+// The URLs of urlLaunchContext, each with urlPassword as its password, and
+// the text each prints as.
+const (
+	urlPassword    = "urlpass-s3cr3t"
+	urlIssuer      = "https://iss:" + urlPassword + "@idp.example"
+	maskedIssuer   = "https://iss:xxxxx@idp.example"
+	urlFHIRUser    = "https://user:" + urlPassword + "@fhir.example/Practitioner/1"
+	maskedFHIRUser = "https://user:xxxxx@fhir.example/Practitioner/1"
+	urlStyle       = "https://style:" + urlPassword + "@app.example/smart-style.json"
+	maskedStyle    = "https://style:xxxxx@app.example/smart-style.json"
+)
+
+// urlLaunchContext returns a launch context with urlPassword as the password
+// of every URL it holds: Issuer, User and SMARTStyleURL, the issuer and
+// fhirUser claims of IDToken, the iss, fhirUser and smart_style_url members
+// of Raw, and the iss and fhirUser members of Principal's Raw. Raw and
+// Principal's Raw also hold an access token.
+func urlLaunchContext() *smart.LaunchContext {
+	return &smart.LaunchContext{
+		Patient:       "p1",
+		User:          urlFHIRUser,
+		IDToken:       &smart.IDTokenClaims{Subject: "sub-1", Audience: []string{"client-id"}, Issuer: urlIssuer, FHIRUser: urlFHIRUser},
+		Issuer:        urlIssuer,
+		SMARTStyleURL: urlStyle,
+		Principal: &smart.PrincipalIdentity{UID: "u1", Type: smart.PrincipalTypePerson, Raw: map[string]any{
+			"access_token": accessSecret, "iss": urlIssuer, "fhirUser": urlFHIRUser, "principal_uid": "u1",
+		}},
+		Raw: map[string]any{
+			"access_token": accessSecret, "iss": urlIssuer, "fhirUser": urlFHIRUser, "smart_style_url": urlStyle, "patient": "p1",
+		},
+	}
+}
+
+// TestREQ060_LaunchContextPrintsNoURLPassword pins REQ-060 for the URLs of a
+// launch context and its principal: printed with any fmt verb or through
+// log/slog's text handler, and logged as a pointer through its JSON handler,
+// they show the password of every URL they hold masked, in the typed fields,
+// in the ID token's claims and in the iss, fhirUser and smart_style_url
+// members of Raw. Printing changes neither of them.
+func TestREQ060_LaunchContextPrintsNoURLPassword(t *testing.T) { // REQ-060
+	lc := urlLaunchContext()
+	checkPrinted(t,
+		[]printedHolder{
+			{name: "*LaunchContext", v: lc, withJSON: true},
+			{name: "LaunchContext copied out of the pointer", v: *lc},
+		},
+		[]string{accessSecret, urlPassword},
+		[]string{"p1", "sub-1", "u1", maskedIssuer, maskedFHIRUser, maskedStyle},
+	)
+	checkPrinted(t,
+		[]printedHolder{
+			{name: "*PrincipalIdentity", v: lc.Principal, withJSON: true},
+			{name: "PrincipalIdentity copied out of the pointer", v: *lc.Principal},
+		},
+		[]string{accessSecret, urlPassword},
+		[]string{"u1", "PERSON", maskedIssuer, maskedFHIRUser},
+	)
+	if !reflect.DeepEqual(lc, urlLaunchContext()) {
+		t.Errorf("printing changed the LaunchContext: got %#v", *lc)
+	}
 }
 
 // TestREQ025_FormatWithNilStateDoesNotPanic pins REQ-025 (idiom.md § No
