@@ -1702,6 +1702,7 @@ requirements:
       - openehr/aql/parse/ast_test.go
       - openehr/aql/parse/parse_test.go
       - openehr/aql/parse/roundtrip_test.go
+      - openehr/aql/parse/sll_internal_test.go
       - openehr/validation/aql_test.go
       - testkit/probes/aql/probe_028_aql_lint.go
       - testkit/probes/aql/probe_099_path_shape_lint.go
