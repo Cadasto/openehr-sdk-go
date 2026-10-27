@@ -76,12 +76,13 @@ func (a *ArchetypeTerm) BMMName() string { return "ARCHETYPE_TERM" }
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
+// (here `code`) are appended to start.Attr before
 // the start token is written.
 func (a *ArchetypeTerm) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("ARCHETYPE_TERM")}
 	}
+	_start.Attr = append(_start.Attr, xml.Attr{Name: xml.Name{Local: "code"}, Value: a.Code})
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
@@ -89,9 +90,6 @@ func (a *ArchetypeTerm) MarshalXML(_e *xml.Encoder, _start xml.StartElement) err
 		if err := _e.EncodeElement(a.Items, xml.StartElement{Name: xml.Name{Local: "items"}}); err != nil {
 			return err
 		}
-	}
-	if err := _e.EncodeElement(a.Code, xml.StartElement{Name: xml.Name{Local: "code"}}); err != nil {
-		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err

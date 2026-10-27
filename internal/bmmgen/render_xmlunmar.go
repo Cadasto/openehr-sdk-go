@@ -185,7 +185,7 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	var attrFields []emittedField
 	elemFields := fields
 	for _, ef := range fields {
-		if isXMLAttributeProperty(ef.Prop) {
+		if isXMLAttributeProperty(ef) {
 			attrFields = append(attrFields, ef)
 		}
 	}
@@ -204,7 +204,7 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	b.WriteString("// Missing/unknown/type-mismatch dispatch failures wrap typereg\n")
 	b.WriteString("// sentinels inside *canxml.DecodeError for errors.Is / errors.As.\n")
 	b.WriteString("// Properties typed as XML attributes per the openEHR ITS-XML XSDs\n")
-	b.WriteString("// (currently `archetype_node_id`) are read from _start.Attr.\n")
+	fmt.Fprintf(&b, "// (%s) are read from _start.Attr.\n", xmlAttributeNote(attrFields))
 	b.WriteString("// Content the method does not read is unmatched: it is skipped, or\n")
 	b.WriteString("// reported or refused under canxml.WithUnmatched and canxml.WithStrict.\n")
 	legacy := sc.IsAbstract() && hasIntervalShape(fields)
@@ -713,7 +713,7 @@ func xmlClassDescriptor(plan *Plan, pc *PlannedClass, fields []emittedField) (xm
 	d := xmlClassDesc{goName: pc.GoName, name: pc.BMMName}
 	for _, ef := range fields {
 		prop := ef.Prop.PropertyName()
-		if isXMLAttributeProperty(ef.Prop) {
+		if isXMLAttributeProperty(ef) {
 			d.attrs = append(d.attrs, prop)
 		}
 		if _, ok := ef.Prop.(*bmm.ContainerProperty); ok {

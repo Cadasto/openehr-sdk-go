@@ -63,7 +63,7 @@ func TestREQ175_RenderUnmarshalXMLClassDescriptor(t *testing.T) {
 				var attrs, items, mandatory []string
 				for _, ef := range fields {
 					prop := ef.Prop.PropertyName()
-					if isXMLAttributeProperty(ef.Prop) {
+					if isXMLAttributeProperty(ef) {
 						attrs = append(attrs, prop)
 					}
 					if _, ok := ef.Prop.(*bmm.ContainerProperty); ok {

@@ -92,6 +92,7 @@ func (a *ArchetypeOntology) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 // xmlClassArchetypeTerm describes ARCHETYPE_TERM to the canonical-XML decode runtime.
 var xmlClassArchetypeTerm = xmlunmatched.Class{
 	Name:     "ARCHETYPE_TERM",
+	Attrs:    []string{"code"},
 	Required: []string{"code"},
 }
 
@@ -101,12 +102,18 @@ var xmlClassArchetypeTerm = xmlunmatched.Class{
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are read from _start.Attr.
+// (here `code`) are read from _start.Attr.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *ArchetypeTerm) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassArchetypeTerm); _err != nil {
 		return _err
+	}
+	for _, _a := range _start.Attr {
+		if _a.Name.Local == "code" && _a.Name.Space == "" {
+			a.Code = _a.Value
+			break
+		}
 	}
 	for {
 		_tok, _err := _dec.Token()

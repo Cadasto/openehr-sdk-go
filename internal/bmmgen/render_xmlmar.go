@@ -143,7 +143,7 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 	// element-typed properties come inside.
 	var attrFields, elemFields []emittedField
 	for _, ef := range fields {
-		if isXMLAttributeProperty(ef.Prop) {
+		if isXMLAttributeProperty(ef) {
 			attrFields = append(attrFields, ef)
 		} else {
 			elemFields = append(elemFields, ef)
@@ -175,7 +175,7 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 		b.WriteString("// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.\n")
 	}
 	b.WriteString("// Properties typed as XML attributes per the openEHR ITS-XML XSDs\n")
-	b.WriteString("// (currently `archetype_node_id`) are appended to start.Attr before\n")
+	fmt.Fprintf(&b, "// (%s) are appended to start.Attr before\n", xmlAttributeNote(attrFields))
 	b.WriteString("// the start token is written.\n")
 	shaped := hasIntervalShape(fields)
 	if shaped {
@@ -212,19 +212,48 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 	return b.String(), nil
 }
 
-// isXMLAttributeProperty reports whether a BMM property is emitted
-// as an XML attribute (rather than a child element) in the openEHR
-// ITS-XML profile. The XSDs declare `archetype_node_id` on
-// LOCATABLE as a mandatory `xs:attribute`; the SDK mirrors that on
-// every concrete LOCATABLE descendant (the property is inherited
-// via flattening, so the check is name-based).
+// isXMLAttributeProperty reports whether a field is emitted as an
+// XML attribute (rather than a child element) in the openEHR ITS-XML
+// profile. The XSDs declare two such members the SDK models:
+//
+//   - `archetype_node_id` on LOCATABLE, a mandatory `xs:attribute`;
+//     the SDK mirrors that on every concrete LOCATABLE descendant (the
+//     property is inherited via flattening, so the check is
+//     name-based);
+//   - `code` on the AM 1.4 ARCHETYPE_TERM, a mandatory `xs:attribute`
+//     of its schema type, matched on the declaring class so that a
+//     `code` member another class gains stays a child element.
 //
 // Other String/primitive properties on LOCATABLE/ARCHETYPED (e.g.
 // `rm_version`) are XSD child elements — the IDCR conformance
 // fixture confirms this. Extend this list as the canonical-XML
 // surface grows.
-func isXMLAttributeProperty(prop bmm.Property) bool {
-	return prop.PropertyName() == "archetype_node_id"
+func isXMLAttributeProperty(ef emittedField) bool {
+	switch name := ef.Prop.PropertyName(); {
+	case name == "archetype_node_id":
+		return true
+	case name == "code" && ef.OwnerName == "ARCHETYPE_TERM":
+		return true
+	}
+	return false
+}
+
+// xmlAttributeNote names the members a generated doc comment says are
+// XML attributes: the class's own when one of them is not
+// `archetype_node_id`, otherwise `archetype_node_id`, the member every
+// LOCATABLE carries as one.
+func xmlAttributeNote(attrFields []emittedField) string {
+	names := make([]string, 0, len(attrFields))
+	own := false
+	for _, ef := range attrFields {
+		name := ef.Prop.PropertyName()
+		names = append(names, "`"+name+"`")
+		own = own || name != "archetype_node_id"
+	}
+	if !own {
+		return "currently `archetype_node_id`"
+	}
+	return "here " + strings.Join(names, ", ")
 }
 
 // marshalXMLAttribute emits the source line that appends one XML
