@@ -1,6 +1,7 @@
 package rm
 
 import (
+	"bytes"
 	"encoding"
 	json "encoding/json/v2"
 	"errors"
@@ -12,6 +13,11 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/refused"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
+
+// jsonSpace is the whitespace RFC 8259 allows around a JSON value. A caller
+// of an UnmarshalJSON method in this package may pass a value with it, and
+// each method trims it before it reads the value's first byte or digits.
+const jsonSpace = " \t\r\n"
 
 // Real is the BMM Real primitive. Upstream CDR canonical JSON sometimes
 // emits decimal magnitudes as quoted strings; decode accepts both forms.
@@ -270,6 +276,7 @@ func (r *Real) UnmarshalJSON(b []byte) error {
 	if r == nil {
 		return fmt.Errorf("rm.Real: %w", typereg.ErrNilReceiver)
 	}
+	b = bytes.Trim(b, jsonSpace)
 	if len(b) == 0 {
 		return errors.New("rm.Real: empty input")
 	}
