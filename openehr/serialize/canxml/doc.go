@@ -37,9 +37,12 @@
 //     declared on the document root whenever any descendant carries
 //     `xsi:type`.
 //   - Polymorphic discrimination: `xsi:type="<BMM_CLASS_NAME>"`
-//     (unprefixed openEHR class name). The encoder emits it as the
-//     first attribute on every concrete element at a polymorphic
-//     site. The decoder requires it at polymorphic sites;
+//     (unprefixed openEHR class name). Three AOM 1.4 classes are
+//     written with their name in the AM 1.4 schema instead
+//     (C_CODE_PHRASE for C_CODED_TEXT, C_DV_ORDINAL for C_ORDINAL,
+//     C_DV_QUANTITY for C_QUANTITY), and either name decodes. The
+//     encoder emits it as the first attribute on every concrete
+//     element at a polymorphic site. The decoder requires it at polymorphic sites;
 //     [WithRelaxedTypeDispatch], which would relax that, is accepted but
 //     not yet enforced. Discriminator values are
 //     matched unprefixed; namespace-prefixed values (the Better/Marand

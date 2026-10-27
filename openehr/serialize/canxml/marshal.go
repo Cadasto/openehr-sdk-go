@@ -152,7 +152,10 @@ func ElementName(bmmName string) string {
 
 // EncodePoly writes one polymorphic child element to e. The element
 // is wrapped under local name `name`, with `xsi:type="<BMMName>"`
-// as its first attribute, then v's [xml.Marshaler] body. v must
+// as its first attribute, then v's [xml.Marshaler] body; the
+// generated MarshalXML of an AOM 1.4 class the AM 1.4 schema names
+// otherwise (C_CODED_TEXT, C_ORDINAL, C_QUANTITY) writes that name
+// in its place. v must
 // implement both [BMMNamer] (every concrete generated RM type does)
 // and [xml.Marshaler].
 //
