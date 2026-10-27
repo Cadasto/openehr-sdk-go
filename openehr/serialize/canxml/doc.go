@@ -186,7 +186,8 @@
 // hands the validators one list. The pointer carries no value from the
 // input.
 //
-// A present member is never missing, whatever it holds: an empty struct
+// A member that carries a value is never missing, whatever the value: an
+// empty struct
 // element such as `<subject/>` or a bare `<subject xsi:type="PARTY_SELF"/>`,
 // `<magnitude>0</magnitude>`, an `archetype_node_id` written as an XML
 // attribute, and a `Hash` or `Any` element the codec does not model are

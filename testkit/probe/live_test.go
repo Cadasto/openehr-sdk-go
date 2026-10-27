@@ -29,13 +29,17 @@ const envAllowMutating = "OPENEHR_LIVE_ALLOW_MUTATING"
 // subtests skip without dialing anyone (REQ-082: Live is pre-release,
 // Sandbox is the CI default). credEnv, when set, names the variable
 // carrying that target's basic-auth credential as user:pass — no
-// credential is hard-coded here.
+// credential is hard-coded here. A set credential that is not user:pass
+// fails the subtest. An unset one skips it, unless credOptional is true:
+// then the target runs without authentication. EHRbase's credential is
+// optional, read as the Live snapshots read it; FerroEHR's is required.
 var liveTargets = []struct {
-	name    string
-	env     string
-	credEnv string
+	name         string
+	env          string
+	credEnv      string
+	credOptional bool
 }{
-	{name: "ehrbase", env: "OPENEHR_LIVE_EHRBASE"},
+	{name: "ehrbase", env: "OPENEHR_LIVE_EHRBASE", credEnv: "OPENEHR_LIVE_EHRBASE_BASIC", credOptional: true},
 	{name: "ferroehr", env: "OPENEHR_LIVE_FERROEHR", credEnv: "OPENEHR_LIVE_FERROEHR_BASIC"},
 }
 
@@ -70,11 +74,14 @@ func TestLiveCreateEHR(t *testing.T) {
 				t.Skipf("set %s to a live openEHR REST base to run this probe; it is not part of CI", target.env)
 			}
 			var src auth.TokenSource
+			var cred string
 			if target.credEnv != "" {
-				cred := os.Getenv(target.credEnv)
-				if cred == "" {
-					t.Skipf("set %s to %s's basic-auth credential as user:pass", target.credEnv, target.name)
-				}
+				cred = os.Getenv(target.credEnv)
+			}
+			if cred == "" && target.credEnv != "" && !target.credOptional {
+				t.Skipf("set %s to %s's basic-auth credential as user:pass", target.credEnv, target.name)
+			}
+			if cred != "" {
 				user, pass, ok := strings.Cut(cred, ":")
 				if !ok || user == "" {
 					t.Fatalf("%s must be user:pass", target.credEnv)

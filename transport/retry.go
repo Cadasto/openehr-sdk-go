@@ -34,9 +34,11 @@ type RetryPolicy struct {
 	// RetriableStatus enumerates HTTP statuses that trigger a retry.
 	// Default {502, 503, 504}.
 	RetriableStatus []int
-	// RetryNonIdempotent enables retrying POST/PATCH/DELETE etc. when
-	// the status is retriable. Defaults to false: the SDK does not
-	// retry non-idempotent methods unless the consumer opts in.
+	// RetryNonIdempotent also retries a method that is not idempotent
+	// (RFC 9110 §9.2.2), such as POST or PATCH, when the status is
+	// retriable. GET, HEAD, OPTIONS, PUT and DELETE are retried without
+	// it. Defaults to false: the SDK does not retry non-idempotent
+	// methods unless the consumer opts in.
 	RetryNonIdempotent bool
 }
 

@@ -146,8 +146,9 @@ func TestREQ175_MissingNamesEveryRequiredMemberTheObjectLacks(t *testing.T) {
 	}
 }
 
-// TestREQ175_MissingNeverNamesAPresentMember pins that a present member is
-// never missing, whatever it holds, and that three kinds of attribute are
+// TestREQ175_MissingNeverNamesAPresentMember pins that a member that
+// carries a value other than null is never missing, whatever the value, and
+// that three kinds of attribute are
 // never missing at all: one no serialization carries (a function the model
 // computes, such as EVENT.offset, and RESOURCE_DESCRIPTION.parent_resource),
 // the four interval boundary flags, and "_type".

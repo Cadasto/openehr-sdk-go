@@ -199,7 +199,8 @@ func WithUploadVersion(v string) UploadOption {
 // format) to the deployment. For [FormatADL14] the body must be an
 // OPT XML document; the Content-Type header is set to
 // `application/xml` automatically. ADL 2 source-form upload (Content-
-// Type `text/plain`) is not yet implemented.
+// Type `text/plain`) is not yet implemented. A leading UTF-8 byte-order
+// mark is removed before the body is sent.
 //
 // The request accepts both `application/json` and `application/xml`. The
 // ITS-REST 201 response may carry the created template as a JSON
@@ -232,6 +233,10 @@ func UploadTemplate(ctx context.Context, c *transport.Client, format TemplateFor
 	if int64(len(raw)) > maxUploadBytes {
 		return nil, nil, fmt.Errorf("definition.UploadTemplate: %w: body exceeds %d bytes", transport.ErrInvalidConfig, maxUploadBytes)
 	}
+	// Drop one leading UTF-8 BOM so every caller need not: some deployments
+	// refuse a BOM-prefixed OPT (EHRbase answers "Content is not allowed in
+	// prolog"). A body that held only the BOM is then refused as empty below.
+	raw = bytes.TrimPrefix(raw, []byte{0xEF, 0xBB, 0xBF})
 	if len(raw) == 0 {
 		return nil, nil, fmt.Errorf("definition.UploadTemplate: %w: empty body", transport.ErrInvalidConfig)
 	}

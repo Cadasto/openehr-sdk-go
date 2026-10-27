@@ -307,7 +307,9 @@ func bracketInterior(lbrack, rbrack antlr.TerminalNode, inner antlr.ParserRuleCo
 }
 
 func (ex *astExtractor) extractAggregateFunctionCall(c gen.IAggregateFunctionCallContext) FunctionCall {
-	out := FunctionCall{Name: aggregateName(c)}
+	// REQ-113: keep the call's source text; Name is upper-cased and emission
+	// is canonical, while an unaliased column is named by what was written.
+	out := FunctionCall{Name: aggregateName(c), Raw: sourceText(c)}
 	if c.DISTINCT() != nil {
 		out.Distinct = true
 	}
@@ -326,7 +328,7 @@ func (ex *astExtractor) extractFunctionCall(c gen.IFunctionCallContext) Function
 	// TERMINOLOGY call has no `name` token and no Terminal children; its
 	// three STRING arguments are modelled as literal operands (REQ-113).
 	if tf := c.TerminologyFunction(); tf != nil {
-		out := FunctionCall{Name: aql.TerminologyFunc}
+		out := FunctionCall{Name: aql.TerminologyFunc, Raw: sourceText(c)}
 		// REQ-113: each argument keeps its source text (the STRING token as
 		// written, quotes included) alongside the unquoted typed value.
 		for i, s := range terminologyArgs(tf) {
@@ -338,7 +340,8 @@ func (ex *astExtractor) extractFunctionCall(c gen.IFunctionCallContext) Function
 		}
 		return out
 	}
-	out := FunctionCall{Name: functionName(c)}
+	// REQ-113: the call's source text, as for an aggregate above.
+	out := FunctionCall{Name: functionName(c), Raw: sourceText(c)}
 	for _, t := range c.AllTerminal() {
 		// INVARIANT: terminalAsSelectExpr returns nil only after recording a
 		// gap (an unrepresentable primitive, or a defensively-unhandled

@@ -10,7 +10,8 @@ package canjson
 // such as PARTY_SELF or ARCHETYPE_ID, decodes to its zero value whether the
 // input carried it or not.
 //
-// A present member is never missing, whatever it holds: an empty string, a
+// A member that carries a value is never missing, whatever the value: an
+// empty string, a
 // zero, an empty list or object and a bare {"_type":"PARTY_SELF"} are
 // present. Three kinds of attribute are never missing either: one no
 // serialization carries (a function the model computes, such as EVENT

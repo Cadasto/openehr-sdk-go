@@ -43,8 +43,9 @@ type Hooks struct {
 	// Missing is called for every missing member, once each: an attribute
 	// the RM makes mandatory on the RM type an object decodes as, which the
 	// object has no member for or holds null at, as the attribute's name
-	// under the object's pointer. A present member is never missing,
-	// whatever it holds, and neither is an attribute no serialization
+	// under the object's pointer. A member that carries a value other than
+	// null is never missing, whatever the value, and neither is an
+	// attribute no serialization
 	// carries, an interval boundary flag or "_type" (see [Model.required]).
 	// The members of one object are reported as the object closes, in the
 	// order the RM declares the attributes, an ancestor's before the

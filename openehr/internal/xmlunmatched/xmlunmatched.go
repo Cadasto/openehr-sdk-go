@@ -174,7 +174,7 @@ type frame struct {
 	text          bool
 	class         *Class
 	seen          uint64 // a bit per class.Required member the element has a value for
-	nilled        bool   // the start element carried xsi:nil="true"
+	nilled        bool   // the start element, or one around it, carried xsi:nil="true"
 	hasText       bool   // the element holds text other than XML whitespace
 	primitive     bool   // a decoder read the element's text as its value
 }
@@ -502,8 +502,9 @@ func (r *trackingReader) Token() (xml.Token, error) {
 	switch tk := tok.(type) {
 	case xml.StartElement:
 		r.t.push(tk.Name.Local)
-		if r.t.missing != nil && isNilled(tk.Attr) {
-			r.t.open[len(r.t.open)-1].nilled = true
+		if r.t.missing != nil {
+			n := len(r.t.open)
+			r.t.open[n-1].nilled = r.t.open[n-2].nilled || isNilled(tk.Attr)
 		}
 		tk.Attr = withoutNamespaceDecls(tk.Attr)
 		return tk, err

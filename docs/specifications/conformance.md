@@ -312,11 +312,11 @@ The HL7 Inferno **SMART App Launch Test Kit STU2.2 _Client_** suite serves as an
 
 #### PROBE-087 — AQL structured-AST catalogue completeness
 
-- **Title:** Every shape in the list of [§ REQ-113 § Catalogue and residual](clinical-modeling.md#catalogue-and-residual), the deprecated `SELECT TOP n [FORWARD|BACKWARD]` clause and a projected literal's source text included, parses into `parse.Query` without `aql.ErrIncompleteAST` and round-trips through `(*Query).Emit` under the PROBE-080 fixed point.
-- **Preconditions:** The catalogue corpus: queries for each catalogue shape, the former gap shapes among them, and the `TOP`-clause and literal-source-text cases.
-- **Wire assertion:** In-repo property: for each catalogue shape, `ParseQuery` returns an AST pinned per shape and `Emit` is a fixed point; the residual of [§ REQ-113 § Catalogue and residual](clinical-modeling.md#catalogue-and-residual) still fires; a `TOP` clause carries its count and direction ([§ The `TOP` carrier](clinical-modeling.md#the-top-carrier)), and a projected literal carries its source text where that text differs from the canonical rendering ([§ Literal source text](clinical-modeling.md#literal-source-text)).
+- **Title:** Every shape in the list of [§ REQ-113 § Catalogue and residual](clinical-modeling.md#catalogue-and-residual), the deprecated `SELECT TOP n [FORWARD|BACKWARD]` clause and a projected literal's and function call's source text included, parses into `parse.Query` without `aql.ErrIncompleteAST` and round-trips through `(*Query).Emit` under the PROBE-080 fixed point.
+- **Preconditions:** The catalogue corpus: queries for each catalogue shape, the former gap shapes among them, and the `TOP`-clause and projection-source-text cases.
+- **Wire assertion:** In-repo property: for each catalogue shape, `ParseQuery` returns an AST pinned per shape and `Emit` is a fixed point; the residual of [§ REQ-113 § Catalogue and residual](clinical-modeling.md#catalogue-and-residual) still fires; a `TOP` clause carries its count and direction ([§ The `TOP` carrier](clinical-modeling.md#the-top-carrier)), and a projected literal or function call carries its source text where that text differs from the canonical rendering ([§ Projection source text](clinical-modeling.md#projection-source-text)).
 - **Modes:** In-repo (unit-level property; no backend).
-- **Status:** Implemented (inline) — the closed gap shapes are checked modelled, the residual guard fires, each shape has a structural pin, and the `TOP` clause, its out-of-range count and literal source text have their own cases.
+- **Status:** Implemented (inline) — the closed gap shapes are checked modelled, the residual guard fires, each shape has a structural pin, and the `TOP` clause, its out-of-range count and projection source text have their own cases.
 - **Satisfies:** REQ-113.
 
 #### PROBE-088 — AQL builder containment and paging stability

@@ -65,10 +65,12 @@ func WithMissing(pointers []string) ValidateOption {
 // building the root and the nodes that lead to the member. The pointer is
 // read as RFC 6901 writes it: "/" before each segment, and in each segment
 // "~1" read as "/" and "~0" as "~", in that order. The empty pointer, which
-// names the root, and a text that does not start with "/" mark nothing.
+// names the root, marks nothing, and so does a text that is no JSON Pointer:
+// one that does not start with "/", or one with a "~" that opens neither
+// escape, which builds no node either.
 func (c *callConfig) addMissing(pointer string) {
 	rest, ok := strings.CutPrefix(pointer, "/")
-	if !ok {
+	if !ok || !wellEscaped(rest) {
 		return
 	}
 	if c.missing == nil {
@@ -117,6 +119,21 @@ func (n *missingNode) child(key string) *missingNode {
 // by none.
 func (n *missingNode) marked() bool {
 	return n != nil && n.absent
+}
+
+// wellEscaped reports whether every "~" in s opens one of the two escapes
+// RFC 6901 defines, "~0" or "~1".
+func wellEscaped(s string) bool {
+	for {
+		_, after, found := strings.Cut(s, "~")
+		if !found {
+			return true
+		}
+		if after == "" || (after[0] != '0' && after[0] != '1') {
+			return false
+		}
+		s = after[1:]
+	}
 }
 
 // unescapePointer returns the segment s names: "~1" is read as "/" first and
