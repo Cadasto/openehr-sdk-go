@@ -1329,6 +1329,7 @@ requirements:
       - openehr/validation/issuepath_internal_test.go
       - openehr/validation/issuepath_test.go
       - openehr/validation/locatable_attributes_test.go
+      - openehr/validation/missing_members_test.go
       - openehr/validation/multi_nonlocatable_test.go
       - openehr/validation/noncomposition_test.go
       - openehr/validation/open_name_list_test.go
@@ -1760,13 +1761,14 @@ requirements:
       - openehr/validation/issuepath_test.go
       - openehr/validation/limits_decoded_test.go
       - openehr/validation/limits_test.go
+      - openehr/validation/missing_internal_test.go
+      - openehr/validation/missing_members_test.go
       - openehr/validation/multi_nonlocatable_test.go
       - openehr/validation/noncomposition_test.go
       - openehr/validation/nonempty_lists_internal_test.go
       - openehr/validation/nonstorable_generic_test.go
       - openehr/validation/primitive_empty_part_test.go
       - openehr/validation/rmfloor_archetype_test.go
-      - openehr/validation/rmfloor_bytes_internal_test.go
       - openehr/validation/rmfloor_bytes_test.go
       - openehr/validation/rmfloor_chained_corpus_test.go
       - openehr/validation/rmfloor_chained_internal_test.go
@@ -2308,6 +2310,7 @@ requirements:
       - openehr/validation/binding_by_name_test.go
       - openehr/validation/godoc_class_test.go
       - openehr/validation/issuepath_test.go
+      - openehr/validation/missing_members_test.go
       - openehr/validation/prohibited_test.go
       - openehr/validation/rmfloor_interval_comparable_test.go
       - openehr/validation/rmfloor_interval_flags_test.go
@@ -2425,12 +2428,13 @@ requirements:
       - openehr/validation/limits_decoded_test.go
       - openehr/validation/limits_test.go
       - openehr/validation/locatable_attributes_test.go
+      - openehr/validation/missing_internal_test.go
+      - openehr/validation/missing_members_test.go
       - openehr/validation/noncomposition_test.go
       - openehr/validation/optional_list_counts_test.go
       - openehr/validation/primitive_empty_part_test.go
       - openehr/validation/prohibited_test.go
       - openehr/validation/registry_roots_test.go
-      - openehr/validation/rmfloor_bytes_internal_test.go
       - openehr/validation/rmfloor_chained_corpus_test.go
       - openehr/validation/rmfloor_chained_internal_test.go
       - openehr/validation/rmfloor_coded_test.go
@@ -2506,3 +2510,4 @@ requirements:
       - openehr/rm/missing_members_test.go
       - openehr/serialize/canjson/missing_test.go
       - openehr/serialize/canxml/missing_test.go
+      - openehr/validation/missing_members_test.go
