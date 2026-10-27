@@ -1308,6 +1308,7 @@ requirements:
       - openehr/composition/typecheck_test.go
       - openehr/composition/typecheck_tiers_test.go
       - openehr/composition/uid_source_test.go
+      - openehr/instance/untyped_child_test.go
       - testkit/probes/composition/probe_023_builder_round_trip.go
       - testkit/probes/composition/probes_test.go
       - testkit/probes/instance/corpus_ratchet_test.go
@@ -1627,6 +1628,7 @@ requirements:
       - openehr/instance/undescribed_content_test.go
       - openehr/instance/unnamed_archetype_root_test.go
       - openehr/instance/unsatisfiable_cardinality_test.go
+      - openehr/instance/untyped_child_test.go
       - openehr/instance/valuefill_leaves_test.go
       - openehr/instance/valuefill_test.go
       - openehr/instance/visit_rules_test.go

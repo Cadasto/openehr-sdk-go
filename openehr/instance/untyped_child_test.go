@@ -1,9 +1,11 @@
 package instance_test
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/rmwrite"
 	"github.com/cadasto/openehr-sdk-go/openehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/rmnames"
@@ -16,8 +18,8 @@ func optUntyped(nodeID string, attrs ...string) string {
 	return optNode("", nodeID, attrs...)
 }
 
-// optAbstractInterval is a DV_INTERVAL over the abstract parameter param,
-// written as an OPT rm_type_name, with the given attributes.
+// optAbstractInterval is a DV_INTERVAL over the parameter param, written as
+// an OPT rm_type_name, with the given attributes.
 func optAbstractInterval(param string, attrs ...string) string {
 	return optNode("DV_INTERVAL&lt;"+param+"&gt;", "", attrs...)
 }
@@ -153,4 +155,27 @@ func TestREQ107_SkeletonOfUntypedAndAbstractIntervalChildren(t *testing.T) {
 // occurrences lower..1, with the given attributes.
 func optElementOccurring(nodeID string, lower int, attrs ...string) string {
 	return optOccurring("C_COMPLEX_OBJECT", "ELEMENT", nodeID, lower, 1, attrs...)
+}
+
+// TestREQ107_IntervalOverAnUnorderedTypeIsRefused is the REQ-107 check of
+// the known gap on generic types: a DV_INTERVAL over a type that is no
+// DV_ORDERED class, here DV_TEXT, cannot be built, and Generate returns an
+// error wrapping rmwrite.ErrUnknownRMType and no root, under every policy
+// and both compile modes.
+func TestREQ107_IntervalOverAnUnorderedTypeIsRefused(t *testing.T) {
+	opt := optTemplate("ELEMENT", optSingle("value", optAbstractInterval("DV_TEXT")))
+	for _, implicit := range []bool{true, false} {
+		c := compileOPTText(t, opt, implicit)
+		for _, policy := range everyPolicy {
+			t.Run(fmt.Sprintf("implicit=%t/%v", implicit, policy), func(t *testing.T) {
+				out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, Now: defaultsNow})
+				if !errors.Is(err, rmwrite.ErrUnknownRMType) {
+					t.Errorf("Generate error = %v, want one wrapping rmwrite.ErrUnknownRMType", err)
+				}
+				if out != nil {
+					t.Errorf("Generate returned %T with the error, want no root", out)
+				}
+			})
+		}
+	}
 }

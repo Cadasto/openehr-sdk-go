@@ -2,9 +2,7 @@ package instance
 
 import (
 	"slices"
-	"strings"
 
-	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	"github.com/cadasto/openehr-sdk-go/internal/rmroots"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -89,7 +87,7 @@ func (g *generator) ownContentUndescribed(node *tcimpl.CompiledNode) bool {
 	}
 	// The mandatory attributes node does not carry, which
 	// fillUncarriedRequired builds from their BMM type.
-	class := bmmtype.Class(concreteFor(strings.TrimSpace(node.RMTypeName())))
+	class := nodeClass(node)
 	for _, name := range requiredAttributes(class) {
 		if node.Attribute(name) != nil || compositionDefaultOwns(class, name) {
 			continue

@@ -496,10 +496,17 @@ func walkSkips(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) boo
 }
 
 // nodeClass is the bare BMM class of the value the walk builds for
-// optNode: the class it names, or its concrete substitute (concreteFor),
-// without generic parameters.
+// optNode (builtRMType): the class it names, or its concrete substitute
+// (concreteFor), without generic parameters, or, for an untyped node, the
+// class of the type the BMM declares for its attribute (untypedRMType). A
+// DV_INTERVAL is one class whatever its parameter, so its parameter is not
+// resolved here.
 func nodeClass(optNode *tcimpl.CompiledNode) string {
-	return bmmtype.Class(concreteFor(strings.TrimSpace(optNode.RMTypeName())))
+	declared := strings.TrimSpace(optNode.RMTypeName())
+	if declared == "" {
+		return bmmtype.Class(untypedRMType(optNode))
+	}
+	return bmmtype.Class(concreteFor(declared))
 }
 
 // multimediaData reports whether attr is the data of optNode, a
@@ -796,10 +803,85 @@ func bindingAlternative(children []*tcimpl.CompiledNode, built string) *tcimpl.C
 	return children[0]
 }
 
-// builtRMType is the RM type the walk builds for an alternative: the
-// type it names, or its concrete substitute (concreteFor).
-func builtRMType(alternative *tcimpl.CompiledNode) string {
-	return concreteFor(strings.TrimSpace(alternative.RMTypeName()))
+// builtRMType is the RM type the walk builds for node, an OPT child: the
+// type it names, or its concrete substitute (concreteFor). An untyped node,
+// which names no type, is built as the type the BMM declares for the
+// attribute that holds it (untypedRMType), and a DV_INTERVAL over an
+// abstract parameter other than DV_ORDERED as an interval over a concrete
+// descendant of that parameter (concreteInterval).
+func builtRMType(node *tcimpl.CompiledNode) string {
+	declared := strings.TrimSpace(node.RMTypeName())
+	if declared == "" {
+		return untypedRMType(node)
+	}
+	if param, ok := abstractIntervalParameter(declared); ok {
+		if built := concreteInterval(node, param); built != "" {
+			return built
+		}
+	}
+	return concreteFor(declared)
+}
+
+// untypedRMType is the RM type the walk builds for node, an OPT child that
+// names no RM type: the type the BMM declares for the attribute that holds
+// it, read on the type the walk builds for its parent, so a formal
+// parameter such as the T of a DV_INTERVAL's lower takes its actual type,
+// or that type's concrete substitute (concreteFor). It is "" for a node no
+// attribute holds, the template root.
+func untypedRMType(node *tcimpl.CompiledNode) string {
+	parent := node.Parent()
+	if parent == nil {
+		return ""
+	}
+	var attr *tcimpl.CompiledAttribute
+	for _, a := range tcimpl.NodeAttributes(parent) {
+		if slices.Contains(tcimpl.ChildNodes(a), node) {
+			attr = a
+			break
+		}
+	}
+	if attr == nil {
+		return ""
+	}
+	// The BMM's own declaration, a formal parameter included, rather than
+	// the compiled attribute's type, which the compile reads on the type
+	// the parent names: an abstract parameter the walk builds otherwise.
+	parentType := builtRMType(parent)
+	declared, ok := rminfo.Default.AttributeRMType(bmmtype.Class(parentType), attr.Name())
+	if !ok || declared == "" {
+		declared = attr.RMTypeName()
+	}
+	return concreteFor(attrType(parentType, declared))
+}
+
+// concreteInterval returns the interval the walk builds for node, a
+// DV_INTERVAL over param, an abstract class other than DV_ORDERED: the
+// interval over the type the OPT names for its lower bound, else for its
+// upper bound, where that type descends from param and the generator builds
+// an interval over it, so the bound the walk builds fits the interval, and
+// otherwise over the first concrete descendant of param in name order
+// (concreteIntervalParameter). The type a bound names is that of its first
+// allowed alternative, whose type the walk builds (bindingAlternative); an
+// untyped one names none. It is "" where param has no such descendant.
+func concreteInterval(node *tcimpl.CompiledNode, param string) string {
+	for _, bound := range [...]string{"lower", "upper"} {
+		attr := node.Attribute(bound)
+		if attr == nil {
+			continue
+		}
+		children := tcimpl.AllowedChildNodes(attr)
+		if len(children) == 0 {
+			continue
+		}
+		named := concreteFor(strings.TrimSpace(children[0].RMTypeName()))
+		if _, builds := intervalOver[named]; builds && named != "DV_ORDERED" && descendsFrom(named, param) {
+			return "DV_INTERVAL<" + named + ">"
+		}
+	}
+	if c := concreteIntervalParameter(param); c != "" {
+		return "DV_INTERVAL<" + c + ">"
+	}
+	return ""
 }
 
 // attrTypedByRMClass reports whether the pinned BMM types attr of
@@ -2206,14 +2288,16 @@ func rmNonEmptyList(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute
 // in-place mutation post-attach). Abstract RM types named by the
 // OPT (EVENT, ITEM_STRUCTURE, DATA_VALUE, ITEM, CONTENT_ITEM,
 // CARE_ENTRY, ENTRY, LOCATABLE) resolve to a documented concrete
-// substitute — see [concreteFor].
+// substitute — see [concreteFor] — an untyped child to the type the BMM
+// declares for its attribute, and a DV_INTERVAL over an abstract
+// parameter to an interval over a concrete descendant ([builtRMType]).
 //
 // A child that would be an archetype root, but for which the OPT
 // names no archetype id, is refused with [ErrArchetypeIDMissing]. A
 // slot is left to its own path: [generator.stampSlotFill] gives it an
 // archetype id, or its caller refuses it with ErrSlotFillUnsupported.
 func (g *generator) makeChild(child *tcimpl.CompiledNode) (any, error) {
-	rmChild, err := newRMForOPTType(child.RMTypeName())
+	rmChild, err := newRMForOPTType(builtRMType(child))
 	if err != nil {
 		return nil, fmt.Errorf("makeChild %s: %w", child.RMTypeName(), err)
 	}
@@ -2330,6 +2414,10 @@ func (g *generator) setLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, 
 		termCode = opt.NodeID()
 	}
 	name := opt.RMTypeName()
+	if strings.TrimSpace(name) == "" {
+		// An untyped node is named after the type the walk builds for it.
+		name = builtRMType(opt)
+	}
 	if text, found := tcimpl.RootTermItem(opt, termCode, "text"); found && text != "" {
 		name = text
 	}
