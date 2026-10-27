@@ -26,10 +26,18 @@ const jsonSpace = " \t\r\n"
 // to, rather than round it.
 type Real float64
 
-// The canonical-XML codec reaches a Real element through this interface, so
-// a signature drift would silently fall back to encoding/xml's plain float
-// handling and lose the lossy-literal refusal. Pin it at compile time.
-var _ encoding.TextUnmarshaler = (*Real)(nil)
+// The canonical-XML codec reaches a Real element through these interfaces,
+// so a signature drift would silently fall back to encoding/xml's plain float
+// handling and lose the lossy-literal refusal and the xs:double spellings.
+// Pin them at compile time.
+var (
+	_ encoding.TextUnmarshaler = (*Real)(nil)
+	_ encoding.TextMarshaler   = Real(0)
+)
+
+// xmlSpace is the whitespace XML collapses around the text of an xs:double
+// element: space, tab, carriage return and line feed.
+const xmlSpace = " \t\r\n"
 
 const (
 	// float64Digits is the number of significant decimal digits a normal
@@ -244,14 +252,16 @@ var errLossyLiteral = errors.New("rm.Real: literal cannot be held in a float64 a
 // only inside its Is method, never while it builds the wrapper here.
 var errLossyShape = typereg.ClassifyShape(errLossyLiteral)
 
-// parseQuotedDecimal parses the content of a quoted Real literal. ADR 0004
-// admits a quoted decimal string only, so it refuses the other spellings
+// parseDecimal parses a decimal Real literal: the content of a quoted JSON
+// literal, which ADR 0004 admits as a decimal string only, and a number in
+// canonical-XML element text, where the xs:double lexical space is decimal
+// apart from its special values. It refuses the other spellings
 // strconv.ParseFloat reads (hexadecimal, Inf, Infinity, NaN, and an
 // underscore between digits) with the *strconv.NumError ParseFloat gives a
 // malformed literal; a NaN or an infinity would also fail canjson encode.
-// A decimal string is an optional sign, digits with at most one decimal
+// A decimal literal is an optional sign, digits with at most one decimal
 // point, and an optional exponent of an optional sign and digits.
-func parseQuotedDecimal(s string) (float64, error) {
+func parseDecimal(s string) (float64, error) {
 	mant, exp, hasExp := s, "", false
 	if k := strings.IndexAny(s, "eE"); k >= 0 {
 		mant, exp, hasExp = s[:k], s[k+1:], true
@@ -318,7 +328,7 @@ func (r *Real) UnmarshalJSON(b []byte) error {
 		if err := json.Unmarshal(b, &s); err != nil {
 			return fmt.Errorf("rm.Real: %w", err)
 		}
-		f, err := parseQuotedDecimal(s)
+		f, err := parseDecimal(s)
 		if err != nil {
 			// wire.md § REQ-052: the literal appears once, in the
 			// *strconv.NumError cause, and in the entry point's
@@ -344,16 +354,20 @@ func (r *Real) UnmarshalJSON(b []byte) error {
 }
 
 // UnmarshalText implements [encoding.TextUnmarshaler] so that canonical XML
-// element content is held to the lossy-literal rule canonical JSON applies.
-// The generated canonical-XML decoder reaches a Real element through
-// xmlunmatched, which hands its text to this method.
+// element content is read in the xs:double lexical space and held to the
+// lossy-literal rule canonical JSON applies. The generated canonical-XML
+// decoder reaches a Real element through xmlunmatched, which hands its text
+// to this method.
 //
-// Text reads as encoding/xml reads a float64 element without this method:
-// empty text is 0, whitespace around the number is trimmed, and the rest
-// goes to strconv.ParseFloat, whose *strconv.NumError is returned as it
-// comes for text that does not spell a number, whitespace alone and a quoted
-// number among them. A number that parsed and is lossy is refused with a
-// value-free error.
+// Empty text is 0, and XML whitespace (space, tab, carriage return and line
+// feed) around the text is trimmed. The rest is a decimal literal, an
+// optional sign, digits with at most one decimal point and an optional
+// exponent, or one of INF, +INF, -INF and NaN. Any other text, such as the
+// hexadecimal form, a digit separator, Inf, Infinity or nan, whitespace alone
+// and a quoted number among them, is refused with a *strconv.NumError as
+// strconv.ParseFloat gives it for text that does not spell a number; so is a
+// literal out of the float64 range. A number that parsed and is lossy is
+// refused with a value-free error.
 //
 // Neither refusal carries typereg.ErrInvalidShape: that sentinel's own text
 // names canonical JSON. canxml classifies the refusal itself: it comes back
@@ -362,8 +376,7 @@ func (r *Real) UnmarshalJSON(b []byte) error {
 // dereferenced, on the same terms as [Real.UnmarshalJSON].
 //
 // encoding/json prefers [Real.UnmarshalJSON] over this method for every JSON
-// value, so the JSON surface is unchanged by its presence. Real has no
-// MarshalText: encode writes it as encoding/xml writes a float64.
+// value, so the JSON surface is unchanged by its presence.
 func (r *Real) UnmarshalText(text []byte) error {
 	if r == nil {
 		return fmt.Errorf("rm.Real: %w", typereg.ErrNilReceiver)
@@ -372,17 +385,47 @@ func (r *Real) UnmarshalText(text []byte) error {
 		*r = 0
 		return nil
 	}
-	s := strings.TrimSpace(string(text))
-	f, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		// Unwrapped, so the refusal reads exactly as encoding/xml's own did.
-		return err
-	}
-	if lossy(s, f) {
-		return errLossyLiteral
+	var f float64
+	switch s := strings.Trim(string(text), xmlSpace); s {
+	case "INF", "+INF":
+		f = math.Inf(1)
+	case "-INF":
+		f = math.Inf(-1)
+	case "NaN":
+		f = math.NaN()
+	default:
+		var err error
+		if f, err = parseDecimal(s); err != nil {
+			// Unwrapped, so the refusal reads exactly as encoding/xml's own did.
+			return err
+		}
+		if lossy(s, f) {
+			return errLossyLiteral
+		}
 	}
 	*r = Real(f)
 	return nil
+}
+
+// MarshalText implements [encoding.TextMarshaler], the encode counterpart of
+// [Real.UnmarshalText] that the generated canonical-XML encoder writes a Real
+// element through. It writes an infinity as INF or -INF and a not-a-number as
+// NaN, the xs:double spellings, and a finite value as the shortest decimal
+// that reads back as the same float64, as encoding/xml writes a float64.
+//
+// encoding/json prefers [Real.MarshalJSON] over this method, so canonical
+// JSON is unchanged by its presence.
+func (r Real) MarshalText() ([]byte, error) {
+	f := float64(r)
+	switch {
+	case math.IsInf(f, 1):
+		return []byte("INF"), nil
+	case math.IsInf(f, -1):
+		return []byte("-INF"), nil
+	case math.IsNaN(f):
+		return []byte("NaN"), nil
+	}
+	return strconv.AppendFloat(nil, f, 'g', -1, 64), nil
 }
 
 // MarshalJSON emits a JSON number.
