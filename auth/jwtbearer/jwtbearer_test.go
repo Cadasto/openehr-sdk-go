@@ -619,3 +619,72 @@ func TestClaimsSignerES256(t *testing.T) {
 	}
 	verifyECDSA(t, "ES256", &key.PublicKey, jwt)
 }
+
+// TestClaimsSignerLifetime pins the assertion lifetime: a zero Lifetime signs
+// assertions that expire five minutes after issue, through NewClaimsSigner
+// and on a signer built without it alike, and a negative one, which would
+// sign assertions already expired, is refused with auth.ErrInvalidConfig:
+// by NewClaimsSigner, and by Assertion on a signer built without it. Drop
+// either refusal and its negative row signs an expired assertion; drop the
+// default in Assertion and the directly built zero row expires as it is
+// issued.
+func TestClaimsSignerLifetime(t *testing.T) {
+	t.Parallel()
+	key := newKey(t)
+	template := func(d time.Duration) ClaimsTemplate {
+		return ClaimsTemplate{Issuer: "i", Audience: "a", Lifetime: d}
+	}
+	direct := func(d time.Duration) func() (*ClaimsSigner, error) {
+		return func() (*ClaimsSigner, error) {
+			return &ClaimsSigner{Template: template(d), Signer: key, Algorithm: "RS384"}, nil
+		}
+	}
+	built := func(d time.Duration) func() (*ClaimsSigner, error) {
+		return func() (*ClaimsSigner, error) { return NewClaimsSigner(template(d), key) }
+	}
+	cases := []struct {
+		name   string
+		signer func() (*ClaimsSigner, error)
+		// refusedBy names the call that refuses the lifetime: "new",
+		// "assertion", or "" when the assertion is signed.
+		refusedBy string
+		want      time.Duration
+	}{
+		{name: "zero through NewClaimsSigner", signer: built(0), want: 5 * time.Minute},
+		{name: "zero built directly", signer: direct(0), want: 5 * time.Minute},
+		{name: "two minutes built directly", signer: direct(2 * time.Minute), want: 2 * time.Minute},
+		{name: "negative through NewClaimsSigner", signer: built(-time.Minute), refusedBy: "new"},
+		{name: "negative built directly", signer: direct(-time.Minute), refusedBy: "assertion"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			s, err := tc.signer()
+			if tc.refusedBy == "new" {
+				if !errors.Is(err, auth.ErrInvalidConfig) {
+					t.Fatalf("NewClaimsSigner: error = %v, want auth.ErrInvalidConfig", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("NewClaimsSigner: %v", err)
+			}
+			jwt, err := s.Assertion(t.Context())
+			if tc.refusedBy == "assertion" {
+				if !errors.Is(err, auth.ErrInvalidConfig) {
+					t.Fatalf("Assertion: error = %v, want auth.ErrInvalidConfig", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Assertion: %v", err)
+			}
+			_, claims, _ := decodeJWT(t, jwt)
+			iat, _ := claims["iat"].(float64)
+			exp, _ := claims["exp"].(float64)
+			if got := time.Duration(exp-iat) * time.Second; got != tc.want {
+				t.Errorf("Assertion: exp - iat = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

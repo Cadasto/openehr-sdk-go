@@ -195,6 +195,32 @@ func TestComparisonRejectsMalformedOperands(t *testing.T) {
 	}
 }
 
+// REQ-113: the left operand of a comparison is a path or a function call,
+// the two shapes `identifiedExpr` compares, so a literal or a parameter
+// there is refused at build time: emitted, `'x' = $p` is text the parser
+// rejects. Drop the shape check and the refused rows format.
+func TestComparisonLeftOperandIsAPathOrACall(t *testing.T) {
+	for name, left := range map[string]aql.Value{
+		"string":    aql.String("x"),
+		"integer":   aql.Int(1),
+		"boolean":   aql.Bool(true),
+		"null":      aql.Null(),
+		"parameter": aql.Param("p"),
+	} {
+		if pred, err := aql.FormatWhere(aql.Compare(left, aql.OpEq, aql.Int(1))); !errors.Is(err, aql.ErrInvalidQuery) {
+			t.Errorf("FormatWhere(Compare(%s, =, 1)) = (%q, %v), want ErrInvalidQuery", name, pred, err)
+		}
+	}
+	for name, left := range map[string]aql.Value{
+		"function call": aql.Func("LENGTH", aql.Path("o/name/value")),
+		"path":          aql.Path("o/name/value"),
+	} {
+		if _, err := aql.FormatWhere(aql.Compare(left, aql.OpEq, aql.Int(1))); err != nil {
+			t.Errorf("FormatWhere(Compare(%s, =, 1)) = %v, want it to format", name, err)
+		}
+	}
+}
+
 // REQ-113: the two non-value-list MATCHES operands are constructible and
 // introspectable on the write side too — a bare TERMINOLOGY(...) call and a
 // `{URI}` operand.

@@ -14,6 +14,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
@@ -236,5 +237,99 @@ func TestEngine_REQ171_PrimitiveLeafTypesAreNoRMClass(t *testing.T) {
 				t.Errorf("primitiveLeaf(%T), a value of %s, under String = true, want false", v, name)
 			}
 		}
+	}
+}
+
+// withPrimitivesSet returns a value of the registered class name, through a
+// pointer, whose every field of a primitive kind, its own, promoted or inside
+// a class it holds by value, holds something other than its zero value, so
+// that every primitive attribute of the class reads present.
+func withPrimitivesSet(name string) any {
+	ctor, _ := typereg.Default.Lookup(name)
+	ptr := ctor()
+	if v := reflect.ValueOf(ptr); v.Kind() == reflect.Pointer && v.Elem().Kind() == reflect.Struct {
+		setPrimitives(v.Elem())
+	}
+	return ptr
+}
+
+// setPrimitives sets every settable field of a primitive kind of the struct
+// v, and of each struct v holds by value, to a value other than its zero.
+func setPrimitives(v reflect.Value) {
+	for _, f := range v.Fields() {
+		if !f.CanSet() {
+			continue
+		}
+		switch k := f.Kind(); {
+		case k == reflect.Struct:
+			setPrimitives(f)
+		case k == reflect.String:
+			f.SetString("x")
+		case k == reflect.Bool:
+			f.SetBool(true)
+		case f.CanInt():
+			f.SetInt(300)
+		case f.CanUint():
+			f.SetUint(300)
+		case f.CanFloat():
+			f.SetFloat(1.5)
+		}
+	}
+}
+
+// REQ-171 § One walk — the walk reads an attribute the template leaves
+// unconstrained, and that no RM rules run on, through rmaccess.Peek, and
+// counts a leaf Peek reports without its value. That is the visit
+// primitiveLeaf gives the value Single reads, only if the two agree: on every
+// single-valued attribute of every registered class, held by pointer and by
+// value, with its primitives zero and set, Peek reads the presence Single
+// does, reports a leaf only for a value primitiveLeaf reads as one, which
+// reads present once every primitive is set, and
+// hands back Single's value for every other attribute. And it reports a leaf
+// for every value of a Go primitive type Single hands back, so no such value
+// is boxed only to be counted. A reader that peeks a pointer, an interface or
+// a class, or stops peeking a primitive, fails here by class and attribute.
+func TestEngine_REQ171_PeekReadsAPrimitiveLeafAsTheWalkDoes(t *testing.T) {
+	t.Parallel()
+	lister, ok := rminfo.Default.(rminfo.AttributeLister)
+	if !ok {
+		t.Fatal("rminfo.Default does not list attribute names")
+	}
+	noRules := walkedAttr(attributeFacts{Name: "value", RMType: "String", Typed: true}, nil)
+	leaves := 0
+	for _, name := range typereg.Default.Names() {
+		ctor, _ := typereg.Default.Lookup(name)
+		set := withPrimitivesSet(name)
+		for i, parent := range []any{ctor(), set, reflect.ValueOf(set).Elem().Interface()} {
+			for _, attr := range lister.AttributeNames(name) {
+				if container, _ := rminfo.Default.IsContainer(name, attr); container {
+					continue
+				}
+				v, present := rmaccess.Single(parent, attr)
+				pv, pPresent, leaf := rmaccess.Peek(parent, attr)
+				if pPresent != present {
+					t.Errorf("Peek(%T, %q) present = %t, Single reads %t", parent, attr, pPresent, present)
+				}
+				primitive := v != nil && reflect.TypeOf(v).Kind() != reflect.Pointer && primitiveLeaf(v, &noRules)
+				switch {
+				case leaf && !present && i > 0:
+					t.Errorf("Peek(%T, %q) reports an absent leaf with every primitive set: a leaf of a primitive type would read present", parent, attr)
+				case leaf && pv != nil:
+					t.Errorf("Peek(%T, %q) = (%#v, leaf), want no value for a leaf", parent, attr, pv)
+				case leaf && present && !primitive:
+					t.Errorf("Peek(%T, %q) reports a leaf, but Single reads %T, which primitiveLeaf does not read as one", parent, attr, v)
+				case !leaf && primitive:
+					t.Errorf("Peek(%T, %q) reads %T as a value, which primitiveLeaf reads as a leaf: Peek boxes it", parent, attr, v)
+				case !leaf && !reflect.DeepEqual(pv, v):
+					t.Errorf("Peek(%T, %q) = %#v, Single reads %#v", parent, attr, pv, v)
+				}
+				if leaf && present {
+					leaves++
+				}
+			}
+		}
+	}
+	if leaves < 200 {
+		t.Fatalf("checked %d present primitive leaves, want every primitive attribute of the registered classes", leaves)
 	}
 }

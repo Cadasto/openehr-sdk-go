@@ -32,7 +32,7 @@ const stringLeafType = "STRING"
 // because whether it holds a value cannot be told; with no owner there is
 // nothing to lose, and it is skipped.
 func emitStringLeaf(out map[string]any, flatPath string, root rm.Locatable, relPath string) error {
-	v, err := rmpath.ItemAtPath(root, relPath)
+	v, err := itemAtPath(root, relPath)
 	if err == nil {
 		return leafToFlat(out, flatPath, v, stringLeafType, false)
 	}
@@ -44,7 +44,7 @@ func emitStringLeaf(out map[string]any, flatPath string, root rm.Locatable, relP
 		ownerRel, attr = before, after
 	}
 	if ownerRel != "" {
-		if _, err := rmpath.ItemAtPath(root, ownerRel); err != nil {
+		if _, err := itemAtPath(root, ownerRel); err != nil {
 			return skipNotFound(err, ownerRel)
 		}
 	}

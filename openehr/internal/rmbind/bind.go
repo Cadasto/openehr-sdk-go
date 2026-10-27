@@ -254,11 +254,11 @@ func IntervalConformsTo(got, want string, val any) bool {
 // name, "DV_QUANTITY" for "DV_INTERVAL<DV_QUANTITY>". ok is false for any
 // other name, the bare "DV_INTERVAL" and a malformed spelling included.
 func TypedIntervalBound(name string) (bound string, ok bool) {
-	class, params, ok := bmmtype.Split(name)
-	if !ok || class != "DV_INTERVAL" || len(params) != 1 {
+	class, param, ok := bmmtype.Param(name)
+	if !ok || class != "DV_INTERVAL" {
 		return "", false
 	}
-	return params[0], true
+	return param, true
 }
 
 // intervalBoundsSatisfy reports whether a round-trip-collapsed

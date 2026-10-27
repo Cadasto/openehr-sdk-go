@@ -136,7 +136,8 @@ var sink string
 // Callers run these per node or per attribute, so the common calls must not
 // allocate: Class reads the class of a generic name without building its
 // parameter list, and Substitute returns a declared type that no class takes
-// as a formal parameter without reading the owner's parameters.
+// as a formal parameter without reading the owner's parameters. Param reads
+// the one parameter of a generic name without building a list.
 func TestNoAllocation(t *testing.T) {
 	cases := []struct {
 		name string
@@ -146,6 +147,8 @@ func TestNoAllocation(t *testing.T) {
 		{name: "Class of a plain name", call: func() { sink = bmmtype.Class("DV_QUANTITY") }},
 		{name: "Class of a generic name", call: func() { sink = bmmtype.Class("DV_INTERVAL<DV_QUANTITY>") }},
 		{name: "Class of a nested name", call: func() { sink = bmmtype.Class(" A < B<C, D> > ") }},
+		{name: "Param of a generic name", call: func() { _, sink, _ = bmmtype.Param("DV_INTERVAL<DV_QUANTITY>") }},
+		{name: "Param of a nested name", call: func() { _, sink, _ = bmmtype.Param(" A < B<C, D> > ") }},
 		{name: "Substitute on a plain owner", call: func() { sink = bmmtype.Substitute("ELEMENT", "T") }},
 		{
 			name: "Substitute of a type that is no formal parameter",

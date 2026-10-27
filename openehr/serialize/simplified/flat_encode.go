@@ -307,7 +307,7 @@ func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, res
 		}
 		return nil
 	}
-	v, err := rmpath.ItemAtPath(resolveRoot, relPath)
+	v, err := itemAtPath(resolveRoot, relPath)
 	if err != nil {
 		if !errors.Is(err, rmpath.ErrPathNotFound) {
 			return fmt.Errorf("simplified: resolve %q: %w", relPath, err)
@@ -414,6 +414,25 @@ func refuseReusedSibling(node *webtemplate.Node, ambiguous map[string]bool) erro
 	return fmt.Errorf("simplified: FLAT id %q is one of several reused siblings sharing the path %q — not yet encodable (see deviations.md): %w", node.ID, bare, rmpath.ErrPathAmbiguous)
 }
 
+// itemAtPath is [rmpath.ItemAtPath] for the encoder, which reads a path that
+// resolves to nothing as an absent optional node, never as a fault: such a
+// path comes back as [rmpath.ErrPathNotFound] itself, without the error
+// ItemAtPath builds to name the path, since no caller passes it on. Every
+// other result is ItemAtPath's.
+func itemAtPath(root rm.Locatable, path string) (any, error) {
+	items, err := rmpath.ItemsAtPath(root, path)
+	switch {
+	case err != nil:
+		return nil, err
+	case len(items) == 1:
+		return items[0], nil
+	case len(items) == 0:
+		return nil, rmpath.ErrPathNotFound
+	}
+	// The path is ambiguous, which ItemAtPath reports in its own words.
+	return rmpath.ItemAtPath(root, path)
+}
+
 // skipNotFound treats an absent optional node (ErrPathNotFound) as a no-op,
 // but surfaces real faults — a malformed path (ErrPathSyntax) or a Max==1
 // node that resolves to multiple items (ErrPathAmbiguous) — rather than
@@ -477,7 +496,7 @@ func emitLeafOwnerRMAttrs(out map[string]any, node *webtemplate.Node, flatPath s
 	if !isElementValue || ownerRel == "" {
 		return nil
 	}
-	owner, err := rmpath.ItemAtPath(ancestorRoot, ownerRel)
+	owner, err := itemAtPath(ancestorRoot, ownerRel)
 	if err != nil {
 		return skipNotFound(err, ownerRel)
 	}

@@ -2060,6 +2060,7 @@ requirements:
       - openehr/serialize/simplified/context_test.go
       - openehr/serialize/simplified/datatypes_test.go
       - openehr/serialize/simplified/flat_encode_test.go
+      - openehr/serialize/simplified/flat_pinned_test.go
       - openehr/serialize/simplified/index_bound_test.go
       - openehr/serialize/simplified/interval_leaf_anchor_test.go
       - openehr/serialize/simplified/ism_transition_test.go
