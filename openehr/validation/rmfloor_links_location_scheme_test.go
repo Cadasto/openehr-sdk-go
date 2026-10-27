@@ -357,3 +357,62 @@ func TestValidate_REQ112_LinksLocationSchemeUnderATemplate(t *testing.T) {
 		})
 	}
 }
+
+// linksExistenceOPT returns a template rooted at an OBSERVATION that
+// declares its links at the existence interval body existence, cardinality
+// 0..*, and nothing else.
+func linksExistenceOPT(existence string) string {
+	return `<?xml version="1.0"?>
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<template_id><value>observation-links</value></template_id><concept>observation-links</concept>
+<language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
+<definition><rm_type_name>OBSERVATION</rm_type_name><node_id>at0000</node_id>
+<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>links</rm_attribute_name>
+<existence>` + existence + `</existence>
+<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval>` + fromLowerUnbounded("0") + `</interval></cardinality>
+</attributes>
+<archetype_id><value>openEHR-EHR-OBSERVATION.links.v1</value></archetype_id></definition>
+</template>`
+}
+
+// REQ-102 An existence lower bound alone asks for no member, REQ-112
+// LOCATABLE.Links_valid — the floor reports a `links` that is present and
+// empty, but `links` is not one of the lists the floor holds non-empty for
+// the template's sake, so a template's existence of 1..1 on it asks for no
+// member: an absent list and an empty one draw no `required` from the
+// template, and the empty one draws the RM's Links_valid alone. A list that
+// holds a link draws nothing. The template's existence does not change what
+// the RM rule reports.
+func TestValidate_REQ102_REQ112_LinksExistenceAsksForNoMember(t *testing.T) {
+	t.Parallel()
+	const at = "/links"
+	tests := []struct {
+		name      string
+		existence string
+		links     string // the members after the OBSERVATION's name
+		want      []string
+	}{
+		{name: "required, absent", existence: fiInterval("1", "1")},
+		{name: "required, null", existence: fiInterval("1", "1"), links: `,"links":null`},
+		{name: "required, present and empty", existence: fiInterval("1", "1"), links: `,"links":[]`, want: []string{"rm_invariant " + at + " rm " + linksValid}},
+		{name: "required, one link", existence: fiInterval("1", "1"), links: `,"links":[` + lsLink + `]`},
+		{name: "optional, absent", existence: fiInterval("0", "1")},
+		{name: "optional, present and empty", existence: fiInterval("0", "1"), links: `,"links":[]`, want: []string{"rm_invariant " + at + " rm " + linksValid}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			c := mustCompileInline(t, linksExistenceOPT(tc.existence))
+			obs := decodeJSON[rm.Observation](t, `{"_type":"OBSERVATION","archetype_node_id":"openEHR-EHR-OBSERVATION.links.v1",`+lsName+tc.links+`}`)
+			var got []validation.Issue
+			for _, iss := range validation.Validate(obs, c).Issues {
+				if iss.Path == at {
+					got = append(got, iss)
+				}
+			}
+			if keys := identityKeys(got); !slices.Equal(keys, tc.want) {
+				t.Errorf("Validate(OBSERVATION with links existence %s, %s) issues at %s = %q, want %q (REQ-102 An existence lower bound alone asks for no member)", tc.existence, tc.name, at, keys, tc.want)
+			}
+		})
+	}
+}
