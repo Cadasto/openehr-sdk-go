@@ -160,6 +160,26 @@ func TestREQ056_RunChecksXMLNameTablesBeforeWriting(t *testing.T) {
 			},
 			want: "not declared by the ITS-XML schema type",
 		},
+		{
+			name: "type name the schemas lack",
+			target: func() Target {
+				tg := TargetAOM14
+				tg.XMLTypeNames = map[string]string{"C_CODED_TEXT": "C_CODE_PHRASE", "C_ORDINAL": "C_NO_SUCH_SCHEMA_TYPE"}
+				return tg
+			},
+			want: "not declared by the target's ITS-XML schemas",
+		},
+		{
+			// The identifier element's class takes its schema type from
+			// the type-name table, so the table is checked first.
+			name: "type name of the class an identifier element belongs to",
+			target: func() Target {
+				tg := TargetAOM14
+				tg.XMLTypeNames = map[string]string{"C_CODED_TEXT": "C_NO_SUCH_SCHEMA_TYPE"}
+				return tg
+			},
+			want: "XML type name C_NO_SUCH_SCHEMA_TYPE of C_CODED_TEXT is not declared by the target's ITS-XML schemas",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			out := t.TempDir()
