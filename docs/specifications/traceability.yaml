@@ -452,6 +452,7 @@ requirements:
       - openehr/rm/integer64_test.go
       - openehr/rm/integer_test.go
       - openehr/rm/interval_bound_test.go
+      - openehr/rm/json_space_test.go
       - openehr/rm/like_interfaces_test.go
       - openehr/rm/literal_capture_test.go
       - openehr/rm/numeric_wire_test.go
