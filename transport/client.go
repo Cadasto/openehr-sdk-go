@@ -23,6 +23,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
+	"github.com/cadasto/openehr-sdk-go/internal/urlredact"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 )
@@ -124,6 +125,44 @@ func (c *Client) HTTPClient() *http.Client {
 		return nil
 	}
 	return c.cfg.httpClient
+}
+
+// String describes c by the base URL of its service catalog, with the
+// password of one that carries one masked. It never shows the token source,
+// the reauther or anything else of c that can hold a credential, and it reads
+// nothing a request changes, so it is safe to call while other goroutines use
+// c. A nil c gives "<nil>", and a Client without a catalog an empty base URL.
+//
+// String, GoString and Format are methods of *Client, because New hands out
+// only pointers. A Client value copied out of one has none of them, and some
+// fmt verbs print its fields, a token source's credential included, so print
+// the pointer.
+func (c *Client) String() string {
+	if c == nil {
+		return "<nil>"
+	}
+	var baseURL string
+	if c.catalog != nil {
+		baseURL = urlredact.String(c.catalog.BaseURL)
+	}
+	return fmt.Sprintf("transport.Client{BaseURL: %q}", baseURL)
+}
+
+// GoString returns the text of [Client.String], so that printing c in Go
+// syntax shows no credential either.
+func (c *Client) GoString() string { return c.String() }
+
+// Format writes the text of [Client.String] for every fmt verb, whatever its
+// flags and width. Without it, a verb that does not suit a pointer, such as
+// %s, %q or %t, would print the fields of c and the token source and
+// reauther they hold, credentials included, since fmt calls no method of a
+// value it reaches through an unexported field. With a nil f it does
+// nothing.
+func (c *Client) Format(f fmt.State, _ rune) {
+	if f == nil {
+		return
+	}
+	_, _ = io.WriteString(f, c.String())
 }
 
 // Do executes req and returns the captured Response. Status codes in
