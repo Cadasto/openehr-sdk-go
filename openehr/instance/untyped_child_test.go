@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/rmwrite"
@@ -326,6 +327,76 @@ func TestREQ107_IntervalOverAnUnorderedTypeIsRefused(t *testing.T) {
 					}
 					if out != nil {
 						t.Errorf("Generate returned %T with the error, want no root", out)
+					}
+				})
+			}
+		}
+	}
+}
+
+// TestREQ107_UntypedChildRefusalNamesItsType is the REQ-107 Errors check
+// that where Generate refuses an attribute of an untyped child, its error
+// names the RM type the walk builds that child as, as it names the type a
+// typed child names: a required feeder_audit the generator has no writer
+// for and a list whose children ask for more members than its cardinality
+// upper bound admits, each wrapping ErrConstraintUnsatisfiable, and a
+// member the RM writer cannot attach or append, under a single-valued
+// attribute, a list the template writes as one, or a multi-valued one. It
+// holds under every policy and both compile modes.
+func TestREQ107_UntypedChildRefusalNamesItsType(t *testing.T) {
+	cases := []struct {
+		name string
+		opt  string
+		// detail is the text after ErrConstraintUnsatisfiable, or "" where
+		// the error wraps none of the documented errors.
+		detail string
+		// prefix starts an error that wraps none of the documented errors.
+		prefix string
+	}{
+		{
+			name: "a feeder_audit at existence 1..1",
+			opt: optTemplate("CLUSTER", optMultiple("items",
+				optUntyped("at0001", optSingle("feeder_audit", optNode("FEEDER_AUDIT", ""))))),
+			detail: "ELEMENT.feeder_audit at /items[at0001] (required, but the generator has no writer for it)",
+		},
+		{
+			name: "items whose children ask past their cardinality",
+			opt: observationWithProtocol(optSingle("protocol", optUntyped("at0003", optCardinal("items", 0, 1,
+				optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0004", 1, 1),
+				optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0005", 1, 1))))),
+			detail: "ITEM_TREE.items at /protocol: the occurrences lower bounds of its children add up to 2, past its cardinality upper bound 1",
+		},
+		{
+			name:   "a value of a type its attribute does not admit",
+			opt:    optTemplate("CLUSTER", optMultiple("items", optUntyped("at0001", optSingle("value", optNode("CLUSTER", "at0002"))))),
+			prefix: "attach ELEMENT.value: ",
+		},
+		{
+			name:   "items written as a single attribute over a type they do not admit",
+			opt:    observationWithProtocol(optSingle("protocol", optUntyped("at0003", optSingle("items", optNode("DV_TEXT", ""))))),
+			prefix: "append ITEM_TREE.items: ",
+		},
+		{
+			name:   "items over a type they do not admit",
+			opt:    observationWithProtocol(optSingle("protocol", optUntyped("at0003", optMultiple("items", optNode("DV_TEXT", ""))))),
+			prefix: "append ITEM_TREE.items: ",
+		},
+	}
+	for _, tc := range cases {
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, tc.opt, implicit)
+			for _, policy := range everyPolicy {
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v", tc.name, implicit, policy), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, Now: defaultsNow})
+					if out != nil {
+						t.Errorf("Generate returned %T, want no root", out)
+					}
+					if tc.detail != "" {
+						checkUnsatisfiableDetail(t, "Generate", err, tc.detail)
+						return
+					}
+					if err == nil || !strings.HasPrefix(err.Error(), tc.prefix) {
+						t.Errorf("Generate error = %v, want one starting %q", err, tc.prefix)
 					}
 				})
 			}
