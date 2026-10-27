@@ -7,6 +7,7 @@ harvested_through: 2026-10-27T16:35:57Z
 Leftovers of merged branches: defects the branch that found them did not fix, and suggestions. Each line is a lead, not a finding: verify it before acting. Lines are grouped by theme so one delivery can take a whole group; the sentence under each heading says what such a delivery is. A delivery whose `Files` touch a line's path verifies it, and fixes it or finds it stale; the next `/sdd-triage --backlog` deletes what is settled. `sdd-pr harvest` and `sdd-pr flip --carry` add new lines under `## Unsorted`, defects first; the next `/sdd-triage --backlog` sorts them into a group. The file is kept at about 80 lines ([ai-workflow.md § Review](ai-workflow.md#review)). Edit freely.
 
 ## Unsorted
+- internal/bmmgen/render_rmaccess.go:615 · Reading a DV_CODED_TEXT or ISM_TRANSITION passed by value, such as a data value a composition built in Go holds by value in an interface field, heap-copies the whole parent, because the value arm hands `&p` to a reader that may return a pointer into it: Peek costs 128 B instead of 0, reading its value 144 B instead of 16 · by: go-reviewer · from: perf/hot-path-sweep-2
 
 ## Typed-nil options: a nil pointer passed as an interface panics on first use
 Code in transport/ and openehr/instance; one delivery decides how a constructor refuses a typed nil without reflection beyond idiom.md § API conventions, or documents the panic. Lane: maintenance. Size: S.
