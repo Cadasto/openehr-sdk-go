@@ -441,14 +441,15 @@ type Source struct {
 }
 
 // String describes s by two values fixed when s was built: its client ID
-// and its issuer. It never shows the client secret, a token or a token
-// response, and it reads nothing a refresh changes, so it is safe to call
-// while other goroutines use s. A nil s gives "<nil>".
+// and its issuer, with the password of an issuer URL that carries one masked,
+// as [url.URL.Redacted] masks it. It never shows the client secret, a token
+// or a token response, and it reads nothing a refresh changes, so it is safe
+// to call while other goroutines use s. A nil s gives "<nil>".
 func (s *Source) String() string {
 	if s == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("smart.Source{ClientID: %q, Issuer: %q}", s.cfg.ClientID, s.cfg.Issuer)
+	return fmt.Sprintf("smart.Source{ClientID: %q, Issuer: %q}", s.cfg.ClientID, urlredact.String(s.cfg.Issuer))
 }
 
 // GoString returns the text of [Source.String], so that printing s in Go
@@ -872,11 +873,12 @@ type AuthorizationRequest struct {
 }
 
 // String describes r with its PKCE shown by the text of [PKCEPair.String],
-// which replaces the verifier by "[redacted]". The other fields are shown as
-// they are.
+// which replaces the verifier by "[redacted]", and the password of an Issuer
+// URL that carries one masked, as [url.URL.Redacted] masks it. The other
+// fields are shown as they are.
 func (r AuthorizationRequest) String() string {
 	return fmt.Sprintf("smart.AuthorizationRequest{State: %q, Launch: %q, PKCE: %s, Issuer: %q, Nonce: %q}",
-		r.State, r.Launch, r.PKCE.String(), r.Issuer, r.Nonce)
+		r.State, r.Launch, r.PKCE.String(), urlredact.String(r.Issuer), r.Nonce)
 }
 
 // GoString returns the text of [AuthorizationRequest.String], so that
@@ -895,14 +897,14 @@ func (r AuthorizationRequest) Format(f fmt.State, _ rune) {
 }
 
 // LogValue lets log/slog log r as a group of its fields, keyed by field name,
-// with the PKCE verifier replaced as [AuthorizationRequest.String] replaces
-// it.
+// with the PKCE verifier replaced and the Issuer masked as
+// [AuthorizationRequest.String] replaces and masks them.
 func (r AuthorizationRequest) LogValue() slog.Value {
 	return slog.GroupValue(
 		slog.String("State", r.State),
 		slog.String("Launch", r.Launch),
 		slog.Attr{Key: "PKCE", Value: r.PKCE.LogValue()},
-		slog.String("Issuer", r.Issuer),
+		slog.String("Issuer", urlredact.String(r.Issuer)),
 		slog.String("Nonce", r.Nonce),
 	)
 }

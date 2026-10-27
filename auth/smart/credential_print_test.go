@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"net/url"
 	"reflect"
 	"strings"
@@ -117,6 +118,32 @@ func credentialResponse() smart.TokenResponse {
 	}
 }
 
+// The URLs of urlResponse, each with credURLPass as its password, and the
+// text each prints as.
+const (
+	credIssuer         = "https://iss:" + credURLPass + "@idp.example"
+	credIssuerMasked   = "https://iss:" + urlMask + "@idp.example"
+	credFHIRUser       = "https://user:" + credURLPass + "@fhir.example/Practitioner/1"
+	credFHIRUserMasked = "https://user:" + urlMask + "@fhir.example/Practitioner/1"
+	credStyle          = "https://style:" + credURLPass + "@app.example/smart-style.json"
+	credStyleMasked    = "https://style:" + urlMask + "@app.example/smart-style.json"
+)
+
+// urlResponse returns credentialResponse with credURLPass as the password of
+// every URL it holds: FHIRUser and SMARTStyleURL, the issuer and fhirUser
+// claims of IDTokenClaims, and the iss, fhirUser and smart_style_url
+// members of Raw.
+func urlResponse() smart.TokenResponse {
+	tr := credentialResponse()
+	tr.FHIRUser = credFHIRUser
+	tr.SMARTStyleURL = credStyle
+	tr.IDTokenClaims = &smart.IDTokenClaims{Subject: "sub-1", Audience: []string{"client-id"}, Issuer: credIssuer, FHIRUser: credFHIRUser}
+	tr.Raw["iss"] = credIssuer
+	tr.Raw["fhirUser"] = credFHIRUser
+	tr.Raw["smart_style_url"] = credStyle
+	return tr
+}
+
 // credentialRequest returns an authorization request whose PKCE verifier is
 // credVerifier.
 func credentialRequest() smart.AuthorizationRequest {
@@ -132,9 +159,11 @@ func credentialRequest() smart.AuthorizationRequest {
 // TestREQ060_PrintsNoCredential pins REQ-060: a smart.Config, a
 // smart.TokenResponse, a smart.TokenChange, a smart.PKCEPair and a
 // smart.AuthorizationRequest, printed with any fmt verb or logged through
-// log/slog, show each credential they hold as [redacted] and their other
-// fields as they are. The token members of a TokenResponse's Raw keep their
-// keys, and printing does not change the Raw it was given.
+// log/slog, show each credential they hold as [redacted], the password of
+// each URL they hold masked and their other fields as they are; so does a
+// *smart.Source, for its issuer. The token members of a TokenResponse's Raw
+// keep their keys, and printing does not change the Raw or the ID token
+// claims it was given.
 func TestREQ060_PrintsNoCredential(t *testing.T) { // REQ-060
 	t.Parallel()
 	key := newRSAKey(t)
@@ -228,6 +257,32 @@ func TestREQ060_PrintsNoCredential(t *testing.T) { // REQ-060
 			secrets: []string{credVerifier},
 			shown:   []string{redactedMarker, "state-1", "launch-1", "challenge-1", "https://idp.example", "nonce-1"},
 		},
+		{
+			name:    "TokenResponse with a password in every URL",
+			v:       urlResponse(),
+			secrets: append([]string{credURLPass}, responseSecrets...),
+			shown:   []string{redactedMarker, "patient-1", "sub-1", credIssuerMasked, credFHIRUserMasked, credStyleMasked},
+		},
+		{
+			name: "TokenChange with a password in every URL",
+			v: smart.TokenChange{
+				Access:       auth.Token{Value: credAccess, Type: auth.TokenTypeBearer, Issuer: credIssuer},
+				RefreshToken: credRefresh,
+				Response:     urlResponse(),
+			},
+			secrets: append([]string{credURLPass}, responseSecrets...),
+			shown:   []string{redactedMarker, credIssuerMasked, credFHIRUserMasked, credStyleMasked},
+		},
+		{
+			name: "AuthorizationRequest with a password in its issuer",
+			v: smart.AuthorizationRequest{
+				State:  "state-1",
+				PKCE:   smart.PKCEPair{Verifier: credVerifier, Challenge: "challenge-1"},
+				Issuer: credIssuer,
+			},
+			secrets: []string{credVerifier, credURLPass},
+			shown:   []string{redactedMarker, "state-1", credIssuerMasked},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -241,14 +296,34 @@ func TestREQ060_PrintsNoCredential(t *testing.T) { // REQ-060
 		})
 	}
 
+	t.Run("*Source with a password in its issuer", func(t *testing.T) {
+		t.Parallel()
+		src, err := smart.New("client-id", discovery.AuthEndpoints{
+			AuthorizationEndpoint: &url.URL{Scheme: "https", Host: "idp.example", Path: "/authorize"},
+			TokenEndpoint:         &url.URL{Scheme: "https", Host: "idp.example", Path: "/token"},
+		}, smart.WithHTTPClient(&http.Client{}), smart.WithRedirectURI("https://app.example/callback"),
+			smart.WithAudience(testAudience), smart.WithIssuer(credIssuer))
+		if err != nil {
+			t.Fatalf("smart.New: %v", err)
+		}
+		for _, p := range printProblems(src, []string{credURLPass}, []string{"client-id", credIssuerMasked}) {
+			t.Error(p)
+		}
+	})
+
 	t.Run("Raw is not changed", func(t *testing.T) {
 		t.Parallel()
-		tr := credentialResponse()
-		_ = fmt.Sprint(tr)
-		var buf bytes.Buffer
-		slog.New(slog.NewJSONHandler(&buf, nil)).Info("printed", "tr", tr)
-		if !reflect.DeepEqual(tr.Raw, credentialResponse().Raw) {
-			t.Errorf("Raw after printing and logging = %v, want it unchanged", tr.Raw)
+		for _, fixture := range []func() smart.TokenResponse{credentialResponse, urlResponse} {
+			tr := fixture()
+			_ = fmt.Sprint(tr)
+			var buf bytes.Buffer
+			slog.New(slog.NewJSONHandler(&buf, nil)).Info("printed", "tr", tr)
+			if !reflect.DeepEqual(tr.Raw, fixture().Raw) {
+				t.Errorf("Raw after printing and logging = %v, want it unchanged", tr.Raw)
+			}
+			if !reflect.DeepEqual(tr.IDTokenClaims, fixture().IDTokenClaims) {
+				t.Errorf("IDTokenClaims after printing and logging = %+v, want them unchanged", tr.IDTokenClaims)
+			}
 		}
 	})
 
