@@ -1,6 +1,8 @@
 package simplified
 
 import (
+	"strings"
+
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 )
@@ -75,13 +77,25 @@ func archetypeRootIDs(wt *webtemplate.WebTemplate) map[string]bool {
 	if wt == nil || wt.Tree == nil {
 		return ids
 	}
+	// Every node's path repeats its parent's predicates, and most ids are
+	// at-codes, so each id is judged once: refused holds the ones that are not
+	// archetype ids. An archetype id names its RM originator, name and entity
+	// with two dashes between them, so an id with fewer is refused unparsed.
+	refused := make(map[string]struct{})
 	add := func(id string) {
 		if id == "" || ids[id] {
 			return
 		}
-		if _, err := rm.ParseArchetypeID(id); err == nil {
-			ids[id] = true
+		if _, done := refused[id]; done {
+			return
 		}
+		if strings.Count(id, "-") >= 2 {
+			if _, err := rm.ParseArchetypeID(id); err == nil {
+				ids[id] = true
+				return
+			}
+		}
+		refused[id] = struct{}{}
 	}
 	stack := []*webtemplate.Node{wt.Tree}
 	for len(stack) > 0 {
@@ -91,7 +105,7 @@ func archetypeRootIDs(wt *webtemplate.WebTemplate) map[string]bool {
 			continue
 		}
 		add(n.NodeID)
-		for _, seg := range parseAQL(n.AQLPath) {
+		for seg := range aqlSegments(n.AQLPath) {
 			add(seg.pred)
 		}
 		stack = append(stack, n.Children...)

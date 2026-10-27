@@ -459,6 +459,7 @@ requirements:
       - openehr/rm/quoted_literal_test.go
       - openehr/rm/real_test.go
       - openehr/rm/typereg/decodeerror_chain_test.go
+      - openehr/rm/typereg/inplace_test.go
       - openehr/rm/typereg/nildecodeerror_test.go
       - openehr/rm/typereg/registry_test.go
       - openehr/rm/typereg/valuefree_test.go
@@ -469,6 +470,7 @@ requirements:
       - openehr/serialize/canjson/edgecases_test.go
       - openehr/serialize/canjson/encode_test.go
       - openehr/serialize/canjson/entryerror_internal_test.go
+      - openehr/serialize/canjson/inplace_slots_test.go
       - openehr/serialize/canjson/interval_failed_decode_test.go
       - openehr/serialize/canjson/interval_flag_defaults_test.go
       - openehr/serialize/canjson/interval_open_side_test.go
@@ -568,6 +570,7 @@ requirements:
       - openehr/serialize/simplified/string_leaf_test.go
       - openehr/serialize/simplified/structured_ctx_test.go
       - openehr/serialize/simplified/structured_test.go
+      - openehr/serialize/simplified/template_index_cache_test.go
       - openehr/serialize/simplified/template_order_test.go
       - openehr/serialize/simplified/template_roundtrip_test.go
       - openehr/serialize/simplified/unmatched_test.go
@@ -1699,6 +1702,7 @@ requirements:
       - openehr/aql/parse/ast_test.go
       - openehr/aql/parse/parse_test.go
       - openehr/aql/parse/roundtrip_test.go
+      - openehr/aql/parse/sll_internal_test.go
       - openehr/validation/aql_test.go
       - testkit/probes/aql/probe_028_aql_lint.go
       - testkit/probes/aql/probe_099_path_shape_lint.go

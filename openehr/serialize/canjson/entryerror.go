@@ -66,7 +66,8 @@ type failure struct {
 // chain records.
 //
 // A pointer in the chain is absolute within the decoder that raised it. A
-// polymorphic slot is decoded on a decoder of its own (see
+// polymorphic slot is decoded on a decoder of its own, or, nested in a slot read
+// whole, has its positions moved to count from it (see
 // [typereg.DecodePolymorphic]), so beneath a slot's [DecodeError] pointers
 // count from the slot, which the slot's Path places; a slot that fell back to
 // its declared type for want of a `_type` has no Type, so the slot is told by

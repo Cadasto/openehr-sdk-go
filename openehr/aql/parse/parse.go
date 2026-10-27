@@ -8,6 +8,7 @@
 package parse
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -153,6 +154,12 @@ type Document struct {
 // document. On the first syntax error it returns a *[SyntaxError] (wrapping
 // [aql.ErrSyntax]) and a nil document.
 func Parse(q string) (*Document, error) {
+	if tree, ok := parseSLL(q); ok {
+		doc := &Document{tree: tree}
+		doc.populate()
+		doc.extract()
+		return doc, nil
+	}
 	lexer := gen.NewAqlLexer(antlr.NewInputStream(q))
 	collector := &errorCollector{}
 	lexer.RemoveErrorListeners()
@@ -173,6 +180,62 @@ func Parse(q string) (*Document, error) {
 	doc.extract()
 	return doc, nil
 }
+
+// parseSLL parses q in ANTLR's SLL prediction mode, stopping at the first
+// error, and reports whether that parse succeeded. SLL prediction skips the
+// full-context analysis the default LL mode runs where the grammar needs more
+// than one token of lookahead to choose, as it does inside path predicates.
+// ANTLR guarantees that an SLL parse that succeeds builds the tree LL builds,
+// while one that fails may only lack LL's power, so [Parse] reads a failure
+// as no answer and parses q again in the default mode. The second parse, and
+// it alone, reports the errors, so a query Parse refuses gets the error it
+// always got.
+func parseSLL(q string) (tree gen.ISelectQueryContext, ok bool) {
+	lexer := gen.NewAqlLexer(antlr.NewInputStream(q))
+	lexErrors := &errorCollector{}
+	lexer.RemoveErrorListeners()
+	lexer.AddErrorListener(lexErrors)
+
+	p := gen.NewAqlParser(antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel))
+	p.RemoveErrorListeners()
+	p.SetErrorHandler(&bailOnError{DefaultErrorStrategy: antlr.NewDefaultErrorStrategy()})
+	p.GetInterpreter().SetPredictionMode(antlr.PredictionModeSLL)
+
+	defer func() {
+		if r := recover(); r != nil {
+			if r != errBailedOut { //nolint:errorlint // the sentinel is panicked as it is, never wrapped
+				panic(r)
+			}
+			tree, ok = nil, false
+		}
+	}()
+	tree = p.SelectQuery()
+	if len(lexErrors.errors) > 0 {
+		return nil, false
+	}
+	return tree, true
+}
+
+// errBailedOut is what [bailOnError] panics with to stop the SLL parse at its
+// first error; [parseSLL] recovers it, and nothing else.
+var errBailedOut = errors.New("aql: SLL parse stopped at its first error")
+
+// bailOnError stops a parse at its first error, by panicking with
+// errBailedOut, rather than recovering and parsing on. antlr4-go's own
+// BailErrorStrategy cannot be used here: the generated rules hand the
+// cancellation it records to ReportError, whose default strategy panics on it,
+// and then clear it, so the parse would carry on.
+type bailOnError struct {
+	*antlr.DefaultErrorStrategy
+}
+
+func (*bailOnError) ReportError(antlr.Parser, antlr.RecognitionException) {}
+
+func (*bailOnError) Recover(antlr.Parser, antlr.RecognitionException) { panic(errBailedOut) }
+
+func (*bailOnError) RecoverInline(antlr.Parser) antlr.Token { panic(errBailedOut) }
+
+func (*bailOnError) Sync(antlr.Parser) {}
 
 // Parsed reports whether d is the result of a successful [Parse] call.
 func (d *Document) Parsed() bool { return d != nil && d.tree != nil }

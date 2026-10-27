@@ -12,11 +12,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"iter"
 	"maps"
 	"math"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
+	"weak"
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
@@ -97,7 +101,7 @@ func UnmarshalFlat(data []byte, wt *webtemplate.WebTemplate, opts ...Option) (*r
 func decodeFlatMap(flat map[string]any, wt *webtemplate.WebTemplate, cfg decodeConfig, loc locator, skipped []string) (*rm.Composition, error) {
 	var tmpl *templateIndex
 	if cfg.template != nil {
-		tmpl = buildTemplateIndex(cfg.template)
+		tmpl = templateIndexFor(cfg.template)
 	}
 	compJSON, unmatched, err := decodeFlatIgnoring(flat, wt, tmpl, cfg.strict)
 	unmatched = slices.Concat(skipped, unmatched)
@@ -1393,19 +1397,27 @@ type aqlSeg struct {
 // split — no supported Web Template emits them (mirror
 // rmpath.parsePredicate if that changes).
 func parseAQL(p string) []aqlSeg {
-	var out []aqlSeg
-	for part := range strings.SplitSeq(strings.TrimPrefix(bareAQLPath(p), "/"), "/") {
-		if part == "" {
-			continue
+	return slices.Collect(aqlSegments(p))
+}
+
+// aqlSegments yields the segments [parseAQL] returns, one at a time, for a
+// caller that reads each once.
+func aqlSegments(p string) iter.Seq[aqlSeg] {
+	return func(yield func(aqlSeg) bool) {
+		for part := range strings.SplitSeq(strings.TrimPrefix(bareAQLPath(p), "/"), "/") {
+			if part == "" {
+				continue
+			}
+			seg := aqlSeg{attr: part}
+			if i := strings.IndexByte(part, '['); i >= 0 && strings.HasSuffix(part, "]") {
+				seg.attr = part[:i]
+				seg.pred = part[i+1 : len(part)-1]
+			}
+			if !yield(seg) {
+				return
+			}
 		}
-		seg := aqlSeg{attr: part}
-		if i := strings.IndexByte(part, '['); i >= 0 && strings.HasSuffix(part, "]") {
-			seg.attr = part[:i]
-			seg.pred = part[i+1 : len(part)-1]
-		}
-		out = append(out, seg)
 	}
-	return out
 }
 
 // placeLeaf walks aqlPath from compJSON, materialising the intermediate RM
@@ -2460,6 +2472,30 @@ func (x *templateIndex) addRMType(path, rmType string) {
 		rmType = ""
 	}
 	x.rmTypes[path] = rmType
+}
+
+// templateIndexes holds the index [buildTemplateIndex] built for each compiled
+// template, for as long as the template lives, so the decodes that share a
+// template build its index once. It is keyed by a weak pointer to the template,
+// so the cache does not keep a template alive, and the entry is dropped once
+// the template is collected; the index holds no pointer back into it. A
+// compiled template does not change once compiled, and no decode writes to an
+// index, so every decode with one template can read the same index.
+var templateIndexes sync.Map // weak.Pointer[templatecompile.Compiled] → *templateIndex
+
+// templateIndexFor returns the index of the compiled template c, building it
+// on the first decode with c ([templateIndexes]). Two first decodes at once may
+// both build it; the one stored first wins, and the other is discarded.
+func templateIndexFor(c *templatecompile.Compiled) *templateIndex {
+	key := weak.Make(c)
+	if x, ok := templateIndexes.Load(key); ok {
+		return x.(*templateIndex)
+	}
+	x, loaded := templateIndexes.LoadOrStore(key, buildTemplateIndex(c))
+	if !loaded {
+		runtime.AddCleanup(c, func(key weak.Pointer[templatecompile.Compiled]) { templateIndexes.Delete(key) }, key)
+	}
+	return x.(*templateIndex)
 }
 
 // buildTemplateIndex walks the compiled template and indexes each archetype
@@ -3630,9 +3666,8 @@ type parsedKey struct {
 // value with another — both are rejected.
 func parseFlatKey(key string) (parsedKey, error) {
 	key, suffix := splitSuffix(key)
-	parts := strings.Split(key, "/")
-	segs := make([]flatSeg, 0, len(parts))
-	for _, p := range parts {
+	segs := make([]flatSeg, 0, strings.Count(key, "/")+1)
+	for p := range strings.SplitSeq(key, "/") {
 		seg := flatSeg{id: p, idx: -1}
 		if id, idxStr, found := strings.CutLast(p, ":"); found {
 			if n, err := strconv.Atoi(idxStr); err == nil {
