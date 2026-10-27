@@ -917,17 +917,20 @@ func builtAttrType(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute)
 
 // attrRMType returns the RM type of attr of optNode: the type the compile
 // gives it, which it reads on the type optNode names. An untyped node names
-// none, so the compile gives its attributes no type; such an attribute
-// takes the type the BMM declares for it on the type the walk builds for
-// optNode (builtRMType), as the compile would read it there.
+// none, and the compile reads its attributes on the type the BMM declares
+// for the attribute that holds it, which can be an abstract class the walk
+// builds as a descendant; such an attribute takes the type the BMM declares
+// for it on the type the walk builds for optNode (builtRMType), as the
+// compile would read it there, and the compile's type where the BMM
+// declares none there.
 func attrRMType(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) string {
-	if declared := attr.RMTypeName(); declared != "" || strings.TrimSpace(optNode.RMTypeName()) != "" {
-		return declared
+	if strings.TrimSpace(optNode.RMTypeName()) != "" {
+		return attr.RMTypeName()
 	}
 	built := builtRMType(optNode)
 	declared, ok := rminfo.Default.AttributeRMType(bmmtype.Class(built), attr.Name())
 	if !ok {
-		return ""
+		return attr.RMTypeName()
 	}
 	return bmmtype.Substitute(built, declared)
 }

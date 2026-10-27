@@ -1259,6 +1259,7 @@ requirements:
       - internal/templatecompile/compile_generic_test.go
       - internal/templatecompile/flat_conformance_compile_test.go
       - internal/templatecompile/registerpath_test.go
+      - internal/templatecompile/untyped_test.go
       - internal/templatecompile/webtemplate_oracle_compile_test.go
       - openehr/rm/rminfo/lookup_test.go
       - openehr/template/archetype_root_template_id_test.go

@@ -165,13 +165,14 @@ func observationWithProtocol(protocol string) string {
 // built as its DV wrapper; which of its attributes the RM computes rather
 // than stores; which of them the RM makes mandatory, so that one the
 // template makes optional is visited under every policy; the type of an
-// attribute the template names with no child; and whether such an
-// attribute can only hold content the template does not describe. Each
-// template holds one untyped child, and the root
-// Generate returns for it is the root it returns for the same template
-// with the child typed as the walk builds it, which passes the template
-// validator and the RM floor, under every policy, both value fills and both
-// compile modes.
+// attribute the template names with no child, read on the type the walk
+// builds rather than on an abstract class the RM redefines it below; and
+// whether such an attribute can only hold content the template does not
+// describe. Each template holds one untyped child, and the root Generate
+// returns for it is the root it returns for the same template with the
+// child typed as the walk builds it, which passes the template validator
+// and the RM floor, under every policy, both value fills and both compile
+// modes.
 func TestREQ107_UntypedChildIsReadAsTheTypeItIsBuiltAs(t *testing.T) {
 	cases := []struct {
 		name string
@@ -212,10 +213,28 @@ func TestREQ107_UntypedChildIsReadAsTheTypeItIsBuiltAs(t *testing.T) {
 			},
 		},
 		{
+			name:  "a POINT_EVENT whose mandatory time the template makes optional",
+			typed: "POINT_EVENT",
+			opt: func(rmType string) string {
+				return historyOf(optNode(rmType, "at0002",
+					optOptionalSingleOver("time", optNode("DV_DATE_TIME", "")), optSingle("data", emptyTree)))
+			},
+		},
+		{
 			name:  "an ELEMENT whose value the template names with no child",
 			typed: "ELEMENT",
 			opt: func(rmType string) string {
 				return optTemplate("CLUSTER", optMultiple("items", optNode(rmType, "at0001", optSingle("value"))))
+			},
+		},
+		{
+			// The interval's parameter declares accuracy a DV_AMOUNT, and
+			// the DV_DATE the walk builds the bound as a DV_DURATION.
+			name:  "a DV_INTERVAL<DV_ABSOLUTE_QUANTITY> bound whose accuracy the template names with no child",
+			typed: "DV_DATE",
+			opt: func(rmType string) string {
+				return optTemplate("ELEMENT", optSingle("value", optAbstractInterval("DV_ABSOLUTE_QUANTITY",
+					optSingle("lower", optNode(rmType, "", optSingle("accuracy"))))))
 			},
 		},
 		{

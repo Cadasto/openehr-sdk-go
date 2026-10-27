@@ -76,7 +76,7 @@ func Compile(opt *template.OperationalTemplate, opts ...Options) (*Compiled, err
 		implicit: map[implicitKey]*CompiledAttribute{},
 		paths:    map[string]pathMark{},
 	}
-	root, err := w.compileNode(opt.Root(), nil, "/")
+	root, err := w.compileNode(opt.Root(), nil, "/", "")
 	if err != nil {
 		return nil, err
 	}
@@ -169,8 +169,10 @@ type pathMark struct {
 
 // compileNode walks one OPT node, recurses into its children, and
 // registers the result in the indexes. path is the node's AQL path ("/"
-// for the root), which the caller computes ([childPath]).
-func (w *walker) compileNode(n template.Node, parent *CompiledNode, path string) (*CompiledNode, error) {
+// for the root), which the caller computes ([childPath]). heldAs is the
+// type the node's attributes are read on when the node names no RM type
+// ([heldType]), "" for the root.
+func (w *walker) compileNode(n template.Node, parent *CompiledNode, path, heldAs string) (*CompiledNode, error) {
 	cn := &CompiledNode{parent: parent, aqlPath: path}
 
 	// A repeated path means this node shares an AQL path with one already
@@ -183,7 +185,7 @@ func (w *walker) compileNode(n template.Node, parent *CompiledNode, path string)
 	} else {
 		w.paths[cn.aqlPath] = pathMark{}
 	}
-	err := w.descend(n, cn)
+	err := w.descend(n, cn, heldAs)
 	if inDup {
 		w.dupDepth--
 	}
@@ -211,8 +213,8 @@ func (w *walker) compileNode(n template.Node, parent *CompiledNode, path string)
 // its children. Split out of compileNode so the caller can scope the
 // duplicate-path subtree marker (dupDepth) to the recursion alone,
 // leaving cn's own path registration subject to the full collision
-// check.
-func (w *walker) descend(n template.Node, cn *CompiledNode) error {
+// check. heldAs is as for compileNode.
+func (w *walker) descend(n template.Node, cn *CompiledNode, heldAs string) error {
 	// The template-level node name (REQ-116) is read via ObjectNode,
 	// the interface that exists so this carry cannot miss one of the
 	// two object kinds; slots are not ObjectNodes and cannot pin one.
@@ -231,13 +233,13 @@ func (w *walker) descend(n template.Node, cn *CompiledNode) error {
 		// Terms already copies each term and its items.
 		cn.terms = v.Terms()
 		w.compiled.termBindings = append(w.compiled.termBindings, v.TermBindings()...)
-		return w.attachAttributes(cn, v.Attributes())
+		return w.attachAttributes(cn, readAs(cn.rmTypeName, heldAs), v.Attributes())
 	case *template.ComplexObject:
 		cn.rmTypeName = v.RMTypeName()
 		cn.nodeID = v.NodeID()
 		cn.occurrences = v.Occurrences()
 		cn.primitive = v.PrimitiveConstraint()
-		return w.attachAttributes(cn, v.Attributes())
+		return w.attachAttributes(cn, readAs(cn.rmTypeName, heldAs), v.Attributes())
 	case *template.Slot:
 		cn.rmTypeName = v.RMTypeName()
 		cn.nodeID = v.NodeID()
@@ -252,17 +254,43 @@ func (w *walker) descend(n template.Node, cn *CompiledNode) error {
 	}
 }
 
+// readAs returns the RM type the attributes of a node are read on: the
+// type declared, the one the template writes for the node, or, where the
+// template writes none, heldAs, the type of the attribute that holds the
+// node ([heldType]).
+func readAs(declared, heldAs string) string {
+	if strings.TrimSpace(declared) == "" {
+		return heldAs
+	}
+	return declared
+}
+
+// heldType returns the RM type an untyped child of an attribute is read
+// as: attrType, the type the attribute has on a node whose bare class is
+// class ([walker.attributeType]), or, where that is a formal generic
+// parameter of class the node's type leaves open, such as the T of a
+// POINT_EVENT's data, the type the BMM constrains that parameter to
+// (ITEM_STRUCTURE). It is "" where neither is known.
+func heldType(class, attrType string) string {
+	if constraint, formal := bmmtype.ParameterConstraint(class, attrType); formal {
+		return constraint
+	}
+	return attrType
+}
+
 // attachAttributes builds the explicit attributes of cn from the
 // OPT-declared list, then (unless disabled) injects implicit
 // attributes for every RM-declared field the OPT did not name.
+// owner is the RM type the attributes are read on ([readAs]): cn's own,
+// or, for a node that names none, the type of the attribute that holds it.
 // Order: OPT-declared first (document order), then implicit
 // (sorted by RM declaration order from rminfo).
-func (w *walker) attachAttributes(cn *CompiledNode, declared []*template.Attribute) error {
+func (w *walker) attachAttributes(cn *CompiledNode, owner string, declared []*template.Attribute) error {
 	// rminfo knows each class by its bare BMM name; the OPT may declare a
 	// generic instantiation (DV_INTERVAL<DV_QUANTITY>) that it does not.
-	class := bmmtype.Class(cn.rmTypeName)
+	class := bmmtype.Class(owner)
 	var required []string
-	if cn.rmTypeName != "" {
+	if owner != "" {
 		required = w.requiredAttributes(class)
 	}
 	// The lookup lists the required attributes in RM declaration order,
@@ -272,7 +300,7 @@ func (w *walker) attachAttributes(cn *CompiledNode, declared []*template.Attribu
 	// fields alone, and optional ones would inflate every node with RM
 	// metadata that walker code does not need.
 	var implicit []string
-	if !w.opts.SkipImplicitAttributes && cn.rmTypeName != "" {
+	if !w.opts.SkipImplicitAttributes && owner != "" {
 		implicit = required
 	}
 	// Room for every attribute up front, so appending never grows the
@@ -281,7 +309,7 @@ func (w *walker) attachAttributes(cn *CompiledNode, declared []*template.Attribu
 		cn.attributes = make([]*CompiledAttribute, 0, n)
 	}
 	for _, a := range declared {
-		ca, err := w.buildAttribute(cn, class, required, a)
+		ca, err := w.buildAttribute(cn, owner, class, required, a)
 		if err != nil {
 			return err
 		}
@@ -291,7 +319,7 @@ func (w *walker) attachAttributes(cn *CompiledNode, declared []*template.Attribu
 		if declares(declared, attrName) {
 			continue
 		}
-		if ca := w.implicitAttribute(cn.rmTypeName, class, attrName); ca != nil {
+		if ca := w.implicitAttribute(owner, class, attrName); ca != nil {
 			cn.attributes = append(cn.attributes, ca)
 		}
 	}
@@ -315,9 +343,10 @@ func countUndeclared(names []string, declared []*template.Attribute) int {
 }
 
 // implicitAttribute returns the implicit attribute attr of a node whose
-// OPT-declared type is owner and whose bare class is class, or nil when the
-// lookup gives the attribute no RM type. It is made once per owner type and
-// attribute name in a call, and shared by the nodes of that type.
+// attributes are read on owner ([readAs]) and whose bare class is class, or
+// nil when the lookup gives the attribute no RM type. It is made once per
+// owner type and attribute name in a call, and shared by the nodes of that
+// type.
 func (w *walker) implicitAttribute(owner, class, attr string) *CompiledAttribute {
 	key := implicitKey{owner: owner, attr: attr}
 	if ca, ok := w.implicit[key]; ok {
@@ -357,10 +386,11 @@ func (w *walker) requiredAttributes(class string) []string {
 // buildAttribute compiles one OPT-declared attribute, recursing
 // into its children. The attribute's BMM RM type is looked up so
 // downstream consumers can resolve type-aware constraints without a
-// separate rminfo query. class is the bare class of parent's RM type,
-// and required the attributes that class requires.
-func (w *walker) buildAttribute(parent *CompiledNode, class string, required []string, a *template.Attribute) (*CompiledAttribute, error) {
-	rm, isProperty := w.attributeType(parent.rmTypeName, class, a.Name())
+// separate rminfo query. owner is the RM type parent's attributes are
+// read on ([readAs]), class its bare class, and required the attributes
+// that class requires.
+func (w *walker) buildAttribute(parent *CompiledNode, owner, class string, required []string, a *template.Attribute) (*CompiledAttribute, error) {
+	rm, isProperty := w.attributeType(owner, class, a.Name())
 	ca := &CompiledAttribute{
 		name:              a.Name(),
 		cardinality:       a.Cardinality(),
@@ -382,8 +412,9 @@ func (w *walker) buildAttribute(parent *CompiledNode, class string, required []s
 	if base == "/" {
 		base = ""
 	}
+	heldAs := heldType(class, rm)
 	for i, child := range children {
-		cn, err := w.compileNode(child, parent, childPath(base, a.Name(), a.Cardinality(), child, i))
+		cn, err := w.compileNode(child, parent, childPath(base, a.Name(), a.Cardinality(), child, i), heldAs)
 		if err != nil {
 			return nil, err
 		}
@@ -393,12 +424,12 @@ func (w *walker) buildAttribute(parent *CompiledNode, class string, required []s
 }
 
 // attributeType resolves the RM type of attribute attr on a node whose
-// OPT-declared type is owner and whose bare class is class. rminfo is keyed by
-// bare class name, so a generic instantiation is looked up by its class; and
-// rminfo types an attribute the class declares with a formal parameter by
-// that parameter's name (DV_INTERVAL.lower is "T"), so the actual parameter
-// the declared name supplies takes its place (DV_QUANTITY for
-// DV_INTERVAL<DV_QUANTITY>).
+// attributes are read on owner ([readAs]) and whose bare class is class.
+// rminfo is keyed by bare class name, so a generic instantiation is looked
+// up by its class; and rminfo types an attribute the class declares with a
+// formal parameter by that parameter's name (DV_INTERVAL.lower is "T"), so
+// the actual parameter the declared name supplies takes its place
+// (DV_QUANTITY for DV_INTERVAL<DV_QUANTITY>).
 func (w *walker) attributeType(owner, class, attr string) (string, bool) {
 	rm, ok := w.lookup.AttributeRMType(class, attr)
 	if !ok {

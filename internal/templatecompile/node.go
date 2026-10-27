@@ -253,6 +253,16 @@ func RootTermItem(n *CompiledNode, code, key string) (string, bool) {
 // CompiledAttribute is one attribute on a CompiledNode. Carries the
 // OPT-declared cardinality + existence when the OPT had an
 // <attributes> entry for it, and the RM-derived type when implicit.
+//
+// What the compile reads on the parent's RM type (RMTypeName, Required,
+// NotInRM, and which attributes are injected as Implicit) it reads, for a
+// parent that names no RM type, on the type of the attribute that holds
+// the parent (that attribute's RMTypeName), or, where that is a formal
+// generic parameter the holding node's type leaves open, on the type the
+// parameter must conform to: an untyped child of a HISTORY's events is
+// read as an EVENT, and one of a POINT_EVENT's data as an ITEM_STRUCTURE.
+// The parent's own RMTypeName stays empty. A template root that names no
+// type has no holding attribute, so its attributes are read on no type.
 type CompiledAttribute struct {
 	name              string
 	cardinality       template.Cardinality
@@ -318,7 +328,8 @@ func (a *CompiledAttribute) RMTypeName() string { return a.rmTypeName }
 func (a *CompiledAttribute) Implicit() bool { return a.implicit }
 
 // Required reports whether the BMM declares this attribute as
-// mandatory on the parent type. True implies the composition
+// mandatory on the parent type, read as [CompiledAttribute] says for a
+// parent that names no RM type. True implies the composition
 // builder must emit a value at this attribute's RM path.
 func (a *CompiledAttribute) Required() bool { return a.required }
 
