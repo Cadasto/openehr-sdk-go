@@ -270,10 +270,9 @@ type exchange struct {
 	done  chan struct{}
 	token auth.Token
 	err   error
-	// held is the access token the exchange's callers get in place of err,
-	// except Reauth, when serveHeld reports that the exchange failed
-	// transiently while held was still valid. Both are written before done
-	// is closed.
+	// held is the access token the exchange's callers get in place of err
+	// when serveHeld reports that the exchange failed transiently while held
+	// was still valid. Both are written before done is closed.
 	held      auth.Token
 	serveHeld bool
 	// abandoned reports that the exchange has no result for the callers
@@ -445,19 +444,12 @@ var _ auth.Reauther = (*Source)(nil)
 // tries again. The calls waiting on an exchange get the same outcome, the
 // cached token included; [Source.Reauth] gets the failure.
 func (s *Source) Token(ctx context.Context) (auth.Token, error) {
-	return s.token(ctx, false)
-}
-
-// token is Token. forced reports a call by Reauth, which exchanges during a
-// backoff and gets the failure of an exchange that Token would answer with
-// the cached token.
-func (s *Source) token(ctx context.Context, forced bool) (auth.Token, error) {
 	for {
 		if err := ctx.Err(); err != nil {
 			return auth.Token{}, err
 		}
 		s.mu.Lock()
-		if !s.stale() || (!forced && time.Now().Before(s.retryAt)) {
+		if !s.stale() || time.Now().Before(s.retryAt) {
 			// The token is fresh, or a transient failure left it to be served
 			// until the backoff ends, which is no later than its ExpiresAt.
 			t := s.cur
@@ -469,7 +461,7 @@ func (s *Source) token(ctx context.Context, forced bool) (auth.Token, error) {
 			ex = &exchange{done: make(chan struct{})}
 			s.inflight = ex
 			s.mu.Unlock()
-			return s.lead(ctx, ex, forced)
+			return s.lead(ctx, ex)
 		}
 		s.mu.Unlock()
 		select {
@@ -478,7 +470,7 @@ func (s *Source) token(ctx context.Context, forced bool) (auth.Token, error) {
 			return auth.Token{}, ctx.Err()
 		}
 		if !ex.abandoned {
-			return ex.outcome(forced)
+			return ex.outcome()
 		}
 		// The caller running ex gave up or panicked, and this caller's
 		// context is live: go round again to run a new exchange or wait on a
@@ -508,21 +500,23 @@ func (s *Source) Reauth(ctx context.Context) error {
 		return err
 	}
 	s.mu.Lock()
+	// Dropping the token also ends its backoff, so the exchange below is
+	// sent at once, and no exchange that ends afterwards can serve the
+	// token to this call.
 	s.setTokenLocked(auth.Token{})
 	s.mu.Unlock()
-	_, err := s.token(ctx, true)
+	_, err := s.Token(ctx)
 	return err
 }
 
 // lead runs the exchange ex on behalf of every caller waiting on it, caches
-// the token it obtains, and publishes the result to those callers. forced
-// reports that the caller is Reauth.
+// the token it obtains, and publishes the result to those callers.
 //
 // A panic in the exchange unwinds lead before the result is published. The
 // deferred release still takes ex out of flight and wakes the waiters, with
 // ex marked abandoned so that they start a new exchange, and the panic goes
 // on to the caller as it was raised.
-func (s *Source) lead(ctx context.Context, ex *exchange, forced bool) (auth.Token, error) {
+func (s *Source) lead(ctx context.Context, ex *exchange) (auth.Token, error) {
 	// ex stays abandoned unless the exchange returns and its result is
 	// published below.
 	ex.abandoned = true
@@ -540,11 +534,18 @@ func (s *Source) lead(ctx context.Context, ex *exchange, forced bool) (auth.Toke
 		ex.held = s.cur
 		ex.serveHeld = true
 	}
+	// Out of flight in the same step, so a Reauth that drops the cached
+	// token after this decision sends an exchange of its own instead of
+	// joining this one; one that dropped it before has left no token to
+	// serve. Either way Reauth gets an exchange's failure.
+	if s.inflight == ex {
+		s.inflight = nil
+	}
 	s.mu.Unlock()
 	ex.token = tok
 	ex.err = err
 	ex.abandoned = abandoned
-	return ex.outcome(forced)
+	return ex.outcome()
 }
 
 // terminal reports whether err is a permanent token-endpoint failure, as
@@ -556,10 +557,9 @@ func terminal(err error) bool {
 
 // outcome returns what a caller of the exchange ex stands for gets: the
 // cached access token in place of a transient failure that left it to be
-// served, unless forced reports a call by Reauth, and otherwise the
-// exchange's own token and error.
-func (ex *exchange) outcome(forced bool) (auth.Token, error) {
-	if ex.serveHeld && !forced {
+// served, and otherwise the exchange's own token and error.
+func (ex *exchange) outcome() (auth.Token, error) {
+	if ex.serveHeld {
 		return ex.held, nil
 	}
 	return ex.token, ex.err
