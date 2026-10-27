@@ -1,6 +1,7 @@
 package instance_test
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/rmnames"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 )
 
 // optUntyped is a C_COMPLEX_OBJECT that names no RM type, with the given
@@ -135,6 +137,137 @@ func TestREQ107_UntypedAndAbstractIntervalChildrenAreBuilt(t *testing.T) {
 					noFloorErrors(t, out)
 					for _, iss := range templateErrors(out, c) {
 						t.Errorf("Validate: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+					}
+				})
+			}
+		}
+	}
+}
+
+// historyOf is a HISTORY template with an origin whose events are events.
+func historyOf(events ...string) string {
+	return optTemplate("HISTORY", optSingle("origin", optNode("DV_DATE_TIME", "")), optMultiple("events", events...))
+}
+
+// observationWithProtocol is an OBSERVATION template with one event over an
+// empty tree, whose protocol is the attribute protocol.
+func observationWithProtocol(protocol string) string {
+	history := optNode("HISTORY", "at0001", optSingle("origin", optNode("DV_DATE_TIME", "")),
+		optMultiple("events", optNode("POINT_EVENT", "at0002", optSingle("data", emptyTree))))
+	return optTemplate("OBSERVATION", optSingle("data", history), protocol)
+}
+
+// TestREQ107_UntypedChildIsReadAsTheTypeItIsBuiltAs is the REQ-107 check
+// that the walk reads an untyped child, which names no RM type, as the type
+// it builds it as, wherever it reads a node's type: whether its attribute
+// is typed by an RM class, so that an AOM primitive short name under it is
+// built as its DV wrapper; which of its attributes the RM computes rather
+// than stores; the type of an attribute the template names with no child;
+// and whether such an attribute can only hold content the template does
+// not describe. Each template holds one untyped child, and the root
+// Generate returns for it is the root it returns for the same template
+// with the child typed as the walk builds it, which passes the template
+// validator and the RM floor, under every policy, both value fills and both
+// compile modes.
+func TestREQ107_UntypedChildIsReadAsTheTypeItIsBuiltAs(t *testing.T) {
+	cases := []struct {
+		name string
+		// typed is the RM type the walk builds the untyped child as.
+		typed string
+		// opt is the template with the child typed as rmType.
+		opt func(rmType string) string
+	}{
+		{
+			name:  "an ELEMENT whose value is a DATE_TIME object",
+			typed: "ELEMENT",
+			opt: func(rmType string) string {
+				return optTemplate("CLUSTER", optMultiple("items", optNode(rmType, "at0001",
+					optSingle("value", optNode("DATE_TIME", "")))))
+			},
+		},
+		{
+			name:  "an ELEMENT whose value is a C_DATE_TIME",
+			typed: "ELEMENT",
+			opt: func(rmType string) string {
+				return optTemplate("CLUSTER", optMultiple("items", optNode(rmType, "at0001",
+					optSingle("value", optPrimitive("DATE_TIME", "C_DATE_TIME", "<pattern>yyyy-mm-ddTHH:MM:SS</pattern>")))))
+			},
+		},
+		{
+			name:  "a POINT_EVENT that names its offset",
+			typed: "POINT_EVENT",
+			opt: func(rmType string) string {
+				return historyOf(optNode(rmType, "at0002",
+					optOptionalSingleOver("offset", optNode("DV_DURATION", "")), optSingle("data", emptyTree)))
+			},
+		},
+		{
+			name:  "an ELEMENT whose value the template names with no child",
+			typed: "ELEMENT",
+			opt: func(rmType string) string {
+				return optTemplate("CLUSTER", optMultiple("items", optNode(rmType, "at0001", optSingle("value"))))
+			},
+		},
+		{
+			name:  "a POINT_EVENT whose data the template names with no child",
+			typed: "POINT_EVENT",
+			opt: func(rmType string) string {
+				return historyOf(optNode(rmType, "at0002", optSingle("data")))
+			},
+		},
+		{
+			name:  "an optional POINT_EVENT whose data the template names with no child",
+			typed: "POINT_EVENT",
+			opt: func(rmType string) string {
+				return historyOf(
+					optOccurring("C_COMPLEX_OBJECT", "POINT_EVENT", "at0002", 1, 1, optSingle("data", emptyTree)),
+					optOccurring("C_COMPLEX_OBJECT", rmType, "at0003", 0, 1, optSingle("data")))
+			},
+		},
+		{
+			name:  "an ITEM_TREE whose items the template names with no child",
+			typed: "ITEM_TREE",
+			opt: func(rmType string) string {
+				return observationWithProtocol(optSingle("protocol", optNode(rmType, "at0003", optMultiple("items"))))
+			},
+		},
+		{
+			name:  "an optional ITEM_TREE whose items the template names with no child",
+			typed: "ITEM_TREE",
+			opt: func(rmType string) string {
+				return observationWithProtocol(optOptionalSingleOver("protocol", optNode(rmType, "at0003", optMultiple("items"))))
+			},
+		},
+	}
+	for _, tc := range cases {
+		for _, implicit := range []bool{true, false} {
+			untyped := compileOPTText(t, tc.opt(""), implicit)
+			typed := compileOPTText(t, tc.opt(tc.typed), implicit)
+			for _, opts := range defaultsOptions() {
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+					want, err := instance.Generate(t.Context(), typed, seededOptions(opts, 1))
+					if err != nil {
+						t.Fatalf("Generate with the child typed %s: %v", tc.typed, err)
+					}
+					got, err := instance.Generate(t.Context(), untyped, seededOptions(opts, 1))
+					if err != nil {
+						t.Fatalf("Generate with the child untyped: %v", err)
+					}
+					noFloorErrors(t, got)
+					for _, iss := range templateErrors(got, untyped) {
+						t.Errorf("Validate: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+					}
+					gotJSON, err := canjson.Marshal(got)
+					if err != nil {
+						t.Fatalf("canjson.Marshal: %v", err)
+					}
+					wantJSON, err := canjson.Marshal(want)
+					if err != nil {
+						t.Fatalf("canjson.Marshal: %v", err)
+					}
+					if !bytes.Equal(gotJSON, wantJSON) {
+						t.Errorf("the untyped child's root differs from the typed one's, first at %s",
+							firstJSONDifference(decodeJSON(t, gotJSON), decodeJSON(t, wantJSON), ""))
 					}
 				})
 			}
