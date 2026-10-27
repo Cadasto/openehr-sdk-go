@@ -39,7 +39,12 @@ func (p PKCEPair) GoString() string { return p.String() }
 // for, whatever the flags and width. fmt answers %T and %p without calling
 // it, and %p of a PKCEPair value prints its fields, so never print a PKCEPair
 // with %p.
-func (p PKCEPair) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, p.String()) }
+func (p PKCEPair) Format(f fmt.State, _ rune) {
+	if f == nil {
+		return
+	}
+	_, _ = io.WriteString(f, p.String())
+}
 
 // LogValue lets log/slog log p as a group of its fields, keyed by field name,
 // with the Verifier replaced as [PKCEPair.String] replaces it.

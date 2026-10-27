@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -202,5 +203,32 @@ func TestExchangeError(t *testing.T) {
 	}
 	if got != oa {
 		t.Errorf("errors.AsType returned %v, want %v", got, oa)
+	}
+}
+
+// TestREQ025_FormatWithNilStateDoesNotPanic pins REQ-025 (idiom.md § No
+// panics): Format called directly with a nil fmt.State returns without a
+// panic, for a Token and for the source StaticTokenSource returns, a nil one
+// included.
+func TestREQ025_FormatWithNilStateDoesNotPanic(t *testing.T) { // REQ-025
+	t.Parallel()
+	tests := []struct {
+		name string
+		v    fmt.Formatter
+	}{
+		{name: "Token", v: Token{}},
+		{name: "*staticTokenSource", v: &staticTokenSource{}},
+		{name: "nil *staticTokenSource", v: (*staticTokenSource)(nil)},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			defer func() {
+				if r := recover(); r != nil {
+					t.Errorf("%s: Format(nil, 'v') panicked: %v", tc.name, r)
+				}
+			}()
+			tc.v.Format(nil, 'v')
+		})
 	}
 }

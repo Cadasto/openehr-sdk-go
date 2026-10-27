@@ -102,7 +102,12 @@ func (c Config) GoString() string { return c.String() }
 // for, whatever the flags and width. fmt answers %T and %p without calling
 // it, and %p of a Config value prints its fields, so never print a Config
 // with %p.
-func (c Config) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, c.String()) }
+func (c Config) Format(f fmt.State, _ rune) {
+	if f == nil {
+		return
+	}
+	_, _ = io.WriteString(f, c.String())
+}
 
 // LogValue lets log/slog log c as a group of the fields [Config.String]
 // shows, keyed by field name, with the Assertion and the TokenURL replaced
@@ -197,7 +202,12 @@ func (s *Source) GoString() string { return s.String() }
 // Format writes the text of [Source.String] for every fmt verb, whatever its
 // flags and width. Without it, fmt would print the unexported fields of s
 // without calling their methods, the held token included.
-func (s *Source) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, s.String()) }
+func (s *Source) Format(f fmt.State, _ rune) {
+	if f == nil {
+		return
+	}
+	_, _ = io.WriteString(f, s.String())
+}
 
 type exchange struct {
 	done  chan struct{}

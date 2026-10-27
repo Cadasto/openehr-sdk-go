@@ -130,7 +130,12 @@ func (tr TokenResponse) GoString() string { return tr.String() }
 // called for, whatever the flags and width. fmt answers %T and %p without
 // calling it, and %p of a TokenResponse value prints its fields, so never
 // print a TokenResponse with %p.
-func (tr TokenResponse) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, tr.String()) }
+func (tr TokenResponse) Format(f fmt.State, _ rune) {
+	if f == nil {
+		return
+	}
+	_, _ = io.WriteString(f, tr.String())
+}
 
 // LogValue lets log/slog log tr as a group of its fields, keyed by field
 // name, with the tokens replaced as [TokenResponse.String] replaces them. tr

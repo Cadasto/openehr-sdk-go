@@ -56,7 +56,12 @@ func (p PrincipalIdentity) GoString() string { return p.String() }
 // is called for, whatever the flags and width. fmt answers %T and %p without
 // calling it, and %p of a PrincipalIdentity value prints its fields, so never
 // print a PrincipalIdentity with %p.
-func (p PrincipalIdentity) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, p.String()) }
+func (p PrincipalIdentity) Format(f fmt.State, _ rune) {
+	if f == nil {
+		return
+	}
+	_, _ = io.WriteString(f, p.String())
+}
 
 // LogValue lets log/slog log p without the tokens Raw can hold. It logs UID,
 // Type and a copy of Raw as a group, keyed by field name; in the copy the

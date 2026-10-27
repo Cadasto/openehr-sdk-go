@@ -100,3 +100,29 @@ func TestREQ060_SourcePrintsNoCredential(t *testing.T) { // REQ-060
 		}
 	})
 }
+
+// TestREQ025_FormatWithNilStateDoesNotPanic pins REQ-025 (idiom.md § No
+// panics): Format called directly with a nil fmt.State returns without a
+// panic, for the zero value of every type of auth/basic that has a Format
+// method, and for a nil pointer where Format takes one.
+func TestREQ025_FormatWithNilStateDoesNotPanic(t *testing.T) { // REQ-025
+	t.Parallel()
+	tests := []struct {
+		name string
+		v    fmt.Formatter
+	}{
+		{name: "*basic.Source", v: &basic.Source{}},
+		{name: "nil *basic.Source", v: (*basic.Source)(nil)},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			defer func() {
+				if r := recover(); r != nil {
+					t.Errorf("%s: Format(nil, 'v') panicked: %v", tc.name, r)
+				}
+			}()
+			tc.v.Format(nil, 'v')
+		})
+	}
+}

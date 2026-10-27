@@ -127,7 +127,12 @@ func (s *ClaimsSigner) GoString() string { return s.String() }
 
 // Format writes the text of [ClaimsSigner.String] for every fmt verb,
 // whatever its flags and width.
-func (s *ClaimsSigner) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, s.String()) }
+func (s *ClaimsSigner) Format(f fmt.State, _ rune) {
+	if f == nil {
+		return
+	}
+	_, _ = io.WriteString(f, s.String())
+}
 
 // LogValue lets log/slog log s as a group of the fields [ClaimsSigner.String]
 // shows, keyed by field name, with the Signer replaced as String replaces it.

@@ -100,7 +100,12 @@ func (lc LaunchContext) GoString() string { return lc.String() }
 // called for, whatever the flags and width. fmt answers %T and %p without
 // calling it, and %p of a LaunchContext value prints its fields, so never
 // print a LaunchContext with %p.
-func (lc LaunchContext) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, lc.String()) }
+func (lc LaunchContext) Format(f fmt.State, _ rune) {
+	if f == nil {
+		return
+	}
+	_, _ = io.WriteString(f, lc.String())
+}
 
 // LogValue lets log/slog log lc without its tokens. It logs the fields of lc
 // as a group, keyed by field name, with Raw and Principal's Raw as copies

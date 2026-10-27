@@ -117,6 +117,9 @@ func (r Redacted) String() string {
 // value. fmt answers %T and %p itself, without calling Format; [Redacted]
 // says what those print.
 func (r Redacted) Format(f fmt.State, verb rune) {
+	if f == nil {
+		return
+	}
 	// A fmt.State writes into the caller's buffer and does not fail.
 	_, _ = f.Write([]byte(r.String()))
 }

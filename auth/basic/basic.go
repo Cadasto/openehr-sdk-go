@@ -58,7 +58,12 @@ func (s *Source) GoString() string { return s.String() }
 // Format writes the text of [Source.String] for every fmt verb, whatever its
 // flags and width. Without it, fmt would print the unexported credential
 // field of s without calling its methods, the Basic payload included.
-func (s *Source) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, s.String()) }
+func (s *Source) Format(f fmt.State, _ rune) {
+	if f == nil {
+		return
+	}
+	_, _ = io.WriteString(f, s.String())
+}
 
 // encodeToken builds the auth.Token transport/ forwards as
 // Authorization: Basic <Value> per REQ-069.

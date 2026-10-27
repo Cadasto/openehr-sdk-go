@@ -101,7 +101,12 @@ func (s *staticTokenSource) String() string {
 func (s *staticTokenSource) GoString() string { return s.String() }
 
 // Format writes the text of String for every fmt verb it is called for.
-func (s *staticTokenSource) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, s.String()) }
+func (s *staticTokenSource) Format(f fmt.State, _ rune) {
+	if f == nil {
+		return
+	}
+	_, _ = io.WriteString(f, s.String())
+}
 
 // AnonymousTokenSource returns a TokenSource that yields a zero-value
 // Token. transport/ treats a zero Token as "do not emit an Authorization
@@ -150,7 +155,12 @@ func (t Token) GoString() string { return t.String() }
 // answers %T and %p without calling Format: %T prints the type name, %p of a
 // *Token prints an address, and %p of a Token value is a fmt error whose text
 // shows the fields, Value included, so never print a Token with %p.
-func (t Token) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, t.String()) }
+func (t Token) Format(f fmt.State, _ rune) {
+	if f == nil {
+		return
+	}
+	_, _ = io.WriteString(f, t.String())
+}
 
 // LogValue lets log/slog log t as a group of its fields, keyed by field name,
 // with the Value replaced as [Token.String] replaces it.

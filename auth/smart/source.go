@@ -136,7 +136,12 @@ func (c Config) GoString() string { return c.String() }
 // for, whatever the flags and width. fmt answers %T and %p without calling
 // it, and %p of a Config value prints its fields, so never print a Config
 // with %p.
-func (c Config) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, c.String()) }
+func (c Config) Format(f fmt.State, _ rune) {
+	if f == nil {
+		return
+	}
+	_, _ = io.WriteString(f, c.String())
+}
 
 // LogValue lets log/slog log c as a group of the fields [Config.String]
 // shows, keyed by field name, with the credentials and endpoints replaced as
@@ -229,7 +234,12 @@ func (c TokenChange) GoString() string { return c.String() }
 // called for, whatever the flags and width. fmt answers %T and %p without
 // calling it, and %p of a TokenChange value prints its fields, so never print
 // a TokenChange with %p.
-func (c TokenChange) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, c.String()) }
+func (c TokenChange) Format(f fmt.State, _ rune) {
+	if f == nil {
+		return
+	}
+	_, _ = io.WriteString(f, c.String())
+}
 
 // LogValue lets log/slog log c as a group of Access, RefreshToken and
 // Response, with the tokens replaced as [TokenChange.String] replaces them.
@@ -446,7 +456,12 @@ func (s *Source) GoString() string { return s.String() }
 // Format writes the text of [Source.String] for every fmt verb, whatever its
 // flags and width. Without it, a verb such as %d or %x would print the
 // fields of s, which hold the client secret and the tokens.
-func (s *Source) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, s.String()) }
+func (s *Source) Format(f fmt.State, _ rune) {
+	if f == nil {
+		return
+	}
+	_, _ = io.WriteString(f, s.String())
+}
 
 // queueChangeLocked records change for the token-change hook, with the
 // context of the call that made it. The hook runs without s.mu, so it gets
@@ -870,7 +885,12 @@ func (r AuthorizationRequest) GoString() string { return r.String() }
 // it is called for, whatever the flags and width. fmt answers %T and %p
 // without calling it, and %p of an AuthorizationRequest value prints its
 // fields, so never print an AuthorizationRequest with %p.
-func (r AuthorizationRequest) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, r.String()) }
+func (r AuthorizationRequest) Format(f fmt.State, _ rune) {
+	if f == nil {
+		return
+	}
+	_, _ = io.WriteString(f, r.String())
+}
 
 // LogValue lets log/slog log r as a group of its fields, keyed by field name,
 // with the PKCE verifier replaced as [AuthorizationRequest.String] replaces
