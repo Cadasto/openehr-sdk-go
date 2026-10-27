@@ -63,7 +63,25 @@ if [[ -n "$canon" ]]; then
   echo
   specfile="${SPECS}/${file}"
   if [[ -f "$specfile" ]]; then
-    start="$(grep -nE "^#+ .*${REQ}([^0-9]|$)" "$specfile" | head -1 | cut -d: -f1 || true)"
+    # The section starts at the heading the registry link's anchor names: an
+    # explicit <a id> or <a name> on the heading or the line before it, or
+    # the heading whose GitHub slug is the anchor (spec-check.sh's slugify,
+    # with -1, -2 ... on a repeat, as GitHub writes it). Headings inside a
+    # fenced code block do not count. Failing that, it is the first heading
+    # that names the REQ.
+    start="$(LC_ALL=C awk -v a="$anchor" '
+      /^[ \t]*(```|~~~)/ { fence = !fence; next }
+      fence { next }
+      index($0, "<a id=\"" a "\"") || index($0, "<a name=\"" a "\"") { named = NR }
+      /^#+[ \t]/ {
+        if (named && NR - named <= 1) { print NR; exit }
+        t = tolower($0); sub(/^#+[ \t]+/, "", t); sub(/[ \t]+#+[ \t]*$/, "", t)
+        gsub(/[^a-z0-9 _-]/, "", t); gsub(/ /, "-", t)
+        if (seen[t]++) t = t "-" (seen[t] - 1)
+        if (t == a) { print NR; exit }
+      }
+    ' "$specfile")"
+    [[ -n "$start" ]] || start="$(grep -nE "^#+ .*${REQ}([^0-9]|$)" "$specfile" | head -1 | cut -d: -f1 || true)"
     if [[ -n "$start" ]]; then
       # The excerpt is the span `sdd-check.py context` prints: from the REQ's
       # heading to the next heading of the same or a higher level, so its
