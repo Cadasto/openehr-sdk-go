@@ -103,14 +103,17 @@ func longestExact(t *testing.T) string {
 // (REQ-052) on the literals it names and on the edges of its shortcuts: a
 // literal is lossy when the float64 it parses to, written back correctly
 // rounded to as many significant digits as the literal carries, denotes
-// another value. A literal of at most 15 digits is lossy only when it
-// underflows to zero; a literal past the 767 digits of the longest float64
-// is lossy without a write-back; a literal that is not decimal is never
-// lossy.
+// another value. A literal of at most 15 digits whose float64 is at least
+// 2^-1022, the smallest normal float64, is never lossy; a shorter literal
+// below it is written back like any other, so a subnormal that keeps fewer
+// digits, or an underflow to zero, is lossy. A literal past the 767 digits
+// of the longest float64 is lossy without a write-back; a literal that is
+// not decimal is never lossy.
 //
 // Can-fail control: skip the write-back and the 16-digit and longer rows
-// that are lossy pass as clean; drop the underflow arm and 1e-400 passes;
-// lower maxExactDigits and the 767-digit row is refused.
+// that are lossy pass as clean; skip it for every non-zero float64 and the
+// short subnormal rows that are lossy pass; drop the underflow arm and
+// 1e-400 passes; lower maxExactDigits and the 767-digit row is refused.
 func TestLossy(t *testing.T) {
 	exact := longestExact(t)
 	mant, exp, _ := strings.Cut(exact, "e")
@@ -122,6 +125,7 @@ func TestLossy(t *testing.T) {
 		{"9007199254740993", true},
 		{"1.2345678901234567890", true},
 		{"1e-400", true},
+		{"1.23e-322", true},
 		{"18446744073709551616", false},
 		{"0.10000000000000001", false},
 		{"0.1000000000000000055511151231257827", false},
@@ -138,6 +142,17 @@ func TestLossy(t *testing.T) {
 		{"-0", false},
 		{"5e-324", false},
 		{"1e308", false},
+		// Short literals around the smallest normal float64, 2^-1022. Above
+		// it, 15 digits always come back. Below it, a subnormal keeps fewer
+		// digits, and the write-back decides: 1.23e-322 parses to 1.24e-322,
+		// and the 15-digit 1.23456789012345e-310 to 1.23456789012346e-310.
+		{"2.2250738585072014e-308", false},
+		{"2.3e-308", false},
+		{"-1.23e-322", true},
+		{"1.23456789012345e-310", true},
+		{"1.23456789012345e-309", false},
+		{"4.9e-324", false},
+		{"1e-310", false},
 		{"9_007_199_254_740_993", true},
 		{"1_000", false},
 		// The longest float64 and one digit more.
@@ -162,8 +177,8 @@ func TestLossy(t *testing.T) {
 }
 
 // TestLossyShortLiteralDoesNotAllocate pins the cost of the decode hot path
-// (REQ-052): a literal of at most 15 significant digits that parsed to a
-// non-zero float64 is never lossy, so the test skips the write-back and
+// (REQ-052): a literal of at most 15 significant digits whose float64 is at
+// least 2^-1022 is never lossy, so the test skips the write-back and
 // allocates nothing.
 func TestLossyShortLiteralDoesNotAllocate(t *testing.T) {
 	if got := testing.AllocsPerRun(100, func() { _ = lossy("123456.789012345", 123456.789012345) }); got != 0 {
@@ -191,6 +206,8 @@ func TestRealUnmarshalJSONCleanCases(t *testing.T) {
 		{"18446744073709551616", 18446744073709551616},
 		{"0.10000000000000001", 0.1},
 		{"0.1000000000000000055511151231257827", 0.1},
+		{"5e-324", 5e-324},
+		{"2.2250738585072014e-308", 0x1p-1022},
 	}
 	for _, tc := range tests {
 		t.Run(tc.lit, func(t *testing.T) {
@@ -237,6 +254,7 @@ func TestRealUnmarshalJSONLossyLiteral(t *testing.T) {
 		"9007199254740993",        // 2^53+1, parses to 2^53
 		"1.2345678901234567890",   // 19 significant digits
 		"1e-400",                  // underflows to zero
+		"1.23e-322",               // a subnormal, parses to 1.24e-322
 		"0.12345678901234567890",  // 20 fractional digits
 		"1.2345678901234567890e5", // exponent form
 	}
@@ -391,6 +409,7 @@ func TestRealUnmarshalText(t *testing.T) {
 		{name: "trailing zero", text: "1.10", want: 1.1},
 		{name: "2^64", text: "18446744073709551616", want: 18446744073709551616},
 		{name: "0.1 at 35 digits", text: "0.1000000000000000055511151231257827", want: 0.1},
+		{name: "smallest subnormal", text: "5e-324", want: 5e-324},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r := Real(80.5)
@@ -409,6 +428,7 @@ func TestRealUnmarshalText(t *testing.T) {
 		{name: "2^53+1", text: "9007199254740993", lossy: true},
 		{name: "19 digits, padded", text: " 1.2345678901234567890 ", lossy: true},
 		{name: "underflow", text: "1e-400", lossy: true},
+		{name: "subnormal", text: "1.23e-322", lossy: true},
 		{name: "whitespace only", text: " \n\t "},
 		{name: "quoted", text: `"72.5"`},
 		{name: "not a number", text: "7777kg"},

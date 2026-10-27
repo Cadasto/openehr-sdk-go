@@ -800,12 +800,14 @@ func TestUnmarshalMantissaPrecisionLossIsATypedError(t *testing.T) {
 //
 // Can-fail control: drop rm.Real's lossy test and the refused rows decode;
 // count digits against a fixed budget instead and 9007199254740993 or 1e-400
-// decodes, or 18446744073709551616 is refused.
+// decodes, or 18446744073709551616 is refused; skip the write-back for every
+// short literal that parsed to a non-zero float64 and the subnormal 1.23e-322
+// decodes.
 func TestUnmarshal_REQ052_LossyRealLiteralAcceptance(t *testing.T) {
 	quantity := func(lit string) []byte {
 		return []byte(`{"_type":"DV_QUANTITY","magnitude":` + lit + `,"units":"kg"}`)
 	}
-	for _, lit := range []string{`9007199254740993`, `1.2345678901234567890`, `1e-400`, `"9007199254740993"`} {
+	for _, lit := range []string{`9007199254740993`, `1.2345678901234567890`, `1.23e-322`, `1e-400`, `"9007199254740993"`} {
 		t.Run("refused "+lit, func(t *testing.T) {
 			var q rm.DVQuantity
 			err := canjson.Unmarshal(quantity(lit), &q)
@@ -820,7 +822,7 @@ func TestUnmarshal_REQ052_LossyRealLiteralAcceptance(t *testing.T) {
 			}
 		})
 	}
-	for _, lit := range []string{`18446744073709551616`, `0.10000000000000001`, `0.1000000000000000055511151231257827`, `1.10`, `72.5`} {
+	for _, lit := range []string{`18446744073709551616`, `0.10000000000000001`, `0.1000000000000000055511151231257827`, `1.10`, `72.5`, `5e-324`, `2.2250738585072014e-308`} {
 		t.Run("decodes "+lit, func(t *testing.T) {
 			want, err := strconv.ParseFloat(lit, 64)
 			if err != nil {

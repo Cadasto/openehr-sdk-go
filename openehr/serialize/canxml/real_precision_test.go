@@ -33,10 +33,12 @@ func xmlQuantity(magnitude string) []byte {
 // that does not carry the literal.
 //
 // Can-fail control: drop rm.Real's lossy test from UnmarshalText, or remove
-// the method so encoding/xml parses the text itself, and every row decodes.
+// the method so encoding/xml parses the text itself, and every row decodes;
+// skip the write-back for every short literal that parsed to a non-zero
+// float64 and the subnormal 1.23e-322 decodes.
 func TestUnmarshal_REQ056_LossyRealLiteralIsRefused(t *testing.T) {
 	const path = "/dv_quantity[1]/magnitude[1]"
-	for _, lit := range []string{"9007199254740993", "1.2345678901234567890", "1e-400"} {
+	for _, lit := range []string{"9007199254740993", "1.2345678901234567890", "1.23e-322", "1e-400"} {
 		t.Run(lit, func(t *testing.T) {
 			for mode, opts := range xmlDecodeModes() {
 				var q rm.DVQuantity
@@ -70,7 +72,7 @@ func TestUnmarshal_REQ056_LossyRealLiteralIsRefused(t *testing.T) {
 // Can-fail control: refuse a literal by a fixed digit budget and
 // 18446744073709551616 and the 35-digit expansion of 0.1 fail.
 func TestUnmarshal_REQ056_RealLiteralDecodesToNearestFloat64(t *testing.T) {
-	for _, lit := range []string{"18446744073709551616", "0.10000000000000001", "0.1000000000000000055511151231257827", "1.10", "72.5"} {
+	for _, lit := range []string{"18446744073709551616", "0.10000000000000001", "0.1000000000000000055511151231257827", "1.10", "72.5", "5e-324", "2.2250738585072014e-308"} {
 		t.Run(lit, func(t *testing.T) {
 			want, err := strconv.ParseFloat(lit, 64)
 			if err != nil {
