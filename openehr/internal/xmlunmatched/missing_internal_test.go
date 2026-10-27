@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -317,4 +318,36 @@ func TestREQ175_EnterCostsNothingWithoutTheHook(t *testing.T) {
 	if withEnter != withPlain {
 		t.Errorf("a tracked decode without the hook allocates %v times through Enter and %v through CheckUnmatchedAttrs; want the same", withEnter, withPlain)
 	}
+}
+
+// TestEnter_REQ175_RefusesMoreThan64Required pins the cap a frame's seen word
+// gives Class.Required: a description with a 65th name would report that
+// member missing whatever the document carries, so Enter refuses it before
+// any decode, tracker or not, while one with exactly 64 names is accepted.
+// Removing the guard makes the second half fail: Enter returns nil.
+func TestEnter_REQ175_RefusesMoreThan64Required(t *testing.T) {
+	names := func(n int) []string {
+		s := make([]string, n)
+		for i := range s {
+			s[i] = "m" + strconv.Itoa(i)
+		}
+		return s
+	}
+	start := xml.StartElement{Name: xml.Name{Local: "a"}}
+	dec := xml.NewDecoder(strings.NewReader("<a/>"))
+	if err := Enter(dec, start, &Class{Name: "WIDE", Required: names(maxRequired)}); err != nil {
+		t.Fatalf("Enter(class with %d required members) = %v, want nil", maxRequired, err)
+	}
+	wide := &Class{Name: "TOO_WIDE", Required: names(maxRequired + 1)}
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatalf("Enter(class with %d required members) returned; want a panic", len(wide.Required))
+		}
+		msg, _ := r.(string)
+		if !strings.Contains(msg, "TOO_WIDE") || !strings.Contains(msg, strconv.Itoa(maxRequired+1)) {
+			t.Errorf("Enter panic = %v; want it to name the class and its count", r)
+		}
+	}()
+	_ = Enter(dec, start, wide)
 }

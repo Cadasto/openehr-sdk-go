@@ -2,6 +2,7 @@ package xmlunmatched
 
 import (
 	"encoding/xml"
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -23,13 +24,18 @@ type Class struct {
 	// class and a document can carry, in the order the model declares them,
 	// an ancestor's before the class's own. It leaves out the members no
 	// serialization carries and the four interval boundary flags, which have
-	// a value when absent. It holds at most 64 names; the generator checks.
+	// a value when absent. It holds at most 64 names ([maxRequired]): the
+	// generator checks, and [Enter] refuses a description past it.
 	Required []string
 	// Items names the multi-valued members, whose child elements are the
 	// items of one list: the n-th child element of such a name is the item
 	// at position n-1 in the canonical-JSON form of the instance.
 	Items []string
 }
+
+// maxRequired is the most names a [Class] can list in Required: a frame
+// records the members it has seen in one word of that many bits.
+const maxRequired = 64
 
 // Enter is the entry of a class's decoder: start opens the element it
 // decodes and c describes the class. It applies the decode's policy for
@@ -40,8 +46,15 @@ type Class struct {
 // as the element closes. start must be the token the decoder read last, and
 // no child token may have been read since.
 //
-// By default it does nothing.
+// By default it does nothing. A description with more than [maxRequired]
+// names in its Required is a programming error, and Enter panics on it
+// before any decode, tracked or not: a frame records the members it has
+// seen in one word of that many bits, and a name past it would be reported
+// missing whatever the document carries.
 func Enter(dec *xml.Decoder, start xml.StartElement, c *Class) error {
+	if len(c.Required) > maxRequired {
+		panic(fmt.Sprintf("xmlunmatched.Enter: class %s lists %d required members, more than the %d a description holds", c.Name, len(c.Required), maxRequired))
+	}
 	t := trackerOf(dec)
 	if t == nil {
 		return nil
