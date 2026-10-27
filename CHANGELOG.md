@@ -8,6 +8,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.42.0] - 2026-10-27
+
+Forty-second `v0.x` minor: the canonical decoders report the mandatory members a document leaves out and the validators read that report, the RM floor evaluates three more invariants, canonical XML follows the ITS-XML schemas, and auth values print and log without their credentials. **Breaking:** `Validate`, `Validator.Validate` and `ValidateRM` take variadic options, the RM floor and canonical XML refuse inputs they accepted, and `transport` retries PUT and DELETE only under `RetryNonIdempotent`.
+
+### Added
+
+- **The canonical JSON and XML decoders report the mandatory members a document leaves out with `WithMissing`, and `validation.ValidateJSON`, `ValidateXML` and `WithMissing` read that report (REQ-175, ADR 0033).** The default decode is unchanged.
+- **`parse.FunctionCall.Raw` keeps an AQL function call's source text, as paths and literals already do (REQ-113).**
+- **The ITS-XML schemas are vendored under `resources/its-xml/`, and every vendored upstream resource has a sha256 manifest that `make ci` checks offline (REQ-041).**
+- **Replay recordings of error envelopes and composition updates from EHRbase and FerroEHR, with two new `make probe-record` scenarios (REQ-082).**
+
+### Changed
+
+- **Breaking: `validation.Validate`, `Validator.Validate` and `ValidateRM` take variadic options, so a caller that stores one in a function value of the old type no longer compiles (REQ-175).**
+- **Breaking: the RM floor, and so template validation, refuses an empty `links` or `location` and a `DV_EHR_URI` without the `ehr` scheme (REQ-112).**
+- **Breaking: canonical XML writes children in the ITS-XML schema order, and refuses text before the root and, under `WithStrict`, stray text inside elements (REQ-056).** A primitive that does not decode fails with a value-free `*canxml.DecodeError`.
+- **Breaking: `transport` retries PUT and DELETE only under `RetryNonIdempotent` (REQ-091).** `WireError.Error` quotes the openEHR code.
+- **`simplified.WithTemplate` decodes what `MarshalFlat` and `MarshalStructured` wrote to a composition that validates against the template, with members in template order (REQ-053).** An ACTION with no archetyped transition writes its `current_state` terminology.
+- **Auth, SMART, discovery and transport values print and log without their credentials (REQ-060).** Two `StaticTokenSource` values from equal tokens no longer compare equal.
+- **A SMART refresh outlives the call that started it, and on a transient renewal failure the token sources serve the still-valid token, with backoff (REQ-063).**
+- **Service discovery honours the cache lifetime a response declares, so `max-age=0`, `no-store` and `no-cache` refetch on the next use (REQ-071).**
+- **Contribution bodies leave a typed-nil RM slot out instead of writing `null`, and `definition.UploadTemplate` strips a leading UTF-8 byte-order mark (REQ-052, REQ-130).**
+
+### Deprecated
+
+- **`validation.ValidateRMEHRStatusBytes`, which `ValidateJSON` now covers (REQ-175).**
+
 ## [0.41.0] - 2026-10-26
 
 Forty-first `v0.x` minor: template validation and the OPT parser check what a live CDR cross-check showed they missed, the instance generator writes documents EHRbase and FerroEHR accept, and the composition and EHR_STATUS clients read a record's version history. **Breaking:** `ValidateComposition` and the strict OPT parse refuse inputs they passed, `Generate` refuses more templates, and `composition.Repository` and `ehrstatus.Repository` each gain five methods.
