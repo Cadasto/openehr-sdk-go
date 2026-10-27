@@ -760,7 +760,7 @@ func unwritableRequired(node *templatecompile.CompiledNode, attr *templatecompil
 		}
 	case name == "settings":
 		noWriter = class == "EHR_ACCESS"
-	case isList && !(class == "DV_MULTIMEDIA" && name == "data"):
+	case isList && (class != "DV_MULTIMEDIA" || name != "data"):
 		itemType, ok := rminfo.Default.AttributeRMType(class, name)
 		ar, reports := rminfo.Default.(rminfo.AbsenceReporter)
 		noWriter = ok && itemType != "" && itemType != "Hash" && reports && ar.AbsenceReason(itemType) == rminfo.AbsencePrimitive
