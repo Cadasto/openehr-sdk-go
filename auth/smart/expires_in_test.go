@@ -211,3 +211,32 @@ func TestREQ063_TokenResponseExpiresInConvertsToADuration(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ063_TokenResponseTellsAMissingExpiresInFromZero pins REQ-063
+// (auth.md § Token refresh): TokenResponse.HasExpiresIn reports whether the
+// response carried expires_in as a number, so an ExpiresIn of 0 from a
+// response that says 0 can be told from one that says nothing.
+func TestREQ063_TokenResponseTellsAMissingExpiresInFromZero(t *testing.T) {
+	tests := []struct {
+		expiresIn string // the member's JSON text; empty leaves the member out
+		want      int64
+		wantHas   bool
+	}{
+		{expiresIn: `3600`, want: 3600, wantHas: true},
+		{expiresIn: `0`, want: 0, wantHas: true},
+		{expiresIn: `-5`, want: -5, wantHas: true},
+		{expiresIn: ``},
+		{expiresIn: `null`},
+		{expiresIn: `1e400`},
+	}
+	for _, tc := range tests {
+		tr, err := smart.ParseTokenResponse([]byte(expiresInBody("at", tc.expiresIn)))
+		if err != nil {
+			t.Errorf("ParseTokenResponse(expires_in %q) error = %v, want nil", tc.expiresIn, err)
+			continue
+		}
+		if tr.ExpiresIn != tc.want || tr.HasExpiresIn != tc.wantHas {
+			t.Errorf("ParseTokenResponse(expires_in %q) = (ExpiresIn %d, HasExpiresIn %t), want (%d, %t)", tc.expiresIn, tr.ExpiresIn, tr.HasExpiresIn, tc.want, tc.wantHas)
+		}
+	}
+}
