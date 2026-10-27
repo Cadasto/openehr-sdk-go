@@ -14,7 +14,10 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/urlredact"
 )
 
-const defaultJWKSTTL = 5 * time.Minute
+const (
+	defaultJWKSTTL                = 5 * time.Minute
+	defaultJWKSMinRefreshInterval = 30 * time.Second
+)
 
 // JWKS holds a cached JSON Web Key Set.
 //
@@ -29,6 +32,14 @@ type JWKS struct {
 	// [NewJWKS] sets five minutes. Zero or a negative value keeps the set
 	// until a lookup misses: it never goes stale by time.
 	TTL time.Duration
+	// MinRefreshInterval is how old the fetched set must be before a lookup
+	// for a kid the set does not hold fetches it again. A lookup that misses
+	// a set fetched more recently fails at once, without a fetch, so tokens
+	// that name unknown kids cannot make the set be fetched for each of
+	// them. [NewJWKS] sets 30 seconds. Zero or a negative value sets no
+	// minimum: every miss fetches the set. A set older than a positive TTL
+	// is fetched again whatever this interval.
+	MinRefreshInterval time.Duration
 
 	mu sync.Mutex
 	// keys holds the signing keys published with a kid, by kid. A signing
@@ -64,17 +75,20 @@ func NewJWKS(httpClient *http.Client, uri string) (*JWKS, error) {
 		return nil, fmt.Errorf("%w: JWKS URI is required", auth.ErrInvalidConfig)
 	}
 	return &JWKS{
-		HTTPClient: httpClient,
-		URI:        uri,
-		TTL:        defaultJWKSTTL,
-		keys:       map[string]json.RawMessage{},
+		HTTPClient:         httpClient,
+		URI:                uri,
+		TTL:                defaultJWKSTTL,
+		MinRefreshInterval: defaultJWKSMinRefreshInterval,
+		keys:               map[string]json.RawMessage{},
 	}, nil
 }
 
 // Key returns the signing key the set publishes under kid, as a JWK
 // document. A signing key is one whose use, if present, is "sig", so a key
-// published for encryption is never returned. On cache miss the JWKS
-// document is refreshed once before failing.
+// published for encryption is never returned. On a cache miss the set is
+// fetched once more before Key fails, unless it was fetched less than
+// MinRefreshInterval ago: Key then fails at once with
+// [auth.ErrJWKSValidationFailed].
 //
 // An empty kid asks for the key that verifies a token whose header carries
 // no kid: the set's only signing key, published with or without a kid. When
@@ -87,10 +101,16 @@ func (j *JWKS) Key(ctx context.Context, kid string) (json.RawMessage, error) {
 	}
 	j.mu.Lock()
 	stale := j.staleLocked()
+	recent := j.fetchedWithinLocked(j.MinRefreshInterval)
 	k, ok := j.keys[kid]
 	j.mu.Unlock()
 	if ok && !stale {
 		return k, nil
+	}
+	if !stale && recent {
+		// A miss on a set fetched within the minimum interval fails without
+		// a fetch, so unknown kids cannot make a fetch each (REQ-062).
+		return nil, fmt.Errorf("%w: kid %q not found in a key set fetched less than %v ago", auth.ErrJWKSValidationFailed, kid, j.MinRefreshInterval)
 	}
 	if err := j.refresh(ctx); err != nil {
 		return nil, err
@@ -150,6 +170,13 @@ func (j *JWKS) staleLocked() bool {
 		return false
 	}
 	return time.Since(j.fetchedAt) >= j.TTL
+}
+
+// fetchedWithinLocked reports whether the cached set was fetched less than d
+// ago. It reports false for a d of zero or less, and when no set has been
+// fetched. The caller holds j.mu.
+func (j *JWKS) fetchedWithinLocked(d time.Duration) bool {
+	return d > 0 && !j.fetchedAt.IsZero() && time.Since(j.fetchedAt) < d
 }
 
 // refresh fetches the set, or waits for the fetch another lookup leads. The

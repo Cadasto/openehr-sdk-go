@@ -203,7 +203,9 @@ func TestExchangeAndRefresh(t *testing.T) {
 }
 
 // REQ-062: a kid missing from the cached JWKS triggers one refresh before the
-// lookup fails.
+// lookup fails. The set has no minimum refresh interval here, so the miss
+// right after the first fetch refreshes it;
+// TestREQ062_KidMissesFetchTheSetAtMostOncePerInterval covers the interval.
 func TestJWKSRefreshOnMiss(t *testing.T) {
 	fetches := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -217,6 +219,7 @@ func TestJWKSRefreshOnMiss(t *testing.T) {
 		t.Fatal(err)
 	}
 	jwks.TTL = time.Hour
+	jwks.MinRefreshInterval = 0
 	if _, err := jwks.Key(t.Context(), "key-2026-04"); err != nil {
 		t.Fatal(err)
 	}

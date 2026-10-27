@@ -135,12 +135,14 @@ func TestJWKSKeyWithoutKid(t *testing.T) {
 // TestValidateIDTokenKidMissesKidlessKey checks that a token that names a kid
 // is still looked up by that kid: a set whose only key has no kid does not
 // match it, and the miss refreshes the set once before the token is refused.
-// REQ-062
+// The set has no minimum refresh interval, so the miss right after the seed
+// refreshes it. REQ-062
 func TestValidateIDTokenKidMissesKidlessKey(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0)
 	priv := newRSAKey(t)
 	jwks, fetches := stubJWKSServer(t, http.StatusOK, keySetBody(t, publishedKey{key: priv}))
 	jwks.TTL = time.Hour
+	jwks.MinRefreshInterval = 0
 
 	// Seed the cache with a kid-less lookup, which succeeds: one fetch.
 	if _, err := jwks.Key(t.Context(), ""); err != nil {
