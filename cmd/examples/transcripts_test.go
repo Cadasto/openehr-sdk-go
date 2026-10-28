@@ -122,6 +122,7 @@ func TestDocsExamplesTranscripts(t *testing.T) {
 	root := moduleRoot(t)
 	doc := docLines(t, root)
 	trackBuildInputs(t, root)
+	trackRunInputs(t, root)
 
 	for _, tc := range transcripts {
 		t.Run(tc.program, func(t *testing.T) {
@@ -378,8 +379,8 @@ func extractSample(t *testing.T, doc []string, section string) string {
 // it opens. So the test opens the directory of each example and of every
 // package from this module an example imports, directly or not; stats each
 // file such a package embeds, which may sit in a subdirectory; and stats
-// go.mod and go.sum, which pin the packages from other modules. The files an
-// example reads while it runs, such as its fixtures, stay out of sight.
+// go.mod and go.sum, which pin the packages from other modules. The fixtures
+// an example reads while it runs are trackRunInputs' part.
 func trackBuildInputs(t *testing.T, root string) {
 	t.Helper()
 
@@ -431,6 +432,21 @@ func trackBuildInputs(t *testing.T, root string) {
 	for _, name := range []string{"go.mod", "go.sum"} {
 		if _, err := os.Stat(filepath.Join(root, name)); err != nil {
 			t.Fatalf("stat %s: %v", name, err)
+		}
+	}
+}
+
+// trackRunInputs shows the Go test cache the corpus directories the
+// allowlisted examples read their fixtures from while they run, so a re-synced
+// template or composition invalidates a cached pass too. Both directories are
+// flat, so opening each records every fixture in it.
+func trackRunInputs(t *testing.T, root string) {
+	t.Helper()
+
+	for _, name := range []string{"compositions", "templates"} {
+		dir := filepath.Join(root, "testkit", "corpus", name)
+		if _, err := os.ReadDir(dir); err != nil {
+			t.Fatalf("list the fixture directory %s: %v", dir, err)
 		}
 	}
 }
