@@ -674,14 +674,15 @@ func topUpLastResort(node *templatecompile.CompiledNode, built map[*templatecomp
 // topUpAsks reports whether the top-up of attr, a list of parent, asks for
 // a member beyond the list's existence: the BMM marks it mandatory, its
 // cardinality lower bound is at least 1, or it is a list the RM keeps
-// non-empty once present (rminfo.NonEmptyLists, with no alternative, as
-// the generator's rmNonEmptyList reads it), such as COMPOSITION.content or
+// non-empty once present on the class the walk builds parent as
+// (builtClass; rminfo.NonEmptyLists, with no alternative, as the
+// generator's rmNonEmptyList reads it), such as COMPOSITION.content or
 // SECTION.items, whose existence lower bound is at least 1.
 func topUpAsks(parent *templatecompile.CompiledNode, attr *templatecompile.CompiledAttribute) bool {
 	if attr.Required() || tcimpl.LowerAtLeastOne(attr.ChildMultiplicity()) {
 		return true
 	}
-	l, ok := rminfo.NonEmptyListOf(bmmtype.Class(parent.RMTypeName()), attr.Name())
+	l, ok := rminfo.NonEmptyListOf(builtClass(parent), attr.Name())
 	return ok && l.Alternative == "" && tcimpl.LowerAtLeastOne(attr.Existence())
 }
 
@@ -726,12 +727,60 @@ func censusRefused(node *templatecompile.CompiledNode) bool {
 	return false
 }
 
-// unnamedRoot reports whether node, a child that is not a slot, is an
-// object of a class that is always an archetype root for which the template
-// names no archetype id, which REQ-107 § Slot fills reads as content the
-// template does not describe.
+// unnamedRoot reports whether node, a child that is not a slot, is built as
+// an object of a class that is always an archetype root (builtClass) for
+// which the template names no archetype id, which REQ-107 § Slot fills reads
+// as content the template does not describe.
 func unnamedRoot(node *templatecompile.CompiledNode) bool {
-	return node.ArchetypeID() == "" && rmroots.IsArchetypeRoot(bmmtype.Class(node.RMTypeName()))
+	return node.ArchetypeID() == "" && rmroots.IsArchetypeRoot(builtClass(node))
+}
+
+// builtClass returns the bare RM class the generator builds node as, which
+// every rule of REQ-107 reads the node as (Generic and untyped types): the
+// class node names, or, where that is abstract, the class the generator
+// builds for it (censusSubstitutes). A node that names no RM type is built
+// as the type the BMM declares for the attribute that holds it, read on the
+// class its parent is built as, or as the constraint of that type where it
+// is a formal generic parameter of that class, such as the T of an EVENT's
+// data, and so substituted. It is "" for an untyped root.
+func builtClass(node *templatecompile.CompiledNode) string {
+	class := bmmtype.Class(strings.TrimSpace(node.RMTypeName()))
+	if class == "" {
+		parent, attr := node.Parent(), parentAttribute(node)
+		if parent == nil || attr == nil {
+			return ""
+		}
+		holder := builtClass(parent)
+		held, ok := rminfo.Default.AttributeRMType(holder, attr.Name())
+		if !ok {
+			return ""
+		}
+		if constraint, formal := bmmtype.ParameterConstraint(holder, held); formal {
+			held = constraint
+		}
+		class = bmmtype.Class(held)
+	}
+	if concrete, abstract := censusSubstitutes[class]; abstract {
+		return concrete
+	}
+	return class
+}
+
+// censusSubstitutes names the concrete class the generator builds for each
+// abstract LOCATABLE class a template node can be read as, as REQ-107
+// What a visit writes builds it: POINT_EVENT for EVENT, ITEM_TREE for
+// ITEM_STRUCTURE, ELEMENT for ITEM, OBSERVATION for an abstract entry, and
+// CLUSTER for LOCATABLE. The census reads only a LOCATABLE's class.
+// TestREQ107_CensusSubstitutesFollowTheGenerator pins each against the
+// generator.
+var censusSubstitutes = map[string]string{
+	"EVENT":          "POINT_EVENT",
+	"ITEM_STRUCTURE": "ITEM_TREE",
+	"ITEM":           "ELEMENT",
+	"CONTENT_ITEM":   "OBSERVATION",
+	"CARE_ENTRY":     "OBSERVATION",
+	"ENTRY":          "OBSERVATION",
+	"LOCATABLE":      "CLUSTER",
 }
 
 // censusRoom reports whether child, an allowed child of a list that n
@@ -813,7 +862,7 @@ func needsNoUndescribed(node *templatecompile.CompiledNode) bool {
 // other than a list that only its existence asks a member of, as the
 // generator's writerNeeded reads it.
 func unwritableRequired(node *templatecompile.CompiledNode, attr *templatecompile.CompiledAttribute) bool {
-	class, name := bmmtype.Class(node.RMTypeName()), attr.Name()
+	class, name := builtClass(node), attr.Name()
 	isList, _ := rminfo.Default.IsContainer(class, name)
 	noWriter := false
 	switch {
@@ -1092,5 +1141,78 @@ func TestREQ107_CensusLastResortFollowsTheGenerator(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// TestREQ107_CensusSubstitutesFollowTheGenerator pins the census's table of
+// the concrete class the generator builds for an abstract LOCATABLE class
+// (censusSubstitutes) against the generator: a root generated under Large
+// from a template that names the abstract class holds a member of the class
+// the table gives for it, where the walk builds that member.
+func TestREQ107_CensusSubstitutesFollowTheGenerator(t *testing.T) {
+	archetypeRoot := func(rmType string) string {
+		return `<children xsi:type="C_ARCHETYPE_ROOT"><rm_type_name>` + rmType + `</rm_type_name>` +
+			`<node_id>at0000</node_id><archetype_id><value>openEHR-EHR-OBSERVATION.census.v1</value></archetype_id></children>`
+	}
+	event := func(rmType string, attrs ...string) string {
+		return censusRootOPT("HISTORY", censusList("events", 1, 1, censusOccurring(rmType, "at0001", 1, attrs...)))
+	}
+	cases := []struct {
+		abstract string
+		opt      string
+		// path leads from the root to the member built for the node that
+		// names the abstract class.
+		path []string
+	}{
+		{abstract: "EVENT", opt: event("EVENT"), path: []string{"events"}},
+		{
+			abstract: "ITEM_STRUCTURE",
+			opt: event("POINT_EVENT", `<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>data</rm_attribute_name>`+
+				censusOccurring("ITEM_STRUCTURE", "at0002", 1)+`</attributes>`),
+			path: []string{"events", "data"},
+		},
+		{abstract: "ITEM", opt: censusRootOPT("CLUSTER", censusList("items", 1, 1, censusOccurring("ITEM", "at0001", 1))), path: []string{"items"}},
+		{abstract: "CONTENT_ITEM", opt: censusRootOPT("SECTION", censusList("items", 1, 1, archetypeRoot("CONTENT_ITEM"))), path: []string{"items"}},
+		{abstract: "CARE_ENTRY", opt: censusRootOPT("SECTION", censusList("items", 1, 1, archetypeRoot("CARE_ENTRY"))), path: []string{"items"}},
+		{abstract: "ENTRY", opt: censusRootOPT("SECTION", censusList("items", 1, 1, archetypeRoot("ENTRY"))), path: []string{"items"}},
+		{
+			abstract: "LOCATABLE",
+			opt: censusRootOPT("CLUSTER", censusList("items", 1, 1,
+				censusOccurring("LOCATABLE", "at0001", 1, censusList("items", 1, 1, censusOccurring("ELEMENT", "at0002", 1))))),
+			path: []string{"items"},
+		},
+	}
+	if len(cases) != len(censusSubstitutes) {
+		t.Fatalf("%d cases for %d substitutes, want one each", len(cases), len(censusSubstitutes))
+	}
+	for _, tc := range cases {
+		t.Run(tc.abstract, func(t *testing.T) {
+			want, ok := censusSubstitutes[tc.abstract]
+			if !ok {
+				t.Fatalf("censusSubstitutes names no substitute for %s", tc.abstract)
+			}
+			out, err := instance.Generate(t.Context(), compileCensusOPT(t, tc.opt), instance.Options{Policy: instance.Large, Language: "en", Now: ratchetNow})
+			if err != nil {
+				t.Fatalf("Generate: %v", err)
+			}
+			raw, err := canjson.Marshal(out)
+			if err != nil {
+				t.Fatalf("canjson.Marshal: %v", err)
+			}
+			var member map[string]any
+			if err := jsonv2.Unmarshal(raw, &member); err != nil {
+				t.Fatalf("json unmarshal: %v", err)
+			}
+			for _, key := range tc.path {
+				members := objects(member[key])
+				if len(members) == 0 {
+					t.Fatalf("the root holds no member at %s", strings.Join(tc.path, "/"))
+				}
+				member = members[0]
+			}
+			if got, _ := member["_type"].(string); got != want {
+				t.Errorf("a node of %s is built as %s, the census reads it as %s", tc.abstract, got, want)
+			}
+		})
 	}
 }
