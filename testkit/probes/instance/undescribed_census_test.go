@@ -1032,7 +1032,12 @@ func censusList(name string, existence, lower int, children ...string) string {
 //     place of the ADMIN_ENTRY, which the walk builds as an OBSERVATION and
 //     refuses, and an untyped ELEMENT, built as one, in place of the ELEMENT
 //     whose feeder_audit the template requires: the census reads each as
-//     the class the walk builds.
+//     the class the walk builds;
+//   - the items of a required LOCATABLE, which the walk builds as a
+//     CLUSTER, whose items the BMM marks mandatory, at existence 1..1, or
+//     with no existence, over an optional CLUSTER whose items admit only a
+//     slot: the census reads the list as the BMM declares it on CLUSTER,
+//     so the top-up asks for a member it takes from that CLUSTER.
 //
 // Read beside a template that leaves the SECTION's items optional, where
 // no top-up runs, the first root holds a violation. So does a root
@@ -1099,6 +1104,16 @@ func TestREQ107_CensusLastResortFollowsTheGenerator(t *testing.T) {
 		{
 			name:      "an untyped inline item before a SECTION",
 			generated: censusRootOPT("SECTION", censusList("items", 1, 0, censusOptional("", "at0004"), innerSection)),
+		},
+		{
+			name: "the items of a LOCATABLE, built as a CLUSTER, at existence 1..1",
+			generated: censusRootOPT("CLUSTER", censusList("items", -1, 1,
+				censusOccurring("LOCATABLE", "at0001", 1, censusList("items", 1, 0, slotCluster("at0002"))))),
+		},
+		{
+			name: "the items of a LOCATABLE, built as a CLUSTER, with no existence",
+			generated: censusRootOPT("CLUSTER", censusList("items", -1, 1,
+				censusOccurring("LOCATABLE", "at0001", 1, censusList("items", -1, 0, slotCluster("at0002"))))),
 		},
 		{
 			name:      "an inline ENTRY before a SECTION",
