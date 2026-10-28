@@ -978,7 +978,12 @@ func censusList(name string, existence, lower int, children ...string) string {
 //   - a SECTION's items at existence 1..1 over an optional ADMIN_ENTRY the
 //     template defines inline with no archetype id, which the walk refuses,
 //     and the optional inner SECTION: the top-up passes over the entry and
-//     takes the SECTION.
+//     takes the SECTION;
+//   - the same with a node that names no RM type, or the abstract ENTRY, in
+//     place of the ADMIN_ENTRY, which the walk builds as an OBSERVATION and
+//     refuses, and an untyped ELEMENT, built as one, in place of the ELEMENT
+//     whose feeder_audit the template requires: the census reads each as
+//     the class the walk builds.
 //
 // Read beside a template that leaves the SECTION's items optional, where
 // no top-up runs, the first root holds a violation. So does a root
@@ -995,6 +1000,10 @@ func TestREQ107_CensusLastResortFollowsTheGenerator(t *testing.T) {
 		return censusOptional("CLUSTER", nodeID, slotItems(nodeID))
 	}
 	feederAuditElement := censusOptional("ELEMENT", "at0003", `<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>feeder_audit</rm_attribute_name>`+
+		`<existence><lower_included>true</lower_included><upper_included>true</upper_included>`+
+		`<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>1</lower><upper>1</upper></existence>`+
+		`<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>FEEDER_AUDIT</rm_type_name><node_id></node_id></children></attributes>`)
+	untypedFeederAuditElement := censusOptional("", "at0003", `<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>feeder_audit</rm_attribute_name>`+
 		`<existence><lower_included>true</lower_included><upper_included>true</upper_included>`+
 		`<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>1</lower><upper>1</upper></existence>`+
 		`<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>FEEDER_AUDIT</rm_type_name><node_id></node_id></children></attributes>`)
@@ -1033,6 +1042,18 @@ func TestREQ107_CensusLastResortFollowsTheGenerator(t *testing.T) {
 				censusOptional("ADMIN_ENTRY", "at0004", `<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>data</rm_attribute_name>`+
 					`<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>ITEM_TREE</rm_type_name><node_id>at0005</node_id></children></attributes>`),
 				innerSection)),
+		},
+		{
+			name:      "an untyped ELEMENT whose feeder_audit the template requires before the CLUSTER",
+			generated: censusRootOPT("CLUSTER", censusList("items", -1, 1, untypedFeederAuditElement, slotCluster("at0002"))),
+		},
+		{
+			name:      "an untyped inline item before a SECTION",
+			generated: censusRootOPT("SECTION", censusList("items", 1, 0, censusOptional("", "at0004"), innerSection)),
+		},
+		{
+			name:      "an inline ENTRY before a SECTION",
+			generated: censusRootOPT("SECTION", censusList("items", 1, 0, censusOptional("ENTRY", "at0004"), innerSection)),
 		},
 		{
 			name: "a required CLUSTER after a required ELEMENT read as optional",
