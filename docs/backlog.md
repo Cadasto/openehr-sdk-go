@@ -8,6 +8,7 @@ Leftovers of merged branches: defects the branch that found them did not fix, an
 
 ## Unsorted
 - internal/bmmgen/render_rmaccess.go:615 · Reading a DV_CODED_TEXT or ISM_TRANSITION passed by value, such as a data value a composition built in Go holds by value in an interface field, heap-copies the whole parent, because the value arm hands `&p` to a reader that may return a pointer into it: Peek costs 128 B instead of 0, reading its value 144 B instead of 16 · by: go-reviewer · from: perf/hot-path-sweep-2
+- smart/discovery/resolver.go:741 · The OpenID and SMART configuration documents (resolver.go:591, :741) and the token responses of auth/smart (exchange.go:216), auth/clientcreds (clientcreds.go:714) and auth/jwtbearer (jwtbearer.go:521) are decoded with encoding/json v1, so a member such as "ISSUER" or "ACCESS_TOKEN" that follows the real one replaces it; encoding/json/v2 would read the names exactly as RFC 8414 and RFC 6749 spell them. · by: claude-opus-5-5 · from: fix/smart-jwks-expiry-336
 
 ## Typed-nil options: a nil pointer passed as an interface panics on first use
 Code in transport/ and openehr/instance; one delivery decides how a constructor refuses a typed nil without reflection beyond idiom.md § API conventions, or documents the panic. Lane: maintenance. Size: S.
