@@ -492,22 +492,40 @@ func TestREQ107_IntervalBoundsOfTwoTypesAreRefused(t *testing.T) {
 }
 
 // TestREQ107_UntypedChildVisitsItsMandatoryAttributes is the REQ-107 check
-// that an untyped child is read as the type it is built as, its attributes
-// as the BMM declares them there (Generic and untyped types): an untyped
-// ELEMENT value is built as a DV_TEXT, whose value the BMM marks mandatory,
-// so every policy visits that value, Required included, and writes the one
-// string the OPT lists for it, where the OPT leaves the attribute optional.
-// A value that names DV_TEXT is built the same way. Each root passes the
-// template validator and the RM floor, under every policy, both value fills
-// and both compile modes.
+// that a child is read as the type it is built as, its attributes as the BMM
+// declares them there (Generic and untyped types): an untyped ELEMENT value,
+// and one of the abstract DATA_VALUE, is built as a DV_TEXT, whose value the
+// BMM marks mandatory, and one of the abstract DV_ORDERED or DV_QUANTIFIED as
+// a DV_COUNT, whose magnitude it marks mandatory. So every policy visits that
+// attribute, Required included, and writes the one value the OPT lists for
+// it, where the OPT leaves the attribute optional. A value that names the
+// concrete class is built the same way. Each root passes the template
+// validator and the RM floor, under every policy, both value fills and both
+// compile modes.
 func TestREQ107_UntypedChildVisitsItsMandatoryAttributes(t *testing.T) {
-	listed := guardSingle("value", guardExistence01, guardString("listed"))
+	text := guardSingle("value", guardExistence01, guardString("listed"))
+	magnitude := guardSingle("magnitude", guardExistence01, dvInteger("7"))
 	cases := []struct {
 		name string
 		opt  string
+		// want is the ELEMENT's value as leafOf renders it.
+		want string
 	}{
-		{name: "an untyped ELEMENT value", opt: optTemplate("ELEMENT", optSingle("value", optUntyped("", listed)))},
-		{name: "an ELEMENT value that names DV_TEXT", opt: optTemplate("ELEMENT", optSingle("value", optNode("DV_TEXT", "", listed)))},
+		{name: "an untyped ELEMENT value", opt: optTemplate("ELEMENT", optSingle("value", optUntyped("", text))), want: "DV_TEXT listed"},
+		{name: "an ELEMENT value of the abstract DATA_VALUE", opt: optTemplate("ELEMENT", optSingle("value", optNode("DATA_VALUE", "", text))), want: "DV_TEXT listed"},
+		{name: "an ELEMENT value that names DV_TEXT", opt: optTemplate("ELEMENT", optSingle("value", optNode("DV_TEXT", "", text))), want: "DV_TEXT listed"},
+		{name: "an ELEMENT value of the abstract DV_ORDERED", opt: optTemplate("ELEMENT", optSingle("value", optNode("DV_ORDERED", "", magnitude))), want: "DV_COUNT 7"},
+		{name: "an ELEMENT value of the abstract DV_QUANTIFIED", opt: optTemplate("ELEMENT", optSingle("value", optNode("DV_QUANTIFIED", "", magnitude))), want: "DV_COUNT 7"},
+		{name: "an ELEMENT value that names DV_COUNT", opt: optTemplate("ELEMENT", optSingle("value", optNode("DV_COUNT", "", magnitude))), want: "DV_COUNT 7"},
+	}
+	leafOf := func(v rm.DataValue) string {
+		switch x := v.(type) {
+		case *rm.DVText:
+			return "DV_TEXT " + x.Value
+		case *rm.DVCount:
+			return fmt.Sprintf("DV_COUNT %d", x.Magnitude)
+		}
+		return fmt.Sprintf("%T", v)
 	}
 	for _, tc := range cases {
 		runEveryWay(t, tc.name, tc.opt, func(t *testing.T, _ instance.Options, out any, c *templatecompile.Compiled) {
@@ -515,12 +533,8 @@ func TestREQ107_UntypedChildVisitsItsMandatoryAttributes(t *testing.T) {
 			if !ok {
 				t.Fatalf("generated root is %T, want *rm.Element", out)
 			}
-			text, ok := el.Value.(*rm.DVText)
-			if !ok {
-				t.Fatalf("ELEMENT.value is %T, want *rm.DVText", el.Value)
-			}
-			if text.Value != "listed" {
-				t.Errorf("DV_TEXT.value = %q, want the listed %q", text.Value, "listed")
+			if got := leafOf(el.Value); got != tc.want {
+				t.Errorf("ELEMENT.value = %s, want %s", got, tc.want)
 			}
 			checkValid(t, out, c)
 		})
