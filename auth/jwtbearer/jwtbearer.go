@@ -533,9 +533,12 @@ func (s *Source) fetch(ctx context.Context) (auth.Token, error) {
 		}
 	}
 
+	// RFC 6749 §5.1: expires_in is the token's lifetime, so one of zero or
+	// below makes the token due at once, and only a response without one,
+	// or with null, leaves it without an expiry (REQ-063).
 	var expiresAt time.Time
-	if secs, ok := expiresin.Seconds(tr.ExpiresIn.String()); ok && secs > 0 {
-		expiresAt = time.Now().Add(time.Duration(secs) * time.Second)
+	if secs, ok := expiresin.Seconds(tr.ExpiresIn.String()); ok {
+		expiresAt = time.Now().Add(time.Duration(max(secs, 0)) * time.Second)
 	}
 	return auth.Token{
 		Value:     tr.AccessToken,

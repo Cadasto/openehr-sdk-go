@@ -108,16 +108,16 @@ func TestAccess_REQ112_IntervalOpenSide(t *testing.T) {
 		name     string
 		interval any
 		attr     string
-		want     any // the bound read back; ignored when absent
+		want     any // the bound read back; ignored when absent. A bound of the concrete form, held by value, comes back as a pointer into the interval
 		present  bool
 	}{
 		// Concrete form.
-		{name: "concrete bounded", interval: &rm.DVInterval[rm.DVQuantity]{Lower: q, Upper: q}, attr: "lower", want: q, present: true},
-		{name: "concrete bounded, zero bound", interval: &rm.DVInterval[rm.DVQuantity]{Upper: q}, attr: "lower", want: rm.DVQuantity{}, present: true},
+		{name: "concrete bounded", interval: &rm.DVInterval[rm.DVQuantity]{Lower: q, Upper: q}, attr: "lower", want: &q, present: true},
+		{name: "concrete bounded, zero bound", interval: &rm.DVInterval[rm.DVQuantity]{Upper: q}, attr: "lower", want: &rm.DVQuantity{}, present: true},
 		{name: "concrete open, empty bound", interval: &rm.DVInterval[rm.DVQuantity]{LowerUnbounded: true, Upper: q}, attr: "lower"},
-		{name: "concrete open, real bound", interval: &rm.DVInterval[rm.DVQuantity]{Lower: q, LowerUnbounded: true}, attr: "lower", want: q, present: true},
+		{name: "concrete open, real bound", interval: &rm.DVInterval[rm.DVQuantity]{Lower: q, LowerUnbounded: true}, attr: "lower", want: &q, present: true},
 		{name: "concrete open upper, empty bound", interval: &rm.DVInterval[rm.DVQuantity]{Lower: q, UpperUnbounded: true}, attr: "upper"},
-		{name: "concrete open upper, real bound", interval: &rm.DVInterval[rm.DVQuantity]{Upper: q, UpperUnbounded: true}, attr: "upper", want: q, present: true},
+		{name: "concrete open upper, real bound", interval: &rm.DVInterval[rm.DVQuantity]{Upper: q, UpperUnbounded: true}, attr: "upper", want: &q, present: true},
 		{name: "concrete value form, open, empty bound", interval: rm.DVInterval[rm.DVDate]{UpperUnbounded: true}, attr: "upper"},
 		// Bare form.
 		{name: "bare bounded", interval: &rm.DVInterval[rm.DVOrdered]{Lower: &q, Upper: &q}, attr: "lower", want: &q, present: true},

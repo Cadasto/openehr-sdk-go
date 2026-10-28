@@ -976,18 +976,19 @@ const ehrScheme = "ehr"
 
 // checkDVEHRURIScheme enforces the RM invariant `Scheme_valid:
 // scheme.is_equal (Ehr_scheme)` (REQ-112) on a DV_EHR_URI: a `value` whose
-// RFC 3986 scheme ([uriScheme]) is not `ehr`, compared without regard to
-// letter case, is reported at the node itself, as the ISO 8601 rule reports
-// at its node. A value with no scheme has none equal to `ehr`, so it is
-// reported too; an empty one is the mandatory-presence rule's. The
-// diagnostic names the class and the attribute, never a value (REQ-168), the
-// scheme being part of the value, so the issue's Value stays empty.
+// RFC 3986 scheme ([rm.DVURI.Scheme], the RM's own scheme function) is not
+// `ehr`, compared without regard to letter case, is reported at the node
+// itself, as the ISO 8601 rule reports at its node. A value with no scheme
+// has none equal to `ehr`, so it is reported too; an empty one is the
+// mandatory-presence rule's. The diagnostic names the class and the
+// attribute, never a value (REQ-168), the scheme being part of the value, so
+// the issue's Value stays empty.
 func (f *findings) checkDVEHRURIScheme(value any, path issuePath) {
 	u, ok := asDVEHRURI(value)
 	if !ok || u.Value == "" {
 		return
 	}
-	if scheme, found := uriScheme(u.Value); found && strings.EqualFold(scheme, ehrScheme) {
+	if strings.EqualFold(u.Scheme(), ehrScheme) {
 		return
 	}
 	f.emit(Issue{
@@ -997,36 +998,6 @@ func (f *findings) checkDVEHRURIScheme(value any, path issuePath) {
 		Rule:   ruleEHRSchemeValid,
 		Detail: "DV_EHR_URI.value must use the ehr scheme (RM Scheme_valid)",
 	})
-}
-
-// uriScheme returns the scheme of the URI reference s as RFC 3986 section
-// 3.1 writes it, `ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )`, followed by
-// ":", and whether s has one. A reference whose text before the first colon
-// is no scheme, such as a relative reference, a path with a colon after a
-// slash, or one that starts with a digit, has none.
-func uriScheme(s string) (scheme string, found bool) {
-	scheme, _, found = strings.Cut(s, ":")
-	if !found || scheme == "" {
-		return "", false
-	}
-	for i := range len(scheme) {
-		if !isSchemeByte(scheme[i], i == 0) {
-			return "", false
-		}
-	}
-	return scheme, true
-}
-
-// isSchemeByte reports whether c may stand in an RFC 3986 scheme: a letter
-// anywhere, and, past the first byte, a digit, "+", "-" or ".".
-func isSchemeByte(c byte, first bool) bool {
-	switch {
-	case 'a' <= c && c <= 'z', 'A' <= c && c <= 'Z':
-		return true
-	case first:
-		return false
-	}
-	return '0' <= c && c <= '9' || c == '+' || c == '-' || c == '.'
 }
 
 // listMembers is what an RM rule that asks a list for a member reads: the

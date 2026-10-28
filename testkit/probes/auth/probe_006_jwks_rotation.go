@@ -87,6 +87,9 @@ func Probe006JWKSRotationTransparent(ctx context.Context) (Result, error) { // P
 	// TTL long enough that staleness never triggers a refresh — only the
 	// kid-miss path can, isolating the rotation behaviour under test.
 	jwks.TTL = time.Hour
+	// No minimum refresh interval, so the miss right after the seed refreshes
+	// the set as a rotation the cache has been holding for a while would.
+	jwks.MinRefreshInterval = 0
 
 	// Seed the cache with the OLD (pre-rotation) key set: one fetch.
 	if _, err := jwks.Key(ctx, oldKid); err != nil {

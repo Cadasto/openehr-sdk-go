@@ -4,6 +4,7 @@
 package expiresin
 
 import (
+	"errors"
 	"math"
 	"strconv"
 )
@@ -20,16 +21,21 @@ const Max = 100 * 365 * 24 * 60 * 60
 // it is. Any other number, such as 3600.0, 3.6e3, 3600.5 or an integer
 // beyond the int64 range, counts as its whole seconds rounded down. Every
 // form is then kept between -Max and Max, so the result always turns into a
-// time.Duration of that many seconds without overflow. A negative value
-// stays negative, so a caller can tell it gives no expiry. ok is false when
-// s is not a number, or is one a float64 cannot hold (it reads as NaN or
-// ±Inf).
+// time.Duration of that many seconds without overflow, so a number too
+// large for a float64, such as 1e400 or -1e400, counts as Max or -Max. A
+// negative value stays negative; callers read zero or below as a lifetime
+// of zero. ok is false when s is not a number: NaN and Inf, which no JSON
+// number spells, included.
 func Seconds(s string) (secs int64, ok bool) {
 	if secs, err := strconv.ParseInt(s, 10, 64); err == nil {
 		return min(max(secs, -Max), Max), true
 	}
 	f, err := strconv.ParseFloat(s, 64)
-	if err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
+	switch {
+	case errors.Is(err, strconv.ErrRange) && math.IsInf(f, 0):
+		// A number too large for a float64, such as 1e400 or -1e400, is
+		// still a number past the bound on its side.
+	case err != nil || math.IsNaN(f) || math.IsInf(f, 0):
 		return 0, false
 	}
 	// Bounding f first keeps the conversion inside the int64 range, where

@@ -8,6 +8,7 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
+	jsonv2 "encoding/json/v2"
 	"errors"
 	"fmt"
 	"slices"
@@ -84,8 +85,11 @@ func WithTrustedAudiences(aud ...string) IDTokenOption {
 // The signing key is the one the token's kid names. A token without a kid is
 // verified with the set's only signing key (see [JWKS.Key]). When that key
 // does not verify the signature, the set is fetched once more, in case the
-// server has rotated its key, and the token is checked against the key it
-// then holds.
+// server has rotated its key, unless it was fetched less than
+// [JWKS.MinRefreshInterval] ago, and the token is checked against the key
+// the set then holds. A key published for a use other than signing verifies no
+// token, and a key that publishes an alg verifies only a token whose header
+// names that alg (RFC 8725 §3.1).
 //
 // A token rejected on its own content matches [auth.ErrJWKSValidationFailed].
 // A missing jwks, issuer or clientID matches [auth.ErrInvalidConfig], and a
@@ -138,12 +142,17 @@ func ValidateIDToken(ctx context.Context, raw string, jwks *JWKS, issuer, client
 	if err != nil {
 		return nil, err
 	}
-	pub, err := publicKeyFromJWK(jwkRaw)
+	pub, keyAlg, err := publicKeyFromJWK(jwkRaw)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", auth.ErrJWKSValidationFailed, err)
 	}
 
-	verify := func(pub crypto.PublicKey) (*oidc.IDToken, error) {
+	verify := func(pub crypto.PublicKey, keyAlg string) (*oidc.IDToken, error) {
+		// RFC 8725 §3.1: a key that names its algorithm verifies a token of
+		// that algorithm only (REQ-062).
+		if keyAlg != "" && keyAlg != hdr.Alg {
+			return nil, fmt.Errorf("the key's alg %q is not the token's alg %q", keyAlg, hdr.Alg)
+		}
 		keySet := &oidc.StaticKeySet{PublicKeys: []crypto.PublicKey{pub}}
 		verifier := oidc.NewVerifier(issuer, keySet, &oidc.Config{
 			ClientID:             clientID,
@@ -157,7 +166,7 @@ func ValidateIDToken(ctx context.Context, raw string, jwks *JWKS, issuer, client
 		})
 		return verifier.Verify(ctx, raw)
 	}
-	idt, err := verify(pub)
+	idt, err := verify(pub, keyAlg)
 	if err != nil && hdr.Kid == "" && !signatureVerifies(ctx, raw, pub) {
 		// A token without a kid cannot name a rotated key, so a signature the
 		// cached key does not verify refreshes the set once, as a kid miss
@@ -167,10 +176,10 @@ func ValidateIDToken(ctx context.Context, raw string, jwks *JWKS, issuer, client
 		if ferr != nil {
 			return nil, ferr
 		}
-		if pub, err = publicKeyFromJWK(jwkRaw); err != nil {
+		if pub, keyAlg, err = publicKeyFromJWK(jwkRaw); err != nil {
 			return nil, fmt.Errorf("%w: %w", auth.ErrJWKSValidationFailed, err)
 		}
-		idt, err = verify(pub)
+		idt, err = verify(pub, keyAlg)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", auth.ErrJWKSValidationFailed, err)
@@ -238,25 +247,26 @@ func resolveIDTokenAlgs(allowedAlgs []string) []string {
 
 // publicKeyFromJWK parses a single JWK document into its crypto.PublicKey
 // (RSA, ECDSA or Ed25519) via go-jose, so go-oidc can verify the signature
-// without any hand-rolled JWK→key conversion. Any other key, a symmetric one
+// without any hand-rolled JWK→key conversion, and returns the alg the JWK
+// publishes, empty when it publishes none. Any other key, a symmetric one
 // included, is refused. Which algorithms a key may verify is decided by the
-// allowlist, not here: an Ed25519 key verifies nothing while EdDSA is not
-// supported.
-func publicKeyFromJWK(jwkRaw json.RawMessage) (crypto.PublicKey, error) {
+// allowlist and by that alg, not here: an Ed25519 key verifies nothing while
+// EdDSA is not supported.
+func publicKeyFromJWK(jwkRaw json.RawMessage) (crypto.PublicKey, string, error) {
 	var k gojose.JSONWebKey
 	if err := k.UnmarshalJSON(jwkRaw); err != nil {
-		return nil, fmt.Errorf("parse JWK: %w", err)
+		return nil, "", fmt.Errorf("parse JWK: %w", err)
 	}
 	if k.Key == nil {
-		return nil, errors.New("JWK has no key material")
+		return nil, "", errors.New("JWK has no key material")
 	}
 	switch k.Key.(type) {
 	case *rsa.PublicKey, *ecdsa.PublicKey, ed25519.PublicKey:
 		// ok — asymmetric public key
 	default:
-		return nil, fmt.Errorf("%w: JWK key type %T is not a supported asymmetric public key", auth.ErrJWKSValidationFailed, k.Key)
+		return nil, "", fmt.Errorf("%w: JWK key type %T is not a supported asymmetric public key", auth.ErrJWKSValidationFailed, k.Key)
 	}
-	return k.Key, nil
+	return k.Key, k.Algorithm, nil
 }
 
 // jwtHeader checks that raw has the three segments of a compact JWS and
@@ -269,12 +279,17 @@ func jwtHeader(raw string) (string, error) {
 	return header, nil
 }
 
+// decodeJWTPart decodes one base64url segment of a compact JWS into dest.
+// JOSE member names are case-sensitive (RFC 7515 §4), and go-jose, which
+// verifies the signature, reads them so, so the decode matches names exactly
+// and refuses a repeated one: an "ALG" or "KID" member never stands in for
+// the alg or kid the key checks read.
 func decodeJWTPart(b64 string, dest any) error {
 	b, err := base64.RawURLEncoding.DecodeString(b64)
 	if err != nil {
 		return fmt.Errorf("%w: segment decode: %w", auth.ErrJWKSValidationFailed, err)
 	}
-	if err := json.Unmarshal(b, dest); err != nil {
+	if err := jsonv2.Unmarshal(b, dest); err != nil {
 		return fmt.Errorf("%w: segment json: %w", auth.ErrJWKSValidationFailed, err)
 	}
 	return nil

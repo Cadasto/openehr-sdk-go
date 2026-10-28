@@ -50,6 +50,13 @@ var manuallyImplemented = map[string]bool{
 	"TERMINOLOGY_ID.version_id":            true,
 	"LOCATABLE_REF.as_uri":                 true,
 
+	// REQ-120 — URI reference components, inherited by DV_EHR_URI.
+	// Hand-written: openehr/rm/uri_funcs.go.
+	"DV_URI.scheme":      true,
+	"DV_URI.path":        true,
+	"DV_URI.query":       true,
+	"DV_URI.fragment_id": true,
+
 	// REQ-121 — locatable path read access. The path-method stubs are
 	// suppressed (not filled): openehr/rm/rmpath provides the read API
 	// as package functions, because a delegating rm method would create

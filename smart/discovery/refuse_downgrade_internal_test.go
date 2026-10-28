@@ -50,8 +50,10 @@ func sameButRedirectPolicy(t *testing.T, name string, cp *http.Client, want *htt
 // keeps the injected client's Transport, Jar and Timeout. Its redirect policy
 // refuses a redirect to a URL that is not https, and otherwise applies the
 // injected client's own policy, or net/http's limit of 10 redirects when the
-// injected client has none. The injected client stays as it was, and with
-// allowInsecure the resolver fetches with the injected client itself.
+// injected client has none. The injected client stays as it was. With
+// allowInsecure the resolver still fetches with a copy of its own, which
+// keeps the injected client's redirect policy, so a later change to the
+// injected client reaches the resolver in neither mode.
 func TestRefuseDowngradeChangesOnlyTheRedirectPolicy(t *testing.T) { // REQ-021, REQ-073
 	t.Parallel()
 
@@ -134,15 +136,25 @@ func TestRefuseDowngradeChangesOnlyTheRedirectPolicy(t *testing.T) { // REQ-021,
 
 	t.Run("allowInsecure", func(t *testing.T) {
 		t.Parallel()
-		injected := injectedClient(t, nil)
+		var calls atomic.Int32
+		policy := func(*http.Request, []*http.Request) error {
+			calls.Add(1)
+			return errCallerPolicy
+		}
+		injected := injectedClient(t, policy)
 		before := *injected
 
-		if got := refuseDowngrade(injected, true); got != injected {
-			t.Errorf("refuseDowngrade(injected, true) = %p, want the injected client %p itself", got, injected)
+		cp := refuseDowngrade(injected, true)
+		if cp == injected {
+			t.Fatal("refuseDowngrade(injected, true) returned the injected client, want a copy")
+		}
+		sameButRedirectPolicy(t, "copy", cp, &before)
+		if cp.CheckRedirect == nil {
+			t.Fatal("copy.CheckRedirect = nil, want the caller's policy")
+		}
+		if err := cp.CheckRedirect(redirectTo("http"), nil); !errors.Is(err, errCallerPolicy) || calls.Load() != 1 {
+			t.Errorf("copy.CheckRedirect(redirect to http) = %v after %d call(s) of the caller's policy, want the caller's policy's %v after 1", err, calls.Load(), errCallerPolicy)
 		}
 		sameButRedirectPolicy(t, "injected", injected, &before)
-		if injected.CheckRedirect != nil {
-			t.Error("injected.CheckRedirect is set after refuseDowngrade, want nil unchanged")
-		}
 	})
 }

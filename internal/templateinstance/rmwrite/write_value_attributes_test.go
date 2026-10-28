@@ -41,6 +41,7 @@ func TestREQ107_EnsureSingleWritesDataValueAttributes(t *testing.T) {
 	text, coded := &rm.DVText{}, &rm.DVCodedText{}
 	linked, ehrLinked := &rm.DVText{}, &rm.DVCodedText{}
 	media, ehrMedia := &rm.DVMultimedia{}, &rm.DVMultimedia{}
+	phrase := &rm.CodePhrase{}
 	quantity, count, duration := &rm.DVQuantity{}, &rm.DVCount{}, &rm.DVDuration{}
 	date, clock, stamp := &rm.DVDate{}, &rm.DVTime{}, &rm.DVDateTime{}
 	dvState := &rm.DVState{}
@@ -59,6 +60,8 @@ func TestREQ107_EnsureSingleWritesDataValueAttributes(t *testing.T) {
 		{"DV_MULTIMEDIA uri DV_URI", media, "uri", link, func() any { return media.URI }, rm.DVURILike(link)},
 		{"DV_MULTIMEDIA uri DV_EHR_URI", ehrMedia, "uri", ehrLink, func() any { return ehrMedia.URI }, rm.DVURILike(ehrLink)},
 		{"DV_MULTIMEDIA thumbnail", media, "thumbnail", &rm.DVMultimedia{Size: 7}, func() any { return media.Thumbnail.Size }, rm.Integer(7)},
+		{"DV_MULTIMEDIA alternate_text through a pointer", media, "alternate_text", new("chest X-ray"), func() any { return *media.AlternateText }, "chest X-ray"},
+		{"CODE_PHRASE preferred_term as a string", phrase, "preferred_term", "event", func() any { return *phrase.PreferredTerm }, "event"},
 		{"DV_QUANTITY accuracy", quantity, "accuracy", 0.5, func() any { return *quantity.Accuracy }, rm.Real(0.5)},
 		{"DV_QUANTITY accuracy_is_percent", quantity, "accuracy_is_percent", true, func() any { return *quantity.AccuracyIsPercent }, true},
 		{"DV_QUANTITY magnitude_status", quantity, "magnitude_status", "~", func() any { return *quantity.MagnitudeStatus }, "~"},

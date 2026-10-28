@@ -6,6 +6,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/internal/iso8601"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
@@ -185,13 +186,22 @@ type orderCase struct {
 	// above reports whether the floor puts a above b: whether the
 	// DV_INTERVAL from a to b breaks Limits_consistent.
 	above func(a, b string) bool
-	// clockAbove reports whether a is above b by the clock-local magnitude
-	// of the RM's Compare (REQ-123), with no zone applied.
+	// clockAbove reports whether a is above b by the clock-local
+	// magnitude, with no zone applied: the RM's Compare (REQ-123) for a
+	// date, a time and a duration, and [clockDateTime] for a date-time,
+	// whose Compare reads a zoned value in UTC.
 	clockAbove func(a, b string) bool
 	// zoned reports whether s carries a time zone; nil for a type with
 	// no zones.
 	zoned   func(s string) bool
 	samples []string
+}
+
+// clockDateTime is the magnitude of the date-time s read on its clock, its
+// zone not applied.
+func clockDateTime(s string) float64 {
+	d, t, _ := iso8601.ParseDateTime(s)
+	return iso8601.DateTimeMagnitude(d, t)
 }
 
 // limitsBroken reports whether the closed interval from lower to upper
@@ -253,7 +263,7 @@ func TestREQ103TemporalRangeAgreesWithREQ112Order(t *testing.T) {
 			},
 			above: func(a, b string) bool { return limitsBroken(rm.DVDateTime{Value: a}, rm.DVDateTime{Value: b}) },
 			clockAbove: func(a, b string) bool {
-				return (&rm.DVDateTime{Value: a}).Compare(rm.DVDateTime{Value: b}) > 0
+				return clockDateTime(a) > clockDateTime(b)
 			},
 			zoned: func(s string) bool { return (&rm.DVDateTime{Value: s}).Timezone() != "" },
 			samples: []string{

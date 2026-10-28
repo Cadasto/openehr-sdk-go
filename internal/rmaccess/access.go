@@ -16,21 +16,39 @@ import (
 // ORIGINAL_VERSION data, whose pointer is present when it is not nil, comes
 // back as nil when that pointer holds a nil interface.
 //
-// A pointer, an interface and a value held by value come back as the field
-// holds them, with six exceptions, of five classes, the validation walks read
-// in another shape: ITEM_SINGLE item and REFERENCE_RANGE range come back as a
-// pointer into parent, ISM_TRANSITION careflow_step and transition as the
-// DV_CODED_TEXT they point to, DV_PROPORTION precision as its Integer, and
-// ORIGINAL_VERSION data as the value its pointer holds, so a walk can enter
-// the payload of a version built in Go. A Hash attribute comes back as its Go
-// map, or the pointer to it, whole; [Hash] reads its entries, with the same
-// presence.
+// A pointer, an interface and a primitive come back as the field holds them.
+// A class held by value comes back as a pointer into parent, so reading it
+// copies nothing and a write through it reaches parent; parent held by value
+// is itself a copy, so such a write reaches only that copy. Two attributes
+// of two classes come back in another shape: DV_PROPORTION precision as its
+// Integer, and ORIGINAL_VERSION data as the value its pointer holds, so a
+// walk can enter the payload of a version built in Go. A Hash attribute
+// comes back as its Go map, or the pointer to it, whole; [Hash] reads its
+// entries, with the same presence.
 func Single(parent any, attr string) (value any, present bool) {
-	v, present, _ := single(parent, attr)
+	v, present, _ := single(parent, attr, false)
 	if !present {
 		return nil, false
 	}
 	return v, true
+}
+
+// Peek reads the single-valued attribute attr on parent as [Single] does,
+// except that a primitive leaf is not read: an attribute whose field holds a
+// string, a boolean or a number, as a predeclared Go type or as rm.Real,
+// rm.Integer, rm.Integer64 or rm.Character, comes back as (nil, present,
+// true), its presence the one Single reads. Every other attribute comes back
+// as Single gives it, with leaf false. A walk that only counts a primitive
+// leaf reads it through Peek, so the value is not boxed.
+func Peek(parent any, attr string) (value any, present, leaf bool) {
+	v, present, _ := single(parent, attr, true)
+	if _, leaf = v.(leafMarker); leaf {
+		return nil, present, true
+	}
+	if !present {
+		return nil, false, false
+	}
+	return v, true, false
 }
 
 // Multiple returns the items of the container attribute attr on parent and
@@ -44,11 +62,11 @@ func Single(parent any, attr string) (value any, present bool) {
 // walk can descend into each and change it in place; the items of a list of
 // interfaces or pointers come back as they are.
 func Multiple(parent any, attr string) (items []any, present bool) {
-	l, present, _ := multiple(parent, attr)
+	items, _, present, _ = multiple(parent, attr, true)
 	if !present {
 		return nil, false
 	}
-	return l.boxed(), true
+	return items, true
 }
 
 // Len returns the number of items of the container attribute attr on parent
@@ -57,11 +75,11 @@ func Multiple(parent any, attr string) (items []any, present bool) {
 // Array of Octet, is counted, not boxed one byte at a time. An absent list,
 // and any pair [Multiple] reads as absent, reads as (0, false).
 func Len(parent any, attr string) (n int, present bool) {
-	l, present, _ := multiple(parent, attr)
+	_, n, present, _ = multiple(parent, attr, false)
 	if !present {
 		return 0, false
 	}
-	return l.length(), true
+	return n, true
 }
 
 // Hash returns the entries of a Hash attribute in ascending key order:
@@ -102,31 +120,26 @@ func IsTypedNilPointer(v any) bool {
 	return rm.IsTypedNil(v)
 }
 
-// list is a container attribute as the generated access hands it over: the
-// Go slice the field holds, its length read without touching an item, and its
-// items boxed only when [Multiple] asks for them.
-type list interface {
-	length() int
-	boxed() []any
+// leafMarker is what a single reader called to peek hands back in place of a
+// primitive leaf's value ([Peek]). It has no size, so boxing it allocates
+// nothing.
+type leafMarker struct{}
+
+// leafValue hands back v, the value of a primitive leaf, or, when peek is
+// set, leafMarker in its place, so the generated readers box v only when it
+// is read.
+func leafValue[T any](peek bool, v T) any {
+	if peek {
+		return leafMarker{}
+	}
+	return v
 }
 
-// boxPointers hands over a list of values, whose items are boxed, when they
-// are read, as pointers into the backing array.
-func boxPointers[T any](xs []T) list { return valueList[T](xs) }
-
-// boxValues hands over a list of interfaces or pointers, whose items are
-// boxed, when they are read, as they are.
-func boxValues[T any](xs []T) list { return refList[T](xs) }
-
-// valueList is a list of values.
-type valueList[T any] []T
-
-func (xs valueList[T]) length() int { return len(xs) }
-
-// boxed boxes each item as a pointer into the backing array. It returns nil
-// for an empty list.
-func (xs valueList[T]) boxed() []any {
-	if len(xs) == 0 {
+// boxPointers boxes, when box is set, each item of a list of values as a
+// pointer into the backing array. It returns nil when box is not set and for
+// an empty list.
+func boxPointers[T any](box bool, xs []T) []any {
+	if !box || len(xs) == 0 {
 		return nil
 	}
 	out := make([]any, len(xs))
@@ -136,14 +149,11 @@ func (xs valueList[T]) boxed() []any {
 	return out
 }
 
-// refList is a list of interfaces or pointers.
-type refList[T any] []T
-
-func (xs refList[T]) length() int { return len(xs) }
-
-// boxed boxes each item as it is. It returns nil for an empty list.
-func (xs refList[T]) boxed() []any {
-	if len(xs) == 0 {
+// boxValues boxes, when box is set, each item of a list of interfaces or
+// pointers as it is. It returns nil when box is not set and for an empty
+// list.
+func boxValues[T any](box bool, xs []T) []any {
+	if !box || len(xs) == 0 {
 		return nil
 	}
 	out := make([]any, len(xs))

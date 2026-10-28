@@ -28,12 +28,20 @@ type TokenResponse struct {
 	AccessToken string
 	TokenType   string
 	// ExpiresIn is the response's expires_in, the access token's lifetime
-	// in whole seconds, or 0 when the response has none. A number such as
-	// 3600.5 or 3.6e3 is rounded down. Every value, an integer included, is
-	// kept between minus and plus 100 years, so turning it into a
-	// time.Duration of that many seconds cannot overflow. A number too large
-	// for a float64 counts as none.
-	ExpiresIn    int64
+	// in whole seconds, or 0 when the response has none: HasExpiresIn tells
+	// the two apart. A number such as 3600.5 or 3.6e3 is rounded down. Every
+	// value, an integer included, is kept between minus and plus 100 years,
+	// so turning it into a time.Duration of that many seconds cannot
+	// overflow. A number too large for a float64 counts as the 100-year
+	// bound on its side.
+	ExpiresIn int64
+	// HasExpiresIn reports whether the response carried expires_in as a
+	// number. A source gives the access token a lifetime of zero seconds
+	// for an expires_in of zero or below (RFC 6749 §5.1), so the next Token
+	// call renews the token or, on a [Source] that holds no refresh token,
+	// returns [auth.ErrReauthRequired]. It gives no expiry when the response
+	// has none.
+	HasExpiresIn bool
 	RefreshToken string
 	Scope        string
 	IDToken      string
@@ -143,10 +151,10 @@ func (tr TokenResponse) String() string {
 	if tr.NeedPatientBanner != nil {
 		banner = strconv.FormatBool(*tr.NeedPatientBanner)
 	}
-	return fmt.Sprintf("smart.TokenResponse{AccessToken: %q, TokenType: %q, ExpiresIn: %d, RefreshToken: %q, Scope: %q, IDToken: %q, "+
+	return fmt.Sprintf("smart.TokenResponse{AccessToken: %q, TokenType: %q, ExpiresIn: %d, HasExpiresIn: %t, RefreshToken: %q, Scope: %q, IDToken: %q, "+
 		"IDTokenClaims: %+v, Patient: %q, Encounter: %q, FHIRUser: %q, EHRID: %q, EpisodeID: %q, Intent: %q, SMARTStyleURL: %q, "+
 		"NeedPatientBanner: %s, Tenant: %q, Raw: %v}",
-		redact(tr.AccessToken), tr.TokenType, tr.ExpiresIn, redact(tr.RefreshToken), tr.Scope, redact(tr.IDToken),
+		redact(tr.AccessToken), tr.TokenType, tr.ExpiresIn, tr.HasExpiresIn, redact(tr.RefreshToken), tr.Scope, redact(tr.IDToken),
 		maskedClaims(tr.IDTokenClaims), tr.Patient, tr.Encounter, urlredact.String(tr.FHIRUser), tr.EHRID, tr.EpisodeID, tr.Intent,
 		urlredact.String(tr.SMARTStyleURL), banner, tr.Tenant, maskedRaw(tr.Raw))
 }
@@ -179,6 +187,7 @@ func (tr TokenResponse) LogValue() slog.Value {
 		slog.String("AccessToken", redact(tr.AccessToken)),
 		slog.String("TokenType", tr.TokenType),
 		slog.Int64("ExpiresIn", tr.ExpiresIn),
+		slog.Bool("HasExpiresIn", tr.HasExpiresIn),
 		slog.String("RefreshToken", redact(tr.RefreshToken)),
 		slog.String("Scope", tr.Scope),
 		slog.String("IDToken", redact(tr.IDToken)),
@@ -226,6 +235,7 @@ func ParseTokenResponse(body []byte) (TokenResponse, error) {
 	}
 	if secs, ok := expiresin.Seconds(string(tr.ExpiresIn)); ok {
 		out.ExpiresIn = secs
+		out.HasExpiresIn = true
 	}
 	return out, nil
 }
@@ -357,8 +367,12 @@ func tokenFromResponse(tr TokenResponse, issuer string) auth.Token {
 		Scope:  tr.Scope,
 		Issuer: issuer,
 	}
-	if tr.ExpiresIn > 0 {
-		tok.ExpiresAt = time.Now().Add(time.Duration(tr.ExpiresIn) * time.Second)
+	// RFC 6749 §5.1: expires_in is the token's lifetime, so one of zero or
+	// below makes the token due at once, and only a response without one
+	// leaves it without an expiry (REQ-063). A non-zero ExpiresIn counts as
+	// present on a TokenResponse built without HasExpiresIn.
+	if tr.HasExpiresIn || tr.ExpiresIn != 0 {
+		tok.ExpiresAt = time.Now().Add(time.Duration(max(tr.ExpiresIn, 0)) * time.Second)
 	}
 	return tok
 }

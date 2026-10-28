@@ -330,3 +330,44 @@ func structuredClasses(q *parse.Query) []parse.ClassExpr {
 	walk(q.From.Contains)
 	return out
 }
+
+// REQ-119 — a boolean the builder writes into a class bracket comparison
+// reads back as that boolean, as an integer there does. (A VERSION bracket
+// reads back as its verbatim text only, whatever it compares with.) The SDK
+// lexer reads `true` and `false` as IDENTIFIER (it declares IDENTIFIER before
+// BOOLEAN), so the operand arrives as a one-part object path; the extractor
+// reads that path as the literal, as it does in a WHERE comparison. Leave
+// the bracket operand to the path reading and the boolean rows come back
+// with no comparison.
+func TestBracketBooleanReadsBackAsTheBoolean(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name     string
+		contains aql.Containment
+		want     aql.Value
+	}{
+		{name: "class true", contains: aql.Class("COMPOSITION", "c").Predicated("context/other_context/items/value/value", aql.OpEq, aql.Bool(true)), want: aql.BoolValue{B: true}},
+		{name: "class false", contains: aql.Class("COMPOSITION", "c").Predicated("context/other_context/items/value/value", aql.OpEq, aql.Bool(false)), want: aql.BoolValue{B: false}},
+		{name: "class integer", contains: aql.Class("COMPOSITION", "c").Predicated("context/other_context/items/value/value", aql.OpEq, aql.Int(1)), want: aql.IntValue{N: 1}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			q, err := aql.NewBuilder().Select(aql.ColAs("c/uid/value", "u")).FromEHR("e", nil).Contains(tc.contains).Build()
+			if err != nil {
+				t.Fatalf("Build: %v", err)
+			}
+			pq, err := parse.ParseQuery(q.Q)
+			if err != nil {
+				t.Fatalf("ParseQuery(%q): %v", q.Q, err)
+			}
+			cmp := pq.From.Contains.Class.PredicateComparison
+			if cmp == nil {
+				t.Fatalf("ParseQuery(%q) reads the bracket with no comparison, want one comparing with %#v", q.Q, tc.want)
+			}
+			if !aql.EqualValues(cmp.Val, tc.want) {
+				t.Errorf("ParseQuery(%q) bracket value = %#v, want %#v", q.Q, cmp.Val, tc.want)
+			}
+		})
+	}
+}

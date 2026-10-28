@@ -374,6 +374,49 @@ func TestDVTimeMagnitudeIsClockLocal(t *testing.T) {
 	}
 }
 
+// REQ-123 — a DV_DATE_TIME's magnitude counts the seconds from
+// 0001-01-01T00:00:00Z: a value with a time zone is read in UTC, so Compare
+// and LessThan order two values in different zones as instants, and a value
+// without a zone counts its clock time.
+func TestREQ123_DateTimeMagnitudeIsUTC(t *testing.T) {
+	t.Parallel()
+	// 2026-01-01T00:00:00Z, in seconds from 0001-01-01T00:00:00Z.
+	const newYear2026 = 63902822400
+	for _, value := range []string{
+		"2026-01-01T00:00:00Z",
+		"2026-01-01T05:00:00+05:00",
+		"2025-12-31T19:00-0500",
+		"2026-01-01T00:00:00", // no zone: its clock time
+	} {
+		if got := (&rm.DVDateTime{Value: value}).Magnitude(); got != newYear2026 {
+			t.Errorf("DVDateTime{%q}.Magnitude() = %.3f, want %d", value, got, newYear2026)
+		}
+	}
+
+	tests := []struct {
+		name string
+		a, b string
+		want int // the sign of a.Compare(b)
+	}{
+		{name: "10:00+05:00 is 05:00Z, before 08:00Z", a: "2026-01-01T10:00:00+05:00", b: "2026-01-01T08:00:00Z", want: -1},
+		{name: "08:00Z is after 10:00+05:00", a: "2026-01-01T08:00:00Z", b: "2026-01-01T10:00:00+05:00", want: 1},
+		{name: "23:00-05:00 is 04:00Z the next day, after 01:00Z", a: "2025-01-01T23:00:00-05:00", b: "2025-01-02T01:00:00Z", want: 1},
+		{name: "one instant in two zones", a: "2026-01-01T10:00:00+05:00", b: "2026-01-01T07:00:00+02:00", want: 0},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			a, b := rm.DVDateTime{Value: tc.a}, rm.DVDateTime{Value: tc.b}
+			if got := a.Compare(b); got != tc.want {
+				t.Errorf("DVDateTime{%q}.Compare(%q) = %d, want %d (magnitudes %.3f and %.3f)", tc.a, tc.b, got, tc.want, a.Magnitude(), b.Magnitude())
+			}
+			if got, want := a.LessThan(b), tc.want < 0; got != want {
+				t.Errorf("DVDateTime{%q}.LessThan(%q) = %t, want %t", tc.a, tc.b, got, want)
+			}
+		})
+	}
+}
+
 func TestREQ123_ValidISO8601(t *testing.T) {
 	cases := []struct {
 		name string

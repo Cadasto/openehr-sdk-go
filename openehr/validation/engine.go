@@ -284,8 +284,14 @@ type attrReading struct {
 	// as the generated access returns them beside the entries; nil for every
 	// other shape.
 	keys []string
-	// value is the value of a present single-valued attribute.
+	// value is the value of a present single-valued attribute, nil for a
+	// leaf.
 	value any
+	// leaf is set for a present single-valued attribute read as a primitive
+	// leaf without its value ([rmaccess.Peek]): a field of a Go primitive
+	// type, which [primitiveLeaf] would report a leaf, at an attribute the
+	// template does not constrain and no RM rules run on.
+	leaf bool
 	// missing is the node of the call's report of missing members that
 	// stands for the attribute ([engineNode].missing): what the report names
 	// below the attribute, nil where it names nothing there. It is set by
@@ -306,7 +312,18 @@ func readAttribute(value any, a *engineAttr) attrReading {
 		keys, entries, present := rmaccess.Hash(value, a.name)
 		return attrReading{present: present, count: len(entries), items: entries, keys: keys}
 	case shapeSingle:
-		v, present := rmaccess.Single(value, a.name)
+		var v any
+		var present bool
+		if a.decl == nil && a.noRules {
+			// The value of a primitive leaf here is only counted
+			// ([engine.visitAttribute]), so it is not read.
+			var leaf bool
+			if v, present, leaf = rmaccess.Peek(value, a.name); leaf {
+				return attrReading{present: present, leaf: present}
+			}
+		} else {
+			v, present = rmaccess.Single(value, a.name)
+		}
 		if present && v != nil && !rmaccess.IsTypedNilPointer(v) {
 			return attrReading{present: true, value: v}
 		}
@@ -953,7 +970,7 @@ func (e *engine) visitAttribute(n *engineNode, class string, a *engineAttr) {
 	if reported && a.mandatory {
 		e.absent = append(e.absent, attrPath.String())
 	}
-	if a.decl == nil && primitiveLeaf(r.value, a) {
+	if a.decl == nil && (r.leaf || primitiveLeaf(r.value, a)) {
 		// Walking a primitive leaf would only spend its visit (REQ-171
 		// visit limit). Only a present single value is read into r.value,
 		// so the mandatory-presence rule reports nothing. No RM class is of

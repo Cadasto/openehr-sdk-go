@@ -3,6 +3,8 @@ package smart
 import (
 	"context"
 	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,7 +16,10 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/urlredact"
 )
 
-const defaultJWKSTTL = 5 * time.Minute
+const (
+	defaultJWKSTTL                = 5 * time.Minute
+	defaultJWKSMinRefreshInterval = 30 * time.Second
+)
 
 // JWKS holds a cached JSON Web Key Set.
 //
@@ -29,11 +34,21 @@ type JWKS struct {
 	// [NewJWKS] sets five minutes. Zero or a negative value keeps the set
 	// until a lookup misses: it never goes stale by time.
 	TTL time.Duration
+	// MinRefreshInterval is how old the fetched set must be before a lookup
+	// for a kid the set does not hold fetches it again. A lookup that misses
+	// a set fetched more recently fails at once, without a fetch, so tokens
+	// that name unknown kids cannot make the set be fetched for each of
+	// them. [NewJWKS] sets 30 seconds. Zero or a negative value sets no
+	// minimum: every miss fetches the set. A set older than a positive TTL
+	// is fetched again whatever this interval.
+	MinRefreshInterval time.Duration
 
-	mu   sync.Mutex
-	keys map[string]json.RawMessage // keys published with a kid, by kid
-	// signing holds every key whose use, if present, is "sig", with or
-	// without a kid, in document order. A lookup without a kid reads it.
+	mu sync.Mutex
+	// keys holds the signing keys published with a kid, by kid. A signing
+	// key is one whose use, if present, is "sig".
+	keys map[string]json.RawMessage
+	// signing holds every signing key, with or without a kid, in document
+	// order. A lookup without a kid reads it.
 	signing   []json.RawMessage
 	fetchedAt time.Time
 	inflight  *jwksRefresh
@@ -62,20 +77,24 @@ func NewJWKS(httpClient *http.Client, uri string) (*JWKS, error) {
 		return nil, fmt.Errorf("%w: JWKS URI is required", auth.ErrInvalidConfig)
 	}
 	return &JWKS{
-		HTTPClient: httpClient,
-		URI:        uri,
-		TTL:        defaultJWKSTTL,
-		keys:       map[string]json.RawMessage{},
+		HTTPClient:         httpClient,
+		URI:                uri,
+		TTL:                defaultJWKSTTL,
+		MinRefreshInterval: defaultJWKSMinRefreshInterval,
+		keys:               map[string]json.RawMessage{},
 	}, nil
 }
 
-// Key returns the JWK document for kid. On cache miss the JWKS document
-// is refreshed once before failing.
+// Key returns the signing key the set publishes under kid, as a JWK
+// document. A signing key is one whose use, if present, is "sig", so a key
+// published for encryption is never returned. On a cache miss the set is
+// fetched once more before Key fails, unless it was fetched less than
+// MinRefreshInterval ago: Key then fails at once with
+// [auth.ErrJWKSValidationFailed].
 //
 // An empty kid asks for the key that verifies a token whose header carries
-// no kid: the set's only signing key. A signing key is one whose use, if
-// present, is "sig", published with or without a kid. When the set holds
-// no signing key or more than one, Key fails with
+// no kid: the set's only signing key, published with or without a kid. When
+// the set holds no signing key or more than one, Key fails with
 // [auth.ErrJWKSValidationFailed]. It fetches the set when the cache is empty
 // or older than TTL, but does not refresh it on that failure.
 func (j *JWKS) Key(ctx context.Context, kid string) (json.RawMessage, error) {
@@ -84,12 +103,19 @@ func (j *JWKS) Key(ctx context.Context, kid string) (json.RawMessage, error) {
 	}
 	j.mu.Lock()
 	stale := j.staleLocked()
+	recent := j.fetchedWithinLocked(j.MinRefreshInterval)
+	seen := j.fetchedAt
 	k, ok := j.keys[kid]
 	j.mu.Unlock()
 	if ok && !stale {
 		return k, nil
 	}
-	if err := j.refresh(ctx); err != nil {
+	if !stale && recent {
+		// A miss on a set fetched within the minimum interval fails without
+		// a fetch, so unknown kids cannot make a fetch each (REQ-062).
+		return nil, fmt.Errorf("%w: kid %q not found in a key set fetched less than %v ago", auth.ErrJWKSValidationFailed, kid, j.MinRefreshInterval)
+	}
+	if err := j.refresh(ctx, seen); err != nil {
 		return nil, err
 	}
 	// This lookup fetched the set or waited on a fetch: look kid up in what
@@ -109,9 +135,10 @@ func (j *JWKS) Key(ctx context.Context, kid string) (json.RawMessage, error) {
 func (j *JWKS) onlySigningKey(ctx context.Context) (json.RawMessage, error) {
 	j.mu.Lock()
 	stale := j.staleLocked()
+	seen := j.fetchedAt
 	j.mu.Unlock()
 	if stale {
-		if err := j.refresh(ctx); err != nil {
+		if err := j.refresh(ctx, seen); err != nil {
 			return nil, err
 		}
 	}
@@ -120,9 +147,19 @@ func (j *JWKS) onlySigningKey(ctx context.Context) (json.RawMessage, error) {
 
 // refreshedSigningKey refreshes the set, sharing a refresh already in flight,
 // and returns its only signing key. It serves a token without a kid that the
-// cached key did not verify (REQ-062).
+// cached key did not verify (REQ-062). As for a kid miss, a set fetched less
+// than MinRefreshInterval ago is not fetched again: the set's signing key is
+// returned as it is, which another lookup's fetch may have replaced since
+// the caller read it.
 func (j *JWKS) refreshedSigningKey(ctx context.Context) (json.RawMessage, error) {
-	if err := j.refresh(ctx); err != nil {
+	j.mu.Lock()
+	recent := !j.staleLocked() && j.fetchedWithinLocked(j.MinRefreshInterval)
+	seen := j.fetchedAt
+	j.mu.Unlock()
+	if recent {
+		return j.cachedSigningKey()
+	}
+	if err := j.refresh(ctx, seen); err != nil {
 		return nil, err
 	}
 	return j.cachedSigningKey()
@@ -149,16 +186,31 @@ func (j *JWKS) staleLocked() bool {
 	return time.Since(j.fetchedAt) >= j.TTL
 }
 
-// refresh fetches the set, or waits for the fetch another lookup leads. The
+// fetchedWithinLocked reports whether the cached set was fetched less than d
+// ago. It reports false for a d of zero or less, and when no set has been
+// fetched. The caller holds j.mu.
+func (j *JWKS) fetchedWithinLocked(d time.Duration) bool {
+	return d > 0 && !j.fetchedAt.IsZero() && time.Since(j.fetchedAt) < d
+}
+
+// refresh fetches the set, or waits for the fetch another lookup leads,
+// unless a fetch has landed since the caller read the set at seen: the set
+// is then already newer than the one the caller found wanting. The
 // fetch runs under the context of the lookup that leads it. When that
 // context ending is all that failed the fetch, or a panic unwound the
 // leading lookup, a waiter whose own context is live goes round again: it
 // leads a new fetch or waits on a newer one. A waiter whose context has
 // ended returns its own context's error. Every other outcome reaches every
 // waiter.
-func (j *JWKS) refresh(ctx context.Context) error {
+func (j *JWKS) refresh(ctx context.Context, seen time.Time) error {
 	for {
 		j.mu.Lock()
+		if j.fetchedAt.After(seen) {
+			// A fetch landed after the caller read the set at seen, so the
+			// set is already newer than the one it found wanting.
+			j.mu.Unlock()
+			return nil
+		}
 		r := j.inflight
 		if r == nil {
 			r = &jwksRefresh{done: make(chan struct{})}
@@ -240,10 +292,14 @@ func (j *JWKS) fetch(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	// JWK member names are case-sensitive (RFC 7517 §4), so the set and each
+	// key match names exactly. A repeated name is allowed in the set, so that
+	// one key with a repeated member does not take the other keys down, and
+	// refused in a key, which is then skipped as RFC 7517 §4 allows.
 	var doc struct {
 		Keys []json.RawMessage `json:"keys"`
 	}
-	if err := json.Unmarshal(body, &doc); err != nil {
+	if err := jsonv2.Unmarshal(body, &doc, jsontext.AllowDuplicateNames(true)); err != nil {
 		return fmt.Errorf("jwks decode: %w", err)
 	}
 	keys := make(map[string]json.RawMessage, len(doc.Keys))
@@ -254,13 +310,16 @@ func (j *JWKS) fetch(ctx context.Context) error {
 			Kid string `json:"kid"`
 			Use any    `json:"use"`
 		}
-		if err := json.Unmarshal(raw, &meta); err != nil || meta == nil {
+		if err := jsonv2.Unmarshal(raw, &meta); err != nil || meta == nil {
 			continue
 		}
-		// A key without a kid is kept for a token without a kid (REQ-062).
-		if meta.Use == nil || meta.Use == "sig" {
-			signing = append(signing, raw)
+		// Only a signing key verifies a token, whether the token's kid names
+		// it or the token has no kid. A key without a kid is kept for a token
+		// without a kid (REQ-062).
+		if meta.Use != nil && meta.Use != "sig" {
+			continue
 		}
+		signing = append(signing, raw)
 		if meta.Kid != "" {
 			keys[meta.Kid] = raw
 		}

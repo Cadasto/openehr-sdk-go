@@ -118,6 +118,7 @@ requirements:
       - auth/clientcreds/http_client_required_test.go
       - auth/jwtbearer/http_client_required_test.go
       - auth/smart/http_client_required_test.go
+      - smart/discovery/injected_client_copy_test.go
       - smart/discovery/new_resolver_test.go
       - smart/discovery/refuse_downgrade_internal_test.go
       - transport/client_test.go
@@ -228,6 +229,7 @@ requirements:
       - auth/jwtbearer/shared_exchange_test.go
       - auth/jwtbearer/template_copy_test.go
       - auth/smart/detached_refresh_test.go
+      - auth/smart/jwks_min_refresh_test.go
       - auth/smart/own_copy_test.go
       - auth/smart/print_test.go
       - auth/smart/response_copy_test.go
@@ -788,7 +790,10 @@ requirements:
     tests:
       - auth/smart/idtoken_subject_test.go
       - auth/smart/idtoken_test.go
+      - auth/smart/jwk_use_alg_test.go
       - auth/smart/jwks_kidless_test.go
+      - auth/smart/jwks_min_refresh_test.go
+      - auth/smart/jwks_refresh_internal_test.go
       - auth/smart/jwks_ttl_test.go
       - auth/smart/redact_test.go
       - auth/smart/shared_refresh_test.go
@@ -812,12 +817,14 @@ requirements:
       - auth/clientcreds/refresh_threshold_test.go
       - auth/clientcreds/renewal_backoff_test.go
       - auth/clientcreds/shared_exchange_test.go
+      - auth/clientcreds/zero_lifetime_test.go
       - auth/errors_test.go
       - auth/jwtbearer/expires_in_test.go
       - auth/jwtbearer/reauth_test.go
       - auth/jwtbearer/refresh_threshold_test.go
       - auth/jwtbearer/renewal_backoff_test.go
       - auth/jwtbearer/shared_exchange_test.go
+      - auth/jwtbearer/zero_lifetime_test.go
       - auth/smart/detached_refresh_test.go
       - auth/smart/expires_in_test.go
       - auth/smart/reauth_test.go
@@ -834,6 +841,7 @@ requirements:
       - auth/smart/shared_refresh_test.go
       - auth/smart/smart_test.go
       - auth/smart/token_change_test.go
+      - auth/smart/zero_lifetime_test.go
       - auth/tokensource_test.go
       - internal/expiresin/expiresin_test.go
       - testkit/probes/auth/probe_007_proactive_refresh.go
@@ -1652,7 +1660,6 @@ requirements:
       - openehr/validation/temporal_constraint_test.go
       - openehr/validation/walk_primitive_test.go
       - testkit/probe/livegenerated_test.go
-      - testkit/probes/composition/probe_023_builder_round_trip.go
       - testkit/probes/instance/corpus_ratchet_test.go
       - testkit/probes/instance/probe_027_generated_validates.go
       - testkit/probes/instance/probes_test.go
@@ -1984,6 +1991,7 @@ requirements:
       - openehr/aql/lint/semantic_test.go
       - openehr/client/ehr/ids_test.go
       - openehr/rm/identification_funcs_test.go
+      - openehr/rm/uri_funcs_test.go
 
   - id: REQ-121
     title: Locatable path read access
@@ -2065,6 +2073,7 @@ requirements:
       - openehr/serialize/simplified/context_test.go
       - openehr/serialize/simplified/datatypes_test.go
       - openehr/serialize/simplified/flat_encode_test.go
+      - openehr/serialize/simplified/flat_pinned_test.go
       - openehr/serialize/simplified/index_bound_test.go
       - openehr/serialize/simplified/interval_leaf_anchor_test.go
       - openehr/serialize/simplified/ism_transition_test.go

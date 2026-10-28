@@ -120,32 +120,69 @@ func pathDivergence(node *tcimpl.CompiledNode, segs []parse.PathSegment) (bad st
 		if len(children) == 0 {
 			return "", false // attribute pins no node; below the modelled tree
 		}
-		node = pickChild(children, seg.Predicate)
+		if node = pickChild(children, seg); node == nil {
+			return "", false // the predicate names no child here; nothing to compare below it
+		}
 	}
 	return "", false
 }
 
-// pickChild selects the child to descend into. When the path segment carries
-// a predicate matching a child's node id (at-/id-code), that child is taken;
-// otherwise the first child is taken deterministically (lenient first-child,
-// mirroring template.OperationalTemplate.NodeAt).
+// pickChild selects the child to descend into. A predicate that names a
+// child, by its node id (at-/id-code) or, at an archetype root, by its
+// archetype id, with or without a node name, or such a term AND-ed with
+// another, selects the first child that id names. When no child carries it,
+// pickChild returns nil: the path names a node the template does not have
+// here, which is no high-confidence divergence, so the walk stops without a
+// warning rather than descend into a sibling the predicate does not select.
+// A segment with no predicate, or one that names no child, takes the first
+// child deterministically (lenient first-child, mirroring
+// template.OperationalTemplate.NodeAt).
 //
-// The predicate is compared with the lexer's SKIPPED trivia removed, because
-// REQ-119 made the read side report bracket text VERBATIM: `events[ at0001 ]`
-// and `events[at0001\n]` now arrive with their padding, where `GetText()` once
-// dropped it. Compared raw, the named child became unreachable and the lenient
-// fallback silently descended a SIBLING — which turned a valid path into an
-// `aql_path_not_in_template` warning wherever the siblings differ structurally.
-// REQ-109 § Layer 3 calls this descent "predicate-aware" and warns only on
-// high-confidence divergence, so the normalisation belongs to the COMPARISON,
-// not to the reported text ([Path.Segments] stays verbatim).
-func pickChild(children []*tcimpl.CompiledNode, predicate string) *tcimpl.CompiledNode {
-	if id := aql.StripPredicateTrivia(predicate); id != "" {
-		for _, child := range children {
-			if child.NodeID() == id {
-				return child
-			}
+// The typed predicate ([aql.PathSegment].Parsed) is read where the parser
+// structured it. Otherwise the verbatim text is compared with the lexer's
+// SKIPPED trivia removed, because REQ-119 made the read side report bracket
+// text VERBATIM: `events[ at0001 ]` and `events[at0001\n]` arrive with their
+// padding, where `GetText()` once dropped it. Compared raw, the named child
+// became unreachable and the lenient fallback silently descended a SIBLING —
+// which turned a valid path into an `aql_path_not_in_template` warning
+// wherever the siblings differ structurally. REQ-109 § Layer 3 calls this
+// descent "predicate-aware" and warns only on high-confidence divergence, so
+// the normalisation belongs to the COMPARISON, not to the reported text
+// ([Path.Segments] stays verbatim).
+func pickChild(children []*tcimpl.CompiledNode, seg aql.PathSegment) *tcimpl.CompiledNode {
+	nodeID, archetypeID := predicateIDs(seg)
+	if nodeID == "" && archetypeID == "" {
+		return children[0]
+	}
+	for _, child := range children {
+		if (nodeID != "" && child.NodeID() == nodeID) || (archetypeID != "" && child.ArchetypeID() == archetypeID) {
+			return child
 		}
 	}
-	return children[0]
+	return nil
+}
+
+// predicateIDs returns the node id or the archetype id seg's predicate
+// selects a child by, "" for each it does not name.
+func predicateIDs(seg aql.PathSegment) (nodeID, archetypeID string) {
+	if seg.Parsed == nil {
+		return aql.StripPredicateTrivia(seg.Predicate), ""
+	}
+	var visit func(p aql.SegmentPredicate) bool
+	visit = func(p aql.SegmentPredicate) bool {
+		switch p := p.(type) {
+		case aql.NodeIDPredicate:
+			nodeID = p.ID
+		case aql.ArchetypePredicate:
+			archetypeID = p.HRID
+		case aql.JunctionPredicate:
+			// Only a conjunction narrows to the id one operand names.
+			return p.Op == aql.OpAnd && (visit(p.Left) || visit(p.Right))
+		default:
+			return false
+		}
+		return true
+	}
+	visit(seg.Parsed)
+	return nodeID, archetypeID
 }

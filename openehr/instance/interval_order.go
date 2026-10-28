@@ -564,9 +564,9 @@ var (
 )
 
 // temporalRead reads an ISO 8601 value of one type as the order of its
-// type reads it: its magnitude, as the RM's Compare reads it; the zone
-// designator it is written with, "" for none; and whether the REQ-123 parse
-// accepts it.
+// type reads it: its magnitude read on its clock, the zone not applied, as
+// the RM's Compare reads a date or a time; the zone designator it is
+// written with, "" for none; and whether the REQ-123 parse accepts it.
 type temporalRead func(s string) (magnitude float64, zone string, ok bool)
 
 func dateOrderRead(s string) (float64, string, bool) {
@@ -579,9 +579,12 @@ func timeOrderRead(s string) (float64, string, bool) {
 	return float64(t.Magnitude()), t.Timezone(), t.ValidISO8601()
 }
 
+// dateTimeOrderRead reads a date-time's magnitude on its clock, which
+// temporalCompare expects: the RM's Compare reads a zoned date-time in UTC,
+// and temporalCompare applies the zone itself.
 func dateTimeOrderRead(s string) (float64, string, bool) {
-	dt := rm.DVDateTime{Value: s}
-	return dt.Magnitude(), dt.Timezone(), dt.ValidISO8601()
+	d, t, err := iso8601.ParseDateTime(s)
+	return iso8601.DateTimeMagnitude(d, t), t.Zone, err == nil
 }
 
 func dateKeyOf(d rm.DVDate) string { return d.Value }
