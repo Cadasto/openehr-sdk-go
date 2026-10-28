@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/rmnames"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
 // optUntyped is a C_COMPLEX_OBJECT that names no RM type, with the given
@@ -588,6 +590,56 @@ func TestREQ107_AbstractClassOutsideDataValuesIsUnknown(t *testing.T) {
 				if errors.Is(err, instance.ErrArchetypeIDMissing) {
 					t.Errorf("Generate error = %v wraps ErrArchetypeIDMissing, want PATHABLE unknown, not built as a descendant", err)
 				}
+			})
+		}
+	}
+}
+
+// TestREQ107_AbstractNodeListsReadTheBuiltClass is the REQ-107 check that a
+// list of a node of the abstract LOCATABLE, which the walk builds as a
+// CLUSTER, is read as the BMM declares it on CLUSTER, mandatory, as for a
+// node that names CLUSTER (Generic and untyped types): at existence 1..1
+// over an optional CLUSTER whose items admit only a slot, the top-up builds
+// a member of that CLUSTER, as it would for a list the BMM marks mandatory,
+// rather than leave the list to an RM default no template child describes,
+// and the root passes both validators; at cardinality 0..0 over an optional
+// ELEMENT, the RM rule wins over the bound, and the walk builds a member of
+// that ELEMENT, so the template validator reports the cardinality alone. It
+// holds under every policy, both value fills and both compile modes.
+func TestREQ107_AbstractNodeListsReadTheBuiltClass(t *testing.T) {
+	slotCluster := guardChild("C_COMPLEX_OBJECT", "CLUSTER", "at0002", guardOccurrences01, "", optMultiple("items", optSlot("CLUSTER", "at0003")))
+	optionalElement := guardChild("C_COMPLEX_OBJECT", "ELEMENT", "at0002", guardOccurrences01, "")
+	cardinality := expectedIssue{name: "the items' cardinality broken", match: func(iss validation.Issue) bool {
+		return iss.Code == "cardinality" && iss.Path == "/items[at0001]/items"
+	}}
+	cases := []struct {
+		name     string
+		items    string
+		expected []expectedIssue
+	}{
+		{name: "items at existence 1..1 over an optional CLUSTER of a slot", items: guardMultiple("items", guardExistence11, slotCluster)},
+		{name: "items at cardinality 0..0 over an optional ELEMENT", items: optCardinal("items", 0, 0, optionalElement), expected: []expectedIssue{cardinality}},
+	}
+	for _, tc := range cases {
+		for _, class := range []string{"LOCATABLE", "CLUSTER"} {
+			opt := optTemplate("CLUSTER", optMultiple("items", optNode(class, "at0001", tc.items)))
+			runEveryWay(t, tc.name+"/"+class, opt, func(t *testing.T, _ instance.Options, out any, c *templatecompile.Compiled) {
+				root, ok := out.(*rm.Cluster)
+				if !ok || len(root.Items) != 1 {
+					t.Fatalf("generated root is %T %+v, want a CLUSTER with one item", out, out)
+				}
+				inner, ok := root.Items[0].(*rm.Cluster)
+				if !ok {
+					t.Fatalf("items[0] is %T, want *rm.Cluster", root.Items[0])
+				}
+				var got []string
+				for _, item := range inner.Items {
+					got = append(got, nodeID(item))
+				}
+				if !slices.Equal(got, []string{"at0002"}) {
+					t.Errorf("the %s's items hold %v, want the template's at0002 alone", class, got)
+				}
+				checkValidBut(t, out, c, tc.expected...)
 			})
 		}
 	}
