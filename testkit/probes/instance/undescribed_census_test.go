@@ -735,7 +735,7 @@ func censusRefused(node *templatecompile.CompiledNode) bool {
 		return true
 	}
 	for _, attr := range node.Attributes() {
-		if !attrProhibited(attr) && unwritableRequired(node, attr) {
+		if !attrProhibited(node, attr) && unwritableRequired(node, attr) {
 			return true
 		}
 	}
@@ -848,7 +848,7 @@ func needsNoUndescribed(node *templatecompile.CompiledNode) bool {
 		return false
 	}
 	for _, attr := range node.Attributes() {
-		if !attrRequired(node, attr) || attrProhibited(attr) {
+		if !attrRequired(node, attr) || attrProhibited(node, attr) {
 			continue
 		}
 		if unwritableRequired(node, attr) {
@@ -873,8 +873,9 @@ func needsNoUndescribed(node *templatecompile.CompiledNode) bool {
 // refuse it (REQ-107 Known gap: attributes the generator cannot write): a
 // LOCATABLE's links or feeder_audit, an EHR_ACCESS's settings, or a list
 // whose items the RM types as primitive values other than a DV_MULTIMEDIA's
-// data, which the BMM marks mandatory, whose existence lower bound is at
-// least 1, or which holds a mandatory child (tcimpl.MandatoryListChildren),
+// data, which the BMM marks mandatory on the class the walk builds node as
+// (bmmMandatory), whose existence lower bound is at least 1, or which holds
+// a mandatory child (tcimpl.MandatoryListChildren),
 // other than a list that only its existence asks a member of, as the
 // generator's writerNeeded reads it.
 func unwritableRequired(node *templatecompile.CompiledNode, attr *templatecompile.CompiledAttribute) bool {
@@ -904,17 +905,19 @@ func unwritableRequired(node *templatecompile.CompiledNode, attr *templatecompil
 		mandatoryChild = true
 		break
 	}
-	if !attr.Required() && !existence && !mandatoryChild {
+	mandatory := bmmMandatory(node, attr)
+	if !mandatory && !existence && !mandatoryChild {
 		return false
 	}
-	return !isList || attr.Required() || tcimpl.AsksForMember(attr) || !existence
+	return !isList || mandatory || tcimpl.AsksForMember(attr) || !existence
 }
 
-// attrProhibited reports whether the template prohibits attr, which the
-// BMM does not mark mandatory: an existence upper bound of 0, or children
+// attrProhibited reports whether the template prohibits attr, an attribute
+// of node, which the BMM does not mark mandatory on the class the walk
+// builds node as (bmmMandatory): an existence upper bound of 0, or children
 // none of which it allows. The walk does not visit such an attribute.
-func attrProhibited(attr *templatecompile.CompiledAttribute) bool {
-	if attr.Required() {
+func attrProhibited(node *templatecompile.CompiledNode, attr *templatecompile.CompiledAttribute) bool {
+	if bmmMandatory(node, attr) {
 		return false
 	}
 	if e := attr.Existence(); e != nil && !e.UpperUnbounded() && e.Upper() == 0 {
