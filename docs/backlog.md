@@ -7,6 +7,7 @@ harvested_through: 2026-10-27T16:35:57Z
 Leftovers of merged branches: defects the branch that found them did not fix, and suggestions. Each line is a lead, not a finding: verify it before acting. Lines are grouped by theme so one delivery can take a whole group; the sentence under each heading says what such a delivery is. A delivery whose `Files` touch a line's path verifies it, and fixes it or finds it stale; the next `/sdd-triage --backlog` deletes what is settled. `sdd-pr harvest` and `sdd-pr flip --carry` add new lines under `## Unsorted`, defects first; the next `/sdd-triage --backlog` sorts them into a group. The file is kept at about 80 lines ([ai-workflow.md § Review](ai-workflow.md#review)). Edit freely.
 
 ## Unsorted
+- smart/discovery/resolver.go:741 · The OpenID and SMART configuration documents (resolver.go:591, :741) and the token responses of auth/smart (exchange.go:216), auth/clientcreds (clientcreds.go:714) and auth/jwtbearer (jwtbearer.go:521) are decoded with encoding/json v1, so a member such as "ISSUER" or "ACCESS_TOKEN" that follows the real one replaces it; encoding/json/v2 would read the names exactly as RFC 8414 and RFC 6749 spell them. · by: claude-opus-5-5 · from: fix/smart-jwks-expiry-336
 
 ## Typed-nil options: a nil pointer passed as an interface panics on first use
 Code in transport/ and openehr/instance; one delivery decides how a constructor refuses a typed nil without reflection beyond idiom.md § API conventions, or documents the panic. Lane: maintenance. Size: S.
