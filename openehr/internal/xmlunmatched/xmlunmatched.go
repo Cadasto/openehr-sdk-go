@@ -1071,9 +1071,11 @@ func DecodeBase64(dec *xml.Decoder, start *xml.StartElement, v *[]byte) error {
 //   - text, as an older SDK wrote it: v is the text, as [DecodeElement]
 //     reads a string.
 //
-// The first `terminology_id` or `code_string` child makes the element a
-// CODE_PHRASE. A tracked decode reports or refuses, in document order, an
-// attribute of the element, any other child of it, text other than XML
+// The first `terminology_id`, `code_string` or `preferred_term` child makes
+// the element a CODE_PHRASE. Its `preferred_term`, which the string has no
+// room for, is dropped as [Drop] drops an element. A tracked decode reports
+// or refuses, in document order, an attribute of the element, any other
+// child of it, text other than XML
 // whitespace beside a CODE_PHRASE child, and anything in `terminology_id`
 // but its `value`, as unmatched content.
 //
@@ -1111,7 +1113,7 @@ func DecodeCodePhraseString(dec *xml.Decoder, start *xml.StartElement, v *string
 			t.valued(hasValue(id) || hasValue(code))
 		case xml.StartElement:
 			name := LocalName(tk.Name)
-			if name != "terminology_id" && name != "code_string" {
+			if name != "terminology_id" && name != "code_string" && name != "preferred_term" {
 				if phrase {
 					err = SkipUnmatched(dec, tk)
 				} else {
@@ -1131,10 +1133,13 @@ func DecodeCodePhraseString(dec *xml.Decoder, start *xml.StartElement, v *string
 					return err
 				}
 			}
-			if name == "terminology_id" {
+			switch name {
+			case "terminology_id":
 				err = decodeIdentifierValue(dec, tk, &id)
-			} else {
+			case "code_string":
 				err = DecodeElement(dec, &tk, &code)
+			default:
+				err = Drop(dec)
 			}
 			if err != nil {
 				return err

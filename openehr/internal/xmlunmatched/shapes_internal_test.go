@@ -64,6 +64,8 @@ func TestREQ056_DecodeCodePhraseStringValue(t *testing.T) {
 		{"code_string first", `<property><code_string>125</code_string><terminology_id><value>openehr</value></terminology_id></property>`, "openehr::125"},
 		{"indented CODE_PHRASE", "<property>\n <terminology_id>\n  <value>openehr</value>\n </terminology_id>\n <code_string>125</code_string>\n</property>", "openehr::125"},
 		{"code_string alone", `<property><code_string>125</code_string></property>`, "::125"},
+		{"preferred_term dropped", `<property><terminology_id><value>openehr</value></terminology_id><code_string>125</code_string><preferred_term>mass</preferred_term></property>`, "openehr::125"},
+		{"preferred_term alone", `<property><preferred_term>mass</preferred_term></property>`, ""},
 		{"terminology_id alone", `<property><terminology_id><value>openehr</value></terminology_id></property>`, "openehr::"},
 		{"empty parts", `<property><terminology_id><value/></terminology_id><code_string/></property>`, ""},
 		{"whitespace parts", `<property><terminology_id><value> </value></terminology_id><code_string>  </code_string></property>`, ""},
@@ -97,8 +99,8 @@ func TestREQ056_DecodeCodePhraseStringValue(t *testing.T) {
 // TestREQ170_DecodeCodePhraseStringUnmatched pins the content of a CODE_PHRASE
 // string DecodeCodePhraseString does not read (REQ-170), reported in document
 // order and refused under strict: an attribute, a child other than
-// terminology_id and code_string (preferred_term among them: the string has
-// nowhere to hold it), text beside a CODE_PHRASE child, before it or after,
+// terminology_id, code_string and preferred_term (a CODE_PHRASE member the
+// string has no room for, dropped), text beside a CODE_PHRASE child, before it or after,
 // and anything in terminology_id but its value. Beside text alone, a child
 // is unmatched and the text is the value; once a CODE_PHRASE child shows
 // the text is unmatched, the text comes before a child skipped after it.
@@ -116,7 +118,8 @@ func TestREQ170_DecodeCodePhraseStringUnmatched(t *testing.T) {
 		{"text after a CODE_PHRASE child", `<property><code_string>125</code_string>junk</property>`, []string{property + "/text()"}},
 		{"text, then a child, then a CODE_PHRASE child", `<property>junk<x/><code_string>125</code_string></property>`, []string{property + "/text()", property + "/x[1]"}},
 		{"text, then a child", `<property>openehr::125<x/></property>`, []string{property + "/x[1]"}},
-		{"preferred_term", `<property><code_string>125</code_string><preferred_term>mass</preferred_term></property>`, []string{property + "/preferred_term[1]"}},
+		{"preferred_term", `<property><code_string>125</code_string><preferred_term>mass</preferred_term></property>`, nil},
+		{"preferred_term, then text", `<property><preferred_term>mass</preferred_term>junk</property>`, []string{property + "/text()"}},
 		{
 			"inside terminology_id", `<property><terminology_id a="1">t<value>openehr</value><y/></terminology_id></property>`,
 			[]string{property + "/terminology_id[1]/@a", property + "/terminology_id[1]/text()", property + "/terminology_id[1]/y[1]"},
