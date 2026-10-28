@@ -84,7 +84,7 @@ func (g *generator) ownContentUndescribed(node *tcimpl.CompiledNode) bool {
 		return false
 	}
 	for _, attr := range tcimpl.NodeAttributes(node) {
-		if !visitRequired(attr) || walkSkips(node, attr) {
+		if !visitRequired(node, attr) || walkSkips(node, attr) {
 			continue
 		}
 		if noWriter(node, attr) {

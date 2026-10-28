@@ -553,7 +553,7 @@ func noWriter(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool
 // than its existence asks it for a member (existenceOnly), since a list
 // with no member meets its existence.
 func writerNeeded(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
-	if !isRequired(attr) {
+	if !isRequired(optNode, attr) {
 		return false
 	}
 	isList, _ := rminfo.Default.IsContainer(nodeClass(optNode), attr.Name())
@@ -691,9 +691,9 @@ func attrProhibited(attr *tcimpl.CompiledAttribute) bool {
 func (g *generator) shouldVisit(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
 	isContext := compositionContext(optNode, attr)
 	if g.opts.Policy == Required && !isContext {
-		return isRequired(attr)
+		return isRequired(optNode, attr)
 	}
-	if isRequired(attr) {
+	if isRequired(optNode, attr) {
 		return true
 	}
 	if !isContext && g.membersUndescribed(optNode, attr) {
@@ -702,7 +702,7 @@ func (g *generator) shouldVisit(optNode *tcimpl.CompiledNode, attr *tcimpl.Compi
 	if attr.Cardinality() == template.Single && g.holdsNoItem(attr) {
 		return false
 	}
-	if visitRequired(attr) {
+	if visitRequired(optNode, attr) {
 		return true
 	}
 	return g.opts.Policy == Large || len(tcimpl.AllowedChildNodes(attr)) > 0
@@ -767,8 +767,8 @@ func (g *generator) holdsNoItem(attr *tcimpl.CompiledAttribute) bool {
 	return g.planMembers(child, list, members).members() == 0
 }
 
-// visitRequired reports whether attr is required as the visit rule reads
-// it, so Large and Medium visit it: it is required (isRequired), or its
+// visitRequired reports whether attr of optNode is required as the visit
+// rule reads it, so Large and Medium visit it: it is required (isRequired), or its
 // cardinality lower bound is bounded and at least 1. Cardinality lower and
 // existence are separate, so a 1..* list is required when existence does
 // not say so. Required leaves out a list only that cardinality requires,
@@ -776,8 +776,8 @@ func (g *generator) holdsNoItem(attr *tcimpl.CompiledAttribute) bool {
 // undescribed or needs undescribed content (shouldVisit). Whether a node
 // needs undescribed content (needsUndescribed) reads this wider sense under
 // every policy.
-func visitRequired(attr *tcimpl.CompiledAttribute) bool {
-	return isRequired(attr) || tcimpl.LowerAtLeastOne(attr.ChildMultiplicity())
+func visitRequired(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
+	return isRequired(optNode, attr) || tcimpl.LowerAtLeastOne(attr.ChildMultiplicity())
 }
 
 // compositionContext reports whether attr is the context of a
@@ -1142,7 +1142,7 @@ func (g *generator) materialiseImplicitSingle(
 	// such as COMPOSITION.content, never reaches this: materialiseSingle
 	// writes it as the list the RM declares. So the refusal is a backstop.
 	if built := rmTypeOf(rmChild); rmroots.IsArchetypeRoot(built) {
-		if !isRequired(attr) {
+		if !isRequired(optNode, attr) {
 			return nil
 		}
 		return fmt.Errorf("%w: %s for %s.%s at %s (required, but the template names no child)",
@@ -2031,7 +2031,7 @@ func (g *generator) planMembers(optNode *tcimpl.CompiledNode, attr *tcimpl.Compi
 	// fallback only when no includes were parsed. Where only the
 	// existence asks for it, there is no seed unless a child needs no
 	// undescribed content (topUpSeed), and the attribute keeps no member.
-	needed := remainingLowerNeeded(attr, total)
+	needed := remainingLowerNeeded(optNode, attr, total)
 	if upperBound >= 0 {
 		needed = min(needed, max(upperBound-total, 0))
 	}
@@ -2281,7 +2281,7 @@ func implicitMembers(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribut
 	if attrRMType(optNode, attr) == "" || existenceOnly(optNode, attr) {
 		return 0
 	}
-	needed := remainingLowerNeeded(attr, 0)
+	needed := remainingLowerNeeded(optNode, attr, 0)
 	if upper := memberCap(attr); upper >= 0 {
 		needed = min(needed, upper)
 	}
@@ -2304,22 +2304,23 @@ func memberCap(attr *tcimpl.CompiledAttribute) int {
 	return cm.Upper()
 }
 
-// remainingLowerNeeded returns the count of members attr still needs,
-// given current: its cardinality lower bound (when present), or one member
-// when that bound is 0 and the attribute is required (isRequired): the BMM
-// marks it mandatory, its existence lower bound is at least 1, or a child
-// asks the list for a member (holdsRequiredChild). Cardinality and
-// existence are separate in AOM 1.4: existence asks for the container and
-// cardinality for its members. So where only the existence asks for the member
+// remainingLowerNeeded returns the count of members attr of optNode still
+// needs, given current: its cardinality lower bound (when present), or one
+// member when that bound is 0 and the attribute is required (isRequired):
+// the BMM marks it mandatory on the class the walk builds for optNode, its
+// existence lower bound is at least 1, or a child asks the list for a
+// member (holdsRequiredChild). Cardinality and existence are separate in
+// AOM 1.4: existence asks for the container and cardinality for its
+// members. So where only the existence asks for the member
 // (existenceOnly), the top-up takes it only from a child that needs no
 // undescribed content (topUpSeed), and materialiseImplicitMultiple builds
 // none: a list with no member meets that existence.
-func remainingLowerNeeded(attr *tcimpl.CompiledAttribute, current int) int {
+func remainingLowerNeeded(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute, current int) int {
 	low := 0
 	if cm := attr.ChildMultiplicity(); cm != nil && !cm.LowerUnbounded() {
 		low = cm.Lower()
 	}
-	if isRequired(attr) && low == 0 {
+	if isRequired(optNode, attr) && low == 0 {
 		low = 1
 	}
 	if current >= low {
@@ -2925,14 +2926,35 @@ func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 	return nil
 }
 
-// isRequired reports whether the BMM marks attr mandatory, its existence
-// lower bound is bounded and at least 1, or it holds a mandatory child
-// (holdsRequiredChild). On a multi-valued attribute that existence asks
-// for the container alone: existenceOnly tells where it is the only thing
-// that asks for a member. Its cardinality is not read: visitRequired adds
-// it.
-func isRequired(attr *tcimpl.CompiledAttribute) bool {
-	return attr.Required() || tcimpl.LowerAtLeastOne(attr.Existence()) || holdsRequiredChild(attr)
+// isRequired reports whether attr of optNode is required: the BMM marks it
+// mandatory on the class the walk builds for optNode (bmmRequired), its
+// existence lower bound is bounded and at least 1, or it holds a mandatory
+// child (holdsRequiredChild). On a multi-valued attribute that existence
+// asks for the container alone: existenceOnly tells where it is the only
+// thing that asks for a member. Its cardinality is not read: visitRequired
+// adds it.
+func isRequired(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
+	return bmmRequired(optNode, attr) || tcimpl.LowerAtLeastOne(attr.Existence()) || holdsRequiredChild(attr)
+}
+
+// bmmRequired reports whether the BMM marks attr of optNode mandatory on the
+// class the walk builds for optNode (nodeClass). The compile marks it so
+// (Required) on the type it reads optNode's attributes on: the type optNode
+// names, or, for an untyped node, the type of the attribute that holds it.
+// Where that is an abstract class the walk builds as a descendant, the
+// descendant's mandatory attributes count too: the value of the DV_TEXT an
+// untyped or DATA_VALUE ELEMENT value is built as, and the magnitude of the
+// DV_COUNT a DV_ORDERED one is built as. A node that names the class it is
+// built as is read as the compile reads it.
+func bmmRequired(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
+	if attr.Required() {
+		return true
+	}
+	class := nodeClass(optNode)
+	if class == "" || class == bmmtype.Class(strings.TrimSpace(optNode.RMTypeName())) {
+		return false
+	}
+	return slices.Contains(rminfo.Default.RequiredAttributes(class), attr.Name())
 }
 
 // holdsRequiredChild reports whether a child asks the list attr for a
@@ -3438,7 +3460,7 @@ func valueGivesWay(opt *tcimpl.CompiledNode) bool {
 // at least 1, or a child asks the list for a member (holdsRequiredChild).
 func requiresAttr(opt *tcimpl.CompiledNode, attrName string) bool {
 	attr := opt.Attribute(attrName)
-	return attr != nil && isRequired(attr)
+	return attr != nil && isRequired(opt, attr)
 }
 
 // fillElementValue gives e the value the generator builds for an
