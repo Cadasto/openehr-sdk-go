@@ -507,13 +507,17 @@ func walkSkips(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) boo
 // nodeClass is the bare BMM class of the value the walk builds for
 // optNode (builtRMType): the class it names, or its concrete substitute
 // (concreteFor), without generic parameters, or, for an untyped node, the
-// class of the type the BMM declares for its attribute (untypedRMType). A
-// DV_INTERVAL is one class whatever its parameter, so its parameter is not
-// resolved here.
+// class of the type the BMM declares for its attribute (untypedRMType), and
+// for a bound of a DV_INTERVAL over an abstract DV_ORDERED class, the class
+// the interval is built over (intervalBoundType). A DV_INTERVAL is one class
+// whatever its parameter, so its parameter is not resolved here.
 func nodeClass(optNode *tcimpl.CompiledNode) string {
 	declared := strings.TrimSpace(optNode.RMTypeName())
 	if declared == "" {
 		return bmmtype.Class(untypedRMType(optNode))
+	}
+	if bound := intervalBoundType(optNode, declared); bound != "" {
+		return bound
 	}
 	return bmmtype.Class(concreteFor(declared))
 }
@@ -819,7 +823,10 @@ func bindingAlternative(children []*tcimpl.CompiledNode, built string) *tcimpl.C
 // which names no type, is built as the type the BMM declares for the
 // attribute that holds it (untypedRMType), and a DV_INTERVAL over an
 // abstract DV_ORDERED class other than DV_ORDERED itself as an interval
-// over a concrete descendant of that class (concreteInterval).
+// over one concrete class that holds both its bounds (concreteInterval). A
+// bound of such an interval that names an abstract class is built as that
+// concrete class (intervalBoundType), as an untyped bound is, so one
+// interval holds both.
 func builtRMType(node *tcimpl.CompiledNode) string {
 	declared := strings.TrimSpace(node.RMTypeName())
 	if declared == "" {
@@ -830,7 +837,40 @@ func builtRMType(node *tcimpl.CompiledNode) string {
 			return built
 		}
 	}
+	if bound := intervalBoundType(node, declared); bound != "" {
+		return bound
+	}
 	return concreteFor(declared)
+}
+
+// intervalBoundType returns the class the walk builds node as where node,
+// which names declared, is the lower or upper bound of a DV_INTERVAL over an
+// abstract DV_ORDERED class other than DV_ORDERED itself, and the concrete
+// class the walk builds that interval over (concreteInterval) descends from
+// declared: that class, so the bound fits the interval, as a DV_TEMPORAL
+// lower of an interval built over DV_DATE_TIME is a DV_DATE_TIME. It is ""
+// otherwise, where node is built as the class it names or its concrete
+// substitute (concreteFor), and intervalBoundFits refuses a bound that does
+// not fit.
+func intervalBoundType(node *tcimpl.CompiledNode, declared string) string {
+	parent := node.Parent()
+	if parent == nil {
+		return ""
+	}
+	if _, abstract := abstractIntervalParameter(strings.TrimSpace(parent.RMTypeName())); !abstract {
+		return ""
+	}
+	if side := holdingAttribute(node); side != "lower" && side != "upper" {
+		return ""
+	}
+	_, params, ok := bmmtype.Split(builtRMType(parent))
+	if !ok || len(params) != 1 {
+		return ""
+	}
+	if c := params[0]; c != declared && descendsFrom(c, declared) {
+		return c
+	}
+	return ""
 }
 
 // untypedRMType is the RM type the walk builds for node, an OPT child that
@@ -867,25 +907,62 @@ func untypedRMType(node *tcimpl.CompiledNode) string {
 
 // concreteInterval returns the interval the walk builds for node, a
 // DV_INTERVAL over param, an abstract DV_ORDERED class other than
-// DV_ORDERED itself: the interval over the type the OPT names for its lower
-// bound, else for its upper bound, where that type descends from param and
-// the generator builds an interval over it, so the bound the walk builds
-// fits the interval, and otherwise over the first concrete descendant of
-// param in name order (concreteIntervalParameter). The type a bound names
-// is that of its first allowed alternative, whose type the walk builds
-// (bindingAlternative); an untyped one names none. It is "" where param has
-// no such descendant.
+// DV_ORDERED itself: the interval over the first candidate class that
+// descends from param, that the generator builds an interval over
+// (intervalOver), and that is, or descends from, the class each bound names
+// (boundClass), so one interval holds both bounds the walk builds. The
+// candidates, in order, are the class the lower bound names where it is
+// concrete, then the upper bound's; the concrete substitute (concreteFor) of
+// the class the lower bound names, then of the upper's; then each concrete
+// descendant of param in name order. A bound names the class of its first
+// allowed alternative, whose type the walk builds (bindingAlternative); an
+// untyped one names none, and fits any candidate. Each bound is then built
+// as the class chosen (intervalBoundType, untypedRMType).
+//
+// Where no candidate fits, as for a DV_DATE lower and a DV_DATE_TIME upper
+// of a DV_INTERVAL<DV_TEMPORAL>, or a bound of a class outside param, it is
+// the interval over the concrete substitute of the class the lower bound
+// names, else of the upper's, where that descends from param and the
+// generator builds an interval over it, and otherwise over the first
+// concrete descendant of param in name order (concreteIntervalParameter),
+// so that intervalBoundFits refuses the bound that does not fit. It is ""
+// where param has no concrete descendant the generator builds an interval
+// over.
 func concreteInterval(node *tcimpl.CompiledNode, param string) string {
-	for _, bound := range [...]string{"lower", "upper"} {
-		attr := node.Attribute(bound)
-		if attr == nil {
-			continue
+	bounds := [...]string{boundClass(node, "lower"), boundClass(node, "upper")}
+	fits := func(c string) bool {
+		if _, builds := intervalOver[c]; !builds || !descendsFrom(c, param) {
+			return false
 		}
-		children := tcimpl.AllowedChildNodes(attr)
-		if len(children) == 0 {
-			continue
+		for _, b := range bounds {
+			if b != "" && !descendsFrom(c, b) {
+				return false
+			}
 		}
-		named := concreteFor(strings.TrimSpace(children[0].RMTypeName()))
+		return true
+	}
+	var candidates []string
+	for _, b := range bounds {
+		if concreteClass(b) {
+			candidates = append(candidates, b)
+		}
+	}
+	for _, b := range bounds {
+		if b != "" {
+			candidates = append(candidates, concreteFor(b))
+		}
+	}
+	if h, ok := rminfo.Default.(rminfo.Hierarchy); ok {
+		descendants, _ := h.ConcreteDescendants(param)
+		candidates = append(candidates, descendants...)
+	}
+	for _, c := range candidates {
+		if fits(c) {
+			return "DV_INTERVAL<" + c + ">"
+		}
+	}
+	for _, b := range bounds {
+		named := concreteFor(b)
 		if _, builds := intervalOver[named]; builds && named != "DV_ORDERED" && descendsFrom(named, param) {
 			return "DV_INTERVAL<" + named + ">"
 		}
@@ -894,6 +971,38 @@ func concreteInterval(node *tcimpl.CompiledNode, param string) string {
 		return "DV_INTERVAL<" + c + ">"
 	}
 	return ""
+}
+
+// boundClass returns the class the bound side, lower or upper, of node, a
+// DV_INTERVAL, names: that of its first allowed alternative, or, for an AOM
+// primitive short name such as DATE, the DV wrapper the walk builds it as
+// (concreteFor). It is "" where node names no such bound, or its first
+// alternative names no RM type.
+func boundClass(node *tcimpl.CompiledNode, side string) string {
+	attr := node.Attribute(side)
+	if attr == nil {
+		return ""
+	}
+	children := tcimpl.AllowedChildNodes(attr)
+	if len(children) == 0 {
+		return ""
+	}
+	named := strings.TrimSpace(children[0].RMTypeName())
+	if tcimpl.IsAOMPrimitiveShortName(named) {
+		return concreteFor(named)
+	}
+	return named
+}
+
+// concreteClass reports whether the pinned BMM knows class as a concrete
+// class.
+func concreteClass(class string) bool {
+	h, ok := rminfo.Default.(rminfo.Hierarchy)
+	if !ok || class == "" {
+		return false
+	}
+	abstract, known := h.IsAbstract(class)
+	return known && !abstract
 }
 
 // attrTypedByRMClass reports whether the pinned BMM types attr of
@@ -1037,9 +1146,14 @@ func (g *generator) materialiseSingle(
 // where attr is the lower or upper of optNode, a DV_INTERVAL over an
 // abstract DV_ORDERED class that the walk builds over a concrete descendant
 // of it (concreteInterval), and built, the type the walk builds for the
-// bound, is neither that descendant nor one of its own: no one interval
-// holds both bounds, as with a DV_DATE lower and a DV_DATE_TIME upper of a
-// DV_INTERVAL<DV_TEMPORAL>, or the bound is of a type outside the class.
+// bound (builtRMType), is neither that descendant nor one of its own. That
+// is so only where no candidate class holds both bounds: two different
+// concrete classes, as a DV_DATE lower and a DV_DATE_TIME upper of a
+// DV_INTERVAL<DV_TEMPORAL>, or a bound of a class outside the interval's
+// parameter, as a DV_COUNT bound of that interval. A bound that names an
+// abstract class the chosen class descends from is built as that class
+// (intervalBoundType), and an untyped one too (untypedRMType), so each
+// fits.
 func intervalBoundFits(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute, built string) error {
 	if name := attr.Name(); name != "lower" && name != "upper" {
 		return nil
