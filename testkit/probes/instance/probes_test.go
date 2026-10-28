@@ -6,10 +6,12 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
@@ -222,5 +224,45 @@ func TestProbe027DrawsFromTheCallersValueSource(t *testing.T) {
 	}
 	if r.Status != "pass" || src.draws == 0 {
 		t.Errorf("Probe027 with a caller's ValueSource: status=%q, %d draw(s) from it, want a pass that draws from it", r.Status, src.draws)
+	}
+}
+
+// TestProbe027IsReproducibleWithoutAValueSource pins the fixed seed
+// PROBE-027's RandomFill runs fall back to when the caller passes no
+// ValueSource, which its doc promises makes the probe reproducible
+// (REQ-107): two runs with the clock and the uids pinned check the same
+// instances.
+func TestProbe027IsReproducibleWithoutAValueSource(t *testing.T) {
+	c := compileFixture(t, "vital_signs")
+	pass := func(*rm.Composition, *templatecompile.Compiled) validation.Result { return validation.Result{OK: true} }
+	run := func() []string {
+		var instances []string
+		capture := func(comp *rm.Composition) validation.Result {
+			out, err := canjson.Marshal(comp)
+			if err != nil {
+				t.Fatalf("canjson.Marshal of a generated instance: %v", err)
+			}
+			instances = append(instances, string(out))
+			return validation.Result{OK: true}
+		}
+		r, err := instanceprobes.Probe027WithValidators(t.Context(), c, instance.Options{
+			Territory: "NL",
+			Composer:  testComposer(),
+			Now:       time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
+			UIDSource: instance.UIDsFrom(rand.NewPCG(1, 1)),
+		}, pass, capture)
+		if err != nil || r.Status != "pass" {
+			t.Fatalf("Probe027: status=%q detail=%q err=%v, want a pass", r.Status, r.Detail, err)
+		}
+		return instances
+	}
+	first, second := run(), run()
+	if len(first) != len(second) {
+		t.Fatalf("Probe027 checked %d instances, then %d", len(first), len(second))
+	}
+	for i := range first {
+		if first[i] != second[i] {
+			t.Errorf("Probe027 instance %d differs between two runs with no ValueSource", i)
+		}
 	}
 }
