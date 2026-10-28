@@ -277,9 +277,9 @@ func TestREQ107_UntypedReferenceRangeBoundsCarryNoNormalRange(t *testing.T) {
 		return optMultiple("other_reference_ranges", optUntyped("", meaning, rangeNode))
 	}
 	runSimpleBoundCases(t, []simpleBoundCase{
-		{dvCase: dvCase{name: "a typed range of a typed REFERENCE_RANGE", value: countValue("4", refRanges(typedRange, true)), check: simple}},
-		{dvCase: dvCase{name: "an untyped range of a typed REFERENCE_RANGE", value: countValue("4", refRanges(untypedRange, true)), check: simple}},
-		{dvCase: dvCase{name: "a typed range of an untyped REFERENCE_RANGE", value: countValue("4", refRanges(typedRange, false)), check: simple}},
-		{dvCase: dvCase{name: "an untyped range of an untyped REFERENCE_RANGE", value: countValue("4", refRanges(untypedRange, false)), check: simple}},
+		{name: "a typed range of a typed REFERENCE_RANGE", value: countValue("4", refRanges(typedRange, true)), check: simple},
+		{name: "an untyped range of a typed REFERENCE_RANGE", value: countValue("4", refRanges(untypedRange, true)), check: simple},
+		{name: "a typed range of an untyped REFERENCE_RANGE", value: countValue("4", refRanges(typedRange, false)), check: simple},
+		{name: "an untyped range of an untyped REFERENCE_RANGE", value: countValue("4", refRanges(untypedRange, false)), check: simple},
 	})
 }
