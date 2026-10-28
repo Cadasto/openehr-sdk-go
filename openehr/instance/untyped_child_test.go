@@ -644,3 +644,86 @@ func TestREQ107_AbstractNodeListsReadTheBuiltClass(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ107_ProhibitedAttributeTheBuiltClassMandates is the REQ-107 check
+// that an attribute the BMM marks mandatory on the class the walk builds for
+// its node is present where the OPT prohibits it, and built as for a node
+// that names that class (Precedence, Generic and untyped types): the items of
+// the abstract LOCATABLE, built as a CLUSTER, at existence 0..0 over an
+// ELEMENT valued from a one-string list, hold that ELEMENT, and the value of
+// an untyped ELEMENT value, or one of the abstract DATA_VALUE, built as a
+// DV_TEXT, at existence 0..0 over that list, carries its string, as the
+// magnitude of a DV_ORDERED one, built as a DV_COUNT, carries the one
+// integer its list holds; the template validator reports the prohibition
+// alone. It holds under every policy, both value fills and both compile
+// modes.
+func TestREQ107_ProhibitedAttributeTheBuiltClassMandates(t *testing.T) {
+	listedElement := optNode("ELEMENT", "at0002", optSingle("value", optNode("DV_TEXT", "", optSingle("value", guardString("listed")))))
+	items := guardMultiple("items", historyExistence00, listedElement)
+	text := guardSingle("value", historyExistence00, guardString("listed"))
+	magnitude := guardSingle("magnitude", historyExistence00, dvInteger("7"))
+	cases := []struct {
+		name string
+		opt  string
+		// want is the root as render gives it.
+		want string
+		// path is where the template validator reports the prohibition.
+		path string
+	}{
+		{name: "the items of the abstract LOCATABLE", opt: optTemplate("CLUSTER", optMultiple("items", optNode("LOCATABLE", "at0001", items))), want: "at0002 DV_TEXT listed", path: "/items[at0001]/items"},
+		{name: "the items of a CLUSTER", opt: optTemplate("CLUSTER", optMultiple("items", optNode("CLUSTER", "at0001", items))), want: "at0002 DV_TEXT listed", path: "/items[at0001]/items"},
+		{name: "the value of an untyped ELEMENT value", opt: optTemplate("ELEMENT", optSingle("value", optUntyped("", text))), want: "DV_TEXT listed", path: "/value/value"},
+		{name: "the value of an ELEMENT value of the abstract DATA_VALUE", opt: optTemplate("ELEMENT", optSingle("value", optNode("DATA_VALUE", "", text))), want: "DV_TEXT listed", path: "/value/value"},
+		{name: "the value of an ELEMENT value that names DV_TEXT", opt: optTemplate("ELEMENT", optSingle("value", optNode("DV_TEXT", "", text))), want: "DV_TEXT listed", path: "/value/value"},
+		{name: "the magnitude of an ELEMENT value of the abstract DV_ORDERED", opt: optTemplate("ELEMENT", optSingle("value", optNode("DV_ORDERED", "", magnitude))), want: "DV_COUNT 7", path: "/value/magnitude"},
+		{name: "the magnitude of an ELEMENT value that names DV_COUNT", opt: optTemplate("ELEMENT", optSingle("value", optNode("DV_COUNT", "", magnitude))), want: "DV_COUNT 7", path: "/value/magnitude"},
+	}
+	leaf := func(v rm.DataValue) string {
+		switch x := v.(type) {
+		case nil:
+			return "no value"
+		case *rm.DVText:
+			return "DV_TEXT " + x.Value
+		case *rm.DVCount:
+			return fmt.Sprintf("DV_COUNT %d", x.Magnitude)
+		}
+		return fmt.Sprintf("%T", v)
+	}
+	// render gives an ELEMENT root's value, and for a CLUSTER root the node
+	// id and value of each item of each CLUSTER it holds.
+	render := func(out any) string {
+		switch x := out.(type) {
+		case *rm.Element:
+			return leaf(x.Value)
+		case *rm.Cluster:
+			var parts []string
+			for _, item := range x.Items {
+				inner, ok := item.(*rm.Cluster)
+				if !ok {
+					parts = append(parts, fmt.Sprintf("%T", item))
+					continue
+				}
+				for _, member := range inner.Items {
+					part := nodeID(member)
+					if el, ok := member.(*rm.Element); ok {
+						part += " " + leaf(el.Value)
+					}
+					parts = append(parts, part)
+				}
+			}
+			return strings.Join(parts, ", ")
+		}
+		return fmt.Sprintf("%T", out)
+	}
+	for _, tc := range cases {
+		prohibited := expectedIssue{name: "the prohibition at " + tc.path, match: func(iss validation.Issue) bool {
+			return iss.Code == "prohibited" && iss.Path == tc.path
+		}}
+		runEveryWay(t, tc.name, tc.opt, func(t *testing.T, _ instance.Options, out any, c *templatecompile.Compiled) {
+			if got := render(out); got != tc.want {
+				t.Errorf("generated root holds %s, want %s", got, tc.want)
+			}
+			checkValidBut(t, out, c, prohibited)
+		})
+	}
+}
