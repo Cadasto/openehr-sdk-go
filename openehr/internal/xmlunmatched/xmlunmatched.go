@@ -38,8 +38,11 @@
 //     between the elements they read, [DecodeElement] for an element
 //     decoded as text, [DecodeText] for one whose text they convert
 //     themselves, such as an interval boundary flag, [DecodeBase64] for an
-//     Octet list, and [DecodeParam] for a member typed by an open generic
-//     parameter. The hand-written TERMINOLOGY_CODE decoder calls the same
+//     Octet list, [DecodeCodePhraseString] for a string the schema writes as
+//     a CODE_PHRASE, [Drop] for an element of another shape the schema
+//     admits that the decoder does not hold, and [DecodeParam] for a member
+//     typed by an open generic parameter. The hand-written TERMINOLOGY_CODE
+//     decoder calls the same
 //     helpers, [CheckUnmatchedAttrs] for the attributes of its inner
 //     TERMINOLOGY_ID element, [CheckUnmatchedTextBefore] for text it keeps
 //     until a child shows that the text is not its value, and
@@ -57,7 +60,9 @@
 // of them the element carried no value for: no child element of that name,
 // none of the other name the class reads it from (`terminology_id` for
 // C_CODED_TEXT's terminology) carrying its own class's mandatory members,
-// and no XML attribute of it where the class reads one; a child carrying
+// none the class reads its own members from (the `defining_code` of an
+// ORDINAL's symbol written as a DV_CODED_TEXT) carrying it, and no XML
+// attribute of it where the class reads one; a child carrying
 // `xsi:nil="true"`; or a primitive child whose text is empty or XML
 // whitespace only. A struct element with no content, such as `<subject/>`,
 // is a value. Each member is named by its JSON Pointer in the canonical-JSON
@@ -1051,6 +1056,164 @@ func DecodeBase64(dec *xml.Decoder, start *xml.StartElement, v *[]byte) error {
 		*v = b
 		return nil
 	})
+}
+
+// DecodeCodePhraseString decodes the element start opens into v, a string
+// such as `openehr::125` that an ITS-XML schema declares as a CODE_PHRASE,
+// as the AM 1.4 schema declares the C_QUANTITY property. start must be the
+// token the decoder read last. The element holds the string in one of two
+// shapes:
+//
+//   - a CODE_PHRASE: a `terminology_id` whose `value` child holds the part
+//     before the first `::`, and a `code_string` that holds the rest. v is
+//     the two parts joined with `::`, or the empty string when neither
+//     carries a value, text other than XML whitespace.
+//   - text, as an older SDK wrote it: v is the text, as [DecodeElement]
+//     reads a string.
+//
+// The first `terminology_id` or `code_string` child makes the element a
+// CODE_PHRASE. A tracked decode reports or refuses, in document order, an
+// attribute of the element, any other child of it, text other than XML
+// whitespace beside a CODE_PHRASE child, and anything in `terminology_id`
+// but its `value`, as unmatched content.
+//
+// For the missing-member report the element is a primitive one: it carries
+// a value when its text does or, as a CODE_PHRASE, when its terminology_id
+// value or its code_string does. Nothing inside it is reported missing.
+func DecodeCodePhraseString(dec *xml.Decoder, start *xml.StartElement, v *string) error {
+	t := trackerOf(dec)
+	if t != nil {
+		t.open[len(t.open)-1].primitive = true
+		if err := t.attrs(start.Attr, nil); err != nil {
+			return err
+		}
+	}
+	var (
+		text     []byte
+		held     Held
+		phrase   bool
+		id, code string
+	)
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			return err
+		}
+		switch tk := tok.(type) {
+		case xml.CharData:
+			if !phrase {
+				text = append(text, tk...)
+				continue
+			}
+			if err := CheckUnmatchedText(dec, tk); err != nil {
+				return err
+			}
+			t.valued(hasValue(id) || hasValue(code))
+		case xml.StartElement:
+			name := LocalName(tk.Name)
+			if name != "terminology_id" && name != "code_string" {
+				if phrase {
+					err = SkipUnmatched(dec, tk)
+				} else {
+					err = SkipUnmatchedAfter(dec, tk, text, &held)
+				}
+				if err != nil {
+					return err
+				}
+				continue
+			}
+			if !phrase {
+				phrase = true
+				if err := CheckUnmatchedTextBefore(dec, text); err != nil {
+					return err
+				}
+				if err := ApplyHeld(dec, &held); err != nil {
+					return err
+				}
+			}
+			if name == "terminology_id" {
+				err = decodeIdentifierValue(dec, tk, &id)
+			} else {
+				err = DecodeElement(dec, &tk, &code)
+			}
+			if err != nil {
+				return err
+			}
+			t.valued(hasValue(id) || hasValue(code))
+		case xml.EndElement:
+			if err := ApplyHeld(dec, &held); err != nil {
+				return err
+			}
+			switch {
+			case !phrase:
+				*v = string(text)
+			case hasValue(id) || hasValue(code):
+				*v = id + "::" + code
+			default:
+				*v = ""
+			}
+			return nil
+		}
+	}
+}
+
+// decodeIdentifierValue decodes the element start opens, an identifier such
+// as a TERMINOLOGY_ID, into v: the text of its `value` child. Its
+// attributes, any other child and text other than XML whitespace are
+// unmatched content. start must be the token the decoder read last.
+func decodeIdentifierValue(dec *xml.Decoder, start xml.StartElement, v *string) error {
+	if err := CheckUnmatchedAttrs(dec, start); err != nil {
+		return err
+	}
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			return err
+		}
+		switch tk := tok.(type) {
+		case xml.CharData:
+			if err := CheckUnmatchedText(dec, tk); err != nil {
+				return err
+			}
+		case xml.StartElement:
+			if LocalName(tk.Name) == "value" {
+				err = DecodeElement(dec, &tk, v)
+			} else {
+				err = SkipUnmatched(dec, tk)
+			}
+			if err != nil {
+				return err
+			}
+		case xml.EndElement:
+			return nil
+		}
+	}
+}
+
+// valued records, for the missing-member report, whether the innermost open
+// element, one read as a primitive, carries a value, where its text alone
+// does not say. A nil tracker records nothing.
+func (t *Tracker) valued(has bool) {
+	if t != nil {
+		t.open[len(t.open)-1].hasText = has
+	}
+}
+
+// hasValue reports whether s carries a value: text other than XML
+// whitespace.
+func hasValue(s string) bool {
+	return strings.TrimLeft(s, " \t\r\n") != ""
+}
+
+// Drop skips the element the decoder read last, which it matches but does
+// not hold: an element of another shape the ITS-XML schema admits where the
+// value being decoded sits, whose type has no member for it, such as the
+// `value` of an ORDINAL's symbol written as a DV_CODED_TEXT. The schema puts
+// the element there, so it is no unmatched content, and it is no member of
+// the value being decoded either: nothing in it is reported, unmatched or
+// missing.
+func Drop(dec *xml.Decoder) error {
+	return dec.Skip()
 }
 
 // dropXMLSpace maps the four XML whitespace characters to -1, which drops

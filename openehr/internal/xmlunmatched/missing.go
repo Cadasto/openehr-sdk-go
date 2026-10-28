@@ -42,6 +42,16 @@ type Class struct {
 	// form has no member of the element's name. A child element of the
 	// member's own name counts as before.
 	Elements []Element
+	// Inline names each child element whose own members are the class's,
+	// read in their place: the `defining_code` of an ORDINAL's symbol
+	// written as a DV_CODED_TEXT, a CODE_PHRASE whose terminology_id and
+	// code_string are the symbol's own. Such an element is no member of the
+	// class. Each mandatory member of its own class it carries a value for
+	// gives the class's member of that name a value, it reports none of its
+	// own missing, and the pointer of a member inside it leaves its name
+	// out: the canonical-JSON form of the instance has no member of that
+	// name.
+	Inline []string
 }
 
 // Element names the child element a member of a [Class] is read from when
@@ -117,8 +127,11 @@ func (t *Tracker) enter(start xml.StartElement, c *Class) error {
 // class also reads from an element of another name ([Class.Elements]) has a
 // value when that element carries every member its own class requires;
 // otherwise the member is reported, by its own name, and nothing inside the
-// element is. The report is the whole policy: no missing member refuses the
-// decode, strict or not. A nil fn asks for nothing.
+// element is. An element the class reads its own members from
+// ([Class.Inline]) gives each of them the value it carries, and the members
+// inside it are named as the class's own. The report is the whole policy: no
+// missing member refuses the decode, strict or not. A nil fn asks for
+// nothing.
 func (t *Tracker) ReportMissing(fn func(pointer string)) {
 	t.missing = fn
 }
@@ -128,11 +141,26 @@ func (t *Tracker) ReportMissing(fn func(pointer string)) {
 // element as a value of its parent's member of that name when it carried
 // one. An element the parent's class reads in place of a member of another
 // name ([Class.Elements]) reports nothing of its own, and is a value of that
-// member when it carries every member its own class requires. It runs as the
-// element closes, before its frame is dropped.
+// member when it carries every member its own class requires. An element the
+// parent reads its own members from ([Class.Inline]) reports nothing of its
+// own either, and gives each member of the parent's class it carries a value
+// for that value. It runs as the element closes, before its frame is dropped.
 func (t *Tracker) closing(n int) {
 	f := &t.open[n-1]
 	p := &t.open[n-2]
+	if p.inlines(f) {
+		if f.class != nil && !f.nilled {
+			for i, name := range f.class.Required {
+				if f.seen&(1<<i) == 0 {
+					continue
+				}
+				if j := slices.Index(p.class.Required, name); j >= 0 {
+					p.seen |= 1 << j
+				}
+			}
+		}
+		return
+	}
 	member, inPlace := f.name, false
 	if p.class != nil {
 		member, inPlace = p.class.memberOf(f.name)
@@ -179,17 +207,29 @@ func (c *Class) allRequired() uint64 {
 	return ^uint64(0) >> (maxRequired - len(c.Required))
 }
 
+// inlines reports whether f is the frame of a child element of p's element
+// that p's class reads its own members from ([Class.Inline]).
+func (p *frame) inlines(f *frame) bool {
+	return p.class != nil && len(p.class.Inline) > 0 && slices.Contains(p.class.Inline, f.name)
+}
+
 // writePointer writes the JSON Pointer of the element whose frame is
 // t.open[n-1] in the canonical-JSON form of the value: nothing for the root
 // element, and for each element below it `/` and its local name, followed by
 // `/` and its 0-based position among its same-named siblings when the
-// parent's class lists the name among its multi-valued members.
+// parent's class lists the name among its multi-valued members. An element
+// its parent's class reads its own members from ([Class.Inline]) adds
+// nothing.
 func (t *Tracker) writePointer(b *strings.Builder, n int) {
 	for k := 2; k < n; k++ {
 		f := &t.open[k]
+		p := &t.open[k-1]
+		if p.inlines(f) {
+			continue
+		}
 		b.WriteByte('/')
 		b.WriteString(f.name)
-		if p := &t.open[k-1]; p.class != nil && slices.Contains(p.class.Items, f.name) {
+		if p.class != nil && slices.Contains(p.class.Items, f.name) {
 			b.WriteByte('/')
 			b.WriteString(strconv.Itoa(f.pos - 1))
 		}

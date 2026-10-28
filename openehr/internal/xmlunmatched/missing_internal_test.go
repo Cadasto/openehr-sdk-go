@@ -11,14 +11,16 @@ import (
 
 // The targets below read as a generated decoder reads (REQ-175): on entry
 // each hands its class to Enter, a child named in prims reads as text through
-// DecodeElement, a child named in kids decodes into a copy of that target,
-// and anything else is unmatched.
+// DecodeElement, a child named in kids decodes into a copy of that target, a
+// child named in drop is dropped through Drop, and anything else is
+// unmatched.
 
 // described is one such target.
 type described struct {
 	class *Class
 	prims []string
 	kids  map[string]*described
+	drop  []string
 }
 
 func (d *described) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error {
@@ -48,6 +50,12 @@ func (d *described) readChildren(dec *xml.Decoder) error {
 			if kid, ok := d.kids[name]; ok {
 				child := *kid
 				if err := dec.DecodeElement(&child, &tk); err != nil {
+					return err
+				}
+				continue
+			}
+			if slices.Contains(d.drop, name) {
+				if err := Drop(dec); err != nil {
 					return err
 				}
 				continue
