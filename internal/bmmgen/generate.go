@@ -222,13 +222,16 @@ func runTarget(opts Options, t Target, resolver wrappedResolver, schemas *itsXML
 			return tr, fmt.Errorf("bmmgen: %w", err)
 		}
 	}
-	// The ITS-XML name tables are checked before any file is written, the
-	// type names first: an identifier element's class takes its schema
-	// type from them.
+	// The ITS-XML name and shape tables are checked before any file is
+	// written, the type names first: an identifier element's class, and a
+	// shaped member's, takes its schema type from them.
 	if err := checkXMLTypeNames(plan); err != nil {
 		return tr, err
 	}
 	if err := checkXMLIdentifierElements(plan); err != nil {
+		return tr, err
+	}
+	if err := checkXMLMemberShapes(plan); err != nil {
 		return tr, err
 	}
 	for _, f := range plan.Files {

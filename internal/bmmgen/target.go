@@ -76,7 +76,35 @@ type Target struct {
 	// the schema places the element. Canonical JSON keeps the member. Empty
 	// when the schemas declare each member under its own name.
 	XMLIdentifierElements map[string]XMLIdentifierElement
+	// XMLMemberShapes maps a member, keyed "CLASS.member" by the BMM names of
+	// the class that declares it and of the member, to the shape the class's
+	// ITS-XML schema type gives the member's element where that is not the
+	// shape of the member's own BMM type ([XMLMemberShape]). The XML codecs
+	// read and write the element in that shape; canonical JSON keeps the
+	// member. Empty when the schemas give each member its own type's shape.
+	XMLMemberShapes map[string]XMLMemberShape
 }
+
+// XMLMemberShape is a shape an ITS-XML schema type gives a member's element
+// in place of the shape of the member's own BMM type
+// ([Target.XMLMemberShapes]).
+type XMLMemberShape int
+
+const (
+	// XMLCodePhraseString is a String member, such as the `openehr::125` of
+	// C_QUANTITY.property, that the schema declares as a CODE_PHRASE. The
+	// XML encoder writes the part before the first `::` as the `value` of
+	// its `terminology_id` and the rest as its `code_string`, and a string
+	// with no `::` as the element's text. The decoder reads both shapes,
+	// joining the two parts with `::`.
+	XMLCodePhraseString XMLMemberShape = iota + 1
+	// XMLCodePhraseOrCodedText is a CODE_PHRASE member, such as
+	// ORDINAL.symbol, that the schema also lets a document write as a
+	// DV_CODED_TEXT, whose `defining_code` holds the CODE_PHRASE. The
+	// decoder reads both shapes and drops the DV_CODED_TEXT's other
+	// elements; the encoder writes the CODE_PHRASE.
+	XMLCodePhraseOrCodedText
+)
 
 // XMLIdentifierElement is the element an ITS-XML schema type declares in
 // place of a String member ([Target.XMLIdentifierElements]).
@@ -127,6 +155,13 @@ var TargetAOM14 = Target{
 	// TERMINOLOGY_ID element terminology_id.
 	XMLIdentifierElements: map[string]XMLIdentifierElement{
 		"C_CODED_TEXT.terminology": {Name: "terminology_id", Type: "TERMINOLOGY_ID"},
+	},
+	// Its C_DV_QUANTITY declares C_QUANTITY's property, a string such as
+	// `openehr::125`, as a CODE_PHRASE, and its ORDINAL_SYMBOL lets an
+	// ORDINAL's symbol be written as a DV_CODED_TEXT too.
+	XMLMemberShapes: map[string]XMLMemberShape{
+		"C_QUANTITY.property": XMLCodePhraseString,
+		"ORDINAL.symbol":      XMLCodePhraseOrCodedText,
 	},
 }
 

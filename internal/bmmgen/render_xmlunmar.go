@@ -283,6 +283,11 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	b.WriteString("\t\t}\n") // close outer switch (token kind)
 	b.WriteString("\t}\n")   // close for
 	b.WriteString("}\n")
+	shapes, err := renderXMLCodedTextShapes(plan, pc, fields)
+	if err != nil {
+		return "", err
+	}
+	b.WriteString(shapes)
 	return b.String(), nil
 }
 
@@ -298,6 +303,17 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 
 	switch p := ef.Prop.(type) {
 	case *bmm.SingleProperty:
+		if shape, ok := xmlMemberShape(plan, ef); ok {
+			// The member's element in the shape its class's schema type
+			// gives it, and the shape an older SDK wrote.
+			switch shape {
+			case XMLCodePhraseString:
+				return unmarshalXMLCodePhraseString(recv, goField, elemName), nil
+			case XMLCodePhraseOrCodedText:
+				return unmarshalXMLCodedTextCall(plan, recv, ef), nil
+			}
+			return "", fmt.Errorf("unknown XML member shape %d", shape)
+		}
 		if el, ok := xmlIdentifierElement(plan, ef); ok {
 			// The element the schema declares in the member's place, then
 			// the member's own, which an older SDK wrote.
@@ -774,8 +790,10 @@ const maxXMLRequired = 64
 // xmlunmatched.Enter, rendered by [renderXMLClassVar] as a package-level var
 // named `xmlClass<GoName>`: the class's BMM name, the members the decoder
 // reads as XML attributes, the presence-checked mandatory members in the
-// Reference Model's declaration order, the multi-valued members, and the
-// members the decoder also reads from a schema element of another name.
+// Reference Model's declaration order, the multi-valued members, the
+// members the decoder also reads from a schema element of another name, and
+// the child elements it reads its own members from (the defining_code of a
+// member read in the DV_CODED_TEXT shape too, [renderXMLCodedTextShape]).
 type xmlClassDesc struct {
 	goName   string
 	name     string
@@ -783,6 +801,7 @@ type xmlClassDesc struct {
 	required []string
 	items    []string
 	elements []xmlElementOf
+	inline   []string
 }
 
 // xmlElementOf pairs a member with the element of another name canonical XML
@@ -893,9 +912,15 @@ func xmlPresenceChecked(ef emittedField) bool {
 // renderXMLClassVar renders d as the package-level var the decoder hands
 // xmlunmatched.Enter, one field per line, leaving out an empty list.
 func renderXMLClassVar(d xmlClassDesc) string {
+	return fmt.Sprintf("// xmlClass%s describes %s to the canonical-XML decode runtime.\n", d.goName, d.name) +
+		renderXMLDescriptor("xmlClass"+d.goName, d)
+}
+
+// renderXMLDescriptor renders d as the package-level var named name, an
+// xmlunmatched.Class, one field per line, leaving out an empty list.
+func renderXMLDescriptor(name string, d xmlClassDesc) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "// xmlClass%s describes %s to the canonical-XML decode runtime.\n", d.goName, d.name)
-	fmt.Fprintf(&b, "var xmlClass%s = xmlunmatched.Class{\n", d.goName)
+	fmt.Fprintf(&b, "var %s = xmlunmatched.Class{\n", name)
 	fmt.Fprintf(&b, "\tName: %q,\n", d.name)
 	for _, f := range []struct {
 		name string
@@ -915,6 +940,9 @@ func renderXMLClassVar(d xmlClassDesc) string {
 			fmt.Fprintf(&b, "{Member: %q, Name: %q}", e.member, e.name)
 		}
 		b.WriteString("},\n")
+	}
+	if len(d.inline) > 0 {
+		fmt.Fprintf(&b, "\tInline: %s,\n", stringSliceLiteral(d.inline))
 	}
 	b.WriteString("}\n")
 	return b.String()

@@ -5,6 +5,7 @@ package aom14
 
 import (
 	"encoding/xml"
+	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
@@ -153,7 +154,11 @@ func (c *CQuantity) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(c.Property, xml.StartElement{Name: xml.Name{Local: "property"}}); err != nil {
+	if _id, _code, _ok := strings.Cut(c.Property, "::"); _ok {
+		if err := _e.EncodeElement(&rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: _id}, CodeString: _code}, xml.StartElement{Name: xml.Name{Local: "property"}}); err != nil {
+			return err
+		}
+	} else if err := _e.EncodeElement(c.Property, xml.StartElement{Name: xml.Name{Local: "property"}}); err != nil {
 		return err
 	}
 	for _idx := range c.List {

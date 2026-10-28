@@ -94,8 +94,11 @@ func RenderMarshalXMLFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	if slices.ContainsFunc(chunks, func(c string) bool { return strings.Contains(c, "base64.") }) {
 		body.WriteString("\t\"encoding/base64\"\n")
 	}
-	body.WriteString("\t\"encoding/xml\"\n\n")
-	body.WriteString("\t\"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml\"\n")
+	body.WriteString("\t\"encoding/xml\"\n")
+	if slices.ContainsFunc(chunks, func(c string) bool { return strings.Contains(c, "strings.Cut(") }) {
+		body.WriteString("\t\"strings\"\n")
+	}
+	body.WriteString("\n\t\"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml\"\n")
 	if needsExternalImportForJSONMar(plan, chunks) {
 		fmt.Fprintf(&body, "\t%q\n", plan.Target.ExternalImport)
 	}
@@ -292,6 +295,9 @@ func renderMarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass, e
 
 	switch p := ef.Prop.(type) {
 	case *bmm.SingleProperty:
+		if shape, ok := xmlMemberShape(plan, ef); ok && shape == XMLCodePhraseString {
+			return marshalXMLCodePhraseString(recv, goField, elemName, goNameForRef(plan, codePhraseClass), goNameForRef(plan, terminologyIDClass)), nil
+		}
 		if el, ok := xmlIdentifierElement(plan, ef); ok {
 			return marshalXMLIdentifier(recv, goField, el.Name, goNameForRef(plan, el.Type), p.IsMandatory), nil
 		}

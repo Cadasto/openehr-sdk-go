@@ -145,9 +145,9 @@ func TestREQ056_CheckXMLIdentifierElements(t *testing.T) {
 }
 
 // TestREQ056_RunChecksXMLNameTablesBeforeWriting pins that a run refuses a
-// target whose ITS-XML name tables the codecs could not honour before it
-// writes any file, so a refused run leaves the output tree as it was
-// (REQ-056).
+// target whose ITS-XML name or shape tables the codecs could not honour
+// before it writes any file, so a refused run leaves the output tree as it
+// was (REQ-056).
 func TestREQ056_RunChecksXMLNameTablesBeforeWriting(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
@@ -162,6 +162,15 @@ func TestREQ056_RunChecksXMLNameTablesBeforeWriting(t *testing.T) {
 				return tg
 			},
 			want: "not declared by the ITS-XML schema type",
+		},
+		{
+			name: "member shape the schema type lacks",
+			target: func() Target {
+				tg := TargetAOM14
+				tg.XMLMemberShapes = map[string]XMLMemberShape{"ARCHETYPE_TERM.code": XMLCodePhraseString}
+				return tg
+			},
+			want: "the ITS-XML schema type of ARCHETYPE_TERM declares no element code",
 		},
 		{
 			name: "type name the schemas lack",
