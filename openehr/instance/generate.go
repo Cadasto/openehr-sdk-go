@@ -595,7 +595,9 @@ func declaredOnLocatable(class, attrName string) bool {
 // either is not simple, which breaks REFERENCE_RANGE Range_is_simple, so
 // the RM wins over the OPT, whether the OPT names the attribute optional or
 // required (Precedence 2). Its normal_status alone is not a reference range
-// and is left to the walk.
+// and is left to the walk. The interval and the REFERENCE_RANGE are read as
+// the classes the walk builds for them (nodeClass), so an untyped one counts
+// as the type the BMM declares for the attribute that holds it.
 func referenceRangeBoundRanges(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
 	if name := attr.Name(); name != "normal_range" && name != "other_reference_ranges" {
 		return false
@@ -604,10 +606,10 @@ func referenceRangeBoundRanges(optNode *tcimpl.CompiledNode, attr *tcimpl.Compil
 		return false
 	}
 	interval := optNode.Parent()
-	if bmmtype.Class(interval.RMTypeName()) != "DV_INTERVAL" || holdingAttribute(interval) != "range" {
+	if nodeClass(interval) != "DV_INTERVAL" || holdingAttribute(interval) != "range" {
 		return false
 	}
-	return bmmtype.Class(interval.Parent().RMTypeName()) == "REFERENCE_RANGE"
+	return nodeClass(interval.Parent()) == "REFERENCE_RANGE"
 }
 
 // locatableUID reports whether attr is the uid of a locatable, the one
