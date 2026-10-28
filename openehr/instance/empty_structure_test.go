@@ -136,6 +136,15 @@ func TestREQ107_OptionalItemStructureWithNoItemIsLeftOut(t *testing.T) {
 			items: map[instance.Policy]int{instance.Large: 1, instance.Medium: 1, instance.Required: -1},
 		},
 		{
+			// The OPT writes the items, a list in the RM, as a single
+			// attribute over an ELEMENT. The walk writes them as the list,
+			// with that ELEMENT, so the protocol holds an item.
+			name: "an ITEM_TREE whose items the OPT writes as a single attribute over an ELEMENT",
+			protocol: optOptionalSingleOver("protocol", optNode("ITEM_TREE", "at0010",
+				optSingle("items", optNode("ELEMENT", "at0011")))),
+			items: map[instance.Policy]int{instance.Large: 1, instance.Medium: 1, instance.Required: -1},
+		},
+		{
 			name:     "an ITEM_TREE the OPT requires, with an optional slot alone",
 			protocol: optSingle("protocol", optSlotOnlyTree("at0010")),
 			items:    map[instance.Policy]int{instance.Large: 0, instance.Medium: 0, instance.Required: 0},

@@ -1267,6 +1267,7 @@ requirements:
       - internal/templatecompile/compile_generic_test.go
       - internal/templatecompile/flat_conformance_compile_test.go
       - internal/templatecompile/registerpath_test.go
+      - internal/templatecompile/untyped_test.go
       - internal/templatecompile/webtemplate_oracle_compile_test.go
       - openehr/rm/rminfo/lookup_test.go
       - openehr/template/archetype_root_template_id_test.go
@@ -1316,6 +1317,7 @@ requirements:
       - openehr/composition/typecheck_test.go
       - openehr/composition/typecheck_tiers_test.go
       - openehr/composition/uid_source_test.go
+      - openehr/instance/untyped_child_test.go
       - testkit/probes/composition/probe_023_builder_round_trip.go
       - testkit/probes/composition/probes_test.go
       - testkit/probes/instance/corpus_ratchet_test.go
@@ -1621,18 +1623,21 @@ requirements:
       - openehr/instance/rm_release_test.go
       - openehr/instance/rmtype_test.go
       - openehr/instance/sample_test.go
+      - openehr/instance/single_over_list_test.go
       - openehr/instance/single_slot_fill_test.go
       - openehr/instance/sizing_rule_test.go
       - openehr/instance/skipped_attributes_test.go
       - openehr/instance/string_attr_party_name_test.go
       - openehr/instance/string_leaf_internal_test.go
       - openehr/instance/string_leaf_test.go
+      - openehr/instance/topup_room_test.go
       - openehr/instance/uid_source_nil_internal_test.go
       - openehr/instance/uids_test.go
       - openehr/instance/uncarried_mandatory_test.go
       - openehr/instance/undescribed_content_test.go
       - openehr/instance/unnamed_archetype_root_test.go
       - openehr/instance/unsatisfiable_cardinality_test.go
+      - openehr/instance/untyped_child_test.go
       - openehr/instance/valuefill_leaves_test.go
       - openehr/instance/valuefill_test.go
       - openehr/instance/visit_rules_test.go

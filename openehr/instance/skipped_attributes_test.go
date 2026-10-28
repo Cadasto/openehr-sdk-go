@@ -80,8 +80,11 @@ func optLink(lower, upper int) string {
 // OPT requires it, by its existence, a child's occurrences, or an existence
 // with a cardinality that asks for a member, Generate returns an error
 // wrapping ErrConstraintUnsatisfiable that names the RM type, the attribute
-// and the OPT path, and no root. Both hold under every policy, both value
-// fills and both compile modes.
+// and the OPT path, and no root. An optional node that holds such a required
+// attribute needs undescribed content (REQ-107 § Slot fills), so no policy
+// gives it a member of its own and Generate returns a root without it; a
+// top-up with no other child takes it, and Generate refuses it. All of it
+// holds under every policy, both value fills and both compile modes.
 func TestREQ107_AttributeWithoutWriterIsVisitedOnlyWhereRequired(t *testing.T) {
 	cases := []struct {
 		name string
@@ -134,6 +137,40 @@ func TestREQ107_AttributeWithoutWriterIsVisitedOnlyWhereRequired(t *testing.T) {
 			opt: optTemplate("CLUSTER", optMultiple("items", optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0001", 1, 1,
 				optSingle("feeder_audit", optNode("FEEDER_AUDIT", ""))))),
 			detail: "ELEMENT.feeder_audit at /items[at0001] (required, but the generator has no writer for it)",
+		},
+		{
+			// The ELEMENT is optional and its required feeder_audit cannot
+			// be written, so it needs undescribed content and no policy
+			// builds it: the root holds the required at0001 alone.
+			name: "feeder_audit at existence 1..1 of an optional ELEMENT",
+			opt: optTemplate("CLUSTER", optMultiple("items", optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0001", 1, 1),
+				optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0002", 0, 1,
+					optSingle("feeder_audit", optNode("FEEDER_AUDIT", ""))))),
+		},
+		{
+			name: "links over a 1..1 LINK of an optional ELEMENT",
+			opt: optTemplate("CLUSTER", optMultiple("items", optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0001", 1, 1),
+				optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0002", 0, 1, optListWithin("links", 0, 1, optLink(1, 1))))),
+		},
+		{
+			// The RM requires the CLUSTER's items, and the optional ELEMENT
+			// is their only child, so the top-up takes it as its last resort
+			// and the walk refuses its feeder_audit.
+			name: "feeder_audit at existence 1..1 of an optional ELEMENT a top-up takes",
+			opt: optTemplate("CLUSTER", optMultiple("items", optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0001", 0, 1,
+				optSingle("feeder_audit", optNode("FEEDER_AUDIT", ""))))),
+			detail: "ELEMENT.feeder_audit at /items[at0001] (required, but the generator has no writer for it)",
+		},
+		{
+			// The cardinality asks for two members, the required at0001 is
+			// full after its own, and the list allows no slot, so the top-up
+			// takes the optional at0002, which the walk refuses, rather than
+			// repeat at0001 past its occurrences.
+			name: "feeder_audit at existence 1..1 of an optional ELEMENT a top-up takes after a full one",
+			opt: optTemplate("CLUSTER", optCardinal("items", 2, -1, optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0001", 1, 1),
+				optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0002", 0, 1,
+					optSingle("feeder_audit", optNode("FEEDER_AUDIT", ""))))),
+			detail: "ELEMENT.feeder_audit at /items[at0002] (required, but the generator has no writer for it)",
 		},
 		{
 			name:   "links over a 1..1 LINK",

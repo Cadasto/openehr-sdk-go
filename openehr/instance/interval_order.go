@@ -741,7 +741,7 @@ func precisionFits(node *tcimpl.CompiledNode, precision *rm.Integer) bool {
 	}
 	if precision == nil {
 		attr := node.Attribute("precision")
-		return attr == nil || !isRequired(attr)
+		return attr == nil || !isRequired(node, attr)
 	}
 	return !prohibited(node, "precision") && componentFits(bindingChild(node, "precision"), int64(*precision))
 }

@@ -2,9 +2,7 @@ package instance
 
 import (
 	"slices"
-	"strings"
 
-	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	"github.com/cadasto/openehr-sdk-go/internal/rmroots"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -25,16 +23,19 @@ import (
 // names no archetype id, such as an ADMIN_ENTRY defined inline under a
 // SECTION, is read the same way, as a slot nothing can fill is: the
 // generator invents no archetype id, so it can build no member of it
-// (unnamedArchetypeRoot). So under Large and Medium the walk builds an
-// optional node only where it holds more than such content: an optional
-// child that needs it gets no member of its own, and an attribute that is
-// not required, or that only its cardinality lower bound requires, and
-// whose members would all be undescribed or need undescribed content is
-// not visited (shouldVisit), except a composition's context, which RM
-// defaults write under every policy. Under every policy a top-up takes the
-// first child that needs none and whose identity no earlier sibling
-// carries, where the attribute has one. Where only the attribute's
-// existence asks for the member, the top-up takes no other child, so the
+// (unnamedArchetypeRoot). So is a node with a required attribute the
+// generator has no writer for, such as a feeder_audit the template
+// requires, which the walk would refuse (noWriter, writerNeeded). So under
+// Large and Medium the walk builds an optional node only where it holds
+// more than such content: an optional child that needs it gets no member of
+// its own, and an attribute that is not required, or that only its
+// cardinality lower bound requires, and whose members would all be
+// undescribed or need undescribed content is not visited (shouldVisit),
+// except a composition's context, which RM defaults write under every
+// policy. Under every policy a top-up takes the first child with room that
+// needs none and whose identity no earlier sibling with room carries, where
+// the attribute has one. Where only the attribute's existence asks for the
+// member, the top-up takes no other child, so the
 // attribute gets no undescribed member and is left with none where it has
 // no such child (topUpSeed): a list with no member meets its existence. A
 // list the RM makes non-empty once present is not one only its existence
@@ -50,7 +51,9 @@ import (
 // the template does not describe: node is a slot or an unnamed archetype
 // root (undescribedNode), or an attribute of node that is required
 // (visitRequired) and that the walk does not skip can only be given
-// undescribed members (onlyUndescribed). An attribute the BMM
+// undescribed members (onlyUndescribed), or is one the generator has no
+// writer for (noWriter) that the walk would visit (writerNeeded) and then
+// refuse, since nothing the walk can build satisfies it. An attribute the BMM
 // marks mandatory that node does not carry, as under
 // templatecompile.WithoutImplicitAttributes, counts as one with no allowed
 // child. A primitive leaf needs none: the walk values it and stops there.
@@ -73,14 +76,23 @@ func (g *generator) needsUndescribed(node *tcimpl.CompiledNode) bool {
 
 // ownContentUndescribed reports whether a required attribute of node, one
 // it carries or one the BMM marks mandatory that it does not carry, can
-// only be given undescribed members. It reads node's own attributes and
-// does not look below their children.
+// only be given undescribed members, or is one the generator has no writer
+// for that the walk would visit. It reads node's own attributes and does
+// not look below their children.
 func (g *generator) ownContentUndescribed(node *tcimpl.CompiledNode) bool {
 	if node.PrimitiveConstraint() != nil {
 		return false
 	}
 	for _, attr := range tcimpl.NodeAttributes(node) {
-		if !visitRequired(attr) || walkSkips(node, attr) {
+		if !visitRequired(node, attr) || walkSkips(node, attr) {
+			continue
+		}
+		if noWriter(node, attr) {
+			// The walk visits such an attribute only to refuse it, so a node
+			// it must build there is one the template does not describe.
+			if writerNeeded(node, attr) {
+				return true
+			}
 			continue
 		}
 		if g.onlyUndescribed(node, attr) {
@@ -89,7 +101,7 @@ func (g *generator) ownContentUndescribed(node *tcimpl.CompiledNode) bool {
 	}
 	// The mandatory attributes node does not carry, which
 	// fillUncarriedRequired builds from their BMM type.
-	class := bmmtype.Class(concreteFor(strings.TrimSpace(node.RMTypeName())))
+	class := nodeClass(node)
 	for _, name := range requiredAttributes(class) {
 		if node.Attribute(name) != nil || compositionDefaultOwns(class, name) {
 			continue
@@ -137,6 +149,32 @@ func unnamedArchetypeRoot(node *tcimpl.CompiledNode) bool {
 	return !node.IsSlot() && node.ArchetypeID() == "" && rmroots.IsArchetypeRoot(nodeClass(node))
 }
 
+// walkRefuses reports whether the walk refuses a member of node, a template
+// child that is not a slot, for what node itself holds: node is an unnamed
+// archetype root, which makeChild refuses with ErrArchetypeIDMissing, or an
+// attribute of its own is one the generator has no writer for that the walk
+// would visit (visits), which walkNode refuses with
+// ErrConstraintUnsatisfiable. Like needsUndescribed, which holds wherever
+// this does, it reads node's own attributes only. A slot is never refused
+// here: the slot-fill rule decides whether its fill can be built.
+func walkRefuses(node *tcimpl.CompiledNode) bool {
+	if node.IsSlot() {
+		return false
+	}
+	if unnamedArchetypeRoot(node) {
+		return true
+	}
+	if node.PrimitiveConstraint() != nil {
+		return false
+	}
+	for _, attr := range tcimpl.NodeAttributes(node) {
+		if !walkSkips(node, attr) && noWriter(node, attr) && writerNeeded(node, attr) {
+			return true
+		}
+	}
+	return false
+}
+
 // membersUndescribed reports whether every member the walk would build for
 // attr of node is undescribed or needs undescribed content. With no allowed
 // template child, the member is built from the attribute's BMM type, which
@@ -168,9 +206,9 @@ func (g *generator) membersUndescribed(node *tcimpl.CompiledNode, attr *tcimpl.C
 // materialiseImplicitMultiple builds.
 func (g *generator) bmmMemberLocatable(node *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
 	if attr.Cardinality() == template.Multiple {
-		return g.buildsLocatable(attr.RMTypeName())
+		return g.buildsLocatable(attrRMType(node, attr))
 	}
-	return g.buildsLocatable(attrType(node.RMTypeName(), attr.RMTypeName()))
+	return g.buildsLocatable(builtAttrType(node, attr))
 }
 
 // buildsLocatable reports whether the value the generator builds for the
@@ -201,17 +239,36 @@ func (g *generator) optionalUndescribed(child *tcimpl.CompiledNode) bool {
 	return !childRequired(child) && g.needsUndescribed(child)
 }
 
-// firstDescribed returns the first of children that needs no content the
-// template does not describe and whose identity no earlier sibling other
-// than a slot carries (identityCarriedBefore), or nil when there is none.
-// A slot always needs such content. A member of a child whose identity an
-// earlier sibling carries would be bound to that sibling, which describes
-// other content.
-func (g *generator) firstDescribed(children []*tcimpl.CompiledNode) *tcimpl.CompiledNode {
+// firstDescribed returns the index of the first of children that has room
+// (hasRoom), given built, the number of members already built of each, needs
+// no content the template does not describe, and whose identity no earlier
+// sibling other than a slot that still has room carries (identityRoomBefore),
+// or -1 when there is none. A slot always needs such content. A member of a
+// child whose identity an earlier sibling with room carries could be bound to
+// that sibling, which describes other content; where every earlier sibling
+// that carries it is full, the validator binds it to the first with room.
+func (g *generator) firstDescribed(children []*tcimpl.CompiledNode, built []int) int {
 	for i, c := range children {
-		if !g.needsUndescribed(c) && !identityCarriedBefore(children, i) {
-			return c
+		if hasRoom(c, built[i]) && !g.needsUndescribed(c) && !identityRoomBefore(children, i, built) {
+			return i
 		}
 	}
-	return nil
+	return -1
+}
+
+// identityRoomBefore reports whether a sibling before children[i], other
+// than a slot, that still has room (hasRoom, given built) carries its
+// identity (childIdentity, carriesIdentity). A child with no identity is
+// never carried.
+func identityRoomBefore(children []*tcimpl.CompiledNode, i int, built []int) bool {
+	id := childIdentity(children[i])
+	if id == "" {
+		return false
+	}
+	for j, sib := range children[:i] {
+		if !sib.IsSlot() && carriesIdentity(sib, id) && hasRoom(sib, built[j]) {
+			return true
+		}
+	}
+	return false
 }

@@ -333,7 +333,7 @@ func (r *codedRule) constraint(opt *tcimpl.CompiledNode) (node *tcimpl.CompiledN
 	if attr == nil {
 		return nil, false
 	}
-	if attrProhibited(attr) && (r.needed == nil || !r.needed(opt)) {
+	if attrProhibited(opt, attr) && (r.needed == nil || !r.needed(opt)) {
 		return nil, true
 	}
 	return bindingChild(opt, r.attr), false

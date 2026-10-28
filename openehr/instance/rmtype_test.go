@@ -3,6 +3,9 @@ package instance
 import (
 	"errors"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"slices"
 	"testing"
 
@@ -148,4 +151,56 @@ func TestIntervalInstantiationParity(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestREQ107_IntervalFlagsNameEveryIntervalBuilt checks that intervalFlags,
+// which gives the boundary flags of an interval the generator builds, and
+// intervalOver, which builds it, name the same DV_INTERVAL instantiations.
+// Each interval intervalOver builds is of a Go type of its own, and one
+// intervalFlags accepts, and the type switch of intervalFlags, read from
+// rmtype.go, names as many types as intervalOver builds. So neither list
+// can gain an instantiation the other lacks: an interval built but not
+// accepted would keep the flags the walk never sets.
+func TestREQ107_IntervalFlagsNameEveryIntervalBuilt(t *testing.T) {
+	built := make(map[string]string, len(intervalOver))
+	for param, build := range intervalOver {
+		v := build()
+		typ := fmt.Sprintf("%T", v)
+		if other, dup := built[typ]; dup {
+			t.Errorf("intervalOver builds %s over both %s and %s", typ, other, param)
+		}
+		built[typ] = param
+		if _, ok := intervalFlags(v); !ok {
+			t.Errorf("intervalFlags(%s), the interval intervalOver builds over %s, reports false", typ, param)
+		}
+	}
+	if named := intervalFlagsCaseTypes(t); named != len(intervalOver) {
+		t.Errorf("the type switch of intervalFlags names %d types, intervalOver builds %d intervals", named, len(intervalOver))
+	}
+}
+
+// intervalFlagsCaseTypes returns the number of types the case clauses of
+// intervalFlags in rmtype.go name.
+func intervalFlagsCaseTypes(t *testing.T) int {
+	t.Helper()
+	f, err := parser.ParseFile(token.NewFileSet(), "rmtype.go", nil, 0)
+	if err != nil {
+		t.Fatalf("parse rmtype.go: %v", err)
+	}
+	for _, decl := range f.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || fn.Name.Name != "intervalFlags" {
+			continue
+		}
+		named := 0
+		ast.Inspect(fn.Body, func(n ast.Node) bool {
+			if clause, ok := n.(*ast.CaseClause); ok {
+				named += len(clause.List)
+			}
+			return true
+		})
+		return named
+	}
+	t.Fatal("rmtype.go declares no intervalFlags")
+	return 0
 }
