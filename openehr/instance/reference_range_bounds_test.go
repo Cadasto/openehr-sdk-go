@@ -240,3 +240,46 @@ func TestREQ107_ReferenceRangeBoundKeepsItsNormalStatus(t *testing.T) {
 		expected: []expectedIssue{normalRangeAbsent("lower"), normalRangeAbsent("upper")},
 	}})
 }
+
+// TestREQ107_UntypedReferenceRangeBoundsCarryNoNormalRange is the REQ-107
+// Precedence 2 check that a bound of a REFERENCE_RANGE's range carries no
+// normal_range where the OPT names no RM type for the range, for the
+// REFERENCE_RANGE, or for either: an untyped node is built as the type the
+// BMM declares for the attribute that holds it, and every rule reads it as
+// that type, as for a child that names it (Generic and untyped types). Each
+// bound is a DV_COUNT whose OPT gives it an optional normal_range, which
+// Large and Medium would otherwise write. It holds under every policy, both
+// value fills and both compile modes, and the root passes both validators.
+func TestREQ107_UntypedReferenceRangeBoundsCarryNoNormalRange(t *testing.T) {
+	bound := func(n string) string {
+		return countValue(n, guardSingle("normal_range", guardExistence01, ordInterval("DV_COUNT", countValue("1"), countValue("9"))))
+	}
+	bounds := []string{optSingle("lower", bound("2")), optSingle("upper", bound("8"))}
+	meaning := optSingle("meaning", optNode("DV_TEXT", "", optSingle("value", guardString("critical"))))
+	typedRange := optSingle("range", optNode("DV_INTERVAL&lt;DV_COUNT&gt;", "", bounds...))
+	untypedRange := optSingle("range", optUntyped("", bounds...))
+	simple := func(t *testing.T, out any) {
+		t.Helper()
+		el, ok := out.(*rm.Element)
+		if !ok {
+			t.Fatalf("generated root is %T, want *rm.Element", out)
+		}
+		lower, upper := referenceRangeBounds(t, el.Value)
+		if lower == nil || upper == nil {
+			t.Errorf("range bounds = %s .. %s, want both", boundString(lower), boundString(upper))
+		}
+		checkRangesSimple(t, el.Value)
+	}
+	refRanges := func(rangeNode string, typed bool) string {
+		if typed {
+			return optMultiple("other_reference_ranges", optNode("REFERENCE_RANGE", "", meaning, rangeNode))
+		}
+		return optMultiple("other_reference_ranges", optUntyped("", meaning, rangeNode))
+	}
+	runSimpleBoundCases(t, []simpleBoundCase{
+		{dvCase: dvCase{name: "a typed range of a typed REFERENCE_RANGE", value: countValue("4", refRanges(typedRange, true)), check: simple}},
+		{dvCase: dvCase{name: "an untyped range of a typed REFERENCE_RANGE", value: countValue("4", refRanges(untypedRange, true)), check: simple}},
+		{dvCase: dvCase{name: "a typed range of an untyped REFERENCE_RANGE", value: countValue("4", refRanges(typedRange, false)), check: simple}},
+		{dvCase: dvCase{name: "an untyped range of an untyped REFERENCE_RANGE", value: countValue("4", refRanges(untypedRange, false)), check: simple}},
+	})
+}
