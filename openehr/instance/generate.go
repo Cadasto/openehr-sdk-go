@@ -424,7 +424,7 @@ func historyAllows(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute)
 	if prohibited(optNode, attr.Name()) {
 		return false
 	}
-	return attr.Name() != "events" || memberCap(attr) != 0
+	return attr.Name() != "events" || memberCap(optNode, attr) != 0
 }
 
 // visitNeeded builds attrName of optNode, an attribute an RM rule needs,
@@ -2093,7 +2093,7 @@ func (p memberPlan) members() int { return len(p.own) + len(p.topUp) }
 // it names none.
 func (g *generator) planMembers(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute, children []*tcimpl.CompiledNode) memberPlan {
 	var plan memberPlan
-	upperBound := memberCap(attr)
+	upperBound := memberCap(optNode, attr)
 	reserved := askedMembers(children)
 	total := 0
 	for i, child := range children {
@@ -2396,23 +2396,24 @@ func implicitMembers(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribut
 		return 0
 	}
 	needed := remainingLowerNeeded(optNode, attr, 0)
-	if upper := memberCap(attr); upper >= 0 {
+	if upper := memberCap(optNode, attr); upper >= 0 {
 		needed = min(needed, upper)
 	}
 	return needed
 }
 
-// memberCap returns the most members attr may get, or -1 for no bound: its
-// cardinality upper bound, but at least 1 where the BMM marks attr
-// mandatory, since that RM rule wins over the OPT (REQ-107 Precedence 2).
-// So a PARTY's identities at cardinality 0..0 still get the member the
-// BMM requires, and the root breaks the OPT's bound instead of the RM's.
-func memberCap(attr *tcimpl.CompiledAttribute) int {
+// memberCap returns the most members attr of optNode may get, or -1 for no
+// bound: its cardinality upper bound, but at least 1 where the BMM marks
+// attr mandatory on the class the walk builds for optNode (bmmRequired),
+// since that RM rule wins over the OPT (REQ-107 Precedence 2). So a PARTY's
+// identities at cardinality 0..0 still get the member the BMM requires, and
+// the root breaks the OPT's bound instead of the RM's.
+func memberCap(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) int {
 	cm := attr.ChildMultiplicity()
 	if cm == nil || cm.UpperUnbounded() {
 		return -1
 	}
-	if attr.Required() {
+	if bmmRequired(optNode, attr) {
 		return max(cm.Upper(), 1)
 	}
 	return cm.Upper()
@@ -2445,7 +2446,8 @@ func remainingLowerNeeded(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAtt
 
 // existenceOnly reports whether only the existence of attr, an attribute
 // of optNode, asks for a member: its existence lower bound is bounded and
-// at least 1, the BMM does not mark it mandatory, the template asks it for
+// at least 1, the BMM does not mark it mandatory on the class the walk
+// builds for optNode (bmmRequired), the template asks it for
 // no member ([tcimpl.AsksForMember]): neither its cardinality lower bound
 // nor the occurrences lower bound of an allowed child is bounded and at
 // least 1, and it is no list the RM makes non-empty once present
@@ -2456,7 +2458,7 @@ func remainingLowerNeeded(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAtt
 // reads a list's existence the same way, and asks a list the RM makes
 // non-empty for a member by its existence too.
 func existenceOnly(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
-	return !attr.Required() && !tcimpl.AsksForMember(attr) && tcimpl.LowerAtLeastOne(attr.Existence()) &&
+	return !bmmRequired(optNode, attr) && !tcimpl.AsksForMember(attr) && tcimpl.LowerAtLeastOne(attr.Existence()) &&
 		!rmNonEmptyList(optNode, attr)
 }
 
