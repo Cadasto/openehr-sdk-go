@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cadasto/openehr-sdk-go/auth"
 	"github.com/cadasto/openehr-sdk-go/cadasto/admin"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 	"github.com/cadasto/openehr-sdk-go/transport"
@@ -29,9 +30,22 @@ func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
 	return newClientWithHTTP(t, srv, srv.Client())
 }
 
+// testToken is the bearer token a client from newTokenClient carries.
+const testToken = "probe-must-not-send"
+
+// newTokenClient is newClient with a static token source, so a request
+// that attached the client's credential would carry testToken. A check
+// that a probe sends no Authorization header needs it: on a client
+// without a token source, attaching the credential sends nothing.
+func newTokenClient(t *testing.T, srv *httptest.Server) *transport.Client {
+	t.Helper()
+	return newClientWithHTTP(t, srv, srv.Client(),
+		transport.WithTokenSource(auth.StaticTokenSource(auth.Token{Value: testToken})))
+}
+
 // newClientWithHTTP is newClient with hc as the HTTP client, so a test
-// can wrap the server's own transport.
-func newClientWithHTTP(t *testing.T, srv *httptest.Server, hc *http.Client) *transport.Client {
+// can wrap the server's own transport. opts follow WithHTTPClient.
+func newClientWithHTTP(t *testing.T, srv *httptest.Server, hc *http.Client, opts ...transport.Option) *transport.Client {
 	t.Helper()
 	cat, err := discovery.NewStaticCatalog(discovery.StaticConfig{
 		Issuer: "https://test.example.com",
@@ -45,11 +59,29 @@ func newClientWithHTTP(t *testing.T, srv *httptest.Server, hc *http.Client) *tra
 	if err != nil {
 		t.Fatalf("build catalog: %v", err)
 	}
-	c, err := transport.New(cat, transport.WithHTTPClient(hc))
+	c, err := transport.New(cat, append([]transport.Option{transport.WithHTTPClient(hc)}, opts...)...)
 	if err != nil {
 		t.Fatalf("build client: %v", err)
 	}
 	return c
+}
+
+// TestTokenClientSendsAuthorization is the control for the checks that a
+// probe sends no Authorization header: a request through transport.Do on
+// the same client does send the token.
+func TestTokenClientSendsAuthorization(t *testing.T) { // REQ-083
+	gotAuth := make(chan string, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth <- r.Header.Get("Authorization")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+	if _, err := newTokenClient(t, srv).Do(t.Context(), &transport.Request{Method: http.MethodGet, Path: "/ehr"}); err != nil {
+		t.Fatalf("Do: %v", err)
+	}
+	if got, want := <-gotAuth, "Bearer "+testToken; got != want {
+		t.Errorf("Authorization = %q, want %q", got, want)
+	}
 }
 
 // captureHandler records the path each request hits and replies with
@@ -310,10 +342,11 @@ func TestProbePathOptionValidation(t *testing.T) {
 	}
 }
 
-// Header contract: probe sets Accept but never Authorization. An
-// injected http.RoundTripper MAY add auth — that is outside the
-// probe's contract — but the probe itself MUST NOT attach a token.
-func TestProbeSetsAcceptNoAuthorization(t *testing.T) {
+// Header contract: probe sets Accept but never Authorization, though the
+// client carries a token source. An injected http.RoundTripper MAY add
+// auth — that is outside the probe's contract — but the probe itself
+// MUST NOT attach a token.
+func TestProbeSetsAcceptNoAuthorization(t *testing.T) { // REQ-083
 	var gotAccept, gotAuth string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotAccept = r.Header.Get("Accept")
@@ -321,7 +354,7 @@ func TestProbeSetsAcceptNoAuthorization(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
-	c := newClient(t, srv)
+	c := newTokenClient(t, srv)
 	if err := admin.Live(context.Background(), c); err != nil {
 		t.Fatalf("Live: %v", err)
 	}
@@ -477,7 +510,8 @@ func TestReadyBodyReturnsBody(t *testing.T) { // REQ-083
 
 // TestReadyBodySendsReadyRequest pins the request ReadyBody sends: a GET
 // to the WithReadyPath override at the origin of the openEHR REST entry,
-// with Accept: application/json and no Authorization header.
+// with Accept: application/json and no Authorization header, though the
+// client carries a token source.
 func TestReadyBodySendsReadyRequest(t *testing.T) { // REQ-083
 	type seen struct {
 		method, host, path, accept string
@@ -495,7 +529,7 @@ func TestReadyBodySendsReadyRequest(t *testing.T) { // REQ-083
 		t.Fatalf("parse server URL: %v", err)
 	}
 
-	got, err := admin.ReadyBody(t.Context(), newClient(t, srv), admin.WithReadyPath("/ehrbase/rest/status"))
+	got, err := admin.ReadyBody(t.Context(), newTokenClient(t, srv), admin.WithReadyPath("/ehrbase/rest/status"))
 	if err != nil {
 		t.Fatalf("ReadyBody: %v", err)
 	}

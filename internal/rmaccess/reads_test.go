@@ -34,14 +34,17 @@ func bothForms(v any) []any {
 // readCase is one attribute read through Single: whether it is present and,
 // when want is set, the value it gives back, compared with == when the value
 // is comparable and with reflect.DeepEqual otherwise. wantType, when set, is
-// the Go type of the value.
+// the Go type of the value. byAddress marks an attribute that holds a class
+// by value, which comes back as a pointer into the parent: want is then the
+// value that pointer points to.
 type readCase struct {
-	name     string
-	parent   any
-	attr     string
-	present  bool
-	want     any
-	wantType string
+	name      string
+	parent    any
+	attr      string
+	present   bool
+	want      any
+	wantType  string
+	byAddress bool
 }
 
 // checkSingle reads tc through Single on each form of its parent.
@@ -55,6 +58,14 @@ func checkSingle(t *testing.T, tc readCase, forms []any) {
 		}
 		if !present {
 			continue
+		}
+		if tc.byAddress {
+			ptr := reflect.ValueOf(got)
+			if ptr.Kind() != reflect.Pointer || ptr.IsNil() {
+				t.Errorf("Single(%T, %q) = %#v, want a pointer to the value the parent holds", form, tc.attr, got)
+				continue
+			}
+			got = ptr.Elem().Interface()
 		}
 		if tc.wantType != "" && fmt.Sprintf("%T", got) != tc.wantType {
 			t.Errorf("Single(%T, %q) = %T, want a %s", form, tc.attr, got, tc.wantType)
@@ -109,10 +120,10 @@ func TestAccess_REQ102_REQ110_ReadsTheTemplateWalkAttributes(t *testing.T) {
 		// COMPOSITION: every attribute the walk reads, set and empty.
 		{name: "COMPOSITION archetype_node_id", parent: comp, attr: "archetype_node_id", present: true, want: comp.ArchetypeNodeID},
 		{name: "COMPOSITION name", parent: comp, attr: "name", present: true},
-		{name: "COMPOSITION category", parent: comp, attr: "category", present: true, want: comp.Category},
+		{name: "COMPOSITION category", parent: comp, attr: "category", present: true, want: comp.Category, byAddress: true},
 		{name: "COMPOSITION composer", parent: comp, attr: "composer", present: true, want: rm.PartySelf{}},
-		{name: "COMPOSITION language", parent: comp, attr: "language", present: true, want: comp.Language},
-		{name: "COMPOSITION territory", parent: comp, attr: "territory", present: true, want: comp.Territory},
+		{name: "COMPOSITION language", parent: comp, attr: "language", present: true, want: comp.Language, byAddress: true},
+		{name: "COMPOSITION territory", parent: comp, attr: "territory", present: true, want: comp.Territory, byAddress: true},
 		{name: "COMPOSITION context", parent: comp, attr: "context", present: true, want: comp.Context},
 		{name: "empty COMPOSITION archetype_node_id", parent: rm.Composition{}, attr: "archetype_node_id"},
 		{name: "empty COMPOSITION name", parent: rm.Composition{}, attr: "name"},
@@ -123,14 +134,14 @@ func TestAccess_REQ102_REQ110_ReadsTheTemplateWalkAttributes(t *testing.T) {
 		{name: "empty COMPOSITION context", parent: rm.Composition{}, attr: "context"},
 
 		// EVENT_CONTEXT's RM-mandatory start_time and setting.
-		{name: "EVENT_CONTEXT start_time", parent: rm.EventContext{StartTime: rm.DVDateTime{Value: "2026-05-26T12:00:00Z"}}, attr: "start_time", present: true, want: rm.DVDateTime{Value: "2026-05-26T12:00:00Z"}},
-		{name: "EVENT_CONTEXT setting", parent: rm.EventContext{Setting: coded("other care", "238")}, attr: "setting", present: true, want: coded("other care", "238")},
+		{name: "EVENT_CONTEXT start_time", parent: rm.EventContext{StartTime: rm.DVDateTime{Value: "2026-05-26T12:00:00Z"}}, attr: "start_time", present: true, want: rm.DVDateTime{Value: "2026-05-26T12:00:00Z"}, byAddress: true},
+		{name: "EVENT_CONTEXT setting", parent: rm.EventContext{Setting: coded("other care", "238")}, attr: "setting", present: true, want: coded("other care", "238"), byAddress: true},
 		{name: "empty EVENT_CONTEXT start_time", parent: rm.EventContext{}, attr: "start_time"},
 		{name: "empty EVENT_CONTEXT setting", parent: rm.EventContext{}, attr: "setting"},
 
 		// OBSERVATION: data present once its HISTORY is not empty; state and
 		// protocol absent until set.
-		{name: "OBSERVATION data", parent: rm.Observation{Data: rm.History[rm.ItemStructure]{ArchetypeNodeID: "at0001"}}, attr: "data", present: true, wantType: "rm.History[github.com/cadasto/openehr-sdk-go/openehr/rm.ItemStructure]"},
+		{name: "OBSERVATION data", parent: rm.Observation{Data: rm.History[rm.ItemStructure]{ArchetypeNodeID: "at0001"}}, attr: "data", present: true, wantType: "rm.History[github.com/cadasto/openehr-sdk-go/openehr/rm.ItemStructure]", byAddress: true},
 		{name: "OBSERVATION state unset", parent: rm.Observation{}, attr: "state"},
 		{name: "OBSERVATION protocol unset", parent: rm.Observation{}, attr: "protocol"},
 		{name: "OBSERVATION protocol set", parent: rm.Observation{Protocol: tree}, attr: "protocol", present: true, want: tree},
@@ -144,10 +155,11 @@ func TestAccess_REQ102_REQ110_ReadsTheTemplateWalkAttributes(t *testing.T) {
 		{name: "empty ACTION instruction_details", parent: rm.Action{}, attr: "instruction_details"},
 
 		// ISM_TRANSITION: current_state once it carries a value, careflow_step
-		// and transition once set.
-		{name: "ISM_TRANSITION current_state", parent: rm.IsmTransition{CurrentState: step}, attr: "current_state", present: true, want: step},
-		{name: "ISM_TRANSITION careflow_step", parent: rm.IsmTransition{CareflowStep: &step}, attr: "careflow_step", present: true, want: step},
-		{name: "ISM_TRANSITION transition", parent: rm.IsmTransition{Transition: &step}, attr: "transition", present: true, want: step},
+		// and transition once set, as the pointer the field holds, so a write
+		// through it reaches the transition.
+		{name: "ISM_TRANSITION current_state", parent: rm.IsmTransition{CurrentState: step}, attr: "current_state", present: true, want: step, byAddress: true},
+		{name: "ISM_TRANSITION careflow_step", parent: rm.IsmTransition{CareflowStep: &step}, attr: "careflow_step", present: true, want: &step},
+		{name: "ISM_TRANSITION transition", parent: rm.IsmTransition{Transition: &step}, attr: "transition", present: true, want: &step},
 		{name: "empty ISM_TRANSITION current_state", parent: rm.IsmTransition{}, attr: "current_state"},
 		{name: "empty ISM_TRANSITION careflow_step", parent: rm.IsmTransition{}, attr: "careflow_step"},
 		{name: "empty ISM_TRANSITION transition", parent: rm.IsmTransition{}, attr: "transition"},
@@ -156,14 +168,14 @@ func TestAccess_REQ102_REQ110_ReadsTheTemplateWalkAttributes(t *testing.T) {
 		{name: "ITEM_SINGLE item", parent: rm.ItemSingle{Item: rm.Element{ArchetypeNodeID: "at0010"}}, attr: "item", present: true, wantType: "*rm.Element"},
 
 		// DV_CODED_TEXT defining_code, the CODE_PHRASE leaf.
-		{name: "DV_CODED_TEXT defining_code", parent: coded("event", "433"), attr: "defining_code", present: true, want: coded("event", "433").DefiningCode},
+		{name: "DV_CODED_TEXT defining_code", parent: coded("event", "433"), attr: "defining_code", present: true, want: coded("event", "433").DefiningCode, byAddress: true},
 		{name: "empty DV_CODED_TEXT defining_code", parent: rm.DVCodedText{}, attr: "defining_code"},
 
 		// TERM_MAPPING: match, purpose and target, set and at their zero
 		// value (REQ-112).
 		{name: "TERM_MAPPING match", parent: termMapping, attr: "match", present: true, want: rm.Character("=")},
 		{name: "TERM_MAPPING purpose", parent: termMapping, attr: "purpose", present: true, want: termMapping.Purpose},
-		{name: "TERM_MAPPING target", parent: termMapping, attr: "target", present: true, want: termMapping.Target},
+		{name: "TERM_MAPPING target", parent: termMapping, attr: "target", present: true, want: termMapping.Target, byAddress: true},
 		{name: "empty TERM_MAPPING match", parent: rm.TermMapping{}, attr: "match"},
 		{name: "empty TERM_MAPPING purpose", parent: rm.TermMapping{}, attr: "purpose"},
 		{name: "empty TERM_MAPPING target", parent: rm.TermMapping{}, attr: "target"},
@@ -375,9 +387,9 @@ func TestAccess_REQ102_REQ112_ReadsReferenceParts(t *testing.T) {
 	}
 	for _, h := range holders {
 		t.Run(h.name+" "+h.attr, func(t *testing.T) {
-			checkSingle(t, readCase{attr: h.attr, present: true, want: full}, bothForms(h.holding(full)))
+			checkSingle(t, readCase{attr: h.attr, present: true, want: full, byAddress: true}, bothForms(h.holding(full)))
 			for _, ref := range partial {
-				checkSingle(t, readCase{attr: h.attr, present: true, want: ref}, bothForms(h.holding(ref)))
+				checkSingle(t, readCase{attr: h.attr, present: true, want: ref, byAddress: true}, bothForms(h.holding(ref)))
 			}
 			checkSingle(t, readCase{attr: h.attr}, bothForms(h.holding(rm.PartyRef{})))
 		})
@@ -412,7 +424,7 @@ func TestAccess_REQ112_ReadsPartyProxiesAndParticipation(t *testing.T) {
 		{name: "PARTY_IDENTIFIED external_ref set", parent: rm.PartyIdentified{ExternalRef: ref}, attr: "external_ref", present: true, want: ref},
 		{name: "PARTY_IDENTIFIED external_ref without namespace", parent: rm.PartyIdentified{ExternalRef: bare}, attr: "external_ref", present: true, want: bare},
 		{name: "PARTY_IDENTIFIED external_ref unset", parent: rm.PartyIdentified{}, attr: "external_ref"},
-		{name: "PARTY_RELATED relationship set", parent: rm.PartyRelated{Relationship: relationship}, attr: "relationship", present: true, want: relationship},
+		{name: "PARTY_RELATED relationship set", parent: rm.PartyRelated{Relationship: relationship}, attr: "relationship", present: true, want: relationship, byAddress: true},
 		{name: "PARTY_RELATED relationship unset", parent: rm.PartyRelated{}, attr: "relationship"},
 		{name: "PARTY_RELATED name set", parent: rm.PartyRelated{PartyIdentified: rm.PartyIdentified{Name: &name}}, attr: "name", present: true, want: &name},
 		{name: "PARTY_RELATED name unset", parent: rm.PartyRelated{}, attr: "name"},
@@ -566,10 +578,10 @@ func TestAccess_REQ112_ReadsOrderedValues(t *testing.T) {
 	cases := []readCase{
 		// DV_ORDINAL and DV_SCALE: symbol reads absent with neither a value
 		// nor a code; value, a number, always reads present.
-		{name: "DV_ORDINAL symbol set", parent: rm.DVOrdinal{Value: 1, Symbol: symbol}, attr: "symbol", present: true, want: symbol},
+		{name: "DV_ORDINAL symbol set", parent: rm.DVOrdinal{Value: 1, Symbol: symbol}, attr: "symbol", present: true, want: symbol, byAddress: true},
 		{name: "DV_ORDINAL symbol absent", parent: rm.DVOrdinal{Value: 1}, attr: "symbol"},
 		{name: "DV_ORDINAL value zero", parent: rm.DVOrdinal{Symbol: symbol}, attr: "value", present: true},
-		{name: "DV_SCALE symbol set", parent: rm.DVScale{Value: 0.5, Symbol: symbol}, attr: "symbol", present: true, want: symbol},
+		{name: "DV_SCALE symbol set", parent: rm.DVScale{Value: 0.5, Symbol: symbol}, attr: "symbol", present: true, want: symbol, byAddress: true},
 		{name: "DV_SCALE symbol absent", parent: rm.DVScale{Value: 0.5}, attr: "symbol"},
 		{name: "DV_SCALE value zero", parent: rm.DVScale{Symbol: symbol}, attr: "value", present: true},
 		{name: "DV_ORDINAL magnitude, no attribute of the class", parent: rm.DVOrdinal{}, attr: "magnitude"},
@@ -625,18 +637,15 @@ func TestAccess_REQ112_ArchetypeDetailsOnEveryLocatable(t *testing.T) {
 	tid := &rm.TemplateID{Value: "ehr_status.v1"}
 	full := rm.Archetyped{ArchetypeID: rm.ArchetypeID{Value: "openEHR-EHR-EHR_STATUS.generic.v1"}, RMVersion: "1.1.0", TemplateID: tid}
 	for _, tc := range []readCase{
-		{name: "complete archetype_id", parent: full, attr: "archetype_id", present: true, want: full.ArchetypeID},
+		{name: "complete archetype_id", parent: full, attr: "archetype_id", present: true, want: full.ArchetypeID, byAddress: true},
 		{name: "complete rm_version", parent: full, attr: "rm_version", present: true, want: "1.1.0"},
 		{name: "complete template_id", parent: full, attr: "template_id", present: true, want: tid},
-		{name: "zero archetype_id", parent: rm.Archetyped{}, attr: "archetype_id", present: true, want: rm.ArchetypeID{}},
+		{name: "zero archetype_id", parent: rm.Archetyped{}, attr: "archetype_id", present: true, want: rm.ArchetypeID{}, byAddress: true},
 		{name: "zero rm_version", parent: rm.Archetyped{}, attr: "rm_version", present: true, want: ""},
 		{name: "archetype_node_id, no attribute of the class", parent: full, attr: "archetype_node_id"},
 	} {
 		t.Run("ARCHETYPED "+tc.name, func(t *testing.T) {
-			got, present := Single(tc.parent, tc.attr)
-			if present != tc.present || (present && !sameValue(got, tc.want)) {
-				t.Errorf("Single(ARCHETYPED, %q) = (%#v, %t), want (%#v, %t)", tc.attr, got, present, tc.want, tc.present)
-			}
+			checkSingle(t, tc, bothForms(tc.parent))
 		})
 	}
 }

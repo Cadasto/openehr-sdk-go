@@ -249,6 +249,16 @@ func (c Comparison) validate() error {
 		if err := validateValue(c.Left); err != nil {
 			return err
 		}
+		// `identifiedExpr` admits a comparison only after an identifiedPath or
+		// a functionCall, so a literal or a parameter on the left would emit
+		// text the parser rejects. The diagnostic names the shape, never the
+		// value (REQ-119).
+		switch inner, _ := DerefValue(c.Left); inner.(type) {
+		case PathValue, FuncCall:
+		default:
+			return fmt.Errorf("%w: a %T as the left operand of a %s comparison; the grammar admits a path or a function call there",
+				ErrInvalidQuery, inner, string(c.Op))
+		}
 	}
 	if c.Val == nil {
 		return fmt.Errorf("%w: nil value in comparison on %q", ErrInvalidQuery, c.leftToken())
@@ -278,7 +288,9 @@ func Le(path string, v Value) WhereExpr { return Comparison{Path: path, Op: OpLe
 // [Value] instead of a path, the write-side mirror of the parser's
 // function-call comparison left-hand side, e.g.
 // Compare(Func("LENGTH", Path("o/name/value")), OpGt, Int(5)) emits
-// `LENGTH(o/name/value) > 5`. Use [Eq] / [Ne] / [Gt] / [Ge] / [Lt] / [Le]
+// `LENGTH(o/name/value) > 5`. The left operand is a function call or a path:
+// AQL compares nothing else, so a literal or a parameter there is refused
+// with [ErrInvalidQuery]. Use [Eq] / [Ne] / [Gt] / [Ge] / [Lt] / [Le]
 // for the ordinary path form.
 func Compare(left Value, op Operator, right Value) WhereExpr {
 	return Comparison{Op: op, Val: right, Left: left}

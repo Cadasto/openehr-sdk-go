@@ -42,6 +42,28 @@ type Assignment struct {
 // openEHR conformance, another implementation of the builder against
 // the same OPT and assignments must produce the same pass outcome.
 func Probe023BuilderRoundTrip(ctx context.Context, c *templatecompile.Compiled, opts []composition.Option, assigns []Assignment) (Result, error) { // PROBE-023 (REQ-082, REQ-101)
+	return probe023(ctx, c, opts, assigns, canjsonRoundTrip)
+}
+
+// canjsonRoundTrip decodes payload into a fresh *rm.Composition and
+// marshals the result again: the second leg of PROBE-023. Decoding into a
+// fresh value shows that the canjson dispatch on the nested data values
+// works in both directions.
+func canjsonRoundTrip(payload []byte) ([]byte, error) {
+	var decoded rm.Composition
+	if err := canjson.Unmarshal(payload, &decoded); err != nil {
+		return nil, fmt.Errorf("canjson.Unmarshal: %w", err)
+	}
+	out, err := canjson.Marshal(&decoded)
+	if err != nil {
+		return nil, fmt.Errorf("canjson.Marshal (after Unmarshal): %w", err)
+	}
+	return out, nil
+}
+
+// probe023 is Probe023BuilderRoundTrip with the second leg passed in, so a
+// test can change what that leg returns and leave the first one alone.
+func probe023(ctx context.Context, c *templatecompile.Compiled, opts []composition.Option, assigns []Assignment, roundTrip func(payload []byte) ([]byte, error)) (Result, error) {
 	r := Result{Probe: "PROBE-023"}
 	if c == nil || c.Root() == nil {
 		return r, errors.New("PROBE-023: nil compiled template")
@@ -79,25 +101,16 @@ func Probe023BuilderRoundTrip(ctx context.Context, c *templatecompile.Compiled, 
 			}
 		}
 	}
-	// Unmarshal round-trip — the full PROBE-023 promise that
-	// REQ-107 Phase 2 unblocked. Decode the marshalled payload back
-	// into a fresh *rm.Composition (proving the canjson polymorphic
-	// dispatch on the nested DataValues works symmetrically), then
-	// re-marshal and assert the same fragment set survives the
-	// round-trip.
-	var decoded rm.Composition
-	if err := canjson.Unmarshal(payload, &decoded); err != nil {
-		failures = append(failures, fmt.Sprintf("canjson.Unmarshal: %v", err))
+	// The second leg: decode the marshalled payload, re-marshal it, and
+	// check the same fragment set survives.
+	reMarshalled, err := roundTrip(payload)
+	if err != nil {
+		failures = append(failures, err.Error())
 	} else {
-		reMarshalled, err := canjson.Marshal(&decoded)
-		if err != nil {
-			failures = append(failures, fmt.Sprintf("canjson.Marshal (after Unmarshal): %v", err))
-		} else {
-			for _, a := range assigns {
-				for _, frag := range a.WireFragments {
-					if !bytes.Contains(reMarshalled, frag) {
-						failures = append(failures, fmt.Sprintf("Set@%s: round-trip output missing fragment %q", a.Path, string(frag)))
-					}
+		for _, a := range assigns {
+			for _, frag := range a.WireFragments {
+				if !bytes.Contains(reMarshalled, frag) {
+					failures = append(failures, fmt.Sprintf("Set@%s: round-trip output missing fragment %q", a.Path, string(frag)))
 				}
 			}
 		}

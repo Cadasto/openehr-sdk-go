@@ -17,23 +17,3 @@ type DVURI struct {
 	// Value Value of URI as a String. 'Plain-text' URIs are allowed, enabling better readability, but must be RFC-3986 encoded in use.
 	Value string `json:"value"`
 }
-
-// FragmentID A part of, a  fragment  or  a  sub-function  within  an object. Allows references to sub-parts of objects, such as a certain line and character  position  in  a  text object. The  syntax  and semantics are defined by the application responsible for the object.
-func (d *DVURI) FragmentID() string {
-	panic("not implemented: DV_URI.fragment_id — implement in a non-generated file")
-}
-
-// Path A string whose format is  a  function  of  the  scheme. Identifies   the   location  in  <scheme>-space  of  an information entity. Typical values include hierarchical directory  paths  for  any  machine.  For example, with scheme = "ftp", path might be `"/pub/images/image_01"`. The strings "." and ".." are reserved for use in the path. Paths may include internet/intranet location identifiers of the form: `sub_domain...domain`, e.g. `"info.cern.ch"`.
-func (d *DVURI) Path() string {
-	panic("not implemented: DV_URI.path — implement in a non-generated file")
-}
-
-// Query Query string to send to application implied  by  scheme and  path.  Enables  queries  to applications, including databases  to  be  included in  the  URI. Supports any query meaningful to the server, including SQL.
-func (d *DVURI) Query() string {
-	panic("not implemented: DV_URI.query — implement in a non-generated file")
-}
-
-// Scheme A distributed information 'space' in which  information objects  exist. The scheme simultaneously specifies an information space and a mechanism for accessing objects in  that  space.  For  example  if  scheme  = "ftp", it identifies the information space in which  all  ftp-able objects  exist,  and also the application - ftp - which can be used to access them. Values may include: "ftp", "telnet", "mailto", etc. Refer to RFC-3986 for a full list.
-func (d *DVURI) Scheme() string {
-	panic("not implemented: DV_URI.scheme — implement in a non-generated file")
-}

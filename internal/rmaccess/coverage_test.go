@@ -45,8 +45,8 @@ func TestAccess_REQ171_CoversEveryRegisteredClass(t *testing.T) {
 			if !ok {
 				t.Fatalf("rminfo.AttributeRMType(%s, %q) not found for an attribute AttributeNames lists", name, attr)
 			}
-			_, _, bySingle := single(v, attr)
-			_, _, byMultiple := multiple(v, attr)
+			_, _, bySingle := single(v, attr, false)
+			_, _, _, byMultiple := multiple(v, attr, false)
 			_, _, _, byHash := hash(v, attr)
 			switch {
 			case container && !byMultiple:
@@ -63,10 +63,10 @@ func TestAccess_REQ171_CoversEveryRegisteredClass(t *testing.T) {
 				hashes++
 			}
 		}
-		if _, _, served := single(v, "no_such_attribute"); served {
+		if _, _, served := single(v, "no_such_attribute", false); served {
 			t.Errorf("single(%T, %q) serves an attribute the class does not declare", v, "no_such_attribute")
 		}
-		if _, _, served := multiple(v, "no_such_attribute"); served {
+		if _, _, _, served := multiple(v, "no_such_attribute", false); served {
 			t.Errorf("multiple(%T, %q) serves an attribute the class does not declare", v, "no_such_attribute")
 		}
 		if _, _, _, served := hash(v, "no_such_attribute"); served {

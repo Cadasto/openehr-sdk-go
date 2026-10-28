@@ -154,6 +154,30 @@ func substituteDiff(owner, declared string) string {
 	return fmt.Sprintf("Substitute(%q, %q) = %q, reference gives %q", owner, declared, got, want)
 }
 
+// paramDiff describes how Param differs from Split on name, or is empty when
+// they agree: Param answers exactly for a name Split reads with one
+// parameter, and gives Split's class and parameter.
+func paramDiff(name string) string {
+	class, param, ok := Param(name)
+	sClass, sParams, sOK := Split(name)
+	wantOK := sOK && len(sParams) == 1
+	switch {
+	case ok != wantOK:
+		return fmt.Sprintf("Param(%q) ok = %t, Split gives (%q, %q, %t)", name, ok, sClass, sParams, sOK)
+	case ok && (class != sClass || param != sParams[0]):
+		return fmt.Sprintf("Param(%q) = (%q, %q), Split gives (%q, %q)", name, class, param, sClass, sParams)
+	}
+	return ""
+}
+
+func TestParamMatchesSplit(t *testing.T) {
+	for _, name := range edgeNames {
+		if d := paramDiff(name); d != "" {
+			t.Error(d)
+		}
+	}
+}
+
 func TestSplitMatchesReference(t *testing.T) {
 	for _, name := range edgeNames {
 		if d := splitDiff(name); d != "" {
@@ -181,7 +205,7 @@ func TestSubstituteMatchesReference(t *testing.T) {
 }
 
 // FuzzClassMatchesReference also holds Split to its reference, since Class
-// and Split share the shortcut for a plain name.
+// and Split share the shortcut for a plain name, and Param to Split.
 func FuzzClassMatchesReference(f *testing.F) {
 	for _, name := range edgeNames {
 		f.Add(name)
@@ -191,6 +215,9 @@ func FuzzClassMatchesReference(f *testing.F) {
 			t.Error(d)
 		}
 		if d := splitDiff(name); d != "" {
+			t.Error(d)
+		}
+		if d := paramDiff(name); d != "" {
 			t.Error(d)
 		}
 	})

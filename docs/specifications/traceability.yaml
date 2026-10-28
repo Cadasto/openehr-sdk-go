@@ -1655,7 +1655,6 @@ requirements:
       - openehr/validation/temporal_constraint_test.go
       - openehr/validation/walk_primitive_test.go
       - testkit/probe/livegenerated_test.go
-      - testkit/probes/composition/probe_023_builder_round_trip.go
       - testkit/probes/instance/corpus_ratchet_test.go
       - testkit/probes/instance/probe_027_generated_validates.go
       - testkit/probes/instance/probes_test.go
@@ -1987,6 +1986,7 @@ requirements:
       - openehr/aql/lint/semantic_test.go
       - openehr/client/ehr/ids_test.go
       - openehr/rm/identification_funcs_test.go
+      - openehr/rm/uri_funcs_test.go
 
   - id: REQ-121
     title: Locatable path read access
@@ -2068,6 +2068,7 @@ requirements:
       - openehr/serialize/simplified/context_test.go
       - openehr/serialize/simplified/datatypes_test.go
       - openehr/serialize/simplified/flat_encode_test.go
+      - openehr/serialize/simplified/flat_pinned_test.go
       - openehr/serialize/simplified/index_bound_test.go
       - openehr/serialize/simplified/interval_leaf_anchor_test.go
       - openehr/serialize/simplified/ism_transition_test.go

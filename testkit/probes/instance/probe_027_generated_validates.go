@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
@@ -19,8 +21,24 @@ import (
 // the same OK outcome.
 //
 // It is scoped to COMPOSITION roots, the roots ValidateComposition
-// supports.
+// supports. It generates once per policy (Large, Medium and Required) and
+// value fill (ExampleFill and RandomFill), and checks each instance with
+// ValidateComposition and ValidateRM. RandomFill draws from opts.ValueSource,
+// or from a fixed seed when that is nil, so the probe is reproducible. On a
+// pass, Detail names each policy/fill pair the instance validated clean
+// under, in that order.
 func Probe027GeneratedValidates(ctx context.Context, c *templatecompile.Compiled, opts instance.Options) (Result, error) { // PROBE-027 (REQ-107)
+	return probe027(ctx, c, opts, validation.ValidateComposition, func(comp *rm.Composition) validation.Result {
+		return validation.ValidateRM(comp)
+	})
+}
+
+// probe027 is PROBE-027 with its two checks passed in, so a test can show
+// that the probe fails when either refuses an instance.
+func probe027(ctx context.Context, c *templatecompile.Compiled, opts instance.Options,
+	validateComposition func(*rm.Composition, *templatecompile.Compiled) validation.Result,
+	validateRM func(*rm.Composition) validation.Result,
+) (Result, error) {
 	r := Result{Probe: "PROBE-027"}
 	if c == nil || c.Root() == nil {
 		return r, errors.New("PROBE-027: nil compiled template")
@@ -32,23 +50,36 @@ func Probe027GeneratedValidates(ctx context.Context, c *templatecompile.Compiled
 		return r, nil
 	}
 
-	var failures []string
+	var failures, validated []string
 	for _, policy := range []instance.Policy{instance.Large, instance.Medium, instance.Required} {
-		opts.Policy = policy
-		out, err := instance.Generate(ctx, c, opts)
-		if err != nil {
-			failures = append(failures, fmt.Sprintf("[%s] Generate: %v", policy, err))
-			continue
-		}
-		comp, err := instance.AsComposition(out)
-		if err != nil {
-			failures = append(failures, fmt.Sprintf("[%s] AsComposition: %v", policy, err))
-			continue
-		}
-		result := validation.ValidateComposition(comp, c)
-		if !result.OK {
-			failures = append(failures, fmt.Sprintf("[%s] ValidateComposition produced %d issue(s): %s",
-				policy, len(result.Issues), summariseIssues(result.Issues)))
+		for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
+			o := opts
+			o.Policy, o.ValueFill = policy, fill
+			if fill == instance.RandomFill && o.ValueSource == nil {
+				o.ValueSource = rand.NewPCG(27, 27)
+			}
+			label := policy.String() + "/" + fill.String()
+			out, err := instance.Generate(ctx, c, o)
+			if err != nil {
+				failures = append(failures, fmt.Sprintf("[%s] Generate: %v", label, err))
+				continue
+			}
+			comp, err := instance.AsComposition(out)
+			if err != nil {
+				failures = append(failures, fmt.Sprintf("[%s] AsComposition: %v", label, err))
+				continue
+			}
+			if result := validateComposition(comp, c); !result.OK {
+				failures = append(failures, fmt.Sprintf("[%s] ValidateComposition produced %d issue(s): %s",
+					label, len(result.Issues), summariseIssues(result.Issues)))
+				continue
+			}
+			if result := validateRM(comp); !result.OK {
+				failures = append(failures, fmt.Sprintf("[%s] ValidateRM produced %d issue(s): %s",
+					label, len(result.Issues), summariseIssues(result.Issues)))
+				continue
+			}
+			validated = append(validated, label)
 		}
 	}
 
@@ -58,6 +89,7 @@ func Probe027GeneratedValidates(ctx context.Context, c *templatecompile.Compiled
 		return r, nil
 	}
 	r.Status = "pass"
+	r.Detail = "validated clean under " + strings.Join(validated, ", ")
 	return r, nil
 }
 

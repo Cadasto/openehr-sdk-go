@@ -227,3 +227,64 @@ func TestMarshalFlatReusedSiblingsRefused(t *testing.T) {
 		t.Fatalf("MarshalFlat with no data at the reused siblings = %v, want nil (guard must fire only when data resolves there)", err)
 	}
 }
+
+// REQ-140 — a Web Template node that occurs at most once but that two items
+// of the composition fill is refused with rmpath.ErrPathAmbiguous, not
+// encoded from one of them: either choice would drop the other's data
+// without a word. Both lookups a single-occurrence leaf makes refuse it, the
+// one for its value and, where no value is there, the one for the ELEMENT
+// that holds its null flavour. Read the second item as absent, or the first
+// as the only one, and a row encodes.
+func TestMarshalFlatSingleNodeFilledTwiceRefused(t *testing.T) {
+	t.Parallel()
+	wt := &webtemplate.WebTemplate{
+		Tree: &webtemplate.Node{
+			ID: "root", RMType: "COMPOSITION", NodeID: "openEHR-EHR-COMPOSITION.t.v1",
+			Children: []*webtemplate.Node{{
+				ID: "a", RMType: "EVALUATION", NodeID: "openEHR-EHR-EVALUATION.test.v1", Max: 1,
+				AQLPath: "/content[openEHR-EHR-EVALUATION.test.v1]",
+				Children: []*webtemplate.Node{{
+					ID: "x", RMType: "DV_TEXT", NodeID: "at0002", Max: 1,
+					AQLPath: "/content[openEHR-EHR-EVALUATION.test.v1]/data[at0001]/items[at0002]/value",
+					Inputs:  []webtemplate.Input{{Type: "TEXT"}},
+				}},
+			}},
+		},
+	}
+	element := func(value rm.DataValue) rm.Item {
+		e := &rm.Element{ArchetypeNodeID: "at0002", Name: rm.DVText{Value: "x"}}
+		if value != nil {
+			e.Value = value
+		} else {
+			e.NullFlavour = &rm.DVCodedText{
+				Value:        "unknown",
+				DefiningCode: rm.CodePhrase{CodeString: "253", TerminologyID: rm.TerminologyID{Value: "openehr"}},
+			}
+		}
+		return e
+	}
+	for _, tc := range []struct {
+		name  string
+		items []rm.Item
+	}{
+		{name: "two values", items: []rm.Item{element(&rm.DVText{Value: "one"}), element(&rm.DVText{Value: "two"})}},
+		{name: "two null flavours", items: []rm.Item{element(nil), element(nil)}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			comp := &rm.Composition{
+				Name:      rm.DVText{Value: "A"},
+				Language:  rm.CodePhrase{CodeString: "en"},
+				Territory: rm.CodePhrase{CodeString: "NL"},
+				Content: []rm.ContentItem{&rm.Evaluation{
+					ArchetypeNodeID: "openEHR-EHR-EVALUATION.test.v1",
+					Name:            rm.DVText{Value: "A"},
+					Data:            &rm.ItemTree{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "tree"}, Items: tc.items},
+				}},
+			}
+			if flat, err := MarshalFlat(comp, wt); !errors.Is(err, rmpath.ErrPathAmbiguous) {
+				t.Fatalf("MarshalFlat of a single-occurrence node two items fill = (%s, %v), want rmpath.ErrPathAmbiguous", flat, err)
+			}
+		})
+	}
+}
