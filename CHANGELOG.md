@@ -8,9 +8,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **`smart.JWKS.MinRefreshInterval` limits how often a verification miss refetches the key set, 30 s from `NewJWKS`, and `smart.TokenResponse.HasExpiresIn` tells a missing `expires_in` from a zero one (REQ-062, REQ-063).**
+
 ### Changed
 
 - **Breaking: `rm.Real` decode refuses a lossy literal, one a float64 cannot hold at its written precision, replacing the 17-digit budget (REQ-052, REQ-056).** Canonical JSON and XML refuse `9007199254740993` and accept `18446744073709551616`.
+- **Breaking: SMART auth verifies an ID token only with a signing key for its `alg`, reads JOSE member names case-sensitively, and takes `expires_in` 0 as a zero lifetime (REQ-062, REQ-063).** `jwtbearer` refuses a negative lifetime.
+- **Breaking: zoned `DV_DATE_TIME` values compare and order as UTC instants, so the interval checks on them change, and the `DV_URI` and `DV_EHR_URI` functions answer instead of panicking (REQ-120, REQ-123).**
+- **Breaking: `rmpath` refuses the predicates outside its grammar it used to misread, and `composition.Builder` builds a path through a class held by value, such as `ism_transition/current_state` (REQ-121, REQ-101).**
+- **Breaking: `aql.Compare` refuses a literal or parameter as its left operand, and the AQL linter accepts `content[<archetype id>]` paths it warned on (REQ-119, REQ-109).**
+- **`instance.Generate` and `composition.NewSkeleton` build untyped and abstract children and intervals over abstract ordered types they used to refuse, and a list topped up to its lower bound takes the first child with room (REQ-107).**
+- **Canonical JSON decode, FLAT decode with a template, AQL parsing and template validation do less work per call, with identical results (REQ-052, REQ-053, REQ-171).**
+- **`cmd/cdrcheck` redacts percent-encoded credentials and refuses a template rename onto another input's id (REQ-082).**
 
 ## [0.42.0] - 2026-10-27
 
