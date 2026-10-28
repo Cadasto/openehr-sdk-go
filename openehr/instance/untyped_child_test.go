@@ -564,3 +564,31 @@ func TestREQ107_UntypedChildVisitsItsMandatoryAttributes(t *testing.T) {
 		})
 	}
 }
+
+// TestREQ107_AbstractClassOutsideDataValuesIsUnknown is the REQ-107 Errors
+// check that only an abstract data-value class is built as its first
+// concrete descendant: a CLUSTER item of the abstract PATHABLE, which is no
+// DATA_VALUE, is a type the generator does not build, so Generate returns
+// an error wrapping rmwrite.ErrUnknownRMType that names PATHABLE, not one
+// wrapping ErrArchetypeIDMissing for a descendant it would build, and no
+// root, under every policy and both compile modes.
+func TestREQ107_AbstractClassOutsideDataValuesIsUnknown(t *testing.T) {
+	opt := optTemplate("CLUSTER", optMultiple("items", optNode("PATHABLE", "at0001")))
+	for _, implicit := range []bool{true, false} {
+		c := compileOPTText(t, opt, implicit)
+		for _, policy := range everyPolicy {
+			t.Run(fmt.Sprintf("implicit=%t/%v", implicit, policy), func(t *testing.T) {
+				out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, Now: defaultsNow})
+				if out != nil {
+					t.Errorf("Generate returned %T with the error, want no root", out)
+				}
+				if !errors.Is(err, rmwrite.ErrUnknownRMType) || !strings.Contains(fmt.Sprint(err), "PATHABLE") {
+					t.Errorf("Generate error = %v, want one wrapping rmwrite.ErrUnknownRMType that names PATHABLE", err)
+				}
+				if errors.Is(err, instance.ErrArchetypeIDMissing) {
+					t.Errorf("Generate error = %v wraps ErrArchetypeIDMissing, want PATHABLE unknown, not built as a descendant", err)
+				}
+			})
+		}
+	}
+}
