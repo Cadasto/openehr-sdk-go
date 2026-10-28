@@ -1054,6 +1054,12 @@ func censusList(name string, existence, lower int, children ...string) string {
 //     with no existence, over an optional CLUSTER whose items admit only a
 //     slot: the census reads the list as the BMM declares it on CLUSTER,
 //     so the top-up asks for a member it takes from that CLUSTER.
+//   - a CLUSTER's items over an optional CLUSTER whose items admit only a
+//     slot and, after it, an optional LOCATABLE, or CLUSTER, whose items
+//     admit only a slot at existence 0..0: the BMM marks the items of the
+//     CLUSTER the walk builds mandatory, which wins over the prohibition,
+//     so both children need undescribed content, and the top-up takes the
+//     first; the census reads the later one as needing it too.
 //
 // Read beside a template that leaves the SECTION's items optional, where
 // no top-up runs, the first root holds a violation. So does a root
@@ -1077,6 +1083,13 @@ func TestREQ107_CensusLastResortFollowsTheGenerator(t *testing.T) {
 		`<existence><lower_included>true</lower_included><upper_included>true</upper_included>`+
 		`<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>1</lower><upper>1</upper></existence>`+
 		`<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>FEEDER_AUDIT</rm_type_name><node_id></node_id></children></attributes>`)
+	prohibitedSlotItems := `<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>items</rm_attribute_name>` +
+		`<existence><lower_included>true</lower_included><upper_included>true</upper_included>` +
+		`<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>0</lower><upper>0</upper></existence>` +
+		`<children xsi:type="ARCHETYPE_SLOT"><rm_type_name>CLUSTER</rm_type_name><node_id>at0004</node_id></children>` +
+		`<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval>` +
+		`<lower_included>true</lower_included><lower_unbounded>false</lower_unbounded>` +
+		`<upper_unbounded>true</upper_unbounded><lower>0</lower></interval></cardinality></attributes>`
 	innerSection := censusOptional("SECTION", "at0002", censusList("items", 1, 0,
 		`<children xsi:type="ARCHETYPE_SLOT"><rm_type_name>SECTION</rm_type_name><node_id>at0003</node_id></children>`))
 	sectionRoot := censusRootOPT("SECTION", censusList("items", 1, 0, innerSection))
@@ -1130,6 +1143,16 @@ func TestREQ107_CensusLastResortFollowsTheGenerator(t *testing.T) {
 			name: "the items of a LOCATABLE, built as a CLUSTER, with no existence",
 			generated: censusRootOPT("CLUSTER", censusList("items", -1, 1,
 				censusOccurring("LOCATABLE", "at0001", 1, censusList("items", -1, 0, slotCluster("at0002"))))),
+		},
+		{
+			name: "a LOCATABLE whose items admit only a slot at existence 0..0 after the CLUSTER",
+			generated: censusRootOPT("CLUSTER", censusList("items", -1, 1,
+				slotCluster("at0002"), censusOptional("LOCATABLE", "at0003", prohibitedSlotItems))),
+		},
+		{
+			name: "a CLUSTER whose items admit only a slot at existence 0..0 after the CLUSTER",
+			generated: censusRootOPT("CLUSTER", censusList("items", -1, 1,
+				slotCluster("at0002"), censusOptional("CLUSTER", "at0003", prohibitedSlotItems))),
 		},
 		{
 			name:      "an inline ENTRY before a SECTION",
