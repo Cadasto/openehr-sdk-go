@@ -3,6 +3,8 @@ package smart
 import (
 	"context"
 	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 	"fmt"
 	"io"
 	"net/http"
@@ -290,10 +292,14 @@ func (j *JWKS) fetch(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	// JWK member names are case-sensitive (RFC 7517 §4), so the set and each
+	// key match names exactly. A repeated name is allowed in the set, so that
+	// one key with a repeated member does not take the other keys down, and
+	// refused in a key, which is then skipped as RFC 7517 §4 allows.
 	var doc struct {
 		Keys []json.RawMessage `json:"keys"`
 	}
-	if err := json.Unmarshal(body, &doc); err != nil {
+	if err := jsonv2.Unmarshal(body, &doc, jsontext.AllowDuplicateNames(true)); err != nil {
 		return fmt.Errorf("jwks decode: %w", err)
 	}
 	keys := make(map[string]json.RawMessage, len(doc.Keys))
@@ -304,7 +310,7 @@ func (j *JWKS) fetch(ctx context.Context) error {
 			Kid string `json:"kid"`
 			Use any    `json:"use"`
 		}
-		if err := json.Unmarshal(raw, &meta); err != nil || meta == nil {
+		if err := jsonv2.Unmarshal(raw, &meta); err != nil || meta == nil {
 			continue
 		}
 		// Only a signing key verifies a token, whether the token's kid names

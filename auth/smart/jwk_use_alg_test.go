@@ -1,7 +1,14 @@
 package smart_test
 
 import (
+	"bytes"
 	"cmp"
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"testing"
@@ -91,4 +98,101 @@ func TestREQ062_KeyAlgMustBeTheTokenAlg(t *testing.T) {
 			})
 		}
 	}
+}
+
+// TestREQ062_MemberNamesAreCaseSensitive pins REQ-062 (auth.md § JWKS
+// rotation) against a member whose name differs from alg, kid or use only in
+// letter case: JOSE member names are case-sensitive (RFC 7515 §4, RFC 7517
+// §4), so such a member is not the one the rule reads. Each extra member
+// follows the real one, where a reader that folds case would take it. Each
+// token is signed by a key the set holds, so each refused token would verify
+// if the SDK read the extra member as the real one.
+func TestREQ062_MemberNamesAreCaseSensitive(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	key, other := newRSAKey(t), newRSAKey(t)
+	cases := []struct {
+		name   string
+		set    []byte
+		header string
+	}{
+		{
+			// The key's alg is RS384 and the token's alg is RS256.
+			name:   "an ALG member naming the key's alg",
+			set:    keySetBody(t, publishedKey{key: key, kid: "kid-1", use: "sig", alg: "RS384"}),
+			header: `{"alg":"RS256","kid":"kid-1","typ":"JWT","ALG":"RS384"}`,
+		},
+		{
+			// A token without a kid needs a set of exactly one signing key.
+			name:   "a KID member and no kid, two signing keys",
+			set:    keySetBody(t, publishedKey{key: other, kid: "kid-1", use: "sig"}, publishedKey{key: key, kid: "kid-2", use: "sig"}),
+			header: `{"alg":"RS256","typ":"JWT","KID":"kid-2"}`,
+		},
+		{
+			name:   "a key with use enc and a USE member of sig",
+			set:    withKeyMember(t, keySetBody(t, publishedKey{key: key, kid: "kid-1", use: "enc"}), `"use":"enc"`, `"USE":"sig"`),
+			header: `{"alg":"RS256","kid":"kid-1","typ":"JWT"}`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			jwks, _ := stubJWKSServer(t, http.StatusOK, tc.set)
+			tok := signRS256(t, key, tc.header, defaultIDClaims(now))
+
+			_, err := smart.ValidateIDToken(t.Context(), tok, jwks,
+				"https://issuer.example", "client-id", "nonce-xyz", now, nil)
+			if !errors.Is(err, auth.ErrJWKSValidationFailed) {
+				t.Errorf("ValidateIDToken(header %s, set %s) error = %v, want ErrJWKSValidationFailed", tc.header, tc.set, err)
+			}
+		})
+	}
+}
+
+// signRS256 signs claims with key as a compact JWS whose protected header is
+// header, written as given, so a test controls each member and its order.
+func signRS256(t *testing.T, key *rsa.PrivateKey, header string, claims map[string]any) string {
+	t.Helper()
+	payload, err := json.Marshal(claims)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := base64.RawURLEncoding.EncodeToString([]byte(header)) + "." + base64.RawURLEncoding.EncodeToString(payload)
+	digest := sha256.Sum256([]byte(input))
+	sig, err := rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, digest[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	return input + "." + base64.RawURLEncoding.EncodeToString(sig)
+}
+
+// TestREQ062_AKeyWithARepeatedMemberLeavesTheOthers pins that a key whose
+// member names repeat is skipped, as RFC 7517 §4 allows, while the set's
+// other keys still verify: the first key repeats its use, and a token whose
+// kid names the second key verifies.
+func TestREQ062_AKeyWithARepeatedMemberLeavesTheOthers(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	key, other := newRSAKey(t), newRSAKey(t)
+	set := withKeyMember(t, keySetBody(t,
+		publishedKey{key: other, kid: "kid-1", use: "sig"},
+		publishedKey{key: key, kid: "kid-2", use: "sig"},
+	), `"use":"sig"`, `"use":"sig"`)
+	jwks, _ := stubJWKSServer(t, http.StatusOK, set)
+	tok := signRS256(t, key, `{"alg":"RS256","kid":"kid-2","typ":"JWT"}`, defaultIDClaims(now))
+
+	if _, err := smart.ValidateIDToken(t.Context(), tok, jwks,
+		"https://issuer.example", "client-id", "nonce-xyz", now, nil); err != nil {
+		t.Errorf("ValidateIDToken(kid-2, beside a kid-1 key that repeats use) error = %v, want nil", err)
+	}
+	if _, err := jwks.Key(t.Context(), "kid-1"); err == nil {
+		t.Errorf("JWKS.Key(kid-1, a key that repeats use) error = nil, want an error")
+	}
+}
+
+// withKeyMember adds member to the set body after the first occurrence of
+// after, a member of its first key that holds it.
+func withKeyMember(t *testing.T, set []byte, after, member string) []byte {
+	t.Helper()
+	if !bytes.Contains(set, []byte(after)) {
+		t.Fatalf("set %s holds no %s to add %s after", set, after, member)
+	}
+	return bytes.Replace(set, []byte(after), []byte(after+","+member), 1)
 }

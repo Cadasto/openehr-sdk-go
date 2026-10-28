@@ -8,6 +8,7 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
+	jsonv2 "encoding/json/v2"
 	"errors"
 	"fmt"
 	"slices"
@@ -278,12 +279,17 @@ func jwtHeader(raw string) (string, error) {
 	return header, nil
 }
 
+// decodeJWTPart decodes one base64url segment of a compact JWS into dest.
+// JOSE member names are case-sensitive (RFC 7515 §4), and go-jose, which
+// verifies the signature, reads them so, so the decode matches names exactly
+// and refuses a repeated one: an "ALG" or "KID" member never stands in for
+// the alg or kid the key checks read.
 func decodeJWTPart(b64 string, dest any) error {
 	b, err := base64.RawURLEncoding.DecodeString(b64)
 	if err != nil {
 		return fmt.Errorf("%w: segment decode: %w", auth.ErrJWKSValidationFailed, err)
 	}
-	if err := json.Unmarshal(b, dest); err != nil {
+	if err := jsonv2.Unmarshal(b, dest); err != nil {
 		return fmt.Errorf("%w: segment json: %w", auth.ErrJWKSValidationFailed, err)
 	}
 	return nil
