@@ -584,7 +584,7 @@ func nodeOptional(node *templatecompile.CompiledNode) bool {
 	if attr == nil {
 		return false
 	}
-	if !attrRequired(attr) {
+	if !attrRequired(node.Parent(), attr) {
 		return true
 	}
 	if attr.Cardinality() == template.Single {
@@ -609,11 +609,24 @@ func parentAttribute(node *templatecompile.CompiledNode) *templatecompile.Compil
 	return nil
 }
 
-// attrRequired reports whether the walk has to give attr a member: the BMM
-// marks it mandatory, or its existence or cardinality lower bound is at
-// least 1.
-func attrRequired(attr *templatecompile.CompiledAttribute) bool {
-	return attr.Required() || tcimpl.LowerAtLeastOne(attr.Existence()) || tcimpl.LowerAtLeastOne(attr.ChildMultiplicity())
+// attrRequired reports whether the walk has to give attr, an attribute of
+// node, a member: the BMM marks it mandatory (bmmMandatory), or its
+// existence or cardinality lower bound is at least 1.
+func attrRequired(node *templatecompile.CompiledNode, attr *templatecompile.CompiledAttribute) bool {
+	return bmmMandatory(node, attr) || tcimpl.LowerAtLeastOne(attr.Existence()) || tcimpl.LowerAtLeastOne(attr.ChildMultiplicity())
+}
+
+// bmmMandatory reports whether the BMM marks attr, an attribute of node,
+// mandatory on the class the walk builds node as (builtClass), as the
+// generator reads it: where the compile marks it so (Required), on the
+// class node names or, for an untyped node, on the type of the attribute
+// that holds it, and where the class the walk builds marks it so, as
+// CLUSTER does the items of a LOCATABLE.
+func bmmMandatory(node *templatecompile.CompiledNode, attr *templatecompile.CompiledAttribute) bool {
+	if attr.Required() {
+		return true
+	}
+	return slices.Contains(rminfo.Default.RequiredAttributes(builtClass(node)), attr.Name())
 }
 
 // topUpLastResort reports whether node, an optional child, is a child a
@@ -650,7 +663,7 @@ func topUpLastResort(node *templatecompile.CompiledNode, built map[*templatecomp
 	if attr == nil || node.IsSlot() || attr.Cardinality() != template.Multiple || !topUpAsks(node.Parent(), attr) {
 		return false
 	}
-	if held > topUpTarget(attr) {
+	if held > topUpTarget(node.Parent(), attr) {
 		return false
 	}
 	children := allowedChildren(attr)
@@ -668,35 +681,37 @@ func topUpLastResort(node *templatecompile.CompiledNode, built map[*templatecomp
 			return false
 		}
 	}
-	return visitedThoughUndescribed(attr, children)
+	return visitedThoughUndescribed(node.Parent(), attr, children)
 }
 
 // topUpAsks reports whether the top-up of attr, a list of parent, asks for
-// a member beyond the list's existence: the BMM marks it mandatory, its
+// a member beyond the list's existence: the BMM marks it mandatory
+// (bmmMandatory), its
 // cardinality lower bound is at least 1, or it is a list the RM keeps
 // non-empty once present on the class the walk builds parent as
 // (builtClass; rminfo.NonEmptyLists, with no alternative, as the
 // generator's rmNonEmptyList reads it), such as COMPOSITION.content or
 // SECTION.items, whose existence lower bound is at least 1.
 func topUpAsks(parent *templatecompile.CompiledNode, attr *templatecompile.CompiledAttribute) bool {
-	if attr.Required() || tcimpl.LowerAtLeastOne(attr.ChildMultiplicity()) {
+	if bmmMandatory(parent, attr) || tcimpl.LowerAtLeastOne(attr.ChildMultiplicity()) {
 		return true
 	}
 	l, ok := rminfo.NonEmptyListOf(builtClass(parent), attr.Name())
 	return ok && l.Alternative == "" && tcimpl.LowerAtLeastOne(attr.Existence())
 }
 
-// topUpTarget returns the number of members a top-up fills attr, a list,
-// up to (REQ-107 § Contract What a visit writes): its cardinality lower
-// bound, or 1 where that is 0 and the list is required, since the BMM
-// marks it mandatory, its existence lower bound is at least 1, or an
+// topUpTarget returns the number of members a top-up fills attr, a list of
+// parent, up to (REQ-107 § Contract What a visit writes): its cardinality
+// lower bound, or 1 where that is 0 and the list is required, since the
+// BMM marks it mandatory (bmmMandatory), its existence lower bound is at
+// least 1, or an
 // allowed child that is not a slot has an occurrences lower bound of at
 // least 1.
-func topUpTarget(attr *templatecompile.CompiledAttribute) int {
+func topUpTarget(parent *templatecompile.CompiledNode, attr *templatecompile.CompiledAttribute) int {
 	if cm := attr.ChildMultiplicity(); cm != nil && !cm.LowerUnbounded() && cm.Lower() > 0 {
 		return cm.Lower()
 	}
-	if attr.Required() || tcimpl.LowerAtLeastOne(attr.Existence()) {
+	if bmmMandatory(parent, attr) || tcimpl.LowerAtLeastOne(attr.Existence()) {
 		return 1
 	}
 	for range tcimpl.MandatoryListChildren(attr) {
@@ -796,15 +811,16 @@ func censusRoom(child *templatecompile.CompiledNode, n int) bool {
 }
 
 // visitedThoughUndescribed reports whether Large and Medium visit attr, a
-// list with the allowed children children, where a top-up of it can only
-// take a child that needs undescribed content: the list is required by
-// more than its cardinality lower bound, since the BMM marks it mandatory,
+// list of parent with the allowed children children, where a top-up of it
+// can only take a child that needs undescribed content: the list is
+// required by more than its cardinality lower bound, since the BMM marks
+// it mandatory (bmmMandatory),
 // its existence lower bound is at least 1, or an allowed child that is not
 // a slot has an occurrences lower bound of at least 1, or one of its
 // children needs no undescribed content, so the rule on undescribed
 // content does not keep the walk out (REQ-107 Visit rule).
-func visitedThoughUndescribed(attr *templatecompile.CompiledAttribute, children []*templatecompile.CompiledNode) bool {
-	if attr.Required() || tcimpl.LowerAtLeastOne(attr.Existence()) {
+func visitedThoughUndescribed(parent *templatecompile.CompiledNode, attr *templatecompile.CompiledAttribute, children []*templatecompile.CompiledNode) bool {
+	if bmmMandatory(parent, attr) || tcimpl.LowerAtLeastOne(attr.Existence()) {
 		return true
 	}
 	for range tcimpl.MandatoryListChildren(attr) {
@@ -832,7 +848,7 @@ func needsNoUndescribed(node *templatecompile.CompiledNode) bool {
 		return false
 	}
 	for _, attr := range node.Attributes() {
-		if !attrRequired(attr) || attrProhibited(attr) {
+		if !attrRequired(node, attr) || attrProhibited(attr) {
 			continue
 		}
 		if unwritableRequired(node, attr) {
@@ -1227,6 +1243,28 @@ func TestREQ107_CensusSubstitutesFollowTheGenerator(t *testing.T) {
 			}
 			if got, _ := member["_type"].(string); got != want {
 				t.Errorf("a node of %s is built as %s, the census reads it as %s", tc.abstract, got, want)
+			}
+		})
+	}
+}
+
+// TestREQ107_CensusReadsAListAsTheBuiltClassDeclaresIt checks that the
+// census reads whether a child is optional (nodeOptional) on the class the
+// walk builds its parent as: an ELEMENT at occurrences 1..1 in the items of
+// a LOCATABLE, which the walk builds as a CLUSTER, whose items the BMM marks
+// mandatory, is required, as it is in the items of a CLUSTER, although the
+// template states no existence or cardinality lower bound for them.
+func TestREQ107_CensusReadsAListAsTheBuiltClassDeclaresIt(t *testing.T) {
+	for _, class := range []string{"LOCATABLE", "CLUSTER"} {
+		t.Run(class, func(t *testing.T) {
+			c := compileCensusOPT(t, censusRootOPT("CLUSTER", censusList("items", -1, 1,
+				censusOccurring(class, "at0001", 1, censusList("items", -1, 0, censusOccurring("ELEMENT", "at0002", 1))))))
+			node, err := c.NodeAt("/items[at0001]/items[at0002]")
+			if err != nil {
+				t.Fatalf("NodeAt: %v", err)
+			}
+			if nodeOptional(node) {
+				t.Errorf("nodeOptional(%s) = true, want false: the items of a %s, built as a CLUSTER, are mandatory", holderPath(node), class)
 			}
 		})
 	}
