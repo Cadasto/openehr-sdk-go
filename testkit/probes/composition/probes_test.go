@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
@@ -113,6 +115,33 @@ func TestProbe023RoundTripLossFails(t *testing.T) {
 	if r.Status != "fail" || r.Detail != want {
 		t.Errorf("Probe023 with %q dropped on the round trip: status=%q detail=%q, want status=\"fail\" detail=%q",
 			lost, r.Status, r.Detail, want)
+	}
+}
+
+// TestProbe023CanjsonRoundTripReMarshals pins the second leg itself
+// (REQ-101): it refuses a payload canjson cannot decode, and it re-marshals
+// what it decodes, so a pretty-printed composition comes back in canjson's
+// compact form rather than as given.
+func TestProbe023CanjsonRoundTripReMarshals(t *testing.T) {
+	if _, err := compositionprobes.CanjsonRoundTrip([]byte("{")); err == nil || !strings.HasPrefix(err.Error(), "canjson.Unmarshal") {
+		t.Errorf(`CanjsonRoundTrip("{") error = %v, want the canjson.Unmarshal error`, err)
+	}
+
+	path := fixtures.CompositionJSON("body_weight")
+	in, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	if !bytes.Contains(in, []byte("\n")) {
+		t.Fatalf("%s is no longer pretty-printed, so it cannot tell a re-marshal from an echo", path)
+	}
+	out, err := compositionprobes.CanjsonRoundTrip(in)
+	if err != nil {
+		t.Fatalf("CanjsonRoundTrip(%s): %v", path, err)
+	}
+	node := []byte(`"archetype_node_id":"openEHR-EHR-COMPOSITION.encounter.v1"`)
+	if bytes.Contains(out, []byte("\n")) || !bytes.Contains(out, node) {
+		t.Errorf("CanjsonRoundTrip(%s) = %d bytes, want compact canjson output holding %s", path, len(out), node)
 	}
 }
 
