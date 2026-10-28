@@ -495,7 +495,7 @@ func walkSkips(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) boo
 	if attr.NotInRM() || multimediaData(optNode, attr) {
 		return true
 	}
-	if attrProhibited(attr) && !rmNeedsProhibited(optNode, attr) {
+	if attrProhibited(optNode, attr) && !rmNeedsProhibited(optNode, attr) {
 		return true
 	}
 	// rminfo knows each class by its bare BMM name; the OPT may declare
@@ -645,14 +645,16 @@ func rmNeedsProhibited(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttrib
 	return attr.Name() == "null_flavour" && nullFlavourNeeded(optNode)
 }
 
-// attrProhibited reports whether the OPT prohibits attr and no RM rule
-// needs it. The OPT prohibits an attribute in two ways: an existence upper
-// bound that is bounded and 0, or OPT children that it all prohibits (an
-// occurrences upper bound of 0). An attribute the BMM marks mandatory is
-// never prohibited: the RM rule wins over the prohibition, so it is
-// visited and filled as an attribute the OPT leaves silent is.
-func attrProhibited(attr *tcimpl.CompiledAttribute) bool {
-	return !attr.Required() && tcimpl.Prohibited(attr)
+// attrProhibited reports whether the OPT prohibits attr of optNode and no
+// RM rule needs it. The OPT prohibits an attribute in two ways: an
+// existence upper bound that is bounded and 0, or OPT children that it all
+// prohibits (an occurrences upper bound of 0). An attribute the BMM marks
+// mandatory on the class the walk builds for optNode (bmmRequired) is never
+// prohibited: the RM rule wins over the prohibition, so it is visited and
+// built from the children the OPT allows, as the items of a LOCATABLE built
+// as a CLUSTER are, or, where it allows none, as one the OPT leaves silent.
+func attrProhibited(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
+	return tcimpl.Prohibited(attr) && !bmmRequired(optNode, attr)
 }
 
 // shouldVisit decides whether an attribute is in scope under the
@@ -1087,7 +1089,7 @@ func (g *generator) materialiseSingle(
 		// its BMM type gives too, as a list the OPT writes so does
 		// (materialiseImplicitMultiple), which refuses an archetype root.
 		if isList {
-			if !attr.Required() && (!rmNonEmptyList(optNode, attr) || !tcimpl.LowerAtLeastOne(attr.Existence())) {
+			if !bmmRequired(optNode, attr) && (!rmNonEmptyList(optNode, attr) || !tcimpl.LowerAtLeastOne(attr.Existence())) {
 				return nil
 			}
 			return g.materialiseImplicitMultiple(optNode, attr, parentRM)
@@ -3379,7 +3381,7 @@ func prohibited(opt *tcimpl.CompiledNode, attrName string) bool {
 		return false
 	}
 	attr := opt.Attribute(attrName)
-	return attr != nil && attrProhibited(attr)
+	return attr != nil && attrProhibited(opt, attr)
 }
 
 // codeAdmitted reports whether the OPT's own constraint on attrName of opt
@@ -3423,7 +3425,7 @@ func defaultAdmitted(opt *tcimpl.CompiledNode, attrName string, admits func(*tci
 	if attr == nil {
 		return true
 	}
-	if attrProhibited(attr) {
+	if attrProhibited(opt, attr) {
 		return false
 	}
 	if node := bindingChild(opt, attrName); node != nil {
