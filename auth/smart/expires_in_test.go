@@ -62,9 +62,10 @@ func TestREQ063_LargeExpiresInGivesAFutureExpiry(t *testing.T) {
 // expiresInForms are expires_in members in each form a JSON number takes,
 // with the lifetime each gives the access token. A value of zero or below is
 // a lifetime of zero seconds (RFC 6749 §5.1), so the token is due at once. A
-// member that is missing or null, or a number a float64 cannot hold, gives
-// the token no expiry. A member that is not a number fails the response, as
-// it did before.
+// member that is missing or null gives the token no expiry. A number a
+// float64 cannot hold counts as the 100-year bound on its side, so 1e400 is
+// a 100-year lifetime and -1e400 a lifetime of zero. A member that is not a
+// number fails the response, as it did before.
 var expiresInForms = []struct {
 	name      string
 	expiresIn string // the member's JSON text; empty leaves the member out

@@ -32,12 +32,15 @@ type TokenResponse struct {
 	// the two apart. A number such as 3600.5 or 3.6e3 is rounded down. Every
 	// value, an integer included, is kept between minus and plus 100 years,
 	// so turning it into a time.Duration of that many seconds cannot
-	// overflow. A number too large for a float64 counts as none.
+	// overflow. A number too large for a float64 counts as the 100-year
+	// bound on its side.
 	ExpiresIn int64
 	// HasExpiresIn reports whether the response carried expires_in as a
 	// number. A source gives the access token a lifetime of zero seconds
-	// for an expires_in of zero or below (RFC 6749 §5.1), so the token is
-	// renewed on the next call, and no expiry when the response has none.
+	// for an expires_in of zero or below (RFC 6749 §5.1), so the next Token
+	// call renews the token or, on a [Source] that holds no refresh token,
+	// returns [auth.ErrReauthRequired]. It gives no expiry when the response
+	// has none.
 	HasExpiresIn bool
 	RefreshToken string
 	Scope        string
