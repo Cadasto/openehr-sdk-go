@@ -53,6 +53,19 @@ Two inclusions are worth knowing when reading the files:
 - The AM Release-1.4 `Resource.xsd` includes `../../RM/Release-1.1.0/Common.xsd`, so the AOM 1.4
   types resolve against the RM Release-1.1.0 schemas.
 
+## Where the AM 1.4 schemas and the AOM 1.4 BMM disagree
+
+The AOM 1.4 types are generated from the BMM, so where the AM Release-1.4 schemas say otherwise,
+their canonical XML follows the BMM. The exceptions are the members
+[REQ-056](../../docs/specifications/wire.md#req-056) maps to the schema's shape: the type names
+`C_CODE_PHRASE`, `C_DV_ORDINAL` and `C_DV_QUANTITY`, `ARCHETYPE_TERM.code`,
+`C_CODED_TEXT.terminology`, `C_QUANTITY.property` and the `ORDINAL` symbol. Elsewhere a schema
+element the BMM lacks is unmatched content on decode, such as the `pattern` of the date and time
+constraints, `C_QUANTITY_ITEM.precision` and the `ARCHETYPE_ONTOLOGY` definition and binding sets.
+A BMM member the schema lacks is written when set, and the schema refuses it, such as
+`C_CODED_TEXT.reference` and the date and time validity flags. Multiplicity differs too:
+`ARCHETYPE_TERM.items` is a `Hash` in the BMM and a list in the schema.
+
 ## Updating the pin
 
 ```bash
