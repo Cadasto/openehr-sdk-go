@@ -658,14 +658,17 @@ requirements:
       - internal/bmmgen/render_interval_bound_test.go
       - internal/bmmgen/render_xmlmar_order_test.go
       - internal/bmmgen/render_xmlnames_test.go
+      - internal/bmmgen/render_xmlshapes_test.go
       - internal/bmmgen/render_xmlunmar_unmatched_test.go
       - internal/rmaccess/interval_test.go
       - openehr/aom/aom14/archetype_term_xml_test.go
       - openehr/aom/aom14/coded_text_code_list_xml_test.go
       - openehr/aom/aom14/coded_text_terminology_xml_test.go
       - openehr/aom/aom14/interval_open_side_test.go
+      - openehr/aom/aom14/profile_member_shapes_xml_test.go
       - openehr/aom/aom14/schema_type_names_xml_test.go
       - openehr/internal/xmlunmatched/document_internal_test.go
+      - openehr/internal/xmlunmatched/shapes_internal_test.go
       - openehr/rm/character_text_test.go
       - openehr/rm/interval_bound_test.go
       - openehr/rm/real_test.go
@@ -2402,12 +2405,15 @@ requirements:
     probes: [PROBE-086, PROBE-105, PROBE-030]
     tests:
       - internal/bmmgen/render_jsonhooks_test.go
+      - internal/bmmgen/render_xmlshapes_test.go
       - internal/bmmgen/render_xmlunmar_unmatched_test.go
       - internal/rmjsonwalk/bindings_internal_test.go
       - internal/rmjsonwalk/root_internal_test.go
       - internal/rmjsonwalk/root_test.go
       - internal/rmjsonwalk/walk_test.go
+      - openehr/aom/aom14/profile_member_shapes_xml_test.go
       - openehr/internal/xmlunmatched/document_internal_test.go
+      - openehr/internal/xmlunmatched/shapes_internal_test.go
       - openehr/serialize/canjson/unmatched_test.go
       - openehr/serialize/canxml/primitive_error_test.go
       - openehr/serialize/canxml/unmatched_test.go
@@ -2555,10 +2561,13 @@ requirements:
     packages: [openehr/serialize/canjson, openehr/serialize/canxml, internal/rmjsonwalk, openehr/internal/xmlunmatched, internal/bmmgen, openehr/rm, openehr/aom/aom14, openehr/validation]
     probes: [PROBE-110, PROBE-081]
     tests:
+      - internal/bmmgen/render_xmlshapes_test.go
       - internal/bmmgen/render_xmlunmar_class_test.go
       - openehr/aom/aom14/coded_text_terminology_xml_test.go
+      - openehr/aom/aom14/profile_member_shapes_xml_test.go
       - openehr/internal/xmlunmatched/document_internal_test.go
       - openehr/internal/xmlunmatched/missing_internal_test.go
+      - openehr/internal/xmlunmatched/shapes_internal_test.go
       - openehr/rm/missing_members_test.go
       - openehr/serialize/canjson/missing_test.go
       - openehr/serialize/canxml/missing_test.go
