@@ -112,6 +112,24 @@ func TestREQ107_UntypedAndAbstractIntervalChildrenAreBuilt(t *testing.T) {
 				optSingle("lower", optUntyped(""))))),
 			want: "DV_INTERVAL<DV_COUNT>",
 		},
+		{
+			name: "a DV_INTERVAL over DV_TEMPORAL whose lower bound is a DV_TEMPORAL and upper a DV_DATE_TIME",
+			opt: optTemplate("ELEMENT", optSingle("value", optAbstractInterval("DV_TEMPORAL",
+				optSingle("lower", optNode("DV_TEMPORAL", "")), optSingle("upper", optNode("DV_DATE_TIME", ""))))),
+			want: "DV_INTERVAL<DV_DATE_TIME>",
+		},
+		{
+			name: "a DV_INTERVAL over DV_TEMPORAL whose lower bound is a DV_ORDERED",
+			opt: optTemplate("ELEMENT", optSingle("value", optAbstractInterval("DV_TEMPORAL",
+				optSingle("lower", optNode("DV_ORDERED", ""))))),
+			want: "DV_INTERVAL<DV_DATE>",
+		},
+		{
+			name: "a DV_INTERVAL over DV_ABSOLUTE_QUANTITY whose lower bound is a DV_QUANTIFIED",
+			opt: optTemplate("ELEMENT", optSingle("value", optAbstractInterval("DV_ABSOLUTE_QUANTITY",
+				optSingle("lower", optNode("DV_QUANTIFIED", ""))))),
+			want: "DV_INTERVAL<DV_DATE>",
+		},
 	}
 	for _, tc := range cases {
 		for _, implicit := range []bool{true, false} {
