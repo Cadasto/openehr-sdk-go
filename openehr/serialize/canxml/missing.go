@@ -11,6 +11,11 @@ package canxml
 // attribute as one (`archetype_node_id`, an ARCHETYPE_TERM's `code`); the
 // child it has carries `xsi:nil="true"` (or `1`), whatever it holds; or the
 // child is a primitive element whose text is empty or XML whitespace only.
+// A C_DV_QUANTITY's `property` written as a CODE_PHRASE carries a value
+// when its `terminology_id` value or its `code_string` does, and is
+// reported, with nothing inside it, when neither does. An ORDINAL symbol
+// written as a DV_CODED_TEXT has the members of its `defining_code`, named
+// as the symbol's own, and its `value` is never missing.
 // The value the decode returns cannot always show that: a member held by
 // value, a number, a boolean, a string or a value struct such as PARTY_SELF
 // or ARCHETYPE_ID, decodes to its zero value whether the input carried it or
