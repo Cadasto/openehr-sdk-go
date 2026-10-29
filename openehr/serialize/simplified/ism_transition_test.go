@@ -499,26 +499,25 @@ func TestREQ053InContextIsmTransitionInventsNoState(t *testing.T) {
 // The in-context `ism_transition` node models `current_state` only. Under it,
 // the reference's `transition` and `careflow_step` leaves and its `_reason`
 // family stay refused in every mode and in both formats, carrying none of the
-// value, and FLAT names the key; the refusal of `transition` and `reason`
-// cites REQ-140, the other REQ-170. The ACTION's own `time` leaf stays refused
-// too.
+// value, and FLAT names the key; each refusal names the attribute it refuses
+// and no requirement id. The ACTION's own `time` leaf stays refused too.
 func TestREQ170InContextIsmTransitionNodeRefusesUnmodelledKeys(t *testing.T) {
 	wt, _ := minimalActionWT(t)
 	const secret = "secret-value-0451"
 	for _, tc := range []struct {
-		name, named, cite string
+		name, named, attr string
 		keys              []string
 	}{
 		{
-			"transition leaf", minimalIsm + "/transition|code", "REQ-140",
+			"transition leaf", minimalIsm + "/transition|code", "an ACTION's ISM transition transition",
 			[]string{minimalIsm + "/transition|code", minimalIsm + "/transition|value", minimalIsm + "/transition|terminology"},
 		},
 		{
-			"careflow_step leaf", minimalIsm + "/careflow_step|code", "REQ-170",
+			"careflow_step leaf", minimalIsm + "/careflow_step|code", "an ACTION's ISM transition careflow_step",
 			[]string{minimalIsm + "/careflow_step|code", minimalIsm + "/careflow_step|value", minimalIsm + "/careflow_step|terminology"},
 		},
-		{"reason family", minimalIsm + "/_reason:0", "REQ-140", []string{minimalIsm + "/_reason:0"}},
-		{"ACTION time leaf", minimalAction + "/time", "REQ-170", []string{minimalAction + "/time"}},
+		{"reason family", minimalIsm + "/_reason:0", "an ACTION's ISM transition reason", []string{minimalIsm + "/_reason:0"}},
+		{"ACTION time leaf", minimalAction + "/time", "an ACTION's time", []string{minimalAction + "/time"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			keys := maps.Clone(referenceCurrentState)
@@ -537,8 +536,8 @@ func TestREQ170InContextIsmTransitionNodeRefusesUnmodelledKeys(t *testing.T) {
 				if format == "FLAT" && !strings.Contains(err.Error(), strconv.Quote(tc.named)) {
 					t.Errorf("%s err = %v, want it to name %q", format, err, tc.named)
 				}
-				if !strings.Contains(err.Error(), "("+tc.cite+",") {
-					t.Errorf("%s err = %v, want it to cite %s", format, err, tc.cite)
+				if !strings.Contains(err.Error(), tc.attr) || strings.Contains(err.Error(), "REQ-") {
+					t.Errorf("%s err = %v, want it to name %q and no requirement id", format, err, tc.attr)
 				}
 				if strings.Contains(err.Error(), secret) {
 					t.Errorf("%s err = %v carries the key's value", format, err)

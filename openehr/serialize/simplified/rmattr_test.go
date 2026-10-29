@@ -567,8 +567,8 @@ func TestRMAttrDeferredFamiliesRefused(t *testing.T) {
 // FEEDER_AUDIT_DETAILS `other_details`, ACTION `instruction_details` and
 // INSTRUCTION `wf_definition`. Decode refuses their keys (the test above, and the
 // party and feeder-audit tests). Encode must refuse a populated one too, with a
-// typed error naming the owner's FLAT path and the attribute but never the value,
-// and must stay silent when the attribute is absent.
+// typed error naming the owner's FLAT path and the attribute but never the value
+// or a requirement id, and must stay silent when the attribute is absent.
 func TestRMAttrBothDirectionRefusalsOnEncode(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	const (
@@ -651,6 +651,9 @@ func TestRMAttrBothDirectionRefusalsOnEncode(t *testing.T) {
 			}
 			if strings.Contains(err.Error(), secret) {
 				t.Errorf("err = %v carries the attribute's value", err)
+			}
+			if strings.Contains(err.Error(), "REQ-") {
+				t.Errorf("err = %v names a requirement id", err)
 			}
 		})
 	}

@@ -254,6 +254,10 @@ func TestREQ169FlatClosedSideWithNoBound(t *testing.T) {
 					if !errors.Is(err, ErrUnsupportedDatatype) || !strings.Contains(err.Error(), "lower_unbounded") {
 						t.Errorf("%s err = %v, want ErrUnsupportedDatatype naming |lower_unbounded", form, err)
 					}
+					// The caller reads the text: it names no requirement id.
+					if strings.Contains(err.Error(), "REQ-") {
+						t.Errorf("%s err = %v names a requirement id", form, err)
+					}
 				}
 			})
 		}
