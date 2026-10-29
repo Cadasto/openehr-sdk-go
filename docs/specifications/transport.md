@@ -85,25 +85,29 @@ net/http forwards these four headers to a redirect target on the same host, or a
 
 ## REQ-093 — openEHR error envelope mapping
 
-openEHR REST 1.1.0 returns a structured JSON body on non-2xx responses:
+openEHR REST 1.1.0 returns a structured JSON body on non-2xx responses. The pin's only error example (`resources/its-rest/overview-validation.openapi.yaml`, line 410) has this shape, shortened here to one coded entry:
 
 ```json
 {
-  "message": "Composition violates template constraints at /content[1]/...",
-  "code": "VALIDATION_FAILED",
-  "coded_text": [
-    {"terminology_id": {"value": "openehr"}, "code_string": "..."}
+  "message": "Error message",
+  "code": 90000,
+  "errors": [
+    {
+      "_type": "DV_CODED_TEXT",
+      "value": "Error message",
+      "defining_code": {"terminology_id": {"value": "local"}, "code_string": "9000"}
+    }
   ]
 }
 ```
 
 The SDK **MUST**:
 
-- Decode this envelope on every non-2xx response (best-effort; missing fields default to zero values).
+- Decode this envelope on every non-2xx response (best-effort; missing fields default to zero values). Its coded entries go to `OpenEHRErrorDetail.CodedText`: first those of a `coded_text` list, kept for servers that send one, then those of the pin's `errors` list, each a `DV_CODED_TEXT` whose `defining_code` gives the item's terminology and code string and whose `value` gives the item's `Value`. An `errors` entry that is not an object or has no `defining_code`, and an `errors` member that is not a list, are skipped without failing the envelope.
 - Accept the envelope's `code` as a JSON string or a JSON number (the overview's own example is `"code": 90000`), keeping the text form (`"90000"`) in `OpenEHRErrorDetail.Code`, and decode the `validationErrors` list the ITS-REST `Error` schema (the `400` bodies) defines beside `message`, so neither a numeric `code` nor a body that carries `validationErrors` with no `code` or no `message` leaves the envelope undecoded.
 - Attach the parsed envelope to `transport.WireError` as `OpenEHRErrorDetail{Message, Code, CodedText, ValidationErrors}`.
 - Map the HTTP status to typed sentinels per [idiom.md § Errors](idiom.md#errors-req-025): `ErrNotFound` (404), `ErrUnauthorized` (401), `ErrForbidden` (403), `ErrVersionConflict` (409), `ErrPreconditionFailed` (412), `ErrUnprocessable` (422), `ErrPreconditionRequired` (428). The status set follows the openEHR contract: a **422** signals a well-formed-but-semantically-invalid request (validation / template failure — `resources/its-rest/overview-validation.openapi.yaml` line 400; used on EHR and demographic writes) and **MUST** map to `ErrUnprocessable`. A **409** spans a conflict with the resource's current state (the Composition delete of a version that is not the latest) and a resource-already-exists collision; the openEHR error `code` on `OpenEHRErrorDetail` disambiguates and `ErrVersionConflict` remains the sentinel for both. openEHR signals a stale `If-Match` as **412** and a missing-but-expected `If-Match` as **400** (overview line 370) — **not** 428; `ErrPreconditionRequired` (428) is retained only as a defensive mapping for non-conformant servers and is **not** an openEHR-canonical status. A **400** with no more specific sentinel surfaces as a bare `WireError` whose openEHR `code` remains reachable via `errors.As`.
-- **PHI-safe error surfaces by default.** openEHR error bodies routinely carry patient identifiers and clinical detail. `WireError.Error()` **MUST NOT** interpolate `OpenEHR.Message` or the raw response bytes. It **MUST** carry HTTP status, route template, and the openEHR error *code* (codes are not PHI). Callers that need the full server payload for diagnostics **MUST** opt in via `transport.WithRawErrorBodies(true)`; only then are `OpenEHR.Message`, `OpenEHR.ValidationErrors` (free text, like the message) and `WireError.RawBody` populated. `OpenEHR.Code` and `OpenEHR.CodedText` remain available via `errors.As` regardless of the opt-in (structured codes, not free-text clinical narrative).
+- **PHI-safe error surfaces by default.** openEHR error bodies routinely carry patient identifiers and clinical detail. `WireError.Error()` **MUST NOT** interpolate `OpenEHR.Message`, a `CodedText` item's `Value` or the raw response bytes. It **MUST** carry HTTP status, route template, and the openEHR error *code* (codes are not PHI). Callers that need the full server payload for diagnostics **MUST** opt in via `transport.WithRawErrorBodies(true)`; only then are `OpenEHR.Message`, `OpenEHR.ValidationErrors`, each `OpenEHR.CodedText` item's `Value` (free text, like the message) and `WireError.RawBody` populated. `OpenEHR.Code` and each `OpenEHR.CodedText` item's terminology and code string remain available via `errors.As` regardless of the opt-in (structured codes, not free-text clinical narrative).
 - **Unrouted requests render a placeholder.** Where a diagnostic string names the request's route, it **MUST** carry the caller's route template, or — when the request carried none — the stable placeholder `(unrouted)`; it **MUST NOT** fall back to the expanded request path or the resolved URL, either of which may hold a caller-supplied identifier. The placeholder's exact text is part of this contract, not an implementation detail: a caller may match on it. The obligation reaches inside a wrapped error: where a network failure arrives as a net/http `*url.Error`, whose own text prints the resolved URL, the SDK **MUST** substitute the same route slot for that URL and leave the error's type, its `Op` and its cause as they were, so `errors.AsType[*url.Error]`, `Timeout()`, `Temporary()` and `errors.Is` against the cause all answer as before. The telemetry surfaces resolve the route their own way (REQ-090 span naming and the `http.route` attribute, REQ-098 `Observation.Route`) and this clause does not bind them.
 - **Bounded response reads.** Every `Client.Do` **MUST** cap how many bytes are read from the response body. The default limit is `transport.DefaultMaxResponseBody` (64 MiB). `transport.WithMaxResponseBody(n)` overrides the cap: `0` means default, a positive value sets an explicit limit, a negative value disables the cap (documented escape hatch for trusted backends). Exceeding the limit **MUST** fail the request with an error that `errors.Is` matches to `transport.ErrResponseTooLarge` and that names the limit, never with an unbounded `io.ReadAll`. What that failure returns beside the error is [§ REQ-151](#req-151--typed-2xx-decode-failure)'s.
 
