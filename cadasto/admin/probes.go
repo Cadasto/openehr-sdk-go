@@ -87,10 +87,12 @@ func WithMaxReadyBody(n int64) ReadyOption {
 // formatted error with no sentinel, so do not rely on errors.Is
 // matching outside the mapped set. A request that gets no response from
 // the underlying http.Client (connection refused, TLS errors, a
-// malformed response, context cancellation) fails with an error whose
-// text names the probe path but not the failure's own text, which can
-// quote bytes the server sent. errors.Is and errors.AsType still reach
-// the failure, such as a [*url.Error] or [context.Canceled].
+// malformed response, a timeout, context cancellation) fails with an
+// error whose text names the probe path and says whether the request
+// timed out, was canceled or failed otherwise. The text never carries
+// the failure's own text, which can quote bytes the server sent.
+// errors.Is and errors.AsType still reach the failure, such as a
+// [*url.Error] or [context.Canceled].
 //
 // Probes reuse [transport]'s sentinel errors for the mapped codes
 // above but bypass [transport.Client.Do]: no WireError envelope is
@@ -315,18 +317,33 @@ func (e *bodyReadError) Error() string {
 func (e *bodyReadError) Unwrap() error { return e.cause }
 
 // requestError reports a probe GET that got no response. Its text names
-// the probe path and nothing else. It never carries the failure's own
-// text: net/http quotes a malformed response header line in it, so a
-// server can put any value there, and the *url.Error around it repeats
-// the URL. Unwrap returns the failure, so errors.Is and errors.AsType
-// still reach it, a context error included.
+// the probe path and a fixed word for the kind of failure: timed out,
+// canceled or failed. It never carries the failure's own text: net/http
+// quotes a malformed response header line in it, so a server can put
+// any value there, and the *url.Error around it repeats the URL. Unwrap
+// returns the failure, so errors.Is and errors.AsType still reach it, a
+// context error included.
 type requestError struct {
 	path  string
 	cause error
 }
 
 func (e *requestError) Error() string {
-	return fmt.Sprintf("admin: probe GET %s: request failed", e.path)
+	return fmt.Sprintf("admin: probe GET %s: %s", e.path, e.failure())
+}
+
+// failure names the kind of failure from the cause, without quoting it.
+func (e *requestError) failure() string {
+	if errors.Is(e.cause, context.DeadlineExceeded) {
+		return "request timed out"
+	}
+	if uerr, ok := errors.AsType[*url.Error](e.cause); ok && uerr != nil && uerr.Timeout() {
+		return "request timed out"
+	}
+	if errors.Is(e.cause, context.Canceled) {
+		return "request canceled"
+	}
+	return "request failed"
 }
 
 func (e *requestError) Unwrap() error { return e.cause }

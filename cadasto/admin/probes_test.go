@@ -1136,38 +1136,42 @@ func TestProbeRequestFailureWord(t *testing.T) { // REQ-083
 		<-r.Context().Done()
 	}))
 	defer stall.Close()
-	canceled, cancel := context.WithCancel(t.Context())
-	cancel()
 
 	cases := []struct {
-		name string
-		ctx  context.Context
-		hc   *http.Client
-		want string
+		name     string
+		canceled bool // the context is canceled before the call
+		hc       *http.Client
+		want     string
 	}{
 		{
-			name: "context already canceled", ctx: canceled, hc: stall.Client(),
+			name: "context already canceled", canceled: true, hc: stall.Client(),
 			want: "request canceled",
 		},
 		{
-			name: "server stalls past the client timeout", ctx: t.Context(),
+			name: "server stalls past the client timeout",
 			hc:   &http.Client{Transport: stall.Client().Transport, Timeout: 50 * time.Millisecond},
 			want: "request timed out",
 		},
 		{
-			name: "transport reports a timeout", ctx: t.Context(),
+			name: "transport reports a timeout",
 			hc:   &http.Client{Transport: failingTransport{err: transportTimeout{}}},
 			want: "request timed out",
 		},
 		{
-			name: "transport fails past a deadline", ctx: t.Context(),
+			name: "transport fails past a deadline",
 			hc:   &http.Client{Transport: failingTransport{err: fmt.Errorf("dial %s: %w", readySecret, context.DeadlineExceeded)}},
 			want: "request timed out",
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := admin.Live(tc.ctx, newClientWithHTTP(t, stall, tc.hc))
+			ctx := t.Context()
+			if tc.canceled {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+			}
+			err := admin.Live(ctx, newClientWithHTTP(t, stall, tc.hc))
 			if err == nil {
 				t.Fatal("Live = nil, want a request failure")
 			}
