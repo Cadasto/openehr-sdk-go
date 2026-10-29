@@ -1091,8 +1091,11 @@ func TestProbeRequestFailureTextStaysOut(t *testing.T) { // REQ-083
 				t.Errorf("%s returned %q beside the error, want no bytes", tc.name, got)
 			}
 			cause, ok := errors.AsType[*url.Error](err)
-			if !ok || cause == nil || !strings.Contains(cause.Error(), readySecret) {
-				t.Fatalf("errors.AsType[*url.Error](%v) = (%v, %v), want net/http's request error quoting %q; the premise of this test is gone", err, cause, ok, readySecret)
+			if !ok || cause == nil {
+				t.Fatalf("errors.AsType[*url.Error](%v) found nothing, want the request failure reached by unwrapping", err)
+			}
+			if !strings.Contains(cause.Error(), readySecret) {
+				t.Fatalf("*url.Error %q does not quote %q; the premise of this test is gone", cause, readySecret)
 			}
 			msg := err.Error()
 			assertNoServerValues(t, msg)
