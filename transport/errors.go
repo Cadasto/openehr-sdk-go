@@ -90,7 +90,12 @@ type OpenEHRErrorDetail struct {
 	// number (the ITS-REST overview shows 90000); either way it is kept
 	// here as text.
 	Code string `json:"code"`
-	// CodedText optionally enumerates terminology-coded error tags.
+	// CodedText enumerates the envelope's terminology-coded error entries.
+	// It holds the entries of the envelope's coded_text list first, then
+	// those of its errors list, the DV_CODED_TEXT list the ITS-REST overview
+	// shows. The codes are always preserved; each item's free-text Value is
+	// populated only when the client is constructed with
+	// WithRawErrorBodies(true).
 	CodedText []CodedTextItem `json:"coded_text,omitempty"`
 	// ValidationErrors lists the validation messages that the ITS-REST
 	// Error schema of a 400 response carries beside the message. Like
@@ -103,11 +108,19 @@ type OpenEHRErrorDetail struct {
 // code. A code of any other JSON type is left empty rather than failing
 // the whole envelope, since the message and the other fields are still
 // usable.
+//
+// CodedText collects the coded_text entries first, then the errors
+// entries. Each errors entry is a DV_CODED_TEXT whose defining_code gives
+// the item's terminology and code string and whose value gives its Value.
+// An errors entry that does not decode as such an object, or has no
+// defining_code, is skipped; an errors member that is not a list is
+// ignored. Neither fails the envelope.
 func (d *OpenEHRErrorDetail) UnmarshalJSON(data []byte) error {
 	var raw struct {
 		Message          string          `json:"message"`
 		Code             json.RawMessage `json:"code"`
 		CodedText        []CodedTextItem `json:"coded_text"`
+		Errors           json.RawMessage `json:"errors"`
 		ValidationErrors []string        `json:"validationErrors"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -116,10 +129,42 @@ func (d *OpenEHRErrorDetail) UnmarshalJSON(data []byte) error {
 	*d = OpenEHRErrorDetail{
 		Message:          raw.Message,
 		Code:             envelopeCode(raw.Code),
-		CodedText:        raw.CodedText,
+		CodedText:        append(raw.CodedText, envelopeErrors(raw.Errors)...),
 		ValidationErrors: raw.ValidationErrors,
 	}
 	return nil
+}
+
+// envelopeErrors returns the coded items of the envelope's errors list, in
+// order. It skips an entry that does not decode as a DV_CODED_TEXT object or
+// has no defining_code, and returns nil when the list is absent, null or not
+// a JSON array.
+func envelopeErrors(raw json.RawMessage) []CodedTextItem {
+	var entries []json.RawMessage
+	if len(raw) == 0 || json.Unmarshal(raw, &entries) != nil {
+		return nil
+	}
+	var items []CodedTextItem
+	for _, entry := range entries {
+		var dv struct {
+			Value        string `json:"value"`
+			DefiningCode *struct {
+				TerminologyID struct {
+					Value string `json:"value"`
+				} `json:"terminology_id"`
+				CodeString string `json:"code_string"`
+			} `json:"defining_code"`
+		}
+		if json.Unmarshal(entry, &dv) != nil || dv.DefiningCode == nil {
+			continue
+		}
+		var item CodedTextItem
+		item.TerminologyID.Value = dv.DefiningCode.TerminologyID.Value
+		item.CodeString = dv.DefiningCode.CodeString
+		item.Value = dv.Value
+		items = append(items, item)
+	}
+	return items
 }
 
 // envelopeCode returns the text of a JSON string or number code, and ""
@@ -141,12 +186,23 @@ func envelopeCode(raw json.RawMessage) string {
 	return ""
 }
 
-// CodedTextItem mirrors the openEHR error envelope's coded_text entry.
+// CodedTextItem is one coded entry of the openEHR error envelope: an entry
+// of its coded_text list, or the defining code and value of a
+// DV_CODED_TEXT in its errors list.
 type CodedTextItem struct {
+	// TerminologyID names the terminology the code comes from, such as
+	// "local" or "openehr".
 	TerminologyID struct {
 		Value string `json:"value"`
 	} `json:"terminology_id"`
+	// CodeString is the code within that terminology. Like the terminology,
+	// it is always preserved.
 	CodeString string `json:"code_string"`
+	// Value is the entry's free text, the DV_CODED_TEXT value. Like the
+	// envelope's Message it may name patients, so it is populated only when
+	// the client is constructed with WithRawErrorBodies(true), and
+	// [WireError.Error] never includes it.
+	Value string `json:"value,omitempty"`
 }
 
 // WireError is the typed wire-level error returned to consumers. Use
@@ -164,9 +220,10 @@ type WireError struct {
 	// kept as sent. [WireError.Error] never includes it.
 	Method, URL, Route string
 	// OpenEHR is the parsed openEHR error envelope. Nil when
-	// the body could not be parsed as such. OpenEHR.Message may contain
-	// PHI and is only populated when the client is built with
-	// WithRawErrorBodies(true). OpenEHR.Code is always present.
+	// the body could not be parsed as such. OpenEHR.Message and the Value
+	// of each OpenEHR.CodedText item may contain PHI and are only
+	// populated when the client is built with WithRawErrorBodies(true).
+	// OpenEHR.Code and the CodedText items' codes are always present.
 	OpenEHR *OpenEHRErrorDetail
 	// RawBody preserves the raw response bytes for diagnostics.
 	// May contain PHI; only populated when the client is built with
@@ -190,8 +247,8 @@ type WireError struct {
 // Error implements error. The returned string includes the HTTP status,
 // the openEHR error code, quoted as a Go string, and the request route,
 // all of which are non-PHI fields.
-// The server message, the raw body and the Bearer challenge are
-// deliberately omitted so WireError values are safe to include in logs,
+// The server message, the coded items' free text, the raw body and the
+// Bearer challenge are deliberately omitted so WireError values are safe to include in logs,
 // traces, and observer callbacks.
 // Callers that need the message (e.g. for user-facing error reporting in
 // a controlled environment) should use errors.As to extract the full
