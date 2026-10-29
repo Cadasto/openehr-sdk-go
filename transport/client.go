@@ -690,8 +690,8 @@ func statusToSentinel(s int) error {
 
 // decodeOpenEHRError attempts to parse the openEHR error envelope
 // (REQ-093). Returns ok=false when the body is empty, non-JSON, or
-// missing message, code and validation errors (the envelope is
-// best-effort).
+// missing message, code, validation errors and coded entries from the
+// coded_text or errors list (the envelope is best-effort).
 func decodeOpenEHRError(body []byte) (*OpenEHRErrorDetail, bool) {
 	if len(body) == 0 {
 		return nil, false
@@ -700,7 +700,7 @@ func decodeOpenEHRError(body []byte) (*OpenEHRErrorDetail, bool) {
 	if err := json.Unmarshal(body, &d); err != nil {
 		return nil, false
 	}
-	if d.Message == "" && d.Code == "" && len(d.ValidationErrors) == 0 {
+	if d.Message == "" && d.Code == "" && len(d.ValidationErrors) == 0 && len(d.CodedText) == 0 {
 		return nil, false
 	}
 	return &d, true

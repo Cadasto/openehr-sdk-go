@@ -239,3 +239,31 @@ func TestErrorEnvelopePinErrorsList(t *testing.T) {
 		})
 	}
 }
+
+// TestErrorEnvelopeEmptyCodedListsAreNoEnvelope pins the edge of REQ-093's
+// best-effort decode: a body whose only members are coded lists with no
+// usable entry carries nothing to attach, so OpenEHR stays nil.
+func TestErrorEnvelopeEmptyCodedListsAreNoEnvelope(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+	}{
+		{name: "empty errors list", body: `{"errors":[]}`},
+		{name: "empty coded_text list", body: `{"coded_text":[]}`},
+		{name: "errors entries that all are skipped", body: `{"errors":[42,{"value":"patient 1234"}]}`},
+		{name: "errors member that is not a list", body: `{"errors":{"value":"patient 1234"}}`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := newDecodeClient(t, http.StatusUnprocessableEntity, tt.body, nil, transport.WithRawErrorBodies(true))
+			_, err := c.Do(t.Context(), &transport.Request{Route: "/x", Path: "/x"})
+			we, ok := errors.AsType[*transport.WireError](err)
+			if !ok || we == nil {
+				t.Fatalf("Do() error = %T (%v), want *transport.WireError", err, err)
+			}
+			if we.OpenEHR != nil {
+				t.Errorf("OpenEHR = %+v, want nil for a body with no usable coded entry", we.OpenEHR)
+			}
+		})
+	}
+}
