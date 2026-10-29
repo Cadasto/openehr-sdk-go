@@ -962,8 +962,8 @@ func putCtx(ctx map[string]any, origin map[string]string, ctxKey string, val any
 			ErrUnsupportedDatatype, ctxKey, val, bodyKey)
 	}
 	if prev, seen := ctx[ctxKey]; seen && !sameCtxValue(prev, val) {
-		return fmt.Errorf("%w: conflicting spellings of %s: %q gives %#v, %q gives %#v; remove one",
-			ErrUnknownPath, ctxKey, ctxSpelling(origin, ctxKey), prev, bodyKey, val)
+		return fmt.Errorf("%w: conflicting spellings of %s: %q and %q give different values; remove one",
+			ErrUnknownPath, ctxKey, ctxSpelling(origin, ctxKey), bodyKey)
 	}
 	ctx[ctxKey] = val
 	origin[ctxKey] = bodyKey
@@ -1751,19 +1751,6 @@ var inContextAttrs = map[string]struct {
 	},
 }
 
-// inContextCite names the section a refusal of an in-context attribute cites:
-// REQ-140's third out-of-scope class lists an ISM transition's `transition`
-// and `reason`; REQ-170 alone binds the rest (`current_state`,
-// `careflow_step`, the ACTION's `time`, and the INTERVAL_EVENT and OBSERVATION
-// attributes).
-func inContextCite(attr string) string {
-	switch attr {
-	case "ISM transition transition", "ISM transition reason":
-		return "REQ-140"
-	}
-	return "REQ-170"
-}
-
 // refuseInContextKeys refuses, in every mode, the reference's in-context
 // spelling of the RM attributes in [inContextAttrs] and of an ACTION's ISM
 // transition, wherever the Web Template does not resolve it (REQ-170; REQ-140's
@@ -1808,8 +1795,8 @@ func refuseInContextKeys(content map[string]any, wt *webtemplate.WebTemplate, am
 			delete(content, key)
 			continue
 		}
-		return fmt.Errorf("%w: %q is the reference's in-context spelling of an %s's %s, which the Web Template this SDK builds does not model — refused rather than dropped or replaced (%s, see deviations.md)",
-			ErrUnknownPath, named, owner, attr, inContextCite(attr))
+		return fmt.Errorf("%w: %q is the reference's in-context spelling of an %s's %s, which the Web Template this SDK builds does not model — refused rather than dropped or replaced (see deviations.md)",
+			ErrUnknownPath, named, owner, attr)
 	}
 	return nil
 }

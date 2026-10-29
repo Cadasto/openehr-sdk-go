@@ -202,7 +202,7 @@ func participationsRMAttr(out map[string]any, base, family string, ps []rm.Parti
 // as the reference's inlined `|identifiers_<field>:N`.
 func participationRMAttr(out map[string]any, path string, p rm.Participation) error {
 	if p.Time != nil {
-		return fmt.Errorf("%w: %q carries a PARTICIPATION.time, which the reference's suffix set has no channel for and the pinned corpus never writes — deferred rather than dropped (REQ-140, see deviations.md)",
+		return fmt.Errorf("%w: %q carries a PARTICIPATION.time, which the reference's suffix set has no channel for and the pinned corpus never writes — deferred rather than dropped (see deviations.md)",
 			ErrUnsupportedDatatype, path+"|time")
 	}
 	function, err := plainDVText(path+"|function", p.Function, "PARTICIPATION")
@@ -265,8 +265,8 @@ func participationModeRubric(key string, mode rm.DVCodedText) (string, error) {
 	}
 	rubric, known := terminology.ParticipationMode.Rubric(mode.DefiningCode.CodeString)
 	if !known {
-		return "", fmt.Errorf("%w: %q carries code %q, which is not in the openEHR `participation mode` group; the key carries only the rubric, so decode could not rebuild the code (REQ-140)",
-			ErrUnsupportedDatatype, key, mode.DefiningCode.CodeString)
+		return "", fmt.Errorf("%w: %q carries a code that is not in the openEHR `participation mode` group; the key carries only the rubric, so decode could not rebuild the code",
+			ErrUnsupportedDatatype, key)
 	}
 	if mode.Value != rubric {
 		return "", fmt.Errorf("%w: %q carries value %q beside code %q, whose `participation mode` rubric is %q; the key carries the rubric alone, so decode would rewrite the value",

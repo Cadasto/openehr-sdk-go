@@ -42,7 +42,7 @@ func rmattrEncode(owner any, base string, out map[string]any) error {
 	}
 	links, feederAudit, modelled := rmattrLocatableAttrs(owner)
 	if !modelled {
-		return fmt.Errorf("%w: %q owns a %T, which the underscore RM attribute grammar does not model (REQ-140)",
+		return fmt.Errorf("%w: %q owns a %T, which the underscore RM attribute grammar does not model",
 			ErrUnsupportedDatatype, base, owner)
 	}
 	if loc, ok := owner.(rm.Locatable); ok {
@@ -123,11 +123,11 @@ func plainText(m map[string]any) bool {
 // absent one writes nothing.
 func deferredEntryRMAttrs(owner any, base string) error {
 	if a, ok := as[rm.Action](owner); ok && a.InstructionDetails != nil {
-		return fmt.Errorf("%w: %q carries an ACTION.instruction_details, which has no FLAT grammar yet and no |raw carrier — deferred rather than dropped (REQ-140, see deviations.md)",
+		return fmt.Errorf("%w: %q carries an ACTION.instruction_details, which has no FLAT grammar yet and no |raw carrier — deferred rather than dropped (see deviations.md)",
 			ErrUnsupportedDatatype, base+"/_instruction_details")
 	}
 	if i, ok := as[rm.Instruction](owner); ok && i.WfDefinition != nil {
-		return fmt.Errorf("%w: %q carries an INSTRUCTION.wf_definition, which has no FLAT grammar yet and no |raw carrier — deferred rather than dropped (REQ-140, see deviations.md)",
+		return fmt.Errorf("%w: %q carries an INSTRUCTION.wf_definition, which has no FLAT grammar yet and no |raw carrier — deferred rather than dropped (see deviations.md)",
 			ErrUnsupportedDatatype, base+"/_wf_definition")
 	}
 	return nil

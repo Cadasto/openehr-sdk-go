@@ -212,8 +212,8 @@ func partyProxyLeafSuffixes(g rmattrGroup) (map[string]any, error) {
 	if spelled {
 		key := ts.key(g, ownTail(partyProxyTypeSuffix))
 		if subtype != partySelfType {
-			return nil, fmt.Errorf("%w: %q is %q, but the discriminator spells only %q — every other PARTY_PROXY subtype is implied by the party keys themselves (REQ-140)",
-				ErrUnsupportedDatatype, key, subtype, partySelfType)
+			return nil, fmt.Errorf("%w: %q spells a subtype other than %q, the only one the discriminator spells — every other PARTY_PROXY subtype is implied by the party keys themselves",
+				ErrUnsupportedDatatype, key, partySelfType)
 		}
 		if populated {
 			return nil, fmt.Errorf("%w: %q says %s, but the position also carries party keys, which contradict it",
@@ -574,7 +574,7 @@ func decodeRMAttrParticipation(g rmattrGroup, _ string) (any, error) {
 	// PARTICIPATION.time is refused in every spelling, before the grammar below
 	// would set a sub-path spelling aside as unmatched.
 	if tail, timed := tailNaming(g, participationTimeSuffix); timed {
-		return nil, fmt.Errorf("%w: %q addresses PARTICIPATION.time, which the reference's suffix set has no channel for — deferred rather than dropped (REQ-140, see deviations.md)",
+		return nil, fmt.Errorf("%w: %q addresses PARTICIPATION.time, which the reference's suffix set has no channel for — deferred rather than dropped (see deviations.md)",
 			ErrUnsupportedDatatype, g.key(tail))
 	}
 	// lists is nil: a participation's identifiers ride the inlined suffix
@@ -712,8 +712,8 @@ func takeInlineIdentifiers(g rmattrGroup, ts rmattrTails) ([]any, error) {
 func participationModeJSON(key, rubric string) (map[string]any, error) {
 	code, known := terminology.ParticipationMode.Code(rubric)
 	if !known {
-		return nil, fmt.Errorf("%w: %q is %q, which is not a rubric of the openEHR `participation mode` group; the key carries no code, so there is nothing else to rebuild PARTICIPATION.mode from (REQ-140)",
-			ErrUnsupportedDatatype, key, rubric)
+		return nil, fmt.Errorf("%w: %q is not a rubric of the openEHR `participation mode` group; the key carries no code, so there is nothing else to rebuild PARTICIPATION.mode from",
+			ErrUnsupportedDatatype, key)
 	}
 	return map[string]any{
 		"_type": "DV_CODED_TEXT", "value": rubric,

@@ -491,7 +491,7 @@ func rmattrFamilyAt(owner rmattrOwner, g rmattrGroup) (rmattrFamily, string, err
 		if allNull(g.tails) {
 			return rmattrFamily{}, "", errNothingMatched
 		}
-		return rmattrFamily{}, "", fmt.Errorf("%w: %q addresses %s.%s, which this codec defers: the reference's suffix set gives it no channel, so it is refused rather than dropped (REQ-140, see deviations.md)",
+		return rmattrFamily{}, "", fmt.Errorf("%w: %q addresses %s.%s, which this codec defers: the reference's suffix set gives it no channel, so it is refused rather than dropped (see deviations.md)",
 			ErrUnknownPath, g.prefix(), owner.kind, rmattrDeferredFamilies[g.family])
 	}
 	fam, judged, read := rmattrFamilyOf(owner.kind, owner.leaf, g.family)
