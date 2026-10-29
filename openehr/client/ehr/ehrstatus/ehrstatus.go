@@ -151,7 +151,7 @@ func Put(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, if
 		return nil, nil, fmt.Errorf("ehrstatus.Put: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
 	if ifMatch == "" {
-		return nil, nil, fmt.Errorf("ehrstatus.Put: %w: empty If-Match (REQ-054)", transport.ErrInvalidConfig)
+		return nil, nil, fmt.Errorf("ehrstatus.Put: %w: empty If-Match", transport.ErrInvalidConfig)
 	}
 	if status == nil {
 		return nil, nil, fmt.Errorf("ehrstatus.Put: %w: nil status", transport.ErrInvalidConfig)

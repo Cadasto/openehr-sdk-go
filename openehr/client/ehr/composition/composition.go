@@ -491,7 +491,7 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 		return nil, nil, fmt.Errorf("composition.Update: %w: empty VersionedObjectID", transport.ErrInvalidConfig)
 	}
 	if ifMatch == "" {
-		return nil, nil, fmt.Errorf("composition.Update: %w: empty If-Match (REQ-054)", transport.ErrInvalidConfig)
+		return nil, nil, fmt.Errorf("composition.Update: %w: empty If-Match", transport.ErrInvalidConfig)
 	}
 	if comp == nil {
 		return nil, nil, fmt.Errorf("composition.Update: %w: nil Composition", transport.ErrInvalidConfig)
