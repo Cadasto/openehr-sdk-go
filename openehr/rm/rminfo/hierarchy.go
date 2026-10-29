@@ -144,18 +144,75 @@ func (l *lookup) Parents(rmType string) ([]string, bool) {
 }
 
 func (l *lookup) Ancestors(rmType string) ([]string, bool) {
-	meta, ok := l.data[rmType]
-	if !ok {
+	if _, ok := l.data[rmType]; !ok {
 		return nil, false
 	}
+	// Copy: the stored list is shared by every caller and by ConformsTo, so a
+	// caller that sorts, overwrites or appends must not reach it.
+	return slices.Clone(l.ancestorIndex()[rmType]), true
+}
+
+// ConformsTo answers from the ancestor index: a binary search in sub's stored,
+// sorted list, which allocates nothing once the index is built. The AQL linter
+// asks this once per overlay edge at every node of its reachability walks,
+// thousands of times per query, which is why the closure is no longer rebuilt
+// per question.
+//
+// Two rules keep the shared index safe, and each has a test that fails when it
+// is broken:
+//
+//   - The index is published whole under ancestorOnce, never filled in while
+//     other goroutines read it, so first use of the shared [Default] from many
+//     goroutines does not race (TestHierarchyConcurrentFirstUse, under -race).
+//   - Ancestors returns a copy of the stored list, never the list itself, so a
+//     caller's write cannot change a later answer from either method
+//     (TestHierarchyReturnsCopiesNotPackageState and
+//     TestMutatingAncestorsLeavesConformsToIntact).
+func (l *lookup) ConformsTo(sub, rmType string) (bool, bool) {
+	if _, ok := l.data[sub]; !ok {
+		return false, false
+	}
+	if _, ok := l.data[rmType]; !ok {
+		return false, false
+	}
+	if sub == rmType {
+		return true, true
+	}
+	_, found := slices.BinarySearch(l.ancestorIndex()[sub], rmType)
+	return found, true
+}
+
+// ancestorIndex returns the shared, memoised ancestor index: every defined
+// class's strict ancestors, sorted. The returned map and its slices are
+// READ-ONLY for callers: Ancestors copies before it hands a list out, and
+// ConformsTo only searches.
+//
+// It is built whole on first use, under ancestorOnce, rather than one class at
+// a time into a map other goroutines may be reading. It is not built at init,
+// so importing the package stays free: doc.go promises no init-time work
+// beyond map literals.
+func (l *lookup) ancestorIndex() map[string][]string {
+	l.ancestorOnce.Do(func() {
+		index := make(map[string][]string, len(l.data))
+		for name := range l.data {
+			index[name] = l.walkAncestors(name)
+		}
+		l.ancestors = index
+	})
+	return l.ancestors
+}
+
+// walkAncestors computes rmType's strict ancestors, sorted, by a breadth-first
+// walk up the Parents edges. A root yields nil.
+func (l *lookup) walkAncestors(rmType string) []string {
 	// seen starts holding rmType so the set stays strict and a cycle in a
 	// synthetic model terminates instead of walking forever.
 	seen := map[string]bool{rmType: true}
 	var out []string
-	// Clone, not alias: queue is appended to below, and meta.Parents is the
+	// Clone, not alias: queue is appended to below, and Parents is the
 	// generated table's own slice — a caller-supplied one via New may carry
 	// spare capacity, so appending in place would overwrite its neighbour.
-	queue := slices.Clone(meta.Parents)
+	queue := slices.Clone(l.data[rmType].Parents)
 	for len(queue) > 0 {
 		name := queue[0]
 		queue = queue[1:]
@@ -167,35 +224,7 @@ func (l *lookup) Ancestors(rmType string) ([]string, bool) {
 		queue = append(queue, l.data[name].Parents...)
 	}
 	slices.Sort(out)
-	return out, true
-}
-
-// ConformsTo builds the full ancestor closure to answer a membership
-// question. At the pinned RM's scale (139 classes, depth <= 6) that is free —
-// the 139x139 cross-check in the test suite runs in well under a millisecond —
-// so it is left simple. Two tempting optimisations are wrong, and are recorded
-// here rather than rediscovered:
-//
-//   - Memoising into a plain map field races with concurrent readers of the
-//     shared [Default]. Use a third sync.Once over a fully built map.
-//   - Returning a memoised slice directly breaks the no-aliasing rule. The
-//     copy-on-return test passes trivially today because every walk allocates;
-//     it exists to catch exactly this change.
-//
-// The safe cheap win, if one is ever needed, is an early-exit upward walk that
-// returns on first hit instead of building and sorting the whole closure.
-func (l *lookup) ConformsTo(sub, rmType string) (bool, bool) {
-	if _, ok := l.data[sub]; !ok {
-		return false, false
-	}
-	if _, ok := l.data[rmType]; !ok {
-		return false, false
-	}
-	if sub == rmType {
-		return true, true
-	}
-	ancestors, _ := l.Ancestors(sub)
-	return slices.Contains(ancestors, rmType), true
+	return out
 }
 
 func (l *lookup) ConcreteDescendants(rmType string) ([]string, bool) {

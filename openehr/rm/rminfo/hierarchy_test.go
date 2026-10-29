@@ -460,6 +460,134 @@ func TestHierarchyReturnsCopiesNotPackageState(t *testing.T) {
 	}
 }
 
+// TestMutatingAncestorsLeavesConformsToIntact — REQ-048. ConformsTo answers
+// from the same stored ancestor list Ancestors copies out, so a caller that
+// rewrites, reorders or extends the slice it was handed must change neither
+// the next Ancestors answer nor any ConformsTo answer. Reordering matters on
+// its own: ConformsTo searches a sorted list, and a reversed one would hide
+// ancestors without changing the set.
+func TestMutatingAncestorsLeavesConformsToIntact(t *testing.T) {
+	h := hier(t)
+	got, _ := h.Ancestors("OBSERVATION")
+	if len(got) < 2 {
+		t.Fatalf("Ancestors(OBSERVATION) = %v, want at least two to reorder", got)
+	}
+	want := slices.Clone(got)
+	slices.Reverse(got)
+	got[0] = "CLOBBERED"
+
+	if again, _ := h.Ancestors("OBSERVATION"); !slices.Equal(again, want) {
+		t.Errorf("Ancestors(OBSERVATION) after mutating the last answer = %v, want %v", again, want)
+	}
+	for _, super := range want {
+		if conforms, known := h.ConformsTo("OBSERVATION", super); !conforms || !known {
+			t.Errorf("ConformsTo(OBSERVATION, %q) after mutating Ancestors' answer = (%t, %t), want (true, true)",
+				super, conforms, known)
+		}
+	}
+	if conforms, _ := h.ConformsTo("OBSERVATION", "CLOBBERED"); conforms {
+		t.Error("ConformsTo(OBSERVATION, CLOBBERED) = true: a caller's write reached the stored list")
+	}
+}
+
+// TestConformsToAllocatesNothing — REQ-048. The AQL linter asks ConformsTo
+// once per overlay edge at every node of a breadth-first walk, thousands of
+// times per query, so once the ancestor index is built a question costs no
+// allocation, whatever its answer. The first call builds the index and is not
+// counted.
+func TestConformsToAllocatesNothing(t *testing.T) {
+	h := hier(t)
+	h.ConformsTo("OBSERVATION", "LOCATABLE")
+	cases := []struct {
+		name, sub, super string
+	}{
+		{name: "ancestor", sub: "OBSERVATION", super: "LOCATABLE"},
+		{name: "deep ancestor", sub: "DV_CODED_TEXT", super: "DATA_VALUE"},
+		{name: "unrelated", sub: "OBSERVATION", super: "EVALUATION"},
+		{name: "descendant", sub: "ENTRY", super: "OBSERVATION"},
+		{name: "reflexive", sub: "OBSERVATION", super: "OBSERVATION"},
+		{name: "root", sub: "PATHABLE", super: "LOCATABLE"},
+		{name: "unknown", sub: "NOT_AN_RM_CLASS", super: "ENTRY"},
+	}
+	for _, tc := range cases {
+		allocs := testing.AllocsPerRun(100, func() { h.ConformsTo(tc.sub, tc.super) })
+		if allocs != 0 {
+			t.Errorf("%s: ConformsTo(%q, %q) allocates %v times per call, want 0", tc.name, tc.sub, tc.super, allocs)
+		}
+	}
+}
+
+// TestAncestorsMatchAWalkOfParents — REQ-048. Ancestors and ConformsTo answer
+// from an index, and the 139x139 cross-check only holds them to each other, so
+// both are checked here against the closure this test computes itself from
+// Parents, on the generated model and on a synthetic one with cycles, a
+// self-parent and a dangling parent.
+func TestAncestorsMatchAWalkOfParents(t *testing.T) {
+	synthetic := map[string]rminfo.ClassMeta{
+		"A":      {Parents: []string{"B"}},
+		"B":      {Parents: []string{"C", "A"}},
+		"C":      {Parents: []string{"A"}},
+		"SELF":   {Parents: []string{"SELF", "A"}},
+		"ORPHAN": {Parents: []string{"NOT_IN_DATA", "SELF"}},
+		"ROOT":   {},
+	}
+	models := []struct {
+		name string
+		look rminfo.Lookup
+	}{
+		{name: "Default", look: rminfo.Default},
+		{name: "synthetic", look: rminfo.New(synthetic)},
+	}
+	for _, m := range models {
+		t.Run(m.name, func(t *testing.T) {
+			h, ok := m.look.(rminfo.Hierarchy)
+			if !ok {
+				t.Fatal("the Lookup does not implement Hierarchy")
+			}
+			classes := m.look.KnownRMTypes()
+			closure := make(map[string][]string, len(classes))
+			for _, class := range classes {
+				closure[class] = walkParents(h, class)
+			}
+			for _, class := range classes {
+				got, known := h.Ancestors(class)
+				if !known || !slices.Equal(got, closure[class]) {
+					t.Errorf("Ancestors(%q) = (%v, %t), want (%v, true)", class, got, known, closure[class])
+				}
+				for _, super := range classes {
+					want := super == class || slices.Contains(closure[class], super)
+					if conforms, known := h.ConformsTo(class, super); conforms != want || !known {
+						t.Errorf("ConformsTo(%q, %q) = (%t, %t), want (%t, true)", class, super, conforms, known, want)
+					}
+				}
+			}
+		})
+	}
+}
+
+// walkParents is the strict transitive closure of class over Parents, sorted,
+// computed by a depth-first walk independent of the package's own. A root
+// yields nil, as Ancestors does.
+func walkParents(h rminfo.Hierarchy, class string) []string {
+	seen := map[string]bool{class: true}
+	var out []string
+	var visit func(string)
+	visit = func(name string) {
+		parents, _ := h.Parents(name)
+		for _, p := range parents {
+			if seen[p] {
+				continue
+			}
+			seen[p] = true
+			out = append(out, p)
+			visit(p)
+		}
+	}
+	visit(class)
+	slices.Sort(out)
+	return out
+}
+
 // TestHierarchyOverSyntheticModel — REQ-048. The New(data) seam must reach
 // every question, because the pinned RM cannot supply every shape: a dead-end
 // abstract class, and a class whose parent is NOT in the data set.
@@ -570,14 +698,27 @@ func TestHierarchyTerminatesOnCyclicSyntheticModel(t *testing.T) {
 	if ds, known := h.ConcreteDescendants("A"); !known || !slices.Equal(ds, []string{"A", "B"}) {
 		t.Errorf("ConcreteDescendants(A) = (%v, %t), want ([A B], true)", ds, known)
 	}
+	conformance := []struct {
+		sub, super string
+		want       bool
+	}{
+		{"A", "B", true}, {"B", "A", true}, // the cycle runs both ways
+		{"C", "C", true}, // reflexive, though C is not its own ancestor
+		{"A", "C", false}, {"C", "A", false},
+	}
+	for _, tc := range conformance {
+		if conforms, known := h.ConformsTo(tc.sub, tc.super); conforms != tc.want || !known {
+			t.Errorf("ConformsTo(%q, %q) = (%t, %t), want (%t, true)", tc.sub, tc.super, conforms, known, tc.want)
+		}
+	}
 }
 
-// TestHierarchyConcurrentFirstUse — REQ-048. The descendant index is built
-// lazily under a sync.Once, beside the pre-existing KnownRMTypes cache. Two
-// lazy caches on one shared Default is where a data race would live, so the
-// first use is driven from many goroutines at once: this test is written to be
-// meaningful under `go test -race`, and it also catches a Once that publishes a
-// half-built map by returning a wrong answer.
+// TestHierarchyConcurrentFirstUse — REQ-048. The descendant and ancestor
+// indexes are each built lazily under a sync.Once, beside the pre-existing
+// KnownRMTypes cache. Lazy caches on one shared Default are where a data race
+// would live, so the first use is driven from many goroutines at once: this
+// test is written to be meaningful under `go test -race`, and it also catches a
+// Once that publishes a half-built map by returning a wrong answer.
 func TestHierarchyConcurrentFirstUse(t *testing.T) {
 	// A fresh Lookup, so the caches really are cold when the goroutines start.
 	h, ok := rminfo.New(rminfoDefaultDataCopy(t)).(rminfo.Hierarchy)
@@ -590,20 +731,38 @@ func TestHierarchyConcurrentFirstUse(t *testing.T) {
 	}
 	const goroutines = 32
 	descendants := make([][]string, goroutines)
+	ancestors := make([][]string, goroutines)
+	conforms := make([]bool, goroutines)
 	knownCounts := make([]int, goroutines)
 	var wg sync.WaitGroup
 	for i := range goroutines {
 		wg.Go(func() {
-			// Both lazy caches on the same cold value, from the same
-			// goroutine, so childOnce and knownOnce race each other too.
+			// Every lazy cache on the same cold value, from the same
+			// goroutine, so childOnce, ancestorOnce and knownOnce race each
+			// other too. Half the goroutines reach the ancestor index through
+			// ConformsTo first, half through Ancestors.
+			if i%2 == 0 {
+				conforms[i], _ = h.ConformsTo("OBSERVATION", "LOCATABLE")
+				ancestors[i], _ = h.Ancestors("OBSERVATION")
+			} else {
+				ancestors[i], _ = h.Ancestors("OBSERVATION")
+				conforms[i], _ = h.ConformsTo("OBSERVATION", "LOCATABLE")
+			}
 			descendants[i], _ = h.ConcreteDescendants("ENTRY")
 			knownCounts[i] = len(lookup.KnownRMTypes())
 		})
 	}
 	wg.Wait()
 	want := []string{"ACTION", "ADMIN_ENTRY", "EVALUATION", "INSTRUCTION", "OBSERVATION"}
+	wantAncestors, _ := hier(t).Ancestors("OBSERVATION")
 	wantKnown := len(rminfo.Default.KnownRMTypes())
 	for i := range goroutines {
+		if !slices.Equal(ancestors[i], wantAncestors) {
+			t.Errorf("goroutine %d saw Ancestors(OBSERVATION) = %v, want %v", i, ancestors[i], wantAncestors)
+		}
+		if !conforms[i] {
+			t.Errorf("goroutine %d saw ConformsTo(OBSERVATION, LOCATABLE) = false, want true", i)
+		}
 		if !slices.Equal(descendants[i], want) {
 			t.Errorf("goroutine %d saw ConcreteDescendants(ENTRY) = %v, want %v", i, descendants[i], want)
 		}
