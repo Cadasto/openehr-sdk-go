@@ -437,14 +437,11 @@ func DecodePolymorphic[T any](dec *jsontext.Decoder, out *T, fallback func() any
 	// stack depth starts again at zero, so the concrete values inside it
 	// measure their depth from the slot. Adding the enclosing decoder's stack
 	// depth to the slot's own nesting keeps a chain of polymorphic slots, each
-	// shallow on its own, from nesting past the cap in total. A value nested d
-	// levels deep holds d opening and d closing brackets, so d is at most
-	// len(raw)/2; when even that bound stays within the cap the check cannot
-	// fail, and the bracket scan is skipped.
-	if depth := dec.StackDepth(); depth+len(raw)/2 > maxDecodeDepth {
-		if d := depth + jsonNestingDepth(raw); d > maxDecodeDepth {
-			return &DecodeError{Inner: fmt.Errorf("typereg.Decode: %w (%d > %d)", ErrMaxDepthExceeded, d, maxDecodeDepth)}
-		}
+	// shallow on its own, from nesting past the cap in total. [depthPastCap]
+	// counts the slot's opening brackets first and scans its nesting only when
+	// that count passes the cap.
+	if d, over := depthPastCap(dec.StackDepth(), raw); over {
+		return &DecodeError{Inner: fmt.Errorf("typereg.Decode: %w (%d > %d)", ErrMaxDepthExceeded, d, maxDecodeDepth)}
 	}
 	// The peek honours the caller's decoder options (REQ-052): ReadValue above
 	// already tokenised the slot under them, so a v1 caller's leniencies

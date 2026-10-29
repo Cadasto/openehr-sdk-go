@@ -10,6 +10,7 @@
 package typereg
 
 import (
+	"bytes"
 	"encoding/json/jsontext"
 	json "encoding/json/v2"
 	"fmt"
@@ -59,6 +60,28 @@ func jsonNestingDepth(data []byte) int {
 	}
 	return maxDepth
 }
+
+// depthPastCap reports whether data, opening at stack depth base, nests past
+// maxDecodeDepth, and the depth to report when it does: base plus what
+// jsonNestingDepth finds (REQ-108). Nesting can never be deeper than the
+// number of '{' and '[' bytes in data, since only those bytes open a level and
+// one inside a string only adds to the count. bytes.Count is vectorised, so a
+// value whose count keeps within the cap is settled at a fraction of the cost
+// of the exact scan, which runs only for the rest. The bound holds for any
+// bytes, malformed input included, so both call sites can use it.
+func depthPastCap(base int, data []byte) (int, bool) {
+	if base+bytes.Count(data, openBrace)+bytes.Count(data, openBracket) <= maxDecodeDepth {
+		return 0, false
+	}
+	d := base + jsonNestingDepth(data)
+	return d, d > maxDecodeDepth
+}
+
+// openBrace and openBracket are the separators depthPastCap counts.
+var (
+	openBrace   = []byte{'{'}
+	openBracket = []byte{'['}
+)
 
 // Registry maps each openEHR _type discriminator string (e.g.
 // "DV_QUANTITY") to a constructor returning a fresh zero-value
@@ -139,7 +162,7 @@ func (r *Registry) Names() []string {
 // shared [ClassifyDuplicate] gate, so every canonical-JSON decode route,
 // this one and the canjson entry points, refuses it the same way.
 func (r *Registry) Decode(data []byte) (any, error) {
-	if d := jsonNestingDepth(data); d > maxDecodeDepth {
+	if d, over := depthPastCap(0, data); over {
 		return nil, fmt.Errorf("typereg.Decode: %w (%d > %d)", ErrMaxDepthExceeded, d, maxDecodeDepth)
 	}
 	typeName, err := peekType(jsontext.Value(data))
