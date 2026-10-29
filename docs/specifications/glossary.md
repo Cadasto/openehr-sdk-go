@@ -73,7 +73,7 @@ A request-side header carrying the commit-time audit envelope (committer, time, 
 Standard HTTP header used by openEHR REST 1.1.0 to negotiate the response body on write paths: `minimal`, `identifier`, or `representation`. The SDK exposes a typed `transport.Prefer` enum and a per-call option `WithPrefer(Prefer)`. Defaults: `minimal` for writes, none for reads (REQ-094).
 
 **Error envelope (openEHR REST)**
-The structured `{message, code, coded_text[]}` JSON body returned on non-2xx responses. Decoded by the SDK into `transport.OpenEHRErrorDetail` attached to a `transport.WireError`; consumers detect class via `errors.Is`, inspect detail via `errors.As` (REQ-093).
+The structured `{message, code, errors[], coded_text[]}` JSON body returned on non-2xx responses: `errors[]` is the ITS-REST pin's `DV_CODED_TEXT` list, `coded_text[]` the list some servers send. Decoded by the SDK into `transport.OpenEHRErrorDetail` attached to a `transport.WireError`; consumers detect class via `errors.Is`, inspect detail via `errors.As` (REQ-093).
 
 ---
 

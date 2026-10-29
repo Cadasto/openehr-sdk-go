@@ -32,7 +32,7 @@ Tests exercise Composition GET responses (Phase 3 reads) against the canonical-J
 
 ### `errors/`
 
-Hand-crafted error envelopes that match the REQ-093 shape (`{message, code, coded_text?}`) plus the documented HTTP status semantics. Each file is named for the status code it represents.
+Hand-crafted error envelopes that match the REQ-093 shape (`{message, code, errors?, coded_text?}`, with `errors` the pin's `DV_CODED_TEXT` list) plus the documented HTTP status semantics. Each file is named for the status code it represents.
 
 | File | Status | Scenario |
 |---|---|---|
