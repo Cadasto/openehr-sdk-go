@@ -250,6 +250,8 @@ var onePassVariants = []struct {
 // "_type" first, reports: the same calls, in the same order, and the same
 // error. It also pins which documents the one pass completes on, so a pass
 // that read a late "_type" as absent, or gave up on a leading one, fails here.
+// The reports are canjson's WithMissing (REQ-175) and WithUnmatched and
+// WithStrict (REQ-052), and ValidateJSON's report of missing members.
 func TestREQ175_REQ052_OnePassReportsWhatTwoPassesReport(t *testing.T) {
 	m, err := Default()
 	if err != nil {
