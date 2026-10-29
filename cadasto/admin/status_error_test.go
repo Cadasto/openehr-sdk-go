@@ -77,6 +77,7 @@ func TestProbeStatusError(t *testing.T) { // REQ-083
 		{http.StatusInternalServerError, transport.ErrServerError},
 		{http.StatusServiceUnavailable, transport.ErrServerError},
 		// net/http accepts any three-digit status; only 5xx is a server error.
+		{599, transport.ErrServerError},
 		{600, admin.ErrUnexpectedStatus},
 		{999, admin.ErrUnexpectedStatus},
 	}

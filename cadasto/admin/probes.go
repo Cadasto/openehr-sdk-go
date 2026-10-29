@@ -409,7 +409,7 @@ func statusToSentinel(s int) error {
 	case http.StatusForbidden:
 		return transport.ErrForbidden
 	}
-	if s >= 500 {
+	if s >= 500 && s < 600 {
 		return transport.ErrServerError
 	}
 	return ErrUnexpectedStatus
