@@ -82,6 +82,13 @@ type Hooks struct {
 // before the walk has read the whole value once, so a malformed document
 // calls none, and the hooks never see a pass the walk gave up.
 //
+// The walk holds the calls back while it reads the document the first time,
+// but only up to a budget: the larger of 64 KiB and the document's length,
+// each call counted as its pointer's length plus 24 bytes. Past it the walk
+// reads the document again as above, calling each hook as it goes, so a hook
+// that returns an error at the first of a great many unmatched or missing
+// members still stops the walk there.
+//
 // An error other than a hook's own is a malformed document, reported by
 // encoding/json/jsontext under its default options; data the canonical-JSON
 // decoder accepted walks without one.
@@ -97,15 +104,35 @@ func (m *Model) Walk(data []byte, root Root, h Hooks) error {
 // calls back, returning them in order. ok is false when the pass cannot stand
 // for [Model.walkIndexed]: an object it looks inside carries a "_type" string
 // it did not read as the object opened, so it may have walked the object as
-// the wrong type, or data is malformed. The two passes then decide, the error
-// included.
+// the wrong type, the calls it holds pass their budget, or data is malformed.
+// The two passes then decide, the error included.
+//
+// The budget is the larger of [holdFloor] and the length of data, each call
+// counted as its pointer's length plus [callBytes]. A hook may stop the walk
+// at its first call, as a strict decode does at the first unmatched member,
+// and the two passes stop there too; the one pass, holding the calls back,
+// would read on and hold a pointer for every member of a hostile document
+// that reports them all. Past the budget it gives up instead: the walk then
+// holds at most the budget beyond what the two passes hold, and reads the
+// document at most once more than they do.
 func (m *Model) walkOnce(data []byte, root Root, h Hooks) (calls []call, ok bool) {
-	w := &walk{m: m, hooks: h, once: true}
+	w := &walk{m: m, hooks: h, once: true, budget: max(holdFloor, len(data))}
 	if err := w.root(newDecoder(data), root.Nest, root); err != nil {
 		return nil, false
 	}
 	return w.calls, true
 }
+
+const (
+	// holdFloor is the least budget, in bytes, of the calls the one pass
+	// holds ([Model.walkOnce]). Real documents stay far below it: the
+	// largest report of a corpus composition holds under 1 KiB, and under
+	// 46 KiB with a member no RM class has added to every object.
+	holdFloor = 64 << 10
+	// callBytes is what a held call counts for beside its pointer's bytes:
+	// a call's own size on a 64-bit platform.
+	callBytes = 24
+)
 
 // walkIndexed is [Model.Walk] in two passes: [typeIndex] reads the "_type" of
 // every object first, wherever it sits among the object's members, and the
@@ -144,6 +171,10 @@ func replay(calls []call, h Hooks) error {
 // errLateType gives the one pass up at an object whose "_type" it did not
 // read as the object opened. [Model.Walk] never returns it.
 var errLateType = errors.New("rmjsonwalk: _type is not the leading member of its object")
+
+// errOverBudget gives the one pass up when the calls it holds pass their
+// budget ([Model.walkOnce]). [Model.Walk] never returns it.
+var errOverBudget = errors.New("rmjsonwalk: the hook calls held exceed their budget")
 
 // leadingType reads the "_type" of an object from unread, the bytes that
 // follow the object's opening brace, without reading a token. ok is true
@@ -300,12 +331,14 @@ type walk struct {
 	m     *Model
 	hooks Hooks
 	// once marks the one pass ([Model.walkOnce]), which reads each object's
-	// type from a leading "_type" and holds the hook calls back in calls.
+	// type from a leading "_type" and holds the hook calls back in calls, as
+	// long as budget, the bytes it may still hold, does not run out.
 	// Otherwise types holds the "_type" of every object, keyed as
 	// [typeIndex] keys it, and the hooks are called as the walk goes.
-	once  bool
-	calls []call
-	types map[int64]string
+	once   bool
+	calls  []call
+	budget int
+	types  map[int64]string
 }
 
 // typeOf returns the "_type" of the object dec has just opened, and whether
@@ -320,9 +353,15 @@ func (w *walk) typeOf(dec *jsontext.Decoder) (string, bool) {
 }
 
 // report calls the Missing hook with pointer, or the Unmatched hook when
-// missing is false. The one pass holds the call back instead.
+// missing is false. The one pass holds the call back instead, counting it
+// against its budget, and gives the pass up with [errOverBudget] once the
+// calls it holds would pass it.
 func (w *walk) report(missing bool, pointer string) error {
 	if w.once {
+		w.budget -= len(pointer) + callBytes
+		if w.budget < 0 {
+			return errOverBudget
+		}
 		w.calls = append(w.calls, call{missing: missing, pointer: pointer})
 		return nil
 	}
