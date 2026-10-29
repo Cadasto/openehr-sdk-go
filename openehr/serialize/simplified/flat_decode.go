@@ -931,8 +931,8 @@ func checkTerminologyWitness(key string, val any, want string) error {
 		return err
 	}
 	if got != want {
-		return fmt.Errorf("%w: %s = %q, but the ctx/ form implies %q (a differing terminology cannot be carried)",
-			ErrUnsupportedDatatype, key, got, want)
+		return fmt.Errorf("%w: %s names a terminology other than %q, the one the ctx/ form implies (a differing terminology cannot be carried)",
+			ErrUnsupportedDatatype, key, want)
 	}
 	return nil
 }
@@ -1682,8 +1682,8 @@ func settleIsmTransition(tr map[string]any, n ismNode) error {
 	dc := definingCodeOf(step)
 	code, _ := dc["code_string"].(string)
 	if code != n.id {
-		return fmt.Errorf("%w: %s/careflow_step is coded %q, but its node is ism_transition[%s]; a careflow step coded otherwise names another node",
-			ErrUnsupportedDatatype, n.flat, code, n.id)
+		return fmt.Errorf("%w: %s/careflow_step is not coded with its node's id %s; a careflow step coded otherwise names another node",
+			ErrUnsupportedDatatype, n.flat, n.id)
 	}
 	switch tid := dc["terminology_id"].(type) {
 	case nil:
@@ -1698,8 +1698,8 @@ func settleIsmTransition(tr map[string]any, n ismNode) error {
 			return fmt.Errorf("%w: %s/careflow_step carries a terminology_id value of JSON type %T, not a string",
 				ErrUnsupportedDatatype, n.flat, raw)
 		case term != localTerminology:
-			return fmt.Errorf("%w: %s/careflow_step is coded in terminology %q, but its node id %s is an at-code of the %s terminology",
-				ErrUnsupportedDatatype, n.flat, term, n.id, localTerminology)
+			return fmt.Errorf("%w: %s/careflow_step is coded in a terminology other than %s, but its node id %s is an at-code of the %s terminology",
+				ErrUnsupportedDatatype, n.flat, localTerminology, n.id, localTerminology)
 		}
 	default:
 		return fmt.Errorf("%w: %s/careflow_step carries a terminology_id of JSON type %T, not a TERMINOLOGY_ID object",

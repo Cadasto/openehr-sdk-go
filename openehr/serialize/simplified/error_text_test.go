@@ -81,6 +81,26 @@ func TestREQ140DecodeRefusalTextNamesNoRequirementOrValue(t *testing.T) {
 			name: "deferred family", key: rmattrAction + "/_instruction_details", want: ErrUnknownPath,
 			keys: map[string]any{rmattrAction + "/_instruction_details|activity_id": refusalTextSecret},
 		},
+		{
+			name: "ctx/ terminology witness naming another terminology", key: "ctx/setting|terminology", want: ErrUnsupportedDatatype,
+			keys: map[string]any{"ctx/setting|terminology": refusalTextSecret},
+		},
+		{
+			name: "real-path terminology witness naming another terminology", key: rmattrRoot + "/territory|terminology", want: ErrUnsupportedDatatype,
+			keys: map[string]any{rmattrRoot + "/territory|terminology": refusalTextSecret},
+		},
+		{
+			name: "careflow step coded as another node", key: rmattrAction + "/transition/careflow_step", want: ErrUnsupportedDatatype,
+			keys: ismTransitionKeys("transition", "524", refusalTextSecret),
+		},
+		{
+			name: "careflow step coded in another terminology", key: rmattrAction + "/transition/careflow_step", want: ErrUnsupportedDatatype,
+			keys: func() map[string]any {
+				keys := ismTransitionKeys("transition", "524", "at0005")
+				keys[rmattrAction+"/transition/careflow_step|terminology"] = refusalTextSecret
+				return keys
+			}(),
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			checkRefusalText(t, decodeRMAttrErr(t, wt, rmattrBody(tc.keys)), tc.want, tc.key)
@@ -149,6 +169,14 @@ func TestREQ140EncodeRefusalTextNamesNoRequirementOrValue(t *testing.T) {
 				// One character, so the encoder accepts it, but outside
 				// TERM_MAPPING's set, so the refusal fires.
 				text.Mappings[0].Match = refusalTextSecretRune
+			},
+		},
+		{
+			name: "_uid spelled as another UID_BASED_ID subtype", key: rmattrRoot + "/_uid",
+			mutate: func(_ *testing.T, c *rm.Composition) {
+				// A HIER_OBJECT_ID spelled as an OBJECT_VERSION_ID, so decode
+				// would retype it.
+				c.UID = &rm.HierObjectID{Value: refusalTextSecret + "::ehrbase.org::1"}
 			},
 		},
 	} {
