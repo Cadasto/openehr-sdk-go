@@ -76,6 +76,9 @@ func TestProbeStatusError(t *testing.T) { // REQ-083
 		{http.StatusTooManyRequests, admin.ErrUnexpectedStatus},
 		{http.StatusInternalServerError, transport.ErrServerError},
 		{http.StatusServiceUnavailable, transport.ErrServerError},
+		// net/http accepts any three-digit status; only 5xx is a server error.
+		{600, admin.ErrUnexpectedStatus},
+		{999, admin.ErrUnexpectedStatus},
 	}
 	for _, p := range probes {
 		for _, tc := range cases {
