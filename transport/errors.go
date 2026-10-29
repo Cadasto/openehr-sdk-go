@@ -118,9 +118,10 @@ type OpenEHRErrorDetail struct {
 // value directly. Each errors entry is a DV_CODED_TEXT whose defining_code
 // gives the item's terminology and code string and whose value gives its
 // Value. In either list an entry that is not an object, or whose terminology
-// or code string is not a string, is skipped, as is an errors entry with no
-// defining_code; a value that is not a string is left empty and the entry's
-// codes are kept. A coded_text or errors member that is not a list is
+// or code string is present but not a string (null included), is skipped, as
+// is an errors entry with no defining_code; an absent terminology or code
+// string is left empty, and a value that is not a string is left empty and
+// the entry's codes are kept. A coded_text or errors member that is not a list is
 // ignored.
 func (d *OpenEHRErrorDetail) UnmarshalJSON(data []byte) error {
 	var raw struct {
@@ -145,23 +146,33 @@ func (d *OpenEHRErrorDetail) UnmarshalJSON(data []byte) error {
 
 // codePhrase is the terminology and code string of a coded entry: the
 // members of a coded_text entry, or the defining_code of an errors entry.
-// Decoding into it fails when either is present with a JSON type other than
-// a string or null.
+// Both are kept raw, so that a null can be told apart from an absent member.
 type codePhrase struct {
-	TerminologyID struct {
-		Value string `json:"value"`
-	} `json:"terminology_id"`
-	CodeString string `json:"code_string"`
+	TerminologyID json.RawMessage `json:"terminology_id"`
+	CodeString    json.RawMessage `json:"code_string"`
 }
 
-// codedItem returns the item for p and an entry's raw value. A value that is
-// not a JSON string is left empty, so the codes survive it.
-func (p codePhrase) codedItem(value json.RawMessage) CodedTextItem {
+// codedItem returns the item for p and an entry's raw value, and false when
+// the terminology_id is present but not an object, or the terminology or code
+// string is present but not a JSON string, null included. An absent one is
+// left empty. A value that is not a JSON string is left empty, so the codes
+// survive it.
+func (p codePhrase) codedItem(value json.RawMessage) (CodedTextItem, bool) {
+	var terminology struct {
+		Value json.RawMessage `json:"value"`
+	}
+	if len(p.TerminologyID) > 0 && (!isJSONObject(p.TerminologyID) || json.Unmarshal(p.TerminologyID, &terminology) != nil) {
+		return CodedTextItem{}, false
+	}
 	var item CodedTextItem
-	item.TerminologyID.Value = p.TerminologyID.Value
-	item.CodeString = p.CodeString
+	var termOK, codeOK bool
+	item.TerminologyID.Value, termOK = optionalString(terminology.Value)
+	item.CodeString, codeOK = optionalString(p.CodeString)
+	if !termOK || !codeOK {
+		return CodedTextItem{}, false
+	}
 	item.Value, _ = jsonString(value)
-	return item
+	return item, true
 }
 
 // envelopeCodedText returns the coded items of the envelope's coded_text
@@ -178,7 +189,9 @@ func envelopeCodedText(raw json.RawMessage) []CodedTextItem {
 		if !isJSONObject(entry) || json.Unmarshal(entry, &e) != nil {
 			continue
 		}
-		items = append(items, e.codedItem(e.Value))
+		if item, ok := e.codedItem(e.Value); ok {
+			items = append(items, item)
+		}
 	}
 	return items
 }
@@ -200,7 +213,9 @@ func envelopeErrors(raw json.RawMessage) []CodedTextItem {
 		if json.Unmarshal(entry, &dv) != nil || dv.DefiningCode == nil {
 			continue
 		}
-		items = append(items, dv.DefiningCode.codedItem(dv.Value))
+		if item, ok := dv.DefiningCode.codedItem(dv.Value); ok {
+			items = append(items, item)
+		}
 	}
 	return items
 }
@@ -226,6 +241,15 @@ func jsonList(raw json.RawMessage) []json.RawMessage {
 		return nil
 	}
 	return entries
+}
+
+// optionalString returns the text of a JSON string and true, "" and true for
+// an absent member, and "" and false for null or any other JSON type.
+func optionalString(raw json.RawMessage) (string, bool) {
+	if len(raw) == 0 {
+		return "", true
+	}
+	return jsonString(raw)
 }
 
 // jsonString returns the text of a JSON string and true, or "" and false for

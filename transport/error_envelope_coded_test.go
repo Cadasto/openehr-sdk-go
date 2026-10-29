@@ -335,6 +335,19 @@ func TestErrorEnvelopeWrongTypedMembersKeepTheEnvelope(t *testing.T) {
 			want:     []transport.CodedTextItem{codedItem("openehr", "K", "")},
 		},
 		{
+			name:     "coded_text entries whose terminology or code_string is null are skipped",
+			body:     `{"code":"X","coded_text":[{"terminology_id":{"value":"openehr"},"code_string":null},{"terminology_id":{"value":null},"code_string":"Z"},{"terminology_id":null,"code_string":"Z"},{"terminology_id":{"value":"openehr"},"code_string":"K"}]}`,
+			wantCode: "X",
+			want:     []transport.CodedTextItem{codedItem("openehr", "K", "")},
+		},
+		{
+			name:     "errors entries whose defining_code holds a null terminology or code_string are skipped",
+			body:     `{"code":"X","errors":[{"_type":"DV_CODED_TEXT","value":"v","defining_code":{"terminology_id":{"value":"local"},"code_string":null}},{"_type":"DV_CODED_TEXT","value":"v","defining_code":{"terminology_id":{"value":null},"code_string":"9000"}},{"_type":"DV_CODED_TEXT","value":"v","defining_code":{"terminology_id":null,"code_string":"9000"}},{"_type":"DV_CODED_TEXT","value":"v","defining_code":{"terminology_id":{"value":"local"},"code_string":"8000"}}]}`,
+			raw:      true,
+			wantCode: "X",
+			want:     []transport.CodedTextItem{codedItem("local", "8000", "v")},
+		},
+		{
 			name:     "coded_text that is not a list is ignored, the errors list is kept",
 			body:     `{"code":"X","coded_text":{"terminology_id":{"value":"openehr"},"code_string":"K"},"errors":[{"_type":"DV_CODED_TEXT","value":"v","defining_code":{"terminology_id":{"value":"local"},"code_string":"9000"}}]}`,
 			raw:      true,
@@ -391,6 +404,8 @@ func TestErrorEnvelopeEmptyCodedListsAreNoEnvelope(t *testing.T) {
 		{name: "empty coded_text list", body: `{"coded_text":[]}`},
 		{name: "errors entries that all are skipped", body: `{"errors":[42,{"value":"patient 1234"}]}`},
 		{name: "errors member that is not a list", body: `{"errors":{"value":"patient 1234"}}`},
+		{name: "coded_text entry whose code_string is null", body: `{"coded_text":[{"terminology_id":{"value":"openehr"},"code_string":null}]}`},
+		{name: "errors entry whose terminology is null", body: `{"errors":[{"value":"patient 1234","defining_code":{"terminology_id":{"value":null},"code_string":"9000"}}]}`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
