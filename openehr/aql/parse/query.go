@@ -65,7 +65,9 @@ type Query struct {
 	// Spans locates each clause in the source text [ParseQuery] or [Parse]
 	// read, as byte offsets. It is zero for a Query built directly.
 	// [Query.Emit] ignores it, and editing the AST leaves it describing the
-	// original source.
+	// original source. Two texts of one query that differ only in spacing
+	// or comments give different Spans, so compare queries by their
+	// [Query.Emit] output, not with reflect.DeepEqual.
 	Spans ClauseSpans
 
 	// incomplete records the catalogue-gap error from the extractor
