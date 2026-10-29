@@ -238,7 +238,7 @@ func (l *lookup) ConcreteDescendants(rmType string) ([]string, bool) {
 	if !meta.Abstract {
 		out = append(out, rmType)
 	}
-	// Clone for the same reason as in Ancestors, and here it is stricter:
+	// Clone for the same reason as in walkAncestors, and here it is stricter:
 	// childIndex builds its slices by repeated append, so they routinely
 	// have spare capacity, and appending into one would corrupt the shared
 	// index for every later call.
