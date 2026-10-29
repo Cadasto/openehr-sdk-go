@@ -259,9 +259,9 @@ func participationModeRubric(key string, mode rm.DVCodedText) (string, error) {
 		return "", fmt.Errorf("%w: %q is a bare rubric and cannot carry a decorated DV_CODED_TEXT (formatting, hyperlink, language, encoding, mappings or a preferred term)",
 			ErrUnsupportedDatatype, key)
 	}
-	if term := mode.DefiningCode.TerminologyID.Value; term != terminology.ID {
-		return "", fmt.Errorf("%w: %q implies the %q terminology, but PARTICIPATION.mode is coded in %q",
-			ErrUnsupportedDatatype, key, terminology.ID, term)
+	if mode.DefiningCode.TerminologyID.Value != terminology.ID {
+		return "", fmt.Errorf("%w: %q implies the openehr terminology, but PARTICIPATION.mode is coded in another terminology",
+			ErrUnsupportedDatatype, key)
 	}
 	rubric, known := terminology.ParticipationMode.Rubric(mode.DefiningCode.CodeString)
 	if !known {
@@ -269,8 +269,8 @@ func participationModeRubric(key string, mode rm.DVCodedText) (string, error) {
 			ErrUnsupportedDatatype, key)
 	}
 	if mode.Value != rubric {
-		return "", fmt.Errorf("%w: %q carries value %q beside code %q, whose `participation mode` rubric is %q; the key carries the rubric alone, so decode would rewrite the value",
-			ErrUnsupportedDatatype, key, mode.Value, mode.DefiningCode.CodeString, rubric)
+		return "", fmt.Errorf("%w: %q carries a PARTICIPATION.mode value other than its code's `participation mode` rubric; the key carries the rubric alone, so decode would rewrite the value",
+			ErrUnsupportedDatatype, key)
 	}
 	return rubric, nil
 }
