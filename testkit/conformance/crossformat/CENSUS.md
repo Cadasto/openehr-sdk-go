@@ -89,8 +89,8 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - `/content/0/data/events/2/archetype_node_id`: reference `"at0003"`, ours `"at0026"`
   - `/content/0/data/events/2/data/items/0/value/magnitude`: reference `60`, ours `30`
 - Reducing decode removed 4 keys from the upstream FLAT:
-  - 3: `simplified: path not in web template: "<key>" is the reference's in-context spelling of an INTERVAL_EVENT's math_function, which the Web Template this SDK builds does not model - refused rather than dropped or replaced (REQ-170, see deviations.md)`
-  - 1: `simplified: path not in web template: "<key>" is the reference's in-context spelling of an INTERVAL_EVENT's width, which the Web Template this SDK builds does not model - refused rather than dropped or replaced (REQ-170, see deviations.md)`
+  - 3: `simplified: path not in web template: "<key>" is the reference's in-context spelling of an INTERVAL_EVENT's math_function, which the Web Template this SDK builds does not model - refused rather than dropped or replaced (see deviations.md)`
+  - 1: `simplified: path not in web template: "<key>" is the reference's in-context spelling of an INTERVAL_EVENT's width, which the Web Template this SDK builds does not model - refused rather than dropped or replaced (see deviations.md)`
 
 ## consult_record
 
@@ -133,7 +133,7 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - `/context/setting/value`: reference `"primary medical care"`, ours `"other care"`
 - Reducing decode removed 4 keys from the upstream FLAT:
   - 2: `reported as unmatched content`
-  - 1: `simplified: path not in web template: conflicting spellings of <key>: "<key>" gives "2023-06-02T12:50:00Z", "opconsultation/context/start_time" gives "2022-02-03T04:05:06"; remove one`
+  - 1: `simplified: path not in web template: conflicting spellings of <key>: "<key>" and "opconsultation/context/start_time" give different values; remove one`
   - 1: `simplified: unsupported datatype: "<key>" spells the setting without its |code and |value, the pair <key> travels as`
 
 ### flat-structured
@@ -448,5 +448,5 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 - Reducing decode removed 11 keys from the upstream FLAT:
   - 4: `simplified: decode "<key>": simplified: unsupported datatype: DV_IDENTIFIER missing required |id`
   - 3: `reported as unmatched content`
-  - 3: `simplified: path not in web template: "<key>" is the reference's in-context spelling of an ACTION's ISM transition current_state, which the Web Template this SDK builds does not model - refused rather than dropped or replaced (REQ-170, see deviations.md)`
-  - 1: `simplified: path not in web template: "<key>" is the reference's in-context spelling of an ACTION's time, which the Web Template this SDK builds does not model - refused rather than dropped or replaced (REQ-170, see deviations.md)`
+  - 3: `simplified: path not in web template: "<key>" is the reference's in-context spelling of an ACTION's ISM transition current_state, which the Web Template this SDK builds does not model - refused rather than dropped or replaced (see deviations.md)`
+  - 1: `simplified: path not in web template: "<key>" is the reference's in-context spelling of an ACTION's time, which the Web Template this SDK builds does not model - refused rather than dropped or replaced (see deviations.md)`

@@ -86,9 +86,9 @@ Concretely:
   ACTION's own `time` leaf where the ACTION has no node for it. Each names RM data the decode
   would otherwise drop, or for `time` replace with the `ctx/time` default a `WithTemplate` decode
   fills in, so the refusal (`ErrUnknownPath`) names the key, or the `_reason` family instance, and
-  carries no value. The refusal of a `transition` leaf or a `_reason` family cites REQ-140, whose
-  third out-of-scope class covers them; the refusal of a `current_state` or `careflow_step` leaf
-  and of the ACTION's `time` cites REQ-170. On the same ground decode refuses an INTERVAL_EVENT's `math_function`, `width`
+  carries no value. The refusal names the RM attribute it refuses: REQ-140's third out-of-scope
+  class covers a `transition` leaf and a `_reason` family, and REQ-170 a `current_state` or
+  `careflow_step` leaf and the ACTION's `time`. On the same ground decode refuses an INTERVAL_EVENT's `math_function`, `width`
   and `sample_count` and an OBSERVATION's `history_origin` in the reference's spelling, a leaf
   under the event or observation node (with any suffix) or a suffix on it, wherever the Web
   Template does not resolve them (the corpus writes `any_event:0/math_function|code`,
