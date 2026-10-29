@@ -104,67 +104,149 @@ type OpenEHRErrorDetail struct {
 	ValidationErrors []string `json:"validationErrors,omitempty"`
 }
 
-// UnmarshalJSON reads the envelope, accepting a string or a number for
-// code. A code of any other JSON type is left empty rather than failing
-// the whole envelope, since the message and the other fields are still
-// usable.
+// UnmarshalJSON reads the envelope member by member, so one member of the
+// wrong JSON type is left empty or skipped instead of failing the whole
+// envelope. It fails only when the body is not a JSON object.
+//
+// Code accepts a string or a number; a code of any other JSON type is left
+// empty. Message is read only when it is a string. ValidationErrors keeps the
+// string entries of a validationErrors list, in order, and skips any other
+// entry.
 //
 // CodedText collects the coded_text entries first, then the errors
-// entries. Each errors entry is a DV_CODED_TEXT whose defining_code gives
-// the item's terminology and code string and whose value gives its Value.
-// An errors entry that does not decode as such an object, or has no
-// defining_code, is skipped; an errors member that is not a list is
-// ignored. Neither fails the envelope.
+// entries. A coded_text entry gives the item's terminology, code string and
+// value directly. Each errors entry is a DV_CODED_TEXT whose defining_code
+// gives the item's terminology and code string and whose value gives its
+// Value. In either list an entry that is not an object, or whose terminology
+// or code string is not a string, is skipped, as is an errors entry with no
+// defining_code; a value that is not a string is left empty and the entry's
+// codes are kept. A coded_text or errors member that is not a list is
+// ignored.
 func (d *OpenEHRErrorDetail) UnmarshalJSON(data []byte) error {
 	var raw struct {
-		Message          string          `json:"message"`
+		Message          json.RawMessage `json:"message"`
 		Code             json.RawMessage `json:"code"`
-		CodedText        []CodedTextItem `json:"coded_text"`
+		CodedText        json.RawMessage `json:"coded_text"`
 		Errors           json.RawMessage `json:"errors"`
-		ValidationErrors []string        `json:"validationErrors"`
+		ValidationErrors json.RawMessage `json:"validationErrors"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
+	message, _ := jsonString(raw.Message)
 	*d = OpenEHRErrorDetail{
-		Message:          raw.Message,
+		Message:          message,
 		Code:             envelopeCode(raw.Code),
-		CodedText:        append(raw.CodedText, envelopeErrors(raw.Errors)...),
-		ValidationErrors: raw.ValidationErrors,
+		CodedText:        append(envelopeCodedText(raw.CodedText), envelopeErrors(raw.Errors)...),
+		ValidationErrors: envelopeStrings(raw.ValidationErrors),
 	}
 	return nil
 }
 
-// envelopeErrors returns the coded items of the envelope's errors list, in
-// order. It skips an entry that does not decode as a DV_CODED_TEXT object or
-// has no defining_code, and returns nil when the list is absent, null or not
-// a JSON array.
-func envelopeErrors(raw json.RawMessage) []CodedTextItem {
-	var entries []json.RawMessage
-	if len(raw) == 0 || json.Unmarshal(raw, &entries) != nil {
-		return nil
-	}
+// codePhrase is the terminology and code string of a coded entry: the
+// members of a coded_text entry, or the defining_code of an errors entry.
+// Decoding into it fails when either is present with a JSON type other than
+// a string or null.
+type codePhrase struct {
+	TerminologyID struct {
+		Value string `json:"value"`
+	} `json:"terminology_id"`
+	CodeString string `json:"code_string"`
+}
+
+// codedItem returns the item for p and an entry's raw value. A value that is
+// not a JSON string is left empty, so the codes survive it.
+func (p codePhrase) codedItem(value json.RawMessage) CodedTextItem {
+	var item CodedTextItem
+	item.TerminologyID.Value = p.TerminologyID.Value
+	item.CodeString = p.CodeString
+	item.Value, _ = jsonString(value)
+	return item
+}
+
+// envelopeCodedText returns the coded items of the envelope's coded_text
+// list, in order. It skips an entry that is not an object or whose
+// terminology or code string is not a string, and returns nil when the list
+// is absent, null or not a JSON array.
+func envelopeCodedText(raw json.RawMessage) []CodedTextItem {
 	var items []CodedTextItem
-	for _, entry := range entries {
+	for _, entry := range jsonList(raw) {
+		var e struct {
+			codePhrase
+			Value json.RawMessage `json:"value"`
+		}
+		if !isJSONObject(entry) || json.Unmarshal(entry, &e) != nil {
+			continue
+		}
+		items = append(items, e.codedItem(e.Value))
+	}
+	return items
+}
+
+// envelopeErrors returns the coded items of the envelope's errors list, in
+// order. It skips an entry that is not an object, has no defining_code, or
+// whose terminology or code string is not a string, and returns nil when the
+// list is absent, null or not a JSON array. A value that is not a string is
+// left empty and the entry's codes are kept. An entry that is not an object
+// fails the decode, and a null one has no defining_code, so neither needs a
+// check of its own.
+func envelopeErrors(raw json.RawMessage) []CodedTextItem {
+	var items []CodedTextItem
+	for _, entry := range jsonList(raw) {
 		var dv struct {
-			Value        string `json:"value"`
-			DefiningCode *struct {
-				TerminologyID struct {
-					Value string `json:"value"`
-				} `json:"terminology_id"`
-				CodeString string `json:"code_string"`
-			} `json:"defining_code"`
+			Value        json.RawMessage `json:"value"`
+			DefiningCode *codePhrase     `json:"defining_code"`
 		}
 		if json.Unmarshal(entry, &dv) != nil || dv.DefiningCode == nil {
 			continue
 		}
-		var item CodedTextItem
-		item.TerminologyID.Value = dv.DefiningCode.TerminologyID.Value
-		item.CodeString = dv.DefiningCode.CodeString
-		item.Value = dv.Value
-		items = append(items, item)
+		items = append(items, dv.DefiningCode.codedItem(dv.Value))
 	}
 	return items
+}
+
+// envelopeStrings returns the string entries of a JSON list, in order,
+// skipping any other entry, and nil when the list is absent, null or not a
+// JSON array.
+func envelopeStrings(raw json.RawMessage) []string {
+	var out []string
+	for _, entry := range jsonList(raw) {
+		if s, ok := jsonString(entry); ok {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// jsonList returns the raw entries of a JSON array, and nil for an absent
+// value, null or any other JSON type.
+func jsonList(raw json.RawMessage) []json.RawMessage {
+	var entries []json.RawMessage
+	if len(raw) == 0 || json.Unmarshal(raw, &entries) != nil {
+		return nil
+	}
+	return entries
+}
+
+// jsonString returns the text of a JSON string and true, or "" and false for
+// an absent value, null or any other JSON type.
+func jsonString(raw json.RawMessage) (string, bool) {
+	if len(raw) == 0 || raw[0] != '"' {
+		return "", false
+	}
+	var s string
+	if json.Unmarshal(raw, &s) != nil {
+		return "", false
+	}
+	return s, true
+}
+
+// isJSONObject reports whether raw is a JSON object. The decoder hands each
+// entry over without leading white space, so the first byte decides. A null
+// entry decodes into a struct without error, so a coded_text entry needs
+// this check to be skipped.
+func isJSONObject(raw json.RawMessage) bool {
+	return len(raw) > 0 && raw[0] == '{'
 }
 
 // envelopeCode returns the text of a JSON string or number code, and ""
