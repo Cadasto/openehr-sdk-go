@@ -1236,8 +1236,16 @@ type Query struct {
     OrderBy []OrderTerm
     Limit   LimitExpr      // nil when no LIMIT
     Offset  LimitExpr      // nil when no OFFSET
+    Spans   ClauseSpans    // byte offsets of each clause in the source; zero when absent or built directly
 }
-func (q *Query) Emit() (string, error)                  // refuses (returns aql.ErrIncompleteAST) on an extractor-incomplete AST
+func (q *Query) Emit() (string, error)                  // refuses (returns aql.ErrIncompleteAST) on an extractor-incomplete AST; ignores Spans
+
+// Clause positions — half-open byte ranges [Start, End) into the parsed text.
+type Offsets     struct { Start, End int }              // zero value: absent
+func (o Offsets) IsZero() bool
+type ClauseSpans struct {
+    Select, From, Where, WhereExpr, OrderBy, Limit, Offset Offsets
+}
 
 // LIMIT / OFFSET — sealed union of literal and parameter forms.
 type LimitExpr  interface { /* sealed */ }
@@ -1264,6 +1272,8 @@ type ContainsJoin int  // ContainsAnd / ContainsOr
 type OrderTerm struct { Path IdentifiedPath; Dir OrderDir }
 type OrderDir  int  // OrderAsc / OrderDesc
 ```
+
+For a query parsed from `src`, `src[Start:End]` of each `ClauseSpans` field is that clause's text: from the first byte of its keyword to just past its last token, with `WhereExpr` the condition after `WHERE`, `Limit` ending before any `OFFSET`, and surrounding whitespace, comments and a trailing `--` outside every span.
 
 The shared `aql.Value` vocabulary also carries `aql.NullValue`, a typed NULL, so the unquoted `NULL` keyword round-trips without colliding with a `StringValue{"NULL"}`. `aql.ErrIncompleteAST` is the sentinel `ParseQuery` and `Document.QueryErr` surface, and `(*Query).Emit` returns it for an AST from an incomplete extraction (§ Catalogue and residual).
 
