@@ -85,25 +85,29 @@ net/http forwards these four headers to a redirect target on the same host, or a
 
 ## REQ-093 — openEHR error envelope mapping
 
-openEHR REST 1.1.0 returns a structured JSON body on non-2xx responses:
+openEHR REST 1.1.0 returns a structured JSON body on non-2xx responses. The pin's only error example (`resources/its-rest/overview-validation.openapi.yaml`, line 410) has this shape, shortened here to one coded entry:
 
 ```json
 {
-  "message": "Composition violates template constraints at /content[1]/...",
-  "code": "VALIDATION_FAILED",
-  "coded_text": [
-    {"terminology_id": {"value": "openehr"}, "code_string": "..."}
+  "message": "Error message",
+  "code": 90000,
+  "errors": [
+    {
+      "_type": "DV_CODED_TEXT",
+      "value": "Error message",
+      "defining_code": {"terminology_id": {"value": "local"}, "code_string": "9000"}
+    }
   ]
 }
 ```
 
 The SDK **MUST**:
 
-- Decode this envelope on every non-2xx response (best-effort; missing fields default to zero values).
+- Decode this envelope on every non-2xx response (best-effort, member by member; missing fields default to zero values). Its coded entries go to `OpenEHRErrorDetail.CodedText`: first those of a `coded_text` list, kept for servers that send one, then those of the pin's `errors` list, each a `DV_CODED_TEXT` whose `defining_code` gives the item's terminology and code string and whose `value` gives the item's `Value`. A member or entry of the wrong JSON type is left empty or skipped without failing the envelope: a `message` that is not a string is left empty; a `validationErrors` entry that is not a string is skipped; a `coded_text` or `errors` entry that is not an object, whose terminology or code string is not a string, or (in `errors`) that has no `defining_code` is skipped; and a `coded_text`, `errors` or `validationErrors` member that is not a list is skipped. A coded entry whose `value` is not a string keeps its terminology and code string, with an empty `Value`.
 - Accept the envelope's `code` as a JSON string or a JSON number (the overview's own example is `"code": 90000`), keeping the text form (`"90000"`) in `OpenEHRErrorDetail.Code`, and decode the `validationErrors` list the ITS-REST `Error` schema (the `400` bodies) defines beside `message`, so neither a numeric `code` nor a body that carries `validationErrors` with no `code` or no `message` leaves the envelope undecoded.
 - Attach the parsed envelope to `transport.WireError` as `OpenEHRErrorDetail{Message, Code, CodedText, ValidationErrors}`.
 - Map the HTTP status to typed sentinels per [idiom.md § Errors](idiom.md#errors-req-025): `ErrNotFound` (404), `ErrUnauthorized` (401), `ErrForbidden` (403), `ErrVersionConflict` (409), `ErrPreconditionFailed` (412), `ErrUnprocessable` (422), `ErrPreconditionRequired` (428). The status set follows the openEHR contract: a **422** signals a well-formed-but-semantically-invalid request (validation / template failure — `resources/its-rest/overview-validation.openapi.yaml` line 400; used on EHR and demographic writes) and **MUST** map to `ErrUnprocessable`. A **409** spans a conflict with the resource's current state (the Composition delete of a version that is not the latest) and a resource-already-exists collision; the openEHR error `code` on `OpenEHRErrorDetail` disambiguates and `ErrVersionConflict` remains the sentinel for both. openEHR signals a stale `If-Match` as **412** and a missing-but-expected `If-Match` as **400** (overview line 370) — **not** 428; `ErrPreconditionRequired` (428) is retained only as a defensive mapping for non-conformant servers and is **not** an openEHR-canonical status. A **400** with no more specific sentinel surfaces as a bare `WireError` whose openEHR `code` remains reachable via `errors.As`.
-- **PHI-safe error surfaces by default.** openEHR error bodies routinely carry patient identifiers and clinical detail. `WireError.Error()` **MUST NOT** interpolate `OpenEHR.Message` or the raw response bytes. It **MUST** carry HTTP status, route template, and the openEHR error *code* (codes are not PHI). Callers that need the full server payload for diagnostics **MUST** opt in via `transport.WithRawErrorBodies(true)`; only then are `OpenEHR.Message`, `OpenEHR.ValidationErrors` (free text, like the message) and `WireError.RawBody` populated. `OpenEHR.Code` and `OpenEHR.CodedText` remain available via `errors.As` regardless of the opt-in (structured codes, not free-text clinical narrative).
+- **PHI-safe error surfaces by default.** openEHR error bodies routinely carry patient identifiers and clinical detail. `WireError.Error()` **MUST NOT** interpolate `OpenEHR.Message`, a `CodedText` item's `Value` or the raw response bytes. It **MUST** carry HTTP status, route template, and the openEHR error *code* (codes are not PHI). Callers that need the full server payload for diagnostics **MUST** opt in via `transport.WithRawErrorBodies(true)`; only then are `OpenEHR.Message`, `OpenEHR.ValidationErrors`, each `OpenEHR.CodedText` item's `Value` (free text, like the message) and `WireError.RawBody` populated. `OpenEHR.Code` and each `OpenEHR.CodedText` item's terminology and code string remain available via `errors.As` regardless of the opt-in (structured codes, not free-text clinical narrative).
 - **Unrouted requests render a placeholder.** Where a diagnostic string names the request's route, it **MUST** carry the caller's route template, or — when the request carried none — the stable placeholder `(unrouted)`; it **MUST NOT** fall back to the expanded request path or the resolved URL, either of which may hold a caller-supplied identifier. The placeholder's exact text is part of this contract, not an implementation detail: a caller may match on it. The obligation reaches inside a wrapped error: where a network failure arrives as a net/http `*url.Error`, whose own text prints the resolved URL, the SDK **MUST** substitute the same route slot for that URL and leave the error's type, its `Op` and its cause as they were, so `errors.AsType[*url.Error]`, `Timeout()`, `Temporary()` and `errors.Is` against the cause all answer as before. The telemetry surfaces resolve the route their own way (REQ-090 span naming and the `http.route` attribute, REQ-098 `Observation.Route`) and this clause does not bind them.
 - **Bounded response reads.** Every `Client.Do` **MUST** cap how many bytes are read from the response body. The default limit is `transport.DefaultMaxResponseBody` (64 MiB). `transport.WithMaxResponseBody(n)` overrides the cap: `0` means default, a positive value sets an explicit limit, a negative value disables the cap (documented escape hatch for trusted backends). Exceeding the limit **MUST** fail the request with an error that `errors.Is` matches to `transport.ErrResponseTooLarge` and that names the limit, never with an unbounded `io.ReadAll`. What that failure returns beside the error is [§ REQ-151](#req-151--typed-2xx-decode-failure)'s.
 
@@ -230,7 +234,7 @@ These outcomes are their own, and the table **MUST NOT** override them:
 
 - The `Prefer: return=identifier` arm (`(*ehr.VersionMetadata).ResolveIdentifierBody`, [§ REQ-094](#req-094--prefer-response-shape-negotiation)) reports a body it cannot read as an identifier with an error wrapping `transport.ErrInvalidShape`, not a `*transport.DecodeError`.
 - On the Definition list operations, and on `GetStoredQuery`, `PutStoredQuery`, `PutStoredQueryVersion` and `UploadTemplate`, an empty body is a success: the list operations return an empty catalog ([wire.md § REQ-144](wire.md#req-144--definition-metadata-decoding) *Empty list bodies*), and the other four return metadata they build themselves with a nil error ([wire.md § REQ-057](wire.md#req-057), [§ REQ-144](wire.md#req-144--definition-metadata-decoding)). A non-empty body there that does not decode is still a `*transport.DecodeError`.
-- A read that answers `204 No Content` with an outcome of its own before the empty-body refusal keeps it: `composition.ErrDeletedAtTime`, and the demographic reads' nil result for no matching version.
+- A read that answers `204 No Content` with an outcome of its own before the empty-body refusal keeps it: `composition.ErrDeletedAtTime`, and `demographic.Get`'s nil PARTY for a party deleted at the requested time.
 
 **What each typed error carries.** Each typed error in the table **MUST** be recoverable from the returned error with `errors.AsType` through any `fmt.Errorf` operation-name wrap a leaf package adds, and **MUST** wrap its cause, exposing it through `Unwrap`, so `errors.Is` and `errors.AsType` still reach the cause's own diagnostics. Beneath a read failure that is `io.ErrUnexpectedEOF` for a connection cut mid-body, the content-coding error (such as `gzip.ErrHeader`) for a body that does not match its encoding, or `transport.ErrResponseTooLarge` for a body over the ceiling; beneath a decode failure, the codec's own typed errors (path, type, offset).
 

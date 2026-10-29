@@ -555,7 +555,8 @@ func TestSaveRejectsNil(t *testing.T) {
 
 // TestUpdateRequiresIfMatch pins REQ-054: an empty ifMatch is refused with
 // ErrInvalidConfig before any request is sent. The client is live and the
-// body is set, so only the If-Match guard can refuse the call.
+// body is set, so only the If-Match guard can refuse the call. The refusal
+// says what was refused and names no requirement id: the caller reads it.
 func TestUpdateRequiresIfMatch(t *testing.T) {
 	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -565,7 +566,10 @@ func TestUpdateRequiresIfMatch(t *testing.T) {
 	defer srv.Close()
 	_, _, err := composition.Update(t.Context(), newClient(t, srv), ehrIDFixture, compositionVOID, "", &rm.Composition{})
 	if !errors.Is(err, transport.ErrInvalidConfig) {
-		t.Errorf("expected ErrInvalidConfig on empty If-Match, got %v", err)
+		t.Fatalf("expected ErrInvalidConfig on empty If-Match, got %v", err)
+	}
+	if msg := err.Error(); !strings.Contains(msg, "empty If-Match") || strings.Contains(msg, "REQ-") {
+		t.Errorf("err = %q, want it to say empty If-Match and name no requirement id", msg)
 	}
 	if n := hits.Load(); n != 0 {
 		t.Errorf("server saw %d request(s), want none", n)

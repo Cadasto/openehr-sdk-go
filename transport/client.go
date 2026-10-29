@@ -621,11 +621,12 @@ func (c *Client) tokenSourceFor(ctx context.Context) auth.TokenSource {
 // mapWireError maps a non-2xx response onto a typed *WireError, decoding
 // the openEHR error envelope when possible.
 //
-// By default (rawErrorBodies false) four fields are left empty, because
+// By default (rawErrorBodies false) five fields are left empty, because
 // each is free text from the server that may contain PHI: the openEHR
-// envelope's Message and ValidationErrors, the raw response body
-// (RawBody), and the Bearer challenge's ErrorDescription. The openEHR Code
-// and CodedText (coded terminology identifiers) and the challenge's other
+// envelope's Message and ValidationErrors, the Value of each CodedText
+// item, the raw response body (RawBody), and the Bearer challenge's
+// ErrorDescription. The openEHR Code, the CodedText items' terminology and
+// code string (coded terminology identifiers) and the challenge's other
 // fields are always preserved. Enable WithRawErrorBodies to retain the
 // full payload for diagnostics in environments where WireError values
 // cannot reach logs or traces.
@@ -641,6 +642,9 @@ func (c *Client) mapWireError(req *Request, safeURL string, resp *Response) erro
 		if !c.cfg.rawErrorBodies {
 			detail.Message = ""
 			detail.ValidationErrors = nil
+			for i := range detail.CodedText {
+				detail.CodedText[i].Value = ""
+			}
 		}
 		we.OpenEHR = detail
 	}
@@ -686,8 +690,8 @@ func statusToSentinel(s int) error {
 
 // decodeOpenEHRError attempts to parse the openEHR error envelope
 // (REQ-093). Returns ok=false when the body is empty, non-JSON, or
-// missing message, code and validation errors (the envelope is
-// best-effort).
+// missing message, code, validation errors and coded entries from the
+// coded_text or errors list (the envelope is best-effort).
 func decodeOpenEHRError(body []byte) (*OpenEHRErrorDetail, bool) {
 	if len(body) == 0 {
 		return nil, false
@@ -696,7 +700,7 @@ func decodeOpenEHRError(body []byte) (*OpenEHRErrorDetail, bool) {
 	if err := json.Unmarshal(body, &d); err != nil {
 		return nil, false
 	}
-	if d.Message == "" && d.Code == "" && len(d.ValidationErrors) == 0 {
+	if d.Message == "" && d.Code == "" && len(d.ValidationErrors) == 0 && len(d.CodedText) == 0 {
 		return nil, false
 	}
 	return &d, true

@@ -98,7 +98,10 @@ func GetRevisionHistory(ctx context.Context, c *transport.Client, voUID openehrc
 	return out, openehrclient.NewVersionMetadata(meta), err
 }
 
-// GetVersion retrieves the latest VERSION of the PARTY family voUID.
+// GetVersion retrieves the latest VERSION of the PARTY family voUID. A 2xx
+// response with an empty or null body, a 204 included, fails with
+// [transport.ErrInvalidShape] beside the response metadata, as it does on
+// [GetVersionAtTime] and [GetVersionByID].
 //
 // Wire: GET /demographic/versioned_party/{vo_uid}/version.
 func GetVersion(ctx context.Context, c *transport.Client, voUID openehrclient.VersionedObjectID) (*PartyVersion, *openehrclient.VersionMetadata, error) {
@@ -116,7 +119,9 @@ func GetVersion(ctx context.Context, c *transport.Client, voUID openehrclient.Ve
 // GetVersionAtTime retrieves the VERSION that was current at t. A zero t
 // fails with [transport.ErrInvalidConfig] before any request: [GetVersion]
 // is the read for the latest. A t whose UTC year falls outside 0000-9999
-// fails the same way, since RFC 3339 cannot write it.
+// fails the same way, since RFC 3339 cannot write it. When the family had no
+// version at t, the server answers 404 and the read fails with
+// [transport.ErrNotFound].
 //
 // Wire: GET /demographic/versioned_party/{vo_uid}/version?version_at_time={t},
 // with t sent in UTC with its fraction of a second.
@@ -172,12 +177,10 @@ func getVersion(ctx context.Context, c *transport.Client, req *transport.Request
 	}
 	meta := openehrclient.NewVersionMetadata(resp.Metadata)
 	if transport.IsNoRepresentationBody(resp.Body) {
-		// Mirror getParty: only a 204 legitimately carries no version body
-		// (a version_at_time with no match); any other empty-body 2xx is a
-		// wire anomaly surfaced as ErrInvalidShape.
-		if resp.StatusCode == http.StatusNoContent {
-			return nil, meta, nil
-		}
+		// The pin answers these reads 200 with a VERSION or 404, no version
+		// at the requested time included, so every empty or null 2xx body,
+		// a 204 too, is a wire anomaly. Unlike getParty there is no 204 to
+		// carve out.
 		return nil, meta, fmt.Errorf("demographic: %w: %d response with empty or null body", transport.ErrInvalidShape, resp.StatusCode)
 	}
 	var env rm.OriginalVersion[jsontext.Value]

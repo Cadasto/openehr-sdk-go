@@ -124,7 +124,7 @@ func valueRMAttrs(out map[string]any, base string, v any, anchor string) error {
 		return codePhraseMembersRMAttr(out, base,
 			codePhraseMember{"_charset", dv.Charset}, codePhraseMember{"_language", dv.Language})
 	}
-	return fmt.Errorf("%w: %q holds a %T whose underscore-carried RM attributes this codec cannot read (REQ-140)",
+	return fmt.Errorf("%w: %q holds a %T whose underscore-carried RM attributes this codec cannot read",
 		ErrUnsupportedDatatype, base, v)
 }
 
@@ -460,7 +460,7 @@ func mappingsRMAttr(out map[string]any, base string, mappings []rm.TermMapping) 
 			// value — tm.Match is a bare Character with no length invariant, so
 			// echoing it here would put an arbitrary-length caller string in the
 			// error rather than a value-free diagnostic.
-			return fmt.Errorf("%w: %q must be TERM_MAPPING.match, one of %s (REQ-140)",
+			return fmt.Errorf("%w: %q must be TERM_MAPPING.match, one of %s",
 				ErrUnsupportedDatatype, prefix+"|match", matchCodes)
 		}
 		out[prefix+"|match"] = string(tm.Match)

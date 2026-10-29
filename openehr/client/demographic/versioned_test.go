@@ -244,18 +244,25 @@ func TestGetVersionCaseVariantMemberIsUnknown(t *testing.T) {
 	}
 }
 
-// TestGetVersionAtTimeNoMatch: the documented 204-on-no-match contract holds
-// through GetVersionAtTime specifically (a clean nil, not an error).
-func TestGetVersionAtTimeNoMatch(t *testing.T) {
+// TestGetVersionAtTimeNoMatchIsNotFound pins REQ-174: the pin answers a
+// version_at_time with no version at that time 404
+// (404_not_found_or_no_version_at_time), so GetVersionAtTime returns
+// ErrNotFound and no version.
+func TestGetVersionAtTimeNoMatchIsNotFound(t *testing.T) { // REQ-174
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"message":"no version at that time","code":"NOT_FOUND"}`))
 	}))
 	defer srv.Close()
 
-	at, _ := time.Parse(time.RFC3339, "1990-01-01T00:00:00Z")
+	at := time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC)
 	pv, _, err := demographic.GetVersionAtTime(t.Context(), newClient(t, srv), personVOID, at)
-	if err != nil || pv != nil {
-		t.Fatalf("no-match GetVersionAtTime = (%+v, %v), want (nil, nil)", pv, err)
+	if !errors.Is(err, transport.ErrNotFound) {
+		t.Errorf("GetVersionAtTime(no version at %v) err = %v, want ErrNotFound", at, err)
+	}
+	if pv != nil {
+		t.Errorf("GetVersionAtTime(no version at %v) = %+v beside the error, want nil", at, pv)
 	}
 }
 
@@ -390,32 +397,76 @@ func TestGetVersionByID(t *testing.T) {
 	}
 }
 
-// TestGetVersionEmptyBody mirrors getParty's strictness: a 204 yields a nil
-// PartyVersion, while any other empty-body 2xx is an ErrInvalidShape anomaly.
-func TestGetVersionEmptyBody(t *testing.T) {
-	t.Run("204_no_content", func(t *testing.T) {
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.WriteHeader(http.StatusNoContent)
-		}))
-		defer srv.Close()
-		pv, _, err := demographic.GetVersion(t.Context(), newClient(t, srv), personVOID)
-		if err != nil {
-			t.Fatalf("204 should be a clean nil, got %v", err)
+// versionedPartyRead is one of the five VERSIONED_PARTY reads; call reports
+// whether it returned a result.
+type versionedPartyRead struct {
+	name string
+	call func(t *testing.T, c *transport.Client) (bool, *openehrclient.VersionMetadata, error)
+}
+
+func versionedPartyReads() []versionedPartyRead {
+	at := time.Date(2026, 6, 16, 8, 0, 0, 0, time.UTC)
+	return []versionedPartyRead{
+		{"GetVersionedParty", func(t *testing.T, c *transport.Client) (bool, *openehrclient.VersionMetadata, error) {
+			out, meta, err := demographic.GetVersionedParty(t.Context(), c, personVOID)
+			return out != nil, meta, err
+		}},
+		{"GetRevisionHistory", func(t *testing.T, c *transport.Client) (bool, *openehrclient.VersionMetadata, error) {
+			out, meta, err := demographic.GetRevisionHistory(t.Context(), c, personVOID)
+			return out != nil, meta, err
+		}},
+		{"GetVersion", func(t *testing.T, c *transport.Client) (bool, *openehrclient.VersionMetadata, error) {
+			out, meta, err := demographic.GetVersion(t.Context(), c, personVOID)
+			return out != nil, meta, err
+		}},
+		{"GetVersionAtTime", func(t *testing.T, c *transport.Client) (bool, *openehrclient.VersionMetadata, error) {
+			out, meta, err := demographic.GetVersionAtTime(t.Context(), c, personVOID, at)
+			return out != nil, meta, err
+		}},
+		{"GetVersionByID", func(t *testing.T, c *transport.Client) (bool, *openehrclient.VersionMetadata, error) {
+			out, meta, err := demographic.GetVersionByID(t.Context(), c, personVOID, personVersion)
+			return out != nil, meta, err
+		}},
+	}
+}
+
+// TestVersionedReadsEmptyBodyIsInvalidShape pins REQ-174: the pin answers
+// each VERSIONED_PARTY read 200 with a body, or 404, so an empty or null 2xx
+// body, a 204 included, fails with ErrInvalidShape. The metadata still comes
+// back beside the error.
+func TestVersionedReadsEmptyBodyIsInvalidShape(t *testing.T) { // REQ-174
+	responses := []struct {
+		name   string
+		status int
+		body   string
+	}{
+		{"empty 200", http.StatusOK, ""},
+		{"null 200", http.StatusOK, "null"},
+		{"204", http.StatusNoContent, ""},
+	}
+	for _, rd := range versionedPartyReads() {
+		for _, resp := range responses {
+			t.Run(rd.name+"/"+resp.name, func(t *testing.T) {
+				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					w.Header().Set("ETag", `"`+personVersion+`"`)
+					w.WriteHeader(resp.status)
+					_, _ = w.Write([]byte(resp.body))
+				}))
+				defer srv.Close()
+
+				ok, meta, err := rd.call(t, newClient(t, srv))
+				if !errors.Is(err, transport.ErrInvalidShape) {
+					t.Errorf("%s(%s) err = %v, want ErrInvalidShape", rd.name, resp.name, err)
+				}
+				if ok {
+					t.Errorf("%s(%s) returned a result beside the error", rd.name, resp.name)
+				}
+				if meta == nil || meta.ETag != personVersion {
+					t.Errorf("%s(%s) metadata = %+v, want the response headers (ETag %q)", rd.name, resp.name, meta, personVersion)
+				}
+			})
 		}
-		if pv != nil {
-			t.Errorf("204 PartyVersion = %+v, want nil", pv)
-		}
-	})
-	t.Run("empty_200", func(t *testing.T) {
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.WriteHeader(http.StatusOK) // empty body
-		}))
-		defer srv.Close()
-		_, _, err := demographic.GetVersion(t.Context(), newClient(t, srv), personVOID)
-		if !errors.Is(err, transport.ErrInvalidShape) {
-			t.Fatalf("empty 200 err = %v, want ErrInvalidShape", err)
-		}
-	})
+	}
 }
 
 func TestVersionedReadGuards(t *testing.T) {

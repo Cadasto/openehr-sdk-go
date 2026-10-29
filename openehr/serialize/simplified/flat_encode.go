@@ -175,10 +175,10 @@ func emitContextSetting(out map[string]any, s rm.DVCodedText) error {
 		if s.Value == "" && !extras && s.DefiningCode.TerminologyID.Value == "" {
 			return nil // all-zero: absent, nothing substituted
 		}
-		return fmt.Errorf("%w: ctx/setting requires a coded value, but EVENT_CONTEXT.setting carries no defining code beside value %q", ErrUnsupportedDatatype, s.Value)
+		return fmt.Errorf("%w: ctx/setting requires a coded value, but EVENT_CONTEXT.setting carries a value with no defining code", ErrUnsupportedDatatype)
 	}
 	if s.DefiningCode.TerminologyID.Value != terminology.ID {
-		return fmt.Errorf("%w: ctx/setting implies the openehr terminology, but EVENT_CONTEXT.setting is coded in %q", ErrUnsupportedDatatype, s.DefiningCode.TerminologyID.Value)
+		return fmt.Errorf("%w: ctx/setting implies the openehr terminology, but EVENT_CONTEXT.setting is not coded in it", ErrUnsupportedDatatype)
 	}
 	if extras {
 		return fmt.Errorf("%w: ctx/setting carries only code and value, but EVENT_CONTEXT.setting has extras (mappings, formatting, a preferred term, …)", ErrUnsupportedDatatype)
@@ -189,7 +189,7 @@ func emitContextSetting(out map[string]any, s rm.DVCodedText) error {
 	// RM-mandatory anyway, so the value is a defect at the source — the mirror
 	// of the decode-side rule, and the same stance as value-without-code above.
 	if s.Value == "" {
-		return fmt.Errorf("%w: ctx/setting requires the code's rubric, but EVENT_CONTEXT.setting carries code %q with an empty value", ErrUnsupportedDatatype, s.DefiningCode.CodeString)
+		return fmt.Errorf("%w: ctx/setting requires the code's rubric, but EVENT_CONTEXT.setting carries a code with an empty value", ErrUnsupportedDatatype)
 	}
 	out["ctx/setting|code"] = s.DefiningCode.CodeString
 	out["ctx/setting|value"] = s.Value

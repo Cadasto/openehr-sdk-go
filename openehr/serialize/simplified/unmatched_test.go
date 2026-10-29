@@ -869,9 +869,8 @@ func TestREQ170RepeatableIntervalElement(t *testing.T) {
 // `transition` leaf or `_reason` family under an archetyped
 // `ism_transition[atNNNN]` node (FLAT id `transition`), which models
 // `current_state` and `careflow_step` but neither of those; and the ACTION's own
-// `time` leaf. The refusal of `transition` and `reason` cites REQ-140, whose
-// third out-of-scope class covers them; any other cites REQ-170. The
-// STRUCTURED form of each body is refused the same way.
+// `time` leaf. Each refusal names the attribute it refuses and no
+// requirement id. The STRUCTURED form of each body is refused the same way.
 func TestREQ170IsmTransitionReferenceKeysRefusedInEveryMode(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	const secret = "secret-value-0451"
@@ -879,14 +878,10 @@ func TestREQ170IsmTransitionReferenceKeysRefusedInEveryMode(t *testing.T) {
 		name  string
 		keys  []string
 		names string
-		cite  string
+		attr  string
 	}
 	leaf := func(base, id string) refusal {
-		cite := "REQ-170"
-		if id == "transition" {
-			cite = "REQ-140"
-		}
-		return refusal{id + " leaf under " + base, []string{base + "/" + id + "|code", base + "/" + id + "|value", base + "/" + id + "|terminology"}, base + "/" + id + "|code", cite}
+		return refusal{id + " leaf under " + base, []string{base + "/" + id + "|code", base + "/" + id + "|value", base + "/" + id + "|terminology"}, base + "/" + id + "|code", "an ACTION's ISM transition " + id}
 	}
 	reference, archetyped := rmattrAction+"/ism_transition", rmattrAction+"/transition"
 	cases := []refusal{
@@ -894,13 +889,13 @@ func TestREQ170IsmTransitionReferenceKeysRefusedInEveryMode(t *testing.T) {
 		leaf(reference, "transition"),
 		leaf(reference, "careflow_step"),
 		leaf(archetyped, "transition"),
-		{"bare transition leaf under " + reference, []string{reference + "/transition"}, reference + "/transition", "REQ-140"},
-		{"bare transition leaf under " + archetyped, []string{archetyped + "/transition"}, archetyped + "/transition", "REQ-140"},
-		{"reason family under " + reference, []string{reference + "/_reason:0"}, reference + "/_reason:0", "REQ-140"},
-		{"reason family under " + archetyped, []string{archetyped + "/_reason:0"}, archetyped + "/_reason:0", "REQ-140"},
-		{"reason family with a suffix", []string{reference + "/_reason|code"}, reference + "/_reason", "REQ-140"},
-		{"ACTION time leaf", []string{rmattrAction + "/time"}, rmattrAction + "/time", "REQ-170"},
-		{"ACTION time leaf with a suffix", []string{rmattrAction + "/time|magnitude_status"}, rmattrAction + "/time|magnitude_status", "REQ-170"},
+		{"bare transition leaf under " + reference, []string{reference + "/transition"}, reference + "/transition", "an ACTION's ISM transition transition"},
+		{"bare transition leaf under " + archetyped, []string{archetyped + "/transition"}, archetyped + "/transition", "an ACTION's ISM transition transition"},
+		{"reason family under " + reference, []string{reference + "/_reason:0"}, reference + "/_reason:0", "an ACTION's ISM transition reason"},
+		{"reason family under " + archetyped, []string{archetyped + "/_reason:0"}, archetyped + "/_reason:0", "an ACTION's ISM transition reason"},
+		{"reason family with a suffix", []string{reference + "/_reason|code"}, reference + "/_reason", "an ACTION's ISM transition reason"},
+		{"ACTION time leaf", []string{rmattrAction + "/time"}, rmattrAction + "/time", "an ACTION's time"},
+		{"ACTION time leaf with a suffix", []string{rmattrAction + "/time|magnitude_status"}, rmattrAction + "/time|magnitude_status", "an ACTION's time"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -918,14 +913,15 @@ func TestREQ170IsmTransitionReferenceKeysRefusedInEveryMode(t *testing.T) {
 			if strings.Contains(err.Error(), secret) {
 				t.Errorf("err = %v carries the key's value", err)
 			}
-			if !strings.Contains(err.Error(), "("+tc.cite+",") {
-				t.Errorf("err = %v, want it to cite %s", err, tc.cite)
+			if !strings.Contains(err.Error(), tc.attr) || strings.Contains(err.Error(), "REQ-") {
+				t.Errorf("err = %v, want it to name %q and no requirement id", err, tc.attr)
 			}
 			// The STRUCTURED form of the same body reaches the same refusal.
 			serr := structuredRefusedInEveryMode(t, wt, rmattrBody(keys))
 			if !errors.Is(serr, ErrUnknownPath) || !strings.Contains(serr.Error(), "in-context spelling") ||
-				!strings.Contains(serr.Error(), "("+tc.cite+",") || strings.Contains(serr.Error(), secret) {
-				t.Errorf("STRUCTURED err = %v, want the in-context refusal citing %s and no value", serr, tc.cite)
+				!strings.Contains(serr.Error(), tc.attr) || strings.Contains(serr.Error(), "REQ-") ||
+				strings.Contains(serr.Error(), secret) {
+				t.Errorf("STRUCTURED err = %v, want the in-context refusal naming %q, no requirement id and no value", serr, tc.attr)
 			}
 		})
 	}
@@ -1459,24 +1455,24 @@ func TestREQ170FamilyIndexJudgedBeforeItsTails(t *testing.T) {
 // OBSERVATION's `history_origin`, in the reference's spelling — a leaf under
 // the node or a suffix on it — name RM data the Web Template this SDK builds
 // does not model. Each is refused by default, under the report option and
-// under strict, naming the key and none of its value, in FLAT and in its
-// STRUCTURED form. Where the Web Template does resolve one, it decodes as
-// before.
+// under strict, naming the key and the attribute, and none of its value and no
+// requirement id, in FLAT and in its STRUCTURED form. Where the Web Template
+// does resolve one, it decodes as before.
 func TestREQ170IntervalEventAndObservationAttrsRefused(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	const secret = "secret-value-0451"
 	for _, tc := range []struct {
-		keys  []string
-		names string
+		keys        []string
+		names, attr string
 	}{
-		{[]string{rmattrEvent + "/math_function|code", rmattrEvent + "/math_function|value", rmattrEvent + "/math_function|terminology"}, rmattrEvent + "/math_function|code"},
-		{[]string{rmattrEvent + "/width"}, rmattrEvent + "/width"},
-		{[]string{rmattrEvent + "/sample_count"}, rmattrEvent + "/sample_count"},
-		{[]string{rmattrEvent + "|sample_count"}, rmattrEvent + "|sample_count"},
-		{[]string{rmattrEvent + "|math_function"}, rmattrEvent + "|math_function"},
-		{[]string{rmattrEvent + "|width"}, rmattrEvent + "|width"},
-		{[]string{rmattrObs + "/history_origin"}, rmattrObs + "/history_origin"},
-		{[]string{rmattrObs + "|history_origin"}, rmattrObs + "|history_origin"},
+		{[]string{rmattrEvent + "/math_function|code", rmattrEvent + "/math_function|value", rmattrEvent + "/math_function|terminology"}, rmattrEvent + "/math_function|code", "an INTERVAL_EVENT's math_function"},
+		{[]string{rmattrEvent + "/width"}, rmattrEvent + "/width", "an INTERVAL_EVENT's width"},
+		{[]string{rmattrEvent + "/sample_count"}, rmattrEvent + "/sample_count", "an INTERVAL_EVENT's sample_count"},
+		{[]string{rmattrEvent + "|sample_count"}, rmattrEvent + "|sample_count", "an INTERVAL_EVENT's sample_count"},
+		{[]string{rmattrEvent + "|math_function"}, rmattrEvent + "|math_function", "an INTERVAL_EVENT's math_function"},
+		{[]string{rmattrEvent + "|width"}, rmattrEvent + "|width", "an INTERVAL_EVENT's width"},
+		{[]string{rmattrObs + "/history_origin"}, rmattrObs + "/history_origin", "an OBSERVATION's history_origin"},
+		{[]string{rmattrObs + "|history_origin"}, rmattrObs + "|history_origin", "an OBSERVATION's history_origin"},
 	} {
 		t.Run(tc.names, func(t *testing.T) {
 			keys := make(map[string]any, len(tc.keys))
@@ -1487,9 +1483,9 @@ func TestREQ170IntervalEventAndObservationAttrsRefused(t *testing.T) {
 			if !errors.Is(err, ErrUnknownPath) || !strings.Contains(err.Error(), strconv.Quote(tc.names)) {
 				t.Errorf("err = %v, want ErrUnknownPath naming %q", err, tc.names)
 			}
-			// REQ-170 binds these attributes; REQ-140 does not name them.
-			if !strings.Contains(err.Error(), "(REQ-170,") || strings.Contains(err.Error(), "REQ-140") {
-				t.Errorf("err = %v, want it to cite REQ-170 and not REQ-140", err)
+			// The refusal names the attribute, and no requirement id.
+			if !strings.Contains(err.Error(), tc.attr) || strings.Contains(err.Error(), "REQ-") {
+				t.Errorf("err = %v, want it to name %q and no requirement id", err, tc.attr)
 			}
 			if strings.Contains(err.Error(), secret) {
 				t.Errorf("err = %v carries the key's value", err)
@@ -1497,8 +1493,9 @@ func TestREQ170IntervalEventAndObservationAttrsRefused(t *testing.T) {
 			// The STRUCTURED form of the same body reaches the same refusal.
 			serr := structuredRefusedInEveryMode(t, wt, rmattrBody(keys))
 			if !errors.Is(serr, ErrUnknownPath) || !strings.Contains(serr.Error(), "in-context spelling") ||
-				!strings.Contains(serr.Error(), "(REQ-170,") || strings.Contains(serr.Error(), secret) {
-				t.Errorf("STRUCTURED err = %v, want the in-context refusal citing REQ-170 and no value", serr)
+				!strings.Contains(serr.Error(), tc.attr) || strings.Contains(serr.Error(), "REQ-") ||
+				strings.Contains(serr.Error(), secret) {
+				t.Errorf("STRUCTURED err = %v, want the in-context refusal naming %q, no requirement id and no value", serr, tc.attr)
 			}
 		})
 	}

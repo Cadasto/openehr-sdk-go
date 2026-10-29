@@ -232,7 +232,7 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 		return nil, nil, fmt.Errorf("directory.Update: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
 	if ifMatch == "" {
-		return nil, nil, fmt.Errorf("directory.Update: %w: empty If-Match (REQ-054)", transport.ErrInvalidConfig)
+		return nil, nil, fmt.Errorf("directory.Update: %w: empty If-Match", transport.ErrInvalidConfig)
 	}
 	if folder == nil {
 		return nil, nil, fmt.Errorf("directory.Update: %w: nil Folder", transport.ErrInvalidConfig)
@@ -281,7 +281,7 @@ func Delete(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 		return nil, fmt.Errorf("directory.Delete: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
 	if ifMatch == "" {
-		return nil, fmt.Errorf("directory.Delete: %w: empty If-Match (REQ-054)", transport.ErrInvalidConfig)
+		return nil, fmt.Errorf("directory.Delete: %w: empty If-Match", transport.ErrInvalidConfig)
 	}
 	cfg := deleteConfig{}
 	for _, o := range opts {

@@ -90,7 +90,12 @@ type OpenEHRErrorDetail struct {
 	// number (the ITS-REST overview shows 90000); either way it is kept
 	// here as text.
 	Code string `json:"code"`
-	// CodedText optionally enumerates terminology-coded error tags.
+	// CodedText enumerates the envelope's terminology-coded error entries.
+	// It holds the entries of the envelope's coded_text list first, then
+	// those of its errors list, the DV_CODED_TEXT list the ITS-REST overview
+	// shows. The codes are always preserved; each item's free-text Value is
+	// populated only when the client is constructed with
+	// WithRawErrorBodies(true).
 	CodedText []CodedTextItem `json:"coded_text,omitempty"`
 	// ValidationErrors lists the validation messages that the ITS-REST
 	// Error schema of a 400 response carries beside the message. Like
@@ -99,27 +104,173 @@ type OpenEHRErrorDetail struct {
 	ValidationErrors []string `json:"validationErrors,omitempty"`
 }
 
-// UnmarshalJSON reads the envelope, accepting a string or a number for
-// code. A code of any other JSON type is left empty rather than failing
-// the whole envelope, since the message and the other fields are still
-// usable.
+// UnmarshalJSON reads the envelope member by member, so one member of the
+// wrong JSON type is left empty or skipped instead of failing the whole
+// envelope. It fails only when the body is not a JSON object.
+//
+// Code accepts a string or a number; a code of any other JSON type is left
+// empty. Message is read only when it is a string. ValidationErrors keeps the
+// string entries of a validationErrors list, in order, and skips any other
+// entry.
+//
+// CodedText collects the coded_text entries first, then the errors
+// entries. A coded_text entry gives the item's terminology, code string and
+// value directly. Each errors entry is a DV_CODED_TEXT whose defining_code
+// gives the item's terminology and code string and whose value gives its
+// Value. In either list an entry that is not an object, or whose terminology
+// or code string is present but not a string (null included), is skipped, as
+// is an errors entry with no defining_code; an absent terminology or code
+// string is left empty, and a value that is not a string is left empty and
+// the entry's codes are kept. A coded_text or errors member that is not a list is
+// ignored.
 func (d *OpenEHRErrorDetail) UnmarshalJSON(data []byte) error {
 	var raw struct {
-		Message          string          `json:"message"`
+		Message          json.RawMessage `json:"message"`
 		Code             json.RawMessage `json:"code"`
-		CodedText        []CodedTextItem `json:"coded_text"`
-		ValidationErrors []string        `json:"validationErrors"`
+		CodedText        json.RawMessage `json:"coded_text"`
+		Errors           json.RawMessage `json:"errors"`
+		ValidationErrors json.RawMessage `json:"validationErrors"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
+	message, _ := jsonString(raw.Message)
 	*d = OpenEHRErrorDetail{
-		Message:          raw.Message,
+		Message:          message,
 		Code:             envelopeCode(raw.Code),
-		CodedText:        raw.CodedText,
-		ValidationErrors: raw.ValidationErrors,
+		CodedText:        append(envelopeCodedText(raw.CodedText), envelopeErrors(raw.Errors)...),
+		ValidationErrors: envelopeStrings(raw.ValidationErrors),
 	}
 	return nil
+}
+
+// codePhrase is the terminology and code string of a coded entry: the
+// members of a coded_text entry, or the defining_code of an errors entry.
+// Both are kept raw, so that a null can be told apart from an absent member.
+type codePhrase struct {
+	TerminologyID json.RawMessage `json:"terminology_id"`
+	CodeString    json.RawMessage `json:"code_string"`
+}
+
+// codedItem returns the item for p and an entry's raw value, and false when
+// the terminology_id is present but not an object, or the terminology or code
+// string is present but not a JSON string, null included. An absent one is
+// left empty. A value that is not a JSON string is left empty, so the codes
+// survive it.
+func (p codePhrase) codedItem(value json.RawMessage) (CodedTextItem, bool) {
+	var terminology struct {
+		Value json.RawMessage `json:"value"`
+	}
+	if len(p.TerminologyID) > 0 && (!isJSONObject(p.TerminologyID) || json.Unmarshal(p.TerminologyID, &terminology) != nil) {
+		return CodedTextItem{}, false
+	}
+	var item CodedTextItem
+	var termOK, codeOK bool
+	item.TerminologyID.Value, termOK = optionalString(terminology.Value)
+	item.CodeString, codeOK = optionalString(p.CodeString)
+	if !termOK || !codeOK {
+		return CodedTextItem{}, false
+	}
+	item.Value, _ = jsonString(value)
+	return item, true
+}
+
+// envelopeCodedText returns the coded items of the envelope's coded_text
+// list, in order. It skips an entry that is not an object or whose
+// terminology or code string is not a string, and returns nil when the list
+// is absent, null or not a JSON array.
+func envelopeCodedText(raw json.RawMessage) []CodedTextItem {
+	var items []CodedTextItem
+	for _, entry := range jsonList(raw) {
+		var e struct {
+			codePhrase
+			Value json.RawMessage `json:"value"`
+		}
+		if !isJSONObject(entry) || json.Unmarshal(entry, &e) != nil {
+			continue
+		}
+		if item, ok := e.codedItem(e.Value); ok {
+			items = append(items, item)
+		}
+	}
+	return items
+}
+
+// envelopeErrors returns the coded items of the envelope's errors list, in
+// order. It skips an entry that is not an object, has no defining_code, or
+// whose terminology or code string is not a string, and returns nil when the
+// list is absent, null or not a JSON array. A value that is not a string is
+// left empty and the entry's codes are kept. An entry that is not an object
+// fails the decode, and a null one has no defining_code, so neither needs a
+// check of its own.
+func envelopeErrors(raw json.RawMessage) []CodedTextItem {
+	var items []CodedTextItem
+	for _, entry := range jsonList(raw) {
+		var dv struct {
+			Value        json.RawMessage `json:"value"`
+			DefiningCode *codePhrase     `json:"defining_code"`
+		}
+		if json.Unmarshal(entry, &dv) != nil || dv.DefiningCode == nil {
+			continue
+		}
+		if item, ok := dv.DefiningCode.codedItem(dv.Value); ok {
+			items = append(items, item)
+		}
+	}
+	return items
+}
+
+// envelopeStrings returns the string entries of a JSON list, in order,
+// skipping any other entry, and nil when the list is absent, null or not a
+// JSON array.
+func envelopeStrings(raw json.RawMessage) []string {
+	var out []string
+	for _, entry := range jsonList(raw) {
+		if s, ok := jsonString(entry); ok {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// jsonList returns the raw entries of a JSON array, and nil for an absent
+// value, null or any other JSON type.
+func jsonList(raw json.RawMessage) []json.RawMessage {
+	var entries []json.RawMessage
+	if len(raw) == 0 || json.Unmarshal(raw, &entries) != nil {
+		return nil
+	}
+	return entries
+}
+
+// optionalString returns the text of a JSON string and true, "" and true for
+// an absent member, and "" and false for null or any other JSON type.
+func optionalString(raw json.RawMessage) (string, bool) {
+	if len(raw) == 0 {
+		return "", true
+	}
+	return jsonString(raw)
+}
+
+// jsonString returns the text of a JSON string and true, or "" and false for
+// an absent value, null or any other JSON type.
+func jsonString(raw json.RawMessage) (string, bool) {
+	if len(raw) == 0 || raw[0] != '"' {
+		return "", false
+	}
+	var s string
+	if json.Unmarshal(raw, &s) != nil {
+		return "", false
+	}
+	return s, true
+}
+
+// isJSONObject reports whether raw is a JSON object. The decoder hands each
+// entry over without leading white space, so the first byte decides. A null
+// entry decodes into a struct without error, so a coded_text entry needs
+// this check to be skipped.
+func isJSONObject(raw json.RawMessage) bool {
+	return len(raw) > 0 && raw[0] == '{'
 }
 
 // envelopeCode returns the text of a JSON string or number code, and ""
@@ -141,12 +292,23 @@ func envelopeCode(raw json.RawMessage) string {
 	return ""
 }
 
-// CodedTextItem mirrors the openEHR error envelope's coded_text entry.
+// CodedTextItem is one coded entry of the openEHR error envelope: an entry
+// of its coded_text list, or the defining code and value of a
+// DV_CODED_TEXT in its errors list.
 type CodedTextItem struct {
+	// TerminologyID names the terminology the code comes from, such as
+	// "local" or "openehr".
 	TerminologyID struct {
 		Value string `json:"value"`
 	} `json:"terminology_id"`
+	// CodeString is the code within that terminology. Like the terminology,
+	// it is always preserved.
 	CodeString string `json:"code_string"`
+	// Value is the entry's free text, the DV_CODED_TEXT value. Like the
+	// envelope's Message it may name patients, so it is populated only when
+	// the client is constructed with WithRawErrorBodies(true), and
+	// [WireError.Error] never includes it.
+	Value string `json:"value,omitempty"`
 }
 
 // WireError is the typed wire-level error returned to consumers. Use
@@ -164,9 +326,10 @@ type WireError struct {
 	// kept as sent. [WireError.Error] never includes it.
 	Method, URL, Route string
 	// OpenEHR is the parsed openEHR error envelope. Nil when
-	// the body could not be parsed as such. OpenEHR.Message may contain
-	// PHI and is only populated when the client is built with
-	// WithRawErrorBodies(true). OpenEHR.Code is always present.
+	// the body could not be parsed as such. OpenEHR.Message and the Value
+	// of each OpenEHR.CodedText item may contain PHI and are only
+	// populated when the client is built with WithRawErrorBodies(true).
+	// OpenEHR.Code and the CodedText items' codes are always present.
 	OpenEHR *OpenEHRErrorDetail
 	// RawBody preserves the raw response bytes for diagnostics.
 	// May contain PHI; only populated when the client is built with
@@ -190,8 +353,8 @@ type WireError struct {
 // Error implements error. The returned string includes the HTTP status,
 // the openEHR error code, quoted as a Go string, and the request route,
 // all of which are non-PHI fields.
-// The server message, the raw body and the Bearer challenge are
-// deliberately omitted so WireError values are safe to include in logs,
+// The server message, the coded items' free text, the raw body and the
+// Bearer challenge are deliberately omitted so WireError values are safe to include in logs,
 // traces, and observer callbacks.
 // Callers that need the message (e.g. for user-facing error reporting in
 // a controlled environment) should use errors.As to extract the full

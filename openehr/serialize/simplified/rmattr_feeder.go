@@ -298,7 +298,7 @@ func decodeFeederAuditDetails(g rmattrGroup) (any, error) {
 	// other_details is refused in every spelling, an own suffix as much as a
 	// sub-path.
 	if tail, named := tailNaming(g, feederAuditOtherDetails); named {
-		return nil, fmt.Errorf("%w: %q addresses FEEDER_AUDIT_DETAILS.other_details, an ITEM_STRUCTURE the reference's suffix set has no channel for and the pinned corpus never writes — deferred rather than dropped (REQ-140, see deviations.md)",
+		return nil, fmt.Errorf("%w: %q addresses FEEDER_AUDIT_DETAILS.other_details, an ITEM_STRUCTURE the reference's suffix set has no channel for and the pinned corpus never writes — deferred rather than dropped (see deviations.md)",
 			ErrUnsupportedDatatype, g.key(tail))
 	}
 	own, children, err := rmattrChildGroups(g, feederAuditDetailsSegs)

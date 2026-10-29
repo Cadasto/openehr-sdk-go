@@ -3,6 +3,7 @@ package admin_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"net"
@@ -274,8 +275,9 @@ func TestProbeMissingOpenEHRRestEntry(t *testing.T) {
 }
 
 // Connection-failure path: server closed before probe issues request
-// → hc.Do returns a network error → probe wraps it with the full URL
-// via %w so callers can errors.Is / errors.As the underlying error.
+// → hc.Do returns a network error → probe wraps it so callers can
+// errors.Is / errors.AsType the underlying error, and its text names the
+// probe path.
 func TestProbeConnectionRefused(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	target := srv.URL
@@ -301,11 +303,11 @@ func TestProbeConnectionRefused(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for closed server")
 	}
-	// Error message MUST contain the probe URL so loop-mode callers
+	// The error message must contain the probe path so loop-mode callers
 	// can identify which endpoint failed without parsing the wrapped
 	// error type.
 	if !strings.Contains(err.Error(), "/health/ready") {
-		t.Errorf("err = %q, want probe URL in message", err)
+		t.Errorf("err = %q, want probe path in message", err)
 	}
 }
 
@@ -1057,5 +1059,127 @@ func TestReadyBodyNilClient(t *testing.T) { // REQ-083 REQ-025
 	}
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Errorf("err = %v, want errors.Is(err, transport.ErrInvalidConfig)", err)
+	}
+}
+
+// TestProbeRequestFailureTextStaysOut pins the value-free text on a
+// probe's request failure: net/http quotes a malformed response header
+// line in its own error, so a server can put any value there, and the
+// *url.Error around it prints the URL a second time. The probe's error
+// names the probe path once and carries neither the value nor the
+// server's address, while the cause is still reached by unwrapping.
+func TestProbeRequestFailureTextStaysOut(t *testing.T) { // REQ-083
+	srv := httptest.NewServer(rawHandler(t, "HTTP/1.1 200 OK\r\nX-Bad "+readySecret+"\r\n\r\n"))
+	defer srv.Close()
+	srvURL, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatalf("parse test server URL: %v", err)
+	}
+
+	cases := []struct {
+		name string
+		path string
+		call probeCall
+	}{
+		{"Live", admin.DefaultLivePath, callLive},
+		{"Ready", admin.DefaultReadyPath, callReady},
+		{"ReadyBody", admin.DefaultReadyPath, callReadyBody},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := tc.call(t.Context(), newClient(t, srv))
+			if got != nil {
+				t.Errorf("%s returned %q beside the error, want no bytes", tc.name, got)
+			}
+			cause, ok := errors.AsType[*url.Error](err)
+			if !ok || cause == nil {
+				t.Fatalf("errors.AsType[*url.Error](%v) found nothing, want the request failure reached by unwrapping", err)
+			}
+			if !strings.Contains(cause.Error(), readySecret) {
+				t.Fatalf("*url.Error %q does not quote %q; the premise of this test is gone", cause, readySecret)
+			}
+			msg := err.Error()
+			assertNoServerValues(t, msg)
+			if strings.Contains(msg, srvURL.Host) {
+				t.Errorf("error text %q carries the server's address %q, want the probe path alone", msg, srvURL.Host)
+			}
+			if n := strings.Count(msg, tc.path); n != 1 {
+				t.Errorf("error text %q names the probe path %q %d time(s), want once", msg, tc.path, n)
+			}
+			if want := tc.path + ": request failed"; !strings.HasSuffix(msg, want) {
+				t.Errorf("error text %q, want it to end in %q", msg, want)
+			}
+		})
+	}
+}
+
+// failingTransport fails every request with err before sending a byte.
+type failingTransport struct{ err error }
+
+func (ft failingTransport) RoundTrip(*http.Request) (*http.Response, error) { return nil, ft.err }
+
+// transportTimeout is a failure that reports itself as a timeout, as a
+// dial or TLS handshake timeout does, without matching
+// context.DeadlineExceeded. Its text carries readySecret.
+type transportTimeout struct{}
+
+func (transportTimeout) Error() string { return "i/o timeout " + readySecret }
+func (transportTimeout) Timeout() bool { return true }
+
+// TestProbeRequestFailureWord pins the fixed word a probe's request
+// failure ends in: its text says whether the request timed out or was
+// canceled, without quoting the failure, whose text here carries
+// readySecret. Any other failure reads "request failed", which
+// TestProbeRequestFailureTextStaysOut pins.
+func TestProbeRequestFailureWord(t *testing.T) { // REQ-083
+	stall := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	defer stall.Close()
+
+	cases := []struct {
+		name     string
+		canceled bool // the context is canceled before the call
+		hc       *http.Client
+		want     string
+	}{
+		{
+			name: "context already canceled", canceled: true, hc: stall.Client(),
+			want: "request canceled",
+		},
+		{
+			name: "server stalls past the client timeout",
+			hc:   &http.Client{Transport: stall.Client().Transport, Timeout: 50 * time.Millisecond},
+			want: "request timed out",
+		},
+		{
+			name: "transport reports a timeout",
+			hc:   &http.Client{Transport: failingTransport{err: transportTimeout{}}},
+			want: "request timed out",
+		},
+		{
+			name: "transport fails past a deadline",
+			hc:   &http.Client{Transport: failingTransport{err: fmt.Errorf("dial %s: %w", readySecret, context.DeadlineExceeded)}},
+			want: "request timed out",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := t.Context()
+			if tc.canceled {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+			}
+			err := admin.Live(ctx, newClientWithHTTP(t, stall, tc.hc))
+			if err == nil {
+				t.Fatal("Live = nil, want a request failure")
+			}
+			msg := err.Error()
+			if want := admin.DefaultLivePath + ": " + tc.want; !strings.HasSuffix(msg, want) {
+				t.Errorf("Live error text %q, want it to end in %q", msg, want)
+			}
+			assertNoServerValues(t, msg)
+		})
 	}
 }

@@ -60,7 +60,7 @@ func identifierListRMAttr(out map[string]any, base, seg string, ids []rm.DVIdent
 // and its three party positions.
 func feederAuditDetailsRMAttr(out map[string]any, path string, d rm.FeederAuditDetails) error {
 	if d.OtherDetails != nil && !rm.IsTypedNil(d.OtherDetails) {
-		return fmt.Errorf("%w: %q carries a FEEDER_AUDIT_DETAILS.other_details (an ITEM_STRUCTURE), which the reference's suffix set has no channel for and the pinned corpus never writes — deferred rather than dropped (REQ-140, see deviations.md)",
+		return fmt.Errorf("%w: %q carries a FEEDER_AUDIT_DETAILS.other_details (an ITEM_STRUCTURE), which the reference's suffix set has no channel for and the pinned corpus never writes — deferred rather than dropped (see deviations.md)",
 			ErrUnsupportedDatatype, path+"/other_details")
 	}
 	if d.SystemID == "" {

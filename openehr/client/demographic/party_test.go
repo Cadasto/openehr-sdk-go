@@ -299,6 +299,11 @@ func TestUpdateRequiresIfMatch(t *testing.T) {
 	if n := hits.Load(); n != 0 {
 		t.Errorf("server saw %d request(s), want none", n)
 	}
+	// The text is for the caller: it names the operation and the missing
+	// header, not a requirement identifier of this repository.
+	if strings.Contains(err.Error(), "REQ-") {
+		t.Errorf("empty If-Match: error text %q carries a requirement identifier", err)
+	}
 }
 
 // TestUpdatePreconditionFailed covers the error branch: a 412 maps to

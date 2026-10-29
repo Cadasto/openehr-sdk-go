@@ -70,8 +70,10 @@ func basePath(t Type) string { return "/demographic/" + string(t) }
 // polymorphically by its `_type` discriminator.
 //
 // Wire: GET /demographic/{type}/{uid_based_id} [?version_at_time=...]. A 204
-// (no version at the requested time) yields a nil Party and nil error; any
-// other empty-body 2xx is surfaced as [transport.ErrInvalidShape].
+// (the party was deleted at the requested time) yields a nil Party and nil
+// error; any other empty-body 2xx is surfaced as [transport.ErrInvalidShape].
+// No version at the requested time is a 404, surfaced as
+// [transport.ErrNotFound].
 func Get(ctx context.Context, c *transport.Client, t Type, ref openehrclient.Ref) (rm.Party, *openehrclient.VersionMetadata, error) {
 	if !t.valid() {
 		return nil, nil, fmt.Errorf("demographic.Get: %w: invalid PARTY type %q", transport.ErrInvalidConfig, t)
@@ -197,7 +199,7 @@ func Update(ctx context.Context, c *transport.Client, t Type, voID openehrclient
 		return nil, nil, fmt.Errorf("demographic.Update: %w: empty VersionedObjectID", transport.ErrInvalidConfig)
 	}
 	if ifMatch == "" {
-		return nil, nil, fmt.Errorf("demographic.Update: %w: empty If-Match (REQ-054)", transport.ErrInvalidConfig)
+		return nil, nil, fmt.Errorf("demographic.Update: %w: empty If-Match", transport.ErrInvalidConfig)
 	}
 	if party == nil {
 		return nil, nil, fmt.Errorf("demographic.Update: %w: nil Party", transport.ErrInvalidConfig)
@@ -287,9 +289,9 @@ func Delete(ctx context.Context, c *transport.Client, t Type, versionUID openehr
 }
 
 // getParty issues a read request and decodes the bare PARTY body
-// polymorphically via the type registry (REQ-040). A 204 (e.g. a
-// version_at_time with no matching version) yields a nil Party; any other
-// empty-body 2xx is a wire anomaly surfaced as [transport.ErrInvalidShape].
+// polymorphically via the type registry (REQ-040). A 204 (the party was
+// deleted at the requested time) yields a nil Party; any other empty-body
+// 2xx is a wire anomaly surfaced as [transport.ErrInvalidShape].
 func getParty(ctx context.Context, c *transport.Client, req *transport.Request) (rm.Party, *openehrclient.VersionMetadata, error) {
 	resp, err := c.Do(ctx, req)
 	if err != nil {
@@ -300,13 +302,14 @@ func getParty(ctx context.Context, c *transport.Client, req *transport.Request) 
 	}
 	meta := openehrclient.NewVersionMetadata(resp.Metadata)
 	if transport.IsNoRepresentationBody(resp.Body) {
-		// Only a 204 legitimately carries no version body (e.g. a
-		// version_at_time with no matching version). Any other empty-body 2xx
-		// is a wire anomaly — surface it as ErrInvalidShape rather than
-		// masquerading as "no version". (The concrete read leaves route through
-		// transport.Decode, which rejects every empty body; this leaf decodes
-		// rm.Party polymorphically so it can't, and instead applies the same
-		// strictness while carving out the legitimate 204.)
+		// Only a 204 legitimately carries no version body (the party was
+		// deleted at the requested time; no version at that time is a 404).
+		// Any other empty-body 2xx is a wire anomaly — surface it as
+		// ErrInvalidShape rather than masquerading as "deleted". (The
+		// concrete read leaves route through transport.Decode, which rejects
+		// every empty body; this leaf decodes rm.Party polymorphically so it
+		// can't, and instead applies the same strictness while carving out
+		// the legitimate 204.)
 		if resp.StatusCode == http.StatusNoContent {
 			return nil, meta, nil
 		}

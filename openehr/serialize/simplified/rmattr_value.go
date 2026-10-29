@@ -484,7 +484,7 @@ func intervalSuffixes(g rmattrGroup, ts rmattrTails, anchor string, boundByValue
 			return nil, fmt.Errorf("%w: %s spells a /%s bound beside `|%s_unbounded: true`; BASE Interval marks that boundary open, so it carries no bound and the pair contradicts itself",
 				ErrUnsupportedDatatype, g.prefix(), end, end)
 		case !bounded && !unbounded && boundByValue:
-			return nil, fmt.Errorf("%w: %s marks its %s side closed with `|%s_unbounded: false` but carries no /%s bound; the RM holds this bound by value, so a missing bound cannot be told from a zero one (REQ-169)",
+			return nil, fmt.Errorf("%w: %s marks its %s side closed with `|%s_unbounded: false` but carries no /%s bound; the RM holds this bound by value, so a missing bound cannot be told from a zero one",
 				ErrUnsupportedDatatype, g.prefix(), end, end, end)
 		}
 		if bounded {
@@ -793,8 +793,8 @@ func (ts rmattrTails) matchCode(g rmattrGroup) (string, error) {
 	}
 	runes := []rune(s)
 	if len(runes) != 1 || !strings.ContainsRune(matchCodes, runes[0]) {
-		return "", fmt.Errorf("%w: %q is %q, but TERM_MAPPING.match is one of %s (REQ-140)",
-			ErrUnsupportedDatatype, key, s, matchCodes)
+		return "", fmt.Errorf("%w: %q must be TERM_MAPPING.match, one of %s",
+			ErrUnsupportedDatatype, key, matchCodes)
 	}
 	return string(runes[0]), nil
 }

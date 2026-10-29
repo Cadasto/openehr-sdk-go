@@ -497,7 +497,9 @@ requirements:
       - openehr/serialize/canxml/unmatched_test.go
       - openehr/serialize/canxml/valuefree_test.go
       - openehr/serialize/internal/poly/poly_test.go
+      - openehr/serialize/simplified/ctx_error_values_test.go
       - openehr/serialize/simplified/datatypes_test.go
+      - openehr/serialize/simplified/error_text_test.go
       - openehr/serialize/simplified/fit_test.go
       - openehr/templatecompile/external_test.go
       - openehr/validation/interval_bounds_test.go
@@ -544,8 +546,10 @@ requirements:
       - openehr/serialize/simplified/composer_test.go
       - openehr/serialize/simplified/composition_name_test.go
       - openehr/serialize/simplified/context_test.go
+      - openehr/serialize/simplified/ctx_error_values_test.go
       - openehr/serialize/simplified/datatypes_test.go
       - openehr/serialize/simplified/empty_structure_test.go
+      - openehr/serialize/simplified/error_text_test.go
       - openehr/serialize/simplified/fit_test.go
       - openehr/serialize/simplified/flat_decode_test.go
       - openehr/serialize/simplified/flat_encode_test.go
@@ -1148,6 +1152,7 @@ requirements:
       - transport/client_test.go
       - transport/decode_error_test.go
       - transport/diagnostics_internal_test.go
+      - transport/error_envelope_coded_test.go
       - transport/error_envelope_test.go
       - transport/errors_test.go
       - transport/hot_path_internal_test.go
@@ -2072,6 +2077,7 @@ requirements:
       - openehr/serialize/simplified/composition_name_test.go
       - openehr/serialize/simplified/context_test.go
       - openehr/serialize/simplified/datatypes_test.go
+      - openehr/serialize/simplified/error_text_test.go
       - openehr/serialize/simplified/flat_encode_test.go
       - openehr/serialize/simplified/flat_pinned_test.go
       - openehr/serialize/simplified/index_bound_test.go

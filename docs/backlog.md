@@ -7,6 +7,7 @@ harvested_through: 2026-10-28T22:22:45Z
 Leftovers of merged branches: defects the branch that found them did not fix, and suggestions. Each line is a lead, not a finding: verify it before acting. Lines are grouped by theme so one delivery can take a whole group; the sentence under each heading says what such a delivery is. A delivery whose `Files` touch a line's path verifies it, and fixes it or finds it stale; the next `/sdd-triage --backlog` deletes what is settled. `sdd-pr harvest` and `sdd-pr flip --carry` add new lines under `## Unsorted`, defects first; the next `/sdd-triage --backlog` sorts them into a group. The file is kept at about 80 lines ([ai-workflow.md § Review](ai-workflow.md#review)). Edit freely.
 
 ## Unsorted
+- transport/client.go:472 · Client.Do's network-failure text still carries net/http's cause, so a malformed response header line's value reaches the error; the admin probe now hides it, REQ-093 still allows it, and the maintainer deferred the transport-wide fix · by: go-reviewer · from: fix/caller-error-surfaces
 
 ## Generator and validator: a required attribute with no child, and an untyped node (REQ-102, REQ-107)
 Two defects where a root `Generate` returns breaks REQ-107 § Contract *Output*, or the template validator reads a node otherwise than the generator builds it; code in openehr/instance and openehr/validation/engine.go, under sentences that already bind (REQ-100 *Node taxonomy*, REQ-107 *Generic and untyped types*). Lane: maintenance. Size: S–M.
