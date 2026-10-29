@@ -17,17 +17,19 @@ import (
 // both ends — the server's Write after WriteHeader(204) returns "status code
 // does not allow body" with n=0, and the client discards the bytes even when a
 // non-conforming server puts them on the wire with a Content-Length. So the
-// 204 arm of the carve-out below only ever sees an empty body, which makes the
+// 204 arm of Get's carve-out only ever sees an empty body, which makes the
 // carve-out's own condition unobservable through `null`. The carve-out itself
-// is pinned by the empty-bodied 204 tests in party_test.go / versioned_test.go
-// (they fail when it is deleted).
+// is pinned by the empty-bodied 204 tests in party_test.go (they fail when it
+// is deleted). The version reads have no carve-out: a 204 there fails like any
+// other empty body (versioned_test.go).
 
 // TestGetNullBodyIsInvalidShape pins the empty-body row of REQ-151
 // § The taxonomy on the polymorphic demographic read: a 200 whose body is the
 // JSON `null` literal is a wire anomaly exactly like an empty one — it MUST
-// surface as transport.ErrInvalidShape rather than as "no version" (which only
-// a 204 may mean) or as a *transport.DecodeError. The version read shares the
-// arm, so the versioned_party/{uid}/version route is exercised too.
+// surface as transport.ErrInvalidShape rather than as "deleted at that time"
+// (which only a 204 on Get may mean) or as a *transport.DecodeError. The
+// version read refuses it the same way, so the versioned_party/{uid}/version
+// route is exercised too.
 func TestGetNullBodyIsInvalidShape(t *testing.T) { // REQ-151
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

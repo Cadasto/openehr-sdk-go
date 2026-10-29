@@ -13,9 +13,10 @@ package demographic_test
 // invisible to the caller".
 //
 // The neighbouring empty-body arms keep the outcomes REQ-151 § The taxonomy
-// gives them: a 204 is a legitimate "no version at that time" success, and any
-// other empty-body 2xx is transport.ErrInvalidShape. Every body below is
-// therefore non-empty and undecodable, which is what this requirement is about.
+// gives them: a 204 on Get is the pin's "deleted at that time" success, and
+// any other empty-body 2xx, a 204 on a version read included, is
+// transport.ErrInvalidShape. Every body below is therefore non-empty and
+// undecodable, which is what this requirement is about.
 
 import (
 	"errors"
@@ -184,10 +185,10 @@ func TestGetVersionDataArmCarriesFullBody(t *testing.T) { // REQ-151
 	}
 }
 
-// TestGetPartyEmptyBodyKeepsInvalidShape and its 204 sibling hold, at this
-// package, the empty-body row of REQ-151 § The taxonomy and the 204 outcome it
-// leaves to the demographic reads: an empty 2xx body is an absent body, not an
-// unusable one, so it must never become a *transport.DecodeError.
+// TestGetPartyEmptyBodyKeepsInvalidShape and its version-read sibling hold,
+// at this package, the empty-body row of REQ-151 § The taxonomy: an empty 2xx
+// body is an absent body, not an unusable one, so it must never become a
+// *transport.DecodeError.
 func TestGetPartyEmptyBodyKeepsInvalidShape(t *testing.T) { // REQ-151
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -203,23 +204,28 @@ func TestGetPartyEmptyBodyKeepsInvalidShape(t *testing.T) { // REQ-151
 	}
 }
 
-// TestGetVersion204IsNotDecodeError pins the legitimate no-body success: a 204
-// on a version read is "no version at that time", a nil-error nil-version
-// answer, and it must not be dragged into this requirement either.
-func TestGetVersion204IsNotDecodeError(t *testing.T) { // REQ-151
+// TestGetVersion204IsInvalidShapeNotDecodeError pins the 204 on a version
+// read: the pin answers it 200 with a body or 404, so a 204 is an absent body
+// like any other empty 2xx, transport.ErrInvalidShape beside the metadata, and
+// never a *transport.DecodeError.
+func TestGetVersion204IsInvalidShapeNotDecodeError(t *testing.T) { // REQ-151
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("ETag", `"`+personVersion+`"`)
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer srv.Close()
 
 	pv, meta, err := demographic.GetVersion(t.Context(), newClient(t, srv), personVOID)
-	if err != nil {
-		t.Fatalf("204 version read: unexpected error %v; a 204 is a legitimate no-version success", err)
+	if !errors.Is(err, transport.ErrInvalidShape) {
+		t.Fatalf("GetVersion(204) err = %v, want transport.ErrInvalidShape", err)
+	}
+	if _, ok := errors.AsType[*transport.DecodeError](err); ok {
+		t.Error("GetVersion(204) produced a *transport.DecodeError; REQ-151 § The taxonomy keeps an absent body on ErrInvalidShape")
 	}
 	if pv != nil {
-		t.Errorf("204 version read returned %+v, want nil", pv)
+		t.Errorf("GetVersion(204) returned %+v beside the error, want nil", pv)
 	}
-	if meta == nil {
-		t.Error("204 version read returned nil metadata")
+	if meta == nil || meta.ETag != personVersion {
+		t.Errorf("GetVersion(204) metadata = %+v, want the response headers (ETag %q)", meta, personVersion)
 	}
 }
