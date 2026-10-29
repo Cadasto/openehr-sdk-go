@@ -3,6 +3,7 @@ package admin_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"net"
@@ -1105,6 +1106,76 @@ func TestProbeRequestFailureTextStaysOut(t *testing.T) { // REQ-083
 			if n := strings.Count(msg, tc.path); n != 1 {
 				t.Errorf("error text %q names the probe path %q %d time(s), want once", msg, tc.path, n)
 			}
+			if want := tc.path + ": request failed"; !strings.HasSuffix(msg, want) {
+				t.Errorf("error text %q, want it to end in %q", msg, want)
+			}
+		})
+	}
+}
+
+// failingTransport fails every request with err before sending a byte.
+type failingTransport struct{ err error }
+
+func (ft failingTransport) RoundTrip(*http.Request) (*http.Response, error) { return nil, ft.err }
+
+// transportTimeout is a failure that reports itself as a timeout, as a
+// dial or TLS handshake timeout does, without matching
+// context.DeadlineExceeded. Its text carries readySecret.
+type transportTimeout struct{}
+
+func (transportTimeout) Error() string { return "i/o timeout " + readySecret }
+func (transportTimeout) Timeout() bool { return true }
+
+// TestProbeRequestFailureWord pins the fixed word a probe's request
+// failure ends in: its text says whether the request timed out or was
+// canceled, without quoting the failure, whose text here carries
+// readySecret. Any other failure reads "request failed", which
+// TestProbeRequestFailureTextStaysOut pins.
+func TestProbeRequestFailureWord(t *testing.T) { // REQ-083
+	stall := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	defer stall.Close()
+	canceled, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	cases := []struct {
+		name string
+		ctx  context.Context
+		hc   *http.Client
+		want string
+	}{
+		{
+			name: "context already canceled", ctx: canceled, hc: stall.Client(),
+			want: "request canceled",
+		},
+		{
+			name: "server stalls past the client timeout", ctx: t.Context(),
+			hc:   &http.Client{Transport: stall.Client().Transport, Timeout: 50 * time.Millisecond},
+			want: "request timed out",
+		},
+		{
+			name: "transport reports a timeout", ctx: t.Context(),
+			hc:   &http.Client{Transport: failingTransport{err: transportTimeout{}}},
+			want: "request timed out",
+		},
+		{
+			name: "transport fails past a deadline", ctx: t.Context(),
+			hc:   &http.Client{Transport: failingTransport{err: fmt.Errorf("dial %s: %w", readySecret, context.DeadlineExceeded)}},
+			want: "request timed out",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := admin.Live(tc.ctx, newClientWithHTTP(t, stall, tc.hc))
+			if err == nil {
+				t.Fatal("Live = nil, want a request failure")
+			}
+			msg := err.Error()
+			if want := admin.DefaultLivePath + ": " + tc.want; !strings.HasSuffix(msg, want) {
+				t.Errorf("Live error text %q, want it to end in %q", msg, want)
+			}
+			assertNoServerValues(t, msg)
 		})
 	}
 }
