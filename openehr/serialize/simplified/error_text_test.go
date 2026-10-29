@@ -15,8 +15,14 @@ import (
 // could reach the error text.
 const refusalTextSecret = "secret-value-0451"
 
+// refusalTextSecretRune stands in for refusalTextSecret where the planted
+// value must be one character: TERM_MAPPING.match is a Character, and a longer
+// value is refused by the canonical JSON encoder before the refusal it plants
+// for is reached.
+const refusalTextSecretRune = "☃"
+
 // checkRefusalText fails when err is not want, does not name key, names a
-// requirement id, or carries refusalTextSecret.
+// requirement id, or carries refusalTextSecret or refusalTextSecretRune.
 func checkRefusalText(t *testing.T, err, want error, key string) {
 	t.Helper()
 	if !errors.Is(err, want) {
@@ -29,7 +35,7 @@ func checkRefusalText(t *testing.T, err, want error, key string) {
 	if strings.Contains(msg, "REQ-") {
 		t.Errorf("err = %q names a requirement id", msg)
 	}
-	if strings.Contains(msg, refusalTextSecret) {
+	if strings.Contains(msg, refusalTextSecret) || strings.Contains(msg, refusalTextSecretRune) {
 		t.Errorf("err = %q carries the document's value", msg)
 	}
 }
@@ -140,7 +146,9 @@ func TestREQ140EncodeRefusalTextNamesNoRequirementOrValue(t *testing.T) {
 				if !ok {
 					t.Fatalf("dv_text leaf decoded as %T", elementText(t, c))
 				}
-				text.Mappings[0].Match = "~"
+				// One character, so the encoder accepts it, but outside
+				// TERM_MAPPING's set, so the refusal fires.
+				text.Mappings[0].Match = refusalTextSecretRune
 			},
 		},
 	} {
