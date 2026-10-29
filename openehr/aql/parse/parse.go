@@ -277,8 +277,9 @@ func ParseQuery(q string) (*Query, error) {
 // Deprecated: Tree exposes the generated parser context
 // ([gen.ISelectQueryContext]) and may change shape on any grammar
 // regeneration. Use [Document.Query] / [ParseQuery] for the stable
-// structured AST; Tree remains as a raw-tree escape hatch for consumers
-// that still need it.
+// structured AST, and [Query.Spans] for where each clause sits in the
+// source; Tree remains as a raw-tree escape hatch for consumers that
+// still need it.
 //
 // Returns nil for a zero-value document; call only after a successful
 // [Parse], or guard with [Document.Parsed].
