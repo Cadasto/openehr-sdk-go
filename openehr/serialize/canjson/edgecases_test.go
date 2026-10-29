@@ -331,21 +331,24 @@ func TestUnmarshalMaxDepthAcrossPolymorphicSlots(t *testing.T) {
 //     "(513 > 512)".
 //
 // Can-fail (each checked with go test -overlay on a patched copy of
-// streaming.go):
+// streaming.go, or of registry.go where the note says so):
 //   - DecodeInto's "d > maxDecodeDepth" changed to "d >= maxDecodeDepth"
 //     refuses the concrete 512 case with "(512 > 512)".
 //   - DecodeInto's "+ 1" changed to "+ 0" lets the concrete 513 case decode;
 //     changed to "+ 2" it refuses the concrete 512 case, and reports the
 //     concrete 513 case as "(514 > 512)" instead of the pinned "(513 > 512)".
-//   - DecodePolymorphic's "jsonNestingDepth(raw)" changed to
-//     "jsonNestingDepth(raw) - 1" lets the polymorphic 513 case decode.
+//   - In registry.go, depthPastCap's "jsonNestingDepth(data)" changed to
+//     "jsonNestingDepth(data) - 1" lets the polymorphic 513 case decode:
+//     DecodePolymorphic measures the buffered slot with depthPastCap.
 //
 // typereg.Default.Decode counts every bracket of its input rather than RM
 // values where they open, so it gets its own pair: a document whose bracket
 // depth is exactly 512 decodes, and one at 513 is refused with "(513 > 512)".
 // The pair reuses the concrete documents above, whose bracket depths the test
-// asserts. Can-fail: Registry.Decode's "d > maxDecodeDepth" changed to
-// "d >= maxDecodeDepth" refuses the 512 document.
+// asserts. The 512 document opens no more brackets than the cap, so
+// depthPastCap settles it on the count and its exact scan and the fence after
+// it never run; typereg's TestDepthBound_REQ108_EveryBracketKind pins that
+// fence with its rows at the cap.
 func TestUnmarshalMaxDepthBoundary(t *testing.T) {
 	wrap := func(n int, leaf string) []byte {
 		doc := leaf
@@ -430,9 +433,9 @@ func TestUnmarshalMaxDepthBoundary(t *testing.T) {
 // where they open, and the deepest RM value, the FEEDER_AUDIT, opens at 512),
 // while typereg.Default.Decode refuses it (513 brackets).
 //
-// Can-fail (checked with go test -overlay on a patched copy of streaming.go):
-// dropping DecodePolymorphic's jsonNestingDepth(raw) check lets the slot case
-// decode, so its sub-test fails.
+// Can-fail (checked with go test -overlay on a patched copy of registry.go):
+// dropping the check in depthPastCap, which DecodePolymorphic runs on the
+// buffered slot, lets the slot case decode, so its sub-test fails.
 func TestUnmarshalUndeclaredNestingDependsOnBuffering(t *testing.T) {
 	quantity := `{"_type":"DV_QUANTITY","magnitude":80.5,"units":"kg","zz":` +
 		strings.Repeat("[", 600) + strings.Repeat("]", 600) + `}`

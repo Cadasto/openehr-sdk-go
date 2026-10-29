@@ -441,6 +441,8 @@ requirements:
       - internal/bmmgen/render_streaming_test.go
       - internal/bmmgen/sim_bump_test.go
       - internal/rmaccess/interval_test.go
+      - internal/rmjsonwalk/walk_once_budget_internal_test.go
+      - internal/rmjsonwalk/walk_once_internal_test.go
       - internal/v1_rm_decode_guard_test.go
       - openehr/aom/aom14/interval_open_side_test.go
       - openehr/client/demographic/versioned_test.go
@@ -1685,6 +1687,7 @@ requirements:
       - openehr/rm/typereg
       - openehr/serialize/canjson
     tests:
+      - internal/rmjsonwalk/walk_once_budget_internal_test.go
       - openehr/bmm/load_test.go
       - openehr/rm/typereg/registry_test.go
       - openehr/rm/typereg/streaming_hotpath_test.go
@@ -1711,6 +1714,7 @@ requirements:
       - openehr/aql/lint/extract_test.go
       - openehr/aql/lint/lint_test.go
       - openehr/aql/lint/pathshape_fanout_test.go
+      - openehr/aql/lint/pathshape_internal_test.go
       - openehr/aql/lint/pathshape_parseonly_test.go
       - openehr/aql/lint/pathshape_redundant_test.go
       - openehr/aql/lint/pathshape_test.go
@@ -2567,6 +2571,7 @@ requirements:
     probes: [PROBE-110, PROBE-081]
     tests:
       - internal/bmmgen/render_xmlunmar_class_test.go
+      - internal/rmjsonwalk/walk_once_internal_test.go
       - openehr/internal/xmlunmatched/document_internal_test.go
       - openehr/internal/xmlunmatched/missing_internal_test.go
       - openehr/rm/missing_members_test.go

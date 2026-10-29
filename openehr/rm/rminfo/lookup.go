@@ -164,6 +164,10 @@ type lookup struct {
 	// tables do not carry — see childIndex in hierarchy.go.
 	childOnce sync.Once
 	children  map[string][]string
+	// ancestorOnce/ancestors memoise each class's sorted, strict ancestor
+	// list — see ancestorIndex in hierarchy.go.
+	ancestorOnce sync.Once
+	ancestors    map[string][]string
 }
 
 func (l *lookup) RequiredAttributes(rmType string) []string {

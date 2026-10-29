@@ -5,6 +5,7 @@ import (
 	"encoding/json/jsontext"
 	json "encoding/json/v2"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -170,18 +171,18 @@ type slotValue interface{ isSlotValue() }
 
 // TestDecodePolymorphicDepthScanBound pins the bound that lets DecodePolymorphic
 // skip the bracket scan of a buffered slot (REQ-108). A value nested d levels
-// deep holds d opening and d closing brackets, so d is at most half the slot's
-// length, and the scan runs only when the enclosing stack depth plus that bound
-// passes the cap. A slot of bare brackets is the tightest case: its depth is
-// exactly half its length. So 511 brackets under an object (stack depth 1)
-// reach the cap and pass the depth check, failing later at the _type peek as a
-// shape error, while 512 are refused with "(513 > 512)". A slot nested past the
-// cap only through a member no type declares is refused too: no concrete
-// decode ever sees that member, so the slot's bracket scan is its only bound.
+// deep holds at least d opening brackets, so d is at most the slot's count of
+// '{' and '[', and the scan runs only when the enclosing stack depth plus that
+// count passes the cap. A slot of bare brackets is the tightest case: its depth
+// is exactly its count. So 511 brackets under an object (stack depth 1) reach
+// the cap and pass the depth check, failing later at the _type peek as a shape
+// error, while 512 are refused with "(513 > 512)". A slot nested past the cap
+// only through a member no type declares is refused too: no concrete decode
+// ever sees that member, so the slot's bracket scan is its only bound.
 //
-// Can-fail: with the skip condition loosened by one (half the length minus
-// one), the 512-bracket slot skips the scan and fails at the peek instead; with
-// the scan always skipped, both refusal rows fail.
+// Can-fail: with the skip condition loosened by one (the count minus one), the
+// 512-bracket slot skips the scan and fails at the peek instead; with the scan
+// always skipped, both refusal rows fail.
 func TestDecodePolymorphicDepthScanBound(t *testing.T) {
 	brackets := func(n int) string { return strings.Repeat("[", n) + strings.Repeat("]", n) }
 	cases := []struct {
@@ -221,5 +222,139 @@ func TestDecodePolymorphicDepthScanBound(t *testing.T) {
 				t.Errorf("DecodePolymorphic(%s at stack depth 1) err = %v, want the text to contain %q", tc.name, err, tc.wantMsg)
 			}
 		})
+	}
+}
+
+// TestDepthBound_REQ108_EveryBracketKind pins the depth refusal on the two
+// routes that read a value whole and bound its nesting (REQ-108):
+// Default.Decode on a whole document, and DecodePolymorphic on a slot that
+// opens one level below the document root. Each row is an ELEMENT, an ITEM
+// value, read into a slot of type any.
+//
+//   - A value nested 600 levels deep through arrays alone, or through objects
+//     alone, is refused with ErrMaxDepthExceeded, with the same text and
+//     reported depth as before. The reported depth is where the scan stops:
+//     one past the cap within the value, plus the level the slot opens at.
+//   - A shallow value whose strings hold more than 512 brackets decodes:
+//     brackets inside a string do not nest, so a bracket count past the cap
+//     is no reason to refuse.
+//   - A value that reaches exactly 512 levels from the root, with one bracket
+//     more than levels (its name), decodes. Its count passes the cap, so the
+//     exact scan runs, and the fence after it is what accepts the value.
+//
+// The undeclared member "zz" carries the deep nesting because no concrete
+// decode ever reads it: the depth check is its only bound, so a check that
+// misses it lets the ELEMENT decode cleanly.
+//
+// Can-fail: a pre-check that counts only '{' lets both array rows through; one
+// that counts only '[' lets both object rows through; one that refuses on the
+// count alone, without the exact scan, refuses the string rows and the rows at
+// the cap; a fence of "d >= cap" after the scan refuses the rows at the cap.
+func TestDepthBound_REQ108_EveryBracketKind(t *testing.T) {
+	arrays := func(n int) string { return strings.Repeat("[", n) + strings.Repeat("]", n) }
+	objects := func(n int) string { return strings.Repeat(`{"a":`, n-1) + "{}" + strings.Repeat("}", n-1) }
+	stringBrackets := strings.Repeat("{[", 400)
+	cases := []struct {
+		name     string
+		elemName string                // ELEMENT.name.value
+		zz       func(base int) string // the undeclared member, given the stack depth the ELEMENT opens at; nil leaves it out
+		// wantDoc and wantSlot are the refusal texts of Default.Decode and of
+		// DecodePolymorphic; empty means the value decodes.
+		wantDoc, wantSlot string
+	}{
+		{
+			name:     "arrays only, past the cap",
+			elemName: "x",
+			zz:       func(int) string { return arrays(600) },
+			wantDoc:  "typereg.Decode: typereg: nesting depth exceeds limit (513 > 512)",
+			wantSlot: "decode: typereg.Decode: typereg: nesting depth exceeds limit (514 > 512)",
+		},
+		{
+			name:     "objects only, past the cap",
+			elemName: "x",
+			zz:       func(int) string { return objects(600) },
+			wantDoc:  "typereg.Decode: typereg: nesting depth exceeds limit (513 > 512)",
+			wantSlot: "decode: typereg.Decode: typereg: nesting depth exceeds limit (514 > 512)",
+		},
+		{
+			name:     "800 brackets inside a string, two levels deep",
+			elemName: stringBrackets,
+		},
+		{
+			// base + ELEMENT + (511 - base) arrays reach 512 levels; the name
+			// object is the one bracket more than levels.
+			name:     "exactly at the cap, one bracket more than levels",
+			elemName: "x",
+			zz:       func(base int) string { return arrays(511 - base) },
+		},
+	}
+	element := func(base int, name string, zz func(int) string) string {
+		v := `{"_type":"ELEMENT","archetype_node_id":"at0001","name":{"_type":"DV_TEXT","value":"` + name + `"}`
+		if zz != nil {
+			v += `,"zz":` + zz(base)
+		}
+		return v + "}"
+	}
+	for _, tc := range cases {
+		t.Run(tc.name+"/Default.Decode", func(t *testing.T) {
+			got, err := Default.Decode([]byte(element(0, tc.elemName, tc.zz)))
+			if tc.wantDoc != "" {
+				if !errors.Is(err, ErrMaxDepthExceeded) {
+					t.Fatalf("Default.Decode(%s) err = %v, want errors.Is(_, ErrMaxDepthExceeded)", tc.name, err)
+				}
+				if err.Error() != tc.wantDoc {
+					t.Errorf("Default.Decode(%s) err = %q, want %q", tc.name, err, tc.wantDoc)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Default.Decode(%s) err = %v, want a decoded ELEMENT", tc.name, err)
+			}
+			checkDecodedElement(t, "Default.Decode", got, tc.elemName)
+		})
+		t.Run(tc.name+"/DecodePolymorphic", func(t *testing.T) {
+			dec := jsontext.NewDecoder(strings.NewReader(`{"slot":` + element(1, tc.elemName, tc.zz) + `}`))
+			// Step into the enclosing object, so the slot opens at stack depth 1.
+			for range 2 {
+				if _, err := dec.ReadToken(); err != nil {
+					t.Fatalf("ReadToken before the slot: %v", err)
+				}
+			}
+			var out any
+			err := DecodePolymorphic(dec, &out, nil)
+			if tc.wantSlot != "" {
+				if !errors.Is(err, ErrMaxDepthExceeded) {
+					t.Fatalf("DecodePolymorphic(%s at stack depth 1) err = %v, want errors.Is(_, ErrMaxDepthExceeded)", tc.name, err)
+				}
+				if _, ok := errors.AsType[*DecodeError](err); !ok {
+					t.Errorf("DecodePolymorphic(%s at stack depth 1) err = %v (%T), want it inside a *DecodeError", tc.name, err, err)
+				}
+				if err.Error() != tc.wantSlot {
+					t.Errorf("DecodePolymorphic(%s at stack depth 1) err = %q, want %q", tc.name, err, tc.wantSlot)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("DecodePolymorphic(%s at stack depth 1) err = %v, want a decoded ELEMENT", tc.name, err)
+			}
+			checkDecodedElement(t, "DecodePolymorphic", out, tc.elemName)
+		})
+	}
+}
+
+// checkDecodedElement fails the test unless v is the rm package's ELEMENT and
+// re-encodes with a DV_TEXT name holding name. The rm package imports this
+// one, so the check goes through the Go type's name and the encoding.
+func checkDecodedElement(t *testing.T, call string, v any, name string) {
+	t.Helper()
+	if got := fmt.Sprintf("%T", v); got != "*rm.Element" {
+		t.Fatalf("%s decoded %s, want *rm.Element", call, got)
+	}
+	enc, err := json.Marshal(v, EncodeOptions())
+	if err != nil {
+		t.Fatalf("%s: re-encode the decoded ELEMENT: %v", call, err)
+	}
+	if want := `"name":{"_type":"DV_TEXT","value":"` + name + `"}`; !strings.Contains(string(enc), want) {
+		t.Errorf("%s: decoded ELEMENT re-encodes as %s, want it to contain %s", call, enc, want)
 	}
 }

@@ -149,6 +149,33 @@ func BenchmarkDecodeDVQuantity(b *testing.B) {
 // between a wide tree and a deep one.
 const benchFixture = "Demonstration.v1"
 
+// BenchmarkDecodeWithMissing measures a decode with WithMissing on three
+// corpus compositions, a small, a middling and the largest: the default decode
+// and the walk over the input that reports the members it leaves out. The
+// setup decode is the control: a fixture that stopped decoding would fail
+// here rather than quietly measuring an error path.
+func BenchmarkDecodeWithMissing(b *testing.B) {
+	for _, id := range []string{"body_weight", "BMI", benchFixture} {
+		payload, err := os.ReadFile(fixtures.CompositionJSON(id))
+		if err != nil {
+			b.Fatalf("read fixture %s: %v", id, err)
+		}
+		report := canjson.WithMissing(func(string) {})
+		if err := canjson.Unmarshal(payload, new(rm.Composition), report); err != nil {
+			b.Fatalf("setup decode of %s: %v", id, err)
+		}
+		b.Run(id, func(b *testing.B) {
+			b.SetBytes(int64(len(payload)))
+			b.ReportAllocs()
+			for b.Loop() {
+				if err := canjson.Unmarshal(payload, new(rm.Composition), report); err != nil {
+					b.Fatalf("Unmarshal: %v", err)
+				}
+			}
+		})
+	}
+}
+
 // BenchmarkDecodeCompositionFixture measures decode plus encode of the largest
 // vendored fixture, the baseline the json/v2 migration is measured against
 // (PR 171; results in research-strands.md, STRAND-04). b.SetBytes reports against
