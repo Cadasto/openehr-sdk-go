@@ -128,6 +128,36 @@ func TestREQ171_SyntheticCompositionIsTenTimesTheLargestCorpusComposition(t *tes
 	}
 }
 
+// jsonBenchIDs are the corpus compositions BenchmarkValidateJSON reads: a
+// small, a middling and the largest the corpus holds.
+var jsonBenchIDs = []string{"body_weight", "BMI", syntheticID}
+
+// BenchmarkValidateJSON measures ValidateJSON with the Reference Model rules
+// alone on raw corpus documents: the decode, the walk that reads the members
+// each document leaves out, and the validation. The setup call is the
+// control: a document that stopped decoding would fail here rather than
+// quietly measuring the invalid_shape path.
+func BenchmarkValidateJSON(b *testing.B) {
+	for _, id := range jsonBenchIDs {
+		raw, err := os.ReadFile(fixtures.CompositionJSON(id))
+		if err != nil {
+			b.Fatalf("read %s: %v", id, err)
+		}
+		for _, iss := range ValidateJSON(raw, new(rm.Composition), nil).Issues {
+			if iss.Code == "invalid_shape" {
+				b.Fatalf("ValidateJSON(%s) setup: invalid_shape issue %+v", id, iss)
+			}
+		}
+		b.Run(id, func(b *testing.B) {
+			b.SetBytes(int64(len(raw)))
+			b.ReportAllocs()
+			for b.Loop() {
+				_ = ValidateJSON(raw, new(rm.Composition), nil)
+			}
+		})
+	}
+}
+
 // BenchmarkValidateComposition measures, per composition, the one walk with
 // the composition's template (ValidateComposition) and with the Reference
 // Model rules alone (ValidateRM).
