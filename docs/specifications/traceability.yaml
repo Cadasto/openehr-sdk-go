@@ -1712,6 +1712,7 @@ requirements:
       - openehr/aql/lint/extract_test.go
       - openehr/aql/lint/lint_test.go
       - openehr/aql/lint/pathshape_fanout_test.go
+      - openehr/aql/lint/pathshape_internal_test.go
       - openehr/aql/lint/pathshape_parseonly_test.go
       - openehr/aql/lint/pathshape_redundant_test.go
       - openehr/aql/lint/pathshape_test.go
