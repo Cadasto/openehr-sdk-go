@@ -57,6 +57,27 @@ func TestREQ170_UnmatchedNamesEveryMemberTheRMDoesNotDefine(t *testing.T) {
 			want: []string{"/x-a", "/x-b"},
 		},
 		{
+			// The decode target's type reads the members before "_type"
+			// as well, and each is reported once.
+			name: "_type after the members it decides, the target's type the same",
+			root: rmjsonwalk.Root{Type: "DV_TEXT"},
+			doc:  `{"x-a":1,"value":"v","x-b":{"value":2},"_type":"DV_TEXT"}`,
+			want: []string{"/x-a", "/x-b"},
+		},
+		{
+			// The "_type" wins over the decode target's type, wherever
+			// it sits.
+			name: "_type after the members it decides, the target's type another",
+			root: rmjsonwalk.Root{Type: "DV_TEXT"},
+			doc:  `{"x-a":1,"magnitude":1,"value":"v","_type":"DV_COUNT"}`,
+			want: []string{"/x-a", "/value"},
+		},
+		{
+			name: "_type spelled with an escape",
+			doc:  `{"\u005ftype":"DV_TEXT","x-a":1,"value":"v"}`,
+			want: []string{"/x-a"},
+		},
+		{
 			name: "by-value class from its attribute",
 			doc:  `{"_type":"CODE_PHRASE","terminology_id":{"x-a":1,"value":"openehr"},"code_string":"433"}`,
 			want: []string{"/terminology_id/x-a"},
