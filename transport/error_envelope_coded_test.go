@@ -240,6 +240,145 @@ func TestErrorEnvelopePinErrorsList(t *testing.T) {
 	}
 }
 
+// TestErrorEnvelopeWrongTypedMembersKeepTheEnvelope pins REQ-093's
+// best-effort decode member by member: a message, a validationErrors entry,
+// a coded_text entry or list, or a coded value of the wrong JSON type is left
+// empty or skipped, and the rest of the envelope survives, so the code still
+// reaches OpenEHR.Code and Error(). A value that is not a string keeps its
+// entry's terminology and code string, under the opt-in or not.
+func TestErrorEnvelopeWrongTypedMembersKeepTheEnvelope(t *testing.T) {
+	tests := []struct {
+		name        string
+		body        string
+		raw         bool
+		wantCode    string
+		want        []transport.CodedTextItem
+		wantMessage string
+		wantVE      []string
+	}{
+		{
+			name:     "coded_text value that is a number keeps the codes, default client",
+			body:     `{"code":"VALIDATION_FAILED","coded_text":[{"terminology_id":{"value":"openehr"},"code_string":"C","value":42}]}`,
+			wantCode: "VALIDATION_FAILED",
+			want:     []transport.CodedTextItem{codedItem("openehr", "C", "")},
+		},
+		{
+			name:     "coded_text value that is a number keeps the codes, raw bodies",
+			body:     `{"code":"VALIDATION_FAILED","coded_text":[{"terminology_id":{"value":"openehr"},"code_string":"C","value":42}]}`,
+			raw:      true,
+			wantCode: "VALIDATION_FAILED",
+			want:     []transport.CodedTextItem{codedItem("openehr", "C", "")},
+		},
+		{
+			name:     "coded_text value that is an object keeps the codes, raw bodies",
+			body:     `{"code":"VALIDATION_FAILED","coded_text":[{"terminology_id":{"value":"openehr"},"code_string":"C","value":{"text":"patient 1234"}}]}`,
+			raw:      true,
+			wantCode: "VALIDATION_FAILED",
+			want:     []transport.CodedTextItem{codedItem("openehr", "C", "")},
+		},
+		{
+			name:     "errors value that is a number keeps the codes, default client",
+			body:     `{"code":"X","errors":[{"_type":"DV_CODED_TEXT","value":5,"defining_code":{"terminology_id":{"value":"local"},"code_string":"9000"}}]}`,
+			wantCode: "X",
+			want:     []transport.CodedTextItem{codedItem("local", "9000", "")},
+		},
+		{
+			name:     "errors value that is a number keeps the codes, raw bodies",
+			body:     `{"code":"X","errors":[{"_type":"DV_CODED_TEXT","value":5,"defining_code":{"terminology_id":{"value":"local"},"code_string":"9000"}}]}`,
+			raw:      true,
+			wantCode: "X",
+			want:     []transport.CodedTextItem{codedItem("local", "9000", "")},
+		},
+		{
+			name:     "message that is an object is left empty, default client",
+			body:     `{"code":"X","message":{"text":"m"}}`,
+			wantCode: "X",
+		},
+		{
+			name:     "message that is an object is left empty, raw bodies",
+			body:     `{"code":"X","message":{"text":"m"}}`,
+			raw:      true,
+			wantCode: "X",
+		},
+		{
+			name:     "validationErrors entries that are not strings are skipped",
+			body:     `{"code":"X","validationErrors":["a",1,"b"]}`,
+			raw:      true,
+			wantCode: "X",
+			wantVE:   []string{"a", "b"},
+		},
+		{
+			name:     "validationErrors entries that are null, objects, lists or booleans are skipped",
+			body:     `{"code":"X","validationErrors":["a",null,{"path":"/p"},["n"],true,"b"]}`,
+			raw:      true,
+			wantCode: "X",
+			wantVE:   []string{"a", "b"},
+		},
+		{
+			name:        "validationErrors that is not a list is ignored",
+			body:        `{"code":"X","message":"m","validationErrors":"patient 1234"}`,
+			raw:         true,
+			wantCode:    "X",
+			wantMessage: "m",
+		},
+		{
+			name:     "coded_text entry whose code_string is not a string is skipped",
+			body:     `{"code":"X","coded_text":[{"terminology_id":{"value":"openehr"},"code_string":7},{"terminology_id":{"value":"openehr"},"code_string":"K"}]}`,
+			wantCode: "X",
+			want:     []transport.CodedTextItem{codedItem("openehr", "K", "")},
+		},
+		{
+			name:     "coded_text entries that are not objects, or whose terminology is not a string, are skipped",
+			body:     `{"code":"X","coded_text":[null,42,"patient 1234",{"terminology_id":{"value":1},"code_string":"Z"},{"terminology_id":"openehr","code_string":"Z"},{"terminology_id":{"value":"openehr"},"code_string":"K"}]}`,
+			raw:      true,
+			wantCode: "X",
+			want:     []transport.CodedTextItem{codedItem("openehr", "K", "")},
+		},
+		{
+			name:     "coded_text that is not a list is ignored, the errors list is kept",
+			body:     `{"code":"X","coded_text":{"terminology_id":{"value":"openehr"},"code_string":"K"},"errors":[{"_type":"DV_CODED_TEXT","value":"v","defining_code":{"terminology_id":{"value":"local"},"code_string":"9000"}}]}`,
+			raw:      true,
+			wantCode: "X",
+			want:     []transport.CodedTextItem{codedItem("local", "9000", "v")},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var opts []transport.Option
+			if tt.raw {
+				opts = append(opts, transport.WithRawErrorBodies(true))
+			}
+			c := newDecodeClient(t, http.StatusUnprocessableEntity, tt.body, nil, opts...)
+			_, err := c.Do(t.Context(), &transport.Request{Route: "/x", Path: "/x"})
+			we, ok := errors.AsType[*transport.WireError](err)
+			if !ok || we == nil {
+				t.Fatalf("Do() error = %T (%v), want *transport.WireError", err, err)
+			}
+			if we.OpenEHR == nil {
+				t.Fatalf("OpenEHR = nil for %s, want the decoded envelope", tt.body)
+			}
+			if we.OpenEHR.Code != tt.wantCode {
+				t.Errorf("Code = %q, want %q", we.OpenEHR.Code, tt.wantCode)
+			}
+			if !slices.Equal(we.OpenEHR.CodedText, tt.want) {
+				t.Errorf("CodedText = %+v, want %+v", we.OpenEHR.CodedText, tt.want)
+			}
+			if we.OpenEHR.Message != tt.wantMessage {
+				t.Errorf("Message = %q, want %q", we.OpenEHR.Message, tt.wantMessage)
+			}
+			if !slices.Equal(we.OpenEHR.ValidationErrors, tt.wantVE) {
+				t.Errorf("ValidationErrors = %q, want %q", we.OpenEHR.ValidationErrors, tt.wantVE)
+			}
+			if wantCode := `code="` + tt.wantCode + `"`; !strings.Contains(we.Error(), wantCode) {
+				t.Errorf("Error() = %q, want it to carry %s", we.Error(), wantCode)
+			}
+			if strings.Contains(we.Error(), "1234") {
+				t.Errorf("Error() = %q, leaks free text", we.Error())
+			}
+		})
+	}
+}
+
 // TestErrorEnvelopeEmptyCodedListsAreNoEnvelope pins the edge of REQ-093's
 // best-effort decode: a body whose only members are coded lists with no
 // usable entry carries nothing to attach, so OpenEHR stays nil.
