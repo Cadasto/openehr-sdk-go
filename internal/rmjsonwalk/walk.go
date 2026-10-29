@@ -79,7 +79,17 @@ func (m *Model) Walk(data []byte, root Root, h Hooks) error {
 		return err
 	}
 	w := &walk{m: m, types: types, hooks: h}
-	return w.root(jsontext.NewDecoder(bytes.NewReader(data)), root.Nest, root)
+	return w.root(newDecoder(data), root.Nest, root)
+}
+
+// newDecoder returns a decoder that reads data in place. Given a
+// *bytes.Buffer, jsontext parses the buffer's own bytes, where from any other
+// reader it copies the whole document into a buffer of its own. The one
+// condition it sets is that nothing writes to the buffer while the decoder
+// reads it: nothing writes to data during a walk, and jsontext leaves a
+// buffer it reads in place as it is.
+func newDecoder(data []byte) *jsontext.Decoder {
+	return jsontext.NewDecoder(bytes.NewBuffer(data))
 }
 
 // Unmatched is [Model.Walk] with report as the Unmatched hook alone: it calls
@@ -135,8 +145,7 @@ func each(dec *jsontext.Decoder, open jsontext.Kind, fn func() error) error {
 // object's type when it opens the object.
 func typeIndex(data []byte) (map[int64]string, error) {
 	types := make(map[int64]string)
-	dec := jsontext.NewDecoder(bytes.NewReader(data))
-	return types, indexValue(dec, types)
+	return types, indexValue(newDecoder(data), types)
 }
 
 // indexValue reads the next value from dec into the index.
