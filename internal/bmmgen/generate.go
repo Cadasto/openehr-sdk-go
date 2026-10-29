@@ -16,7 +16,10 @@
 //     has any;
 //   - interval_bound_gen.go, the emptiness test the canonical encoders
 //     apply to an open interval side's bound, when the target owns an
-//     interval-shaped class.
+//     interval-shaped class;
+//   - xmlnames_gen.go, the ITS-XML schema names of the classes whose
+//     schema name differs from their BMM name, when the target has any
+//     ([Target].XMLTypeNames).
 //
 // These fixed file names are reserved: a BMM package whose file stem would
 // produce one of them fails generation instead of being overwritten.
@@ -219,6 +222,18 @@ func runTarget(opts Options, t Target, resolver wrappedResolver, schemas *itsXML
 			return tr, fmt.Errorf("bmmgen: %w", err)
 		}
 	}
+	// The ITS-XML name and shape tables are checked before any file is
+	// written, the type names first: an identifier element's class, and a
+	// shaped member's, takes its schema type from them.
+	if err := checkXMLTypeNames(plan); err != nil {
+		return tr, err
+	}
+	if err := checkXMLIdentifierElements(plan); err != nil {
+		return tr, err
+	}
+	if err := checkXMLMemberShapes(plan); err != nil {
+		return tr, err
+	}
 	for _, f := range plan.Files {
 		if !safeFileBase(f.FileBase) {
 			return tr, fmt.Errorf("bmmgen: unsafe file base %q", f.FileBase)
@@ -418,6 +433,35 @@ func runTarget(opts Options, t Target, resolver wrappedResolver, schemas *itsXML
 		}
 	}
 
+	// ITS-XML schema names, one file per target whose classes have any;
+	// the target's XML codecs call the helpers it declares.
+	namesBody, err := RenderXMLNamesFile(plan)
+	if err != nil {
+		return tr, err
+	}
+	namesPath := filepath.Join(outDir, xmlNamesFile)
+	if namesBody == nil {
+		if opts.Verify {
+			if _, statErr := os.Stat(namesPath); statErr == nil {
+				result.Drifts = append(result.Drifts, DriftRecord{Path: namesPath, Existing: true})
+			}
+		}
+	} else {
+		tr.Files = append(tr.Files, namesPath)
+		result.Files = append(result.Files, namesPath)
+		if opts.Verify {
+			drift, err := compareFile(namesPath, namesBody)
+			if err != nil {
+				return tr, err
+			}
+			if drift != nil {
+				result.Drifts = append(result.Drifts, *drift)
+			}
+		} else if err := writeAtomic(namesPath, namesBody); err != nil {
+			return tr, err
+		}
+	}
+
 	// Interval-bound emptiness test, one file per target that owns an
 	// interval-shaped concrete class. The canonical encoders it serves
 	// sit in the per-package companions above.
@@ -538,15 +582,17 @@ func runTarget(opts Options, t Target, resolver wrappedResolver, schemas *itsXML
 // the ones not derived from a BMM package: a package whose file stem produced
 // one of them would be silently overwritten by it.
 //
-// The reservation is uniform: all four names, in every target. A BMM package
+// The reservation is uniform: all five names, in every target. A BMM package
 // named like a fixed file is refused even in a target that would not emit that
 // file (the AOM 1.4 target emits neither interval_bound_gen.go nor
-// release_gen.go), so the set of reserved names never depends on the target and
-// a package can be moved between targets without a new collision.
+// release_gen.go, and the RM target no xmlnames_gen.go), so the set of
+// reserved names never depends on the target and a package can be moved
+// between targets without a new collision.
 var fixedGeneratedFiles = []string{
 	"typereg_gen.go",
 	"jsonhooks_gen.go",
 	intervalBoundFile,
+	xmlNamesFile,
 	releaseFileName,
 }
 

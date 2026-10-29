@@ -37,9 +37,12 @@
 //     declared on the document root whenever any descendant carries
 //     `xsi:type`.
 //   - Polymorphic discrimination: `xsi:type="<BMM_CLASS_NAME>"`
-//     (unprefixed openEHR class name). The encoder emits it as the
-//     first attribute on every concrete element at a polymorphic
-//     site. The decoder requires it at polymorphic sites;
+//     (unprefixed openEHR class name). Three AOM 1.4 classes are
+//     written with their name in the AM 1.4 schema instead
+//     (C_CODE_PHRASE for C_CODED_TEXT, C_DV_ORDINAL for C_ORDINAL,
+//     C_DV_QUANTITY for C_QUANTITY), and either name decodes. The
+//     encoder emits it as the first attribute on every concrete
+//     element at a polymorphic site. The decoder requires it at polymorphic sites;
 //     [WithRelaxedTypeDispatch], which would relax that, is accepted but
 //     not yet enforced. Discriminator values are
 //     matched unprefixed; namespace-prefixed values (the Better/Marand
@@ -83,6 +86,22 @@
 //     the CODE_PHRASE shape the AOM 1.4 ITS-XML schema gives it, with the
 //     terminology identifier in a `value` child of `terminology_id`;
 //     decode also reads a plain text `terminology_id`.
+//   - The AOM 1.4 C_CODED_TEXT `terminology` is written as the
+//     `terminology_id` element the AM 1.4 schema type C_CODE_PHRASE
+//     declares in its place, the identifier in a `value` child; decode
+//     also reads a `terminology` element.
+//   - The AOM 1.4 C_QUANTITY `property`, a string such as `openehr::125`,
+//     is written as the CODE_PHRASE the AM 1.4 schema type C_DV_QUANTITY
+//     declares: the part before the first `::` as the `value` of its
+//     `terminology_id`, the rest as its `code_string`. A property with no
+//     `::` is written as the element's text. Decode reads both shapes,
+//     joining a CODE_PHRASE's two parts with `::`, or giving the empty
+//     string when neither carries a value.
+//   - The symbol of an AOM 1.4 ORDINAL is written as a CODE_PHRASE. Decode
+//     also reads the DV_CODED_TEXT shape the AM 1.4 schema type
+//     ORDINAL_SYMBOL admits, whose `defining_code` is the symbol; its
+//     other elements, such as an empty `value`, are read and dropped, and
+//     are no unmatched content.
 //   - A member typed by a generic parameter that is instantiated with an
 //     interface, such as the `data` of ORIGINAL_VERSION<any>, is a
 //     polymorphic site and needs `xsi:type`, even when its element is
@@ -158,11 +177,18 @@
 // on the class its element decodes as, the class its `xsi:type` names, or
 // else the type the RM declares where it sits, as "Unmatched content" above
 // reads it, and the element carries no value for it: it has no child element
-// of that name, and no XML attribute of it where the ITS-XML schema carries
-// the attribute as one (`archetype_node_id`); the child it has carries
+// of that name, nor one the AM 1.4 schema declares in its place
+// (`terminology_id` for a C_CODE_PHRASE's terminology) holding a value, and
+// no XML attribute of it where the ITS-XML schema carries the attribute as
+// one (`archetype_node_id`, an ARCHETYPE_TERM's `code`); the child it has carries
 // `xsi:nil="true"` (or `1`), whatever it holds; or the child is a primitive
 // element whose text is empty or XML whitespace only, which carries no
-// value, as an empty interval flag element does. The decoder cannot always
+// value, as an empty interval flag element does. A C_DV_QUANTITY's
+// `property` written as a CODE_PHRASE carries a value when its
+// `terminology_id` value or its `code_string` does; otherwise the property
+// is missing, and nothing inside it is. The members of an ORDINAL symbol
+// written as a DV_CODED_TEXT are those of its `defining_code`, named
+// without that element, and its `value` is no member. The decoder cannot always
 // show that in the value it returns: a member the SDK holds by value, a
 // number, a boolean, a string or a value struct such as PARTY_SELF or
 // ARCHETYPE_ID, decodes to its zero value whether the input carried it or

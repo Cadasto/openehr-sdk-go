@@ -8,20 +8,24 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 )
 
-// TestREQ052_EmptyContainerRulesCheckTheirClass pins that the two empty-
-// container rules hold only for the class REQ-052 names: an empty "mappings"
-// is dropped only where DV_TEXT declares it, and an empty byte list only where
-// DV_MULTIMEDIA declares it ("data", "integrity_check"). The pinned RM has no
-// other class with such an attribute, so a synthetic one carries both, and
-// both stay as written. Drop either class check and this test reddens.
-func TestREQ052_EmptyContainerRulesCheckTheirClass(t *testing.T) {
+// TestREQ052_EmptyListRuleChecksOptionality pins that the REQ-052 empty-list
+// rule turns on whether the attribute is optional, not on its class or name: on a
+// synthetic class, an empty list and an empty byte list an optional attribute
+// holds are dropped, as the encoder leaves them out, and the same two held by
+// mandatory attributes are kept, as the encoder writes them. The class and
+// attribute names are none the pinned RM uses, so a rule bound to DV_TEXT
+// mappings or DV_MULTIMEDIA data keeps the optional pair, and a rule that
+// ignores optionality drops the mandatory pair; either reddens this test.
+func TestREQ052_EmptyListRuleChecksOptionality(t *testing.T) {
 	data := map[string]rminfo.ClassMeta{
 		"BLOB": {
 			Attributes: map[string]rminfo.AttrMeta{
-				"data":     {TypeName: "Octet", Container: true, DeclaredIn: "BLOB"},
-				"mappings": {TypeName: "NOTE", Container: true, DeclaredIn: "BLOB"},
+				"bytes":     {TypeName: "Octet", Container: true, DeclaredIn: "BLOB"},
+				"notes":     {TypeName: "NOTE", Container: true, DeclaredIn: "BLOB"},
+				"bytes_req": {TypeName: "Octet", Container: true, Required: true, DeclaredIn: "BLOB"},
+				"notes_req": {TypeName: "NOTE", Container: true, Required: true, DeclaredIn: "BLOB"},
 			},
-			AttrOrder: []string{"data", "mappings"},
+			AttrOrder: []string{"bytes", "notes", "bytes_req", "notes_req"},
 		},
 		"NOTE": {Attributes: map[string]rminfo.AttrMeta{}, AttrOrder: []string{}},
 	}
@@ -30,15 +34,20 @@ func TestREQ052_EmptyContainerRulesCheckTheirClass(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newWalker: %v", err)
 	}
-	got, err := w.object(map[string]any{"data": "", "mappings": []any{}}, "BLOB", "", "")
+	got, err := w.object(map[string]any{"bytes": "", "notes": []any{}, "bytes_req": "", "notes_req": []any{}}, "BLOB", "", "")
 	if err != nil {
 		t.Fatalf("object: %v", err)
 	}
-	if v, ok := got["data"]; !ok || v != "" {
-		t.Errorf("BLOB.data = %v (present %v), want the empty string kept: the empty-bytes rule binds DV_MULTIMEDIA only", v, ok)
+	for _, name := range []string{"bytes", "notes"} {
+		if v, ok := got[name]; ok {
+			t.Errorf("BLOB.%s = %v, want it removed: an empty list an optional attribute holds reads as absent", name, v)
+		}
 	}
-	if v, ok := got["mappings"].([]any); !ok || len(v) != 0 {
-		t.Errorf("BLOB.mappings = %v, want the empty list kept: the empty-mappings rule binds DV_TEXT only", got["mappings"])
+	if v, ok := got["bytes_req"]; !ok || v != "" {
+		t.Errorf("BLOB.bytes_req = %v (present %v), want the empty string kept: a mandatory list is written", v, ok)
+	}
+	if v, ok := got["notes_req"].([]any); !ok || len(v) != 0 {
+		t.Errorf("BLOB.notes_req = %v, want the empty list kept: a mandatory list is written", got["notes_req"])
 	}
 }
 

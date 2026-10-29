@@ -185,7 +185,7 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	var attrFields []emittedField
 	elemFields := fields
 	for _, ef := range fields {
-		if isXMLAttributeProperty(ef.Prop) {
+		if isXMLAttributeProperty(ef) {
 			attrFields = append(attrFields, ef)
 		}
 	}
@@ -204,7 +204,7 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	b.WriteString("// Missing/unknown/type-mismatch dispatch failures wrap typereg\n")
 	b.WriteString("// sentinels inside *canxml.DecodeError for errors.Is / errors.As.\n")
 	b.WriteString("// Properties typed as XML attributes per the openEHR ITS-XML XSDs\n")
-	b.WriteString("// (currently `archetype_node_id`) are read from _start.Attr.\n")
+	fmt.Fprintf(&b, "// (%s) are read from _start.Attr.\n", xmlAttributeNote(attrFields))
 	b.WriteString("// Content the method does not read is unmatched: it is skipped, or\n")
 	b.WriteString("// reported or refused under canxml.WithUnmatched and canxml.WithStrict.\n")
 	legacy := sc.IsAbstract() && hasIntervalShape(fields)
@@ -283,6 +283,11 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	b.WriteString("\t\t}\n") // close outer switch (token kind)
 	b.WriteString("\t}\n")   // close for
 	b.WriteString("}\n")
+	shapes, err := renderXMLCodedTextShapes(plan, pc, fields)
+	if err != nil {
+		return "", err
+	}
+	b.WriteString(shapes)
 	return b.String(), nil
 }
 
@@ -298,6 +303,30 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 
 	switch p := ef.Prop.(type) {
 	case *bmm.SingleProperty:
+		if shape, ok := xmlMemberShape(plan, ef); ok {
+			// The member's element in the shape its class's schema type
+			// gives it, and the shape an older SDK wrote.
+			switch shape {
+			case XMLCodePhraseString:
+				return unmarshalXMLCodePhraseString(recv, goField, elemName), nil
+			case XMLCodePhraseOrCodedText:
+				return unmarshalXMLCodedTextCall(plan, recv, ef), nil
+			}
+			return "", fmt.Errorf("unknown XML member shape %d", shape)
+		}
+		if el, ok := xmlIdentifierElement(plan, ef); ok {
+			// The element the schema declares in the member's place, then
+			// the member's own, which an older SDK wrote.
+			own := unmarshalXMLPrimitiveMandatory(recv, goField, elemName)
+			if !p.IsMandatory {
+				goType, _, err := singleTypeRef(plan, ef.Owner, p.TypeName)
+				if err != nil {
+					return "", err
+				}
+				own = unmarshalXMLPrimitiveOptionalLit(recv, goField, elemName, goType)
+			}
+			return unmarshalXMLIdentifier(recv, goField, el.Name, goNameForRef(plan, el.Type), p.IsMandatory) + own, nil
+		}
 		if p.TypeName == bmmAnyType {
 			// The codec cannot decode the content of an Any member: the
 			// element goes to xmlunmatched.SkipUnmatched, like a Hash member's.
@@ -305,7 +334,7 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 		}
 		ifaceName, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
 		if kind == polySingle {
-			return unmarshalXMLPolySingle(recv, goField, elemName, ifaceName), nil
+			return unmarshalXMLPolySingle(recv, goField, elemName, ifaceName, xmlSite(plan, ifaceName)), nil
 		}
 		if kind == polySingleNarrow {
 			// REQ-052: narrow-interface slot. canxml.DecodeAsOrDefault
@@ -313,7 +342,7 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 			// declared parent's concrete type when the wire omits the
 			// discriminator (the openEHR canonical XML tolerance).
 			parentGo := strings.TrimSuffix(ifaceName, "Like")
-			return unmarshalXMLPolySingleNarrow(recv, goField, elemName, ifaceName, parentGo), nil
+			return unmarshalXMLPolySingleNarrow(recv, goField, elemName, ifaceName, parentGo, xmlSite(plan, ifaceName)), nil
 		}
 		isClass := !isPrimitive(p.TypeName)
 		isInterface := isInterfaceTypeRef(plan, p.TypeName)
@@ -321,7 +350,7 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 			// True abstract / Like-narrow handled by the polySingle
 			// branch above; this defensive fall-through covers any
 			// other interface-typed shape.
-			return unmarshalXMLPolySingle(recv, goField, elemName, p.TypeName), nil
+			return unmarshalXMLPolySingle(recv, goField, elemName, p.TypeName, xmlSite(plan, p.TypeName)), nil
 		}
 		if isOpenParam(ef.Owner, p.TypeName) {
 			// Typed by the owner's generic parameter (VERSION<T>.data):
@@ -368,7 +397,7 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 	case *bmm.SinglePropertyOpen:
 		ifaceName, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
 		if kind == polySingle {
-			return unmarshalXMLPolySingle(recv, goField, elemName, ifaceName), nil
+			return unmarshalXMLPolySingle(recv, goField, elemName, ifaceName, xmlSite(plan, ifaceName)), nil
 		}
 		// Open generic param bound to a concrete primitive or struct —
 		// emit a generic decode that chooses at run time, through
@@ -387,7 +416,7 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 			// uniformly carry xsi:type on slice items today; a
 			// dedicated polySliceNarrow XML path can be added if a
 			// fixture appears that omits the discriminator.
-			return unmarshalXMLPolySlice(recv, goField, elemName, ifaceName), nil
+			return unmarshalXMLPolySlice(recv, goField, elemName, ifaceName, xmlSite(plan, ifaceName)), nil
 		}
 		if p.TypeDef != nil && p.TypeDef.ContainerType == "Hash" {
 			return unmarshalXMLHashTODO(elemName), nil
@@ -425,8 +454,13 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 	case *bmm.GenericProperty:
 		// Hash<K,V> at the property type level — Go maps it to
 		// map[K]V. v1 defers XML emission/decoding (see canxml/doc.go).
-		if p.TypeDef != nil && containerKinds[p.TypeDef.RootType] {
+		if p.TypeDef != nil && p.TypeDef.RootType == "Hash" {
 			return unmarshalXMLHashTODO(elemName), nil
+		}
+		// List<T>, Set<T> or Array<T> at the property type level — Go
+		// holds it as []T, or *[]T when optional: one element per item.
+		if p.TypeDef != nil && containerKinds[p.TypeDef.RootType] {
+			return unmarshalXMLGenericList(plan, recv, goField, elemName, ef.Owner, p)
 		}
 		if p.TypeDef != nil {
 			decoding, err := xmlClassDecoding(plan, p.TypeDef.RootType)
@@ -617,6 +651,20 @@ func containerInnerName(td *bmm.ContainerType) string {
 	return ""
 }
 
+// unmarshalXMLIdentifier emits the decode case of the element an ITS-XML
+// schema type declares in place of a String member
+// ([Target.XMLIdentifierElements]): the element decodes as the identifier Go
+// type idType, which reads its own content, and its Value is the member's.
+func unmarshalXMLIdentifier(recv, field, elem, idType string, mandatory bool) string {
+	assign := fmt.Sprintf("%s.%s = _v.Value", recv, field)
+	if !mandatory {
+		assign = fmt.Sprintf("%s.%s = &_v.Value", recv, field)
+	}
+	return fmt.Sprintf(
+		"\t\t\tcase %q:\n\t\t\t\tvar _v %s\n\t\t\t\tif _err := _dec.DecodeElement(&_v, &_t); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s\n",
+		elem, idType, assign)
+}
+
 func unmarshalXMLStructMandatory(recv, field, elem string) string {
 	return fmt.Sprintf(
 		"\t\t\tcase %q:\n\t\t\t\tif _err := _dec.DecodeElement(&%s.%s, &_t); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
@@ -629,10 +677,14 @@ func unmarshalXMLStructOptionalLit(recv, field, elem, goType string) string {
 		elem, goType, recv, field)
 }
 
-func unmarshalXMLPolySingle(recv, field, elem, ifaceName string) string {
+// unmarshalXMLPolySingle emits the decode case of a polymorphic single
+// member. site says what the case hands canxml as the element's start and
+// returns when the dispatch fails ([xmlSite]); so it does for the narrow
+// and slice cases below.
+func unmarshalXMLPolySingle(recv, field, elem, ifaceName string, site xmlDispatchSite) string {
 	return fmt.Sprintf(
-		"\t\t\tcase %q:\n\t\t\t\t_v, _err := canxml.DecodeAs[%s](_dec, _t)\n\t\t\t\tif _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s.%s = _v\n",
-		elem, ifaceName, recv, field)
+		"\t\t\tcase %q:\n\t\t\t\t_v, _err := canxml.DecodeAs[%s](_dec, %s)\n\t\t\t\tif _err != nil {\n\t\t\t\t\treturn %s\n\t\t\t\t}\n\t\t\t\t%s.%s = _v\n",
+		elem, ifaceName, site.start, site.fail, recv, field)
 }
 
 // unmarshalXMLPolySingleNarrow emits the REQ-052 narrow-interface
@@ -640,16 +692,61 @@ func unmarshalXMLPolySingle(recv, field, elem, ifaceName string) string {
 // present and otherwise instantiates the parent concrete type
 // (`parentGo`) — preserving openEHR canonical XML fixtures that omit
 // xsi:type on concrete-typed slots.
-func unmarshalXMLPolySingleNarrow(recv, field, elem, ifaceName, parentGo string) string {
+func unmarshalXMLPolySingleNarrow(recv, field, elem, ifaceName, parentGo string, site xmlDispatchSite) string {
 	return fmt.Sprintf(
-		"\t\t\tcase %q:\n\t\t\t\t_v, _err := canxml.DecodeAsOrDefault[%s](_dec, _t, func() any { return new(%s) })\n\t\t\t\tif _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s.%s = _v\n",
-		elem, ifaceName, parentGo, recv, field)
+		"\t\t\tcase %q:\n\t\t\t\t_v, _err := canxml.DecodeAsOrDefault[%s](_dec, %s, func() any { return new(%s) })\n\t\t\t\tif _err != nil {\n\t\t\t\t\treturn %s\n\t\t\t\t}\n\t\t\t\t%s.%s = _v\n",
+		elem, ifaceName, site.start, parentGo, site.fail, recv, field)
 }
 
-func unmarshalXMLPolySlice(recv, field, elem, ifaceName string) string {
+func unmarshalXMLPolySlice(recv, field, elem, ifaceName string, site xmlDispatchSite) string {
 	return fmt.Sprintf(
-		"\t\t\tcase %q:\n\t\t\t\t_v, _err := canxml.DecodeAs[%s](_dec, _t)\n\t\t\t\tif _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s.%s = append(%s.%s, _v)\n",
-		elem, ifaceName, recv, field, recv, field)
+		"\t\t\tcase %q:\n\t\t\t\t_v, _err := canxml.DecodeAs[%s](_dec, %s)\n\t\t\t\tif _err != nil {\n\t\t\t\t\treturn %s\n\t\t\t\t}\n\t\t\t\t%s.%s = append(%s.%s, _v)\n",
+		elem, ifaceName, site.start, site.fail, recv, field, recv, field)
+}
+
+// unmarshalXMLGenericList emits the decode case of a member typed by a
+// generic List, Set or Array of one item type, held as []T, or as *[]T when
+// optional, which the case allocates on the first item. Each element is one
+// item, decoded as a container property's item of that type is and
+// appended. An item the case cannot decode alone, an interface, a generic
+// parameter or an Octet, is refused at generation: no such member exists,
+// and a container property's item of those kinds needs `xsi:type`
+// dispatch or a base64 element.
+func unmarshalXMLGenericList(plan *Plan, recv, field, elem string, owner *bmm.SimpleClass, p *bmm.GenericProperty) (string, error) {
+	params := p.TypeDef.GenericParameters
+	if len(params) != 1 {
+		return "", fmt.Errorf("generic %s with %d parameters; want one item type", p.TypeDef.RootType, len(params))
+	}
+	itemName := containerInnerName(&bmm.ContainerType{ContainerType: p.TypeDef.RootType, TypeDef: params[0]})
+	if itemName == bmmOctetType || isOpenParam(owner, itemName) || isInterfaceTypeRef(plan, itemName) {
+		return "", fmt.Errorf("generic %s<%s>: canonical XML decodes no such item alone", p.TypeDef.RootType, itemName)
+	}
+	itemType, err := typeRef(plan, owner, params[0])
+	if err != nil {
+		return "", err
+	}
+	decode := "xmlunmatched.DecodeElement(_dec, &_t, &_v)"
+	if !isPrimitive(itemName) {
+		decoding, err := xmlClassDecoding(plan, itemName)
+		if err != nil {
+			return "", err
+		}
+		switch decoding {
+		case xmlNoDecoder:
+			return unmarshalXMLNoDecoder(elem, itemName), nil
+		case xmlOwnDecoder:
+			decode = "_dec.DecodeElement(&_v, &_t)"
+		case xmlTextDecoder:
+		}
+	}
+	appendItem := fmt.Sprintf("\t\t\t\t%s.%s = append(%s.%s, _v)\n", recv, field, recv, field)
+	if !p.IsMandatory {
+		appendItem = fmt.Sprintf("\t\t\t\tif %s.%s == nil {\n\t\t\t\t\t%s.%s = new([]%s)\n\t\t\t\t}\n\t\t\t\t*%s.%s = append(*%s.%s, _v)\n",
+			recv, field, recv, field, itemType, recv, field, recv, field)
+	}
+	return fmt.Sprintf(
+		"\t\t\tcase %q:\n\t\t\t\tvar _v %s\n\t\t\t\tif _err := %s; _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n%s",
+		elem, itemType, decode, appendItem), nil
 }
 
 func unmarshalXMLStructSlice(recv, field, elem, innerType string) string {
@@ -693,13 +790,25 @@ const maxXMLRequired = 64
 // xmlunmatched.Enter, rendered by [renderXMLClassVar] as a package-level var
 // named `xmlClass<GoName>`: the class's BMM name, the members the decoder
 // reads as XML attributes, the presence-checked mandatory members in the
-// Reference Model's declaration order, and the multi-valued members.
+// Reference Model's declaration order, the multi-valued members, the
+// members the decoder also reads from a schema element of another name, and
+// the child elements it reads its own members from (the defining_code of a
+// member read in the DV_CODED_TEXT shape too, [renderXMLCodedTextShape]).
 type xmlClassDesc struct {
 	goName   string
 	name     string
 	attrs    []string
 	required []string
 	items    []string
+	elements []xmlElementOf
+	inline   []string
+}
+
+// xmlElementOf pairs a member with the element of another name canonical XML
+// writes it under ([Target.XMLIdentifierElements]), rendered as an
+// xmlunmatched.Element.
+type xmlElementOf struct {
+	member, name string
 }
 
 // xmlClassDescriptor builds the description of pc from its effective fields.
@@ -708,16 +817,22 @@ type xmlClassDesc struct {
 // an ancestor's members before the class's own, which rminfo's table shares;
 // the decoder's own field order puts the nearest ancestor first and is not
 // used. A class with more presence-checked members than the runtime holds
-// ([maxXMLRequired]) is refused.
+// ([maxXMLRequired]) is refused. Elements pairs each field the target writes
+// under a schema element of another name ([Target.XMLIdentifierElements])
+// with that element: the field stays in Required when it is mandatory, and
+// the runtime counts the element as its value.
 func xmlClassDescriptor(plan *Plan, pc *PlannedClass, fields []emittedField) (xmlClassDesc, error) {
 	d := xmlClassDesc{goName: pc.GoName, name: pc.BMMName}
 	for _, ef := range fields {
 		prop := ef.Prop.PropertyName()
-		if isXMLAttributeProperty(ef.Prop) {
+		if isXMLAttributeProperty(ef) {
 			d.attrs = append(d.attrs, prop)
 		}
-		if _, ok := ef.Prop.(*bmm.ContainerProperty); ok {
+		if xmlMultiValued(ef.Prop) {
 			d.items = append(d.items, prop)
+		}
+		if el, ok := xmlIdentifierElement(plan, ef); ok {
+			d.elements = append(d.elements, xmlElementOf{member: prop, name: el.Name})
 		}
 	}
 	_, order := effectiveProperties(plan, pc.BMMName)
@@ -727,6 +842,19 @@ func xmlClassDescriptor(plan *Plan, pc *PlannedClass, fields []emittedField) (xm
 	}
 	d.required = required
 	return d, nil
+}
+
+// xmlMultiValued reports whether prop is a multi-valued member, whose items
+// canonical XML writes as one element each: a container property, or a
+// property typed by a generic List, Set or Array.
+func xmlMultiValued(prop bmm.Property) bool {
+	switch p := prop.(type) {
+	case *bmm.ContainerProperty:
+		return true
+	case *bmm.GenericProperty:
+		return p.TypeDef != nil && containerKinds[p.TypeDef.RootType] && p.TypeDef.RootType != "Hash"
+	}
+	return false
 }
 
 // xmlRequiredMembers returns the presence-checked members among fields, the
@@ -784,9 +912,15 @@ func xmlPresenceChecked(ef emittedField) bool {
 // renderXMLClassVar renders d as the package-level var the decoder hands
 // xmlunmatched.Enter, one field per line, leaving out an empty list.
 func renderXMLClassVar(d xmlClassDesc) string {
+	return fmt.Sprintf("// xmlClass%s describes %s to the canonical-XML decode runtime.\n", d.goName, d.name) +
+		renderXMLDescriptor("xmlClass"+d.goName, d)
+}
+
+// renderXMLDescriptor renders d as the package-level var named name, an
+// xmlunmatched.Class, one field per line, leaving out an empty list.
+func renderXMLDescriptor(name string, d xmlClassDesc) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "// xmlClass%s describes %s to the canonical-XML decode runtime.\n", d.goName, d.name)
-	fmt.Fprintf(&b, "var xmlClass%s = xmlunmatched.Class{\n", d.goName)
+	fmt.Fprintf(&b, "var %s = xmlunmatched.Class{\n", name)
 	fmt.Fprintf(&b, "\tName: %q,\n", d.name)
 	for _, f := range []struct {
 		name string
@@ -796,6 +930,19 @@ func renderXMLClassVar(d xmlClassDesc) string {
 			continue
 		}
 		fmt.Fprintf(&b, "\t%s: %s,\n", f.name, stringSliceLiteral(f.vals))
+	}
+	if len(d.elements) > 0 {
+		b.WriteString("\tElements: []xmlunmatched.Element{")
+		for i, e := range d.elements {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(&b, "{Member: %q, Name: %q}", e.member, e.name)
+		}
+		b.WriteString("},\n")
+	}
+	if len(d.inline) > 0 {
+		fmt.Fprintf(&b, "\tInline: %s,\n", stringSliceLiteral(d.inline))
 	}
 	b.WriteString("}\n")
 	return b.String()

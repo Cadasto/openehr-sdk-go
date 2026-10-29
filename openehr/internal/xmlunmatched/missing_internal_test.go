@@ -11,14 +11,16 @@ import (
 
 // The targets below read as a generated decoder reads (REQ-175): on entry
 // each hands its class to Enter, a child named in prims reads as text through
-// DecodeElement, a child named in kids decodes into a copy of that target,
-// and anything else is unmatched.
+// DecodeElement, a child named in kids decodes into a copy of that target, a
+// child named in drop is dropped through Drop, and anything else is
+// unmatched.
 
 // described is one such target.
 type described struct {
 	class *Class
 	prims []string
 	kids  map[string]*described
+	drop  []string
 }
 
 func (d *described) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error {
@@ -48,6 +50,12 @@ func (d *described) readChildren(dec *xml.Decoder) error {
 			if kid, ok := d.kids[name]; ok {
 				child := *kid
 				if err := dec.DecodeElement(&child, &tk); err != nil {
+					return err
+				}
+				continue
+			}
+			if slices.Contains(d.drop, name) {
+				if err := Drop(dec); err != nil {
 					return err
 				}
 				continue
@@ -233,6 +241,64 @@ func TestREQ175_MissingMembersXMLAttribute(t *testing.T) {
 		if !slices.Equal(got, tc.want) {
 			t.Errorf("%s: missing members = %q; want %q", tc.name, got, tc.want)
 		}
+	}
+}
+
+// codedTextTarget returns the decode target of a cut-down C_SINGLE_ATTRIBUTE
+// whose children are C_CODED_TEXT-like: each requires node_id and
+// terminology, and its class names terminology_id, a TERMINOLOGY_ID-like
+// element whose value holds the string, as the element terminology is
+// written under. The child reads both terminology_id and terminology.
+func codedTextTarget() *described {
+	id := &described{class: &Class{Name: "TERMINOLOGY_ID", Required: []string{"value"}}, prims: []string{"value"}}
+	coded := &described{
+		class: &Class{
+			Name:     "C_CODED_TEXT",
+			Required: []string{"node_id", "terminology"},
+			Elements: []Element{{Member: "terminology", Name: "terminology_id"}},
+		},
+		prims: []string{"node_id", "terminology"},
+		kids:  map[string]*described{"terminology_id": id},
+	}
+	return &described{
+		class: &Class{Name: "C_SINGLE_ATTRIBUTE", Items: []string{"children"}},
+		kids:  map[string]*described{"children": coded},
+	}
+}
+
+// TestREQ175_MissingMembersElementOfAnotherName pins a member written under
+// an element of another name (Class.Elements): the element gives the member a
+// value when it carries every mandatory member of its own class, and the
+// member's own element still does. When the element carries no value, the
+// member is reported once, by its own pointer in the canonical-JSON form,
+// `/children/0/terminology`, and nothing inside the element is reported,
+// such as `/children/0/terminology_id/value`, which the canonical-JSON form
+// does not have.
+func TestREQ175_MissingMembersElementOfAnotherName(t *testing.T) {
+	const missing = "/children/0/terminology"
+	for _, tc := range []struct {
+		name, terminology string
+		want              []string
+	}{
+		{"element with a value", `<terminology_id><value>local</value></terminology_id>`, nil},
+		{"own element", `<terminology>local</terminology>`, nil},
+		{"empty element", `<terminology_id/>`, []string{missing}},
+		{"element with an empty value", `<terminology_id><value/></terminology_id>`, []string{missing}},
+		{"element with a blank value", `<terminology_id><value> </value></terminology_id>`, []string{missing}},
+		{"nilled element", `<terminology_id xsi:nil="true"><value>local</value></terminology_id>`, []string{missing}},
+		{"empty own element", `<terminology/>`, []string{missing}},
+		{"absent", ``, []string{missing}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			doc := `<c_single_attribute ` + xmlnsDecl + `><children><node_id>at0001</node_id>` + tc.terminology + `</children></c_single_attribute>`
+			got, err := decodeMissing(doc, codedTextTarget(), false)
+			if err != nil {
+				t.Fatalf("Decode(%s) = %v; want nil", doc, err)
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("Decode(%s): missing members = %q; want %q", doc, got, tc.want)
+			}
+		})
 	}
 }
 

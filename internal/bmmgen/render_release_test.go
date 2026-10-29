@@ -199,8 +199,8 @@ func TestREQ042_RunEmitsReleaseFile(t *testing.T) {
 
 // TestCheckFixedNameCollisions pins which file stems the generator reserves
 // for its own fixed-name files: a BMM package whose file would be written over
-// by typereg_gen.go, jsonhooks_gen.go, interval_bound_gen.go or
-// release_gen.go is refused, the error names both files, and an ordinary plan
+// by typereg_gen.go, jsonhooks_gen.go, interval_bound_gen.go,
+// release_gen.go or xmlnames_gen.go is refused, the error names both files, and an ordinary plan
 // passes.
 func TestCheckFixedNameCollisions(t *testing.T) {
 	for _, tc := range []struct {
@@ -211,6 +211,7 @@ func TestCheckFixedNameCollisions(t *testing.T) {
 		{"jsonhooks", "jsonhooks_gen.go"},
 		{"interval_bound", intervalBoundFile},
 		{"release", releaseFileName},
+		{"xmlnames", xmlNamesFile},
 	} {
 		t.Run(tc.fixed, func(t *testing.T) {
 			plan := &Plan{Files: []*PlannedFile{{FileBase: "data_types_quantity"}, {FileBase: tc.fileBase}}}
@@ -249,6 +250,7 @@ func TestRunRefusesBMMPackageNamedLikeAFixedFile(t *testing.T) {
 		{"jsonhooks", "jsonhooks_gen.go"},
 		{"interval_bound", intervalBoundFile},
 		{"release", releaseFileName},
+		{"xmlnames", xmlNamesFile},
 	} {
 		t.Run(tc.fixed, func(t *testing.T) {
 			resources := t.TempDir()
@@ -307,6 +309,7 @@ func TestRunRefusesFixedFileNameInAnyTarget(t *testing.T) {
 		{"jsonhooks", "jsonhooks_gen.go"},
 		{"interval_bound", intervalBoundFile},
 		{"release", releaseFileName},
+		{"xmlnames", xmlNamesFile},
 	} {
 		t.Run(tc.fixed, func(t *testing.T) {
 			resources := t.TempDir()

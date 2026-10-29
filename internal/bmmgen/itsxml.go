@@ -369,7 +369,8 @@ func (s *itsXMLSchemas) orderFor(roots [][]string) (*xmlChildOrder, error) {
 }
 
 // sequenceFor returns the element names whose order class's encoder takes
-// from the schemas. The class takes the type of its own name, or of its
+// from the schemas. The class takes the type of its schema name
+// ([Target.XMLTypeNames]) when it has one, else of its own name, or of its
 // nearest ancestor, from the first set that declares one; the type's
 // extension bases come first. When another set declares a type of the same
 // name, each element only that set declares is placed right after the
@@ -377,6 +378,9 @@ func (s *itsXMLSchemas) orderFor(roots [][]string) (*xmlChildOrder, error) {
 // the class or an ancestor.
 func (o *xmlChildOrder) sequenceFor(plan *Plan, class string) ([]string, error) {
 	lineage := nearestLineage(plan, class)
+	if schema, ok := plan.Target.XMLTypeNames[class]; ok {
+		lineage = slices.Insert(lineage, 0, schema)
+	}
 	for i, set := range o.sets {
 		for _, name := range lineage {
 			if !set.has(name) {
@@ -440,8 +444,9 @@ func placeOtherOnly(own, other []string) []string {
 }
 
 // xmlChildFields returns fields in the order pc's XML encoder writes them:
-// the ones its schema sequence names in that order, then the rest in the
-// order given. Without schemas the order given stands.
+// the ones its schema sequence names in that order, each by the name of the
+// element it is written as ([xmlElementName]), then the rest in the order
+// given. Without schemas the order given stands.
 func xmlChildFields(plan *Plan, pc *PlannedClass, fields []emittedField) ([]emittedField, error) {
 	if plan.xmlOrder == nil {
 		return fields, nil
@@ -451,7 +456,7 @@ func xmlChildFields(plan *Plan, pc *PlannedClass, fields []emittedField) ([]emit
 		return nil, fmt.Errorf("bmmgen: XML child order of %s: %w", pc.BMMName, err)
 	}
 	rank := func(f emittedField) int {
-		if i := slices.Index(seq, f.Prop.PropertyName()); i >= 0 {
+		if i := slices.Index(seq, xmlElementName(plan, f)); i >= 0 {
 			return i
 		}
 		return len(seq)

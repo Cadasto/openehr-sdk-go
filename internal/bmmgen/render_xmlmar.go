@@ -94,8 +94,11 @@ func RenderMarshalXMLFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	if slices.ContainsFunc(chunks, func(c string) bool { return strings.Contains(c, "base64.") }) {
 		body.WriteString("\t\"encoding/base64\"\n")
 	}
-	body.WriteString("\t\"encoding/xml\"\n\n")
-	body.WriteString("\t\"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml\"\n")
+	body.WriteString("\t\"encoding/xml\"\n")
+	if slices.ContainsFunc(chunks, func(c string) bool { return strings.Contains(c, "strings.Cut(") }) {
+		body.WriteString("\t\"strings\"\n")
+	}
+	body.WriteString("\n\t\"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml\"\n")
 	if needsExternalImportForJSONMar(plan, chunks) {
 		fmt.Fprintf(&body, "\t%q\n", plan.Target.ExternalImport)
 	}
@@ -137,13 +140,13 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 	}
 	_ = typeParams // reserved — generic type parameter list lives on the receiver via typeArgs
 
-	// Partition fields: properties emitted as XML attributes
-	// (currently `archetype_node_id` on every LOCATABLE descendant,
-	// per the openEHR ITS-XML XSDs) come before the start token;
-	// element-typed properties come inside.
+	// Partition fields: properties emitted as XML attributes per the
+	// openEHR ITS-XML XSDs ([isXMLAttributeProperty]: `archetype_node_id`
+	// on every LOCATABLE descendant and the AOM 1.4 ARCHETYPE_TERM.code)
+	// come before the start token; element-typed properties come inside.
 	var attrFields, elemFields []emittedField
 	for _, ef := range fields {
-		if isXMLAttributeProperty(ef.Prop) {
+		if isXMLAttributeProperty(ef) {
 			attrFields = append(attrFields, ef)
 		} else {
 			elemFields = append(elemFields, ef)
@@ -154,10 +157,17 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 
 	// BMMName method. An abstract class (BASE Interval) is no polymorphic
 	// discriminator value, so it gets none.
+	schemaName, renamed := plan.Target.XMLTypeNames[pc.BMMName]
 	if !sc.IsAbstract() {
 		fmt.Fprintf(&b, "// BMMName returns %q — the BMM class identifier used as the\n", pc.BMMName)
-		b.WriteString("// `xsi:type` polymorphic discriminator in canonical XML and the\n")
-		b.WriteString("// `_type` discriminator in canonical JSON.\n")
+		if renamed {
+			b.WriteString("// `_type` discriminator in canonical JSON. Canonical XML writes the\n")
+			fmt.Fprintf(&b, "// `xsi:type` %s, the name the ITS-XML schema gives the class,\n", schemaName)
+			b.WriteString("// and reads either name.\n")
+		} else {
+			b.WriteString("// `xsi:type` polymorphic discriminator in canonical XML and the\n")
+			b.WriteString("// `_type` discriminator in canonical JSON.\n")
+		}
 		fmt.Fprintf(&b, "func (%s *%s%s) BMMName() string { return %q }\n\n", recv, pc.GoName, typeArgs, pc.BMMName)
 	}
 
@@ -175,7 +185,7 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 		b.WriteString("// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.\n")
 	}
 	b.WriteString("// Properties typed as XML attributes per the openEHR ITS-XML XSDs\n")
-	b.WriteString("// (currently `archetype_node_id`) are appended to start.Attr before\n")
+	fmt.Fprintf(&b, "// (%s) are appended to start.Attr before\n", xmlAttributeNote(attrFields))
 	b.WriteString("// the start token is written.\n")
 	shaped := hasIntervalShape(fields)
 	if shaped {
@@ -187,6 +197,10 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 	b.WriteString("\tif _start.Name.Local == \"\" {\n")
 	fmt.Fprintf(&b, "\t\t_start.Name = xml.Name{Local: canxml.ElementName(%q)}\n", pc.BMMName)
 	b.WriteString("\t}\n")
+	if renamed {
+		// The polymorphic parent wrote the BMM name as `xsi:type`.
+		fmt.Fprintf(&b, "\t_start.Attr = xmlSchemaTyped(_start.Attr, %q, %q)\n", pc.BMMName, schemaName)
+	}
 	// Append attribute-typed properties.
 	for _, ef := range attrFields {
 		line := marshalXMLAttribute(recv, FieldName(ef.Prop.PropertyName()), ef.Prop.PropertyName())
@@ -212,19 +226,48 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 	return b.String(), nil
 }
 
-// isXMLAttributeProperty reports whether a BMM property is emitted
-// as an XML attribute (rather than a child element) in the openEHR
-// ITS-XML profile. The XSDs declare `archetype_node_id` on
-// LOCATABLE as a mandatory `xs:attribute`; the SDK mirrors that on
-// every concrete LOCATABLE descendant (the property is inherited
-// via flattening, so the check is name-based).
+// isXMLAttributeProperty reports whether a field is emitted as an
+// XML attribute (rather than a child element) in the openEHR ITS-XML
+// profile. The XSDs declare two such members the SDK models:
+//
+//   - `archetype_node_id` on LOCATABLE, a mandatory `xs:attribute`;
+//     the SDK mirrors that on every concrete LOCATABLE descendant (the
+//     property is inherited via flattening, so the check is
+//     name-based);
+//   - `code` on the AM 1.4 ARCHETYPE_TERM, a mandatory `xs:attribute`
+//     of its schema type, matched on the declaring class so that a
+//     `code` member another class gains stays a child element.
 //
 // Other String/primitive properties on LOCATABLE/ARCHETYPED (e.g.
 // `rm_version`) are XSD child elements — the IDCR conformance
 // fixture confirms this. Extend this list as the canonical-XML
 // surface grows.
-func isXMLAttributeProperty(prop bmm.Property) bool {
-	return prop.PropertyName() == "archetype_node_id"
+func isXMLAttributeProperty(ef emittedField) bool {
+	switch name := ef.Prop.PropertyName(); {
+	case name == "archetype_node_id":
+		return true
+	case name == "code" && ef.OwnerName == "ARCHETYPE_TERM":
+		return true
+	}
+	return false
+}
+
+// xmlAttributeNote names the members a generated doc comment says are
+// XML attributes: the class's own when one of them is not
+// `archetype_node_id`, otherwise `archetype_node_id`, the member every
+// LOCATABLE carries as one.
+func xmlAttributeNote(attrFields []emittedField) string {
+	names := make([]string, 0, len(attrFields))
+	own := false
+	for _, ef := range attrFields {
+		name := ef.Prop.PropertyName()
+		names = append(names, "`"+name+"`")
+		own = own || name != "archetype_node_id"
+	}
+	if !own {
+		return "currently `archetype_node_id`"
+	}
+	return "here " + strings.Join(names, ", ")
 }
 
 // marshalXMLAttribute emits the source line that appends one XML
@@ -252,6 +295,12 @@ func renderMarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass, e
 
 	switch p := ef.Prop.(type) {
 	case *bmm.SingleProperty:
+		if shape, ok := xmlMemberShape(plan, ef); ok && shape == XMLCodePhraseString {
+			return marshalXMLCodePhraseString(recv, goField, elemName, goNameForRef(plan, codePhraseClass), goNameForRef(plan, terminologyIDClass)), nil
+		}
+		if el, ok := xmlIdentifierElement(plan, ef); ok {
+			return marshalXMLIdentifier(recv, goField, el.Name, goNameForRef(plan, el.Type), p.IsMandatory), nil
+		}
 		_, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
 		if kind == polySingle || kind == polySingleNarrow {
 			return marshalXMLPolySingle(recv, goField, elemName), nil
@@ -367,6 +416,21 @@ func marshalXMLStructOptional(recv, field, elem string) string {
 	return fmt.Sprintf(
 		"\tif %s.%s != nil {\n\t\tif err := _e.EncodeElement(%s.%s, xml.StartElement{Name: xml.Name{Local: %q}}); err != nil {\n\t\t\treturn err\n\t\t}\n\t}\n",
 		recv, field, recv, field, elem)
+}
+
+// marshalXMLIdentifier emits a String member as the element its class's
+// ITS-XML schema type declares in its place ([Target.XMLIdentifierElements]):
+// a value of the identifier Go type idType holding the string as its Value.
+// An optional member, held as a pointer, emits no element when nil.
+func marshalXMLIdentifier(recv, field, elem, idType string, mandatory bool) string {
+	if mandatory {
+		return fmt.Sprintf(
+			"\tif err := _e.EncodeElement(&%s{Value: %s.%s}, xml.StartElement{Name: xml.Name{Local: %q}}); err != nil {\n\t\treturn err\n\t}\n",
+			idType, recv, field, elem)
+	}
+	return fmt.Sprintf(
+		"\tif %s.%s != nil {\n\t\tif err := _e.EncodeElement(&%s{Value: *%s.%s}, xml.StartElement{Name: xml.Name{Local: %q}}); err != nil {\n\t\t\treturn err\n\t\t}\n\t}\n",
+		recv, field, idType, recv, field, elem)
 }
 
 func marshalXMLPolySingle(recv, field, elem string) string {

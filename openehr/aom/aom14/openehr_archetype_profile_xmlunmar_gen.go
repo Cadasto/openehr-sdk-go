@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
@@ -18,6 +19,8 @@ import (
 var xmlClassCCodedText = xmlunmatched.Class{
 	Name:     "C_CODED_TEXT",
 	Required: []string{"rm_type_name", "occurrences", "node_id", "terminology"},
+	Items:    []string{"code_list"},
+	Elements: []xmlunmatched.Element{{Member: "terminology", Name: "terminology_id"}},
 }
 
 // UnmarshalXML decodes canonical openEHR XML into CCodedText.
@@ -58,15 +61,25 @@ func (c *CCodedText) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.NodeID); _err != nil {
 					return _err
 				}
+			case "terminology_id":
+				var _v rm.TerminologyID
+				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+					return _err
+				}
+				c.Terminology = _v.Value
 			case "terminology":
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.Terminology); _err != nil {
 					return _err
 				}
 			case "code_list":
-				// TODO(canxml): Hash<K,V> XML decode deferred — see canxml/doc.go.
-				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+				var _v string
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
+				if c.CodeList == nil {
+					c.CodeList = new([]string)
+				}
+				*c.CodeList = append(*c.CodeList, _v)
 			case "reference":
 				var _v string
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
@@ -200,7 +213,7 @@ func (c *CQuantity) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 					return _err
 				}
 			case "property":
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.Property); _err != nil {
+				if _err := xmlunmatched.DecodeCodePhraseString(_dec, &_t, &c.Property); _err != nil {
 					return _err
 				}
 			case "list":
@@ -304,11 +317,75 @@ func (o *Ordinal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "symbol":
-				if _err := _dec.DecodeElement(&o.Symbol, &_t); _err != nil {
+				if _err := unmarshalXMLOrdinalSymbol(_dec, _t, &o.Symbol); _err != nil {
 					return _err
 				}
 			case "value":
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &o.Value); _err != nil {
+					return _err
+				}
+			default:
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+					return _err
+				}
+			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
+			}
+		case xml.EndElement:
+			return nil
+		}
+	}
+}
+
+// xmlShapeOrdinalSymbol describes ORDINAL.symbol to the
+// canonical-XML decode runtime: a CODE_PHRASE the ITS-XML schema
+// also lets a document write as a DV_CODED_TEXT, the members of
+// whose defining_code are its own.
+var xmlShapeOrdinalSymbol = xmlunmatched.Class{
+	Name:     "CODE_PHRASE",
+	Required: []string{"terminology_id", "code_string"},
+	Inline:   []string{"defining_code"},
+}
+
+// unmarshalXMLOrdinalSymbol decodes the element start opens into c,
+// ORDINAL.symbol, in either shape its ITS-XML schema type gives it:
+// a CODE_PHRASE, or a DV_CODED_TEXT whose defining_code is the
+// CODE_PHRASE. It drops the DV_CODED_TEXT's other elements. Content
+// it does not read is unmatched, as in UnmarshalXML.
+func unmarshalXMLOrdinalSymbol(_dec *xml.Decoder, _start xml.StartElement, c *rm.CodePhrase) error {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlShapeOrdinalSymbol); _err != nil {
+		return _err
+	}
+	for {
+		_tok, _err := _dec.Token()
+		if _err != nil {
+			return _err
+		}
+		switch _t := _tok.(type) {
+		case xml.StartElement:
+			switch xmlunmatched.LocalName(_t.Name) {
+			case "terminology_id":
+				if _err := _dec.DecodeElement(&c.TerminologyID, &_t); _err != nil {
+					return _err
+				}
+			case "code_string":
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.CodeString); _err != nil {
+					return _err
+				}
+			case "preferred_term":
+				var _v string
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+					return _err
+				}
+				c.PreferredTerm = &_v
+			case "defining_code":
+				if _err := _dec.DecodeElement(c, &_t); _err != nil {
+					return _err
+				}
+			case "value", "hyperlink", "formatting", "mappings", "language", "encoding":
+				if _err := xmlunmatched.Drop(_dec); _err != nil {
 					return _err
 				}
 			default:

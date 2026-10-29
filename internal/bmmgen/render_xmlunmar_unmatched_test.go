@@ -3,6 +3,7 @@ package bmmgen
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -17,7 +18,11 @@ import (
 // every other element it does not read through its default arm, the text
 // between its child elements through its character-data arm, a Hash element
 // and the element of an Any member through their own arms, and a primitive
-// element through xmlunmatched.DecodeElement.
+// element through xmlunmatched.DecodeElement. A member typed by a generic
+// List, Set or Array decodes each element as one item and appends it. The
+// element an ITS-XML schema type declares in place of a String member (Target.XMLIdentifierElements)
+// goes to the decoder's own DecodeElement as its identifier class, which
+// checks its own content.
 //
 // An arm may hand an element to the decoder's own DecodeElement only when the
 // member's class is one of those the two targets render a decoder for, which
@@ -60,7 +65,7 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 
 	for _, target := range []Target{TargetRM, TargetAOM14} {
 		plan := plans[target.GoPackage]
-		hashes, anys, params, octets := 0, 0, 0, 0
+		hashes, anys, params, octets, identifiers, lists := 0, 0, 0, 0, 0, 0
 		for _, f := range plan.Files {
 			classes, err := codecClassesIn(plan, f)
 			if err != nil {
@@ -87,7 +92,19 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 				}
 				for _, ef := range fields {
 					prop := ef.Prop.PropertyName()
+					if el, ok := xmlIdentifierElement(plan, ef); ok {
+						identifiers++
+						if arm := xmlCaseArm(src, el.Name); !strings.Contains(arm, "_dec.DecodeElement(") || !withDecoder[el.Type] {
+							t.Errorf("%s.%s is written as the %s element %s; its arm must hand the element to the decoder's own DecodeElement as a class with a generated decoder:\n%s", pc.BMMName, prop, el.Type, el.Name, arm)
+						}
+					}
 					arm := xmlCaseArm(src, prop)
+					if isGenericListProperty(ef.Prop) {
+						lists++
+						if !strings.Contains(arm, "append(") {
+							t.Errorf("%s.%s is typed by a generic list; its arm must decode each element as one item and append it:\n%s", pc.BMMName, prop, arm)
+						}
+					}
 					switch {
 					case isHashProperty(ef.Prop):
 						hashes++
@@ -127,8 +144,8 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 		if target.GoPackage == TargetRM.GoPackage && (hashes == 0 || params == 0 || octets == 0) {
 			t.Errorf("the RM target rendered %d Hash arms, %d generic-parameter arms and %d Octet arms; want the resource-metadata Hash members, VERSION<T>.data and DV_MULTIMEDIA.data covered", hashes, params, octets)
 		}
-		if target.GoPackage == TargetAOM14.GoPackage && anys == 0 {
-			t.Errorf("the AOM 1.4 target rendered no Any arm; want `assumed_value` and `EXPR_LEAF.item` covered")
+		if target.GoPackage == TargetAOM14.GoPackage && (anys == 0 || identifiers == 0 || lists == 0) {
+			t.Errorf("the AOM 1.4 target rendered %d Any arms, %d identifier-element arms and %d generic-list arms; want `assumed_value`, `EXPR_LEAF.item` and C_CODED_TEXT's `terminology_id` and `code_list` covered", anys, identifiers, lists)
 		}
 	}
 }
@@ -157,9 +174,16 @@ func isHashProperty(prop bmm.Property) bool {
 	case *bmm.ContainerProperty:
 		return p.TypeDef != nil && p.TypeDef.ContainerType == "Hash"
 	case *bmm.GenericProperty:
-		return p.TypeDef != nil && containerKinds[p.TypeDef.RootType]
+		return p.TypeDef != nil && p.TypeDef.RootType == "Hash"
 	}
 	return false
+}
+
+// isGenericListProperty reports whether prop is typed by a generic List, Set
+// or Array, which canonical XML writes as one element per item.
+func isGenericListProperty(prop bmm.Property) bool {
+	p, ok := prop.(*bmm.GenericProperty)
+	return ok && p.TypeDef != nil && slices.Contains([]string{"List", "Set", "Array"}, p.TypeDef.RootType)
 }
 
 // isAnyProperty reports whether prop is a single property typed by the BMM
@@ -248,7 +272,8 @@ func isEnumerationClass(plan *Plan, name string) bool {
 }
 
 // decodedClassName returns the BMM class a property's element decodes as:
-// its type, a container's item type, or a generic type's root.
+// its type, a container's item type, a generic list's item type, or another
+// generic type's root.
 func decodedClassName(prop bmm.Property) string {
 	switch p := prop.(type) {
 	case *bmm.SingleProperty:
@@ -256,9 +281,66 @@ func decodedClassName(prop bmm.Property) string {
 	case *bmm.ContainerProperty:
 		return containerInnerName(p.TypeDef)
 	case *bmm.GenericProperty:
+		if isGenericListProperty(p) && len(p.TypeDef.GenericParameters) == 1 {
+			return containerInnerName(&bmm.ContainerType{TypeDef: p.TypeDef.GenericParameters[0]})
+		}
 		if p.TypeDef != nil {
 			return p.TypeDef.RootType
 		}
 	}
 	return ""
+}
+
+// TestREQ056_GenericListDecode pins the decode case of a member typed by a
+// generic List, Set or Array (REQ-056): a primitive item reads as text and
+// a class item through the class's own decoder, each appended, and an item
+// the case cannot decode alone, an interface or an Octet, or a list with no
+// item type, is refused at generation rather than skipped.
+func TestREQ056_GenericListDecode(t *testing.T) {
+	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, bmm.FSResolver{Root: testResources})
+	if err != nil {
+		t.Fatalf("BuildPlanForTarget(aom14): %v", err)
+	}
+	owner, ok := plan.Classes["C_CODED_TEXT"].Class.(*bmm.SimpleClass)
+	if !ok {
+		t.Fatalf("plan has no simple class C_CODED_TEXT")
+	}
+	field := func(mandatory bool, root string, items ...string) emittedField {
+		p := &bmm.GenericProperty{TypeDef: &bmm.GenericType{RootType: root}}
+		for _, item := range items {
+			p.TypeDef.GenericParameters = append(p.TypeDef.GenericParameters, &bmm.SimpleType{TypeName: item})
+		}
+		p.Name = "probe"
+		p.IsMandatory = mandatory
+		return emittedField{Prop: p, Owner: owner, OwnerName: "C_CODED_TEXT"}
+	}
+	for _, tc := range []struct {
+		name string
+		ef   emittedField
+		want []string // fragments of the case; nil means a refusal
+	}{
+		{"optional list of String", field(false, "List", "String"), []string{"var _v string", "xmlunmatched.DecodeElement(_dec, &_t, &_v)", "c.Probe = new([]string)", "*c.Probe = append(*c.Probe, _v)"}},
+		{"mandatory set of a class", field(true, "Set", "C_QUANTITY_ITEM"), []string{"var _v CQuantityItem", "_dec.DecodeElement(&_v, &_t)", "c.Probe = append(c.Probe, _v)"}},
+		{"list of an interface", field(false, "List", "C_OBJECT"), nil},
+		{"list of Octet", field(false, "Array", "Octet"), nil},
+		{"list with no item type", field(false, "List"), nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := renderUnmarshalXMLField(plan, "c", owner, tc.ef)
+			if tc.want == nil {
+				if err == nil {
+					t.Errorf("renderUnmarshalXMLField(%s) = %q, nil; want a refusal", tc.name, got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("renderUnmarshalXMLField(%s) = %v; want a case", tc.name, err)
+			}
+			for _, w := range tc.want {
+				if !strings.Contains(got, w) {
+					t.Errorf("renderUnmarshalXMLField(%s) lacks %q:\n%s", tc.name, w, got)
+				}
+			}
+		})
+	}
 }
