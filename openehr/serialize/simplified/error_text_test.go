@@ -95,21 +95,34 @@ func TestREQ140EncodeRefusalTextNamesNoRequirementOrValue(t *testing.T) {
 		rmattrText + "/_mapping:0/target|code":        "21794005",
 		rmattrText + "/_mapping:0/target|terminology": "SNOMED-CT",
 	})
+	// withMode sets the composition's one participation, whose mode is
+	// value coded as code in terminology.
+	withMode := func(value, code, terminology string) func(*testing.T, *rm.Composition) {
+		return func(_ *testing.T, c *rm.Composition) {
+			mode := rm.DVCodedText{
+				Value:        value,
+				DefiningCode: rm.CodePhrase{CodeString: code, TerminologyID: rm.TerminologyID{Value: terminology}},
+			}
+			c.Context.Participations = []rm.Participation{{
+				Function: rm.DVText{Value: "requester"}, Mode: &mode, Performer: rm.PartySelf{},
+			}}
+		}
+	}
 	for _, tc := range []struct {
 		name, key string
 		mutate    func(t *testing.T, c *rm.Composition)
 	}{
 		{
 			name: "participation mode code outside its group", key: participation + "|mode",
-			mutate: func(_ *testing.T, c *rm.Composition) {
-				mode := rm.DVCodedText{
-					Value:        "by carrier pigeon",
-					DefiningCode: rm.CodePhrase{CodeString: refusalTextSecret, TerminologyID: rm.TerminologyID{Value: "openehr"}},
-				}
-				c.Context.Participations = []rm.Participation{{
-					Function: rm.DVText{Value: "requester"}, Mode: &mode, Performer: rm.PartySelf{},
-				}}
-			},
+			mutate: withMode("by carrier pigeon", refusalTextSecret, "openehr"),
+		},
+		{
+			name: "participation mode coded in another terminology", key: participation + "|mode",
+			mutate: withMode("not specified", "193", refusalTextSecret),
+		},
+		{
+			name: "participation mode value other than its rubric", key: participation + "|mode",
+			mutate: withMode(refusalTextSecret, "193", "openehr"),
 		},
 		{
 			name: "PARTICIPATION time", key: participation + "|time",
