@@ -62,6 +62,12 @@ type Query struct {
 	// clause appeared in the source. Same concrete shapes as [Query.Limit].
 	Offset LimitExpr
 
+	// Spans locates each clause in the source text [ParseQuery] or [Parse]
+	// read, as byte offsets. It is zero for a Query built directly.
+	// [Query.Emit] ignores it, and editing the AST leaves it describing the
+	// original source.
+	Spans ClauseSpans
+
 	// incomplete records the catalogue-gap error from the extractor
 	// (an error wrapping [aql.ErrIncompleteAST] when present). Emit
 	// refuses to render an incomplete AST so a caller who ignored

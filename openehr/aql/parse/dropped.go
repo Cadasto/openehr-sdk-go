@@ -104,7 +104,7 @@ func (d *Document) Dropped() []DroppedConstruct {
 		return nil
 	}
 	d.queryOnce.Do(func() {
-		d.query, d.dropped, d.queryErr = extractQuery(d.tree)
+		d.query, d.dropped, d.queryErr = extractQuery(d.tree, d.src)
 	})
 	if len(d.dropped) == 0 {
 		return nil

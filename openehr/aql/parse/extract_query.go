@@ -94,12 +94,15 @@ func (e *astExtractor) err() error {
 // that extracted cleanly. Caller decides whether the partial AST is
 // useful. The drops carry the same findings value-free, one per gap
 // (REQ-113 § Value-free structured drop records).
-func extractQuery(tree gen.ISelectQueryContext) (*Query, []DroppedConstruct, error) {
+//
+// src is the text tree was parsed from; it locates each clause in
+// [Query.Spans].
+func extractQuery(tree gen.ISelectQueryContext, src string) (*Query, []DroppedConstruct, error) {
 	if tree == nil {
 		return nil, nil, nil
 	}
 	ex := &astExtractor{}
-	q := &Query{}
+	q := &Query{Spans: clauseSpans(tree, src)}
 	if sc := tree.SelectClause(); sc != nil {
 		ex.clause = ClauseSelect
 		q.Select = ex.extractSelectClause(sc)
