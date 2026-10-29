@@ -356,8 +356,8 @@ func uidRMAttr(out map[string]any, base string, uid rm.UIDBasedID) error {
 		return nil
 	}
 	if implied := uidBasedIDType(value); implied != kind {
-		return fmt.Errorf("%w: %q carries a %s whose value %q is the lexical form of a %s; the bare `_uid` key cannot distinguish them, so decode would retype it",
-			ErrUnsupportedDatatype, base+"/_uid", kind, value, implied)
+		return fmt.Errorf("%w: %q carries a %s whose value is the lexical form of a %s; the bare `_uid` key cannot distinguish them, so decode would retype it",
+			ErrUnsupportedDatatype, base+"/_uid", kind, implied)
 	}
 	out[base+"/_uid"] = value
 	return nil

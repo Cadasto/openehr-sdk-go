@@ -206,8 +206,8 @@ func TestActionIsmTransitionBlankTerminologyEncodes(t *testing.T) {
 // careflow step whose code is not its node's id names another node, so encode
 // would move the transition there. One carrying the node's id in a terminology
 // other than `local` names no archetype node at all: an at-code belongs to the
-// archetype's own terminology. Decode refuses both, naming the key's node and the
-// code, never the clinical value.
+// archetype's own terminology. Decode refuses both, naming the key's node and its
+// id, never the step's code, terminology or clinical value.
 func TestActionIsmTransitionCareflowStepCodedOtherwiseRefused(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	inTerminology := func(keys map[string]any, node, terminology string) map[string]any {
