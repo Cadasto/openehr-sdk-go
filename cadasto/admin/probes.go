@@ -21,6 +21,54 @@ import (
 // an absolute path on that origin.
 var ErrInvalidPath = errors.New("admin: invalid probe path")
 
+// ErrUnexpectedStatus is the sentinel a [*StatusError] unwraps to for a
+// status that is neither 2xx nor in the mapped set (401, 403, 404, 5xx),
+// such as 400, 405, 408, 429 or a 3xx the HTTP client did not follow.
+var ErrUnexpectedStatus = errors.New("admin: unexpected status")
+
+// StatusError reports a probe that the server answered with a status that
+// is not 2xx. Live, Ready and ReadyBody return it for every such status;
+// extract it with errors.AsType[*admin.StatusError](err) to read the
+// status and the path. Unwrap returns the sentinel for the status, so
+// errors.Is matches [transport.ErrUnauthorized] for 401,
+// [transport.ErrForbidden] for 403, [transport.ErrNotFound] for 404,
+// [transport.ErrServerError] for 5xx and [ErrUnexpectedStatus] for any
+// other status.
+//
+// Its text names the probe path and the status, and for a mapped status
+// the sentinel's text. It never carries a body byte or a header value.
+type StatusError struct {
+	// Path is the probe path the request was sent to: the default path or
+	// the caller's WithLivePath or WithReadyPath override.
+	Path string
+	// StatusCode is the status the server answered with.
+	StatusCode int
+}
+
+// Error names the probe path, the status and, for a mapped status, the
+// sentinel. It works on a nil receiver instead of panicking, so the typed
+// nil a failed errors.AsType leaves behind is safe to print.
+func (e *StatusError) Error() string {
+	if e == nil {
+		return "admin: probe: status not 2xx"
+	}
+	sentinel := statusToSentinel(e.StatusCode)
+	if errors.Is(sentinel, ErrUnexpectedStatus) {
+		return fmt.Sprintf("admin: probe %s: unexpected status %d", e.Path, e.StatusCode)
+	}
+	return fmt.Sprintf("admin: probe %s status=%d: %s", e.Path, e.StatusCode, sentinel)
+}
+
+// Unwrap returns the sentinel for the status: a [transport] sentinel for
+// 401, 403, 404 and 5xx, [ErrUnexpectedStatus] for any other status. It
+// returns nil on a nil receiver.
+func (e *StatusError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return statusToSentinel(e.StatusCode)
+}
+
 // Default probe paths. Override per call via WithLivePath
 // or WithReadyPath when a deployment serves health on different paths
 // (e.g. "/healthz").
@@ -77,22 +125,22 @@ func WithMaxReadyBody(n int64) ReadyOption {
 // Live probes the deployment liveness endpoint. Returns nil on any 2xx
 // response.
 //
-// Status-code mapping (errors.Is-compatible):
+// Any non-2xx status returns a [*StatusError] that carries the probe path
+// and the status code; errors.AsType[*admin.StatusError](err) reaches it.
+// It unwraps to a sentinel, so errors.Is matches (status-code mapping):
 //   - 401 → [transport.ErrUnauthorized]
 //   - 403 → [transport.ErrForbidden]
 //   - 404 → [transport.ErrNotFound]
 //   - 5xx → [transport.ErrServerError]
+//   - any other non-2xx code (e.g. 400, 405, 408, 429) → [ErrUnexpectedStatus]
 //
-// Other non-2xx codes (e.g. 400, 405, 408, 429) surface as a plain
-// formatted error with no sentinel, so do not rely on errors.Is
-// matching outside the mapped set. A request that gets no response from
-// the underlying http.Client (connection refused, TLS errors, a
-// malformed response, a timeout, context cancellation) fails with an
-// error whose text names the probe path and says whether the request
-// timed out, was canceled or failed otherwise. The text never carries
-// the failure's own text, which can quote bytes the server sent.
-// errors.Is and errors.AsType still reach the failure, such as a
-// [*url.Error] or [context.Canceled].
+// A request that gets no response from the underlying http.Client
+// (connection refused, TLS errors, a malformed response, a timeout,
+// context cancellation) fails with an error whose text names the probe
+// path and says whether the request timed out, was canceled or failed
+// otherwise. The text never carries the failure's own text, which can
+// quote bytes the server sent. errors.Is and errors.AsType still reach
+// the failure, such as a [*url.Error] or [context.Canceled].
 //
 // Probes reuse [transport]'s sentinel errors for the mapped codes
 // above but bypass [transport.Client.Do]: no WireError envelope is
@@ -186,8 +234,8 @@ func probe(ctx context.Context, c *transport.Client, path string) error {
 // probe can end the request itself when a body will not finish. A 2xx
 // returns the open response and the cancel of that context: the caller
 // reads and closes the body, then calls cancel. Any other status returns
-// the error statusToSentinel gives it, with the body already drained (up
-// to maxDrain bytes, for up to maxDrainTime) and closed.
+// a *StatusError, with the body already drained (up to maxDrain bytes,
+// for up to maxDrainTime) and closed.
 func send(ctx context.Context, c *transport.Client, path string) (*http.Response, context.CancelFunc, error) {
 	if path == "" || !strings.HasPrefix(path, "/") {
 		return nil, nil, fmt.Errorf("%w: %q (must be a non-empty absolute path starting with '/')", ErrInvalidPath, path)
@@ -231,11 +279,7 @@ func send(ctx context.Context, c *transport.Client, path string) (*http.Response
 		return resp, cancel, nil
 	}
 	drainAndClose(resp, cancel)
-	sentinel := statusToSentinel(resp.StatusCode)
-	if sentinel == nil {
-		return nil, nil, fmt.Errorf("admin: probe %s: unexpected status %d", path, resp.StatusCode)
-	}
-	return nil, nil, fmt.Errorf("admin: probe %s status=%d: %w", path, resp.StatusCode, sentinel)
+	return nil, nil, &StatusError{Path: path, StatusCode: resp.StatusCode}
 }
 
 // maxDrain is the most bytes drainAndClose reads from a body: 256 KiB, the
@@ -348,13 +392,13 @@ func (e *requestError) failure() string {
 
 func (e *requestError) Unwrap() error { return e.cause }
 
-// statusToSentinel maps the subset of status codes this probe
-// translates to [transport] sentinels. Returns nil for codes outside
-// the mapped set (e.g. 400, 408, 429); callers surface those as a
-// plain formatted error without a sentinel.
+// statusToSentinel gives the sentinel a StatusError unwraps to: the
+// [transport] sentinel for the mapped codes (401, 403, 404, 5xx) and
+// ErrUnexpectedStatus for any other code (e.g. 400, 408, 429). It never
+// returns nil, so every non-2xx probe error carries a sentinel.
 //
-// The set is intentionally narrower than transport.statusToSentinel
-// (which also handles 409/412/428 for openEHR REST envelopes) —
+// The mapped set is intentionally narrower than transport.statusToSentinel
+// (which also handles 409/412/422/428 for openEHR REST envelopes) —
 // probes are a deployment-level concern and do not see those codes.
 func statusToSentinel(s int) error {
 	switch s {
@@ -368,5 +412,5 @@ func statusToSentinel(s int) error {
 	if s >= 500 {
 		return transport.ErrServerError
 	}
-	return nil
+	return ErrUnexpectedStatus
 }

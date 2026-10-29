@@ -173,10 +173,10 @@ func TestProbe2xxReturnsNil(t *testing.T) {
 }
 
 // Acceptance criterion: unmapped non-2xx codes (400, 405, 408, 429)
-// surface as a plain formatted error WITHOUT a transport sentinel.
-// Callers MUST NOT depend on errors.Is matching outside the documented
-// mapping (404/401/403/5xx).
-func TestProbeUnmapped4xxHasNoSentinel(t *testing.T) {
+// carry none of the transport sentinels: they unwrap to
+// admin.ErrUnexpectedStatus instead, so errors.Is matches a transport
+// sentinel only inside the documented mapping (404/401/403/5xx).
+func TestProbeUnmapped4xxHasNoTransportSentinel(t *testing.T) {
 	cases := []int{http.StatusBadRequest, http.StatusMethodNotAllowed, http.StatusRequestTimeout, http.StatusTooManyRequests}
 	for _, status := range cases {
 		t.Run(strconv.Itoa(status), func(t *testing.T) {
@@ -188,7 +188,7 @@ func TestProbeUnmapped4xxHasNoSentinel(t *testing.T) {
 			if err == nil {
 				t.Fatalf("status=%d: expected error", status)
 			}
-			// None of the mapped sentinels should match.
+			// None of the transport sentinels should match.
 			for _, sentinel := range []error{
 				transport.ErrNotFound,
 				transport.ErrUnauthorized,
@@ -196,8 +196,11 @@ func TestProbeUnmapped4xxHasNoSentinel(t *testing.T) {
 				transport.ErrServerError,
 			} {
 				if errors.Is(err, sentinel) {
-					t.Errorf("status=%d: err matched %v but unmapped codes must not carry a sentinel", status, sentinel)
+					t.Errorf("status=%d: err matched %v but unmapped codes must not carry a transport sentinel", status, sentinel)
 				}
+			}
+			if !errors.Is(err, admin.ErrUnexpectedStatus) {
+				t.Errorf("status=%d: err = %v, want errors.Is(err, admin.ErrUnexpectedStatus)", status, err)
 			}
 		})
 	}
@@ -986,15 +989,15 @@ func TestReadyBodyCanceledMidBody(t *testing.T) { // REQ-083
 func TestReadyBodyNon2xxMatchesReady(t *testing.T) { // REQ-083
 	cases := []struct {
 		status   int
-		sentinel error // nil for a status outside the mapped set
+		sentinel error
 	}{
 		{http.StatusServiceUnavailable, transport.ErrServerError},
 		{http.StatusInternalServerError, transport.ErrServerError},
 		{http.StatusNotFound, transport.ErrNotFound},
 		{http.StatusUnauthorized, transport.ErrUnauthorized},
 		{http.StatusForbidden, transport.ErrForbidden},
-		{http.StatusBadRequest, nil},
-		{http.StatusTooManyRequests, nil},
+		{http.StatusBadRequest, admin.ErrUnexpectedStatus},
+		{http.StatusTooManyRequests, admin.ErrUnexpectedStatus},
 	}
 	for _, tc := range cases {
 		t.Run(strconv.Itoa(tc.status), func(t *testing.T) {
@@ -1009,7 +1012,7 @@ func TestReadyBodyNon2xxMatchesReady(t *testing.T) { // REQ-083
 			if err == nil {
 				t.Fatalf("status=%d: ReadyBody returned no error", tc.status)
 			}
-			if tc.sentinel != nil && !errors.Is(err, tc.sentinel) {
+			if !errors.Is(err, tc.sentinel) {
 				t.Errorf("status=%d: err = %v, want errors.Is(err, %v)", tc.status, err, tc.sentinel)
 			}
 			readyErr := admin.Ready(t.Context(), c)
