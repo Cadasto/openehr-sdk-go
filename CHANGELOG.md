@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.43.0] - 2026-10-29
+
+Forty-third `v0.x` minor: the instance generator builds the template shapes it used to refuse, SMART auth checks key use and token lifetimes, zoned date-times order as instants, and decoding and validation do less work per call. **Breaking:** `rm.Real` decode refuses lossy literals, SMART auth refuses keys and member spellings it accepted, zoned `DV_DATE_TIME` values order by UTC, and `rmpath` and `aql.Compare` refuse inputs they accepted.
+
 ### Added
 
 - **`smart.JWKS.MinRefreshInterval` limits how often a verification miss refetches the key set, 30 s from `NewJWKS`, and `smart.TokenResponse.HasExpiresIn` tells a missing `expires_in` from a zero one (REQ-062, REQ-063).**

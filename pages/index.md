@@ -184,7 +184,7 @@ deployment.
 ## Quick start
 
 ```bash
-go get github.com/cadasto/openehr-sdk-go@v0.42.0
+go get github.com/cadasto/openehr-sdk-go@v0.43.0
 ```
 
 ```go
