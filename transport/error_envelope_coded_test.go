@@ -77,6 +77,32 @@ const malformedErrorsEnvelope = `{
     ]
 }`
 
+// errorsOnlyEnvelope carries the pin's errors list and nothing else: no
+// message, no code, no validationErrors.
+const errorsOnlyEnvelope = `{
+    "errors": [
+        {
+            "_type": "DV_CODED_TEXT",
+            "value": "errors entry names patient 1234",
+            "defining_code": {
+                "terminology_id": {"value": "local"},
+                "code_string": "9000"
+            }
+        }
+    ]
+}`
+
+// codedTextOnlyEnvelope carries a coded_text list and nothing else.
+const codedTextOnlyEnvelope = `{
+    "coded_text": [
+        {
+            "terminology_id": {"value": "openehr"},
+            "code_string": "VALIDATION_FAILED",
+            "value": "coded_text entry names patient 1234"
+        }
+    ]
+}`
+
 // codedItem builds the CodedTextItem a test expects.
 func codedItem(terminology, code, value string) transport.CodedTextItem {
 	var it transport.CodedTextItem
@@ -91,6 +117,7 @@ func codedItem(terminology, code, value string) transport.CodedTextItem {
 // OpenEHR.CodedText after those of coded_text, their codes stay whatever
 // WithRawErrorBodies says, their free-text Value is kept only under that
 // opt-in, a malformed errors entry or list is skipped without failing the
+// envelope, a body that carries only one of the coded lists is still an
 // envelope, and Error() carries none of the free text.
 func TestErrorEnvelopePinErrorsList(t *testing.T) {
 	tests := []struct {
@@ -148,6 +175,32 @@ func TestErrorEnvelopePinErrorsList(t *testing.T) {
 			wantCode: "VALIDATION_FAILED",
 			want:     []transport.CodedTextItem{codedItem("local", "9000", "kept")},
 			leaks:    []string{"1234"},
+		},
+		{
+			name:  "errors list only, default client keeps the code and drops the value",
+			body:  errorsOnlyEnvelope,
+			want:  []transport.CodedTextItem{codedItem("local", "9000", "")},
+			leaks: []string{"1234"},
+		},
+		{
+			name:  "errors list only, raw bodies keep the value",
+			body:  errorsOnlyEnvelope,
+			raw:   true,
+			want:  []transport.CodedTextItem{codedItem("local", "9000", "errors entry names patient 1234")},
+			leaks: []string{"1234"},
+		},
+		{
+			name:  "coded_text list only, default client keeps the code and drops the value",
+			body:  codedTextOnlyEnvelope,
+			want:  []transport.CodedTextItem{codedItem("openehr", "VALIDATION_FAILED", "")},
+			leaks: []string{"1234"},
+		},
+		{
+			name:  "coded_text list only, raw bodies keep the value",
+			body:  codedTextOnlyEnvelope,
+			raw:   true,
+			want:  []transport.CodedTextItem{codedItem("openehr", "VALIDATION_FAILED", "coded_text entry names patient 1234")},
+			leaks: []string{"1234"},
 		},
 		{
 			name:     "an errors member that is not a list is ignored, the envelope is kept",
