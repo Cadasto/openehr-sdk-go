@@ -199,6 +199,24 @@ func TestConformsToAgreesWithAncestors(t *testing.T) {
 	}
 }
 
+// BenchmarkConformsTo asks ConformsTo every ordered pair of known classes once
+// per iteration: one op is the whole 139x139 grid on [rminfo.Default].
+func BenchmarkConformsTo(b *testing.B) {
+	h, ok := rminfo.Default.(rminfo.Hierarchy)
+	if !ok {
+		b.Fatal("rminfo.Default does not implement Hierarchy")
+	}
+	classes := rminfo.Default.KnownRMTypes()
+	b.ReportAllocs()
+	for b.Loop() {
+		for _, sub := range classes {
+			for _, super := range classes {
+				h.ConformsTo(sub, super)
+			}
+		}
+	}
+}
+
 // TestConcreteDescendantsExpandsAbstractClasses — REQ-048. This is the AQL
 // class-expression question: naming an abstract class denotes its concrete
 // descendants.
