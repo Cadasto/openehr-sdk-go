@@ -25,6 +25,7 @@ package lint
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/contain"
@@ -156,18 +157,50 @@ type segmentWalker struct {
 	// [rminfo.Lookup.AttributeRMType] alone cannot: asking it about a generic
 	// parameter `T` answers exactly as asking it about a real class with no
 	// such attribute would.
+	//
+	// It is read-only: every walker over rminfo.Default shares one set.
 	known map[string]bool
 }
 
 // newSegmentWalker builds a walker over look's class universe, with classes as
 // the alias→class-expression binding ([Metadata.Aliases]).
+//
+// A walker over [rminfo.Default], which is every walker a lint pass builds,
+// reads the shared set [defaultUniverse] holds instead of building its own.
+// Any other Lookup may define a different universe, so it gets a set of its
+// own.
 func newSegmentWalker(look rminfo.Lookup, classes map[string]parse.ClassExpr) *segmentWalker {
+	var known map[string]bool
+	if u := defaultUniverse(); look == u.look {
+		known = u.known
+	} else {
+		known = knownClasses(look)
+	}
+	return &segmentWalker{look: look, classes: classes, known: known}
+}
+
+// defaultUniverse is [rminfo.Default]'s class universe as a set, built on the
+// first walk rather than at init, so importing the package stays free. It
+// records the Lookup it was built from, so a walker shares the set only with
+// that exact Lookup. The map is read-only once built.
+var defaultUniverse = sync.OnceValue(func() classUniverse {
+	return classUniverse{look: rminfo.Default, known: knownClasses(rminfo.Default)}
+})
+
+// classUniverse is a Lookup beside its class universe as a set.
+type classUniverse struct {
+	look  rminfo.Lookup
+	known map[string]bool
+}
+
+// knownClasses returns look's class universe as a set.
+func knownClasses(look rminfo.Lookup) map[string]bool {
 	names := look.KnownRMTypes()
 	known := make(map[string]bool, len(names))
 	for _, n := range names {
 		known[n] = true
 	}
-	return &segmentWalker{look: look, classes: classes, known: known}
+	return known
 }
 
 // walk types p's segments from the class its alias binds, stopping SILENTLY at

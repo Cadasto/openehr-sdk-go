@@ -215,6 +215,70 @@ func TestWalkStopNames(t *testing.T) {
 	}
 }
 
+// TestSegmentWalkerSharesTheDefaultClassSet — REQ-109. Every lint pass builds
+// a walker over rminfo.Default, so that walker reads one class set built on
+// first use rather than rebuilding the pin's universe each pass. The set must
+// still be that universe, name for name.
+func TestSegmentWalkerSharesTheDefaultClassSet(t *testing.T) {
+	names := rminfo.Default.KnownRMTypes()
+	w := newSegmentWalker(rminfo.Default, nil)
+	if len(w.known) != len(names) {
+		t.Errorf("the walker over rminfo.Default knows %d classes, want the pin's %d", len(w.known), len(names))
+	}
+	for _, n := range names {
+		if !w.known[n] {
+			t.Errorf("the walker over rminfo.Default does not know %q, which KnownRMTypes lists", n)
+		}
+	}
+	allocs := testing.AllocsPerRun(100, func() { _ = newSegmentWalker(rminfo.Default, nil) })
+	if allocs > 1 {
+		t.Errorf("newSegmentWalker(rminfo.Default, nil) allocates %v times, want at most 1 (the walker itself)", allocs)
+	}
+}
+
+// TestSegmentWalkerOverAnotherLookupUsesItsOwnClassSet — REQ-109. Only a walker
+// over rminfo.Default reads the shared set. A walker over any other Lookup
+// types against that Lookup's own universe: with the shared set instead, a
+// class only it defines would stop the walk as unknown.
+func TestSegmentWalkerOverAnotherLookupUsesItsOwnClassSet(t *testing.T) {
+	synthetic := rminfo.New(map[string]rminfo.ClassMeta{
+		"SYNTH": {
+			Attributes: map[string]rminfo.AttrMeta{
+				"items": {TypeName: "SYNTH_ITEM", Container: true, DeclaredIn: "SYNTH"},
+			},
+			AttrOrder: []string{"items"},
+		},
+		"SYNTH_ITEM": {
+			Attributes: map[string]rminfo.AttrMeta{
+				"value": {TypeName: "String", DeclaredIn: "SYNTH_ITEM"},
+			},
+			AttrOrder: []string{"value"},
+		},
+	})
+	walk := func(look rminfo.Lookup, q string) pathShape {
+		t.Helper()
+		doc, err := parse.Parse(q)
+		if err != nil {
+			t.Fatalf("Parse(%q): %v", q, err)
+		}
+		if len(doc.Paths) != 1 {
+			t.Fatalf("Parse(%q) reported %d identified paths, want 1", q, len(doc.Paths))
+		}
+		return newSegmentWalker(look, Extract(doc).Aliases).walk(doc.Paths[0])
+	}
+	const synthQ = "SELECT s/items/value FROM SYNTH s"
+	if sh := walk(synthetic, synthQ); sh.Root != "SYNTH" || sh.Stop != stopNone || len(sh.Typed) != 2 {
+		t.Errorf("walk over the synthetic Lookup of %q = %+v, want a completed walk typing 2 segments from SYNTH", synthQ, sh)
+	}
+	if sh := walk(rminfo.Default, synthQ); sh.Stop != stopUnknownAliasClass {
+		t.Errorf("walk over rminfo.Default of %q stopped with %v, want %v", synthQ, sh.Stop, stopUnknownAliasClass)
+	}
+	const pinQ = "SELECT o/data FROM OBSERVATION o[" + walkArch + "]"
+	if sh := walk(synthetic, pinQ); sh.Stop != stopUnknownAliasClass {
+		t.Errorf("walk over the synthetic Lookup of %q stopped with %v, want %v", pinQ, sh.Stop, stopUnknownAliasClass)
+	}
+}
+
 // --- aql_contains_redundant_step: the chain linearisation --------------------
 
 // chainNames renders a linearised chain for a failure message.
