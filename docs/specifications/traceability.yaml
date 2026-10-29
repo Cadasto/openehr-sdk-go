@@ -1086,6 +1086,7 @@ requirements:
     packages: [cadasto, cadasto/admin]
     tests:
       - cadasto/admin/probes_test.go
+      - cadasto/admin/status_error_test.go
 
   - id: REQ-090
     title: OpenTelemetry hooks
@@ -1886,6 +1887,7 @@ requirements:
       - openehr/aql/lint/semantic_test.go
       - openehr/aql/paging_test.go
       - openehr/aql/parse/ast_test.go
+      - openehr/aql/parse/clause_spans_test.go
       - openehr/aql/parse/dropped_test.go
       - openehr/aql/parse/literal_roundtrip_test.go
       - openehr/aql/parse/parse_test.go

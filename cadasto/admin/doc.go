@@ -13,12 +13,15 @@
 // entry's origin (scheme + host); the openEHR REST API path prefix
 // is not inherited.
 //
-// Status-code mapping (errors.Is-compatible): 2xx → nil; 401 →
+// A 2xx returns nil. Any other status returns a [*StatusError] that
+// carries the probe path and the status code, reached with
+// errors.AsType[*admin.StatusError](err). It unwraps to a sentinel, so
+// errors.Is matches (status-code mapping): 401 →
 // [transport.ErrUnauthorized]; 403 → [transport.ErrForbidden]; 404 →
-// [transport.ErrNotFound]; 5xx → [transport.ErrServerError]. Other
-// non-2xx codes (400, 405, 408, 429, etc.) surface as a plain
-// formatted error with no sentinel. ReadyBody returns nil bytes beside
-// that error.
+// [transport.ErrNotFound]; 5xx → [transport.ErrServerError]; any other
+// non-2xx code (400, 405, 408, 429, etc.) → [ErrUnexpectedStatus]. The
+// error text never carries a body byte or a header value. ReadyBody
+// returns nil bytes beside that error.
 //
 // ReadyBody reads at most DefaultMaxReadyBody bytes (1 MiB) of a 2xx
 // body, or the limit WithMaxReadyBody sets. A longer 2xx body fails with

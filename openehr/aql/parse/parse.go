@@ -73,6 +73,11 @@ func (e *SyntaxError) Unwrap() error { return aql.ErrSyntax }
 // mutate them (lint clones what it carries across its own boundary).
 type Document struct {
 	tree gen.ISelectQueryContext
+	// src is the text tree was parsed from. The structured extraction reads
+	// it to report each clause's byte offsets: the ANTLR input stream holds
+	// runes, and re-encoding them would not give back the caller's bytes when
+	// the text carries invalid UTF-8.
+	src string
 
 	// query / queryErr are the structured AST and any catalogue-gap
 	// error from extraction, populated lazily on the first call to
@@ -155,7 +160,7 @@ type Document struct {
 // [aql.ErrSyntax]) and a nil document.
 func Parse(q string) (*Document, error) {
 	if tree, ok := parseSLL(q); ok {
-		doc := &Document{tree: tree}
+		doc := &Document{tree: tree, src: q}
 		doc.populate()
 		doc.extract()
 		return doc, nil
@@ -175,7 +180,7 @@ func Parse(q string) (*Document, error) {
 		return nil, collector.errors[0]
 	}
 
-	doc := &Document{tree: tree}
+	doc := &Document{tree: tree, src: q}
 	doc.populate()
 	doc.extract()
 	return doc, nil
@@ -272,8 +277,9 @@ func ParseQuery(q string) (*Query, error) {
 // Deprecated: Tree exposes the generated parser context
 // ([gen.ISelectQueryContext]) and may change shape on any grammar
 // regeneration. Use [Document.Query] / [ParseQuery] for the stable
-// structured AST; Tree remains as a raw-tree escape hatch for consumers
-// that still need it.
+// structured AST, and [Query.Spans] for where each clause sits in the
+// source; Tree remains as a raw-tree escape hatch for consumers that
+// still need it.
 //
 // Returns nil for a zero-value document; call only after a successful
 // [Parse], or guard with [Document.Parsed].
@@ -304,7 +310,7 @@ func (d *Document) Query() *Query {
 		return nil
 	}
 	d.queryOnce.Do(func() {
-		d.query, d.dropped, d.queryErr = extractQuery(d.tree)
+		d.query, d.dropped, d.queryErr = extractQuery(d.tree, d.src)
 	})
 	return d.query
 }
@@ -322,7 +328,7 @@ func (d *Document) QueryErr() error {
 		return nil
 	}
 	d.queryOnce.Do(func() {
-		d.query, d.dropped, d.queryErr = extractQuery(d.tree)
+		d.query, d.dropped, d.queryErr = extractQuery(d.tree, d.src)
 	})
 	return d.queryErr
 }
