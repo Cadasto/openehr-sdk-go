@@ -8,6 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.44.0] - 2026-10-30
+
+Forty-fourth `v0.x` minor: failed health probes carry their HTTP status, a parsed AQL query locates each clause in its source, the openEHR error envelope reads the coded `errors` list, and error text carries no payload values or requirement ids. **Breaking:** the VERSIONED_PARTY version reads refuse an empty 2xx body.
+
+### Added
+
+- **`admin.StatusError` carries a failed probe's path and HTTP status, and `admin.ErrUnexpectedStatus` matches the statuses no `transport` sentinel covers, 600 to 999 included (REQ-083).**
+- **`parse.Query.Spans` gives the byte offsets of each clause, and of the WHERE expression, in the source text (REQ-113).**
+- **The openEHR error envelope reads the coded `errors` list beside `coded_text`, keeps the code when a member has the wrong JSON type, and fills `CodedTextItem.Value` under `WithRawErrorBodies(true)` (REQ-093).**
+
+### Changed
+
+- **Breaking: the VERSIONED_PARTY version reads return `ErrInvalidShape` on an empty or `null` 2xx body, 204 included, as the composition and EHR_STATUS reads do (REQ-174).**
+- **Error text names no requirement id, FLAT refusals name keys instead of composition values, and a `cadasto/admin` probe's request failure leaves out net/http's text (REQ-093, REQ-053).**
+- **Canonical JSON decode, the `WithMissing`, `WithStrict` and `ValidateJSON` reports, and AQL lint do less work per call, with identical results (REQ-052, REQ-108, REQ-175).**
+
 ## [0.43.0] - 2026-10-29
 
 Forty-third `v0.x` minor: the instance generator builds the template shapes it used to refuse, SMART auth checks key use and token lifetimes, zoned date-times order as instants, and decoding and validation do less work per call. **Breaking:** `rm.Real` decode refuses lossy literals, SMART auth refuses keys and member spellings it accepted, zoned `DV_DATE_TIME` values order by UTC, and `rmpath` and `aql.Compare` refuse inputs they accepted.
