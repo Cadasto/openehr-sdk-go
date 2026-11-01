@@ -578,12 +578,14 @@ func noWriter(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool
 }
 
 // writerNeeded reports whether the template requires attr of optNode, an
-// attribute the generator has no writer for, so that a root without it
-// fails the template validator: it is required (isRequired, which a
+// attribute the generator has no writer for, so that Generate refuses it
+// rather than return a root without it: it is required (isRequired, which a
 // cardinality lower bound alone does not make so, since that counts the
 // members of a list that exists), and, for a list the RM declares, more
-// than its existence asks it for a member (existenceOnly), since a list
-// with no member meets its existence.
+// than its existence asks it for a member (existenceOnly). A list only its
+// existence asks a member of is left out instead, and the template
+// validator reports it absent: canonical JSON cannot carry such a list
+// empty (REQ-107 known gap, issue 341).
 func writerNeeded(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
 	if !isRequired(optNode, attr) {
 		return false
