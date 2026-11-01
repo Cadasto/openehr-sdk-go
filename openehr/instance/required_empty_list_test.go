@@ -161,9 +161,10 @@ func TestREQ107_VitalSignsRequiredItemListsArePresentAndEmpty(t *testing.T) {
 // that canonical JSON writes as [], whichever way the walk leaves it
 // without a member: no allowed child, slots only, only an optional child
 // that needs undescribed content, a cardinality of 0..0 over an optional
-// ELEMENT, or an RM list the template writes as a single attribute with no
-// child. A list the template leaves optional by its existence stays absent,
-// whether the walk visits it or not. Every root passes the template
+// ELEMENT, an RM list the template writes as a single attribute with no
+// child, or children the template all prohibits, so that the walk does not
+// visit the list. A list the template leaves optional by its existence
+// stays absent, whether the walk visits it or not. Every root passes the template
 // validator and the RM floor.
 func TestREQ107_RequiredEmptyItemListIsPresent(t *testing.T) {
 	cases := []struct {
@@ -218,12 +219,33 @@ func TestREQ107_RequiredEmptyItemListIsPresent(t *testing.T) {
 			present:   true,
 		},
 		{
+			// The OPT prohibits these items by prohibiting their every
+			// child, so the walk does not visit them.
+			name:      "ITEM_TREE items whose every child the template prohibits",
+			structure: optNode("ITEM_TREE", "at0010", optList("items", 1, 0, optElement("at0011", 0, 0))),
+			present:   true,
+		},
+		{
+			name:      "ITEM_LIST items whose every child the template prohibits",
+			structure: optNode("ITEM_LIST", "at0010", optList("items", 1, 0, optElement("at0011", 0, 0), optElement("at0012", 0, 0))),
+			present:   true,
+		},
+		{
+			name:      "ITEM_TABLE rows whose every child the template prohibits",
+			structure: optNode("ITEM_TABLE", "at0010", optList("rows", 1, 0, optOccurring("C_COMPLEX_OBJECT", "CLUSTER", "at0011", 0, 0))),
+			present:   true,
+		},
+		{
 			name:      "control: ITEM_TREE items the template leaves optional by its existence",
 			structure: optNode("ITEM_TREE", "at0010", optList("items", 0, 0)),
 		},
 		{
 			name:      "control: ITEM_LIST items the template leaves optional, with only a slot",
 			structure: optNode("ITEM_LIST", "at0010", optList("items", 0, 0, optSlot("ELEMENT", "at0011"))),
+		},
+		{
+			name:      "control: ITEM_TREE items the template leaves optional, whose every child it prohibits",
+			structure: optNode("ITEM_TREE", "at0010", optList("items", 0, 0, optElement("at0011", 0, 0))),
 		},
 		{
 			// Large and Medium visit these items, for the ELEMENT, and give
