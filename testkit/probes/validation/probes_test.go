@@ -55,19 +55,26 @@ func TestProbe025CompositionValidate_PrimitiveOutOfRange(t *testing.T) {
 }
 
 // PROBE-026 — REQ-102 § An existence lower bound alone asks for no member.
-// Removing the systolic element, so that the ITEM_LIST holds no items list
-// at all, surfaces no issue: vital_signs.opt gives those items existence
+// Removing the systolic element, so that the ITEM_LIST's items are present
+// and empty, surfaces no issue: vital_signs.opt gives those items existence
 // 1..1 and cardinality 0..*, and the systolic element is optional, so the
-// template asks for the container alone and an instance cannot show an
-// empty one apart from a missing one. Stability test.
+// template asks for the container alone, which the empty list is. Leaving
+// the items out altogether surfaces `required`: there is no container to
+// meet that existence (issue 341). Stability test.
 func TestProbe026MissingNodes_MissingSystolic(t *testing.T) {
 	body := loadFixture(t, "vital_signs")
 	cases := []probes.ValidateCase{
 		{
+			Name:        "empty_systolic_items",
+			OPT:         body,
+			Composition: probes.SystolicItemsEmpty(),
+			WantCodes:   nil,
+		},
+		{
 			Name:        "missing_systolic_items",
 			OPT:         body,
 			Composition: probes.SystolicItemsAbsent(),
-			WantCodes:   nil,
+			WantCodes:   []string{"required"},
 		},
 	}
 	r, err := probes.Probe026MissingNodes(cases)

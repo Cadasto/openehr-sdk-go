@@ -57,8 +57,10 @@ func AsksForMember(a *CompiledAttribute) bool {
 // the template validator share. Under Required, the generator visits a list
 // with such a child and builds the child's members. The validator reports
 // each such child as missing where a list the template leaves optional by
-// its existence holds no item. So a list Required leaves out is one the
-// validator accepts as absent.
+// its existence holds no item. So a list Required leaves out that the
+// template leaves optional by its existence is one the validator accepts as
+// absent. A list the template requires by its existence is another matter:
+// the validator reports it absent whatever its children ask.
 func MandatoryListChildren(a *CompiledAttribute) iter.Seq[*CompiledNode] {
 	return func(yield func(*CompiledNode) bool) {
 		if a.cardinality != template.Multiple || a.prohibited || primitiveItems(a) {

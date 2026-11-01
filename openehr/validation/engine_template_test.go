@@ -650,12 +650,12 @@ func TestREQ171_EngineReadsAnEmptyHashAsTheRMRulesDo(t *testing.T) {
 
 // REQ-171 § One walk (Presence), REQ-102 § An existence lower bound alone
 // asks for no member — a Hash the RM marks mandatory that the instance lacks
-// is reported once, by the rule that requires it. A template that declares
-// RESOURCE_DESCRIPTION original_author multi-valued asks for no member where
-// its existence alone requires it, so the absent Hash is the RM's `required`,
-// rule mandatory, as it is where the existence is open. Where the template's
-// existence and its child count both require it, it is the template's
-// `required`, rule existence, alone: an absent Hash has no entries to count.
+// is reported once, by the rule that requires it. Where the template's
+// existence on RESOURCE_DESCRIPTION original_author is open, the absent Hash
+// is the RM's `required`, rule mandatory. Where its existence requires it,
+// alone or with its child count, it is the template's `required`, rule
+// existence, alone: the existence asks for the container, which an absent
+// Hash is not (issue 341), and an absent Hash has no entries to count.
 func TestREQ171_EngineReportsAnAbsentHashByTheRuleThatRequiresIt(t *testing.T) {
 	t.Parallel()
 	const path = "/original_author"
@@ -672,7 +672,7 @@ func TestREQ171_EngineReportsAnAbsentHashByTheRuleThatRequiresIt(t *testing.T) {
 		{
 			name: "existence required alone",
 			c:    mustCompileInline(t, resourceDescriptionOPT("1", "1", "0")),
-			want: []string{"required rm mandatory"},
+			want: []string{"required template existence"},
 		},
 		{
 			name: "existence and child count required",

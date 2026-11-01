@@ -1138,7 +1138,8 @@ func (e *engine) admitSingle(decl *tcimpl.CompiledAttribute, v engineNode) {
 // existence ([optionalList]) has its children counted when it is absent
 // too; while it holds no item, absent or present, the children counted are
 // those that ask a list for a member ([appendMissingChildIssues]), and its
-// child count is not reported: canonical JSON carries the one as the other.
+// child count is not reported: canonical JSON leaves out most empty optional
+// lists, and canonical XML every empty list, so the two are judged alike.
 // Then each
 // admitted item is walked against the child it binds to, at the path the
 // shared path rule writes for it, with the name the child pins where a
@@ -1235,11 +1236,11 @@ func (e *engine) visitDeclaredItems(n *engineNode, a *engineAttr, r *attrReading
 // children that ask a list for a member are counted
 // ([appendMissingChildIssues]), and the list's own child count, which binds
 // only a container that exists (ADL 1.4: "optional, but if present"), is
-// not reported, since canonical JSON carries the one as the other. A list
-// the template requires by its existence fails existence alone when it is
-// absent ([engine.checkAbsent]); the children of a list the template writes
-// as a single-valued attribute are alternatives, which its existence
-// decides.
+// not reported, since canonical JSON leaves out most empty optional lists,
+// and canonical XML every empty list. A list the template requires by its
+// existence fails existence alone when it is absent, whatever its counts
+// ask ([engine.checkAbsent]); the children of a list the template writes as
+// a single-valued attribute are alternatives, which its existence decides.
 func optionalList(attr *tcimpl.CompiledAttribute) bool {
 	return attr.Cardinality() == template.Multiple && !tcimpl.LowerAtLeastOne(attr.Existence())
 }
@@ -1285,10 +1286,9 @@ func (e *engine) refuse(iss Issue) {
 
 // checkAbsent reports the attribute a of node n, which the template declares
 // and the instance lacks, at attrPath, once. Where the template requires it
-// ([templateRequires]: its existence, and for a list or a Hash a cardinality
-// or a child's occurrences that asks for a member too, or an RM rule of the
-// node's class that makes the list hold a member, [asksForMember]), it is
-// the template's `required`. A Hash is read as multi-valued here, as a list
+// by its existence ([templateRequires]), a list or a Hash whatever its
+// counts ask, since there is no container to meet that existence, it is the
+// template's `required`. A Hash is described as multi-valued here, as a list
 // is, although [attrShape.multiValued] leaves it out. Otherwise it is the RM's
 // `required` where the RM marks it mandatory for the value's class, as the
 // RM rules alone read it (a.mandatory), which leave out the part of a
@@ -1297,8 +1297,7 @@ func (e *engine) refuse(iss Issue) {
 // attribute that class does not list draws no RM finding, whatever
 // mandatory bit the compiled template carries for it.
 func (e *engine) checkAbsent(n *engineNode, a *engineAttr, attrPath issuePath) {
-	multiValued := a.shape != shapeSingle
-	if iss, required := absentIssue(a.decl, n.value, attrPath, multiValued, multiValued && asksForMember(n, a.name)); required {
+	if iss, required := absentIssue(a.decl, n.value, attrPath, a.shape != shapeSingle); required {
 		e.found.emit(iss)
 		return
 	}
@@ -1308,11 +1307,11 @@ func (e *engine) checkAbsent(n *engineNode, a *engineAttr, attrPath issuePath) {
 }
 
 // checkEmpty reports the multi-valued attribute a of node n, at attrPath,
-// which is present and holds no item, once. Where the template requires it
-// ([templateRequires]: its existence, and a cardinality or a child's
-// occurrences that asks for a member, or an RM rule of the node's class that
-// makes the list hold a member, [asksForMember]), it is the template's
-// `required`.
+// which is present and holds no item, once. Where the template asks for a
+// member there ([templateAsksForMember]: its existence, and a cardinality or
+// a child's occurrences that asks for a member, or an RM rule of the node's
+// class that makes the list hold a member, [asksForMember]), it is the
+// template's `required`.
 // Where only the RM requires it, read from the value's class alone as
 // [engine.checkAbsent] reads it, it is the RM's `cardinality`, rule
 // cardinality, unless the template reports the same container itself

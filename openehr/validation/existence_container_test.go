@@ -56,6 +56,12 @@ func containerElement(lower string) string {
 // existence 1..1 and the cardinality interval body cardinality, left out of
 // the OPT where it is empty, admitting children.
 func containerOPT(rmType, cardinality string, children ...string) string {
+	return containerOPTWithExistence(rmType, fiInterval("1", "1"), cardinality, children...)
+}
+
+// containerOPTWithExistence is containerOPT with the existence interval body
+// existence on items.
+func containerOPTWithExistence(rmType, existence, cardinality string, children ...string) string {
 	card := ""
 	if cardinality != "" {
 		card = `<cardinality><is_ordered>true</is_ordered><is_unique>false</is_unique><interval>` + cardinality + `</interval></cardinality>`
@@ -66,7 +72,7 @@ func containerOPT(rmType, cardinality string, children ...string) string {
 <template_id><value>existence_container</value></template_id><concept>existence_container</concept>
 <definition><rm_type_name>` + rmType + `</rm_type_name><node_id>at0000</node_id>
 <attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>items</rm_attribute_name>
-<existence>` + fiInterval("1", "1") + `</existence>` + strings.Join(children, "") + card + `
+<existence>` + existence + `</existence>` + strings.Join(children, "") + card + `
 </attributes>
 <archetype_id><value>` + containerArchetype(rmType) + `</value></archetype_id></definition>
 </template>`
@@ -98,8 +104,11 @@ func noInformationElement() *rm.Element {
 // `required` and `cardinality`, with that child's occurrences beside them.
 // Where only a child's occurrences lower bound is 1, a present, empty list
 // draws `required` with that child's occurrences. A single-valued attribute
-// at existence 1..1 that is absent still draws `required`, and the RM layer
-// still reports a container the Reference Model requires (CLUSTER.items).
+// at existence 1..1 that is absent still draws `required`. The RM layer still
+// reports a container the Reference Model requires (CLUSTER.items) where the
+// template leaves it optional, absent or present and empty; absent under a
+// template that requires it, the template's `required` stands for the RM's
+// (REQ-171 § One finding per defect).
 func TestValidate_REQ102_ListExistenceAsksForTheContainerOnly(t *testing.T) {
 	t.Parallel()
 	zeroOrMore := mustCompileInline(t, containerOPT("ITEM_TREE", fromLowerUnbounded("0"), containerElement("0")))
@@ -109,6 +118,7 @@ func TestValidate_REQ102_ListExistenceAsksForTheContainerOnly(t *testing.T) {
 	oneOrMore := mustCompileInline(t, containerOPT("ITEM_TREE", fromLowerUnbounded("1"), containerElement("1")))
 	requiredChild := mustCompileInline(t, containerOPT("ITEM_TREE", fromLowerUnbounded("0"), containerElement("1")))
 	cluster := mustCompileInline(t, containerOPT("CLUSTER", fromLowerUnbounded("0"), containerElement("0")))
+	optionalCluster := mustCompileInline(t, containerOPTWithExistence("CLUSTER", fiInterval("0", "1"), fromLowerUnbounded("0"), containerElement("0")))
 	tree := func(items []rm.Item) *rm.ItemTree {
 		return &rm.ItemTree{ArchetypeNodeID: containerArchetype("ITEM_TREE"), Name: rm.DVText{Value: "tree"}, Items: items}
 	}
@@ -169,7 +179,19 @@ func TestValidate_REQ102_ListExistenceAsksForTheContainerOnly(t *testing.T) {
 			name:  "absent RM-mandatory list, cardinality 0..*",
 			root:  &rm.Cluster{ArchetypeNodeID: containerArchetype("CLUSTER"), Name: rm.DVText{Value: "cluster"}},
 			under: cluster,
+			want:  []string{"required /items template existence"},
+		},
+		{
+			name:  "absent RM-mandatory list, existence 0..1",
+			root:  &rm.Cluster{ArchetypeNodeID: containerArchetype("CLUSTER"), Name: rm.DVText{Value: "cluster"}},
+			under: optionalCluster,
 			want:  []string{"required /items rm mandatory"},
+		},
+		{
+			name:  "present empty RM-mandatory list, existence 0..1",
+			root:  &rm.Cluster{ArchetypeNodeID: containerArchetype("CLUSTER"), Name: rm.DVText{Value: "cluster"}, Items: []rm.Item{}},
+			under: optionalCluster,
+			want:  []string{"cardinality /items rm cardinality"},
 		},
 		{
 			name:  "present empty RM-mandatory list, cardinality 0..*",
@@ -189,10 +211,37 @@ func TestValidate_REQ102_ListExistenceAsksForTheContainerOnly(t *testing.T) {
 	}
 }
 
+// vitalSignsAbsentLists returns the identity keys of the `required`
+// findings the vendored vital_signs.json draws from vital_signs.opt for the
+// lists it leaves out (REQ-102, issue 341): the state and protocol items of
+// nine structures, each at existence 1..1 and cardinality 0..* (or 0..1).
+// The two heart-rate OBSERVATIONs share an archetype id, so their paths are
+// positional.
+func vitalSignsAbsentLists() []string {
+	const (
+		bp   = "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]"
+		temp = "/content[openEHR-EHR-OBSERVATION.body_temperature.v1]"
+		resp = "/content[openEHR-EHR-OBSERVATION.respiration.v1]"
+	)
+	return []string{
+		"required " + bp + "/data/events[at0006]/state/items template existence",
+		"required " + bp + "/protocol/items template existence",
+		"required " + temp + "/data/events[at0003]/state/items template existence",
+		"required " + temp + "/protocol/items template existence",
+		"required /content[3]/data/events[at0003]/state/items template existence",
+		"required /content[3]/protocol/items template existence",
+		"required /content[4]/data/events[at0003]/state/items template existence",
+		"required /content[4]/protocol/items template existence",
+		"required " + resp + "/data/events[at0002]/state/items template existence",
+	}
+}
+
 // REQ-102 — the vendored vital_signs.json, demo data, carries no state or
 // protocol items where vital_signs.opt gives those lists existence 1..1 and
-// cardinality 0..* (or 0..1): the template asks for no member there, so the
-// sample draws only its magnitude and units issues.
+// cardinality 0..* (or 0..1): the template asks for no member there, but its
+// existence asks for the container, which the sample leaves out (issue 341),
+// so the sample draws `required` at each of those nine lists beside its
+// magnitude and units issues.
 func TestValidateComposition_REQ102_CorpusVitalSignsListsWithNoMember(t *testing.T) {
 	t.Parallel()
 	c := mustCompile(t, "vital_signs")
@@ -206,11 +255,12 @@ func TestValidateComposition_REQ102_CorpusVitalSignsListsWithNoMember(t *testing
 	}
 	const bp = "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events[at0006]/data/items"
 	const temp = "/content[openEHR-EHR-OBSERVATION.body_temperature.v1]/data/events[at0003]/data/item/value"
-	want := []string{
+	want := append([]string{
 		"primitive_out_of_range " + bp + "[at0004]/value template out_of_range",
 		"primitive_unit_unknown " + bp + "[at0005]/value template unit_unknown",
 		"primitive_unit_unknown " + temp + " template unit_unknown",
-	}
+	}, vitalSignsAbsentLists()...)
+	slices.Sort(want)
 	r := validation.ValidateComposition(&comp, c)
 	if got := identityKeys(r.Issues); !slices.Equal(got, want) {
 		t.Errorf("ValidateComposition(vital_signs.json) issues = %q, want %q", got, want)
