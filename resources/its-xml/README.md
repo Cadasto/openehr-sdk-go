@@ -53,6 +53,13 @@ Three inclusions are worth knowing when reading the files:
   Release-1.2.0 copy. At the pinned commit the two `BaseTypes.xsd` files are byte-identical.
 - `Template.xsd` includes `OpenehrProfile.xsd`, so it joins the AM Release-1.4 set. The AOM 1.4 BMM
   has none of its classes, so no generated encoder takes its order from this file today.
+
+  OPTs exported by Archetype Designer carry a `match_negated` element, always `false`, on every
+  `C_SINGLE_ATTRIBUTE` and `C_MULTIPLE_ATTRIBUTE`. No openEHR specification, schema or BMM declares
+  it, so a validator that holds such an OPT to these schemas refuses it. The element is obsolete:
+  openEHR's `adl2-core` ADL 1.5 parser used it for the cADL negated match `~matches` and dropped it
+  in 2015, and neither AOM 1.4 nor AOM 2 has such a member. A decoder can ignore it; the SDK's OPT
+  reader does, in strict mode too.
 - The AM Release-1.4 `Resource.xsd` includes `../../RM/Release-1.1.0/Common.xsd`, so the AOM 1.4
   types resolve against the RM Release-1.1.0 schemas.
 
