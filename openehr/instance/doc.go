@@ -122,9 +122,10 @@
 // ITEM_LIST's items, or an ITEM_TABLE's rows, the template requires by its
 // existence and the walk gives no member is written as an empty list, which
 // canonical JSON writes as []. Any other list so left is left out, since
-// canonical JSON cannot carry it empty. A child's identity is its archetype
-// id when it is an archetype root, and its node id otherwise, and a sibling
-// that is a slot carries none.
+// canonical JSON cannot carry it empty, and the template validator then
+// reports it as required. A child's identity is its archetype id when it
+// is an archetype root, and its node id otherwise, and a sibling that is a
+// slot carries none.
 //
 // [Minimal] is another name for Required, and [Complete] for Large until
 // the complete level lands. [ParsePolicy] reads a policy from the names
