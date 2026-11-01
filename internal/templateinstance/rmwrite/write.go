@@ -271,6 +271,40 @@ func AppendMultiple(parent any, attrName string, child any) error {
 	return fmt.Errorf("%w: parent %T, attr %q", ErrUnknownAttribute, parent, attrName)
 }
 
+// EnsureList makes the list attribute named `attrName` on `parent`
+// present: a nil list becomes an empty one, and a list that already
+// holds members, or is already empty, is left as it is. It writes the
+// lists canonical JSON carries as [] when present and empty: ITEM_LIST
+// and ITEM_TREE `items`, and ITEM_TABLE `rows`. Any other parent or
+// attribute returns ErrUnknownAttribute.
+func EnsureList(parent any, attrName string) error {
+	switch p := parent.(type) {
+	case *rm.ItemTree:
+		if attrName == "items" {
+			ensureList(&p.Items)
+			return nil
+		}
+	case *rm.ItemList:
+		if attrName == "items" {
+			ensureList(&p.Items)
+			return nil
+		}
+	case *rm.ItemTable:
+		if attrName == "rows" {
+			ensureList(&p.Rows)
+			return nil
+		}
+	}
+	return fmt.Errorf("%w: parent %T, list attr %q", ErrUnknownAttribute, parent, attrName)
+}
+
+// ensureList sets *list to an empty slice when it is nil.
+func ensureList[T any](list *[]T) {
+	if *list == nil {
+		*list = []T{}
+	}
+}
+
 // --- COMPOSITION ---------------------------------------------------------
 
 func writeCompositionSingle(c *rm.Composition, attr string, child any) error {
