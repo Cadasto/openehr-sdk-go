@@ -13,8 +13,9 @@ The generator reads only the element sequences. These schemas declare
 ## Provenance
 
 - **Source:** [`openEHR/specifications-ITS-XML`](https://github.com/openEHR/specifications-ITS-XML).
-- **Roots:** `components/RM/Release-1.1.0/*.xsd`, `components/BASE/Release-1.1.0/*.xsd`,
-  `components/AM/Release-1.4/Archetype.xsd` and `components/AM/Release-1.4/OpenehrProfile.xsd`.
+- **Roots:** `components/RM/Release-1.1.0/*.xsd`, `components/BASE/Release-1.2.0/*.xsd`,
+  `components/AM/Release-1.4/Archetype.xsd`, `components/AM/Release-1.4/OpenehrProfile.xsd` and
+  `components/AM/Release-1.4/Template.xsd`.
   A `*` matches within its own directory, so the `documents/` subdirectory of the RM release is not
   a root: its files declare top-level elements only (`composition`, `version`, `extract` and the
   like), over types the main files define.
@@ -38,18 +39,20 @@ At the pinned commit the closure holds these files.
 | `components/RM/Release-1.1.0/Ehr.xsd` | RM EHR and composition (`EHR_STATUS`, `COMPOSITION`, `OBSERVATION`, ...) | root |
 | `components/RM/Release-1.1.0/Demographic.xsd` | RM demographic (`PERSON`, `ORGANISATION`, `ROLE`, ...) | root |
 | `components/RM/Release-1.1.0/EhrExtract.xsd` | RM EHR extract (`EXTRACT`, `X_VERSIONED_OBJECT`, ...) | root |
-| `components/BASE/Release-1.1.0/BaseTypes.xsd` | BASE base types (`UID`, `OBJECT_ID`, `ARCHETYPE_ID`, ...) | root |
-| `components/BASE/Release-1.1.0/Resource.xsd` | BASE resource (`AUTHORED_RESOURCE`, `RESOURCE_DESCRIPTION`, ...) | root |
+| `components/BASE/Release-1.2.0/BaseTypes.xsd` | BASE base types (`UID`, `OBJECT_ID`, `ARCHETYPE_ID`, ...) | root |
+| `components/BASE/Release-1.2.0/Resource.xsd` | BASE resource (`AUTHORED_RESOURCE`, `RESOURCE_DESCRIPTION`, ...) | root |
 | `components/AM/Release-1.4/Archetype.xsd` | AOM 1.4 (`ARCHETYPE`, `C_OBJECT`, `C_ATTRIBUTE`, ...) | root |
 | `components/AM/Release-1.4/OpenehrProfile.xsd` | openEHR Archetype Profile 1.4 (`C_DV_QUANTITY`, `C_DV_ORDINAL`, ...) | root |
+| `components/AM/Release-1.4/Template.xsd` | ADL 1.4 operational template (`OPERATIONAL_TEMPLATE`, `C_ARCHETYPE_ROOT`, `T_VIEW`, ...) | root |
 | `components/AM/Release-1.4/Resource.xsd` | AOM 1.4 resource (`AUTHORED_RESOURCE`, `RESOURCE_DESCRIPTION`, ...) | included by `Archetype.xsd` |
 | `components/BASE/latest/BaseTypes.xsd` | BASE base types (`UID`, `OBJECT_ID`, `ARCHETYPE_ID`, ...) | included by RM `DataTypes.xsd` |
 
-Two inclusions are worth knowing when reading the files:
+Three inclusions are worth knowing when reading the files:
 
 - The RM Release-1.1.0 `DataTypes.xsd` includes `../../BASE/latest/BaseTypes.xsd`, not the BASE
-  Release-1.1.0 copy. At the pinned commit the two `BaseTypes.xsd` files differ only in the schema's
-  `version` attribute (`v1.2.0` against `v1.1.0`).
+  Release-1.2.0 copy. At the pinned commit the two `BaseTypes.xsd` files are byte-identical.
+- `Template.xsd` includes `OpenehrProfile.xsd`, so it joins the AM Release-1.4 set. The AOM 1.4 BMM
+  has none of its classes, so no generated encoder takes its order from this file today.
 - The AM Release-1.4 `Resource.xsd` includes `../../RM/Release-1.1.0/Common.xsd`, so the AOM 1.4
   types resolve against the RM Release-1.1.0 schemas.
 
@@ -70,6 +73,6 @@ fails until the generated files match the schemas.
 ## Licence
 
 The upstream repository is licensed under the **Apache License 2.0** (its `LICENSE` file). The
-schemas carry no licence header of their own; the three AM Release-1.4 files carry the comment
-"Authored by Ocean Informatics 2008.12.22". They are vendored unmodified. Repository-wide
+schemas carry no licence header of their own; the four AM Release-1.4 files carry an "Authored by
+Ocean Informatics" comment. They are vendored unmodified. Repository-wide
 inventory: [`LICENSING.md`](../../LICENSING.md).

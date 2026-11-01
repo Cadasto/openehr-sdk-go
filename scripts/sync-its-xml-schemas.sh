@@ -5,9 +5,10 @@
 #
 # Source: https://github.com/openEHR/specifications-ITS-XML
 #         components/RM/Release-1.1.0/*.xsd
-#         components/BASE/Release-1.1.0/*.xsd
+#         components/BASE/Release-1.2.0/*.xsd
 #         components/AM/Release-1.4/Archetype.xsd
 #         components/AM/Release-1.4/OpenehrProfile.xsd
+#         components/AM/Release-1.4/Template.xsd
 #         and every file those reach through xs:include, xs:import or
 #         xs:redefine, followed transitively from the files themselves.
 #
@@ -49,9 +50,10 @@ readonly REF="${ITS_XML_REF:-master}"
 # The root schemas, as patterns over upstream paths from the repository root.
 readonly ROOT_GLOBS=(
   "components/RM/Release-1.1.0/*.xsd"
-  "components/BASE/Release-1.1.0/*.xsd"
+  "components/BASE/Release-1.2.0/*.xsd"
   "components/AM/Release-1.4/Archetype.xsd"
   "components/AM/Release-1.4/OpenehrProfile.xsd"
+  "components/AM/Release-1.4/Template.xsd"
 )
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

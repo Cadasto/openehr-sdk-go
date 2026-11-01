@@ -49,8 +49,8 @@
 //     (identical to canjson JSON keys; e.g. `dv_quantity`,
 //     `magnitude_status`).
 //   - Child elements follow the `xs:sequence` of the class's type in
-//     the openEHR ITS-XML schemas (RM and BASE Release-1.1.0, AM
-//     Release-1.4), or of its nearest ancestor's type when the schemas
+//     the openEHR ITS-XML schemas (RM Release-1.1.0, BASE Release-1.2.0,
+//     AM Release-1.4), or of its nearest ancestor's type when the schemas
 //     have none, with the elements of the type it extends first. A
 //     property the schemas do not declare, one a later release added
 //     such as `EHR.tags`, comes after the declared ones. The decoder
