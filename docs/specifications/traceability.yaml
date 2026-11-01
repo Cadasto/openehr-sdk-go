@@ -1658,6 +1658,7 @@ requirements:
       - openehr/instance/valuefill_test.go
       - openehr/instance/visit_rules_test.go
       - openehr/internal/rmbind/bind_test.go
+      - openehr/serialize/simplified/empty_structure_test.go
       - openehr/serialize/simplified/flat_encode_test.go
       - openehr/serialize/simplified/structured_test.go
       - openehr/template/constraints/constraint_ref_test.go
