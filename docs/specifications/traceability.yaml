@@ -437,12 +437,14 @@ requirements:
     tests:
       - internal/bmmgen/render_interval_bound_test.go
       - internal/bmmgen/render_jsonunmar_polymorphic_test.go
+      - internal/bmmgen/render_keeps_empty_tag_test.go
       - internal/bmmgen/render_mandatory_tag_test.go
       - internal/bmmgen/render_streaming_test.go
       - internal/bmmgen/sim_bump_test.go
       - internal/rmaccess/interval_test.go
       - internal/rmjsonwalk/walk_once_budget_internal_test.go
       - internal/rmjsonwalk/walk_once_internal_test.go
+      - internal/rmlists/rmlists_test.go
       - internal/v1_rm_decode_guard_test.go
       - openehr/aom/aom14/interval_open_side_test.go
       - openehr/client/demographic/versioned_test.go
@@ -478,6 +480,7 @@ requirements:
       - openehr/serialize/canjson/interval_failed_decode_test.go
       - openehr/serialize/canjson/interval_flag_defaults_test.go
       - openehr/serialize/canjson/interval_open_side_test.go
+      - openehr/serialize/canjson/item_structure_list_test.go
       - openehr/serialize/canjson/map_value_type_test.go
       - openehr/serialize/canjson/mappings_presence_test.go
       - openehr/serialize/canjson/marshal_sentinel_test.go
@@ -670,6 +673,7 @@ requirements:
       - openehr/rm/character_text_test.go
       - openehr/rm/interval_bound_test.go
       - openehr/rm/real_test.go
+      - openehr/serialize/canjson/item_structure_list_test.go
       - openehr/serialize/canxml/child_order_test.go
       - openehr/serialize/canxml/crossformat_test.go
       - openehr/serialize/canxml/decode_test.go
