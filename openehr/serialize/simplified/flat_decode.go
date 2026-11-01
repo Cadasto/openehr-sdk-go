@@ -23,6 +23,7 @@ import (
 	"weak"
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
+	"github.com/cadasto/openehr-sdk-go/internal/rmlists"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
@@ -2217,7 +2218,9 @@ type templateIndex struct {
 
 // emptyStructure is a structure decode rebuilds with no member, under a
 // rebuilt node that lacks it, as the generator writes it: an ITEM_STRUCTURE
-// object that holds its type, its node id and a name, and nothing else. The
+// object that holds its type, its node id and a name, and, where the
+// template requires the list that holds its items by its existence, that
+// list present and empty ([requiredEmptyList]), and nothing else. The
 // formats have no key for a structure with no member, so its node is never
 // rebuilt from the body.
 //
@@ -2237,6 +2240,9 @@ type emptyStructure struct {
 	// does not, decode rebuilds the structure only where the RM requires attr
 	// of the rebuilt node's class, as the validator reads it.
 	required bool
+	// list names the structure's list that the rebuilt structure carries
+	// present and empty ([requiredEmptyList]), or is "" for none.
+	list string
 }
 
 // name returns the LOCATABLE name the template gives the node at path, or "".
@@ -2629,9 +2635,28 @@ func emptyStructuresOf(n *templatecompile.CompiledNode) []emptyStructure {
 			rmType:   first.RMTypeName(),
 			nodeID:   first.NodeID(),
 			required: tcimpl.LowerAtLeastOne(a.Existence()),
+			list:     requiredEmptyList(first),
 		})
 	}
 	return out
+}
+
+// requiredEmptyList returns the name of the list of c, a template node of a
+// concrete ITEM_STRUCTURE subtype, that the generator writes present and
+// empty when it gives the list no member: the list the template requires by
+// its existence (a bounded existence lower bound of 1 or more) and does not
+// prohibit, of those canonical JSON carries as [] when present and empty
+// ([rmlists.KeepsEmpty]): an ITEM_LIST's or ITEM_TREE's items, or an
+// ITEM_TABLE's rows. It returns "" where c carries no such list, where the
+// template leaves it optional, as the generator then leaves it out.
+func requiredEmptyList(c *templatecompile.CompiledNode) string {
+	class := bmmtype.Class(c.RMTypeName())
+	for _, a := range tcimpl.NodeAttributes(c) {
+		if rmlists.KeepsEmpty(class, a.Name()) && tcimpl.LowerAtLeastOne(a.Existence()) && !tcimpl.Prohibited(a) && !a.NotInRM() {
+			return a.Name()
+		}
+	}
+	return ""
 }
 
 // isEmptyStructure reports whether decode can rebuild the template node c as
@@ -2707,8 +2732,9 @@ func carriedByEmptyStructure(attr string) bool {
 // existence or the RM requires the attribute that holds one: the formats have
 // no key for a structure with no member, so a body whose template requires
 // one never spells it. Each structure gets its type, its node id and the name
-// the template index gives its path; one whose path has no name, a node with
-// no node id say, is not rebuilt. The walk composes each node's bare path as
+// the template index gives its path, and its list present and empty where the
+// template requires that list by its existence; one whose path has no name, a
+// node with no node id say, is not rebuilt. The walk composes each node's bare path as
 // walkAQL does, a predicate only on a list member, and enters only the nodes
 // on the way to one the template gives structures (structureRoute). The root
 // is entered with an empty path, which no key has: a COMPOSITION holds no
@@ -2726,11 +2752,15 @@ func rebuildEmptyStructures(compJSON map[string]any, tmpl *templateIndex) {
 				continue
 			}
 			if name := tmpl.nameJSON(s.path); name != nil {
-				node[s.attr] = map[string]any{
+				structure := map[string]any{
 					"_type":             s.rmType,
 					"archetype_node_id": s.nodeID,
 					"name":              name,
 				}
+				if s.list != "" {
+					structure[s.list] = []any{}
+				}
+				node[s.attr] = structure
 			}
 		}
 		for attr, v := range node {
