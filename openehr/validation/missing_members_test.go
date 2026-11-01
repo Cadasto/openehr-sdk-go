@@ -528,7 +528,8 @@ func TestValidateJSON_PROBE081_EHRStatusSubjectInBothFormats(t *testing.T) {
 // corpus vital-signs composition, whose systolic magnitude is out of the
 // template's range, draws the constraint's out_of_range there; with that
 // magnitude left out it draws `required` at the magnitude instead, and no
-// out_of_range, its other findings unchanged. New().Validate with the
+// out_of_range, its other findings, the lists it leaves out among them
+// (REQ-102, issue 341), unchanged. New().Validate with the
 // codec's pointer, and package Validate with the same option, return the
 // same result.
 func TestValidateJSON_PROBE110_TemplateReportsTheMissingMember(t *testing.T) {
@@ -549,11 +550,12 @@ func TestValidateJSON_PROBE110_TemplateReportsTheMissingMember(t *testing.T) {
 	}
 	doc := rewriteJSON(t, string(raw), dropped(pointer))
 	r := validation.ValidateJSON(doc, new(rm.Composition), c)
-	want := []string{
+	want := append([]string{
 		"primitive_unit_unknown " + bp + "[at0005]/value template unit_unknown",
 		"primitive_unit_unknown " + temp + " template unit_unknown",
 		"required " + bp + "[at0004]/value/magnitude rm mandatory",
-	}
+	}, vitalSignsAbsentLists()...)
+	slices.Sort(want)
 	if got := identityKeys(r.Issues); !slices.Equal(got, want) {
 		t.Errorf("ValidateJSON(vital_signs.json without the systolic magnitude, c) issues = %q, want %q", got, want)
 	}

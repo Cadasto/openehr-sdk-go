@@ -404,10 +404,11 @@ func linksExistenceOPT(existence string) string {
 // LOCATABLE.Links_valid — the floor reports a `links` that is present and
 // empty, but `links` is not one of the lists the floor holds non-empty for
 // the template's sake, so a template's existence of 1..1 on it asks for no
-// member: an absent list and an empty one draw no `required` from the
-// template, and the empty one draws the RM's Links_valid alone. A list that
-// holds a link draws nothing. The template's existence does not change what
-// the RM rule reports.
+// member: an empty list draws no `required` from the template, and draws the
+// RM's Links_valid alone. That existence asks for the container, so a list
+// left out, absent or `null`, draws the template's `required` (issue 341).
+// A list that holds a link draws nothing. The template's existence does not
+// change what the RM rule reports.
 func TestValidate_REQ102_REQ112_LinksExistenceAsksForNoMember(t *testing.T) {
 	t.Parallel()
 	const at = "/links"
@@ -417,8 +418,8 @@ func TestValidate_REQ102_REQ112_LinksExistenceAsksForNoMember(t *testing.T) {
 		links     string // the members after the OBSERVATION's name
 		want      []string
 	}{
-		{name: "required, absent", existence: fiInterval("1", "1")},
-		{name: "required, null", existence: fiInterval("1", "1"), links: `,"links":null`},
+		{name: "required, absent", existence: fiInterval("1", "1"), want: []string{"required " + at + " template existence"}},
+		{name: "required, null", existence: fiInterval("1", "1"), links: `,"links":null`, want: []string{"required " + at + " template existence"}},
 		{name: "required, present and empty", existence: fiInterval("1", "1"), links: `,"links":[]`, want: []string{"rm_invariant " + at + " rm " + linksValid}},
 		{name: "required, one link", existence: fiInterval("1", "1"), links: `,"links":[` + lsLink + `]`},
 		{name: "optional, absent", existence: fiInterval("0", "1")},

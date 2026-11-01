@@ -432,17 +432,19 @@ requirements:
     canonical: docs/specifications/wire.md#req-052
     status: draft
     implementation: landed
-    packages: [openehr/serialize/canjson, openehr/rm, openehr/rm/typereg, openehr/internal/refused, openehr/internal/xmlunmatched, openehr/aom/aom14, openehr/client/ehr/contribution, testkit/corpus, testkit/fixtures, testkit/wireequiv, testkit/expectedform]
+    packages: [openehr/serialize/canjson, openehr/rm, internal/rmlists, openehr/rm/typereg, openehr/internal/refused, openehr/internal/xmlunmatched, openehr/aom/aom14, openehr/client/ehr/contribution, testkit/corpus, testkit/fixtures, testkit/wireequiv, testkit/expectedform]
     probes: [PROBE-030, PROBE-031, PROBE-038, PROBE-105]
     tests:
       - internal/bmmgen/render_interval_bound_test.go
       - internal/bmmgen/render_jsonunmar_polymorphic_test.go
+      - internal/bmmgen/render_keeps_empty_tag_test.go
       - internal/bmmgen/render_mandatory_tag_test.go
       - internal/bmmgen/render_streaming_test.go
       - internal/bmmgen/sim_bump_test.go
       - internal/rmaccess/interval_test.go
       - internal/rmjsonwalk/walk_once_budget_internal_test.go
       - internal/rmjsonwalk/walk_once_internal_test.go
+      - internal/rmlists/rmlists_test.go
       - internal/v1_rm_decode_guard_test.go
       - openehr/aom/aom14/interval_open_side_test.go
       - openehr/client/demographic/versioned_test.go
@@ -478,6 +480,7 @@ requirements:
       - openehr/serialize/canjson/interval_failed_decode_test.go
       - openehr/serialize/canjson/interval_flag_defaults_test.go
       - openehr/serialize/canjson/interval_open_side_test.go
+      - openehr/serialize/canjson/item_structure_list_test.go
       - openehr/serialize/canjson/map_value_type_test.go
       - openehr/serialize/canjson/mappings_presence_test.go
       - openehr/serialize/canjson/marshal_sentinel_test.go
@@ -532,6 +535,7 @@ requirements:
     implementation: landed
     packages:
       - openehr/serialize/simplified
+      - internal/rmlists
       - testkit/corpus/flat-conformance
       - testkit/conformance/webtemplate
       - testkit/corpus/crossformat
@@ -670,6 +674,7 @@ requirements:
       - openehr/rm/character_text_test.go
       - openehr/rm/interval_bound_test.go
       - openehr/rm/real_test.go
+      - openehr/serialize/canjson/item_structure_list_test.go
       - openehr/serialize/canxml/child_order_test.go
       - openehr/serialize/canxml/crossformat_test.go
       - openehr/serialize/canxml/decode_test.go
@@ -1359,6 +1364,7 @@ requirements:
       - openehr/instance/required_mandatory_child_test.go
       - openehr/instance/rm_defaults_yield_test.go
       - openehr/instance/sizing_rule_test.go
+      - openehr/instance/skipped_attributes_test.go
       - openehr/internal/rmbind/bind_test.go
       - openehr/internal/rmbind/tier_test.go
       - openehr/template/identifier_whitespace_test.go
@@ -1510,6 +1516,7 @@ requirements:
       - openehr/rm/rminfo
       - internal/templateinstance/rmwrite
       - internal/rmroots
+      - internal/rmlists
       - testkit/fixtures
       - testkit/probes/instance
     probes: [PROBE-027]
@@ -1622,6 +1629,7 @@ requirements:
       - openehr/instance/reference_uid_internal_test.go
       - openehr/instance/reproducible_test.go
       - openehr/instance/required_context_test.go
+      - openehr/instance/required_empty_list_test.go
       - openehr/instance/required_mandatory_child_test.go
       - openehr/instance/required_policy_test.go
       - openehr/instance/required_rm_rule_fill_test.go
@@ -1650,6 +1658,7 @@ requirements:
       - openehr/instance/valuefill_test.go
       - openehr/instance/visit_rules_test.go
       - openehr/internal/rmbind/bind_test.go
+      - openehr/serialize/simplified/empty_structure_test.go
       - openehr/serialize/simplified/flat_encode_test.go
       - openehr/serialize/simplified/structured_test.go
       - openehr/template/constraints/constraint_ref_test.go

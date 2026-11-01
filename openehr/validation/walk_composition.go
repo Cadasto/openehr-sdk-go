@@ -113,14 +113,14 @@ func formatAllowedTypes(children []*tcimpl.CompiledNode) string {
 
 // absentIssue returns the issue the template reports for the attribute attr
 // of parentRM, at attrPath, when the instance lacks it and the template
-// requires it ([templateRequires]): `required`, on the template layer, rule
-// existence, with required set. A multi-valued attribute is required only
-// where the template asks for a member too ([tcimpl.AsksForMember]), or
-// where an RM rule of parentRM's class makes the list hold a member
-// (rmAsks), and is described as one. The RM's requirement is not read here:
-// the walk reads it from the value's class ([engine.checkAbsent]).
-func absentIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath issuePath, multiValued, rmAsks bool) (iss Issue, required bool) {
-	if !templateRequires(attr, multiValued, rmAsks) {
+// requires it by its existence ([templateRequires]): `required`, on the
+// template layer, rule existence, with required set. A multi-valued
+// attribute is described as one, and is required whatever its counts ask:
+// its existence asks for the container, which an absent list is not. The
+// RM's requirement is not read here: the walk reads it from the value's
+// class ([engine.checkAbsent]).
+func absentIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath issuePath, multiValued bool) (iss Issue, required bool) {
+	if !templateRequires(attr) {
 		return iss, false
 	}
 	detail := fmt.Sprintf("required attribute %q absent on %s", attr.Name(), describeRMType(parentRM))
@@ -139,15 +139,15 @@ func absentIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath issuePat
 
 // emptyIssue returns the issue the template reports for the multi-valued
 // attribute attr of parentRM, at attrPath, when it is present and holds no
-// item and the template requires it ([templateRequires]), which it does only
-// where its cardinality, or the occurrences of a child it allows, asks for at
-// least one member ([tcimpl.AsksForMember]), or where an RM rule of
-// parentRM's class makes the list hold a member (rmAsks): `required`, on the
-// template layer, rule existence, with required set. The RM's requirement is
-// not read here: the walk reads it from the value's class
-// ([engine.checkEmpty]).
+// item and the template asks for a member there ([templateAsksForMember]):
+// its existence requires the list, and its cardinality, or the occurrences
+// of a child it allows, asks for at least one member
+// ([tcimpl.AsksForMember]), or an RM rule of parentRM's class makes the list
+// hold a member (rmAsks): `required`, on the template layer, rule existence,
+// with required set. The RM's requirement is not read here: the walk reads
+// it from the value's class ([engine.checkEmpty]).
 func emptyIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath issuePath, rmAsks bool) (iss Issue, required bool) {
-	if !templateRequires(attr, true, rmAsks) {
+	if !templateAsksForMember(attr, rmAsks) {
 		return iss, false
 	}
 	return Issue{
@@ -382,24 +382,28 @@ func primitiveInput(rmValue any) any {
 }
 
 // templateRequires reports whether the template itself requires the
-// compiled attribute, which is multi-valued (a list or a Hash) or not. A
-// single-valued attribute is required by an OPT existence interval with a
-// bounded lower bound of 1 or more. On a multi-valued attribute that
-// existence asks for the container alone and the counts for its members, and
-// an instance cannot show a list with no member apart from a missing one, so
-// it is required only where the template asks for a member as well
-// ([tcimpl.AsksForMember]), or where an RM rule makes the list, once
-// present, hold a member (rmAsks, [classRules.asksForMember]): there the
-// container the existence asks for cannot exist without one. The mandatory
-// bit the compile carries from the lookup it was given
+// compiled attribute, single-valued or multi-valued (a list or a Hash): its
+// OPT existence interval has a bounded lower bound of 1 or more. On a
+// multi-valued attribute that existence asks for the container alone, so an
+// absent list fails it whatever its counts ask, and a present one meets it
+// unless the template asks for a member too ([templateAsksForMember]). The
+// mandatory bit the compile carries from the lookup it was given
 // ([tcimpl.CompiledAttribute.Required]) is not the template's requirement
 // and is not read: the RM rules read the pinned Reference Model, from the
 // value's class.
-func templateRequires(attr *tcimpl.CompiledAttribute, multiValued, rmAsks bool) bool {
-	if !tcimpl.LowerAtLeastOne(attr.Existence()) {
-		return false
-	}
-	return !multiValued || rmAsks || tcimpl.AsksForMember(attr)
+func templateRequires(attr *tcimpl.CompiledAttribute) bool {
+	return tcimpl.LowerAtLeastOne(attr.Existence())
+}
+
+// templateAsksForMember reports whether a present multi-valued attribute
+// attr that holds no item fails the existence the template requires it by
+// ([templateRequires]): the template also asks it for a member, by its
+// cardinality or the occurrences of a child it allows
+// ([tcimpl.AsksForMember]), or an RM rule makes the list, once present, hold
+// a member (rmAsks, [classRules.asksForMember]), so the container the
+// existence asks for cannot exist without one.
+func templateAsksForMember(attr *tcimpl.CompiledAttribute, rmAsks bool) bool {
+	return templateRequires(attr) && (rmAsks || tcimpl.AsksForMember(attr))
 }
 
 // isProhibited reports whether the OPT prohibits the compiled attribute:

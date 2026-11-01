@@ -149,6 +149,14 @@ func SystolicItemsAbsent() *rm.Composition {
 	return comp
 }
 
+// SystolicItemsEmpty returns the valid blood-pressure composition whose
+// ITEM_LIST holds an items list with no element.
+func SystolicItemsEmpty() *rm.Composition {
+	comp := ValidBloodPressureComposition()
+	bloodPressureList(comp).Items = []rm.Element{}
+	return comp
+}
+
 // UnknownArchetypeUnderContent returns the valid blood-pressure composition
 // whose OBSERVATION carries an archetype id the template knows nowhere, so
 // it fits no slot. The OBSERVATION is RM-valid apart from its id.

@@ -462,19 +462,23 @@ func TestValidateComposition_PrimitiveCategoryNotInList(t *testing.T) {
 }
 
 // REQ-102 — removing every element of the blood-pressure ITEM_LIST, the
-// systolic one included, leaves the composition valid, whether the list is
-// absent (nil) or present and empty. vital_signs.opt gives those items
-// existence 1..1, cardinality 0..* and an optional systolic child, and an
-// existence lower bound alone asks for no member (REQ-102 § An existence
-// lower bound alone asks for no member), so the template reports no
-// `required` at /content[…]/data/events[at0006]/data/items.
+// systolic one included, leaves the composition valid while the list is
+// present and empty. vital_signs.opt gives those items existence 1..1,
+// cardinality 0..* and an optional systolic child, and an existence lower
+// bound alone asks for no member (REQ-102 § An existence lower bound alone
+// asks for no member), so the template reports no `required` at
+// /content[…]/data/events[at0006]/data/items for the empty list. That
+// existence asks for the container, so the list left out (nil) draws
+// `required` there, rule existence, alone (issue 341).
 func TestValidateComposition_MissingSystolic(t *testing.T) {
 	c := mustCompile(t, "vital_signs")
+	const items = "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events[at0006]/data/items"
 	for _, tc := range []struct {
 		name  string
 		items []rm.Element
+		want  []string
 	}{
-		{name: "absent", items: nil},
+		{name: "absent", items: nil, want: []string{"required " + items + " template existence"}},
 		{name: "present and empty", items: []rm.Element{}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -484,8 +488,8 @@ func TestValidateComposition_MissingSystolic(t *testing.T) {
 			list := pe.Data.(*rm.ItemList)
 			list.Items = tc.items
 			r := validation.ValidateComposition(comp, c)
-			if len(r.Issues) != 0 {
-				t.Errorf("ValidateComposition(blood-pressure items %s) issues = %q, want none", tc.name, issueKeys(r.Issues))
+			if got := identityKeys(r.Issues); !slices.Equal(got, tc.want) {
+				t.Errorf("ValidateComposition(blood-pressure items %s) issues = %q, want %q", tc.name, got, tc.want)
 			}
 		})
 	}
