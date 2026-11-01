@@ -82,7 +82,7 @@ Licensed under the Apache License, Version 2.0 (full text: licenses/Apache-2.0.t
 
 ## CODE24 (Cadasto)
 
-**Files:** CODE24-sourced templates under `templates/` paired with `compositions/` (see [README.md](README.md)), including the OPT-only `Referral Request.v1`; benchmark `vital_signs` and `clinical_notes.v0` (made by Medblocks together with CODE24). The `alternative_types.en.v1` and `BMI` compositions are CODE24's, but their OPTs are EHRbase's (above). `body_weight.opt` has its authoring tool's account id replaced by `user=redacted`; nothing else in it is edited. `clinical_notes.v0.opt` has its root `xsi:type="OPT"`, a type no schema defines, replaced by `OPERATIONAL_TEMPLATE`; nothing else in it is edited.
+**Files:** CODE24-sourced templates under `templates/` paired with `compositions/` (see [README.md](README.md)), including the OPT-only `Referral Request.v1`; benchmark `vital_signs` and `clinical_notes.v0` (made by Medblocks together with CODE24). The `alternative_types.en.v1` and `BMI` compositions are CODE24's, but their OPTs are EHRbase's (above). `body_weight.opt` has its authoring tool's account id replaced by `user=redacted`; nothing else in it is edited. `clinical_notes.v0.opt`, an Archetype Designer export that another tool later re-serialised, has that tool's changes undone where they break the schema: the root carries no `xsi:type` (it had `OPT`, a type no schema defines), the XML declaration is back, and `match_negated` follows `existence` again instead of preceding `rm_attribute_name`; nothing else in it is edited.
 
 **License:** MIT
 
