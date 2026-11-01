@@ -2644,15 +2644,16 @@ func emptyStructuresOf(n *templatecompile.CompiledNode) []emptyStructure {
 // requiredEmptyList returns the name of the list of c, a template node of a
 // concrete ITEM_STRUCTURE subtype, that the generator writes present and
 // empty when it gives the list no member: the list the template requires by
-// its existence (a bounded existence lower bound of 1 or more) and does not
-// prohibit, of those canonical JSON carries as [] when present and empty
-// ([rmlists.KeepsEmpty]): an ITEM_LIST's or ITEM_TREE's items, or an
-// ITEM_TABLE's rows. It returns "" where c carries no such list, where the
-// template leaves it optional, as the generator then leaves it out.
+// its existence (a bounded existence lower bound of 1 or more), one whose
+// every child it prohibits included, of those canonical JSON carries as []
+// when present and empty ([rmlists.KeepsEmpty]): an ITEM_LIST's or
+// ITEM_TREE's items, or an ITEM_TABLE's rows. It returns "" where c carries
+// no such list, where the template leaves it optional, as the generator then
+// leaves it out.
 func requiredEmptyList(c *templatecompile.CompiledNode) string {
 	class := bmmtype.Class(c.RMTypeName())
 	for _, a := range tcimpl.NodeAttributes(c) {
-		if rmlists.KeepsEmpty(class, a.Name()) && tcimpl.LowerAtLeastOne(a.Existence()) && !tcimpl.Prohibited(a) && !a.NotInRM() {
+		if rmlists.KeepsEmpty(class, a.Name()) && tcimpl.LowerAtLeastOne(a.Existence()) && !a.NotInRM() {
 			return a.Name()
 		}
 	}
