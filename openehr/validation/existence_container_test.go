@@ -3,13 +3,13 @@ package validation_test
 // existence_container_test.go: REQ-102 § Validation dimensions, Structural —
 // required attributes, and § An existence lower bound alone asks for no
 // member. On a multi-valued attribute the template's existence asks for the
-// container and its counts for the members, and canonical JSON leaves a list
-// with no member out, so the template reports `required` for a list that is
-// absent, or present and empty, only where it asks for a member there: its
-// cardinality lower bound, or the occurrences lower bound of a child it
-// allows, is bounded and at least 1. A single-valued attribute keeps its
-// reading, and the RM layer still reports a container the Reference Model
-// requires.
+// container and its counts for the members, so the template reports
+// `required` for a list it requires by its existence that is absent, whatever
+// its counts ask, and for one that is present and empty only where it asks
+// for a member there: its cardinality lower bound, or the occurrences lower
+// bound of a child it allows, is bounded and at least 1. A single-valued
+// attribute keeps its reading, and the RM layer still reports a container the
+// Reference Model requires.
 
 import (
 	"os"
@@ -86,21 +86,20 @@ func noInformationElement() *rm.Element {
 }
 
 // REQ-102 — a list whose existence lower bound is 1 is asked for as a
-// container only: absent, or present and empty, it draws no `required` from
-// the template unless the template asks for a member there, by a cardinality
-// lower bound, or the occurrences lower bound of a child it allows, that is
-// bounded and at least 1. So it draws none whether the template admits a
-// child under it or not, whether it states a cardinality or not, and where
-// its one child is optional or states no occurrences. Where the cardinality
-// lower bound is 1, an absent list draws `required` alone (no `cardinality`,
-// no `occurrences` of the child it requires, REQ-171 § Structural access)
-// and a present, empty one both `required` and `cardinality`, with that
-// child's occurrences beside them. Where only a child's occurrences lower
-// bound is 1, an absent list draws `required` alone too, and a present,
-// empty one `required` with that child's occurrences. A single-valued
-// attribute at existence 1..1 that is absent still draws `required`, and
-// the RM layer still reports a container the Reference Model requires
-// (CLUSTER.items).
+// container (issue 341): absent, it draws `required` from the template, rule
+// existence, alone (no `cardinality`, no `occurrences` of a child it
+// requires, REQ-171 § Structural access), whatever its counts ask, whether
+// the template admits a child under it or not, whether it states a
+// cardinality or not, and where its one child is optional or states no
+// occurrences. Present and empty, it meets that existence unless the
+// template asks for a member there, by a cardinality lower bound, or the
+// occurrences lower bound of a child it allows, that is bounded and at least
+// 1. Where the cardinality lower bound is 1, a present, empty list draws both
+// `required` and `cardinality`, with that child's occurrences beside them.
+// Where only a child's occurrences lower bound is 1, a present, empty list
+// draws `required` with that child's occurrences. A single-valued attribute
+// at existence 1..1 that is absent still draws `required`, and the RM layer
+// still reports a container the Reference Model requires (CLUSTER.items).
 func TestValidate_REQ102_ListExistenceAsksForTheContainerOnly(t *testing.T) {
 	t.Parallel()
 	zeroOrMore := mustCompileInline(t, containerOPT("ITEM_TREE", fromLowerUnbounded("0"), containerElement("0")))
@@ -121,13 +120,13 @@ func TestValidate_REQ102_ListExistenceAsksForTheContainerOnly(t *testing.T) {
 		// want is the whole report, as identityKeys writes it.
 		want []string
 	}{
-		{name: "absent list, cardinality 0..*", root: tree(nil), under: zeroOrMore},
+		{name: "absent list, cardinality 0..*", root: tree(nil), under: zeroOrMore, want: []string{"required /items template existence"}},
 		{name: "present empty list, cardinality 0..*", root: tree([]rm.Item{}), under: zeroOrMore},
-		{name: "absent list, no child", root: tree(nil), under: noChild},
+		{name: "absent list, no child", root: tree(nil), under: noChild, want: []string{"required /items template existence"}},
 		{name: "present empty list, no child", root: tree([]rm.Item{}), under: noChild},
-		{name: "absent list, no cardinality stated", root: tree(nil), under: noCardinality},
+		{name: "absent list, no cardinality stated", root: tree(nil), under: noCardinality, want: []string{"required /items template existence"}},
 		{name: "present empty list, no cardinality stated", root: tree([]rm.Item{}), under: noCardinality},
-		{name: "absent list, child with no occurrences", root: tree(nil), under: noOccurrences},
+		{name: "absent list, child with no occurrences", root: tree(nil), under: noOccurrences, want: []string{"required /items template existence"}},
 		{name: "present empty list, child with no occurrences", root: tree([]rm.Item{}), under: noOccurrences},
 		{
 			name:  "absent list, cardinality 0..*, child at occurrences 1..1",
@@ -184,7 +183,7 @@ func TestValidate_REQ102_ListExistenceAsksForTheContainerOnly(t *testing.T) {
 			t.Parallel()
 			r := validation.Validate(tc.root, tc.under)
 			if got := identityKeys(r.Issues); !slices.Equal(got, tc.want) {
-				t.Errorf("Validate(%s) issues = %q, want %q (REQ-102 § An existence lower bound alone asks for no member)", tc.name, got, tc.want)
+				t.Errorf("Validate(%s) issues = %q, want %q (REQ-102 § An existence lower bound alone asks for no member, issue 341)", tc.name, got, tc.want)
 			}
 		})
 	}
