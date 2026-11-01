@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/cadasto/openehr-sdk-go/internal/rmlists"
 	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
 )
 
@@ -615,7 +616,10 @@ func genericInstantiationFromDescendant(sc *bmm.SimpleClass) string {
 //     pointer, so a pointer to "" is still written (REQ-052, Q6).
 //   - Any other optional field takes omitempty. On a list or map this
 //     leaves out a nil and an empty value alike, on purpose: it is the
-//     DV_TEXT.mappings re-encode collapse REQ-052 documents.
+//     DV_TEXT.mappings re-encode collapse REQ-052 documents. The optional
+//     lists [rmlists.KeepsEmpty] names, ITEM_LIST.items, ITEM_TREE.items
+//     and ITEM_TABLE.rows, are the one exception and take omitzero, so a
+//     present empty one is written as [] (issue 341).
 //   - A mandatory field takes the tag [mandatoryJSONTag] chooses, so a
 //     mandatory member with no value is left out rather than written as
 //     null (REQ-052, an absent mandatory member).
@@ -670,7 +674,7 @@ func renderField(plan *Plan, owner *bmm.SimpleClass, ownerName string, prop bmm.
 		if err != nil {
 			return "", err
 		}
-		fieldType, tag := containerFieldShape(p.TypeDef, inner, name, p.Cardinality)
+		fieldType, tag := containerFieldShape(p.TypeDef, inner, ownerName, name, p.Cardinality)
 		return docLines + fmt.Sprintf("\t%s %s %s\n", goName, fieldType, tag), nil
 
 	case *bmm.GenericProperty:
@@ -746,11 +750,15 @@ func genericRootIsInterface(plan *Plan, gt *bmm.GenericType) bool {
 
 // containerFieldShape converts a BMM container TypeDef + cardinality
 // into a Go field-type string (either []T or map[K]V) and the JSON tag
-// of the field named name. An optional container (cardinality lower
-// bound 0 or absent) takes omitempty, so a nil and an empty one are both
-// left out. A mandatory one takes omitzero ([mandatoryJSONTag]), so only
-// a nil one is left out and a present empty one is written as [] or {}.
-func containerFieldShape(td *bmm.ContainerType, inner, name string, card *bmm.Cardinality) (string, string) {
+// of the field named name, which the class ownerName declares. An
+// optional container (cardinality lower bound 0 or absent) takes
+// omitempty, so a nil and an empty one are both left out. A mandatory one
+// takes omitzero ([mandatoryJSONTag]), so only a nil one is left out and a
+// present empty one is written as [] or {}. An optional list
+// [rmlists.KeepsEmpty] names is tagged as a mandatory one: an archetype
+// can make it mandatory by existence, so a present empty one is written
+// (REQ-052, issue 341).
+func containerFieldShape(td *bmm.ContainerType, inner, ownerName, name string, card *bmm.Cardinality) (string, string) {
 	fieldType := "[]" + inner
 	if td != nil && td.ContainerType == "Hash" {
 		// Hash<K,V> in the BMM has K = string typically. We emit
@@ -760,7 +768,8 @@ func containerFieldShape(td *bmm.ContainerType, inner, name string, card *bmm.Ca
 		// and any other container kind are slices.
 		fieldType = "map[string]" + inner
 	}
-	if card == nil || card.Lower == 0 {
+	optional := card == nil || card.Lower == 0
+	if optional && !rmlists.KeepsEmpty(ownerName, name) {
 		return fieldType, fmt.Sprintf("`json:%q`", name+",omitempty")
 	}
 	return fieldType, mandatoryJSONTag(name, fieldType, false)
