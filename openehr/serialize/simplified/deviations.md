@@ -364,7 +364,9 @@ partially or silently accepted.
   the template's existence, or the RM, requires of it, and the template gives there one
   concrete `ITEM_STRUCTURE` it lets hold no member (or alternatives that agree on its
   subtype and node id), decode adds that structure as the generator writes it: subtype,
-  node id and template name, no member. Until then the `vital_signs` blood-pressure event
+  node id and template name, no member, and its `items` (an `ITEM_TABLE`'s `rows`) present
+  and empty where the template requires that list by its existence (since 2026-11-01,
+  issue 341). Until then the `vital_signs` blood-pressure event
   `state` and observation `protocol`, and the event `data` of `sdk_crosscheck_structure.v1`
   and `cluster-slot.ehrbase.org.v0`, came back absent from a round trip of their skeletons,
   which then failed `ValidateComposition` with `required`. It is a **synthesised empty structure**, not recovered data: FLAT has no key
@@ -374,7 +376,8 @@ partially or silently accepted.
   parent's path disagree on it, and nothing where the template asks the structure for a
   member (the body then lacks data, and `required` is the right report).
   A structure with no member that nothing requires is still dropped. Pinned by
-  `TestREQ053WithTemplateRebuildsEmptyRequiredStructure` and
+  `TestREQ053WithTemplateRebuildsEmptyRequiredStructure`,
+  `TestREQ053WithTemplateRebuildsRequiredEmptyList` and
   `TestREQ053EmptyStructureRebuildRules`. Without `WithTemplate`, decode omits names,
   defaults and empty structures entirely (format-idempotent only). **One completion is
   visible on re-encode** (since
