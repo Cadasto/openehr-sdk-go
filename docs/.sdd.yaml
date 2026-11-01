@@ -94,6 +94,7 @@ sdd:
   # Every value here is an example: no model and no reviewer is required by the plugin.
   agents:
     worker_model: inherit           # per-dispatch model override; inherit = no override, or a host model id
+    mechanical_worker_model: sonnet  # a mechanical task's model (a version bump, a wording fix, a test pin); inherit = worker_model's
     max_parallel_workers: 3
     worktree_per_worker: false      # true: each parallel worker on its own branch and worktree, merged; false: one shared branch
     worker_skills: [go-coding:go-coding]  # skills named in the worker's brief (suggested from go.mod)
