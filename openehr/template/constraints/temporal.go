@@ -292,18 +292,19 @@ func (c CDuration) Validate(value any) []Violation {
 
 // ValidityKind is the AOM 1.4 VALIDITY_KIND of the timezone_validity of a
 // C_DATE, C_TIME or C_DATE_TIME: whether a value must, may or must not carry
-// a time zone. The ITS-XML schema writes it as 1001 (mandatory), 1002
-// (optional) or 1003 (disallowed). The zero value is ValidityOptional, so a
+// a time zone. An OPT writes it as a word, mandatory, optional or
+// prohibited (disallowed in AOM 1.4), or, in the older XML schemas, as the
+// code 1001, 1002 or 1003. The zero value is ValidityOptional, so a
 // constraint that sets none leaves the zone open.
 type ValidityKind uint8
 
 const (
-	// ValidityOptional admits a value with or without a zone: 1002, or no
-	// timezone_validity.
+	// ValidityOptional admits a value with or without a zone: optional or
+	// 1002, or no timezone_validity.
 	ValidityOptional ValidityKind = iota
-	// ValidityMandatory requires a zone: 1001.
+	// ValidityMandatory requires a zone: mandatory or 1001.
 	ValidityMandatory
-	// ValidityDisallowed refuses a zone: 1003.
+	// ValidityDisallowed refuses a zone: prohibited, disallowed or 1003.
 	ValidityDisallowed
 )
 

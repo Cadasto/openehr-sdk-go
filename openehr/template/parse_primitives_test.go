@@ -1214,10 +1214,12 @@ func tzChild(xsiType, rmType string, text *string) string {
 }
 
 // TestParse_REQ103_TimezoneValidity pins REQ-103 § Validate contract on the
-// parse of the ITS-XML timezone_validity, a VALIDITY_KIND: 1001 is
-// mandatory and 1003 disallowed, and 1002, an absent element or an empty
-// one is optional, in both modes, on C_TIME and C_DATE_TIME, and inside a
-// C_PRIMITIVE_OBJECT. A C_DATE keeps disallowed and optional.
+// parse of the ITS-XML timezone_validity, a VALIDITY_KIND in either
+// spelling: mandatory and 1001 are mandatory, prohibited, disallowed and
+// 1003 disallowed, and optional, 1002, an absent element or an empty one
+// optional, in both modes, on C_TIME and C_DATE_TIME, and inside a
+// C_PRIMITIVE_OBJECT. A C_DATE keeps disallowed and optional. The word rows
+// fail against a parser that reads only the codes.
 func TestParse_REQ103_TimezoneValidity(t *testing.T) {
 	t.Parallel()
 	text := func(s string) *string { return &s }
@@ -1235,6 +1237,14 @@ func TestParse_REQ103_TimezoneValidity(t *testing.T) {
 		{name: "C_DATE_TIME 1003", child: tzChild("C_DATE_TIME", "DATE_TIME", text("1003")), want: constraints.CDateTime{TimezoneValidity: constraints.ValidityDisallowed}},
 		{name: "C_DATE 1003", child: tzChild("C_DATE", "DATE", text("1003")), want: constraints.CDate{TimezoneValidity: constraints.ValidityDisallowed}},
 		{name: "C_DATE 1002", child: tzChild("C_DATE", "DATE", text("1002")), want: constraints.CDate{}},
+		{name: "C_TIME 01001, an xs:integer form", child: tzChild("C_TIME", "TIME", text("01001")), want: constraints.CTime{TimezoneValidity: constraints.ValidityMandatory}},
+		{name: "C_TIME mandatory", child: tzChild("C_TIME", "TIME", text("mandatory")), want: constraints.CTime{TimezoneValidity: constraints.ValidityMandatory}},
+		{name: "C_TIME optional", child: tzChild("C_TIME", "TIME", text("optional")), want: constraints.CTime{TimezoneValidity: constraints.ValidityOptional}},
+		{name: "C_TIME prohibited, padded", child: tzChild("C_TIME", "TIME", text(" prohibited\n")), want: constraints.CTime{TimezoneValidity: constraints.ValidityDisallowed}},
+		{name: "C_DATE_TIME mandatory", child: tzChild("C_DATE_TIME", "DATE_TIME", text("mandatory")), want: constraints.CDateTime{TimezoneValidity: constraints.ValidityMandatory}},
+		{name: "C_DATE_TIME disallowed", child: tzChild("C_DATE_TIME", "DATE_TIME", text("disallowed")), want: constraints.CDateTime{TimezoneValidity: constraints.ValidityDisallowed}},
+		{name: "C_DATE prohibited", child: tzChild("C_DATE", "DATE", text("prohibited")), want: constraints.CDate{TimezoneValidity: constraints.ValidityDisallowed}},
+		{name: "C_DATE optional", child: tzChild("C_DATE", "DATE", text("optional")), want: constraints.CDate{}},
 		{
 			name: "C_TIME inside C_PRIMITIVE_OBJECT, with a pattern and a range",
 			child: `<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>TIME</rm_type_name><node_id/>
@@ -1268,8 +1278,8 @@ func TestParse_REQ103_TimezoneValidity(t *testing.T) {
 }
 
 // TestParse_REQ103_TimezoneValidityMalformed pins REQ-103 § Validate
-// contract on a timezone_validity that is not one of the three VALIDITY_KIND
-// values, and on 1001 on a C_DATE, which has no zone: ParseOPTStrict fails
+// contract on a timezone_validity that spells no VALIDITY_KIND, and on
+// mandatory or 1001 on a C_DATE, which has no zone: ParseOPTStrict fails
 // with ErrInvalidOPT, and ParseOPT reads it as optional, the rest of the
 // constraint kept.
 func TestParse_REQ103_TimezoneValidityMalformed(t *testing.T) {
@@ -1282,9 +1292,11 @@ func TestParse_REQ103_TimezoneValidityMalformed(t *testing.T) {
 	}{
 		{name: "C_TIME 1004", child: tzChild("C_TIME", "TIME", text("1004")), lenient: constraints.CTime{}},
 		{name: "C_TIME 0", child: tzChild("C_TIME", "TIME", text("0")), lenient: constraints.CTime{}},
-		{name: "C_TIME a name", child: tzChild("C_TIME", "TIME", text("mandatory")), lenient: constraints.CTime{}},
+		{name: "C_TIME a capitalised word", child: tzChild("C_TIME", "TIME", text("Mandatory")), lenient: constraints.CTime{}},
+		{name: "C_TIME another word", child: tzChild("C_TIME", "TIME", text("forbidden")), lenient: constraints.CTime{}},
 		{name: "C_DATE_TIME a decimal", child: tzChild("C_DATE_TIME", "DATE_TIME", text("1001.0")), lenient: constraints.CDateTime{}},
 		{name: "C_DATE 1001", child: tzChild("C_DATE", "DATE", text("1001")), lenient: constraints.CDate{}},
+		{name: "C_DATE mandatory", child: tzChild("C_DATE", "DATE", text("mandatory")), lenient: constraints.CDate{}},
 		{
 			name: "C_DATE 1001 with a pattern",
 			child: `<children xsi:type="C_DATE"><rm_type_name>DATE</rm_type_name><node_id/>
