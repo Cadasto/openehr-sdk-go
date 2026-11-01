@@ -225,6 +225,14 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 
 	for _, attr := range tcimpl.NodeAttributes(optNode) {
 		if !g.visits(optNode, attr) {
+			// A list the template prohibits by prohibiting its every
+			// child, and requires by its existence, is there with no
+			// member.
+			if attrProhibited(optNode, attr) {
+				if err := keepRequiredList(optNode, attr, rmValue); err != nil {
+					return err
+				}
+			}
 			continue
 		}
 		// visits lets through an attribute the generator has no writer for
@@ -266,16 +274,18 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	return settleNormalRange(optNode, rmValue)
 }
 
-// keepRequiredList writes attr of optNode, a visited attribute, as a present
-// empty list on rmValue where the walk gave it no member, the template
-// requires it by its existence (a bounded existence lower bound of 1 or
-// more), and canonical JSON carries an empty one (rmlists.KeepsEmpty): an
-// ITEM_LIST's or ITEM_TREE's items, or an ITEM_TABLE's rows. In AOM 1.4 a
+// keepRequiredList writes attr of optNode, a visited attribute or one the
+// template prohibits (attrProhibited), as a present empty list on rmValue
+// where the walk gave it no member, the template requires it by its
+// existence (a bounded existence lower bound of 1 or more), and canonical
+// JSON carries an empty one (rmlists.KeepsEmpty): an ITEM_LIST's or
+// ITEM_TREE's items, or an ITEM_TABLE's rows. In AOM 1.4 a
 // C_MULTIPLE_ATTRIBUTE's existence says whether the list is there and its
 // cardinality how many members it holds, so such a list is there with no
 // member, whichever way the walk left it without one: no allowed child,
-// slots only, optional children it skipped, or a template that writes the
-// list as a single attribute. Any other list at that existence with no
+// slots only, optional children it skipped, children the template all
+// prohibits, so that the walk does not visit it, or a template that writes
+// the list as a single attribute. Any other list at that existence with no
 // member stays left out, since canonical JSON cannot carry it empty
 // (REQ-107 Known gap: required lists canonical JSON cannot carry empty), and
 // so does a list the template leaves optional. A list that holds members is
@@ -487,7 +497,8 @@ func compositionDefaultOwns(class, attrName string) bool {
 // needs (attrProhibited), whatever children the OPT names under it, nor
 // one no serialization carries, the BMM functions and
 // RESOURCE_DESCRIPTION.parent_resource that rminfo.IsNonStorableAttr
-// names: the generator has nothing to write there. Nor does it visit a
+// names: the generator has nothing to write there, but for a prohibited
+// list it writes present and empty (keepRequiredList). Nor does it visit a
 // locatable's uid, which setLocatableIdentity stamps, nor the normal_range or
 // other_reference_ranges of a bound of a REFERENCE_RANGE's range, which
 // the RM keeps absent, nor an attribute the node's RM class does not have,
