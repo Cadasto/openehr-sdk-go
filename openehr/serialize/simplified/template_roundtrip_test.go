@@ -288,8 +288,21 @@ var emptyStructureCases = []struct {
 	}},
 }
 
+// structureMembers returns the members the canonical JSON object s, an item
+// structure, holds: its rows for an ITEM_TABLE, its items otherwise. An
+// absent list and an empty one hold none.
+func structureMembers(s map[string]any) []any {
+	key := "items"
+	if s["_type"] == "ITEM_TABLE" {
+		key = "rows"
+	}
+	members, _ := s[key].([]any)
+	return members
+}
+
 // writtenEmptyStructures returns the structure the skeleton comp writes at
-// each of paths, each of which must hold no member.
+// each of paths, each of which must hold no member: its list is absent, or
+// present and empty where the template requires it by its existence.
 func writtenEmptyStructures(t *testing.T, comp *rm.Composition, paths []string) map[string]map[string]any {
 	t.Helper()
 	doc := canonicalDoc(t, comp)
@@ -299,12 +312,46 @@ func writtenEmptyStructures(t *testing.T, comp *rm.Composition, paths []string) 
 		if !ok {
 			t.Fatalf("the written skeleton has no structure at %s — fixture changed?", p)
 		}
-		if _, has := s["items"]; has {
-			t.Fatalf("the written structure at %s holds items — fixture changed?", p)
+		if members := structureMembers(s); len(members) > 0 {
+			t.Fatalf("the written structure at %s holds %d members — fixture changed?", p, len(members))
 		}
 		written[p] = s
 	}
 	return written
+}
+
+// TestREQ053WithTemplateRebuildsRequiredEmptyList — REQ-053: the vital_signs
+// skeleton writes the blood_pressure event's state and the protocol with no
+// member, and with their items present and empty, which the template
+// requires by its existence (existence 1..1, cardinality 0..*, no child or
+// slots only), as "items":[]. A WithTemplate decode of its FLAT and
+// STRUCTURED bodies rebuilds both structures as the generator writes them,
+// "items":[] included, so the decoded structure carries the list the
+// written one does.
+func TestREQ053WithTemplateRebuildsRequiredEmptyList(t *testing.T) {
+	paths := emptyStructureCases[0].paths
+	wt, compiled := templateOf(t, emptyStructureCases[0].template)
+	comp := skeletonOf(t, compiled, emptyStructureCases[0].policy)
+	for p, s := range writtenEmptyStructures(t, comp, paths) {
+		if items, ok := s["items"].([]any); !ok || len(items) != 0 {
+			t.Fatalf("the written structure at %s = %s, want its items as [] — fixture changed?", p, jsonText(s))
+		}
+	}
+	for _, format := range []string{"FLAT", "STRUCTURED"} {
+		t.Run(format, func(t *testing.T) {
+			doc := canonicalDoc(t, bmiRoundTrip(t, format, comp, wt, simplified.WithTemplate(compiled), simplified.WithStrict()))
+			for _, p := range paths {
+				got, ok := nodeAt(doc, p)
+				if !ok {
+					t.Errorf("decoded composition has no structure at %s, want one with items []", p)
+					continue
+				}
+				if items, ok := got["items"].([]any); !ok || len(items) != 0 {
+					t.Errorf("decoded structure at %s = %s, want its items as []: the template requires them by their existence", p, jsonText(got))
+				}
+			}
+		})
+	}
 }
 
 // TestREQ053WithTemplateRebuildsEmptyRequiredStructure — REQ-053: a structure
