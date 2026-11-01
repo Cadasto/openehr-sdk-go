@@ -62,17 +62,15 @@ type ratchetFailure struct {
 
 // corpusCompileFailures names vendored OPTs whose ParseFile or Compile
 // fails. An allowlisted name that compiles, or a compile failure that
-// is not listed, fails the test.
-var corpusCompileFailures = []string{
-	"definition/body_weight",
-}
+// is not listed, fails the test. Every vendored OPT compiles.
+var corpusCompileFailures = []string{}
 
 // requiredBodies names the compiling vendored templates whose body holds
 // at least one ELEMENT under Required, under every value fill and seed:
 // the hollow-body floor under that policy. Required builds only what the
 // template makes mandatory and gives an optional child no member of its
 // own (REQ-107 Visit rule, What a visit writes), so a template that
-// requires no ELEMENT gets a body with none by design: the other 63
+// requires no ELEMENT gets a body with none by design: the other 64
 // compiling COMPOSITION templates, whose ELEMENTs all sit below an
 // optional attribute or child (an optional content, or a required entry
 // whose items are optional), and Address.v2, which is ADDRESS-rooted, has

@@ -56,11 +56,11 @@ Hand-crafted capabilities response matching the openEHR REST 1.1.0 System API sh
 
 ### `definition/`
 
-Hand-crafted Definition API fixtures for the ADL 1.4 template lifecycle (Phase 6). ADL 2 source-form fixtures will land with their leaf-client implementation. Stored-query metadata bodies are a separate gap: their leaf client has already landed (`openehr/client/definition`), but no vendored `StoredQueryMetadata` body exists yet (see the Coverage table).
+Definition API fixtures for the ADL 1.4 template lifecycle (Phase 6): hand-crafted metadata bodies and a copy of a real OPT. ADL 2 source-form fixtures will land with their leaf-client implementation. Stored-query metadata bodies are a separate gap: their leaf client has already landed (`openehr/client/definition`), but no vendored `StoredQueryMetadata` body exists yet (see the Coverage table).
 
 | File | Format | Notes |
 |---|---|---|
-| `body_weight.opt` | OPT XML | Minimal OPT. Exercises the upload/get round-trip without depending on a full template-parser implementation. |
+| `body_weight.opt` | OPT XML | CODE24's [`templates/body_weight.opt`](../templates/body_weight.opt) with its `template_id` set to `body_weight.v1`, the id the metadata fixtures use, and a new `uid`; nothing else differs. Exercises the upload/get round trip. |
 | `template_metadata.json` | JSON | Single-template metadata (typed + a deployment-specific `uri` Extras key). |
 | `template_list.json` | JSON | Two-template listing response. |
 
