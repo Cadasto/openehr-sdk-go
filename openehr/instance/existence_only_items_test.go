@@ -42,9 +42,11 @@ func existenceOnlyShape(out any) string {
 // The controls keep the top-up they had: an optional described child
 // still gives the one member, and a list whose cardinality lower bound is
 // 1, or a CLUSTER's items, which the BMM marks mandatory, is still topped
-// up with a slot fill or a member built from its BMM type. Every root
-// passes the RM floor and the template validator, under every policy, both
-// value fills and both compile modes.
+// up with a slot fill or a member built from its BMM type. The items of an
+// ITEM_TREE or ITEM_LIST root, which their existence of 1..1 requires, are
+// present in every case, with no member where the walk gives them none
+// (issue 341). Every root passes the RM floor and the template validator,
+// under every policy, both value fills and both compile modes.
 func TestREQ107_ExistenceOnlyItemsGetNoUndescribedMember(t *testing.T) {
 	const stub = "openEHR-EHR-CLUSTER.example.v1"
 	element := optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0002", 0, 1)
@@ -136,6 +138,11 @@ func TestREQ107_ExistenceOnlyItemsGetNoUndescribedMember(t *testing.T) {
 					if got := existenceOnlyShape(out); got != tc.want {
 						t.Errorf("Generate built %q, want %q", got, tc.want)
 					}
+					if s, ok := out.(rm.ItemStructure); ok {
+						if present, _, _ := itemStructureList(s); !present {
+							t.Errorf("Generate built %T with nil items, want them present: their existence is 1..1", out)
+						}
+					}
 					noFloorErrors(t, out)
 					for _, iss := range templateErrors(out, c) {
 						t.Errorf("template validator: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
@@ -155,8 +162,9 @@ func TestREQ107_ExistenceOnlyItemsGetNoUndescribedMember(t *testing.T) {
 // several seeds, the root holds no LOCATABLE with the archetype node id
 // at0000 and no slot fill below a protocol or a state; the blood_pressure
 // event's state is the ITEM_LIST at0007 and its protocol the ITEM_TREE
-// at0011, both with no items. Every root passes the template validator and
-// the RM floor.
+// at0011, both with items present and empty, since their existence
+// requires the list (issue 341). Every root passes the template validator
+// and the RM floor.
 func TestREQ107_VitalSignsStateAndProtocolHoldNoUndescribedItems(t *testing.T) {
 	const bloodPressure = "openEHR-EHR-OBSERVATION.blood_pressure.v1"
 	c := compileFixture(t, "vital_signs")
@@ -200,14 +208,14 @@ func TestREQ107_VitalSignsStateAndProtocolHoldNoUndescribedItems(t *testing.T) {
 						continue
 					}
 					if !emptyStructure(obs["protocol"], "ITEM_TREE", "at0011") {
-						t.Errorf("%s %s/protocol = %v, want the ITEM_TREE at0011 with no items", call, where, obs["protocol"])
+						t.Errorf("%s %s/protocol = %v, want the ITEM_TREE at0011 with items []", call, where, obs["protocol"])
 					}
 					if len(events) == 0 {
 						t.Errorf("%s %s has no event, want one whose state is the ITEM_LIST at0007", call, where)
 					}
 					for j, ev := range events {
 						if !emptyStructure(ev["state"], "ITEM_LIST", "at0007") {
-							t.Errorf("%s %s/data/events[%d]/state = %v, want the ITEM_LIST at0007 with no items", call, where, j, ev["state"])
+							t.Errorf("%s %s/data/events[%d]/state = %v, want the ITEM_LIST at0007 with items []", call, where, j, ev["state"])
 						}
 					}
 				}
@@ -236,14 +244,14 @@ func jsonList(v any) []map[string]any {
 }
 
 // emptyStructure reports whether v, a decoded JSON value, is an object of
-// rmType with the archetype node id nodeID and no items.
+// rmType with the archetype node id nodeID whose items are present and
+// empty, written as [].
 func emptyStructure(v any, rmType, nodeID string) bool {
 	m, ok := v.(map[string]any)
 	if !ok || m["_type"] != rmType || m["archetype_node_id"] != nodeID {
 		return false
 	}
-	_, hasItems := m["items"]
-	return !hasItems
+	return jsonEmptyList(m, "items")
 }
 
 // nodeIDPaths returns the JSON path of every object in v, a decoded JSON

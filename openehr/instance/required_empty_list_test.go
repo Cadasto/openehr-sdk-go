@@ -162,8 +162,9 @@ func TestREQ107_VitalSignsRequiredItemListsArePresentAndEmpty(t *testing.T) {
 // without a member: no allowed child, slots only, only an optional child
 // that needs undescribed content, a cardinality of 0..0 over an optional
 // ELEMENT, or an RM list the template writes as a single attribute with no
-// child. A list the template leaves optional by its existence stays absent.
-// Every root passes the template validator and the RM floor.
+// child. A list the template leaves optional by its existence stays absent,
+// whether the walk visits it or not. Every root passes the template
+// validator and the RM floor.
 func TestREQ107_RequiredEmptyItemListIsPresent(t *testing.T) {
 	cases := []struct {
 		name      string
@@ -223,6 +224,16 @@ func TestREQ107_RequiredEmptyItemListIsPresent(t *testing.T) {
 		{
 			name:      "control: ITEM_LIST items the template leaves optional, with only a slot",
 			structure: optNode("ITEM_LIST", "at0010", optList("items", 0, 0, optSlot("ELEMENT", "at0011"))),
+		},
+		{
+			// Large and Medium visit these items, for the ELEMENT, and give
+			// them no member, since the cardinality leaves no room; the
+			// existence does not ask for the list, so it stays absent.
+			name: "control: ITEM_TREE items the template leaves optional, at cardinality 0..0 over an optional ELEMENT",
+			structure: optNode("ITEM_TREE", "at0010", `<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>items</rm_attribute_name>`+
+				`<existence>`+optInterval(0, 1)+`</existence>`+optElement("at0011", 0, 1)+
+				`<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval>`+
+				optInterval(0, 0)+`</interval></cardinality></attributes>`),
 		},
 	}
 	for _, tc := range cases {
