@@ -512,26 +512,34 @@ func clockParts(o *xmlCObject, strict bool, ctx string, validate func(any) []con
 	return r, tz, err
 }
 
+// validityCodes maps the integer VALIDITY_KIND codes of the Release 1.0.2
+// XML schemas to the words the current AM 1.4 schema writes.
+var validityCodes = map[int]string{1001: "mandatory", 1002: "optional", 1003: "disallowed"}
+
 // timezoneValidity reads the timezone_validity text of a C_DATE, C_TIME or
-// C_DATE_TIME named ctx, an ITS-XML VALIDITY_KIND: 1001 is mandatory, 1003
-// disallowed, and 1002, an omitted element or an empty one optional. Text
-// that names no VALIDITY_KIND, and 1001 on a C_DATE, which has no zone to
-// require, are OPT defects: strict mode surfaces them as ErrInvalidOPT, and
-// lenient mode reads them as optional, as temporalRange opens a side whose
-// bound is not ISO 8601 text.
+// C_DATE_TIME named ctx, a VALIDITY_KIND in either spelling: the word
+// (mandatory, optional, prohibited, or disallowed, the AOM 1.4 name for
+// prohibited) or the integer code of the older schemas (1001, 1002, 1003).
+// An omitted or empty element is optional. Text that names no VALIDITY_KIND,
+// and mandatory on a C_DATE, which has no zone to require, are OPT defects:
+// strict mode surfaces them as ErrInvalidOPT, and lenient mode reads them as
+// optional, as temporalRange opens a side whose bound is not ISO 8601 text.
 func timezoneValidity(text string, strict bool, ctx string) (constraints.ValidityKind, error) {
 	text = strings.TrimSpace(text)
 	if text == "" {
 		return constraints.ValidityOptional, nil
 	}
+	kind := text
+	if n, err := strconv.Atoi(text); err == nil {
+		kind = validityCodes[n]
+	}
 	tz, ok := constraints.ValidityOptional, false
-	switch n, err := strconv.Atoi(text); {
-	case err != nil:
-	case n == 1001:
+	switch kind {
+	case "mandatory":
 		tz, ok = constraints.ValidityMandatory, ctx != "C_DATE"
-	case n == 1002:
+	case "optional":
 		ok = true
-	case n == 1003:
+	case "prohibited", "disallowed":
 		tz, ok = constraints.ValidityDisallowed, true
 	}
 	switch {

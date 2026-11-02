@@ -22,8 +22,8 @@ func openTestITSXML(t *testing.T) *os.Root {
 	return root
 }
 
-// loadTestXSDSets reads the two vendored schema sets: RM and BASE
-// Release-1.1.0, and AM Release-1.4.
+// loadTestXSDSets reads the two vendored schema sets: RM Release-1.1.0
+// with BASE Release-1.2.0, and AM Release-1.4.
 func loadTestXSDSets(t *testing.T) (rmSet, amSet *xsdSet) {
 	t.Helper()
 	root := openTestITSXML(t)

@@ -22,7 +22,7 @@ Each probe has a stable `PROBE-NNN` ID, one catalogue entry here, and a pass/fai
 
 ### REQ-082 — Runnability
 
-A backend-facing probe runs in up to three modes: **Sandbox**, against the in-memory `sandbox/` transport; **Cassette**, against a replayed recording; and **Live**, against a reference openEHR deployment. An **in-repo** probe asserts a property over vendored inputs or over the SDK's own output and reaches no server in any mode. Each catalogue entry's **Modes** line says which applies: 36 of the 81 catalog entries are in-repo by construction. Today 12 entries declare all three modes; a mode missing from a backend-facing entry is open work in this requirement, not a defect in the probe ([roadmap.md](../roadmap.md)).
+A backend-facing probe runs in up to three modes: **Sandbox**, against the in-memory `sandbox/` transport; **Cassette**, against a replayed recording; and **Live**, against a reference openEHR deployment. An **in-repo** probe asserts a property over vendored inputs or over the SDK's own output and reaches no server in any mode. Each catalogue entry's **Modes** line says which applies: 37 of the 82 catalog entries are in-repo by construction. Today 12 entries declare all three modes; a mode missing from a backend-facing entry is open work in this requirement, not a defect in the probe ([roadmap.md](../roadmap.md)).
 
 How the runner selects a mode, what a probe reports and each mode's working rules are in [development-process.md § Conformance probes](../development-process.md#conformance-probes). This section holds what an SDK consumer, or the operator of a deployment a probe writes to, relies on.
 
@@ -500,6 +500,15 @@ The HL7 Inferno **SMART App Launch Test Kit STU2.2 _Client_** suite serves as an
 - **Modes:** In-repo (unit-level property; no backend).
 - **Status:** Implemented (inline).
 - **Satisfies:** REQ-175, REQ-112.
+
+#### PROBE-111 — Operational template corpus round trip
+
+- **Title:** Every ADL 1.4 OPT the corpus vendors decodes into the generated operational template types with no unmatched content, and encodes back to a document that validates against the pinned AM Release-1.4 schemas and holds the content of the input, as [clinical-modeling.md § REQ-176](clinical-modeling.md#req-176--adl-14-operational-template-model) defines.
+- **Preconditions:** Every `.opt` file under `testkit/corpus/`, and the pinned ITS-XML closure under `resources/its-xml/` with `Template.xsd` among its roots. An OPT the pinned schemas refuse as written is listed in a ratchet with its reason and goes through the round-trip leg only, until a re-pin admits it.
+- **Wire assertion:** In-repo property, two legs. Round trip: `canxml.Unmarshal` with the report option returns no unmatched item; `canxml.Marshal` of the value and a second decode give an equal value; and the re-encoded document, read as elements, attributes and text, equals the input with `match_negated` removed, each `timezone_validity` written as its `VALIDITY_KIND` word, `T_ARCHETYPE_ROOT` written as `C_ARCHETYPE_ROOT`, each `xsi:type` compared as the qualified name it denotes and white space between elements ignored. Schema: the re-encoded document of every OPT not in the ratchet validates against the pinned schemas, their `targetNamespace` read as `http://schemas.openehr.org/v1`, through an XML schema validation target the probe adds to the CI gate. A can-fail control: with one operational template member withheld from the decoder, the round-trip leg fails on a corpus file that carries it.
+- **Modes:** In-repo (property across the vendored corpus; no backend).
+- **Status:** Draft.
+- **Satisfies:** REQ-176.
 
 ### Simplified formats and upstream parity
 

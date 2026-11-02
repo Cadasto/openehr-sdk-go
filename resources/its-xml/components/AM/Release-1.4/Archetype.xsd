@@ -44,8 +44,15 @@
 		<xs:complexContent>
 			<xs:extension base="ARCHETYPE_CONSTRAINT">
 				<xs:sequence>
+					<!-- match_negated: legacy element some tools still write, always false. No AOM
+					     1.4 or AOM 2 class has it; it held the cADL negated match of an ADL 1.5 draft
+					     parser. Accepted, before rm_attribute_name or after existence, so that such
+					     OPTs validate; readers ignore it. Fixed to false: a negated match cannot be
+					     expressed in AOM 1.4. -->
+					<xs:element name="match_negated" type="xs:boolean" fixed="false" minOccurs="0"/>
 					<xs:element name="rm_attribute_name" type="xs:string"/>
 					<xs:element name="existence" type="IntervalOfInteger"/>
+					<xs:element name="match_negated" type="xs:boolean" fixed="false" minOccurs="0"/>
 					<xs:element name="children" type="C_OBJECT" minOccurs="0" maxOccurs="unbounded"
 					/>
 				</xs:sequence>
@@ -219,6 +226,27 @@
 			<xs:enumeration value="2024" id="exponent"/>
 		</xs:restriction>
 	</xs:simpleType>
+	<!-- timezone_validity of C_DATE, C_TIME and C_DATE_TIME: the BASE VALIDITY_KIND words, the
+	     AOM 1.4 word 'disallowed' (in BASE a deprecated synonym of 'prohibited'), or the integer
+	     codes of the Release-1.0.2 schemas (1001 mandatory, 1002 optional, 1003 disallowed), so
+	     that OPTs written to either schema validate. -->
+	<xs:simpleType name="VALIDITY_KIND_AOM14">
+		<xs:union memberTypes="VALIDITY_KIND">
+			<xs:simpleType>
+				<xs:restriction base="xs:string">
+					<xs:enumeration value="disallowed"/>
+				</xs:restriction>
+			</xs:simpleType>
+			<xs:simpleType>
+				<xs:restriction base="xs:integer">
+					<xs:enumeration value="1001"/>
+					<xs:enumeration value="1002"/>
+					<xs:enumeration value="1003"/>
+				</xs:restriction>
+			</xs:simpleType>
+		</xs:union>
+	</xs:simpleType>
+
 	<xs:complexType name="C_PRIMITIVE" abstract="true">
 		<xs:sequence/>
 	</xs:complexType>
@@ -272,7 +300,7 @@
 			<xs:extension base="C_PRIMITIVE">
 				<xs:sequence>
 					<xs:element name="pattern" type="DateConstraintPattern" minOccurs="0"/>
-					<xs:element name="timezone_validity" type="VALIDITY_KIND" minOccurs="0"/>
+					<xs:element name="timezone_validity" type="VALIDITY_KIND_AOM14" minOccurs="0"/>
 					<xs:element name="range" type="IntervalOfDate" minOccurs="0"/>
 					<xs:element name="assumed_value" type="Iso8601Date" minOccurs="0"/>
 				</xs:sequence>
@@ -290,7 +318,7 @@
 			<xs:extension base="C_PRIMITIVE">
 				<xs:sequence>
 					<xs:element name="pattern" type="DateTimeConstraintPattern" minOccurs="0"/>
-					<xs:element name="timezone_validity" type="VALIDITY_KIND" minOccurs="0"/>
+					<xs:element name="timezone_validity" type="VALIDITY_KIND_AOM14" minOccurs="0"/>
 					<xs:element name="range" type="IntervalOfDateTime" minOccurs="0"/>
 					<xs:element name="assumed_value" type="Iso8601DateTime" minOccurs="0"/>
 				</xs:sequence>
@@ -310,7 +338,7 @@
 			<xs:extension base="C_PRIMITIVE">
 				<xs:sequence>
 					<xs:element name="pattern" type="TimeConstraintPattern" minOccurs="0"/>
-					<xs:element name="timezone_validity" type="VALIDITY_KIND" minOccurs="0"/>
+					<xs:element name="timezone_validity" type="VALIDITY_KIND_AOM14" minOccurs="0"/>
 					<xs:element name="range" type="IntervalOfTime" minOccurs="0"/>
 					<xs:element name="assumed_value" type="Iso8601Time" minOccurs="0"/>
 				</xs:sequence>

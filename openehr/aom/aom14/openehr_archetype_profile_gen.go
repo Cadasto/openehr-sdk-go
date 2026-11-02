@@ -63,6 +63,14 @@ type CQuantityItem struct {
 	Magnitude rm.Interval[Real] `json:"magnitude"`
 	// Units Optional units constraint.
 	Units *string `json:"units,omitzero"`
+	// UnitsDisplayName Optional displayable form of `_units_`, as for `DV_QUANTITY._units_display_name_`, e.g. `'lb'` for `'[lb_av]'`.
+	//
+	// NOTE: The display name may be language-dependent, so it is better set in templates than in archetypes.
+	UnitsDisplayName *string `json:"units_display_name,omitzero"`
+	// UnitsSystem Optional units system from which the code in `_units_` is defined, as for `DV_QUANTITY._units_system_`: a URI identifying a terminology containing units concepts.
+	//
+	// If not set, the UCUM standard (case-sensitive codes) is assumed as the units system.
+	UnitsSystem *string `json:"units_system,omitzero"`
 }
 
 // Ordinal Constrainer object representing a single Ordinal value.

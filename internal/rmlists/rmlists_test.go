@@ -21,28 +21,37 @@ type bmmClass struct {
 
 // bmmProperty is the part of a P_BMM property the test reads.
 type bmmProperty struct {
-	Type        string `json:"_type"`
-	IsMandatory bool   `json:"is_mandatory"`
-	Cardinality *struct {
-		Lower *int `json:"lower"`
-	} `json:"cardinality"`
+	Type        string          `json:"_type"`
+	IsMandatory bool            `json:"is_mandatory"`
+	Cardinality *bmmCardinality `json:"cardinality"`
+}
+
+// bmmCardinality is the part of a P_BMM cardinality the test reads.
+type bmmCardinality struct {
+	Lower *int `json:"lower"`
 }
 
 // readRMBMM decodes the class definitions of the vendored RM BMM.
 func readRMBMM(t *testing.T) map[string]bmmClass {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("..", "..", "resources", "bmm", "openehr_rm_1.2.0.bmm.json"))
+	return readBMM(t, "openehr_rm_1.2.0.bmm.json")
+}
+
+// readBMM decodes the class definitions of the vendored BMM file name.
+func readBMM(t *testing.T, name string) map[string]bmmClass {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("..", "..", "resources", "bmm", name))
 	if err != nil {
-		t.Fatalf("read vendored RM BMM: %v", err)
+		t.Fatalf("read vendored BMM %s: %v", name, err)
 	}
 	var schema struct {
 		ClassDefinitions map[string]bmmClass `json:"class_definitions"`
 	}
 	if err := json.Unmarshal(raw, &schema); err != nil {
-		t.Fatalf("decode vendored RM BMM: %v", err)
+		t.Fatalf("decode vendored BMM %s: %v", name, err)
 	}
 	if len(schema.ClassDefinitions) == 0 {
-		t.Fatal("the vendored RM BMM defines no classes")
+		t.Fatalf("the vendored BMM %s defines no classes", name)
 	}
 	return schema.ClassDefinitions
 }
@@ -158,6 +167,56 @@ func TestREQ052_KeepsEmptyMatchesBMM(t *testing.T) {
 	} {
 		if rmlists.KeepsEmpty(tc.class, tc.attr) {
 			t.Errorf("KeepsEmpty(%q, %q) = true, want false: not one of the listed pairs", tc.class, tc.attr)
+		}
+	}
+}
+
+// mandatoryListsWithoutLowerBound returns, sorted as "CLASS.attr", the
+// P_BMM_CONTAINER_PROPERTY attributes of defs that are mandatory with a
+// cardinality lower bound of 0 or none.
+func mandatoryListsWithoutLowerBound(defs map[string]bmmClass) []string {
+	var found []string
+	for class, c := range defs {
+		for attr, p := range c.Properties {
+			if p.Type != "P_BMM_CONTAINER_PROPERTY" || !p.IsMandatory {
+				continue
+			}
+			if p.Cardinality == nil || p.Cardinality.Lower == nil || *p.Cardinality.Lower == 0 {
+				found = append(found, class+"."+attr)
+			}
+		}
+	}
+	slices.Sort(found)
+	return found
+}
+
+// TestREQ052_MandatoryListsHaveLowerBound pins an agreement the vendored RM
+// and BASE BMM keep: every mandatory list has a cardinality lower bound of 1
+// or more (REQ-052 § An absent mandatory member, PROBE-030).
+//
+// The generator tags a list field by its lower bound alone, so, the lists
+// KeepsEmpty names aside, a present empty list is written only when the
+// bound is 1 or more, while
+// testkit/expectedform keeps a present empty list the BMM marks mandatory.
+// A mandatory list with a lower bound of 0 would be left out by the encoder
+// and kept by the expected form, and PROBE-030 would fail on valid input.
+func TestREQ052_MandatoryListsHaveLowerBound(t *testing.T) {
+	// The control: the scan reports the pairs it must.
+	zero, one := 0, 1
+	control := map[string]bmmClass{"X": {Properties: map[string]bmmProperty{
+		"lower_zero": {Type: "P_BMM_CONTAINER_PROPERTY", IsMandatory: true, Cardinality: &bmmCardinality{Lower: &zero}},
+		"no_bound":   {Type: "P_BMM_CONTAINER_PROPERTY", IsMandatory: true},
+		"lower_one":  {Type: "P_BMM_CONTAINER_PROPERTY", IsMandatory: true, Cardinality: &bmmCardinality{Lower: &one}},
+		"optional":   {Type: "P_BMM_CONTAINER_PROPERTY"},
+		"single":     {Type: "P_BMM_SINGLE_PROPERTY", IsMandatory: true},
+	}}}
+	if got, want := mandatoryListsWithoutLowerBound(control), []string{"X.lower_zero", "X.no_bound"}; !slices.Equal(got, want) {
+		t.Errorf("mandatoryListsWithoutLowerBound(control) = %v, want %v", got, want)
+	}
+
+	for _, name := range []string{"openehr_rm_1.2.0.bmm.json", "openehr_base_1.3.0.bmm.json"} {
+		if got := mandatoryListsWithoutLowerBound(readBMM(t, name)); len(got) != 0 {
+			t.Errorf("%s: mandatory lists with a cardinality lower bound of 0 or none: %v; the generated encoder leaves a present empty one out and the expected form keeps it, so align the two before re-pinning", name, got)
 		}
 	}
 }

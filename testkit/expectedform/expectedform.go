@@ -25,8 +25,12 @@
 //     side whose bound is left out or null, and "*_included" is true on a
 //     side that is not unbounded and false on a side that is;
 //   - an empty bound on a side marked unbounded is removed;
-//   - an empty DV_TEXT "mappings", DV_MULTIMEDIA "data" or DV_MULTIMEDIA
-//     "integrity_check" is removed;
+//   - an empty list an optional attribute holds is removed, such as DV_TEXT
+//     "mappings", LOCATABLE "links", or DV_MULTIMEDIA "data" or
+//     "integrity_check", whose bytes are written as one base64 string. An
+//     empty mandatory list is kept, and so are the optional ITEM_LIST
+//     "items", ITEM_TREE "items" and ITEM_TABLE "rows" and an empty map,
+//     optional or not: the encoder writes a present one;
 //   - a number held by an Integer, Integer64, Real or Double attribute, written
 //     as a JSON number or as a quoted string, is replaced by the literal the
 //     encoder writes for its value.
@@ -71,6 +75,7 @@ import (
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/internal/rmjsonwalk"
+	"github.com/cadasto/openehr-sdk-go/internal/rmlists"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 )
 
@@ -249,6 +254,7 @@ func (w walker) object(obj map[string]any, declared, boundType, ptr string) (map
 	if err != nil {
 		return nil, err
 	}
+	required := w.lookup.RequiredAttributes(rmType)
 	out := make(map[string]any, len(obj)+len(intervalFlags)+1)
 	for name, val := range obj {
 		if name == "_type" {
@@ -273,7 +279,11 @@ func (w walker) object(obj map[string]any, declared, boundType, ptr string) (map
 			}
 			continue
 		}
-		nv, keep, err := w.member(name, attr, val, child)
+		// The item-structure lists canonical JSON writes as [] when
+		// present and empty, such as ITEM_TREE.items, are kept as a
+		// mandatory list is.
+		optional := !slices.Contains(required, name) && !rmlists.KeepsEmpty(rmType, name)
+		nv, keep, err := w.member(attr, optional, val, child)
 		if err != nil {
 			return nil, err
 		}
@@ -338,9 +348,12 @@ func (w walker) resolve(obj map[string]any, declared, ptr string) (string, error
 	return rmType, nil
 }
 
-// member walks the value of the attribute name, which the RM declares as attr.
-// The second result is false when the expected form drops the member.
-func (w walker) member(name string, attr rmjsonwalk.Attribute, val any, ptr string) (any, bool, error) {
+// member walks the value of an attribute the RM declares as attr; optional
+// says whether the encoder leaves the attribute out when it holds an empty
+// list. The second result is false when the expected form drops the member:
+// an empty list an optional attribute holds. A map is a Hash attribute,
+// never a list, and is kept.
+func (w walker) member(attr rmjsonwalk.Attribute, optional bool, val any, ptr string) (any, bool, error) {
 	if attr.Payload {
 		// The decoder holds a generic payload as plain JSON.
 		if w.full {
@@ -376,9 +389,10 @@ func (w walker) member(name string, attr rmjsonwalk.Attribute, val any, ptr stri
 		return w.single(attr.Type, attr.Kind, attr.Bound, val, ptr)
 	}
 	if attr.Type == "Octet" {
-		// A byte list written as one base64 string. An empty DV_MULTIMEDIA
-		// data or integrity_check is dropped on re-encode.
-		if w.full && attr.DeclaredOn == "DV_MULTIMEDIA" && isEmptyBytes(val) {
+		// A byte list written as one base64 string, such as DV_MULTIMEDIA
+		// data or integrity_check. An empty optional one is dropped on
+		// re-encode.
+		if w.full && optional && isEmptyBytes(val) {
 			return nil, false, nil
 		}
 		return val, true, nil
@@ -387,7 +401,7 @@ func (w walker) member(name string, attr rmjsonwalk.Attribute, val any, ptr stri
 	if !ok {
 		return nil, false, fmt.Errorf("%s: want a JSON array for a container attribute", ptr)
 	}
-	if w.full && len(list) == 0 && name == "mappings" && attr.DeclaredOn == "DV_TEXT" {
+	if w.full && optional && len(list) == 0 {
 		return nil, false, nil
 	}
 	out := make([]any, len(list))

@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!-- Modified by CODE24 from the EHRbase openEHR_SDK original: rm_type_name, occurrences and node_id added to each constraints child and type added to the DV_PROPORTION default value, so the file validates against openEHR Template.xsd. See testkit/corpus/THIRD_PARTY_LICENSES.md. -->
 <template xmlns="http://schemas.openehr.org/v1">
     <language>
         <terminology_id>
@@ -5857,6 +5858,16 @@
         <attributes>
             <rm_attribute_name>value</rm_attribute_name>
             <children>
+                <rm_type_name>DV_DATE_TIME</rm_type_name>
+                <occurrences>
+                    <lower_included>true</lower_included>
+                    <upper_included>true</upper_included>
+                    <lower_unbounded>false</lower_unbounded>
+                    <upper_unbounded>false</upper_unbounded>
+                    <lower>1</lower>
+                    <upper>1</upper>
+                </occurrences>
+                <node_id></node_id>
                 <default_value xsi:type="DV_DATE_TIME" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
                     <value>2019-01-28T21:22:49.426Z</value>
                 </default_value>
@@ -5866,6 +5877,16 @@
         <attributes>
             <rm_attribute_name>value</rm_attribute_name>
             <children>
+                <rm_type_name>DV_ORDINAL</rm_type_name>
+                <occurrences>
+                    <lower_included>true</lower_included>
+                    <upper_included>true</upper_included>
+                    <lower_unbounded>false</lower_unbounded>
+                    <upper_unbounded>false</upper_unbounded>
+                    <lower>1</lower>
+                    <upper>1</upper>
+                </occurrences>
+                <node_id></node_id>
                 <default_value xsi:type="DV_ORDINAL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
                     <value>1</value>
                     <symbol>
@@ -5884,6 +5905,16 @@
         <attributes>
             <rm_attribute_name>value</rm_attribute_name>
             <children>
+                <rm_type_name>DV_COUNT</rm_type_name>
+                <occurrences>
+                    <lower_included>true</lower_included>
+                    <upper_included>true</upper_included>
+                    <lower_unbounded>false</lower_unbounded>
+                    <upper_unbounded>false</upper_unbounded>
+                    <lower>1</lower>
+                    <upper>1</upper>
+                </occurrences>
+                <node_id></node_id>
                 <default_value xsi:type="DV_COUNT" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
                     <magnitude>11</magnitude>
                 </default_value>
@@ -5893,6 +5924,16 @@
         <attributes>
             <rm_attribute_name>value</rm_attribute_name>
             <children>
+                <rm_type_name>DV_QUANTITY</rm_type_name>
+                <occurrences>
+                    <lower_included>true</lower_included>
+                    <upper_included>true</upper_included>
+                    <lower_unbounded>false</lower_unbounded>
+                    <upper_unbounded>false</upper_unbounded>
+                    <lower>1</lower>
+                    <upper>1</upper>
+                </occurrences>
+                <node_id></node_id>
                 <default_value xsi:type="DV_QUANTITY" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
                     <magnitude>17.0</magnitude>
                     <units>mm[Hg]</units>
@@ -5903,6 +5944,16 @@
         <attributes>
             <rm_attribute_name>value</rm_attribute_name>
             <children>
+                <rm_type_name>DV_TEXT</rm_type_name>
+                <occurrences>
+                    <lower_included>true</lower_included>
+                    <upper_included>true</upper_included>
+                    <lower_unbounded>false</lower_unbounded>
+                    <upper_unbounded>false</upper_unbounded>
+                    <lower>1</lower>
+                    <upper>1</upper>
+                </occurrences>
+                <node_id></node_id>
                 <default_value xsi:type="DV_TEXT" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
                     <value>default value</value>
                 </default_value>
@@ -5912,6 +5963,16 @@
         <attributes>
             <rm_attribute_name>value</rm_attribute_name>
             <children>
+                <rm_type_name>DV_DURATION</rm_type_name>
+                <occurrences>
+                    <lower_included>true</lower_included>
+                    <upper_included>true</upper_included>
+                    <lower_unbounded>false</lower_unbounded>
+                    <upper_unbounded>false</upper_unbounded>
+                    <lower>1</lower>
+                    <upper>1</upper>
+                </occurrences>
+                <node_id></node_id>
                 <default_value xsi:type="DV_DURATION" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
                     <value>P6Y</value>
                 </default_value>
@@ -5921,9 +5982,20 @@
         <attributes>
             <rm_attribute_name>value</rm_attribute_name>
             <children>
+                <rm_type_name>DV_PROPORTION</rm_type_name>
+                <occurrences>
+                    <lower_included>true</lower_included>
+                    <upper_included>true</upper_included>
+                    <lower_unbounded>false</lower_unbounded>
+                    <upper_unbounded>false</upper_unbounded>
+                    <lower>1</lower>
+                    <upper>1</upper>
+                </occurrences>
+                <node_id></node_id>
                 <default_value xsi:type="DV_PROPORTION" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
                     <numerator>10.0</numerator>
                     <denominator>100.0</denominator>
+                    <type>2</type>
                 </default_value>
             </children>
             <differential_path>[openEHR-EHR-COMPOSITION.encounter.v1]/content[openEHR-EHR-OBSERVATION.affected_body_surface_area.v0]/data[at0001]/events[at0002]/data[at0003]/items[at0014]</differential_path>

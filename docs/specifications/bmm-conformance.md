@@ -31,7 +31,7 @@ Pinned schemas live in [`../resources/bmm/`](../../resources/bmm):
 
 ### REQ-041 — Pinned BMM sources
 
-The BMM files in `resources/bmm/` are the source of truth for the openEHR domain model. The generated RM and AOM 1.4 types, their primitive mappings and their type registry entries **MUST** correspond to the classes and properties of the pinned BMM files, mapped by [§ Mapping rules](#mapping-rules) and [§ Primitive type mapping](#primitive-type-mapping); hand-written code embeds no out-of-band information about openEHR types.
+The BMM files in `resources/bmm/`, the pinned schemas and the SDK-authored roots over them, are the source of truth for the openEHR domain model. The generated RM and AOM 1.4 types, their primitive mappings and their type registry entries **MUST** correspond to the classes and properties of the pinned BMM files as the SDK-authored root schemas include and amend them ([§ SDK-authored root schemas](#sdk-authored-root-schemas)), mapped by [§ Mapping rules](#mapping-rules) and [§ Primitive type mapping](#primitive-type-mapping); hand-written Go code embeds no out-of-band information about openEHR types: what the pinned schemas lack or get wrong is declared in a root schema, never in a Go table.
 
 How the SDK keeps that correspondence:
 
@@ -39,9 +39,23 @@ How the SDK keeps that correspondence:
 - **Drift-checked.** The build gate re-runs the generator and fails when the working tree differs from its output, which is the mechanical guarantee against a hand edit silently diverging from the BMM.
 - **Scope.** The generator skips the BMM package `org.openehr.rm.ehr_extract` and its sub-packages, and the deferred BMM files (`am 2.4.0`, `lang 1.1.0`, `term 3.1.0`) are not its inputs in v1.
 - **Generated and hand-written files stay apart.** A generated file carries the standard generated-code header ([§ Generator output conventions](#generator-output-conventions)) and is never edited by hand. Hand-written code in a BMM-derived package lives in its own files, documented in a `doc.go` or named by the `<file>_ext.go` convention; it consumes the generated types, never redefines a generated type or method, and never weakens or overrides an invariant the BMM declares. A hand-written package can hold a generated `*_gen.go` file that the drift check covers like any other output, such as the generated attribute access in `internal/rmaccess` and the invariant inventory in `openehr/validation`, which a hand-kept `invariants.json` classifies.
-- **The BMM wins.** Where a BMM file declares a class, property or cardinality that contradicts a statement elsewhere in the openEHR specifications, the SDK follows the BMM. The BMM is the computable form the openEHR ecosystem uses for validation, AQL path typing and tooling, so diverging from it would make archetype validation disagree with templates compiled from it, and it is the form the openEHR Foundation actively maintains while spec prose lags. A suspected bug in a BMM file is raised upstream, in the openEHR specifications repository, rather than worked around in the SDK. A deviation from the mapping rules takes an ADR and an update to [§ Mapping rules](#mapping-rules).
+- **The BMM wins.** Where a BMM file declares a class, property or cardinality that contradicts a statement elsewhere in the openEHR specifications, the SDK follows the BMM. The BMM is the computable form the openEHR ecosystem uses for validation, AQL path typing and tooling, so diverging from it would make archetype validation disagree with templates compiled from it, and it is the form the openEHR Foundation actively maintains while spec prose lags. A suspected bug in a BMM file is raised upstream, in the openEHR specifications repository, and until the corrected schema is pinned the target's root schema carries the correction ([§ SDK-authored root schemas](#sdk-authored-root-schemas)); it is never worked around in Go. Where an ITS-XML schema and the BMM disagree on the wire form of an ADL 1.4 artefact, the schema is what the documents follow, and the root schema declares the schema's form. A deviation from the mapping rules takes an ADR and an update to [§ Mapping rules](#mapping-rules).
 
 The openEHR Terminology vocabulary is pinned the same way under `resources/terminology/` ([rm-modeling.md § REQ-034](rm-modeling.md#openehr-terminology-vocabulary-req-034)).
+
+#### SDK-authored root schemas
+
+<a id="sdk-authored-root-schemas"></a>
+
+The schema a generation target loads is not a pinned file but a root schema the SDK authors, under `resources/bmm/sdk/`, which includes the pinned schema and declares only what the pinned ones lack or get wrong ([ADR 0034](../adr/0034-sdk-authored-root-schemas.md)). The loader's include merge lets a root's class shadow an include's class of the same name ([ADR 0002 D2](../adr/0002-bmm-codegen-decisions.md#d2--descendant-shadows-ancestor-bmm-include-merge)), so a root amends a pinned class by declaring it again, whole. A pinned file is never edited.
+
+- **What a root declares.** A class no pinned schema defines, or a pinned class in a corrected form. Each class and property a root declares carries, in its `documentation`, the reason and the upstream reference it rests on: the openEHR schema it follows, or the specification ticket or pull request that carries the same change upstream. A correction leaves the root in the commit that pins the upstream fix, so the root never outlives the gap it closes.
+- **The AOM 1.4 root**, `openehr_opt_1.4.0`, includes `openehr_am_1.4.0` and declares the ADL 1.4 operational template ([clinical-modeling.md § REQ-176](clinical-modeling.md#req-176--adl-14-operational-template-model)): `OPERATIONAL_TEMPLATE`, `C_ARCHETYPE_ROOT`, `FLAT_ARCHETYPE_ONTOLOGY`, `ANNOTATION`, `T_VIEW`, `T_CONSTRAINT`, `T_ATTRIBUTE`, `T_COMPLEX_OBJECT` and `C_CODE_REFERENCE`, from the AM Release-1.4 `Template.xsd`, the only formal definition openEHR has published for them; `AUTHORED_RESOURCE` in the form of the RM `common.resource` package, which the AOM 1.4 specification names as its dependency and the AM Release-1.4 schemas and every OPT carry, in place of the BASE form the pinned AOM 1.4 schema inherits; and each AOM 1.4 class whose AM Release-1.4 schema type differs from the pinned schema, in the schema type's form. Where the schema names a class otherwise than the BMM (`C_CODE_PHRASE`, `C_DV_ORDINAL` and `C_DV_QUANTITY` for `C_CODED_TEXT`, `C_ORDINAL` and `C_QUANTITY`), the root declares the schema's name and the target leaves the BMM's class out, so each generated type, its `_type` and its `xsi:type` carry one name.
+- **The RM root** includes `openehr_rm_1.2.0` and corrects `TRANSLATION_DETAILS.accreditation`, the spelling the openEHR ITS-XML schemas and ITS-JSON use and the RM schema misspells, until the RM schema is re-pinned with the upstream fix.
+- **Observable.** A generated type **MUST** carry the names its root declares, in Go, canonical JSON and canonical XML alike, `rm.TranslationDetails.Accreditation` and `aom14.CCodePhrase` among them. A document that writes a property in the pinned schema's spelling instead is unmatched content ([wire.md § REQ-170](wire.md#req-170--unmatched-content-on-decode)); one that names a class by the pinned schema's name in `_type` or `xsi:type` names an unknown type and fails in every mode, as REQ-170 says.
+- **Gate.** The build gate runs the BMM checker on every root with its includes, and the drift check holds the generated output to the roots as it holds it to a pinned file. A generated file's header names the root and the pinned schemas it includes.
+
+*Known gaps.* No root exists yet. Each target still loads its pinned schema, so a generated file's header names that schema, `rm.TranslationDetails` carries the pinned `Accreditaton`, and the AOM 1.4 types carry the BMM's class names. The AOM 1.4 root lands with the operational template model of [clinical-modeling.md § REQ-176](clinical-modeling.md#req-176--adl-14-operational-template-model), and the RM root with it, unless a re-pin carries the upstream fix first.
 
 ### REQ-045 — BMM loader is a building block
 
@@ -200,9 +214,9 @@ How each P_BMM construct becomes Go code.
 
 | BMM schema | Go package | v1 |
 |---|---|---|
-| `openehr_base_1.3.0` | shared between `openehr/rm/` (primitives + foundational classes); no dedicated `openehr/base/` package — base types appear in their using packages | ✓ |
-| `openehr_rm_1.2.0` | `openehr/rm/` — one struct file per BMM package, e.g. `openehr/rm/data_types_quantity_gen.go`, plus its JSON and XML codec files when the package has concrete classes. The `org.openehr.rm.ehr_extract` package is **skipped** for v1. | ✓ (less ehr_extract) |
-| `openehr_am_1.4.0` | `openehr/aom/aom14/`, one struct file per BMM package, e.g. `openehr/aom/aom14/archetype_gen.go`, plus its JSON and XML codec files when the package has concrete classes. The package is a sibling of `openehr/rm/`, **not** a sub-package of `openehr/template/`. Rationale: AOM is the in-memory model of an *archetype*; templates consume archetypes but AOM is the more fundamental sibling of RM. | ✓ |
+| `openehr_base_1.3.0` | shared between `openehr/rm/` (primitives + foundational classes); no dedicated `openehr/base/` package — base types appear in their using packages. Where BASE and RM declare a class of one name (`AUTHORED_RESOURCE`, `RESOURCE_DESCRIPTION`, `RESOURCE_DESCRIPTION_ITEM`, `TRANSLATION_DETAILS`, `CODE_PHRASE`), `openehr/rm/` holds the RM form, which the root's precedence over its include gives it and which ADL 1.4 archetypes and OPTs carry; the BASE form, which AOM 2 uses, is emitted into AOM 2's package when that target is wired in | ✓ |
+| `openehr_rm_1.2.0`, through the SDK-authored RM root ([§ SDK-authored root schemas](#sdk-authored-root-schemas)) | `openehr/rm/` — one struct file per BMM package, e.g. `openehr/rm/data_types_quantity_gen.go`, plus its JSON and XML codec files when the package has concrete classes. The `org.openehr.rm.ehr_extract` package is **skipped** for v1. | ✓ (less ehr_extract) |
+| `openehr_am_1.4.0`, through the SDK-authored root `openehr_opt_1.4.0` ([§ SDK-authored root schemas](#sdk-authored-root-schemas)) | `openehr/aom/aom14/`, the AOM 1.4 classes and the ADL 1.4 operational template classes, one struct file per BMM package, e.g. `openehr/aom/aom14/archetype_gen.go`, plus its JSON and XML codec files when the package has concrete classes. The package is a sibling of `openehr/rm/`, **not** a sub-package of `openehr/template/`. Rationale: AOM is the in-memory model of an *archetype*; templates consume archetypes but AOM is the more fundamental sibling of RM. | ✓ |
 | `openehr_am_2.4.0` | `openehr/aom/aom2/` (when wired in) | deferred |
 | `openehr_lang_1.1.0` | would target `openehr/bmm/` (BMM meta-classes), but v1 hand-writes that loader against the P_BMM persistence shape — generation deferred | deferred |
 | `openehr_term_3.1.0` | would target `openehr/rm/terminology/` (terminology service interface) | deferred |
@@ -337,7 +351,7 @@ Helpers in `openehr/rm/` (hand-written, non-generated) **SHOULD** offer typed pa
 ## Generator output conventions
 
 - File naming: `<package_name>_gen.go` for generated files. Example: `openehr/rm/data_types_quantity_gen.go` corresponds to BMM package `org.openehr.rm.data_types.quantity`.
-- Header: every generated file begins with `// Code generated by bmmgen; DO NOT EDIT.` followed by a `// Source: openehr_rm_1.2.0.bmm.json` line for traceability.
+- Header: every generated file begins with `// Code generated by bmmgen; DO NOT EDIT.` followed by a `// Source:` line naming the root schema and the pinned schemas it includes, for traceability.
 - RM release: the public constant `rm.Release` **MUST** carry the primary RM schema's `rm_release`. What the SDK writes into `ARCHETYPED.rm_version` is [wire.md § REQ-053](wire.md#req-053) for FLAT and STRUCTURED decode and [clinical-modeling.md § REQ-107](clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) for the instance generator.
 - Hand-written companions: `<package_name>_ext.go` (e.g. `data_types_quantity_ext.go`) hold method bodies, helper functions, and codec hooks.
 - One Go package per BMM top-level package; sub-packages flattened into the same Go package via filename (Go does not require a one-to-one directory mapping with BMM packages).
@@ -350,12 +364,12 @@ The generator carries the BMM `documentation` field on classes, properties, and 
 ## v1 scope summary
 
 **Generated in v1:**
-- `openehr/rm/` from `openehr_rm_1.2.0` (excluding `ehr_extract`) + `openehr_base_1.3.0`.
+- `openehr/rm/` from the SDK-authored RM root over `openehr_rm_1.2.0` (excluding `ehr_extract`) + `openehr_base_1.3.0`.
 - `openehr/rm/typereg/` from the same.
 - `openehr/rm/rminfo/` from the same — the flattened attribute tables, the REQ-048 class graph and absence table, and the REQ-112 function table that `rminfo.IsNonStorableAttr` reads.
 - `internal/rmaccess/access_gen.go` from the same — the attribute access of every registered class (REQ-171).
 - `openehr/validation/inventory_gen.go` from the same and the hand-kept `invariants.json` — the invariant inventory (REQ-171).
-- `openehr/aom/aom14/` from `openehr_am_1.4.0` + `openehr_base_1.3.0`.
+- `openehr/aom/aom14/` from `openehr_opt_1.4.0`, the SDK-authored root over `openehr_am_1.4.0` + `openehr_base_1.3.0`.
 
 **Deferred (BMM file kept, no v1 generation):**
 - AOM 2 (`openehr_am_2.4.0`) — consumers requesting ADL 2 / AOM 2 are out of v1 scope.

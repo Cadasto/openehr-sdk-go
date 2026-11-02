@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
 		   xmlns="http://schemas.openehr.org/v2" targetNamespace="http://schemas.openehr.org/v2" elementFormDefault="qualified"
-		   id="Resources.xsd" version="v1.1.0">
+		   id="Resources.xsd" version="v1.2.0">
 	<!-- dependencies -->
 	<xs:include schemaLocation="BaseTypes.xsd"/>
 
@@ -39,6 +39,7 @@
 			<xs:element name="accreditation" type="xs:string" minOccurs="0"/>
 			<xs:element name="other_details" type="StringDictionaryItem" minOccurs="0" maxOccurs="unbounded"/>
 			<xs:element name="version_last_translated" type="xs:string" minOccurs="0"/>
+			<xs:element name="other_contributors" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
 		</xs:sequence>
 		<xs:attribute name="id" type="xs:string" use="required"/>
 	</xs:complexType>

@@ -20,16 +20,18 @@ const xsdNamespace = "http://www.w3.org/2001/XMLSchema"
 // ITS-XML directory. A file a root includes, imports or redefines joins the
 // set it was reached from.
 var (
-	// itsXMLRMRoots are the RM and BASE schemas of Release-1.1.0.
+	// itsXMLRMRoots are the RM schemas of Release-1.1.0 and the BASE
+	// schemas of Release-1.2.0.
 	itsXMLRMRoots = []string{
 		"components/RM/Release-1.1.0/*.xsd",
-		"components/BASE/Release-1.1.0/*.xsd",
+		"components/BASE/Release-1.2.0/*.xsd",
 	}
-	// itsXMLAMRoots are the AM schemas of Release-1.4: the archetype model
-	// and the openEHR archetype profile.
+	// itsXMLAMRoots are the AM schemas of Release-1.4: the archetype model,
+	// the openEHR archetype profile and the operational template.
 	itsXMLAMRoots = []string{
 		"components/AM/Release-1.4/Archetype.xsd",
 		"components/AM/Release-1.4/OpenehrProfile.xsd",
+		"components/AM/Release-1.4/Template.xsd",
 	}
 )
 

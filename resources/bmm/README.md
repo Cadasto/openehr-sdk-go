@@ -35,7 +35,7 @@ base 1.3.0  (foundation)
 
 These BMM files are published by the openEHR Foundation as the computable form of the corresponding openEHR specification documents. The on-disk format is `P_BMM`, the persistence binding of the abstract BMM meta-model defined in the openEHR LANG specification (`bmm` and `bmm_persistence`).
 
-The files in this directory are byte-identical copies of [`openEHR/specifications-ITS-BMM`](https://github.com/openEHR/specifications-ITS-BMM) `components/<COMPONENT>/json/` at the commit [`MANIFEST.txt`](MANIFEST.txt) records, fetched by [`scripts/sync-bmm.sh`](../../scripts/sync-bmm.sh) (`make bmm-sync`). They are stored here, not fetched at build time, for the reasons listed above. When upstream publishes a newer version, follow § Updating below.
+The files in this directory are byte-identical copies of [`openEHR/specifications-ITS-BMM`](https://github.com/openEHR/specifications-ITS-BMM) `components/<COMPONENT>/json/` at the commit [`MANIFEST.txt`](MANIFEST.txt) records, fetched by [`scripts/sync-bmm.sh`](../../scripts/sync-bmm.sh) (`make bmm-sync`). They are stored here, not fetched at build time, for the reasons listed above. The pin is currently the ITS-BMM branch `integration/am14-opt-validation`, which adds [specifications-AM PR 48](https://github.com/openEHR/specifications-AM/pull/48) to `master`: `units_system` and `units_display_name` on the AOM 1.4 `C_QUANTITY_ITEM` (SPECAM-109, `schema_revision` 1.4.0.3). Re-pin to `master` once ITS-BMM carries the merged change. When upstream publishes a newer version, follow § Updating below.
 
 `make bmm-drift` compares each pinned file with ITS-BMM `master` and lists any newer version of a pinned component. It needs the network and is not a gate.
 

@@ -18,6 +18,7 @@ import (
 var xmlClassCCodedText = xmlunmatched.Class{
 	Name:     "C_CODED_TEXT",
 	Required: []string{"rm_type_name", "occurrences", "node_id", "terminology"},
+	Items:    []string{"code_list"},
 }
 
 // UnmarshalXML decodes canonical openEHR XML into CCodedText.
@@ -63,10 +64,14 @@ func (c *CCodedText) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 					return _err
 				}
 			case "code_list":
-				// TODO(canxml): Hash<K,V> XML decode deferred — see canxml/doc.go.
-				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+				var _v string
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
+				if c.CodeList == nil {
+					c.CodeList = new([]string)
+				}
+				*c.CodeList = append(*c.CodeList, _v)
 			case "reference":
 				var _v string
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
@@ -261,6 +266,18 @@ func (c *CQuantityItem) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 					return _err
 				}
 				c.Units = &_v
+			case "units_system":
+				var _v string
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+					return _err
+				}
+				c.UnitsSystem = &_v
+			case "units_display_name":
+				var _v string
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+					return _err
+				}
+				c.UnitsDisplayName = &_v
 			default:
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
