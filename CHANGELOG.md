@@ -10,12 +10,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- **`aom14.CQuantityItem` carries `UnitsSystem` and `UnitsDisplayName`, AOM 1.4 generic List members such as `C_CODED_TEXT.code_list` decode from canonical XML, and the vendored ITS-XML schemas add the AM Release-1.4 `Template.xsd` (REQ-041, REQ-056).**
+- **`aom14.CQuantityItem` carries `UnitsSystem` and `UnitsDisplayName`, AOM 1.4 generic List members decode from canonical XML, and the vendored ITS-XML schemas add the AM Release-1.4 `Template.xsd` (REQ-041, REQ-056).**
 
 ### Changed
 
-- **Breaking: canonical XML reads `Real` element text in the `xs:double` lexical space, refusing spellings Go's float parser accepted, such as `0x1p-2`, `1_000` and `Inf` (REQ-056).**
-- **Canonical JSON writes a present empty `ITEM_LIST.items`, `ITEM_TREE.items` or `ITEM_TABLE.rows` as `[]`, `instance.Generate` writes one the template requires by existence, and template validation reports it `required` when absent (REQ-052, REQ-102, REQ-107).**
+- **Breaking: canonical XML reads `Real` element text in the `xs:double` lexical space, refusing spellings Go's float parser accepted, such as hexadecimal, digit separators and `Inf` (REQ-056).**
+- **Canonical JSON writes a present empty `ITEM_LIST.items`, `ITEM_TREE.items` or `ITEM_TABLE.rows` as `[]`, the instance generator writes one the template requires by existence, and template validation reports it required when absent (REQ-052, REQ-102, REQ-107).**
 - **`template.ParseOPT` reads `timezone_validity` as a `VALIDITY_KIND` word, which strict mode refused and lenient mode misread for two words, or as the code 1001 to 1003 (REQ-103).**
 
 ## [0.44.0] - 2026-10-30
