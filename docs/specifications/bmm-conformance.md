@@ -31,7 +31,7 @@ Pinned schemas live in [`../resources/bmm/`](../../resources/bmm):
 
 ### REQ-041 — Pinned BMM sources
 
-The BMM files in `resources/bmm/` are the source of truth for the openEHR domain model. The generated RM and AOM 1.4 types, their primitive mappings and their type registry entries **MUST** correspond to the classes and properties of the pinned BMM files as the SDK-authored root schemas include and amend them ([§ SDK-authored root schemas](#sdk-authored-root-schemas)), mapped by [§ Mapping rules](#mapping-rules) and [§ Primitive type mapping](#primitive-type-mapping); hand-written Go code embeds no out-of-band information about openEHR types: what the pinned schemas lack or get wrong is declared in a root schema, never in a Go table.
+The BMM files in `resources/bmm/`, the pinned schemas and the SDK-authored roots over them, are the source of truth for the openEHR domain model. The generated RM and AOM 1.4 types, their primitive mappings and their type registry entries **MUST** correspond to the classes and properties of the pinned BMM files as the SDK-authored root schemas include and amend them ([§ SDK-authored root schemas](#sdk-authored-root-schemas)), mapped by [§ Mapping rules](#mapping-rules) and [§ Primitive type mapping](#primitive-type-mapping); hand-written Go code embeds no out-of-band information about openEHR types: what the pinned schemas lack or get wrong is declared in a root schema, never in a Go table.
 
 How the SDK keeps that correspondence:
 
@@ -43,7 +43,7 @@ How the SDK keeps that correspondence:
 
 The openEHR Terminology vocabulary is pinned the same way under `resources/terminology/` ([rm-modeling.md § REQ-034](rm-modeling.md#openehr-terminology-vocabulary-req-034)).
 
-### SDK-authored root schemas
+#### SDK-authored root schemas
 
 <a id="sdk-authored-root-schemas"></a>
 
@@ -52,8 +52,10 @@ The schema a generation target loads is not a pinned file but a root schema the 
 - **What a root declares.** A class no pinned schema defines, or a pinned class in a corrected form. Each class and property a root declares carries, in its `documentation`, the reason and the upstream reference it rests on: the openEHR schema it follows, or the specification ticket or pull request that carries the same change upstream. A correction leaves the root in the commit that pins the upstream fix, so the root never outlives the gap it closes.
 - **The AOM 1.4 root**, `openehr_opt_1.4.0`, includes `openehr_am_1.4.0` and declares the ADL 1.4 operational template ([clinical-modeling.md § REQ-176](clinical-modeling.md#req-176--adl-14-operational-template-model)): `OPERATIONAL_TEMPLATE`, `C_ARCHETYPE_ROOT`, `FLAT_ARCHETYPE_ONTOLOGY`, `ANNOTATION`, `T_VIEW`, `T_CONSTRAINT`, `T_ATTRIBUTE`, `T_COMPLEX_OBJECT` and `C_CODE_REFERENCE`, from the AM Release-1.4 `Template.xsd`, the only formal definition openEHR has published for them; `AUTHORED_RESOURCE` in the form of the RM `common.resource` package, which the AOM 1.4 specification names as its dependency and the AM Release-1.4 schemas and every OPT carry, in place of the BASE form the pinned AOM 1.4 schema inherits; and each AOM 1.4 class whose AM Release-1.4 schema type differs from the pinned schema, in the schema type's form. Where the schema names a class otherwise than the BMM (`C_CODE_PHRASE`, `C_DV_ORDINAL` and `C_DV_QUANTITY` for `C_CODED_TEXT`, `C_ORDINAL` and `C_QUANTITY`), the root declares the schema's name and the target leaves the BMM's class out, so each generated type, its `_type` and its `xsi:type` carry one name.
 - **The RM root** includes `openehr_rm_1.2.0` and corrects `TRANSLATION_DETAILS.accreditation`, the spelling the openEHR ITS-XML schemas and ITS-JSON use and the RM schema misspells, until the RM schema is re-pinned with the upstream fix.
-- **Observable.** A generated type **MUST** carry the names its root declares, in Go, canonical JSON and canonical XML alike, `rm.TranslationDetails.Accreditation` and `aom14.CCodePhrase` among them; a document that writes the pinned schema's spelling instead is unmatched content ([wire.md § REQ-170](wire.md#req-170--unmatched-content-on-decode)).
+- **Observable.** A generated type **MUST** carry the names its root declares, in Go, canonical JSON and canonical XML alike, `rm.TranslationDetails.Accreditation` and `aom14.CCodePhrase` among them. A document that writes a property in the pinned schema's spelling instead is unmatched content ([wire.md § REQ-170](wire.md#req-170--unmatched-content-on-decode)); one that names a class by the pinned schema's name in `_type` or `xsi:type` names an unknown type and fails in every mode, as REQ-170 says.
 - **Gate.** The build gate runs the BMM checker on every root with its includes, and the drift check holds the generated output to the roots as it holds it to a pinned file. A generated file's header names the root and the pinned schemas it includes.
+
+*Known gaps.* No root exists yet. Each target still loads its pinned schema, so a generated file's header names that schema, `rm.TranslationDetails` carries the pinned `Accreditaton`, and the AOM 1.4 types carry the BMM's class names. The AOM 1.4 root lands with the operational template model of [clinical-modeling.md § REQ-176](clinical-modeling.md#req-176--adl-14-operational-template-model), and the RM root with it, unless a re-pin carries the upstream fix first.
 
 ### REQ-045 — BMM loader is a building block
 
