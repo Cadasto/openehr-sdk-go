@@ -2580,3 +2580,11 @@ requirements:
       - openehr/serialize/canjson/missing_test.go
       - openehr/serialize/canxml/missing_test.go
       - openehr/validation/missing_members_test.go
+
+  - id: REQ-176
+    title: ADL 1.4 operational template model
+    canonical: docs/specifications/clinical-modeling.md#req-176--adl-14-operational-template-model
+    status: draft
+    implementation: planned
+    packages: [openehr/aom/aom14, internal/bmmgen, resources/bmm, openehr/serialize/canxml]
+    probes: [PROBE-111]

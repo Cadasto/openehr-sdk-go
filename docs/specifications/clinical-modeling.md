@@ -124,6 +124,31 @@ All errors wrap context with `fmt.Errorf("...: %w", err)`; callers compare with 
 
 ---
 
+## REQ-176 — ADL 1.4 operational template model
+
+The SDK **MUST** provide, in its AOM 1.4 package, generated types for the ADL 1.4 operational template as the AM Release-1.4 `Template.xsd` defines it, `OPERATIONAL_TEMPLATE` at the root, with the canonical-XML codec of [wire.md § REQ-056](wire.md#req-056) and the canonical-JSON codec of [wire.md § REQ-052](wire.md#req-052), so a consumer reads an OPT into typed values that carry everything the document carries and writes it back. The types come from the SDK-authored root schema [bmm-conformance.md § SDK-authored root schemas](bmm-conformance.md#sdk-authored-root-schemas) describes, which declares the operational template classes and binds `ARCHETYPE` to the RM `common.resource` form of `AUTHORED_RESOURCE`. [§ REQ-100](#req-100--adl-14-operational-template-opt-parse-and-paths)'s parser is a separate reader of the same documents; how the two relate is open ([research-strands.md § STRAND-17](research-strands.md#strand-17--the-opt-parser-and-the-generated-operational-template-model)).
+
+### Round trip
+
+An OPT that validates against the pinned AM Release-1.4 schemas (`Template.xsd` and its closure) **MUST** decode with no unmatched content, so [wire.md § REQ-170](wire.md#req-170--unmatched-content-on-decode)'s report is empty and its strict option refuses nothing, apart from the element the next section names; and encoding the decoded value **MUST** give a document that validates against the same schemas and holds the same content: the same elements in the same order with the same attributes and text, the XML declaration and white space between elements aside. The `Hash` members the OPT carries, `ARCHETYPE_TERM.items`, `translations` and the maps of `RESOURCE_DESCRIPTION`, `RESOURCE_DESCRIPTION_ITEM` and `TRANSLATION_DETAILS`, round-trip in the shapes [wire.md § REQ-056](wire.md#req-056) gives them.
+
+### Shapes the schemas leave open
+
+- `timezone_validity` on `C_DATE`, `C_TIME` and `C_DATE_TIME` decodes from a `VALIDITY_KIND` word, from `disallowed` and from the Release-1.0.2 integer codes `1001`, `1002` and `1003`, as [§ REQ-103](#req-103--primitive-constraint-introspection) reads them; any other text is refused in every mode with `canxml.ErrInvalidShape`. The encoder writes the word.
+- `C_QUANTITY_ITEM` carries `units_system` and `units_display_name` after `units`, the members RM 1.1.0 gave `DV_QUANTITY` and Archetype Designer writes in every OPT it exports (openEHR SPECAM-109).
+- `match_negated`, which Archetype Designer writes as `false` on every `C_SINGLE_ATTRIBUTE` and `C_MULTIPLE_ATTRIBUTE`, is an element no openEHR model declares and that carries no meaning: with the text `false` it is read and dropped in every mode, neither reported nor refused, and never written; with any other text it is refused in every mode with `canxml.ErrInvalidShape`, since AOM 1.4 cannot express a negated match.
+- `xsi:type="T_ARCHETYPE_ROOT"` reads as `C_ARCHETYPE_ROOT`, as [§ REQ-100](#req-100--adl-14-operational-template-opt-parse-and-paths) reads it, and is written as `C_ARCHETYPE_ROOT`.
+
+### Out of scope
+
+- The parser and compile pipeline of [§ REQ-100](#req-100--adl-14-operational-template-opt-parse-and-paths) and their consumers, which keep reading OPTs on their own path until STRAND-17 is resolved.
+- OET authoring templates, ADL 2 operational templates and AOM 2.
+- Validating an OPT against its archetypes, and validating a composition against the generated model: [§ REQ-102](#req-102--composition-validation) stays on the compiled template.
+
+- **Probes:** PROBE-111 (corpus round trip)
+
+---
+
 ## REQ-108 — Untrusted document bounds
 
 Clinical-modeling and codec entry points **MUST** bound how much untrusted input they read and how deeply they recurse, so hostile OPT XML, BMM JSON, uploaded templates, or crafted canonical JSON cannot exhaust memory or CPU before the caller's own policy kicks in. Two threats need no guard beyond these bounds. Go's `encoding/xml` does not expand DTD entity declarations and refuses an undeclared entity, so OPT parsing is open to neither external-entity injection nor entity expansion. `C_STRING` patterns compile with Go's `regexp` (RE2, linear time), so a crafted pattern cannot backtrack catastrophically.

@@ -339,6 +339,28 @@ Three candidates are named and none is built:
 
 ---
 
+## STRAND-17 — The OPT parser and the generated operational template model
+
+**Status:** Open. Opened 2026-11-02, with [ADR 0034](../adr/0034-sdk-authored-root-schemas.md).
+
+**Question:** once [REQ-176](clinical-modeling.md#req-176--adl-14-operational-template-model)'s generated types read an OPT losslessly, what becomes of [REQ-100](clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths)'s parser, `template.ParseOPT`: does it stay an independent reader, is it rebuilt as a view over the generated model, or does a converter outside `openehr/template` map one to the other?
+
+**Why it is open:** the parser is a projection built for path resolution and template compilation, with about twenty consumers across the compile, validation, the instance generator, the Web Template builder, FLAT and the examples, and it is tuned as a hot path. It loses what the model keeps: the description's details, `view`, `constraints`, `component_ontologies`, the root `ontology`, `C_CODE_REFERENCE.referenceSetUri`, `T_COMPLEX_OBJECT.default_value` and `translations`. Rebuilding it on the model would amend [REQ-013](module-layout.md#req-013--building-block-independence)'s row for `openehr/template`, which keeps the RM and AOM types out of its closure, and would put the generated decoders' cost on every compile.
+
+**The trade-off:**
+
+- **Two readers.** The parser stays as it is; a consumer that needs the whole document decodes it with the model. Against it: two readers of one format, each with its own tolerances.
+- **A view over the model.** The parser decodes with the model and projects. Against it: the REQ-013 row, the decode cost on the compile path, and the parser's tolerances (an unknown child type admitted as a leaf, `null_flavor`) restated on the model.
+- **A converter.** A package outside `openehr/template` maps a decoded `OPERATIONAL_TEMPLATE` to the parser's tree and back. Against it: a third representation to keep in step.
+
+**Evidence needed:** the decode cost of the generated model on the corpus against `ParseOPT`'s, on the compile benchmarks; which consumers need what the parser loses; and whether the parser's tolerances can be stated on the model without weakening [REQ-170](wire.md#req-170--unmatched-content-on-decode).
+
+**Resolution form:** an ADR amending REQ-100 and, for the second option, REQ-013.
+
+**Affects:** REQ-013, REQ-100, REQ-176.
+
+---
+
 ## Index
 
 | Strand | Title | Status | Affects |
@@ -359,3 +381,4 @@ Three candidates are named and none is built:
 | [STRAND-14](#strand-14--should-template-driven-validation-also-run-the-rm-floor-invariants) | Template-driven validation and the RM floor | **Resolved** ([ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md)) | REQ-102, REQ-112 |
 | [STRAND-15](#strand-15--decode-time-presence-and-unmatched-member-capture-on-the-generated-types) | Decode-time presence and unmatched-member capture | Partly resolved (presence: [ADR 0033](../adr/0033-missing-members-reported-by-decoders.md); capture open) | REQ-040, REQ-052, REQ-112, REQ-170, REQ-175 |
 | [STRAND-16](#strand-16--validator-policy-beyond-the-limits) | Validator policy beyond the limits | Open | REQ-102, REQ-171 |
+| [STRAND-17](#strand-17--the-opt-parser-and-the-generated-operational-template-model) | The OPT parser and the generated OPT model | Open | REQ-013, REQ-100, REQ-176 |

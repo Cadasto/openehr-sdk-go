@@ -11,7 +11,7 @@ date: 2026-05-16
 - **Status:** Accepted, 2026-05-16.
 - **Supersedes:** —
 - **Superseded by:** —
-- **Amended:** D4, 2026-10-01 (the `P_BMM_INTERFACE` shape). D8, 2026-10-11 (the interval classes' boundary-flag logic). D9 added, 2026-10-12 (canonical-XML unmatched content). D10 added, 2026-10-26 (canonical-XML child order from the ITS-XML schemas). D9, 2026-10-26 (the decoders hand the runtime a description of their class on entry, [ADR 0033](0033-missing-members-reported-by-decoders.md)).
+- **Amended:** D4, 2026-10-01 (the `P_BMM_INTERFACE` shape). D8, 2026-10-11 (the interval classes' boundary-flag logic). D9 added, 2026-10-12 (canonical-XML unmatched content). D10 added, 2026-10-26 (canonical-XML child order from the ITS-XML schemas). D9, 2026-10-26 (the decoders hand the runtime a description of their class on entry, [ADR 0033](0033-missing-members-reported-by-decoders.md)). D2 and D5, 2026-11-02 (the targets' roots are SDK-authored schemas over the pinned ones, [ADR 0034](0034-sdk-authored-root-schemas.md)).
 - **Tracks:** the BMM code generator, landed on `main` in commit [b89aa589](https://github.com/Cadasto/openehr-sdk-go/commit/b89aa589).
 - **Requirements:** [REQ-043](../specifications/bmm-conformance.md#mapping-rules) (the P_BMM to Go mapping rules the generator applies); [REQ-056](../specifications/wire.md#req-056) (the canonical-XML child order D10 supplies).
 
@@ -29,7 +29,7 @@ All RM classes emit into one Go package `openehr/rm/`, with one `*_gen.go` file 
 
 ### D2 — Descendant-shadows-ancestor BMM include merge
 
-`bmm.LoadAll` allows a descendant schema's class to override an ancestor schema's class with the same name (descendant wins). Two sibling ancestor schemas containing the same class still return `ErrSchemaConflict`. Matches REQ-047 and real openEHR corpus shape (base + RM refinements).
+`bmm.LoadAll` allows a descendant schema's class to override an ancestor schema's class with the same name (descendant wins). Two sibling ancestor schemas containing the same class still return `ErrSchemaConflict`. Matches REQ-047 and real openEHR corpus shape (base + RM refinements). The SDK-authored root schemas of [ADR 0034](0034-sdk-authored-root-schemas.md) rest on this rule: a root amends a pinned class by declaring it again.
 
 ### D3 — `typereg_gen.go` in package `rm` / `aom14`, not under `typereg/`
 
@@ -43,7 +43,7 @@ A `P_BMM_INTERFACE` class is emitted as a Go interface with the unexported `is<X
 
 ### D5 — AOM 1.4 references RM for base types (one-way import)
 
-`openehr/aom/aom14/` imports `openehr/rm` for shared base types (`rm.HierObjectID`, etc.). AOM does not duplicate base classes. Dependency is strictly `aom14 → rm`.
+`openehr/aom/aom14/` imports `openehr/rm` for shared base types (`rm.HierObjectID`, etc.). AOM does not duplicate base classes. Dependency is strictly `aom14 → rm`. The AOM 1.4 root of [ADR 0034](0034-sdk-authored-root-schemas.md) binds `AUTHORED_RESOURCE` to the RM `common.resource` form, so the resource classes it references are the ones `openehr/rm` holds.
 
 ### D6 — BMM functions become panic stubs; bodies live in `*_ext.go`
 

@@ -45,6 +45,7 @@ Open decisions (those that would be ADRs once resolved) live in this repo as **r
 | ADR-0031 | The composition and EHR_STATUS version reads refuse an IMPORTED_VERSION, departing from the pinned version schemas | Accepted | 2026-10-25 | Amends: REQ-095, REQ-174 |
 | ADR-0032 | The composition and EHR_STATUS version reads accept an ORIGINAL_VERSION without data, the RM's logical deletion, departing from the pinned version schemas | Accepted | 2026-10-26 | Amends: REQ-095, REQ-174 |
 | ADR-0033 | A missing mandatory member is reported by the decoder and read by the validators, not recorded on the value | Accepted | 2026-10-26 | Resolves: STRAND-15 (the presence question); Amends: REQ-112, REQ-171, ADR-0002 |
+| ADR-0034 | Each generation target's root is an SDK-authored BMM schema over the pinned openEHR schemas; the ADL 1.4 operational template is modelled from Template.xsd | Accepted | 2026-11-02 | Amends: REQ-041, REQ-056, ADR-0002 |
 
 <!-- /sdd:generated -->
 
