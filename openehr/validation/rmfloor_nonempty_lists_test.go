@@ -288,11 +288,13 @@ func historyOPT(existence, cardinality string) string {
 // 0..*, over a POINT_EVENT at occurrences 0..*: while the HISTORY has no
 // summary, the template asks events for a member, so events absent or
 // present and empty draws the template's `required` at /events once, and
-// no Events_valid at the HISTORY's path; a summary keeps both, and an
-// event keeps both. At a cardinality of 1..* the empty list draws the
-// template's cardinality beside it, and still no RM rule. Where the template
-// leaves events optional (existence 0..1), a HISTORY with neither an event
-// nor a summary draws Events_valid alone, absent or empty.
+// no Events_valid at the HISTORY's path; a summary keeps a present, empty
+// list, and an event keeps both. With a summary, events left out still draw
+// the template's `required`: the existence asks for the container whatever
+// asks for a member (issue 341). At a cardinality of 1..* the empty list
+// draws the template's cardinality beside it, and still no RM rule. Where the
+// template leaves events optional (existence 0..1), a HISTORY with neither an
+// event nor a summary draws Events_valid alone, absent or empty.
 func TestValidate_REQ102_REQ171_HistoryEventsExistence(t *testing.T) {
 	t.Parallel()
 	required := fiInterval("1", "1")
@@ -307,7 +309,8 @@ func TestValidate_REQ102_REQ171_HistoryEventsExistence(t *testing.T) {
 	}{
 		{name: "required, absent, no summary", existence: required, cardinality: zeroOrMore, root: rmHistory(nil, nil), want: []string{"required /events template existence"}},
 		{name: "required, present and empty, no summary", existence: required, cardinality: zeroOrMore, root: rmHistory([]rm.Event{}, nil), want: []string{"required /events template existence"}},
-		{name: "required, absent, a summary", existence: required, cardinality: zeroOrMore, root: rmHistory(nil, summaryTree())},
+		{name: "required, absent, a summary", existence: required, cardinality: zeroOrMore, root: rmHistory(nil, summaryTree()), want: []string{"required /events template existence"}},
+		{name: "required, present and empty, a summary", existence: required, cardinality: zeroOrMore, root: rmHistory([]rm.Event{}, summaryTree())},
 		{name: "required, an event", existence: required, cardinality: zeroOrMore, root: rmHistory([]rm.Event{pointEvent()}, nil)},
 		{
 			name: "required at cardinality 1..*, present and empty, no summary", existence: required, cardinality: oneOrMore, root: rmHistory([]rm.Event{}, nil),

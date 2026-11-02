@@ -353,8 +353,8 @@ func TestREQ168_EmptyValue(t *testing.T) {
 		paths []string
 	}{
 		{
-			// vital_signs.opt requires the events by their existence and
-			// their cardinality; an existence alone asks for no member.
+			// vital_signs.opt requires the events by their existence,
+			// which asks for the container the instance leaves out.
 			name:  "required under a template",
 			run:   vitalSigns(func(c *rm.Composition) { c.Content[0].(*rm.Observation).Data.Events = nil }),
 			code:  "required",

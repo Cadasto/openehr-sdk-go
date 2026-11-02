@@ -137,7 +137,7 @@ testkit/  -. helpers for .-→ all of the above
 - `openehr/serialize/canjson/` reaches the RM's attribute tables through `internal/rmjsonwalk/`, which imports `openehr/rm/rminfo/` and `internal/rmjsonwalk/polyreg/`, never `openehr/rm/`; `openehr/rm/`'s generated init registers its interface table into `polyreg`, which imports only the standard library. An import-guard test holds this.
 - `cadasto/<X>` may depend on `openehr/client/*`, `transport/`, `openehr/rm/`, etc. — but never on another `cadasto/<Y>`. `cadasto/datamap` is the exception on the wire side: REQ-058 keeps it off `transport/` and `auth/`.
 - `openehr/bmm/` depends on no `transport/`, `auth/` or HTTP package; the rule is [REQ-045](bmm-conformance.md#req-045--bmm-loader-is-a-building-block)'s, and its import rule is in the table of [§ REQ-013](#req-013--building-block-independence).
-- `internal/bmmgen` depends on `openehr/bmm/` and the standard `text/template` / `go/format` packages — no SDK runtime packages.
+- `internal/bmmgen` depends on `openehr/bmm/`, the standard `text/template` / `go/format` packages and `internal/rmlists`, a list with no imports that it shares with the runtime — no other SDK runtime package.
 - `openehr/terminology/` imports only the standard library (the table of [§ REQ-013](#req-013--building-block-independence)); it sits *below* `openehr/rm`, so `openehr/rm` can import it later without a cycle.
 - `internal/termgen` is a generator tool consumed only by `cmd/termgen` at build time — no library package imports it.
 

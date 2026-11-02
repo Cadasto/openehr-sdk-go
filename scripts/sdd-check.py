@@ -32,7 +32,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 # Constants
 # ---------------------------------------------------------------------------
 
-__version__ = "0.17.0"
+__version__ = "0.18.0"
 
 #: Every family, in report order.
 FAMILIES = (
@@ -1097,9 +1097,11 @@ class Descriptor:
         return DEFAULT_SEVERITY.get(family, "error")
 
     def req_pattern(self) -> "re.Pattern":
+        """``REQ-NNN`` when flat-numeric; otherwise the area and up to two sub-areas,
+        ``REQ-AREA[-SUB[-SUB]]-NNN``. Only the first segment is the area."""
         if self.req_style == "flat-numeric":
             return re.compile(r"REQ-\d{3,}")
-        return re.compile(r"REQ-[A-Z][A-Z0-9]*-\d{3,}")
+        return re.compile(r"REQ-[A-Z][A-Z0-9]*(?:-[A-Z][A-Z0-9]*){0,2}-\d{3,}")
 
     def is_file_form(self, rel: str) -> bool:
         return Path(rel).suffix != "" or self.resolve(rel).is_file()
@@ -2547,6 +2549,8 @@ def check_links(ctx: Context, report: "Report") -> None:
         report.skip("links", "every document is excluded by check.links.exclude")
         return
     examined = 0
+    # A target's fragment names, keyed on its text: a document many links point at is parsed once.
+    names_by_text: Dict[str, set] = {}
     for path in kept:
         if _waived(ctx, report, "links", path):
             continue
@@ -2603,7 +2607,10 @@ def check_links(ctx: Context, report: "Report") -> None:
                 if not fragment:
                     continue
                 text = ctx.read(path)
-            if fragment not in _fragment_targets(text):
+            names = names_by_text.get(text)
+            if names is None:
+                names = names_by_text[text] = _fragment_targets(text)
+            if fragment not in names:
                 report.add(
                     "links",
                     level,

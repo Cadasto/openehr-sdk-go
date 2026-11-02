@@ -8,9 +8,10 @@
 //
 //	EnsureSingle(parent any, attrName string, child any) error
 //	AppendMultiple(parent any, attrName string, child any) error
+//	EnsureList(parent any, attrName string) error
 //	NewRM(rmTypeName string) (any, error)
 //
-// All three are pure structural setters. Dispatch is a closed type
+// All four are pure structural setters. Dispatch is a closed type
 // switch on the Go concrete type of `parent`, with no reflection.
 //
 // # Scope
@@ -58,6 +59,10 @@
 // (an ACTOR's languages and roles included), CONTACT, PARTY_IDENTIFIED,
 // PARTY_RELATED, FOLDER, DV_TEXT, DV_CODED_TEXT, DV_PARAGRAPH, and the
 // nine ordered data values (their other_reference_ranges).
+//
+// EnsureList makes a list present with no member, for the lists canonical
+// JSON writes as [] when present and empty: ITEM_LIST and ITEM_TREE items,
+// and ITEM_TABLE rows. A test pins it to that list in internal/rmlists.
 //
 // Each parent's writer lists the attributes it fills. An attribute takes a
 // child of its RM type or of a class that descends from it, wherever the

@@ -181,6 +181,20 @@ func emptyStructureJSON(rmType, nodeID, name string) map[string]any {
 	}
 }
 
+// prohibitedItems is an ITEM_TREE's items at existence 1..1 and cardinality
+// 0..*, whose one ELEMENT child occurs 0..0: the template requires the list
+// and prohibits its every child, so the list is there with no member.
+var prohibitedItems = optAttribute("C_MULTIPLE_ATTRIBUTE", "items", "1",
+	`<cardinality><is_ordered>true</is_ordered><is_unique>false</is_unique><interval>`+optInterval("0", "*")+`</interval></cardinality>`,
+	optChild("C_COMPLEX_OBJECT", "ELEMENT", "0", "0", "at0004", ""))
+
+// withEmptyItems returns s, the canonical JSON of an ITEM_TREE or ITEM_LIST,
+// with its items present and empty.
+func withEmptyItems(s map[string]any) map[string]any {
+	s["items"] = []any{}
+	return s
+}
+
 // TestREQ053EmptyStructureRebuildRules — REQ-053: decode rebuilds a structure
 // with no member only where the template, or the RM, requires the attribute
 // that holds it, and the template gives there one ITEM_STRUCTURE node, or
@@ -234,6 +248,11 @@ func TestREQ053EmptyStructureRebuildRules(t *testing.T) {
 			name: "a structure whose required items ask for a member", path: protocol,
 			edits: []optEdit{withProtocol(optProtocol("1", tree(optAttribute("C_MULTIPLE_ATTRIBUTE", "items", "1",
 				`<cardinality><is_ordered>true</is_ordered><is_unique>false</is_unique><interval>`+optInterval("1", "*")+`</interval></cardinality>`))))},
+		},
+		{
+			name: "a required protocol whose required items the template prohibits", path: protocol,
+			edits: []optEdit{withProtocol(optProtocol("1", tree(prohibitedItems)))},
+			want:  withEmptyItems(emptyStructureJSON("ITEM_TREE", "at0010", "Protocol")),
 		},
 		{
 			name: "alternatives that disagree on the type", path: protocol,
@@ -321,6 +340,36 @@ func TestREQ053EmptyStructureRebuildRules(t *testing.T) {
 				}
 				for _, is := range validation.ValidateComposition(back, edited).Issues {
 					t.Errorf("decoded composition: %s at %s: %s", is.Code, is.Path, is.Detail)
+				}
+			})
+		}
+	}
+}
+
+// TestREQ053WithTemplateRoundTripKeepsProhibitedRequiredList — REQ-053,
+// REQ-107: a required protocol whose ITEM_TREE requires its items by their
+// existence and prohibits their every child is written with its items
+// present and empty, under every policy. A WithTemplate decode of the FLAT
+// and STRUCTURED bodies rebuilds the structure as written, "items":[]
+// included, and the round trip validates against the template.
+func TestREQ053WithTemplateRoundTripKeepsProhibitedRequiredList(t *testing.T) {
+	const protocol = structureObservation + "/protocol"
+	wt, compiled := editedStructureTemplate(t, withProtocol(optProtocol("1", optStructure("ITEM_TREE", "at0010", prohibitedItems))))
+	want := withEmptyItems(emptyStructureJSON("ITEM_TREE", "at0010", "Protocol"))
+	for _, policy := range []instance.Policy{instance.Large, instance.Medium, instance.Required} {
+		comp := skeletonOf(t, compiled, policy)
+		written, ok := nodeAt(canonicalDoc(t, comp), protocol)
+		if !ok || !reflect.DeepEqual(written, want) {
+			t.Fatalf("the %v skeleton writes %s at %s, want %s", policy, jsonText(written), protocol, jsonText(want))
+		}
+		for _, format := range []string{"FLAT", "STRUCTURED"} {
+			t.Run(policy.String()+"/"+format, func(t *testing.T) {
+				back := bmiRoundTrip(t, format, comp, wt, simplified.WithTemplate(compiled), simplified.WithStrict())
+				for _, is := range validation.ValidateComposition(back, compiled).Issues {
+					t.Errorf("decoded composition: %s at %s: %s", is.Code, is.Path, is.Detail)
+				}
+				if got, _ := nodeAt(canonicalDoc(t, back), protocol); !reflect.DeepEqual(got, want) {
+					t.Errorf("decoded structure at %s = %s, want %s: the template requires its items by their existence", protocol, jsonText(got), jsonText(want))
 				}
 			})
 		}

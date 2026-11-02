@@ -13,6 +13,7 @@ import (
 	"uuid"
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
+	"github.com/cadasto/openehr-sdk-go/internal/rmlists"
 	"github.com/cadasto/openehr-sdk-go/internal/rmroots"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/rmwrite"
@@ -224,6 +225,14 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 
 	for _, attr := range tcimpl.NodeAttributes(optNode) {
 		if !g.visits(optNode, attr) {
+			// A list the template prohibits by prohibiting its every
+			// child, and requires by its existence, is there with no
+			// member.
+			if attrProhibited(optNode, attr) {
+				if err := keepRequiredList(optNode, attr, rmValue); err != nil {
+					return err
+				}
+			}
 			continue
 		}
 		// visits lets through an attribute the generator has no writer for
@@ -246,6 +255,9 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 				return err
 			}
 		}
+		if err := keepRequiredList(optNode, attr, rmValue); err != nil {
+			return err
+		}
 	}
 	g.fillUncarriedRequired(optNode, rmValue)
 	if err := g.writeRMNeeded(optNode, rmValue); err != nil {
@@ -260,6 +272,32 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	// After finishNode, which settles a DV_PROPORTION's kind, so the value
 	// and its normal_range are final.
 	return settleNormalRange(optNode, rmValue)
+}
+
+// keepRequiredList writes attr of optNode, a visited attribute or one the
+// template prohibits (attrProhibited), as a present empty list on rmValue
+// where the walk gave it no member, the template requires it by its
+// existence (a bounded existence lower bound of 1 or more), and canonical
+// JSON carries an empty one (rmlists.KeepsEmpty): an ITEM_LIST's or
+// ITEM_TREE's items, or an ITEM_TABLE's rows. In AOM 1.4 a
+// C_MULTIPLE_ATTRIBUTE's existence says whether the list is there and its
+// cardinality how many members it holds, so such a list is there with no
+// member, whichever way the walk left it without one: no allowed child,
+// slots only, optional children it skipped, children the template all
+// prohibits, so that the walk does not visit it, or a template that writes
+// the list as a single attribute. Any other list at that existence with no
+// member stays left out, since canonical JSON cannot carry it empty
+// (REQ-107 Known gap: required lists canonical JSON cannot carry empty), and
+// so does a list the template leaves optional. A list that holds members is
+// left as it is.
+func keepRequiredList(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute, rmValue any) error {
+	if !tcimpl.LowerAtLeastOne(attr.Existence()) || !rmlists.KeepsEmpty(nodeClass(optNode), attr.Name()) {
+		return nil
+	}
+	if err := rmwrite.EnsureList(rmValue, attr.Name()); err != nil {
+		return fmt.Errorf("write %s.%s: %w", builtRMType(optNode), attr.Name(), err)
+	}
+	return nil
 }
 
 // fillUncarriedRequired fills each attribute the BMM marks mandatory on
@@ -459,7 +497,8 @@ func compositionDefaultOwns(class, attrName string) bool {
 // needs (attrProhibited), whatever children the OPT names under it, nor
 // one no serialization carries, the BMM functions and
 // RESOURCE_DESCRIPTION.parent_resource that rminfo.IsNonStorableAttr
-// names: the generator has nothing to write there. Nor does it visit a
+// names: the generator has nothing to write there, but for a prohibited
+// list it writes present and empty (keepRequiredList). Nor does it visit a
 // locatable's uid, which setLocatableIdentity stamps, nor the normal_range or
 // other_reference_ranges of a bound of a REFERENCE_RANGE's range, which
 // the RM keeps absent, nor an attribute the node's RM class does not have,
@@ -550,12 +589,14 @@ func noWriter(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool
 }
 
 // writerNeeded reports whether the template requires attr of optNode, an
-// attribute the generator has no writer for, so that a root without it
-// fails the template validator: it is required (isRequired, which a
+// attribute the generator has no writer for, so that Generate refuses it
+// rather than return a root without it: it is required (isRequired, which a
 // cardinality lower bound alone does not make so, since that counts the
 // members of a list that exists), and, for a list the RM declares, more
-// than its existence asks it for a member (existenceOnly), since a list
-// with no member meets its existence.
+// than its existence asks it for a member (existenceOnly). A list only its
+// existence asks a member of is left out instead, and the template
+// validator reports it absent: canonical JSON cannot carry such a list
+// empty (REQ-107 known gap, issue 341).
 func writerNeeded(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
 	if !isRequired(optNode, attr) {
 		return false
@@ -1084,10 +1125,12 @@ func (g *generator) materialiseSingle(
 		// the BMM marks it mandatory, as it does PERSON.identities, it gets
 		// the member its BMM type gives. Where the BMM does not, only its
 		// existence asks for a member, so it gets none: a list with no
-		// member meets its existence. A list the RM makes non-empty once
-		// present does not: at an existence of 1 or more it gets the member
-		// its BMM type gives too, as a list the OPT writes so does
-		// (materialiseImplicitMultiple), which refuses an archetype root.
+		// member meets its existence, and keepRequiredList writes an
+		// item-structure list so left present and empty. A list the RM
+		// makes non-empty once present does not: at an existence of 1 or
+		// more it gets the member its BMM type gives too, as a list the OPT
+		// writes so does (materialiseImplicitMultiple), which refuses an
+		// archetype root.
 		if isList {
 			if !bmmRequired(optNode, attr) && (!rmNonEmptyList(optNode, attr) || !tcimpl.LowerAtLeastOne(attr.Existence())) {
 				return nil
@@ -2015,7 +2058,10 @@ func includedPerOPT(optNode *tcimpl.CompiledNode, attrName string) bool {
 // each member from the child topUpSeed names, which still has room under
 // its occurrences wherever one does. Where only the attribute's
 // existence asks for a member, the top-up builds one only of a child that
-// needs no undescribed content, and none where there is no such child.
+// needs no undescribed content, and none where there is no such child. An
+// item-structure list the template requires by its existence that ends
+// with no member, that way or any other, is then written present and empty
+// (keepRequiredList).
 func (g *generator) materialiseMultiple(
 	optNode *tcimpl.CompiledNode,
 	attr *tcimpl.CompiledAttribute,
@@ -2035,7 +2081,9 @@ func (g *generator) materialiseMultiple(
 		// mandatory-attribute check and the validator's cardinality.lower
 		// check pass; downstream consumers (REQ-101 Builder) overwrite.
 		// One only its existence requires, and an optional one, get no
-		// child: a list with no member meets its existence.
+		// child: a list with no member meets its existence. keepRequiredList
+		// then writes the first, where it is an item-structure list,
+		// present and empty.
 		return g.materialiseImplicitMultiple(optNode, attr, parentRM)
 	}
 	if err := checkCardinalityRoom(optNode, attr, children); err != nil {
@@ -2063,7 +2111,8 @@ func (g *generator) materialiseMultiple(
 			// expects an Item interface but the rmwrite check
 			// finds a type mismatch). Stop top-up gracefully so
 			// the caller (REQ-101 builder) can fill the slot
-			// later.
+			// later. A list left with no member here is still
+			// written present where keepRequiredList says so.
 			return nil //nolint:nilerr // intentional: defer to validator
 		}
 	}
@@ -2353,9 +2402,10 @@ func firstNonSlot(children []*tcimpl.CompiledNode) *tcimpl.CompiledNode {
 // registry — the validator will flag it. An attribute that is optional
 // (neither BMM-mandatory, nor existence or cardinality lower ≥ 1) gets no
 // child, and neither does one only its existence requires (existenceOnly),
-// since a list with no member meets its existence. One that needs a child
-// that would be an archetype root, such as a COMPOSITION's content or a
-// SECTION's items, is refused with [ErrArchetypeIDMissing].
+// since a list with no member meets its existence; the walk then writes such
+// an item-structure list present and empty (keepRequiredList). One that
+// needs a child that would be an archetype root, such as a COMPOSITION's
+// content or a SECTION's items, is refused with [ErrArchetypeIDMissing].
 func (g *generator) materialiseImplicitMultiple(
 	optNode *tcimpl.CompiledNode,
 	attr *tcimpl.CompiledAttribute,

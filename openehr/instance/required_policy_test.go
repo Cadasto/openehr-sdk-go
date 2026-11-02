@@ -95,8 +95,8 @@ type policyLevel struct {
 // Required builds no optional archetype, only the composition's own and
 // its context. No policy builds a slot fill in vital_signs: the slots sit
 // in the items of an OBSERVATION's protocol or an event's state, which only
-// their existence requires, so those items get no member (What a visit
-// writes). Each tree passes the template validator and the RM floor
+// their existence requires, so those items get no member and are written
+// as an empty list (What a visit writes). Each tree passes the template validator and the RM floor
 // (PROBE-027).
 func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 	const encounter = "openEHR-EHR-COMPOSITION.encounter.v1"
@@ -107,14 +107,14 @@ func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 		{
 			name: "vital_signs",
 			want: map[instance.Policy]policyLevel{
-				instance.Large: {values: 353, archetypes: map[string]int{
+				instance.Large: {values: 360, archetypes: map[string]int{
 					encounter: 1,
 					"openEHR-EHR-OBSERVATION.blood_pressure.v1":   1,
 					"openEHR-EHR-OBSERVATION.body_temperature.v1": 1,
 					"openEHR-EHR-OBSERVATION.heart_rate.v1":       1,
 					"openEHR-EHR-OBSERVATION.respiration.v1":      1,
 				}},
-				instance.Medium: {values: 138, archetypes: map[string]int{
+				instance.Medium: {values: 140, archetypes: map[string]int{
 					encounter: 1,
 					"openEHR-EHR-OBSERVATION.blood_pressure.v1": 1,
 				}},
@@ -179,7 +179,7 @@ func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 
 // TestREQ107_ZeroPolicyBuildsMedium is the REQ-107 check of Levels and
 // names on vital_signs: Options with no Policy builds the medium level, the
-// tree Medium builds in TestREQ107_PoliciesBuildTheirLevels, with 138 JSON
+// tree Medium builds in TestREQ107_PoliciesBuildTheirLevels, with 140 JSON
 // values and, besides the composition's own archetype, only the first
 // optional content OBSERVATION.
 func TestREQ107_ZeroPolicyBuildsMedium(t *testing.T) {
@@ -190,7 +190,7 @@ func TestREQ107_ZeroPolicyBuildsMedium(t *testing.T) {
 		Now:       defaultsNow,
 	})
 	tree := decodedJSON(t, comp)
-	if got, want := jsonValueCount(tree), 138; got != want {
+	if got, want := jsonValueCount(tree), 140; got != want {
 		t.Errorf("Generate(vital_signs) with no Policy holds %d JSON values, want Medium's %d", got, want)
 	}
 	got := make(map[string]int)

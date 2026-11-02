@@ -79,7 +79,10 @@
 //     no error, and [WithMissing] reports it. See "Missing members" below.
 //
 //   - Empty containers with BMM cardinality.lower == 0 are emitted as
-//     absent (omitempty), not as `[]`.
+//     absent (omitempty), not as `[]`, except the items of an ITEM_LIST or
+//     ITEM_TREE and the rows of an ITEM_TABLE: an archetype can require such
+//     a list by its existence, so a present empty one is written as `[]` and
+//     only a nil one is left out.
 //
 //   - A mandatory member that holds no value, a nil list, map, pointer or
 //     interface, or a polymorphic slot holding a typed-nil pointer, is

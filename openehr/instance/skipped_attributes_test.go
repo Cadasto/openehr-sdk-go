@@ -64,6 +64,18 @@ func TestREQ107_AttributeNotInRMIsNotVisited(t *testing.T) {
 	}
 }
 
+// templateRequired expects the template's `required`, rule existence, at
+// path: a list the template requires by its existence that the root leaves
+// out (REQ-102).
+func templateRequired(path string) expectedIssue {
+	return expectedIssue{
+		name: "the template's required at " + path,
+		match: func(iss validation.Issue) bool {
+			return iss.Code == "required" && iss.Path == path && iss.Layer == validation.LayerTemplate && iss.Rule == "existence"
+		},
+	}
+}
+
 // optLink is a LINK child whose occurrences are lower..upper.
 func optLink(lower, upper int) string {
 	return optOccurring("C_COMPLEX_OBJECT", "LINK", "", lower, upper)
@@ -75,8 +87,12 @@ func optLink(lower, upper int) string {
 // RM type ACCESS_CONTROL_SETTINGS has no concrete class, and a
 // DV_MULTIMEDIA's integrity_check. Where the OPT leaves it optional, whatever it puts under
 // it, it is not visited, and Generate returns a root that passes the RM
-// floor and the template validator; so it is for a list only its existence
-// or only its cardinality asks a member of, which may stay absent. Where the
+// floor and the template validator; so it is for a list only its
+// cardinality asks a member of, which may stay absent. A list only its
+// existence asks a member of is not visited either, but its existence asks
+// for the container, which canonical JSON cannot carry empty for links, so
+// the root draws the template's `required` there alone (REQ-102; REQ-107
+// Known gap: required lists canonical JSON cannot carry empty). Where the
 // OPT requires it, by its existence, a child's occurrences, or an existence
 // with a cardinality that asks for a member, Generate returns an error
 // wrapping ErrConstraintUnsatisfiable that names the RM type, the attribute
@@ -92,6 +108,9 @@ func TestREQ107_AttributeWithoutWriterIsVisitedOnlyWhereRequired(t *testing.T) {
 		// detail is what the error says after the sentinel's own text; ""
 		// marks a control row, which must generate.
 		detail string
+		// expect lists the errors a control row's root draws, none where
+		// it is empty.
+		expect []expectedIssue
 	}{
 		{
 			name: "optional feeder_audit over a FEEDER_AUDIT",
@@ -107,8 +126,9 @@ func TestREQ107_AttributeWithoutWriterIsVisitedOnlyWhereRequired(t *testing.T) {
 			opt:  optTemplate("CLUSTER", optListWithin("links", 0, 1, optLink(0, 1))),
 		},
 		{
-			name: "links only their existence requires",
-			opt:  optTemplate("CLUSTER", optListWithin("links", 1, 1, optLink(0, 1))),
+			name:   "links only their existence requires",
+			opt:    optTemplate("CLUSTER", optListWithin("links", 1, 1, optLink(0, 1))),
+			expect: []expectedIssue{templateRequired("/links")},
 		},
 		{
 			name: "links only their cardinality asks a member of",
@@ -203,7 +223,7 @@ func TestREQ107_AttributeWithoutWriterIsVisitedOnlyWhereRequired(t *testing.T) {
 						if err != nil {
 							t.Fatalf("Generate: %v, want a root", err)
 						}
-						checkValid(t, out, c)
+						checkValidBut(t, out, c, tc.expect...)
 						return
 					}
 					checkUnsatisfiableDetail(t, "Generate", err, tc.detail)
