@@ -3,22 +3,21 @@
 source_repo: openEHR/specifications-ITS-XML
 roots: components/RM/Release-1.1.0/*.xsd components/BASE/Release-1.2.0/*.xsd components/AM/Release-1.4/Archetype.xsd components/AM/Release-1.4/OpenehrProfile.xsd components/AM/Release-1.4/Template.xsd
 closure: transitive xs:include, xs:import and xs:redefine schemaLocation
-ref: master
-commit: e6ff2a4e55c13cc79e15376a46c29f4c1e529f92
-fetched_utc: 2026-11-01T20:33:45Z
-source_tree: https://github.com/openEHR/specifications-ITS-XML/tree/e6ff2a4e55c13cc79e15376a46c29f4c1e529f92/components
+ref: integration/am14-opt-validation
+commit: 49c2ca39121e9e165f74ecec1f4e0d551cc8566d
+fetched_utc: 2026-11-02T11:44:33Z
+source_tree: https://github.com/openEHR/specifications-ITS-XML/tree/49c2ca39121e9e165f74ecec1f4e0d551cc8566d/components
 #
 # sha256  path
-64d450f6759e9a5930b53d125e3b1f0f80c3a3878f4043acaf9a62b6d3bb89b6  components/AM/Release-1.4/Archetype.xsd
-bb2ed5848b9286dc1c6aae81080be851a36b2d1f04fb66227c2d5b1e76444184  components/AM/Release-1.4/OpenehrProfile.xsd
-129ce7ada5c1c6de2140931c2da8706dff8b6b909beaba4f81f4e4569c81acd4  components/AM/Release-1.4/Resource.xsd
+1113c343062192ef00b913b26af5e1aae61e09dcd89b2cd2cfb5ab11f564dd17  components/AM/Release-1.4/Archetype.xsd
+2d41fe6f66433c1fbaff66e0627ec6243f2f29aa7ad93501242611db29b0c8f6  components/AM/Release-1.4/OpenehrProfile.xsd
+494d5bc43bfc81466c6acb65d0477c561be136a3a4c0205aa7778bfd31709ccd  components/AM/Release-1.4/Resource.xsd
 348d4e8fb368f97d028284bb87888bd8b9bcba0e2839b4405fe23f145849eff1  components/AM/Release-1.4/Template.xsd
 b1af9db5ab01865087cb7783f349de9cbacf9c045ccd785132483bec99e89a67  components/BASE/Release-1.2.0/BaseTypes.xsd
 5c7d35500876f32ebf1db80335803395936c15731ee33ea8e09df180e8f478e2  components/BASE/Release-1.2.0/Resource.xsd
-b1af9db5ab01865087cb7783f349de9cbacf9c045ccd785132483bec99e89a67  components/BASE/latest/BaseTypes.xsd
 795a655416465797aca258d53c65a0ae0248dc79adb1ac18e67ee4a78e07cd01  components/RM/Release-1.1.0/Common.xsd
 267ba156088a72065314eb70e572952a6529a0d64670548a21a812ca25400a0d  components/RM/Release-1.1.0/DataStructures.xsd
-36360b539917b0574fc156700810a40799591c6fc2ed95decc83bb0727a398fc  components/RM/Release-1.1.0/DataTypes.xsd
+c950a7102d5c50e828c357a0ffee314f7ac1ef4bca86e310ad105339dbb085c0  components/RM/Release-1.1.0/DataTypes.xsd
 75b87424dc46efdd8b371ade6570d9448dbb71262cee4360d3bc10e80c6d2281  components/RM/Release-1.1.0/Demographic.xsd
 7d8a029e392ad925892d2226198314058952da8bc779e4f5b9b2fe32ba4685b8  components/RM/Release-1.1.0/Ehr.xsd
 271e3fa1df27ab567de4f866d6cf8bfe95270e01dac7614d8e3b62c24e8bd288  components/RM/Release-1.1.0/EhrExtract.xsd

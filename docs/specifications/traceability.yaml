@@ -673,6 +673,7 @@ requirements:
       - internal/rmaccess/interval_test.go
       - openehr/aom/aom14/coded_text_code_list_xml_test.go
       - openehr/aom/aom14/interval_open_side_test.go
+      - openehr/aom/aom14/quantity_item_units_xml_test.go
       - openehr/internal/xmlunmatched/document_internal_test.go
       - openehr/rm/character_text_test.go
       - openehr/rm/interval_bound_test.go

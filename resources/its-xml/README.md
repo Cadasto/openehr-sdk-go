@@ -23,7 +23,13 @@ The generator reads only the element sequences. These schemas declare
   roots, transitively, and vendors each file it reaches. Every file keeps its upstream path under
   this directory, so each `schemaLocation` still resolves here.
 - **Pin + integrity:** the exact upstream commit and a per-file `sha256` are recorded in
-  [`MANIFEST.txt`](MANIFEST.txt). Regenerate with `make its-xml-sync`; verify offline with
+  [`MANIFEST.txt`](MANIFEST.txt). The pin is currently the upstream branch
+  `integration/am14-opt-validation`, which merges three open pull requests onto `master`:
+  [#15](https://github.com/openEHR/specifications-ITS-XML/pull/15) (`units_system` and
+  `units_display_name` on `C_QUANTITY_ITEM`, SPECAM-109),
+  [#16](https://github.com/openEHR/specifications-ITS-XML/pull/16) (`timezone_validity` accepts the
+  Release-1.0.2 integer codes) and [#17](https://github.com/openEHR/specifications-ITS-XML/pull/17)
+  (`match_negated`), the last two under SPECPR-516. Re-pin to `master` once they merge. Regenerate with `make its-xml-sync`; verify offline with
   `make its-xml-check`, which `make ci` runs, or with `make its-xml-drift`, which also reports
   upstream drift (see [the sync script](../../scripts/sync-its-xml-schemas.sh)).
 
@@ -45,18 +51,15 @@ At the pinned commit the closure holds these files.
 | `components/AM/Release-1.4/OpenehrProfile.xsd` | openEHR Archetype Profile 1.4 (`C_DV_QUANTITY`, `C_DV_ORDINAL`, ...) | root |
 | `components/AM/Release-1.4/Template.xsd` | ADL 1.4 operational template (`OPERATIONAL_TEMPLATE`, `C_ARCHETYPE_ROOT`, `T_VIEW`, ...) | root |
 | `components/AM/Release-1.4/Resource.xsd` | AOM 1.4 resource (`AUTHORED_RESOURCE`, `RESOURCE_DESCRIPTION`, ...) | included by `Archetype.xsd` |
-| `components/BASE/latest/BaseTypes.xsd` | BASE base types (`UID`, `OBJECT_ID`, `ARCHETYPE_ID`, ...) | included by RM `DataTypes.xsd` |
 
-Three inclusions are worth knowing when reading the files:
+Two inclusions are worth knowing when reading the files:
 
-- The RM Release-1.1.0 `DataTypes.xsd` includes `../../BASE/latest/BaseTypes.xsd`, not the BASE
-  Release-1.2.0 copy. At the pinned commit the two `BaseTypes.xsd` files are byte-identical.
 - `Template.xsd` includes `OpenehrProfile.xsd`, so it joins the AM Release-1.4 set. The AOM 1.4 BMM
   has none of its classes, so no generated encoder takes its order from this file today.
 
   OPTs exported by Archetype Designer carry a `match_negated` element, always `false`, on every
-  `C_SINGLE_ATTRIBUTE` and `C_MULTIPLE_ATTRIBUTE`. No openEHR specification, schema or BMM declares
-  it, so a validator that holds such an OPT to these schemas refuses it. The element is obsolete:
+  `C_SINGLE_ATTRIBUTE` and `C_MULTIPLE_ATTRIBUTE`. No AOM 1.4 or AOM 2 class has it; at the pinned
+  commit `Archetype.xsd` accepts it, fixed to `false`, so such OPTs validate. The element is obsolete:
   openEHR's `adl2-core` ADL 1.5 parser used it for the cADL negated match `~matches` and dropped it
   in 2015, and neither AOM 1.4 nor AOM 2 has such a member. A decoder can ignore it; the SDK's OPT
   reader does, in strict mode too.

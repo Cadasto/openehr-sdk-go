@@ -266,6 +266,18 @@ func (c *CQuantityItem) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 					return _err
 				}
 				c.Units = &_v
+			case "units_system":
+				var _v string
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+					return _err
+				}
+				c.UnitsSystem = &_v
+			case "units_display_name":
+				var _v string
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+					return _err
+				}
+				c.UnitsDisplayName = &_v
 			default:
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err

@@ -189,6 +189,16 @@ func (c *CQuantityItem) MarshalXML(_e *xml.Encoder, _start xml.StartElement) err
 			return err
 		}
 	}
+	if c.UnitsSystem != nil {
+		if err := _e.EncodeElement(*c.UnitsSystem, xml.StartElement{Name: xml.Name{Local: "units_system"}}); err != nil {
+			return err
+		}
+	}
+	if c.UnitsDisplayName != nil {
+		if err := _e.EncodeElement(*c.UnitsDisplayName, xml.StartElement{Name: xml.Name{Local: "units_display_name"}}); err != nil {
+			return err
+		}
+	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err
 	}
