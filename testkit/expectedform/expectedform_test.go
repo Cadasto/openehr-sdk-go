@@ -439,7 +439,8 @@ func TestREQ052_BuildRemovesEmptyMappingsAndMultimediaBytes(t *testing.T) {
 
 // emptyContainerCases are one input per kind of container member, each
 // empty: an optional list of RM objects at the root and below it, an
-// optional list of strings, a mandatory list, an optional map and a
+// optional list of strings, a mandatory list, the three optional
+// item-structure lists canonical JSON writes as [], an optional map and a
 // mandatory map. want is the input's expected form, compared by wire
 // equivalence; target makes a decode target for the input.
 var emptyContainerCases = []struct {
@@ -473,6 +474,27 @@ var emptyContainerCases = []struct {
 		in:     `{"_type":"CLUSTER","archetype_node_id":"at1","name":{"_type":"DV_TEXT","value":"c"},"items":[]}`,
 		want:   `{"_type":"CLUSTER","archetype_node_id":"at1","name":{"_type":"DV_TEXT","value":"c"},"items":[]}`,
 		target: func() any { return new(rm.Cluster) },
+	},
+	{
+		name:   "optional item-structure list (ITEM_LIST.items) is kept",
+		root:   "ITEM_LIST",
+		in:     `{"_type":"ITEM_LIST","archetype_node_id":"at1","name":{"_type":"DV_TEXT","value":"l"},"items":[]}`,
+		want:   `{"_type":"ITEM_LIST","archetype_node_id":"at1","name":{"_type":"DV_TEXT","value":"l"},"items":[]}`,
+		target: func() any { return new(rm.ItemList) },
+	},
+	{
+		name:   "optional item-structure list (ITEM_TREE.items) is kept",
+		root:   "ITEM_TREE",
+		in:     `{"_type":"ITEM_TREE","archetype_node_id":"at1","name":{"_type":"DV_TEXT","value":"t"},"items":[]}`,
+		want:   `{"_type":"ITEM_TREE","archetype_node_id":"at1","name":{"_type":"DV_TEXT","value":"t"},"items":[]}`,
+		target: func() any { return new(rm.ItemTree) },
+	},
+	{
+		name:   "optional item-structure list (ITEM_TABLE.rows) is kept",
+		root:   "ITEM_TABLE",
+		in:     `{"_type":"ITEM_TABLE","archetype_node_id":"at1","name":{"_type":"DV_TEXT","value":"t"},"rows":[]}`,
+		want:   `{"_type":"ITEM_TABLE","archetype_node_id":"at1","name":{"_type":"DV_TEXT","value":"t"},"rows":[]}`,
+		target: func() any { return new(rm.ItemTable) },
 	},
 	{
 		name:   "optional map (RESOURCE_DESCRIPTION_ITEM.other_details) is kept",
