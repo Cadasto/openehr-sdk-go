@@ -5,15 +5,18 @@ kind: plan
 # Plan: ADL 1.4 operational template model (REQ-176)
 
 **Date:** 2026-11-02
-**Status:** Draft, ready for `/sdd-deliver REQ-176` (one pull request, branch `feat/opt-model-req-176`)
+**Status:** In delivery (`/sdd-deliver REQ-176`, branch `feat/operational-template-model-req-176`); the first of two pull requests, the second outlined under *The follow-up pull request*
 **Covers:** [REQ-176](../specifications/clinical-modeling.md#req-176--adl-14-operational-template-model); [REQ-041 § SDK-authored root schemas](../specifications/bmm-conformance.md#sdk-authored-root-schemas); [REQ-045](../specifications/bmm-conformance.md#req-045--bmm-loader-is-a-building-block) (the include merge); [REQ-056](../specifications/wire.md#req-056), [REQ-052](../specifications/wire.md#req-052), [REQ-170](../specifications/wire.md#req-170--unmatched-content-on-decode)
 **Probes:** [PROBE-111](../specifications/conformance.md#probe-111--operational-template-corpus-round-trip)
 **Depends on:** PR 360 (Template.xsd pinned, ADR 0034, REQ-176 written), merged as `acf9a9ca`
-**Defers:** how `template.ParseOPT` relates to the model ([STRAND-17](../specifications/research-strands.md#strand-17--the-opt-parser-and-the-generated-operational-template-model)); a depth or size bound on canonical-XML decode of an untrusted OPT (REQ-108 bounds only `template.ParseOPT`); ADL 2 and AOM 2
+**Settles:** [STRAND-17](../specifications/research-strands.md#strand-17--the-opt-parser-and-the-generated-operational-template-model), by a new ADR (Task 1)
+**Defers:** the compile step's move onto the model, to the follow-up pull request; a depth or size bound on canonical-XML decode of an untrusted OPT (REQ-108 bounds only `template.ParseOPT`); ADL 2 and AOM 2
 
 This header is for the reader. No tool reads it, and nothing fails when it is missing or out of date. The work itself meets the [Definition of Ready](../development-process.md#definition-of-ready) before it starts and the [Definition of Done](../development-process.md#definition-of-done) in the implementing PR.
 
 ## Goal
+
+The model exists to give the compile step, and through it the instance generator, the validator, the composition builder, FLAT and STRUCTURED, the Web Template builder and the AQL lint, everything an OPT says: `template.ParseOPT` reads only what it has code for, so `C_CODE_REFERENCE` (10 of the 74 corpus OPTs) reaches them with no constraint and the template-level `<constraints>` default values, RM `DATA_VALUE`s (10 OPTs), not at all. This pull request delivers the model; the follow-up pull request moves the compile step onto it.
 
 A consumer decodes any ADL 1.4 OPT the corpus holds into generated `aom14` types, with no unmatched content, and encodes it back to a document that validates against the pinned AM Release-1.4 schemas. The types come from SDK-authored root schemas over the pinned openEHR BMM files ([ADR 0034](../adr/0034-sdk-authored-root-schemas.md)); the generator stays generic over a BMM and the ITS-XML schemas. PROBE-111 proves it across the whole corpus and adds an XML schema check to `make ci`.
 
@@ -26,6 +29,15 @@ A consumer decodes any ADL 1.4 OPT the corpus holds into generated `aom14` types
 - **RM resource classes in canonical XML take the AM Release-1.4 shape everywhere**: no `id` attribute, keyed by language.
 - **The loader's include merge resolves a diamond**: when two includes meet again and one form comes from a schema that descends from the other's source (RM includes BASE), the descendant's form wins; `ErrSchemaConflict` stays for a real sibling conflict. This changes `openehr/bmm` behaviour and amends ADR 0002 D2.
 - **Members typed `C_COMPLEX_OBJECT` become an interface** once `C_ARCHETYPE_ROOT` and `T_COMPLEX_OBJECT` subclass it. Accepted under the pre-1.0 policy; the CHANGELOG names it under Breaking.
+
+## Decisions taken (maintainer, 2026-11-03)
+
+- **Purpose:** the compile step reads the model, which replaces `template.ParseOPT`'s tree as its source; `templatecompile` itself stays, since it adds what no OPT holds (AQL paths, the attributes the RM requires that the OPT leaves out, parent links, indexes).
+- **Two pull requests:** this one, the model (Tasks 1 to 10, the ADR settling STRAND-17 included); then the switch, whose parity check needs the finished model. D1's "one pull request" now means one for the model.
+- **`template.ParseOPT` and its node tree** are deprecated in the switch pull request and removed in a later release; `openehr/template` stays the home of `constraints`, `webtemplate` and the small shared types (`Cardinality`, `Multiplicity`, `ErrPathNotFound`).
+- **Path lookup** (`NodeAt`, `ParsePath`, `ValidatePath` and their rules for a path without node ids) is rewritten over the model in the switch pull request.
+- **The parser's tolerances** are kept, by the model's reader or the compile step: `null_flavor` read as `null_flavour`, white space around identifiers, `T_ARCHETYPE_ROOT`, and whatever the corpus parity check shows the rest need.
+- **Naming:** "operational template" is spelled out in every name this work gives (BMM schema id, Go identifiers, tests, Make targets); "OPT" stays only for the file format. The AOM 1.4 root is `openehr_operational_template_1.4.0`.
 
 ## What the research found
 
@@ -53,6 +65,9 @@ Edit in `/sdd-specify`'s form, adding no keyword for an internal, and cite rathe
 - `wire.md` § REQ-056, the `xsi:type` bullet (`:229`): a value whose prefix is bound to the XML Schema namespace names an XML Schema built-in and reads as its BMM primitive; any other prefixed value is still refused.
 - `bmm-conformance.md` § SDK-authored root schemas: what a root declares gains the SDK extension keys and their entries' reason and reference; the RM root's id; the *Gate* bullet names the Go test of Task 3 as the root check. § REQ-045, or wherever the merge rule is stated: the diamond rule.
 - ADR 0034: a dated amendment for the extension keys, the diamond rule, the normalised comparison and the integer code. ADR 0002: D2 amended for the diamond. `docs/adr/README.md` if the index shows amendments.
+- REQ-176 states the purpose: the intro's sentence on § REQ-100's parser says the compile step moves onto the model, citing the new ADR; *Out of scope*'s first bullet is replaced by one naming the switch as the follow-up change, with § REQ-100's parser feeding the compile step until it lands.
+- A new ADR (next free number) settling STRAND-17 with the 2026-11-03 decisions: the compile step reads the model; the parser and its tree deprecated when it does and removed later; path lookup over the model; the tolerances kept; the REQ-108 bounds carried to the model's reader before the switch. Header names the REQs it amends (REQ-176 now; REQ-100, REQ-108, REQ-111 and REQ-013's `openehr/template` row when the switch lands). STRAND-17's status: Resolved, citing it; `research-strands.md`'s index row; `docs/adr/README.md`; a `docs/roadmap.md` entry for the switch.
+- The root's id `openehr_opt_1.4.0` becomes `openehr_operational_template_1.4.0` wherever the merged text names it: `bmm-conformance.md:53`, `:219`, `:372`; `module-layout.md:45`; `scope.md:17`; ADR 0034 `:33`.
 - REQ-176's map row: `implementation: in_progress`.
 
 Verify: `make spec-check`.
@@ -81,7 +96,7 @@ Parsed from the root JSON beside the public loader, so `openehr/bmm` stays a P_B
 
 `itsxml.go` reads `xs:attribute` on a type, in `complexContent/extension` and `simpleContent/extension`, inherited through the base chain; the generator takes the attribute set from there and `isXMLAttributeProperty` goes. Attribute members that are not a plain string get a rule or a refusal at generation time. An attribute that names no BMM member is the key of the `Hash` holding the class (Task 7). Verify that RM output is unchanged apart from what the schemas say (`archetype_node_id` stays an attribute): `make codegen-check` after `make codegen`, `go test ./internal/bmmgen/... -count=1`.
 
-### Task 6: the AOM 1.4 root, `openehr_opt_1.4.0`
+### Task 6: the AOM 1.4 root, `openehr_operational_template_1.4.0`
 
 Under `resources/bmm/sdk/`, including `openehr_am_1.4.0` and the RM root (the diamond of Task 2 gives the RM `common.resource` forms). Declares the Template.xsd classes and each AOM 1.4 class the schema shapes otherwise, listed under *What the research found*, in the schema type's form, each with its reason and upstream reference (the schema file and line, or the openEHR ticket or pull request). `OPERATOR_KIND` and the `timezone_validity` type as `P_BMM_ENUMERATION_INTEGER` (the loader reads it, `openehr/bmm/class.go:110-120`); the generator gains one generic rule for an integer enumeration: decode from its value or its item name, encode the value; `disallowed` reads as 1003. `C_COMPLEX_OBJECT` members become an interface. Regenerate; rename `C_CODED_TEXT` and the other two in the tests that name them (`render_xmlunmar_unmatched_test.go:139,295`, `aom14/coded_text_code_list_xml_test.go`, `aom14/typereg_smoke_test.go:24`). This task verifies and closes the two [backlog](../backlog.md) leads under *AOM 1.4 canonical XML*.
 
@@ -113,9 +128,21 @@ Verify: `go test ./testkit/probes/... -run 111 -count=1`, the new target, `make 
 - `bmm-conformance.md`: the *Known gaps* paragraph under § SDK-authored root schemas goes; `module-layout.md`, `scope.md`, `architecture.md` and `canxml` package docs describe the roots and the model as present.
 - REQ-176's map row: `implementation: landed`, its packages, probes; `make spec-generate`.
 - The backlog theme *AOM 1.4 canonical XML* deleted once Task 6 closes both lines.
+- `docs/roadmap.md`: the switch entry Task 1 added stays, now unblocked.
 - `CHANGELOG.md` `[Unreleased]`, on the maintainer's request: Added (the operational template model, canonical-XML `Hash` shapes); Changed with Breaking (`C_COMPLEX_OBJECT` members an interface, the three class renames, `Accreditation`, the canonical-XML `xsi:type` prefix rule).
 
 Then `make ci`, `/sdd-review --lane full`, `/sdd-triage`, and the pull request.
+
+## The follow-up pull request: the compile step reads the model
+
+Not on this branch; its own plan is written once this pull request merges, from the model as built. What it holds, from the 2026-11-03 decisions:
+
+- `templatecompile.Compile` takes the generated `OperationalTemplate`; `internal/templatecompile`, the only library package that walks the parser's tree, walks the model, building the `template/constraints` values from the model's primitive classes.
+- A parity check over every corpus OPT: the compiled tree from the model equals the one from `template.ParseOPT`, apart from the named gains (`C_CODE_REFERENCE`, the `<constraints>` default values).
+- Path lookup over the model; the parser's tolerances; the REQ-108 size and depth bounds on the model's reader.
+- The users move: the three examples that read the tree (`opt-parse`, `primitive-validate`, `template-explore`), `cmd/cdrcheck`, `testkit/fixtures` and the probes; `template.ParseOPT` and its tree deprecated.
+- The compile benchmarks from PR 287 compared before and after.
+- Spec: REQ-100, REQ-108, REQ-111 and REQ-013's `openehr/template` row amended as the ADR says.
 
 ## Open points for the delivery
 
