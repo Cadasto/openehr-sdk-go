@@ -633,6 +633,7 @@ func TestPrimitiveConstraint_InterfaceSeal(_ *testing.T) {
 	var _ constraints.PrimitiveConstraint = constraints.CDateTime{}
 	var _ constraints.PrimitiveConstraint = constraints.CDuration{}
 	var _ constraints.PrimitiveConstraint = constraints.CodePhrase{}
+	var _ constraints.PrimitiveConstraint = constraints.CodeReference{}
 	var _ constraints.PrimitiveConstraint = constraints.DvQuantity{}
 	var _ constraints.PrimitiveConstraint = constraints.CDvOrdinal{}
 	var _ constraints.PrimitiveConstraint = constraints.ConstraintRef{}
