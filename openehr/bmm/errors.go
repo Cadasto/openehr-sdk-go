@@ -17,8 +17,10 @@ var (
 	// ErrMissingField is returned when a required BMM field is absent.
 	ErrMissingField = errors.New("bmm: missing required field")
 
-	// ErrSchemaConflict is returned when two schemas (root + an included
-	// ancestor) both define the same class.
+	// ErrSchemaConflict is returned by LoadAll when two includes bring
+	// differing forms of one class or primitive type and neither schema
+	// that declares a form includes the other. A schema's own
+	// declaration always wins over its includes' and never conflicts.
 	ErrSchemaConflict = errors.New("bmm: schema conflict")
 
 	// ErrCircularIncludes is returned when LoadAll detects an include
