@@ -1485,11 +1485,15 @@ requirements:
       - internal/templatecompile/compile_test.go
       - internal/templatecompile/node_primitive_test.go
       - internal/templatecompile/walk/walk_test.go
+      - openehr/instance/coded_group_test.go
+      - openehr/instance/coded_name_code_test.go
       - openehr/instance/placeholder_test.go
       - openehr/instance/sample_test.go
       - openehr/instance/string_leaf_internal_test.go
       - openehr/instance/string_leaf_test.go
+      - openehr/serialize/simplified/coded_name_test.go
       - openehr/template/constraint_ref_test.go
+      - openehr/template/constraints/code_reference_test.go
       - openehr/template/constraints/constraint_ref_test.go
       - openehr/template/constraints/constraints_test.go
       - openehr/template/constraints/example_test.go
@@ -1515,6 +1519,7 @@ requirements:
       - openehr/validation/cstring_list_open_test.go
       - openehr/validation/optional_string_test.go
       - openehr/validation/ordinal_symbol_test.go
+      - openehr/validation/primitive_empty_part_test.go
       - openehr/validation/quantity_property_test.go
       - openehr/validation/temporal_constraint_test.go
       - testkit/probes/template/constraint_fixtures_test.go
@@ -1831,6 +1836,7 @@ requirements:
       - internal/templatecompile/compile_nodename_test.go
       - internal/templatecompile/compile_test.go
       - internal/templatecompile/compiled_golden_test.go
+      - internal/templatecompile/default_value_test.go
       - internal/templatecompile/resolve_test.go
       - openehr/instance/local_term_text_test.go
       - openehr/template/path_test.go
