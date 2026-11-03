@@ -1809,6 +1809,7 @@ requirements:
       - openehr/aql/lint
       - openehr/template
       - internal/templatecompile
+      - openehr/aom/aom14
     probes: []
     tests:
       - internal/templatecompile/compile_nodename_test.go
