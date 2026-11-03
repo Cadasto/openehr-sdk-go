@@ -2669,3 +2669,8 @@ requirements:
       - openehr/rm/resource_hash_xml_test.go
       - openehr/serialize/canxml/names_test.go
       - openehr/serialize/canxml/unmatched_test.go
+      - testkit/probes/template/probe_111_compare_internal_test.go
+      - testkit/probes/template/probe_111_guard_internal_test.go
+      - testkit/probes/template/probe_111_operational_template_compare.go
+      - testkit/probes/template/probe_111_operational_template_round_trip.go
+      - testkit/probes/template/probe_111_operational_template_round_trip_test.go
