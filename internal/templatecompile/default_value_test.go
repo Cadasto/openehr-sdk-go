@@ -17,6 +17,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile/walk"
 	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -259,6 +260,64 @@ func TestREQ111_CompileRefusesADefaultValueThatAddressesNoNode(t *testing.T) {
 			// repeat it.
 			if strings.Contains(err.Error(), sentinel) {
 				t.Errorf("Compile error = %q; want it free of the default value's text", err)
+			}
+		})
+	}
+}
+
+// A default value whose T_ATTRIBUTE names an ELEMENT's null_flavor lands on
+// the attribute the compile reads that name as: null_flavour, unless the
+// ELEMENT declares both names, when each keeps its own.
+func TestREQ111_DefaultValueOnNullFlavorLandsWhereTheCompileReadsIt(t *testing.T) {
+	const (
+		archetypeID = "openEHR-EHR-COMPOSITION.model.v1" // the root modelOf gives
+		elementPath = "/context/other_context[at0001]/items[at0002]"
+	)
+	cases := []struct {
+		name     string
+		declared []string // the ELEMENT's attributes, each over one DV_CODED_TEXT
+		wantAt   string   // the attribute whose child carries the default value
+	}{
+		{name: "null_flavor alone", declared: []string{"null_flavor"}, wantAt: "null_flavour"},
+		{name: "null_flavor beside null_flavour", declared: []string{"null_flavor", "null_flavour"}, wantAt: "null_flavor"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var attrs []aom14.CAttribute
+			for _, name := range tc.declared {
+				attrs = append(attrs, single(name, complexObject("DV_CODED_TEXT", "")))
+			}
+			model := modelOf(single("context", complexObject("EVENT_CONTEXT", "",
+				single("other_context", complexObject("ITEM_TREE", "at0001",
+					multiple("items", complexObject("ELEMENT", "at0002", attrs...)))))))
+			model.Constraints = &aom14.TConstraint{Attributes: []aom14.TAttribute{{
+				DifferentialPath: "[" + archetypeID + "]" + elementPath,
+				RMAttributeName:  "null_flavor",
+				Children: []aom14.TComplexObject{{
+					CComplexObject: *complexObject("DV_CODED_TEXT", ""),
+					DefaultValue: &rm.DVCodedText{
+						Value:        "unknown",
+						DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}, CodeString: "253"},
+					},
+				}},
+			}}}
+
+			c, err := templatecompile.Compile(model)
+			if err != nil {
+				t.Fatalf("Compile = %v; want the default value placed", err)
+			}
+			path := elementPath + "/" + tc.wantAt
+			p, err := template.ParsePath(path)
+			if err != nil {
+				t.Fatalf("ParsePath(%q): %v", path, err)
+			}
+			n, err := c.Resolve(p)
+			if err != nil {
+				t.Fatalf("Resolve(%s) = %v", path, err)
+			}
+			got, ok := n.DefaultValue().(*rm.DVCodedText)
+			if !ok || got.DefiningCode.CodeString != "253" {
+				t.Errorf("DefaultValue() at %s = %#v; want the DV_CODED_TEXT with code 253", path, n.DefaultValue())
 			}
 		})
 	}
