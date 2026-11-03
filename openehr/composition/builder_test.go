@@ -8,21 +8,21 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rmpath"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 func compileFixture(t testing.TB, name string) *templatecompile.Compiled {
 	t.Helper()
-	opt, err := template.ParseFile(fixtures.TemplateOptForName(name))
+	opt, err := readOPTFile(fixtures.TemplateOptForName(name))
 	if err != nil {
-		t.Fatalf("ParseFile %s: %v", name, err)
+		t.Fatalf("readOPTFile %s: %v", name, err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
@@ -147,9 +147,9 @@ const unnamedEntryOPT = `<?xml version="1.0" encoding="utf-8"?>
 // on its refusal of an archetype-root object the template names no
 // archetype for, and return nothing with it.
 func TestREQ101_REQ107_BuilderRefusesUnnamedArchetypeRoot(t *testing.T) {
-	opt, err := template.ParseOPT(strings.NewReader(unnamedEntryOPT))
+	opt, err := aom14.ReadOperationalTemplate(strings.NewReader(unnamedEntryOPT))
 	if err != nil {
-		t.Fatalf("ParseOPT: %v", err)
+		t.Fatalf("ReadOperationalTemplate: %v", err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
@@ -489,12 +489,12 @@ const abstractValueOPT = `<?xml version="1.0" encoding="utf-8"?>
 // abstractValuePath is the DATA_VALUE node of abstractValueOPT.
 const abstractValuePath = "/context/other_context/items[at0002]/value"
 
-// compileInline parses and compiles an inline operational template.
+// compileInline reads and compiles an inline operational template.
 func compileInline(t *testing.T, opt string) *templatecompile.Compiled {
 	t.Helper()
-	parsed, err := template.ParseOPT(strings.NewReader(opt))
+	parsed, err := aom14.ReadOperationalTemplate(strings.NewReader(opt))
 	if err != nil {
-		t.Fatalf("ParseOPT: %v", err)
+		t.Fatalf("ReadOperationalTemplate: %v", err)
 	}
 	c, err := templatecompile.Compile(parsed)
 	if err != nil {
