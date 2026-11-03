@@ -71,7 +71,8 @@ import (
 // are not checked: the members of the body itself beside `audit` and
 // `versions`, since the body is a REST request shape rather than an RM class,
 // and the payload of an IMPORTED_VERSION's item, which [ImportedVersion] holds
-// as plain JSON. The check runs once the submission has decoded and passed
+// as plain JSON: a [jsontext.Value] holding the bytes the body carries, so
+// MarshalJSON writes its numbers as the body spells them. The check runs once the submission has decoded and passed
 // Validate, so a decode that fails reports nothing, and a decode error comes
 // back as itself under [canjson.WithStrict]. Checking decodes each audit and
 // version a second time.
@@ -206,7 +207,7 @@ func (b *submissionBody) decode() (*Submission, error) {
 	}
 	for i, v := range b.versions {
 		var err error
-		if sub.Versions[i], err = v.codec.decode(v.document(false), v.key(), v.auditType()); err != nil {
+		if sub.Versions[i], err = v.codec.decode(v.document(false), v.key(), v.auditType(), v.itemData); err != nil {
 			return nil, err
 		}
 	}
@@ -314,6 +315,9 @@ type versionPiece struct {
 	audit       *auditPiece // its commit_audit; nil when absent or null
 	auditMember int         // the index of its commit_audit member, or -1
 	codec       versionCodec
+	// itemData is a copy of an IMPORTED_VERSION's `item.data` as the body
+	// writes it; nil when the item has none or holds null.
+	itemData []byte
 }
 
 // readVersion reads the element raw holds at index i of `versions`.
@@ -391,6 +395,9 @@ func (v *versionPiece) payloadType(at string) (string, string, error) {
 	case !isObject:
 		return "", "", refusal(at, "", "the payload is not a JSON object", canjson.ErrInvalidShape)
 	}
+	if v.kind == typeImportedVersion {
+		v.itemData = bytes.Clone(holder.value(i))
+	}
 	t := data.index(memberType)
 	if t < 0 {
 		return "", "", refusal(at, "", "the payload has no _type", typereg.ErrMissingType)
@@ -440,7 +447,7 @@ func (v *versionPiece) document(forCheck bool) []byte {
 // wrapper instantiations a submission admits, the element placed in its
 // document (see [submissionBody]).
 type versionCodec struct {
-	decode func(doc []byte, key string, audit AuditType) (CommitVersion, error)
+	decode func(doc []byte, key string, audit AuditType, itemData []byte) (CommitVersion, error)
 	check  func(doc []byte, opts []canjson.DecoderOption) error
 }
 
@@ -486,8 +493,9 @@ func importedCodec[T any]() versionCodec {
 }
 
 // decodeOriginal decodes the ORIGINAL_VERSION placed at key in doc, its
-// commit_audit kept with the `_type` it was read with.
-func decodeOriginal[T any](doc []byte, key string, audit AuditType) (CommitVersion, error) {
+// commit_audit kept with the `_type` it was read with. An ORIGINAL_VERSION
+// has no item, so itemData is unused.
+func decodeOriginal[T any](doc []byte, key string, audit AuditType, _ []byte) (CommitVersion, error) {
 	var d map[string]map[string]*rm.OriginalVersion[T]
 	if err := canjson.Unmarshal(doc, &d); err != nil {
 		return nil, err
@@ -498,13 +506,21 @@ func decodeOriginal[T any](doc []byte, key string, audit AuditType) (CommitVersi
 }
 
 // decodeImported decodes the IMPORTED_VERSION placed at key in doc, its
-// commit_audit kept with the `_type` it was read with.
-func decodeImported[T any](doc []byte, key string, audit AuditType) (CommitVersion, error) {
+// commit_audit kept with the `_type` it was read with. The item's payload is
+// held as itemData, the JSON text the body carries, rather than as the
+// generic value the decode reads it into: that value holds a number as a
+// float64, which would rewrite 1.0 as 1 and round an integer past 2^53.
+func decodeImported[T any](doc []byte, key string, audit AuditType, itemData []byte) (CommitVersion, error) {
 	var d map[string]map[string]*rm.ImportedVersion[T]
 	if err := canjson.Unmarshal(doc, &d); err != nil {
 		return nil, err
 	}
-	w := WrapImportedVersion(d[memberVersions][key])
+	iv := d[memberVersions][key]
+	if iv != nil && itemData != nil {
+		var data any = jsontext.Value(itemData)
+		iv.Item.Data = &data
+	}
+	w := WrapImportedVersion(iv)
 	w.CommitAudit.Type = audit
 	return w, nil
 }

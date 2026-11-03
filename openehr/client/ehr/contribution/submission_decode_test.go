@@ -430,6 +430,59 @@ func TestUnmarshalSubmissionDropsTimeCommitted(t *testing.T) { // REQ-130
 	}
 }
 
+// TestUnmarshalSubmissionImportedPayloadKeepsNumbers reads an imported item
+// whose payload spells a number with a fraction of zero and an integer past
+// 2^53: the encoding writes both as the body spells them, since the payload
+// is held as the body's JSON text, and changing the input buffer after the
+// decode does not reach the decoded submission.
+func TestUnmarshalSubmissionImportedPayloadKeepsNumbers(t *testing.T) { // REQ-130
+	data := strings.Replace(compositionJSON, `"composer":`, `"f":1.0,"n":9007199254740993,"composer":`, 1)
+	if data == compositionJSON {
+		t.Fatal("test setup: the composition fixture no longer carries the composer member this test writes before")
+	}
+	body := bodyJSON(auditJSON("AUDIT_DETAILS"), importedJSON(data))
+	want := bytes.Clone(body)
+	sub, err := contribution.UnmarshalSubmission(body)
+	if err != nil {
+		t.Fatalf("UnmarshalSubmission: %v", err)
+	}
+	for i := range body {
+		body[i] = ' '
+	}
+	got, err := sub.MarshalJSON()
+	if err != nil {
+		t.Fatalf("MarshalJSON: %v", err)
+	}
+	if ok, diff := wireequiv.Equivalent(want, got); !ok {
+		t.Errorf("encoding is not wire-equivalent to the body: %s\ngot: %s", diff, got)
+	}
+}
+
+// TestUnmarshalSubmissionMissingImportedItem reads an imported item that
+// carries none of its members: it decodes, and canjson.WithMissing reports
+// each member the RM makes mandatory on it.
+func TestUnmarshalSubmissionMissingImportedItem(t *testing.T) { // REQ-130, REQ-175
+	audit := auditJSON("AUDIT_DETAILS")
+	body := bodyJSON(audit, object(
+		member("_type", `"IMPORTED_VERSION"`),
+		member("commit_audit", audit),
+		member("item", "{}")))
+	var got []string
+	if _, err := contribution.UnmarshalSubmission(body, canjson.WithMissing(func(p string) { got = append(got, p) })); err != nil {
+		t.Fatalf("UnmarshalSubmission: %v", err)
+	}
+	slices.Sort(got)
+	want := []string{
+		"/versions/0/item/commit_audit",
+		"/versions/0/item/contribution",
+		"/versions/0/item/lifecycle_state",
+		"/versions/0/item/uid",
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("WithMissing received %q, want %q", got, want)
+	}
+}
+
 // TestUnmarshalSubmissionRefusals pins each body the decoder cannot place: a
 // *canjson.DecodeError at the top of the chain whose Path is the JSON Pointer
 // of the offending member from the root of the body, whose text holds no
