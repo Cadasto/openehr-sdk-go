@@ -13,6 +13,7 @@ What you can build on today, and what is still open. Per-requirement status is i
 | **Landed** | Code + tests in tree; usable (may still be v1-preview quality) |
 | **Partial** | Subset implemented, or spec-only with traceability incomplete |
 | **Planned** | Normative in `docs/specifications/`; directory may exist with `doc.go` only |
+| **In delivery** | Specified, and being built on a branch whose pull request lands it |
 | **Deferred** | Explicitly out of v1 scope in specs or ADRs |
 
 ---
@@ -49,7 +50,7 @@ Each stage groups several deliverables, and a stage is only as done as its weake
 
 ## Open work
 
-Everything below is `Partial`, `Planned` or `Deferred`. Gaps that belong to a deployment rather than a feature (EHRbase, Better Platform) are under [Deployment targets](#deployment-targets). Anything in neither table has landed; see the [registry](specifications/REQ.md).
+Everything below is `Partial`, `Planned`, `In delivery` or `Deferred`. Gaps that belong to a deployment rather than a feature (EHRbase, Better Platform) are under [Deployment targets](#deployment-targets). Anything in neither table has landed; see the [registry](specifications/REQ.md).
 
 | Area | Feature | Status | Package / REQ | Notes |
 |---|---|---|---|---|
@@ -62,8 +63,7 @@ Everything below is `Partial`, `Planned` or `Deferred`. Gaps that belong to a de
 | Core | EHR Extract RM | **Deferred** | — | Out of v1 scope |
 | Core | `bmm.Load` context | **Deferred** | `openehr/bmm/` | `Load` and `LoadAll` take no `context.Context` (`openehr/bmm/load.go:23`, `openehr/bmm/loadall.go:46`); adding one changes the API, so it waits for the pre-1.0 API review |
 | Core | Test fixtures through `go:embed` | **Deferred** | `testkit/fixtures/` | `CorpusRoot` finds the fixture tree through `runtime.Caller` (`testkit/fixtures/paths.go:34`); moving to `go:embed` is test-only work |
-| Clinical modeling | Compile step on the operational template model | **Planned** | `internal/templatecompile/`, `openehr/template/` REQ-111 | `templatecompile.Compile` moves from `template.ParseOPT`'s tree onto the generated model of [§ REQ-176](specifications/clinical-modeling.md#req-176--adl-14-operational-template-model), so the compiled template carries `C_CODE_REFERENCE` and the template-level `<constraints>` default values, which the parser does not read. Path lookup moves onto the model, the REQ-108 bounds reach the model's reader first, and `ParseOPT` and its tree are deprecated ([ADR 0035](adr/0035-compile-step-reads-operational-template-model.md)). The model it reads has landed |
-| Clinical modeling | `<OPERATIONAL_TEMPLATE>` OPT root | **Deferred** | `openehr/template/` REQ-100 | `ParseOPT` refuses an `<OPERATIONAL_TEMPLATE>` root with `ErrInvalidOPT` (`openehr/template/parse.go:113`); the test corpus renames the root before parsing (`testkit/fixtures/parse_opt.go:13`) |
+| Clinical modeling | Compile step on the operational template model | **In delivery** | `internal/templatecompile/`, `openehr/templatecompile/`, `openehr/aom/aom14/`, `openehr/template/` REQ-111 | `templatecompile.Compile` moves from `template.ParseOPT`'s tree onto the generated model of [§ REQ-176](specifications/clinical-modeling.md#req-176--adl-14-operational-template-model), so the compiled template carries `C_CODE_REFERENCE` and the template-level `<constraints>` default values, which the parser does not read. `aom14.ReadOperationalTemplate` bounds an untrusted OPT ([§ REQ-108](specifications/clinical-modeling.md#req-108--untrusted-document-bounds)), path lookup moves onto the compiled template, and `ParseOPT` and its tree are deprecated ([ADR 0035](adr/0035-compile-step-reads-operational-template-model.md)), in one pull request |
 | Clinical modeling | Malformed `C_STRING` pattern at parse time | **Deferred** | `openehr/template/constraints/` REQ-103 | `NewCString` keeps a pattern that does not compile, and `Validate` reports it as `CodeInvalidValue` (`NewCString` in `openehr/template/constraints/string.go`). Reporting it from `ParseOPT` needs a signature change through the primitive builders (`openehr/template/parse_primitives.go:205`) |
 | Clinical modeling | RM floor change-control and resource-description coded invariants | **Deferred** | `openehr/validation/` REQ-112 | The floor checks the coded invariants its *Coded invariants* table lists, but not VERSION `Lifecycle_state_valid`, AUDIT_DETAILS `Change_type_valid`, ATTESTATION `Reason_valid`, or the `Language_valid` of TRANSLATION_DETAILS and RESOURCE_DESCRIPTION_ITEM, even on an ORIGINAL_VERSION handed to `ValidateRM` as the root ([Coded invariants](specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor)) |
 | Clinical modeling | Interval templates in the constraint-fixture axis | **Deferred** | `testkit/fixtures/`, `openehr/validation/` | `isConstraintTemplateID` holds the four `Test_dv_interval_*` templates out (`testkit/fixtures/constraint_templates.go:46`, pinned at `constraint_templates_test.go:20`). Enrolling them flips that pin and adds two `primitive_out_of_range` assertions to `openehr/validation/constraint_fixtures_test.go` for the `lower_upper` instances, whose bounds `-10` and `200` fall outside the template's `0..100`; PROBE-076 already passes on all four |
