@@ -4,6 +4,7 @@ import (
 	jsonv2 "encoding/json/v2"
 	"fmt"
 	mrand "math/rand/v2"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -11,6 +12,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	"github.com/cadasto/openehr-sdk-go/internal/rmroots"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
@@ -88,7 +90,11 @@ func TestREQ107_UndescribedContentCensus(t *testing.T) {
 	observed := make(map[undescribedMember]struct{})
 	var violations []string
 	for _, ref := range refs {
-		opt, err := template.ParseFile(ref.Path)
+		raw, err := os.ReadFile(ref.Path)
+		if err != nil {
+			continue // the ratchet's compile list covers it
+		}
+		opt, err := fixtures.ReadOperationalTemplate(raw)
 		if err != nil {
 			continue // the ratchet's compile list covers it
 		}
@@ -193,9 +199,9 @@ func censusOccurring(rmType, nodeID string, lower int, attrs ...string) string {
 
 func compileCensusOPT(t *testing.T, xml string) *templatecompile.Compiled {
 	t.Helper()
-	opt, err := template.ParseOPT(strings.NewReader(xml))
+	opt, err := aom14.ReadOperationalTemplate(strings.NewReader(xml))
 	if err != nil {
-		t.Fatalf("ParseOPT: %v", err)
+		t.Fatalf("ReadOperationalTemplate: %v", err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
