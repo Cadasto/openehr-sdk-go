@@ -5,6 +5,7 @@ package aom14_test
 // ANNOTATION's items as StringDictionaryItems, the key in `id` and the value
 // as text; ARCHETYPE's translations one TRANSLATION_DETAILS per value, with no
 // `id`, keyed by the value's language code; entries in ascending key order.
+// REQ-170: an OPT repeating a Hash key is refused in every mode.
 
 import (
 	"encoding/xml"

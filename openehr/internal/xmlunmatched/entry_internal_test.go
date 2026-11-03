@@ -238,6 +238,9 @@ func TestREQ176_EntryValueFailureNamesNoValue(t *testing.T) {
 	}
 }
 
+// REQ-170: decode refuses, in every mode, a Hash entry whose key an earlier
+// entry of the member holds, or that has none.
+
 // entryModes are the decodes a Hash entry is refused in alike: a whole
 // document read untracked, as canxml.Unmarshal reads one given no option, and
 // read through a tracker that reports unmatched content or refuses it.

@@ -449,6 +449,7 @@ requirements:
     probes: [PROBE-030, PROBE-031, PROBE-038, PROBE-105]
     tests:
       - internal/bmmgen/render_interval_bound_test.go
+      - internal/bmmgen/render_jsonmar_any_test.go
       - internal/bmmgen/render_jsonunmar_polymorphic_test.go
       - internal/bmmgen/render_keeps_empty_tag_test.go
       - internal/bmmgen/render_mandatory_tag_test.go
@@ -2475,7 +2476,9 @@ requirements:
       - internal/rmjsonwalk/root_internal_test.go
       - internal/rmjsonwalk/root_test.go
       - internal/rmjsonwalk/walk_test.go
+      - openehr/aom/aom14/hash_xml_test.go
       - openehr/internal/xmlunmatched/document_internal_test.go
+      - openehr/internal/xmlunmatched/entry_internal_test.go
       - openehr/serialize/canjson/unmatched_test.go
       - openehr/serialize/canxml/primitive_error_test.go
       - openehr/serialize/canxml/unmatched_test.go
@@ -2644,6 +2647,7 @@ requirements:
       - internal/bmmgen/itsxml_test.go
       - internal/bmmgen/naming_test.go
       - internal/bmmgen/render_integer_enum_test.go
+      - internal/bmmgen/render_jsonmar_any_test.go
       - internal/bmmgen/render_xml_attributes_test.go
       - internal/bmmgen/render_xml_hash_test.go
       - internal/bmmgen/render_xmlchoice_optional_test.go
