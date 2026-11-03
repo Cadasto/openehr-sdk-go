@@ -7,10 +7,12 @@ package canxml_test
 // and the values after it decode as they would have.
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
 	"io"
 	"reflect"
+	"strings"
 	"testing"
 	"testing/iotest"
 
@@ -219,5 +221,54 @@ func (stalledReader) Read([]byte) (int, error) { return 0, nil }
 func TestREQ056_DecoderRefusesAReaderThatMakesNoProgress(t *testing.T) {
 	if err := canxml.NewDecoder(stalledReader{}).Decode(new(aom14.ArchetypeSlot)); !errors.Is(err, io.ErrNoProgress) {
 		t.Errorf("Decode = %v; want io.ErrNoProgress", err)
+	}
+}
+
+// TestREQ056_DecoderReadsNoFurtherThanTheValue pins a Decoder over a
+// bufio.Reader, an io.ByteReader, in every mode: Decode takes from the reader
+// no byte past the end of the value it decodes, so what follows the stream's
+// values is left in the reader for the caller. It holds for a stream of
+// values each decoded once, and for one whose first value is decoded a
+// second time to resolve a prefix declared around its item, after which the
+// Decoder reads the rest of the stream through the reader it replays the
+// value from.
+func TestREQ056_DecoderReadsNoFurtherThanTheValue(t *testing.T) {
+	const trailer = "TRAILER-BYTES"
+	once := streamValue{item: ` xsi:type="C_STRING"`, content: "<pattern>.*</pattern>"}
+	again := streamValue{parent: ` xmlns:xs="` + xsdNamespace + `"`, item: ` xsi:type="xs:string"`, content: "archetype_id/value"}
+	streams := []struct {
+		name   string
+		values []streamValue
+	}{
+		{"values decoded once", []streamValue{once, once}},
+		{"a value decoded again, then one more", []streamValue{again, once}},
+	}
+	modes := []struct {
+		name string
+		opts []canxml.DecoderOption
+	}{
+		{"no option", nil},
+		{"WithUnmatched", []canxml.DecoderOption{canxml.WithUnmatched(func(string) {})}},
+		{"WithStrict", []canxml.DecoderOption{canxml.WithStrict()}},
+		{"WithMissing", []canxml.DecoderOption{canxml.WithMissing(func(string) {})}},
+	}
+	for _, s := range streams {
+		var stream strings.Builder
+		for _, v := range s.values {
+			stream.WriteString(v.slot())
+		}
+		stream.WriteString(trailer)
+		for _, m := range modes {
+			br := bufio.NewReader(strings.NewReader(stream.String()))
+			dec := canxml.NewDecoder(br, m.opts...)
+			for i := range s.values {
+				if err := dec.Decode(new(aom14.ArchetypeSlot)); err != nil {
+					t.Fatalf("%s, %s: Decode of value %d = %v; want nil", s.name, m.name, i+1, err)
+				}
+			}
+			if rest, err := io.ReadAll(br); err != nil || string(rest) != trailer {
+				t.Errorf("%s, %s: io.ReadAll after the last Decode = %q, %v; want %q, nil", s.name, m.name, rest, err, trailer)
+			}
+		}
 	}
 }

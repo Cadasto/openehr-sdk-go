@@ -173,12 +173,18 @@ type Decoder struct {
 // options apply to every value it decodes; a path that [WithUnmatched] or
 // [WithStrict] reports, and a pointer that [WithMissing] reports, is
 // relative to the value being decoded.
+//
+// When r is an io.ByteReader, such as a *bufio.Reader, the Decoder reads it a
+// byte at a time and takes from it no byte past the end of the value it
+// decodes, whatever its options, so what follows the value stays in r. Any
+// other r it reads ahead, as encoding/xml does.
 func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 	cfg := newDecoderConfig(opts)
 	if t := cfg.tracker(); t != nil {
 		return &Decoder{dec: t.NewDecoder(r), cfg: cfg, trk: t}
 	}
 	rec := &recorder{src: r}
+	rec.bsrc, _ = r.(io.ByteReader)
 	return &Decoder{dec: xml.NewDecoder(rec), cfg: cfg, rec: rec}
 }
 
@@ -186,13 +192,16 @@ func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 // through. It keeps the bytes read from src since the value being decoded
 // began, so that the value can be read again. encoding/xml reads it a byte at
 // a time, as an io.ByteReader, so it buffers nothing else and the bytes it
-// keeps are the only copy of them.
+// keeps are the only copy of them. A src that is an io.ByteReader is read a
+// byte at a time too, so the recorder takes from it no byte past the last one
+// encoding/xml asks for; any other src is read ahead, in blocks.
 type recorder struct {
 	src  io.Reader
-	buf  []byte // the bytes read from src from offset base on
-	pos  int    // the index in buf of the next byte to return
-	base int64  // the offset in the stream of buf[0]
-	err  error  // the error src returned, once it has returned one
+	bsrc io.ByteReader // src, when it is an io.ByteReader; nil otherwise
+	buf  []byte        // the bytes read from src from offset base on
+	pos  int           // the index in buf of the next byte to return
+	base int64         // the offset in the stream of buf[0]
+	err  error         // the error src returned, once it has returned one
 }
 
 // minRead is the least room a recorder makes for one read of its source.
@@ -201,6 +210,14 @@ const minRead = 4096
 // ReadByte returns the next byte of the stream.
 func (r *recorder) ReadByte() (byte, error) {
 	if r.pos == len(r.buf) {
+		if r.bsrc != nil {
+			c, err := r.takeByte()
+			if err != nil {
+				return 0, err
+			}
+			r.pos++
+			return c, nil
+		}
 		if err := r.fill(); err != nil {
 			return 0, err
 		}
@@ -225,8 +242,13 @@ func (r *recorder) Read(p []byte) (int, error) {
 
 // fill reads src into the room after the bytes buf holds until it reads one
 // or more, making room first when there is none, and returns the error src
-// gave, which every later call returns too.
+// gave, which every later call returns too. A src that is an io.ByteReader
+// gives one byte.
 func (r *recorder) fill() error {
+	if r.bsrc != nil {
+		_, err := r.takeByte()
+		return err
+	}
 	for range 100 {
 		if r.err != nil {
 			return r.err
@@ -245,6 +267,25 @@ func (r *recorder) fill() error {
 	return r.err
 }
 
+// takeByte reads the next byte of bsrc, appends it to buf, making room first
+// as fill does when there is none, and returns it; or it returns the error
+// bsrc gave, which every later call returns too.
+func (r *recorder) takeByte() (byte, error) {
+	if r.err != nil {
+		return 0, r.err
+	}
+	c, err := r.bsrc.ReadByte()
+	if err != nil {
+		r.err = err
+		return 0, err
+	}
+	if len(r.buf) == cap(r.buf) {
+		r.buf = slices.Grow(r.buf, max(len(r.buf), minRead))
+	}
+	r.buf = append(r.buf, c)
+	return c, nil
+}
+
 // from drops the bytes before off, an offset in the stream no later than the
 // next byte to return, which a value decoded from off on does not need.
 func (r *recorder) from(off int64) {
@@ -255,12 +296,51 @@ func (r *recorder) from(off int64) {
 }
 
 // replay returns a reader of the stream from where the record starts: the
-// bytes recorded, then the rest of src, or the error src gave.
+// bytes recorded, then the rest of src, or the error src gave. For a src that
+// is an io.ByteReader it is an io.ByteReader too, so a decoder reading it
+// puts no buffer of its own in front of it and takes from src no byte past
+// the last one it asks for. Such a src has given no error when a value is
+// replayed: the decode stops at the prefix it cannot resolve, in a start
+// element it has read to its end and no further.
 func (r *recorder) replay() io.Reader {
+	if r.bsrc != nil {
+		return &byteReplay{rec: r.buf, src: r.bsrc}
+	}
 	if r.err != nil {
 		return io.MultiReader(bytes.NewReader(r.buf), failedReader{r.err})
 	}
 	return io.MultiReader(bytes.NewReader(r.buf), r.src)
+}
+
+// byteReplay is the replay of a recorder whose source is an io.ByteReader:
+// the bytes recorded, then the rest of the source a byte at a time.
+type byteReplay struct {
+	rec []byte        // the bytes recorded that are still to be read
+	src io.ByteReader // the recorder's source
+}
+
+// ReadByte returns the next byte of the stream.
+func (r *byteReplay) ReadByte() (byte, error) {
+	if len(r.rec) > 0 {
+		c := r.rec[0]
+		r.rec = r.rec[1:]
+		return c, nil
+	}
+	return r.src.ReadByte()
+}
+
+// Read reads the next byte of the stream into p. It makes a byteReplay the
+// io.Reader encoding/xml takes, which reads it through ReadByte.
+func (r *byteReplay) Read(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
+	c, err := r.ReadByte()
+	if err != nil {
+		return 0, err
+	}
+	p[0] = c
+	return 1, nil
 }
 
 // failedReader is a reader that returns err.
