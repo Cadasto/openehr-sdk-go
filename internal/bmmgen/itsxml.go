@@ -213,13 +213,14 @@ func (s *xsdSet) readFile(root *os.Root, file string) ([]string, error) {
 // attributes of a named complex type. A construct the reader does not know
 // fails, so a re-pinned schema that uses one cannot be read into a wrong
 // order or a wrong set of attributes: an xs:attributeGroup among them, which
-// the reader does not expand.
+// the reader does not expand, and an xs:anyAttribute, which admits attributes
+// no member declares.
 func parseComplexType(file string, n *xsdNode) (*xsdType, error) {
 	t := &xsdType{file: file, name: n.attr("name")}
 	for i := range n.Children {
 		c := &n.Children[i]
 		switch {
-		case c.is("annotation"), c.is("anyAttribute"):
+		case c.is("annotation"):
 		case c.is("attribute"):
 			if err := t.addAttribute(c); err != nil {
 				return nil, err
@@ -243,8 +244,8 @@ func parseComplexType(file string, n *xsdNode) (*xsdType, error) {
 // xs:simpleContent or xs:complexContent, holds: its base, its particle and
 // its attributes. An extension adds them to its base's; a restriction
 // restates the content it keeps, and its base's attributes are not read
-// through it ([xsdSet.attributesOf]). An xs:attributeGroup fails in either,
-// and so does an xs:anyAttribute in a restriction.
+// through it ([xsdSet.attributesOf]). An xs:attributeGroup or an
+// xs:anyAttribute fails in either.
 func (t *xsdType) parseDerivation(c *xsdNode) error {
 	for j := range c.Children {
 		d := &c.Children[j]
@@ -255,7 +256,7 @@ func (t *xsdType) parseDerivation(c *xsdNode) error {
 			for k := range d.Children {
 				e := &d.Children[k]
 				switch {
-				case e.is("annotation"), e.is("anyAttribute"):
+				case e.is("annotation"):
 				case e.is("attribute"):
 					if err := t.addAttribute(e); err != nil {
 						return err
@@ -292,10 +293,15 @@ func (t *xsdType) parseDerivation(c *xsdNode) error {
 
 // addAttribute records the XML attribute n declares. An attribute by
 // reference names no attribute of the type's own vocabulary and is refused.
+// So is a prohibited one, which declares no attribute and in a restriction
+// takes away an inherited one, which the reader does not do.
 func (t *xsdType) addAttribute(n *xsdNode) error {
 	name := n.attr("name")
 	if name == "" {
 		return fmt.Errorf("its-xml: %s: type %s: an attribute has no name", t.file, t.name)
+	}
+	if n.attr("use") == "prohibited" {
+		return fmt.Errorf("its-xml: %s: type %s: attribute %s is prohibited", t.file, t.name, name)
 	}
 	if !slices.Contains(t.attrs, name) {
 		t.attrs = append(t.attrs, name)

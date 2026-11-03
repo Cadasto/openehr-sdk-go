@@ -381,6 +381,40 @@ func TestXSDAttributesRefuses(t *testing.T) {
 			wantErr: "unexpected xs:anyAttribute in xs:restriction",
 		},
 		{
+			name: "an attribute wildcard on a type",
+			files: map[string]string{"s/a.xsd": xsdDoc(
+				`<xs:complexType name="A"><xs:sequence/><xs:anyAttribute/></xs:complexType>`)},
+			wantErr: "unexpected xs:anyAttribute",
+		},
+		{
+			name: "an attribute wildcard in an extension",
+			files: map[string]string{"s/a.xsd": xsdDoc(
+				`<xs:complexType name="B"><xs:sequence/></xs:complexType>` +
+					`<xs:complexType name="A"><xs:complexContent><xs:extension base="B"><xs:anyAttribute/></xs:extension></xs:complexContent></xs:complexType>`)},
+			wantErr: "unexpected xs:anyAttribute in xs:extension",
+		},
+		{
+			// Recorded by name, a prohibited attribute would be listed as one
+			// the type has.
+			name: "a prohibited attribute on a type",
+			files: map[string]string{"s/a.xsd": xsdDoc(
+				`<xs:complexType name="A"><xs:sequence/><xs:attribute name="id" use="prohibited"/></xs:complexType>`)},
+			wantErr: `attribute id is prohibited`,
+		},
+		{
+			name: "a prohibited attribute in an extension",
+			files: map[string]string{"s/a.xsd": xsdDoc(
+				`<xs:complexType name="B"><xs:sequence/><xs:attribute name="id"/></xs:complexType>` +
+					`<xs:complexType name="A"><xs:complexContent><xs:extension base="B"><xs:attribute name="id" use="prohibited"/></xs:extension></xs:complexContent></xs:complexType>`)},
+			wantErr: `attribute id is prohibited`,
+		},
+		{
+			name: "a prohibited attribute in a restriction of a built-in type",
+			files: map[string]string{"s/a.xsd": xsdDoc(
+				`<xs:complexType name="A"><xs:complexContent><xs:restriction base="xs:anyType"><xs:sequence/><xs:attribute name="id" use="prohibited"/></xs:restriction></xs:complexContent></xs:complexType>`)},
+			wantErr: `attribute id is prohibited`,
+		},
+		{
 			name: "an attribute with no name",
 			files: map[string]string{"s/a.xsd": xsdDoc(
 				`<xs:complexType name="A"><xs:simpleContent><xs:extension base="xs:string"><xs:attribute ref="xml:lang"/></xs:extension></xs:simpleContent></xs:complexType>`)},
