@@ -135,8 +135,8 @@ func pathDivergence(node *tcimpl.CompiledNode, segs []parse.PathSegment) (bad st
 // here, which is no high-confidence divergence, so the walk stops without a
 // warning rather than descend into a sibling the predicate does not select.
 // A segment with no predicate, or one that names no child, takes the first
-// child deterministically (lenient first-child, mirroring
-// template.OperationalTemplate.NodeAt).
+// child deterministically (lenient first-child, mirroring the rules of
+// templatecompile.Compiled.Resolve).
 //
 // The typed predicate ([aql.PathSegment].Parsed) is read where the parser
 // structured it. Otherwise the verbatim text is compared with the lexer's
