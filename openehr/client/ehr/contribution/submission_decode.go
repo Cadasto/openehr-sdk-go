@@ -50,9 +50,11 @@ import (
 // "/versions/0/commit_audit/_type"); an IMPORTED_VERSION with no `item`, or
 // a null one ("/versions/0/item"); a `data` without a `_type`
 // ("/versions/0/data") or with one outside the four
-// ("/versions/0/data/_type"); and a failure inside a payload or an audit, such
-// as an unknown `_type` within a composition, which canjson reports at its
-// pointer from the root of the body ("/versions/0/data/content/0"). A `_type`
+// ("/versions/0/data/_type"); and a failure inside an ORIGINAL_VERSION's
+// payload or an audit, such as an unknown `_type` within a composition, which
+// canjson reports at its pointer from the root of the body
+// ("/versions/0/data/content/0"); an IMPORTED_VERSION's payload is not
+// decoded beyond its `_type`. A `_type`
 // the RM defines but the body cannot hold there wraps
 // [typereg.ErrTypeMismatch], one it does not define wraps
 // [typereg.ErrUnknownType], a missing payload `_type` wraps
@@ -316,8 +318,13 @@ type versionPiece struct {
 	auditMember int         // the index of its commit_audit member, or -1
 	codec       versionCodec
 	// itemData is a copy of an IMPORTED_VERSION's `item.data` as the body
-	// writes it; nil when the item has none or holds null.
-	itemData []byte
+	// writes it; nil when the item has none or holds null. item is that
+	// version's item, at index itemMember of obj, and itemDataMember is the
+	// index of `data` in item.
+	itemData       []byte
+	item           jsonObject
+	itemMember     int
+	itemDataMember int
 }
 
 // readVersion reads the element raw holds at index i of `versions`.
@@ -381,6 +388,7 @@ func (v *versionPiece) payloadType(at string) (string, string, error) {
 		case !isObject:
 			return "", "", refusal(at, "", "the imported item is not a JSON object", canjson.ErrInvalidShape)
 		}
+		v.item, v.itemMember = item, i
 		holder = item
 	}
 	at += "/" + memberData
@@ -396,7 +404,7 @@ func (v *versionPiece) payloadType(at string) (string, string, error) {
 		return "", "", refusal(at, "", "the payload is not a JSON object", canjson.ErrInvalidShape)
 	}
 	if v.kind == typeImportedVersion {
-		v.itemData = bytes.Clone(holder.value(i))
+		v.itemData, v.itemDataMember = bytes.Clone(holder.value(i)), i
 	}
 	t := data.index(memberType)
 	if t < 0 {
@@ -439,6 +447,15 @@ func (v *versionPiece) document(forCheck bool) []byte {
 			e.supply(memberUID, standInUID)
 		}
 		e.supply(memberContribution, standInContribution)
+	}
+	if v.itemData != nil {
+		// The item's payload is held as the bytes the body carries (see
+		// decodeImported), so the decode reads null in its place: reading
+		// it as a generic value would refuse a number no float64 holds,
+		// such as 1e400.
+		ie := objectEdit{obj: v.item}
+		ie.replace(v.itemDataMember, "null")
+		e.replace(v.itemMember, string(ie.bytes()))
 	}
 	return slices.Concat([]byte(`{"`+memberVersions+`":{"`+v.key()+`":`), e.bytes(), []byte(`}}`))
 }

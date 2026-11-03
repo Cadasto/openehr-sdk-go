@@ -430,13 +430,44 @@ func TestUnmarshalSubmissionDropsTimeCommitted(t *testing.T) { // REQ-130
 	}
 }
 
+// TestUnmarshalSubmissionDropsEmptySystemID reads a batch audit whose
+// system_id is empty and a commit_audit whose system_id is null: the decode
+// succeeds, and the encoding leaves both out, as the write-side audit leaves
+// out a system_id it does not hold.
+func TestUnmarshalSubmissionDropsEmptySystemID(t *testing.T) { // REQ-130
+	audit := func(systemID string) string {
+		return object(
+			member("_type", `"AUDIT_DETAILS"`),
+			member("system_id", systemID),
+			member("committer", committerJSON),
+			member("change_type", codedCreation))
+	}
+	version := object(
+		member("_type", `"ORIGINAL_VERSION"`),
+		member("commit_audit", audit("null")),
+		member("lifecycle_state", codedComplete),
+		member("data", compositionJSON))
+	sub, err := contribution.UnmarshalSubmission(bodyJSON(audit(`""`), version))
+	if err != nil {
+		t.Fatalf("UnmarshalSubmission: %v", err)
+	}
+	got, err := sub.MarshalJSON()
+	if err != nil {
+		t.Fatalf("MarshalJSON: %v", err)
+	}
+	if bytes.Contains(got, []byte("system_id")) {
+		t.Errorf("encoding carries system_id: %s", got)
+	}
+}
+
 // TestUnmarshalSubmissionImportedPayloadKeepsNumbers reads an imported item
-// whose payload spells a number with a fraction of zero and an integer past
-// 2^53: the encoding writes both as the body spells them, since the payload
-// is held as the body's JSON text, and changing the input buffer after the
-// decode does not reach the decoded submission.
+// whose payload spells a number with a fraction of zero, an integer past 2^53
+// and a number no float64 holds: the decode accepts them and the encoding
+// writes each as the body spells it, since the payload is held as the body's
+// JSON text, and changing the input buffer after the decode does not reach
+// the decoded submission.
 func TestUnmarshalSubmissionImportedPayloadKeepsNumbers(t *testing.T) { // REQ-130
-	data := strings.Replace(compositionJSON, `"composer":`, `"f":1.0,"n":9007199254740993,"composer":`, 1)
+	data := strings.Replace(compositionJSON, `"composer":`, `"f":1.0,"n":9007199254740993,"g":1e400,"composer":`, 1)
 	if data == compositionJSON {
 		t.Fatal("test setup: the composition fixture no longer carries the composer member this test writes before")
 	}
