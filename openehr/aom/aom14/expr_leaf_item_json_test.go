@@ -12,6 +12,7 @@ import (
 	json "encoding/json/v2"
 	"errors"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -29,7 +30,14 @@ import (
 // around it as XML Schema reads one, and a JSON number for the integer and
 // real primitives, back with its text as that JSON value and its Type as
 // `xsd:` and the built-in canonical for the primitive, so an `xs:string` item
-// comes back as `xsd:string` and an `xs:decimal` one as `xsd:float`.
+// comes back as `xsd:string` and an `xs:decimal` one as `xsd:float`. A Real
+// or a Double keeps its text's own digits, none of them passed through a
+// float64, so a literal whose digits a float64 does not keep, such as
+// `0.1000000000000000055511151231257827`, which a float64 writes as 0.1, or
+// `1e-400`, which it reads as zero, is written as it is. The text is rewritten
+// only where JSON's number grammar differs from XML Schema's: a leading `+`
+// dropped, `0` before a leading point, a trailing point dropped and leading
+// zeros dropped.
 func TestREQ176_REQ052_ExprLeafItemCanonicalJSON(t *testing.T) {
 	pattern := ".*"
 	typed := func(typ, value string) *aom14.TypedString { return &aom14.TypedString{Value: value, Type: typ} }
@@ -50,8 +58,17 @@ func TestREQ176_REQ052_ExprLeafItemCanonicalJSON(t *testing.T) {
 		{"xs:int", typed("xs:int", "-42"), `{"_type":"Integer","value":-42}`, typed("xsd:int", "-42")},
 		{"xs:integer", typed("xs:integer", " +7 "), `{"_type":"Integer","value":7}`, typed("xsd:int", "7")},
 		{"xs:long", typed("xs:long", "9223372036854775807"), `{"_type":"Integer64","value":9223372036854775807}`, typed("xsd:long", "9223372036854775807")},
-		{"xs:decimal", typed("xs:decimal", "2.50"), `{"_type":"Real","value":2.5}`, typed("xsd:float", "2.5")},
-		{"xs:double", typed("xs:double", "1e3"), `{"_type":"Double","value":1000}`, typed("xsd:double", "1000")},
+		{"xs:decimal", typed("xs:decimal", "2.50"), `{"_type":"Real","value":2.50}`, typed("xsd:float", "2.50")},
+		{"xs:double", typed("xs:double", "1e3"), `{"_type":"Double","value":1e3}`, typed("xsd:double", "1e3")},
+		{"xs:double exact", typed("xs:double", "0.1000000000000000055511151231257827"), `{"_type":"Double","value":0.1000000000000000055511151231257827}`, typed("xsd:double", "0.1000000000000000055511151231257827")},
+		{"xs:float underflow", typed("xs:float", "1e-400"), `{"_type":"Real","value":1e-400}`, typed("xsd:float", "1e-400")},
+		{"xs:float plus", typed("xs:float", "+1.5"), `{"_type":"Real","value":1.5}`, typed("xsd:float", "1.5")},
+		{"xs:decimal leading point", typed("xs:decimal", ".5"), `{"_type":"Real","value":0.5}`, typed("xsd:float", "0.5")},
+		{"xs:decimal signed leading point", typed("xs:decimal", "-.5"), `{"_type":"Real","value":-0.5}`, typed("xsd:float", "-0.5")},
+		{"xs:decimal trailing point", typed("xs:decimal", "1."), `{"_type":"Real","value":1}`, typed("xsd:float", "1")},
+		{"xs:double trailing point", typed("xs:double", "1.E3"), `{"_type":"Double","value":1E3}`, typed("xsd:double", "1E3")},
+		{"xs:decimal leading zeros", typed("xs:decimal", "-007.50"), `{"_type":"Real","value":-7.50}`, typed("xsd:float", "-7.50")},
+		{"xs:double zeros", typed("xs:double", "\t+00.0e+01 "), `{"_type":"Double","value":0.0e+01}`, typed("xsd:double", "0.0e+01")},
 		{"xs:date", typed("xs:date", "2026-11-03"), `{"_type":"Iso8601_date","value":"2026-11-03"}`, typed("xsd:date", "2026-11-03")},
 		{"xs:time", typed("xs:time", "10:30:00"), `{"_type":"Iso8601_time","value":"10:30:00"}`, typed("xsd:time", "10:30:00")},
 		{"xs:dateTime", typed("xs:dateTime", "2026-11-03T10:30:00Z"), `{"_type":"Iso8601_date_time","value":"2026-11-03T10:30:00Z"}`, typed("xsd:dateTime", "2026-11-03T10:30:00Z")},
@@ -139,32 +156,48 @@ func TestREQ176_REQ052_ExprLeafItemCanonicalJSONRefusals(t *testing.T) {
 // primitive does not read: a Boolean other than true, false, 1 or 0; an
 // Integer or Integer64 that is no whole number in its range; and a Real or
 // Double that is no decimal number in the float64 range, an infinity and a
-// not-a-number among them.
+// not-a-number among them. Where the text is refused for its spelling or its
+// range, the refusal wraps strconv.ErrSyntax or strconv.ErrRange, so a Real
+// or a Double that no XML Schema literal spells, such as a hexadecimal float
+// or digits with an underscore, is refused before it is written.
 func TestREQ176_REQ052_ExprLeafItemCanonicalJSONEncodeRefusals(t *testing.T) {
-	for _, item := range []aom14.TypedString{
-		{Type: "string", Value: "unprefixed"},
-		{Type: "xs:nothing", Value: "unknown"},
-		{Type: "xs:boolean", Value: "yes"},
-		{Type: "xs:boolean", Value: ""},
-		{Type: "xs:int", Value: "abc"},
-		{Type: "xs:int", Value: "1.0"},
-		{Type: "xs:int", Value: "2147483648"},
-		{Type: "xs:long", Value: "9223372036854775808"},
-		{Type: "xs:decimal", Value: "2.5.1"},
-		{Type: "xs:float", Value: "0x1p-2"},
-		{Type: "xs:double", Value: "1_000"},
-		{Type: "xs:double", Value: "1e400"},
-		{Type: "xs:double", Value: "INF"},
-		{Type: "xs:decimal", Value: "NaN"},
+	for _, tc := range []struct {
+		item  aom14.TypedString
+		cause error // the strconv sentinel the refusal wraps, or nil
+	}{
+		{item: aom14.TypedString{Type: "string", Value: "unprefixed"}},
+		{item: aom14.TypedString{Type: "xs:nothing", Value: "unknown"}},
+		{item: aom14.TypedString{Type: "xs:boolean", Value: "yes"}, cause: strconv.ErrSyntax},
+		{item: aom14.TypedString{Type: "xs:boolean", Value: ""}, cause: strconv.ErrSyntax},
+		{item: aom14.TypedString{Type: "xs:int", Value: "abc"}, cause: strconv.ErrSyntax},
+		{item: aom14.TypedString{Type: "xs:int", Value: "1.0"}, cause: strconv.ErrSyntax},
+		{item: aom14.TypedString{Type: "xs:int", Value: "2147483648"}, cause: strconv.ErrRange},
+		{item: aom14.TypedString{Type: "xs:long", Value: "9223372036854775808"}, cause: strconv.ErrRange},
+		{item: aom14.TypedString{Type: "xs:decimal", Value: "2.5.1"}, cause: strconv.ErrSyntax},
+		{item: aom14.TypedString{Type: "xs:float", Value: "0x1p-2"}, cause: strconv.ErrSyntax},
+		{item: aom14.TypedString{Type: "xs:double", Value: "1_000"}, cause: strconv.ErrSyntax},
+		{item: aom14.TypedString{Type: "xs:double", Value: "1e400"}, cause: strconv.ErrRange},
+		{item: aom14.TypedString{Type: "xs:double", Value: "."}, cause: strconv.ErrSyntax},
+		{item: aom14.TypedString{Type: "xs:double", Value: "-"}, cause: strconv.ErrSyntax},
+		{item: aom14.TypedString{Type: "xs:double", Value: "1e"}, cause: strconv.ErrSyntax},
+		{item: aom14.TypedString{Type: "xs:double", Value: "e3"}, cause: strconv.ErrSyntax},
+		{item: aom14.TypedString{Type: "xs:double", Value: "1e+"}, cause: strconv.ErrSyntax},
+		{item: aom14.TypedString{Type: "xs:double", Value: "+-1"}, cause: strconv.ErrSyntax},
+		{item: aom14.TypedString{Type: "xs:double", Value: "INF"}},
+		{item: aom14.TypedString{Type: "xs:double", Value: "-INF"}},
+		{item: aom14.TypedString{Type: "xs:decimal", Value: "NaN"}},
 	} {
-		leaf := &aom14.ExprLeaf{Type: "String", ReferenceType: "attribute", Item: &item}
+		leaf := &aom14.ExprLeaf{Type: "String", ReferenceType: "attribute", Item: &tc.item}
 		_, err := canjson.Marshal(leaf)
 		if !errors.Is(err, canjson.ErrInvalidValue) {
-			t.Errorf("canjson.Marshal(item %#v) = %v; want canjson.ErrInvalidValue", item, err)
+			t.Errorf("canjson.Marshal(item %#v) = %v; want canjson.ErrInvalidValue", tc.item, err)
 			continue
 		}
-		if len(item.Value) > 2 && strings.Contains(err.Error(), item.Value) {
-			t.Errorf("canjson.Marshal(item %#v) = %q; want an error that does not quote the text", item, err)
+		if tc.cause != nil && !errors.Is(err, tc.cause) {
+			t.Errorf("canjson.Marshal(item %#v) = %v; want it to wrap %v", tc.item, err, tc.cause)
+		}
+		if len(tc.item.Value) > 2 && strings.Contains(err.Error(), tc.item.Value) {
+			t.Errorf("canjson.Marshal(item %#v) = %q; want an error that does not quote the text", tc.item, err)
 		}
 	}
 }

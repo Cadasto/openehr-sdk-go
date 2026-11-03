@@ -20,9 +20,15 @@ import (
 // string. A Boolean writes `true` or `1` as true and `false` or `0` as false,
 // XML white space around the text removed as XML Schema reads a boolean. An
 // Integer or an Integer64 writes a JSON integer, a whole number of 32 or 64
-// bits, and a Real or a Double a JSON number, a decimal number in the float64
-// range, as canonical JSON writes a member of that primitive. The JSON keeps
-// neither Type's prefix nor which of the primitive's built-ins Type names.
+// bits. A Real or a Double writes the text itself as a JSON number, an XML
+// Schema decimal or floating-point literal in the float64 range, so the number
+// written has the text's value exactly, digits a float64 would not keep
+// included: XML white space around the text is removed, and the text is
+// rewritten only where JSON's number grammar differs from XML Schema's, a
+// leading `+` and leading zeros dropped, `0` written before a leading decimal
+// point and a trailing one dropped, so `+.5` is written `0.5` and `1.E3`
+// `1E3`. The JSON keeps neither Type's prefix nor which of the primitive's
+// built-ins Type names.
 //
 // A Type that is no prefixed XML Schema built-in datatype is refused, and so
 // is text the primitive does not read, such as a Boolean written `yes`, an
@@ -33,21 +39,28 @@ func (s TypedString) MarshalJSONTo(enc *jsontext.Encoder) error {
 	if !ok {
 		return errTypedType
 	}
-	value, err := jsonValue(primitive, s.Value)
+	value, number, err := jsonValue(primitive, s.Value)
 	if err != nil {
 		return err
 	}
 	for _, tok := range [...]jsontext.Token{
 		jsontext.BeginObject,
 		jsontext.String("_type"), jsontext.String(primitive),
-		jsontext.String("value"), value,
-		jsontext.EndObject,
+		jsontext.String("value"),
 	} {
 		if err := enc.WriteToken(tok); err != nil {
 			return err
 		}
 	}
-	return nil
+	if number != nil {
+		err = enc.WriteValue(number)
+	} else {
+		err = enc.WriteToken(value)
+	}
+	if err != nil {
+		return err
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }
 
 // errTypedType is the refusal of a typed item whose Type is no prefixed XML
@@ -70,18 +83,19 @@ func typedPrimitive(t string) (string, bool) {
 const xmlSpace = " \t\r\n"
 
 // jsonValue returns text, the text of a typed item whose type reads as
-// primitive, as the JSON value [TypedString.MarshalJSONTo] writes for it, or
-// the refusal of text primitive does not read.
-func jsonValue(primitive, text string) (jsontext.Token, error) {
+// primitive, as the JSON value [TypedString.MarshalJSONTo] writes for it: the
+// token value, or for a Real or a Double the JSON number in number, or the
+// refusal of text primitive does not read.
+func jsonValue(primitive, text string) (value jsontext.Token, number jsontext.Value, err error) {
 	switch primitive {
 	case "Boolean":
 		switch strings.Trim(text, xmlSpace) {
 		case "true", "1":
-			return jsontext.True, nil
+			return jsontext.True, nil, nil
 		case "false", "0":
-			return jsontext.False, nil
+			return jsontext.False, nil, nil
 		}
-		return jsontext.Token{}, textRefusal(primitive, strconv.ErrSyntax)
+		return jsontext.Token{}, nil, textRefusal(primitive, strconv.ErrSyntax)
 	case "Integer", "Integer64":
 		bits := 32
 		if primitive == "Integer64" {
@@ -89,24 +103,63 @@ func jsonValue(primitive, text string) (jsontext.Token, error) {
 		}
 		n, err := strconv.ParseInt(strings.Trim(text, xmlSpace), 10, bits)
 		if err != nil {
-			return jsontext.Token{}, textRefusal(primitive, numCause(err))
+			return jsontext.Token{}, nil, textRefusal(primitive, numCause(err))
 		}
-		return jsontext.Int(n), nil
+		return jsontext.Int(n), nil, nil
 	case "Real", "Double":
-		s := strings.Trim(text, xmlSpace)
-		switch {
-		case s == "INF" || s == "+INF" || s == "-INF" || s == "NaN":
-			return jsontext.Token{}, fmt.Errorf("the text of a typed item is no finite %s, which canonical JSON cannot write", primitive)
-		case !isDecimal(s):
-			return jsontext.Token{}, textRefusal(primitive, strconv.ErrSyntax)
-		}
-		f, err := strconv.ParseFloat(s, 64)
-		if err != nil {
-			return jsontext.Token{}, textRefusal(primitive, numCause(err))
-		}
-		return jsontext.Float(f), nil
+		number, err := jsonNumber(primitive, text)
+		return jsontext.Token{}, number, err
 	}
-	return jsontext.String(text), nil
+	return jsontext.String(text), nil, nil
+}
+
+// jsonNumber returns text, the text of a typed item whose type reads as
+// primitive, a Real or a Double, as the JSON number
+// [TypedString.MarshalJSONTo] writes for it, or the refusal of text primitive
+// does not read.
+func jsonNumber(primitive, text string) (jsontext.Value, error) {
+	s := strings.Trim(text, xmlSpace)
+	switch {
+	case s == "INF" || s == "+INF" || s == "-INF" || s == "NaN":
+		return nil, fmt.Errorf("the text of a typed item is no finite %s, which canonical JSON cannot write", primitive)
+	case !isDecimal(s):
+		return nil, textRefusal(primitive, strconv.ErrSyntax)
+	}
+	// The float64 refuses a literal beyond its range, which canonical JSON
+	// does not read back as the primitive; the number written is s's own.
+	if _, err := strconv.ParseFloat(s, 64); err != nil {
+		return nil, textRefusal(primitive, numCause(err))
+	}
+	return appendJSONNumber(make(jsontext.Value, 0, len(s)+1), s), nil
+}
+
+// appendJSONNumber appends s, a literal [isDecimal] accepts, to dst as a JSON
+// number of the same value, rewritten only where JSON's number grammar
+// differs from XML Schema's: a leading plus sign and leading zeros dropped, a
+// zero written before a leading decimal point and a trailing decimal point
+// dropped. The exponent is written as it is.
+func appendJSONNumber(dst []byte, s string) []byte {
+	switch s[0] {
+	case '+':
+		s = s[1:]
+	case '-':
+		dst = append(dst, '-')
+		s = s[1:]
+	}
+	mant, exp := s, ""
+	if k := strings.IndexAny(s, "eE"); k >= 0 {
+		mant, exp = s[:k], s[k:]
+	}
+	intPart, frac, _ := strings.Cut(mant, ".")
+	if intPart = strings.TrimLeft(intPart, "0"); intPart == "" {
+		intPart = "0"
+	}
+	dst = append(dst, intPart...)
+	if frac != "" {
+		dst = append(dst, '.')
+		dst = append(dst, frac...)
+	}
+	return append(dst, exp...)
 }
 
 // textRefusal is the refusal of the text of a typed item that its primitive
