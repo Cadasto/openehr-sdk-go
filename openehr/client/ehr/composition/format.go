@@ -91,8 +91,12 @@ type EncodeError struct {
 	Err error
 }
 
-// Error names the format and, after a colon, the codec's error.
+// Error names the format and, after a colon, the codec's error. A nil
+// receiver gives the text of the zero value.
 func (e *EncodeError) Error() string {
+	if e == nil {
+		e = &EncodeError{}
+	}
 	msg := "encode the composition as " + e.Format.String()
 	if e.Err == nil {
 		return msg
@@ -100,8 +104,13 @@ func (e *EncodeError) Error() string {
 	return msg + ": " + e.Err.Error()
 }
 
-// Unwrap returns the codec's error.
-func (e *EncodeError) Unwrap() error { return e.Err }
+// Unwrap returns the codec's error, or nil for a nil receiver.
+func (e *EncodeError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Err
+}
 
 // valid reports whether f is one of the four formats.
 func (f Format) valid() bool {

@@ -1060,3 +1060,23 @@ func TestWithFormatCopiesDecodeOptions(t *testing.T) {
 		t.Errorf("first content entry name = %q, want %q from the compiled template", got, fixtureEntryName)
 	}
 }
+
+// TestNilEncodeErrorAnswersInsteadOfPanicking pins REQ-025 § No panics on the
+// typed nil a failed errors.AsType[*composition.EncodeError] match leaves
+// behind: Error gives the zero value's text, Unwrap gives nil, and errors.Is
+// through it answers false instead of panicking.
+func TestNilEncodeErrorAnswersInsteadOfPanicking(t *testing.T) {
+	e, ok := errors.AsType[*composition.EncodeError](transport.ErrInvalidConfig)
+	if ok {
+		t.Fatal("errors.AsType[*EncodeError](ErrInvalidConfig) matched, want no match")
+	}
+	if got, want := e.Error(), (&composition.EncodeError{}).Error(); got != want {
+		t.Errorf("nil EncodeError.Error() = %q, want %q (what the zero EncodeError says)", got, want)
+	}
+	if got := e.Unwrap(); got != nil {
+		t.Errorf("nil EncodeError.Unwrap() = %v, want nil", got)
+	}
+	if errors.Is(e, canjson.ErrInvalidValue) {
+		t.Error("errors.Is(nil EncodeError, ErrInvalidValue) = true, want false")
+	}
+}
