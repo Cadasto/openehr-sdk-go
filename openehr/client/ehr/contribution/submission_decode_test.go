@@ -430,11 +430,12 @@ func TestUnmarshalSubmissionDropsTimeCommitted(t *testing.T) { // REQ-130
 	}
 }
 
-// TestUnmarshalSubmissionDropsEmptySystemID reads a batch audit whose
-// system_id is empty and a commit_audit whose system_id is null: the decode
-// succeeds, and the encoding leaves both out, as the write-side audit leaves
-// out a system_id it does not hold.
-func TestUnmarshalSubmissionDropsEmptySystemID(t *testing.T) { // REQ-130
+// TestUnmarshalSubmissionDropsEmptyWriteSideMembers reads a batch audit
+// whose system_id is empty, a commit_audit whose system_id is null and a
+// version whose uid has an empty value: the decode succeeds, and the encoding
+// leaves all three out, as the write-side shape leaves out a member it does
+// not hold.
+func TestUnmarshalSubmissionDropsEmptyWriteSideMembers(t *testing.T) { // REQ-130
 	audit := func(systemID string) string {
 		return object(
 			member("_type", `"AUDIT_DETAILS"`),
@@ -445,6 +446,7 @@ func TestUnmarshalSubmissionDropsEmptySystemID(t *testing.T) { // REQ-130
 	version := object(
 		member("_type", `"ORIGINAL_VERSION"`),
 		member("commit_audit", audit("null")),
+		member("uid", `{"_type":"OBJECT_VERSION_ID","value":""}`),
 		member("lifecycle_state", codedComplete),
 		member("data", compositionJSON))
 	sub, err := contribution.UnmarshalSubmission(bodyJSON(audit(`""`), version))
@@ -455,8 +457,10 @@ func TestUnmarshalSubmissionDropsEmptySystemID(t *testing.T) { // REQ-130
 	if err != nil {
 		t.Fatalf("MarshalJSON: %v", err)
 	}
-	if bytes.Contains(got, []byte("system_id")) {
-		t.Errorf("encoding carries system_id: %s", got)
+	for _, name := range []string{"system_id", "uid"} {
+		if bytes.Contains(got, []byte(`"`+name+`"`)) {
+			t.Errorf("encoding carries %s: %s", name, got)
+		}
 	}
 }
 
