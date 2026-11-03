@@ -3,10 +3,13 @@ package aom14_test
 // REQ-176 § Shapes, REQ-056: canonical XML writes the `value` of an ORDINAL or
 // SCALE symbol in the DV_CODED_TEXT shape only when it is non-empty; REQ-175:
 // the missing-member report holds that shape to the members its schema shape
-// requires, so it does not report the `value`.
+// requires, so it does not report the `value`; a symbol of neither shape is
+// refused with canxml.ErrInvalidShape.
 
 import (
 	"encoding/xml"
+	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -117,6 +120,39 @@ func TestREQ176_REQ175_SymbolValueIsNotMissing(t *testing.T) {
 			}
 			if !reflect.DeepEqual(missing, tc.want) {
 				t.Errorf("%s, %s: WithMissing reported %q; want %q", class, tc.name, missing, tc.want)
+			}
+		}
+	}
+}
+
+// TestREQ176_REQ056_SymbolOfAnotherTypeIsRefused pins that canonical XML
+// refuses an ORDINAL or SCALE symbol that holds neither of its shapes, a Go
+// value or a class value through a pointer or by value, with
+// canxml.ErrInvalidShape, as it refuses an EXPR_LEAF item it cannot write: the
+// refusal names the member and the Go type the symbol holds, never the value.
+func TestREQ176_REQ056_SymbolOfAnotherTypeIsRefused(t *testing.T) {
+	const secret = "Jane Doe"
+	for _, symbol := range []struct {
+		value any
+		text  string // the value's text, which the refusal does not carry
+	}{
+		{secret, secret},
+		{98765, "98765"},
+		{rm.DVText{Value: secret}, secret},
+		{&rm.DVText{Value: secret}, secret},
+	} {
+		for member, v := range map[string]canxml.BMMNamer{
+			"ORDINAL.symbol": &aom14.Ordinal{Value: 1, Symbol: symbol.value},
+			"SCALE.symbol":   &aom14.Scale{Value: 1, Symbol: symbol.value},
+		} {
+			out, err := canxml.Marshal(v)
+			if !errors.Is(err, canxml.ErrInvalidShape) {
+				t.Errorf("canxml.Marshal(%s holding %T) = %s, %v; want canxml.ErrInvalidShape", member, symbol.value, out, err)
+				continue
+			}
+			got, typ := err.Error(), fmt.Sprintf("%T", symbol.value)
+			if !strings.Contains(got, member+" holds "+typ) || strings.Contains(got, symbol.text) {
+				t.Errorf("canxml.Marshal(%s holding %T) = %q; want it to name %s and %s, and not the value", member, symbol.value, got, member, typ)
 			}
 		}
 	}

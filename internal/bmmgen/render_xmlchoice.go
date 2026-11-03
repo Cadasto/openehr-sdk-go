@@ -177,9 +177,11 @@ func unmarshalXMLChoice(recv, field, elem string, c *xmlChoice, mandatory bool) 
 // marshalXMLChoice emits the encoding of a choice member: the value it holds,
 // a pointer to one of the shapes or a shape by value, under the member's
 // element, through the shape's own MarshalXML, which writes no `xsi:type`; a
-// nil member writes nothing, and a value of any other type is refused. A
-// shape with members to leave out when empty is written through
-// xmlschema.EncodeElementOmittingEmpty.
+// nil member writes nothing, and a value of any other type is refused with
+// canxml.ErrInvalidShape, naming the member and the Go type it holds, never
+// the value, as the encoder of a member typed Any refuses one
+// ([marshalXMLAny]). A shape with members to leave out when empty is written
+// through xmlschema.EncodeElementOmittingEmpty.
 func marshalXMLChoice(recv, field, elem string, c *xmlChoice, mandatory bool) string {
 	start := fmt.Sprintf("xml.StartElement{Name: xml.Name{Local: %q}}", elem)
 	var b strings.Builder
@@ -212,7 +214,7 @@ func marshalXMLChoice(recv, field, elem string, c *xmlChoice, mandatory bool) st
 		encode(s, "&_v")
 	}
 	fmt.Fprintf(&b, "%sdefault:\n", indent)
-	fmt.Fprintf(&b, "%s\treturn fmt.Errorf(\"canxml: %s holds %%T, which is none of the shapes its element takes\", _v)\n", indent, c.label)
+	fmt.Fprintf(&b, "%s\treturn fmt.Errorf(\"%%w: %s holds %%T, which is none of the shapes its element takes\", canxml.ErrInvalidShape, _v)\n", indent, c.label)
 	fmt.Fprintf(&b, "%s}\n", indent)
 	if !mandatory {
 		b.WriteString("\t}\n")

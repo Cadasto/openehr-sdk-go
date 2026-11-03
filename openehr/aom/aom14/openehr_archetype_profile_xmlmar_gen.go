@@ -387,7 +387,7 @@ func (o *Ordinal) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 			return err
 		}
 	default:
-		return fmt.Errorf("canxml: ORDINAL.symbol holds %T, which is none of the shapes its element takes", _v)
+		return fmt.Errorf("%w: ORDINAL.symbol holds %T, which is none of the shapes its element takes", canxml.ErrInvalidShape, _v)
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err
@@ -452,7 +452,7 @@ func (s *Scale) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 			return err
 		}
 	default:
-		return fmt.Errorf("canxml: SCALE.symbol holds %T, which is none of the shapes its element takes", _v)
+		return fmt.Errorf("%w: SCALE.symbol holds %T, which is none of the shapes its element takes", canxml.ErrInvalidShape, _v)
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err
