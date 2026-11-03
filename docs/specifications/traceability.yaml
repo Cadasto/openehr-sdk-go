@@ -357,6 +357,7 @@ requirements:
       - internal/importguard/importguard_test.go
       - openehr/bmm/imports_test.go
       - openehr/bmm/load_test.go
+      - openehr/bmm/loadall_test.go
 
   - id: REQ-046
     title: Primitive type mapping
