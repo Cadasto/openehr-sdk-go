@@ -51,6 +51,10 @@ import (
 // and the path of an <annotations>. So "defining_code\n   " is read as
 // defining_code, and an xsi:type that holds only white space reads as an
 // empty one.
+//
+// Deprecated: Read the document with aom14.ReadOperationalTemplate and
+// compile it with templatecompile.Compile. A later release removes
+// ParseOPT.
 func ParseOPT(r io.Reader) (*OperationalTemplate, error) {
 	return parseOPT(r, false)
 }
@@ -85,6 +89,11 @@ func ParseOPT(r io.Reader) (*OperationalTemplate, error) {
 // [constraints.ConstraintRef], with one difference: where the
 // reference is missing or blank, ParseOPT keeps the leaf with an
 // empty Reference and strict mode refuses the template.
+//
+// Deprecated: Read the document with aom14.ReadOperationalTemplate,
+// passing canxml.WithStrict to refuse content the model does not read,
+// and compile it with templatecompile.Compile. A later release removes
+// ParseOPTStrict.
 func ParseOPTStrict(r io.Reader) (*OperationalTemplate, error) {
 	return parseOPT(r, true)
 }
@@ -92,6 +101,10 @@ func ParseOPTStrict(r io.Reader) (*OperationalTemplate, error) {
 // ParseFile reads an .opt file from disk. The path suffix must be
 // .opt (case-insensitive); other extensions return
 // ErrNotOPTFile without opening the file.
+//
+// Deprecated: Open the file and read it with
+// aom14.ReadOperationalTemplate, then compile it with
+// templatecompile.Compile. A later release removes ParseFile.
 func ParseFile(path string) (*OperationalTemplate, error) {
 	return parseFile(path, false)
 }
@@ -99,6 +112,11 @@ func ParseFile(path string) (*OperationalTemplate, error) {
 // ParseFileStrict is the strict-mode counterpart to ParseFile.
 // It is equivalent to ParseFile + ParseOPTStrict; see ParseOPTStrict
 // for the strict-mode contract.
+//
+// Deprecated: Open the file and read it with
+// aom14.ReadOperationalTemplate, passing canxml.WithStrict to refuse
+// content the model does not read, then compile it with
+// templatecompile.Compile. A later release removes ParseFileStrict.
 func ParseFileStrict(path string) (*OperationalTemplate, error) {
 	return parseFile(path, true)
 }

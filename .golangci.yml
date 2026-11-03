@@ -66,6 +66,13 @@ linters:
           disabled: true
   exclusions:
     generated: lax           # skip bmmgen output (// Code generated … DO NOT EDIT.)
+    rules:
+      # These three tests compare the compiled template with the deprecated
+      # OPT parser's tree on purpose, so they call the parser. The rule goes
+      # with the parser.
+      - path: internal/templatecompile/(primitives_from_model|resolve|slots_from_model)_test\.go
+        linters: [staticcheck]
+        text: 'SA1019:'
 
 formatters:
   enable:

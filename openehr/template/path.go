@@ -6,10 +6,10 @@ import (
 )
 
 // Path is a parsed openEHR path. The zero value renders as "/" and
-// resolves to the template root when passed to
-// [OperationalTemplate.NodeAt]. A Path is not bound to any
-// particular template; the same Path can be applied to multiple
-// OperationalTemplates. Construct non-root paths via
+// resolves to the template root when passed to Compiled.Resolve in
+// package templatecompile. A Path is not bound to any particular
+// template; the same Path can be applied to multiple compiled
+// templates. Construct non-root paths via
 // [OperationalTemplate.ParsePath].
 type Path struct {
 	segments []pathSegment
@@ -56,11 +56,12 @@ func (p Path) IsRoot() bool { return len(p.segments) == 0 }
 // (predicates with name= / @ / quoted values).
 //
 // ParsePath validates grammar only; it does not check that segment
-// names or predicates resolve against any OPT. The template receiver
-// is retained for API symmetry with NodeAt; the grammar itself is
-// template-independent. For tree-aware validation use
-// [OperationalTemplate.ValidatePath] (or [OperationalTemplate.NodeAt]
-// when the resolved node is needed).
+// names or predicates resolve against any OPT. The receiver is not
+// read, so a nil *OperationalTemplate works; the grammar itself is
+// template-independent. To check a path against a template, compile
+// the template with templatecompile.Compile and pass the Path to
+// Compiled.ValidatePath, or to Compiled.Resolve when the resolved
+// node is needed.
 func (t *OperationalTemplate) ParsePath(s string) (Path, error) {
 	if s == "" {
 		return Path{}, fmt.Errorf("%w: empty path", ErrPathSyntax)
@@ -138,6 +139,10 @@ func (t *OperationalTemplate) ParsePath(s string) (Path, error) {
 // ResolveOption tunes path-resolution behaviour. Construct via the
 // With* functions in this package. Options compose; passing the same
 // option twice is idempotent.
+//
+// Deprecated: Use templatecompile.ResolveOption, which Compiled.Resolve
+// and Compiled.ValidatePath take. A later release removes
+// ResolveOption.
 type ResolveOption func(*resolveOpts)
 
 type resolveOpts struct {
@@ -150,6 +155,10 @@ type resolveOpts struct {
 // picking the first child (the default). Use this in validators and
 // code generators that must surface ambiguity to the caller rather
 // than guess.
+//
+// Deprecated: Use templatecompile.WithStrictPaths, which
+// Compiled.Resolve and Compiled.ValidatePath take. A later release
+// removes WithStrictPaths.
 func WithStrictPaths() ResolveOption {
 	return func(o *resolveOpts) { o.strictPaths = true }
 }
@@ -171,6 +180,10 @@ func WithStrictPaths() ResolveOption {
 //     returns ErrAmbiguousPath.
 //
 // The root path (Path{}) returns the template root unchanged.
+//
+// Deprecated: Use Compiled.Resolve on the compiled template that
+// templatecompile.Compile builds; it takes the same Path and applies
+// the same rules. A later release removes NodeAt.
 func (t *OperationalTemplate) NodeAt(p Path, opts ...ResolveOption) (Node, error) {
 	if t == nil || t.root == nil {
 		return nil, fmt.Errorf("%w: empty template", ErrPathNotFound)
@@ -193,6 +206,9 @@ func (t *OperationalTemplate) NodeAt(p Path, opts ...ResolveOption) (Node, error
 // (ErrPathNotFound; ErrAmbiguousPath when strict). Use it for
 // code-generator preconditions and call-site assertions that do not
 // need the resolved node.
+//
+// Deprecated: Use Compiled.ValidatePath on the compiled template that
+// templatecompile.Compile builds. A later release removes ValidatePath.
 func (t *OperationalTemplate) ValidatePath(p Path, opts ...ResolveOption) error {
 	_, err := t.NodeAt(p, opts...)
 	return err

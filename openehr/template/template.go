@@ -12,6 +12,12 @@ import (
 
 // OperationalTemplate is a parsed ADL 1.4 operational template (OPT).
 // Construct via ParseOPT or ParseFile; the zero value is not useful.
+//
+// Deprecated: Read an operational template with
+// aom14.ReadOperationalTemplate, which returns the generated
+// operational template model, and compile it with
+// templatecompile.Compile. A later release removes OperationalTemplate
+// and the node tree below it.
 type OperationalTemplate struct {
 	templateID  string
 	concept     string
@@ -24,24 +30,39 @@ type OperationalTemplate struct {
 
 // TemplateID returns the value of <template_id>/<value> from the OPT
 // (e.g. "vital_signs"). It is non-empty after a successful parse.
+//
+// Deprecated: Use Compiled.TemplateID on the compiled template that
+// templatecompile.Compile builds. A later release removes it.
 func (t *OperationalTemplate) TemplateID() string { return t.templateID }
 
 // Concept returns the value of <concept> from the OPT (the
 // machine-readable concept slug). Empty when the OPT omits it.
+//
+// Deprecated: Use Compiled.Concept on the compiled template that
+// templatecompile.Compile builds. A later release removes it.
 func (t *OperationalTemplate) Concept() string { return t.concept }
 
 // UID returns the value of <uid>/<value> from the OPT, or an empty
 // string when the OPT does not carry a UID.
+//
+// Deprecated: Use Compiled.UID on the compiled template that
+// templatecompile.Compile builds. A later release removes it.
 func (t *OperationalTemplate) UID() string { return t.uid }
 
 // Language returns the ISO 639-1 code from <language>/<code_string>,
 // or an empty string when absent.
+//
+// Deprecated: Use Compiled.Language on the compiled template that
+// templatecompile.Compile builds. A later release removes it.
 func (t *OperationalTemplate) Language() string { return t.language }
 
 // Description returns the parsed top-level <description> block, or
 // nil when the OPT omits it (or carries only empty sub-elements).
 // The returned pointer is owned by the OperationalTemplate; callers
 // must not mutate the map values it exposes.
+//
+// Deprecated: Use the Description field of the model that
+// aom14.ReadOperationalTemplate returns. A later release removes it.
 func (t *OperationalTemplate) Description() *Description { return t.description }
 
 // Annotations returns the parsed <annotations path="..."> blocks,
@@ -50,6 +71,9 @@ func (t *OperationalTemplate) Description() *Description { return t.description 
 // empty ones. The returned map is a defensive copy: map mutation
 // does not affect the underlying template (the Annotation slice
 // headers and their entries are still shared with the OPT).
+//
+// Deprecated: Use the Annotations field of the model that
+// aom14.ReadOperationalTemplate returns. A later release removes it.
 func (t *OperationalTemplate) Annotations() map[string][]Annotation {
 	return maps.Clone(t.annotations)
 }
@@ -58,6 +82,10 @@ func (t *OperationalTemplate) Annotations() map[string][]Annotation {
 // block. Annotations carry UI / editor hints in the OPT and are
 // addressable by path (an AQL-style locator string). The format is
 // open-ended in the OPT XSD; consumers interpret IDs by convention.
+//
+// Deprecated: The model that aom14.ReadOperationalTemplate returns
+// carries the template's annotations. A later release removes
+// Annotation.
 type Annotation struct {
 	// ID is the items/@id attribute (e.g. "name", "comment", "ui-hint").
 	ID string
@@ -70,6 +98,10 @@ type Annotation struct {
 // XSD models it as a RESOURCE_DESCRIPTION, of which this package
 // captures the most frequently consumed fields. Translations and
 // per-language details are not captured.
+//
+// Deprecated: The model that aom14.ReadOperationalTemplate returns
+// carries the template's description. A later release removes
+// Description.
 type Description struct {
 	lifecycleState  string
 	originalAuthors map[string]string
@@ -79,6 +111,10 @@ type Description struct {
 // LifecycleState returns the OPT's <lifecycle_state> value (e.g.
 // "initial", "in_review", "published", "unmanaged"). Empty when
 // the OPT omits the element.
+//
+// Deprecated: Description is deprecated; read the description of the
+// model that aom14.ReadOperationalTemplate returns. A later release
+// removes this method.
 func (d *Description) LifecycleState() string {
 	if d == nil {
 		return ""
@@ -91,6 +127,10 @@ func (d *Description) LifecycleState() string {
 // Returns nil when the OPT omits the element. The returned map is
 // a defensive copy: caller mutation does not affect the underlying
 // Description.
+//
+// Deprecated: Description is deprecated; read the description of the
+// model that aom14.ReadOperationalTemplate returns. A later release
+// removes this method.
 func (d *Description) OriginalAuthors() map[string]string {
 	if d == nil {
 		return nil
@@ -102,6 +142,10 @@ func (d *Description) OriginalAuthors() map[string]string {
 // map. These are open-ended provenance fields (e.g. "licence",
 // "sem_ver", "build_uid"). Returns nil when absent. The returned
 // map is a defensive copy.
+//
+// Deprecated: Description is deprecated; read the description of the
+// model that aom14.ReadOperationalTemplate returns. A later release
+// removes this method.
 func (d *Description) OtherDetails() map[string]string {
 	if d == nil {
 		return nil
@@ -116,6 +160,9 @@ func (d *Description) OtherDetails() map[string]string {
 // *ComplexObject for OPTs without an explicit root archetype id.
 // Callers that need to descend into attributes should type-switch
 // on both *ArchetypeRoot and *ComplexObject, or use OperationalTemplate.NodeAt.
+//
+// Deprecated: Use Compiled.Root on the compiled template that
+// templatecompile.Compile builds. A later release removes it.
 func (t *OperationalTemplate) Root() Node { return t.root }
 
 // Node is the sealed root interface for OPT definition-tree nodes.
@@ -127,16 +174,31 @@ func (t *OperationalTemplate) Root() Node { return t.root }
 // objects from attribute carriers should match against ObjectNode
 // (covers *ComplexObject + *ArchetypeRoot) rather than re-listing
 // the two concrete types.
+//
+// Deprecated: The compiled template that templatecompile.Compile builds
+// from the model aom14.ReadOperationalTemplate reads replaces the
+// parser's node tree; Compiled.Root and Compiled.Resolve return its
+// CompiledNode values. A later release removes Node.
 type Node interface {
 	// RMTypeName returns the openEHR Reference Model class name this
 	// node constrains (e.g. "COMPOSITION", "DV_QUANTITY"). For an
 	// *Attribute node it returns the empty string, because attributes
 	// are not RM-typed.
+	//
+	// Deprecated: The node tree is deprecated; use the compiled template
+	// that templatecompile.Compile builds from the model
+	// aom14.ReadOperationalTemplate reads. A later release removes this
+	// method.
 	RMTypeName() string
 
 	// NodeID returns the archetype node id (e.g. "at0001") when one
 	// is set on this node; otherwise the empty string. *Attribute
 	// nodes always return the empty string.
+	//
+	// Deprecated: The node tree is deprecated; use the compiled template
+	// that templatecompile.Compile builds from the model
+	// aom14.ReadOperationalTemplate reads. A later release removes this
+	// method.
 	NodeID() string
 
 	isNode()
@@ -150,20 +212,40 @@ type Node interface {
 // ObjectNodes (a slot is a leaf with opaque slot-fill semantics; an
 // attribute holds an RM attribute name and its children rather than
 // being a typed object).
+//
+// Deprecated: The compiled template that templatecompile.Compile builds
+// from the model aom14.ReadOperationalTemplate reads replaces the
+// parser's node tree; Compiled.Root and Compiled.Resolve return its
+// CompiledNode values. A later release removes ObjectNode.
 type ObjectNode interface {
 	Node
 	// Attributes returns the OPT-declared child attributes in
 	// document order. The returned slice is a defensive copy; see
 	// ComplexObject.Attributes.
+	//
+	// Deprecated: The node tree is deprecated; use the compiled template
+	// that templatecompile.Compile builds from the model
+	// aom14.ReadOperationalTemplate reads. A later release removes this
+	// method.
 	Attributes() []*Attribute
 	// Occurrences returns the parsed occurrences interval, or nil
 	// when the OPT did not declare one for this node.
+	//
+	// Deprecated: The node tree is deprecated; use the compiled template
+	// that templatecompile.Compile builds from the model
+	// aom14.ReadOperationalTemplate reads. A later release removes this
+	// method.
 	Occurrences() *Multiplicity
 	// NodeName returns the template-level node name, or ""
 	// when the node pins no fixed name; see ComplexObject.NodeName.
 	// It is on the interface so ObjectNode walkers (such as the template
 	// compiler) read it without asserting the concrete type; a
 	// *ComplexObject assertion would silently miss *ArchetypeRoot.
+	//
+	// Deprecated: The node tree is deprecated; use the compiled template
+	// that templatecompile.Compile builds from the model
+	// aom14.ReadOperationalTemplate reads. A later release removes this
+	// method.
 	NodeName() string
 }
 
@@ -279,6 +361,11 @@ func (c Cardinality) IsValid() bool {
 // internal nodes (with child attributes) and leaf primitive
 // constraints (e.g. CODE_PHRASE, DV_QUANTITY); for the latter, the
 // typed constraint surface is on [PrimitiveConstraint].
+//
+// Deprecated: The compiled template that templatecompile.Compile builds
+// from the model aom14.ReadOperationalTemplate reads replaces the
+// parser's node tree; Compiled.Root and Compiled.Resolve return its
+// CompiledNode values. A later release removes ComplexObject.
 type ComplexObject struct {
 	rmTypeName  string
 	nodeID      string
@@ -289,9 +376,19 @@ type ComplexObject struct {
 }
 
 // RMTypeName implements Node.
+//
+// Deprecated: The node tree is deprecated; use the compiled template
+// that templatecompile.Compile builds from the model
+// aom14.ReadOperationalTemplate reads. A later release removes this
+// method.
 func (c *ComplexObject) RMTypeName() string { return c.rmTypeName }
 
 // NodeID implements Node.
+//
+// Deprecated: The node tree is deprecated; use the compiled template
+// that templatecompile.Compile builds from the model
+// aom14.ReadOperationalTemplate reads. A later release removes this
+// method.
 func (c *ComplexObject) NodeID() string { return c.nodeID }
 
 // NodeName returns the template-level node name: the runtime
@@ -303,15 +400,30 @@ func (c *ComplexObject) NodeID() string { return c.nodeID }
 // disambiguate a reused archetype under one slot: the reference
 // WebTemplate derives node ids from this name and name-predicates
 // the AQL paths of colliding siblings.
+//
+// Deprecated: The node tree is deprecated; use the compiled template
+// that templatecompile.Compile builds from the model
+// aom14.ReadOperationalTemplate reads. A later release removes this
+// method.
 func (c *ComplexObject) NodeName() string { return c.nodeName }
 
 // Occurrences returns the parsed occurrences block, or nil when the
 // OPT did not declare one for this node.
+//
+// Deprecated: The node tree is deprecated; use the compiled template
+// that templatecompile.Compile builds from the model
+// aom14.ReadOperationalTemplate reads. A later release removes this
+// method.
 func (c *ComplexObject) Occurrences() *Multiplicity { return c.occurrences }
 
 // Attributes returns a defensive copy of the child attributes in OPT
 // document order. Slice mutation does not affect the underlying tree;
 // the *Attribute pointers themselves are still shared with the OPT.
+//
+// Deprecated: The node tree is deprecated; use the compiled template
+// that templatecompile.Compile builds from the model
+// aom14.ReadOperationalTemplate reads. A later release removes this
+// method.
 func (c *ComplexObject) Attributes() []*Attribute { return slices.Clone(c.attributes) }
 
 // PrimitiveConstraint returns the typed constraint payload
@@ -325,6 +437,11 @@ func (c *ComplexObject) Attributes() []*Attribute { return slices.Clone(c.attrib
 //
 // The returned value is one of the concrete types in the
 // [constraints] package; pattern-match on it via a type switch.
+//
+// Deprecated: The node tree is deprecated; use the compiled template
+// that templatecompile.Compile builds from the model
+// aom14.ReadOperationalTemplate reads. A later release removes this
+// method.
 func (c *ComplexObject) PrimitiveConstraint() constraints.PrimitiveConstraint {
 	return c.primitive
 }
@@ -339,6 +456,11 @@ func (c *ComplexObject) isNode() {}
 // The parser also reads xsi:type="T_ARCHETYPE_ROOT" as an ArchetypeRoot,
 // because some exporters write that spelling for the same node. openEHR
 // Template.xsd defines only C_ARCHETYPE_ROOT.
+//
+// Deprecated: The compiled template that templatecompile.Compile builds
+// from the model aom14.ReadOperationalTemplate reads replaces the
+// parser's node tree; Compiled.Root and Compiled.Resolve return its
+// CompiledNode values. A later release removes ArchetypeRoot.
 type ArchetypeRoot struct {
 	archetypeID  string
 	templateID   string
@@ -348,6 +470,11 @@ type ArchetypeRoot struct {
 }
 
 // ArchetypeID returns the slot-fill archetype identifier.
+//
+// Deprecated: The node tree is deprecated; use the compiled template
+// that templatecompile.Compile builds from the model
+// aom14.ReadOperationalTemplate reads. A later release removes this
+// method.
 func (a *ArchetypeRoot) ArchetypeID() string { return a.archetypeID }
 
 // TemplateID returns the optional template id an archetype root may
@@ -355,6 +482,11 @@ func (a *ArchetypeRoot) ArchetypeID() string { return a.archetypeID }
 // its archetype id, or "" when the OPT gives none. It may differ from
 // [OperationalTemplate.TemplateID], the id of the template as a whole:
 // an exporter can record there the template the root was taken from.
+//
+// Deprecated: The node tree is deprecated; use the compiled template
+// that templatecompile.Compile builds from the model
+// aom14.ReadOperationalTemplate reads. A later release removes this
+// method.
 func (a *ArchetypeRoot) TemplateID() string { return a.templateID }
 
 // Terms returns the per-at-code term definitions captured from the
@@ -362,6 +494,11 @@ func (a *ArchetypeRoot) TemplateID() string { return a.templateID }
 // Returns nil when none were declared. The returned map is a
 // defensive copy, and each term's Items map is a copy too, so a caller
 // may change either without changing the template.
+//
+// Deprecated: The node tree is deprecated; use the compiled template
+// that templatecompile.Compile builds from the model
+// aom14.ReadOperationalTemplate reads. A later release removes this
+// method.
 func (a *ArchetypeRoot) Terms() map[string]ArchetypeTerm {
 	if len(a.terms) == 0 {
 		return nil
@@ -376,6 +513,11 @@ func (a *ArchetypeRoot) Terms() map[string]ArchetypeTerm {
 // Term returns the term definition for the given at-code, or
 // (zero, false) when none exists. The returned [ArchetypeTerm.Items]
 // map is a defensive copy.
+//
+// Deprecated: The node tree is deprecated; use the compiled template
+// that templatecompile.Compile builds from the model
+// aom14.ReadOperationalTemplate reads. A later release removes this
+// method.
 func (a *ArchetypeRoot) Term(code string) (ArchetypeTerm, bool) {
 	t, ok := a.terms[code]
 	if !ok {
@@ -387,6 +529,11 @@ func (a *ArchetypeRoot) Term(code string) (ArchetypeTerm, bool) {
 // TermBindings returns a defensive copy of the term-binding records
 // captured from this archetype root's <term_bindings> blocks. Order
 // matches OPT document order. Returns nil when none were declared.
+//
+// Deprecated: The node tree is deprecated; use the compiled template
+// that templatecompile.Compile builds from the model
+// aom14.ReadOperationalTemplate reads. A later release removes this
+// method.
 func (a *ArchetypeRoot) TermBindings() []TermBinding {
 	return slices.Clone(a.termBindings)
 }
@@ -436,6 +583,11 @@ type CodedTermRef struct {
 // Implements Node; an Attribute's RMTypeName and NodeID are always
 // empty (attributes are not RM-typed and do not carry archetype
 // node ids).
+//
+// Deprecated: The compiled template that templatecompile.Compile builds
+// from the model aom14.ReadOperationalTemplate reads replaces the
+// parser's node tree; Compiled.Root and Compiled.Resolve return its
+// CompiledNode values. A later release removes Attribute.
 type Attribute struct {
 	name              string
 	cardinality       Cardinality
@@ -445,9 +597,19 @@ type Attribute struct {
 }
 
 // Name returns the RM attribute name (e.g. "content", "data").
+//
+// Deprecated: The node tree is deprecated; use the compiled template
+// that templatecompile.Compile builds from the model
+// aom14.ReadOperationalTemplate reads. A later release removes this
+// method.
 func (a *Attribute) Name() string { return a.name }
 
 // Cardinality returns Single or Multiple per the OPT xsi:type.
+//
+// Deprecated: The node tree is deprecated; use the compiled template
+// that templatecompile.Compile builds from the model
+// aom14.ReadOperationalTemplate reads. A later release removes this
+// method.
 func (a *Attribute) Cardinality() Cardinality { return a.cardinality }
 
 // Existence returns the parsed existence block, or nil when the OPT
@@ -455,6 +617,11 @@ func (a *Attribute) Cardinality() Cardinality { return a.cardinality }
 // filled with at least one value?", i.e. a constraint on the
 // attribute as a whole. For child-count bounds on a multi-valued
 // attribute, see [Attribute.ChildMultiplicity].
+//
+// Deprecated: The node tree is deprecated; use the compiled template
+// that templatecompile.Compile builds from the model
+// aom14.ReadOperationalTemplate reads. A later release removes this
+// method.
 func (a *Attribute) Existence() *Multiplicity { return a.existence }
 
 // ChildMultiplicity returns the AOM 1.4 CARDINALITY interval that
@@ -466,6 +633,11 @@ func (a *Attribute) Existence() *Multiplicity { return a.existence }
 // Semantic distinction from [Attribute.Existence]: existence is a
 // 0/1 yes-or-no constraint on the attribute itself; cardinality is
 // the min/max count on its children when present.
+//
+// Deprecated: The node tree is deprecated; use the compiled template
+// that templatecompile.Compile builds from the model
+// aom14.ReadOperationalTemplate reads. A later release removes this
+// method.
 func (a *Attribute) ChildMultiplicity() *Multiplicity { return a.childMultiplicity }
 
 // Children returns a defensive copy of the child nodes in OPT
@@ -477,13 +649,28 @@ func (a *Attribute) ChildMultiplicity() *Multiplicity { return a.childMultiplici
 // *Attribute. Walker code that needs to descend may type-switch on
 // ObjectNode (covers ComplexObject + ArchetypeRoot) and treat *Slot
 // as a leaf.
+//
+// Deprecated: The node tree is deprecated; use the compiled template
+// that templatecompile.Compile builds from the model
+// aom14.ReadOperationalTemplate reads. A later release removes this
+// method.
 func (a *Attribute) Children() []Node { return slices.Clone(a.children) }
 
 // RMTypeName implements Node and always returns the empty string,
 // because attributes are not RM-typed.
+//
+// Deprecated: The node tree is deprecated; use the compiled template
+// that templatecompile.Compile builds from the model
+// aom14.ReadOperationalTemplate reads. A later release removes this
+// method.
 func (*Attribute) RMTypeName() string { return "" }
 
 // NodeID implements Node and always returns the empty string.
+//
+// Deprecated: The node tree is deprecated; use the compiled template
+// that templatecompile.Compile builds from the model
+// aom14.ReadOperationalTemplate reads. A later release removes this
+// method.
 func (*Attribute) NodeID() string { return "" }
 
 func (a *Attribute) isNode() {}
@@ -493,6 +680,11 @@ func (a *Attribute) isNode() {}
 // also compiles the `archetype_id matches {regex}` subset
 // (and the OPT XML expression shape) into [constraints.SlotAssertion]
 // values at parse time.
+//
+// Deprecated: The compiled template that templatecompile.Compile builds
+// from the model aom14.ReadOperationalTemplate reads replaces the
+// parser's node tree; Compiled.Root and Compiled.Resolve return its
+// CompiledNode values. A later release removes Slot.
 type Slot struct {
 	rmTypeName     string
 	nodeID         string
@@ -504,45 +696,90 @@ type Slot struct {
 
 // RMTypeName implements Node. It is typically the slot-constrained RM
 // class name (e.g. "OBSERVATION", "SECTION").
+//
+// Deprecated: The node tree is deprecated; use the compiled template
+// that templatecompile.Compile builds from the model
+// aom14.ReadOperationalTemplate reads. A later release removes this
+// method.
 func (s *Slot) RMTypeName() string { return s.rmTypeName }
 
 // NodeID implements Node.
+//
+// Deprecated: The node tree is deprecated; use the compiled template
+// that templatecompile.Compile builds from the model
+// aom14.ReadOperationalTemplate reads. A later release removes this
+// method.
 func (s *Slot) NodeID() string { return s.nodeID }
 
 // Includes returns a defensive copy of the raw (unparsed) archetype-id
 // include assertion blobs as written in the OPT. For the structured
 // form use [Slot.ParsedIncludes].
+//
+// Deprecated: The node tree is deprecated; use the compiled template
+// that templatecompile.Compile builds from the model
+// aom14.ReadOperationalTemplate reads. A later release removes this
+// method.
 func (s *Slot) Includes() []string { return slices.Clone(s.includes) }
 
 // Excludes returns a defensive copy of the raw (unparsed) archetype-id
 // exclude assertion blobs. For the structured form see
 // [Slot.ParsedExcludes].
+//
+// Deprecated: The node tree is deprecated; use the compiled template
+// that templatecompile.Compile builds from the model
+// aom14.ReadOperationalTemplate reads. A later release removes this
+// method.
 func (s *Slot) Excludes() []string { return slices.Clone(s.excludes) }
 
 // ParsedIncludes returns the compiled include assertions.
 // Empty when the OPT carried no parseable include expressions.
+//
+// Deprecated: The node tree is deprecated; use the compiled template
+// that templatecompile.Compile builds from the model
+// aom14.ReadOperationalTemplate reads. A later release removes this
+// method.
 func (s *Slot) ParsedIncludes() []constraints.SlotAssertion {
 	return slices.Clone(s.parsedIncludes)
 }
 
 // ParsedExcludes returns the compiled exclude assertions.
+//
+// Deprecated: The node tree is deprecated; use the compiled template
+// that templatecompile.Compile builds from the model
+// aom14.ReadOperationalTemplate reads. A later release removes this
+// method.
 func (s *Slot) ParsedExcludes() []constraints.SlotAssertion {
 	return slices.Clone(s.parsedExcludes)
 }
 
 // AllowsRMType reports whether archetypeID satisfies the RM-type-
 // prefix fallback (openEHR-EHR-<this slot's RMTypeName>.).
+//
+// Deprecated: The node tree is deprecated; use the compiled template
+// that templatecompile.Compile builds from the model
+// aom14.ReadOperationalTemplate reads. A later release removes this
+// method.
 func (s *Slot) AllowsRMType(archetypeID string) bool {
 	return s.slotRules().AllowsRMTypePrefix(archetypeID)
 }
 
 // SlotRules returns the parsed assertion rules for this slot.
 // The returned rule slices are defensive copies.
+//
+// Deprecated: The node tree is deprecated; use the compiled template
+// that templatecompile.Compile builds from the model
+// aom14.ReadOperationalTemplate reads. A later release removes this
+// method.
 func (s *Slot) SlotRules() constraints.SlotRules { return s.slotRules().Clone() }
 
 // AllowsArchetypeID reports whether archetypeID satisfies parsed
 // include / exclude rules, falling back to [Slot.AllowsRMType] when
 // no include assertions were parsed.
+//
+// Deprecated: The node tree is deprecated; use the compiled template
+// that templatecompile.Compile builds from the model
+// aom14.ReadOperationalTemplate reads. A later release removes this
+// method.
 func (s *Slot) AllowsArchetypeID(archetypeID string) bool {
 	return s.slotRules().AllowsArchetypeID(archetypeID)
 }
