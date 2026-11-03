@@ -232,3 +232,183 @@ func TestRunRefusesMissingITSXML(t *testing.T) {
 		t.Errorf("Run with an empty ITS-XML directory = %v, want an error naming the unmatched schema roots", err)
 	}
 }
+
+// testAttributesXSD is the fixture schema tree whose types declare XML
+// attributes in each place a schema can put them.
+const testAttributesXSD = "testdata/itsxml_attributes"
+
+// TestXSDAttributesOfFixtureTypes pins where the reader finds a type's XML
+// attributes: on the type itself, in a complexContent extension after its
+// base's, in a simpleContent extension of a built-in type, of a complex type
+// with simple content and of a named simple type, and through the base chain.
+// A type with simple content has no child element, and its sequence is empty.
+//
+// REQ-056: the generated codec writes and reads as an XML attribute what the
+// class's ITS-XML schema type declares as one.
+func TestXSDAttributesOfFixtureTypes(t *testing.T) {
+	root, err := os.OpenRoot(testAttributesXSD)
+	if err != nil {
+		t.Fatalf("open %s: %v", testAttributesXSD, err)
+	}
+	t.Cleanup(func() { _ = root.Close() }) // read-only handle
+	set, err := loadXSDSet(root, []string{"attributes.xsd"})
+	if err != nil {
+		t.Fatalf("loadXSDSet(%s): %v", testAttributesXSD, err)
+	}
+	cases := []struct {
+		typeName string
+		attrs    []string
+		seq      []string
+	}{
+		{typeName: "OWN", attrs: []string{"language"}, seq: []string{"items"}},
+		{typeName: "EXTENDED", attrs: []string{"language", "code"}, seq: []string{"items", "value"}},
+		{typeName: "INHERITED", attrs: []string{"language", "code"}, seq: []string{"items", "value", "extra"}},
+		{typeName: "TEXT_ITEM", attrs: []string{"id"}},
+		{typeName: "TEXT_ITEM_AT_PATH", attrs: []string{"id", "path"}},
+		{typeName: "TOKEN_ITEM", attrs: []string{"terminology"}},
+		{typeName: "PLAIN", seq: []string{"value"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.typeName, func(t *testing.T) {
+			attrs, err := set.attributes(tc.typeName)
+			if err != nil {
+				t.Fatalf("attributes(%s): %v", tc.typeName, err)
+			}
+			if !slices.Equal(attrs, tc.attrs) {
+				t.Errorf("attributes(%s) = %q, want %q", tc.typeName, attrs, tc.attrs)
+			}
+			seq, err := set.sequence(tc.typeName)
+			if err != nil {
+				t.Fatalf("sequence(%s): %v", tc.typeName, err)
+			}
+			if !slices.Equal(seq, tc.seq) {
+				t.Errorf("sequence(%s) = %q, want %q", tc.typeName, seq, tc.seq)
+			}
+		})
+	}
+}
+
+// TestXSDAttributesOfVendoredTypes pins the attributes the reader finds in
+// the vendored schemas: `archetype_node_id` on LOCATABLE and, through the
+// base chain, on its descendants; the `id` the BASE resource classes and
+// StringDictionaryItem declare; and the AM Release-1.4 attributes of the
+// ontology and the operational template, on a type or in its extension.
+//
+// REQ-056: the generated codec writes and reads as an XML attribute what the
+// class's ITS-XML schema type declares as one.
+func TestXSDAttributesOfVendoredTypes(t *testing.T) {
+	rmSet, amSet := loadTestXSDSets(t)
+	cases := []struct {
+		set      string
+		typeName string
+		want     []string
+	}{
+		{"rm", "LOCATABLE", []string{"archetype_node_id"}},
+		{"rm", "OBSERVATION", []string{"archetype_node_id"}},
+		{"rm", "ELEMENT", []string{"archetype_node_id"}},
+		{"rm", "DV_TEXT", nil},
+		{"rm", "StringDictionaryItem", []string{"id"}},
+		{"rm", "RESOURCE_DESCRIPTION_ITEM", []string{"id"}},
+		{"rm", "TRANSLATION_DETAILS", []string{"id"}},
+		{"am", "RESOURCE_DESCRIPTION_ITEM", nil},
+		{"am", "ARCHETYPE_TERM", []string{"code"}},
+		{"am", "CodeDefinitionSet", []string{"language"}},
+		{"am", "TermBindingSet", []string{"terminology"}},
+		{"am", "FLAT_ARCHETYPE_ONTOLOGY", []string{"archetype_id"}},
+		{"am", "ANNOTATION", []string{"path"}},
+		{"am", "C_COMPLEX_OBJECT", nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.set+"/"+tc.typeName, func(t *testing.T) {
+			set := rmSet
+			if tc.set == "am" {
+				set = amSet
+			}
+			got, err := set.attributes(tc.typeName)
+			if err != nil {
+				t.Fatalf("attributes(%s): %v", tc.typeName, err)
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("attributes(%s) = %q, want %q", tc.typeName, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestXSDAttributesRefuses pins each declaration the attribute reader refuses
+// rather than read into a wrong attribute set: an attribute group, which it
+// does not expand, an attribute with no name, and a type two files declare
+// with different attributes; a simple-content base that is declared nowhere;
+// and a restriction of a declared type, whose inherited attributes it does
+// not work out.
+//
+// REQ-056: the attributes the codec writes are the ones the schema declares.
+func TestXSDAttributesRefuses(t *testing.T) {
+	plainA := `<xs:complexType name="A"><xs:sequence><xs:element name="a"/></xs:sequence><xs:attribute name="id"/></xs:complexType>`
+	codeA := `<xs:complexType name="A"><xs:sequence><xs:element name="a"/></xs:sequence><xs:attribute name="code"/></xs:complexType>`
+	for _, tc := range []struct {
+		name    string
+		files   map[string]string
+		wantErr string
+	}{
+		{
+			name: "an attribute group on a type",
+			files: map[string]string{"s/a.xsd": xsdDoc(
+				`<xs:attributeGroup name="G"><xs:attribute name="id"/></xs:attributeGroup>` +
+					`<xs:complexType name="A"><xs:sequence/><xs:attributeGroup ref="G"/></xs:complexType>`)},
+			wantErr: "unexpected xs:attributeGroup",
+		},
+		{
+			name: "an attribute group in an extension",
+			files: map[string]string{"s/a.xsd": xsdDoc(
+				`<xs:complexType name="B"><xs:sequence/></xs:complexType>` +
+					`<xs:complexType name="A"><xs:complexContent><xs:extension base="B"><xs:attributeGroup ref="G"/></xs:extension></xs:complexContent></xs:complexType>`)},
+			wantErr: "unexpected xs:attributeGroup",
+		},
+		{
+			name: "an attribute with no name",
+			files: map[string]string{"s/a.xsd": xsdDoc(
+				`<xs:complexType name="A"><xs:simpleContent><xs:extension base="xs:string"><xs:attribute ref="xml:lang"/></xs:extension></xs:simpleContent></xs:complexType>`)},
+			wantErr: "an attribute has no name",
+		},
+		{
+			name: "a type two files declare with different attributes",
+			files: map[string]string{
+				"s/a.xsd": xsdDoc(`<xs:include schemaLocation="b.xsd"/>` + plainA),
+				"s/b.xsd": xsdDoc(codeA),
+			},
+			wantErr: "type A has the attributes",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := writeSchemaTree(t, tc.files)
+			_, err := loadXSDSet(root, []string{"s/a.xsd"})
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Errorf("loadXSDSet = %v, want an error containing %q", err, tc.wantErr)
+			}
+		})
+	}
+
+	root := writeSchemaTree(t, map[string]string{"s/a.xsd": xsdDoc(
+		`<xs:complexType name="MissingSimpleBase"><xs:simpleContent><xs:extension base="NOPE"><xs:attribute name="id"/></xs:extension></xs:simpleContent></xs:complexType>` +
+			`<xs:complexType name="B"><xs:sequence><xs:element name="b"/></xs:sequence><xs:attribute name="id"/></xs:complexType>` +
+			`<xs:complexType name="Restricted"><xs:complexContent><xs:restriction base="B"><xs:sequence><xs:element name="b"/></xs:sequence></xs:restriction></xs:complexContent></xs:complexType>`)})
+	set, err := loadXSDSet(root, []string{"s/a.xsd"})
+	if err != nil {
+		t.Fatalf("loadXSDSet: %v", err)
+	}
+	const wantErr = "base type NOPE is not declared"
+	if _, err := set.attributes("MissingSimpleBase"); err == nil || !strings.Contains(err.Error(), wantErr) {
+		t.Errorf("attributes(MissingSimpleBase) = %v, want an error containing %q", err, wantErr)
+	}
+	if _, err := set.sequence("MissingSimpleBase"); err == nil || !strings.Contains(err.Error(), wantErr) {
+		t.Errorf("sequence(MissingSimpleBase) = %v, want an error containing %q", err, wantErr)
+	}
+	const wantRestricted = "does not derive attributes through a restriction"
+	if _, err := set.attributes("Restricted"); err == nil || !strings.Contains(err.Error(), wantRestricted) {
+		t.Errorf("attributes(Restricted) = %v, want an error containing %q", err, wantRestricted)
+	}
+	if seq, err := set.sequence("Restricted"); err != nil || !slices.Equal(seq, []string{"b"}) {
+		t.Errorf("sequence(Restricted) = %q, %v; want the restated [b]", seq, err)
+	}
+}

@@ -178,21 +178,14 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 
 	var b strings.Builder
 
-	// Partition fields: attribute-typed properties are read from
-	// _start.Attr before the token loop; element-typed properties are
-	// handled inside the switch. For attribute-typed properties we
-	// ALSO keep the child-element case so the decoder remains
-	// tolerant of producers that emit the property as a child element
-	// (legacy fixtures, the SDK's own pre-fix output). The attribute
-	// path runs first; the child-element path overwrites only if the
-	// attribute was absent and a child appears.
-	var attrFields []emittedField
+	// The members the class's ITS-XML schema type declares as XML
+	// attributes, which the description names, are read from _start.Attr
+	// before the token loop; every member, those included, has its case in
+	// the switch. The child-element case of an attribute member keeps the
+	// decoder tolerant of producers that write it as a child element (legacy
+	// fixtures, the SDK's own pre-fix output): the attribute is read first,
+	// and a child element that appears overwrites it.
 	elemFields := fields
-	for _, ef := range fields {
-		if isXMLAttributeProperty(ef.Prop) {
-			attrFields = append(attrFields, ef)
-		}
-	}
 
 	// The description of the class the method hands the runtime on entry.
 	desc, err := xmlClassDescriptor(plan, pc, fields)
@@ -238,10 +231,9 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	// The runtime learns the class, and every attribute the class does not
 	// read is unmatched content.
 	b.WriteString(enterXMLClass(pc.GoName))
-	// Read attribute-typed properties from _start.Attr.
-	for _, ef := range attrFields {
-		line := unmarshalXMLAttribute(recv, FieldName(ef.Prop.PropertyName()), ef.Prop.PropertyName())
-		b.WriteString(line)
+	// Read the attribute members from _start.Attr.
+	for _, name := range desc.attrs {
+		b.WriteString(unmarshalXMLAttribute(recv, FieldName(name), name))
 	}
 	if flagged {
 		b.WriteString("\tvar _seen intervalFlagsSeen\n")
@@ -732,8 +724,8 @@ func unmarshalXMLPrimitiveSlice(recv, field, elem, innerType string) string {
 // Mirror of [marshalXMLAttribute]. Tolerates an absent attribute —
 // the openEHR ITS-XML XSDs declare `archetype_node_id` mandatory,
 // but some upstream fixtures (e.g. ehrbase's simple_empty_folder)
-// omit it, so we treat absence as the zero value rather than an
-// error.
+// omit it, so absence leaves the zero value rather than failing; the
+// description's Required list lets a decode that asks report it.
 func unmarshalXMLAttribute(recv, goField, attrName string) string {
 	return fmt.Sprintf(
 		"\tfor _, _a := range _start.Attr {\n\t\tif _a.Name.Local == %q && _a.Name.Space == \"\" {\n\t\t\t%s.%s = _a.Value\n\t\t\tbreak\n\t\t}\n\t}\n",
@@ -802,8 +794,10 @@ const maxXMLRequired = 64
 // xmlClassDesc is the description of a class its generated decoder hands
 // xmlunmatched.Enter, rendered by [renderXMLClassVar] as a package-level var
 // named `xmlClass<GoName>`: the class's BMM name, the members the decoder
-// reads as XML attributes, the presence-checked mandatory members in the
-// Reference Model's declaration order, and the multi-valued members.
+// reads as XML attributes, which its ITS-XML schema type declares as
+// attributes, in the type's order ([xmlAttributesOf]), the presence-checked
+// mandatory members in the Reference Model's declaration order, and the
+// multi-valued members.
 type xmlClassDesc struct {
 	goName   string
 	name     string
@@ -820,14 +814,14 @@ type xmlClassDesc struct {
 // used. A class with more presence-checked members than the runtime holds
 // ([maxXMLRequired]) is refused.
 func xmlClassDescriptor(plan *Plan, pc *PlannedClass, fields []emittedField) (xmlClassDesc, error) {
-	d := xmlClassDesc{goName: pc.GoName, name: pc.BMMName}
+	attrs, err := xmlAttributesOf(plan, pc, fields)
+	if err != nil {
+		return xmlClassDesc{}, err
+	}
+	d := xmlClassDesc{goName: pc.GoName, name: pc.BMMName, attrs: attrs.members}
 	for _, ef := range fields {
-		prop := ef.Prop.PropertyName()
-		if isXMLAttributeProperty(ef.Prop) {
-			d.attrs = append(d.attrs, prop)
-		}
 		if xmlMultiValued(ef.Prop) {
-			d.items = append(d.items, prop)
+			d.items = append(d.items, ef.Prop.PropertyName())
 		}
 	}
 	_, order := effectiveProperties(plan, pc.BMMName)

@@ -1,7 +1,6 @@
 package bmmgen
 
 import (
-	"context"
 	"fmt"
 	"slices"
 	"strings"
@@ -24,10 +23,7 @@ import (
 func TestREQ175_RenderUnmarshalXMLClassDescriptor(t *testing.T) {
 	flagged, parentResource := 0, false
 	for _, target := range []Target{TargetRM, TargetAOM14} {
-		plan, err := BuildPlanForTarget(context.Background(), target, testResolver())
-		if err != nil {
-			t.Fatalf("BuildPlanForTarget: %v", err)
-		}
+		plan := buildPlanWithITSXML(t, target)
 		for _, f := range plan.Files {
 			classes, err := codecClassesIn(plan, f)
 			if err != nil {
@@ -61,12 +57,20 @@ func TestREQ175_RenderUnmarshalXMLClassDescriptor(t *testing.T) {
 				if err != nil {
 					t.Fatalf("xmlClassDescriptor(%s): %v", pc.BMMName, err)
 				}
+				// The XML attributes the class's schema type declares that
+				// name one of its members (REQ-056).
+				schemaAttrs, err := plan.xmlOrder.attributesFor(plan, pc.BMMName)
+				if err != nil {
+					t.Fatalf("attributesFor(%s): %v", pc.BMMName, err)
+				}
 				var attrs, items, mandatory []string
+				for _, name := range schemaAttrs {
+					if slices.ContainsFunc(fields, func(ef emittedField) bool { return ef.Prop.PropertyName() == name }) {
+						attrs = append(attrs, name)
+					}
+				}
 				for _, ef := range fields {
 					prop := ef.Prop.PropertyName()
-					if isXMLAttributeProperty(ef.Prop) {
-						attrs = append(attrs, prop)
-					}
 					switch p := ef.Prop.(type) {
 					case *bmm.ContainerProperty:
 						items = append(items, prop)
@@ -141,10 +145,7 @@ func mandatoryProperty(prop bmm.Property) bool {
 // DV_COUNT renders to the literal its one mandatory member and one
 // multi-valued member give, before gofmt aligns it.
 func TestREQ175_XMLClassDescriptorOrderAndShape(t *testing.T) {
-	plan, err := BuildPlanForTarget(context.Background(), TargetRM, testResolver())
-	if err != nil {
-		t.Fatalf("BuildPlanForTarget: %v", err)
-	}
+	plan := buildPlanWithITSXML(t, TargetRM)
 	describe := func(name string) (xmlClassDesc, []emittedField) {
 		t.Helper()
 		pc, ok := plan.Classes[name]
