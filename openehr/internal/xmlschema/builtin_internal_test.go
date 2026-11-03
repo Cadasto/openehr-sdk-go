@@ -45,3 +45,21 @@ func TestREQ176_REQ052_CanonicalBuiltinsReadBack(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ176_REQ052_IntegerBuiltinsByRange pins the primitive each integer
+// built-in reads as: an Integer where a 32-bit Integer holds the built-in's
+// whole range, and an Integer64 where it does not, so that a value the
+// built-in admits beyond 32 bits, such as an `unsignedInt` of 3000000000, is
+// written in canonical JSON.
+func TestREQ176_REQ052_IntegerBuiltinsByRange(t *testing.T) {
+	for local, want := range map[string]string{
+		"int": "Integer", "short": "Integer", "byte": "Integer", "unsignedShort": "Integer", "unsignedByte": "Integer",
+		"integer": "Integer64", "nonNegativeInteger": "Integer64", "positiveInteger": "Integer64",
+		"nonPositiveInteger": "Integer64", "negativeInteger": "Integer64", "unsignedInt": "Integer64",
+		"long": "Integer64", "unsignedLong": "Integer64",
+	} {
+		if got, ok := Builtin(local); !ok || got != want {
+			t.Errorf("Builtin(%q) = %q, %t; want %q", local, got, ok, want)
+		}
+	}
+}

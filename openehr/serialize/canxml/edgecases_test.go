@@ -44,7 +44,8 @@ func TestREQ056_XSITypeOfReadsXMLSchemaPrefix(t *testing.T) {
 		want  string
 	}{
 		{name: "xsd:string with no declaration", value: "xsd:string", want: "String"},
-		{name: "xsd:integer with no declaration", value: "xsd:integer", want: "Integer"},
+		{name: "xsd:int with no declaration", value: "xsd:int", want: "Integer"},
+		{name: "xsd:integer with no declaration", value: "xsd:integer", want: "Integer64"},
 		{name: "xs:string bound on the element", value: "xs:string", decls: []xml.Attr{{Name: xml.Name{Space: "xmlns", Local: "xs"}, Value: xsd}}, want: "String"},
 		{name: "xsd:string bound on the element", value: "xsd:string", decls: []xml.Attr{{Name: xml.Name{Space: "xmlns", Local: "xsd"}, Value: xsd}}, want: "String"},
 		{name: "xsd:string bound to another namespace", value: "xsd:string", decls: []xml.Attr{{Name: xml.Name{Space: "xmlns", Local: "xsd"}, Value: "urn:example:other"}}, want: "xsd:string"},

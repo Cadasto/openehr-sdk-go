@@ -30,7 +30,10 @@ import (
 // around it as XML Schema reads one, and a JSON number for the integer and
 // real primitives, back with its text as that JSON value and its Type as
 // `xsd:` and the built-in canonical for the primitive, so an `xs:string` item
-// comes back as `xsd:string` and an `xs:decimal` one as `xsd:float`. A Real
+// comes back as `xsd:string` and an `xs:decimal` one as `xsd:float`. An
+// integer built-in whose range a 32-bit Integer does not hold, `xs:integer`
+// and `xs:unsignedInt` among them, is an Integer64, back as `xsd:long`, and
+// `xs:int` and the narrower ones an Integer, back as `xsd:int`. A Real
 // or a Double keeps its text's own digits, none of them passed through a
 // float64, so a literal whose digits a float64 does not keep, such as
 // `0.1000000000000000055511151231257827`, which a float64 writes as 0.1, or
@@ -56,7 +59,18 @@ func TestREQ176_REQ052_ExprLeafItemCanonicalJSON(t *testing.T) {
 		{"xs:boolean 1", typed("xs:boolean", " 1\n"), `{"_type":"Boolean","value":true}`, typed("xsd:boolean", "true")},
 		{"xs:boolean 0", typed("xs:boolean", "0"), `{"_type":"Boolean","value":false}`, typed("xsd:boolean", "false")},
 		{"xs:int", typed("xs:int", "-42"), `{"_type":"Integer","value":-42}`, typed("xsd:int", "-42")},
-		{"xs:integer", typed("xs:integer", " +7 "), `{"_type":"Integer","value":7}`, typed("xsd:int", "7")},
+		{"xs:integer", typed("xs:integer", " +7 "), `{"_type":"Integer64","value":7}`, typed("xsd:long", "7")},
+		{"xs:integer beyond 32 bits", typed("xs:integer", "3000000000"), `{"_type":"Integer64","value":3000000000}`, typed("xsd:long", "3000000000")},
+		{"xs:nonNegativeInteger", typed("xs:nonNegativeInteger", "3000000000"), `{"_type":"Integer64","value":3000000000}`, typed("xsd:long", "3000000000")},
+		{"xs:positiveInteger", typed("xs:positiveInteger", "3000000000"), `{"_type":"Integer64","value":3000000000}`, typed("xsd:long", "3000000000")},
+		{"xs:nonPositiveInteger", typed("xs:nonPositiveInteger", "-3000000000"), `{"_type":"Integer64","value":-3000000000}`, typed("xsd:long", "-3000000000")},
+		{"xs:negativeInteger", typed("xs:negativeInteger", "-3000000000"), `{"_type":"Integer64","value":-3000000000}`, typed("xsd:long", "-3000000000")},
+		{"xs:unsignedInt", typed("xs:unsignedInt", "3000000000"), `{"_type":"Integer64","value":3000000000}`, typed("xsd:long", "3000000000")},
+		{"xs:unsignedLong", typed("xs:unsignedLong", "3000000000"), `{"_type":"Integer64","value":3000000000}`, typed("xsd:long", "3000000000")},
+		{"xs:short", typed("xs:short", "-7"), `{"_type":"Integer","value":-7}`, typed("xsd:int", "-7")},
+		{"xs:byte", typed("xs:byte", "7"), `{"_type":"Integer","value":7}`, typed("xsd:int", "7")},
+		{"xs:unsignedShort", typed("xs:unsignedShort", "65535"), `{"_type":"Integer","value":65535}`, typed("xsd:int", "65535")},
+		{"xs:unsignedByte", typed("xs:unsignedByte", "255"), `{"_type":"Integer","value":255}`, typed("xsd:int", "255")},
 		{"xs:long", typed("xs:long", "9223372036854775807"), `{"_type":"Integer64","value":9223372036854775807}`, typed("xsd:long", "9223372036854775807")},
 		{"xs:decimal", typed("xs:decimal", "2.50"), `{"_type":"Real","value":2.50}`, typed("xsd:float", "2.50")},
 		{"xs:double", typed("xs:double", "1e3"), `{"_type":"Double","value":1e3}`, typed("xsd:double", "1e3")},
@@ -178,6 +192,8 @@ func TestREQ176_REQ052_ExprLeafItemCanonicalJSONEncodeRefusals(t *testing.T) {
 		{item: aom14.TypedString{Type: "xs:int", Value: "1.0"}, cause: strconv.ErrSyntax},
 		{item: aom14.TypedString{Type: "xs:int", Value: "2147483648"}, cause: strconv.ErrRange},
 		{item: aom14.TypedString{Type: "xs:long", Value: "9223372036854775808"}, cause: strconv.ErrRange},
+		{item: aom14.TypedString{Type: "xs:integer", Value: "9223372036854775808"}, cause: strconv.ErrRange},
+		{item: aom14.TypedString{Type: "xs:unsignedLong", Value: "18446744073709551615"}, cause: strconv.ErrRange},
 		{item: aom14.TypedString{Type: "xs:decimal", Value: "2.5.1"}, cause: strconv.ErrSyntax},
 		{item: aom14.TypedString{Type: "xs:float", Value: "0x1p-2"}, cause: strconv.ErrSyntax},
 		{item: aom14.TypedString{Type: "xs:double", Value: "1_000"}, cause: strconv.ErrSyntax},

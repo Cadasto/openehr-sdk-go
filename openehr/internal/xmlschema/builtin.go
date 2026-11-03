@@ -11,7 +11,10 @@ const LiteralPrefix = "xsd"
 
 // builtins maps the XML Schema built-in datatypes the openEHR ITS-XML schemas
 // and the producers of canonical XML write openEHR primitives as to the BMM
-// primitive each reads as.
+// primitive each reads as. An integer built-in reads as an Integer where a
+// 32-bit Integer holds its whole range, `int` and the narrower ones, and as an
+// Integer64 otherwise, so a value the built-in admits is not refused for its
+// range where a 64-bit Integer64 holds it.
 var builtins = map[string]string{
 	"string":             "String",
 	"normalizedString":   "String",
@@ -25,16 +28,16 @@ var builtins = map[string]string{
 	"anyURI":             "Uri",
 	"boolean":            "Boolean",
 	"int":                "Integer",
-	"integer":            "Integer",
 	"short":              "Integer",
 	"byte":               "Integer",
-	"nonNegativeInteger": "Integer",
-	"positiveInteger":    "Integer",
-	"nonPositiveInteger": "Integer",
-	"negativeInteger":    "Integer",
-	"unsignedInt":        "Integer",
 	"unsignedShort":      "Integer",
 	"unsignedByte":       "Integer",
+	"integer":            "Integer64",
+	"nonNegativeInteger": "Integer64",
+	"positiveInteger":    "Integer64",
+	"nonPositiveInteger": "Integer64",
+	"negativeInteger":    "Integer64",
+	"unsignedInt":        "Integer64",
 	"long":               "Integer64",
 	"unsignedLong":       "Integer64",
 	"float":              "Real",
