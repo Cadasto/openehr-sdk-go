@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 )
@@ -219,6 +220,66 @@ func TestREQ176_REQ052_ExprLeafItemCanonicalJSONEncodeRefusals(t *testing.T) {
 		}
 		if len(tc.item.Value) > 2 && strings.Contains(err.Error(), tc.item.Value) {
 			t.Errorf("canjson.Marshal(item %#v) = %q; want an error that does not quote the text", tc.item, err)
+		}
+	}
+}
+
+// TestREQ176_REQ052_ExprLeafItemClassValuesJSON pins which class values the
+// canonical-JSON encoder writes for an EXPR_LEAF item, a BMM `Any`: a value of
+// each class the type registry constructs, an AOM 1.4 one or an RM one,
+// through a pointer or by value, the value written as the pointer is and read
+// back as a pointer to it; and nothing else. A value of any other type is
+// refused with canjson.ErrInvalidValue, one that names itself after a
+// registered class and writes itself as one included (cStringImpostor), since
+// the decoder would read back a value of another type. A zero value some
+// other member of its class refuses, such as an enumeration's zero, is not
+// the item's refusal.
+func TestREQ176_REQ052_ExprLeafItemClassValuesJSON(t *testing.T) {
+	for _, c := range registeredClasses(t) {
+		want, errPtr := canjson.Marshal(exprLeafWithItem(c.byPtr))
+		got, errValue := canjson.Marshal(exprLeafWithItem(c.byValue))
+		for form, err := range map[string]error{"through a pointer": errPtr, "by value": errValue} {
+			if err != nil && strings.Contains(err.Error(), itemRefusal) {
+				t.Errorf("%s %s: canjson.Marshal = %v; want the item accepted", c.name, form, err)
+			}
+		}
+		if errPtr == nil && (errValue != nil || string(got) != string(want)) {
+			t.Errorf("%s: by value written\n%s, %v\nwant it written as through a pointer\n%s", c.name, got, errValue, want)
+		}
+	}
+	pattern := ".*"
+	for _, tc := range []struct {
+		name           string
+		byValue, byPtr any
+	}{
+		{"C_STRING", aom14.CString{Pattern: &pattern}, &aom14.CString{Pattern: &pattern}},
+		{"DV_TEXT", rm.DVText{Value: "text"}, &rm.DVText{Value: "text"}},
+	} {
+		want, err := canjson.Marshal(exprLeafWithItem(tc.byPtr))
+		if err != nil {
+			t.Fatalf("%s: canjson.Marshal(through a pointer) = %v", tc.name, err)
+		}
+		got, err := canjson.Marshal(exprLeafWithItem(tc.byValue))
+		if err != nil {
+			t.Errorf("%s: canjson.Marshal(by value) = %v; want nil", tc.name, err)
+			continue
+		}
+		if string(got) != string(want) {
+			t.Errorf("%s: by value written\n%s\nwant it written as through a pointer\n%s", tc.name, got, want)
+		}
+		var back aom14.ExprLeaf
+		if err := canjson.Unmarshal(got, &back, canjson.WithStrict()); err != nil {
+			t.Errorf("%s: canjson.Unmarshal(%s) = %v", tc.name, got, err)
+			continue
+		}
+		if !reflect.DeepEqual(back.Item, tc.byPtr) {
+			t.Errorf("%s: the item reads back as %#v; want %#v", tc.name, back.Item, tc.byPtr)
+		}
+	}
+	for _, item := range []any{cStringImpostor{Pattern: ".*"}, &cStringImpostor{Pattern: ".*"}, 42, []string{"a"}} {
+		out, err := canjson.Marshal(exprLeafWithItem(item))
+		if !errors.Is(err, canjson.ErrInvalidValue) {
+			t.Errorf("canjson.Marshal(an item of %T) = %s, %v; want canjson.ErrInvalidValue", item, out, err)
 		}
 	}
 }

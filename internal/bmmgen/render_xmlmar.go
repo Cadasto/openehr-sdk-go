@@ -273,7 +273,7 @@ func renderMarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass, e
 	switch p := ef.Prop.(type) {
 	case *bmm.SingleProperty:
 		if p.TypeName == bmmAnyType {
-			return marshalXMLAny(recv, goField, elemName, p.IsMandatory), nil
+			return marshalXMLAny(recv, goField, elemName, emitting.ClassName()+"."+propName, p.IsMandatory), nil
 		}
 		_, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
 		if kind == polySingle || kind == polySingleNarrow {
@@ -373,11 +373,17 @@ func containerInnerIsClass(plan *Plan, td *bmm.ContainerType) bool {
 // --- Per-shape emission helpers ----------------------------------------
 
 // marshalXMLAny emits the encoding of a property typed by the BMM root type
-// Any, held as a Go any, or as *any when optional: a string, the text of an
-// item with no `xsi:type`, and an xmlschema.TypedString, which writes its own
-// `xsi:type`, go to encoding/xml; any other value is a class value, written
-// through canxml.EncodePoly with its `xsi:type`; a nil member writes nothing.
-func marshalXMLAny(recv, field, elem string, mandatory bool) string {
+// Any, held as a Go any, or as *any when optional, label naming it as its
+// class and property: a string, the text of an item with no `xsi:type`, and
+// an xmlschema.TypedString, which writes its own `xsi:type`, go to
+// encoding/xml; a nil member writes nothing; and any other value
+// [anyMemberFunc] accepts is a class value, which it returns as a pointer
+// where the member holds it by value, written through canxml.EncodePoly with
+// its `xsi:type`. A value it does not accept, one whose type names itself
+// after a registered class included, is refused with canxml.ErrInvalidShape,
+// naming the member and the Go type it holds, never the value, as the
+// canonical-JSON encoder refuses it ([jsonAnyChecks]).
+func marshalXMLAny(recv, field, elem, label string, mandatory bool) string {
 	start := fmt.Sprintf("xml.StartElement{Name: xml.Name{Local: %q}}", elem)
 	value := recv + "." + field
 	indent := "\t"
@@ -392,7 +398,11 @@ func marshalXMLAny(recv, field, elem string, mandatory bool) string {
 	fmt.Fprintf(&b, "%scase string, xmlschema.TypedString, *xmlschema.TypedString:\n", indent)
 	fmt.Fprintf(&b, "%s\tif err := _e.EncodeElement(_v, %s); err != nil {\n%s\t\treturn err\n%s\t}\n", indent, start, indent, indent)
 	fmt.Fprintf(&b, "%sdefault:\n", indent)
-	fmt.Fprintf(&b, "%s\tif err := canxml.EncodePoly(_e, %q, _v); err != nil {\n%s\t\treturn err\n%s\t}\n", indent, elem, indent, indent)
+	fmt.Fprintf(&b, "%s\t_c, _ok := %s(_v)\n", indent, anyMemberFunc)
+	fmt.Fprintf(&b, "%s\tif !_ok {\n", indent)
+	fmt.Fprintf(&b, "%s\t\treturn fmt.Errorf(\"%%w: %s holds %%T, %s\", canxml.ErrInvalidShape, _v)\n", indent, label, anyMemberRefusal)
+	fmt.Fprintf(&b, "%s\t}\n", indent)
+	fmt.Fprintf(&b, "%s\tif err := canxml.EncodePoly(_e, %q, _c); err != nil {\n%s\t\treturn err\n%s\t}\n", indent, elem, indent, indent)
 	fmt.Fprintf(&b, "%s}\n", indent)
 	if !mandatory {
 		b.WriteString("\t}\n")

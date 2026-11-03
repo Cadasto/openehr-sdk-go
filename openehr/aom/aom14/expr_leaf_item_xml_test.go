@@ -8,12 +8,17 @@ package aom14_test
 
 import (
 	"bytes"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
@@ -243,6 +248,121 @@ func TestREQ176_TypedStringRefusesAnUnreadableType(t *testing.T) {
 		}
 		if got, ok := back.Item.(*aom14.TypedString); !ok || got.Type != typ || got.Value != "x" {
 			t.Errorf("the item of %s reads back as %#v; want the typed string %q of Type %q", out, back.Item, "x", typ)
+		}
+	}
+}
+
+// cStringImpostor names itself C_STRING and writes itself as canonical XML
+// and JSON, but it is no class the type registry constructs, so no decoder
+// returns it for an EXPR_LEAF item.
+type cStringImpostor struct{ Pattern string }
+
+func (cStringImpostor) BMMName() string { return "C_STRING" }
+
+func (c cStringImpostor) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	return e.EncodeElement(struct {
+		Pattern string `xml:"pattern"`
+	}{c.Pattern}, start)
+}
+
+func (c cStringImpostor) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, struct {
+		Type    string `json:"_type"`
+		Pattern string `json:"pattern"`
+	}{"C_STRING", c.Pattern})
+}
+
+// itemRefusal is the part of an encoder's refusal of an EXPR_LEAF item's
+// value that names the member.
+const itemRefusal = "EXPR_LEAF.item holds"
+
+// registeredClass is a zero value of a class the type registry constructs,
+// through a pointer and by value.
+type registeredClass struct {
+	name           string
+	byPtr, byValue any
+}
+
+// registeredClasses returns a zero value of each class the type registry
+// holds in this test binary, the AOM 1.4 and the RM ones, through the pointer
+// its registration constructs and by value.
+func registeredClasses(t *testing.T) []registeredClass {
+	t.Helper()
+	var out []registeredClass
+	for _, name := range typereg.Default.Names() {
+		ctor, ok := typereg.Default.Lookup(name)
+		if !ok {
+			t.Fatalf("typereg.Default.Lookup(%s) = false; want the name it lists", name)
+		}
+		p := ctor()
+		out = append(out, registeredClass{name: name, byPtr: p, byValue: reflect.ValueOf(p).Elem().Interface()})
+	}
+	if len(out) == 0 {
+		t.Fatal("the type registry holds no class")
+	}
+	return out
+}
+
+// exprLeafWithItem returns an EXPR_LEAF whose item is item.
+func exprLeafWithItem(item any) *aom14.ExprLeaf {
+	return &aom14.ExprLeaf{Type: "String", ReferenceType: "constraint", Item: item}
+}
+
+// TestREQ176_REQ056_ExprLeafItemClassValues pins which class values the
+// canonical-XML encoder writes for an EXPR_LEAF item, a BMM `Any`: a value of
+// each class the type registry constructs, an AOM 1.4 one or an RM one,
+// through a pointer or by value, the value written as the pointer is and read
+// back as a pointer to it; and nothing else. A value of any other type is
+// refused with canxml.ErrInvalidShape, one that names itself after a
+// registered class and writes itself as one included, since the decoder would
+// read back a value of another type. A zero value some other member of its
+// class refuses, such as an enumeration's zero, is not the item's refusal.
+func TestREQ176_REQ056_ExprLeafItemClassValues(t *testing.T) {
+	for _, c := range registeredClasses(t) {
+		want, errPtr := canxml.Marshal(exprLeafWithItem(c.byPtr))
+		got, errValue := canxml.Marshal(exprLeafWithItem(c.byValue))
+		for form, err := range map[string]error{"through a pointer": errPtr, "by value": errValue} {
+			if err != nil && strings.Contains(err.Error(), itemRefusal) {
+				t.Errorf("%s %s: canxml.Marshal = %v; want the item accepted", c.name, form, err)
+			}
+		}
+		if errPtr == nil && (errValue != nil || !bytes.Equal(got, want)) {
+			t.Errorf("%s: by value written\n%s, %v\nwant it written as through a pointer\n%s", c.name, got, errValue, want)
+		}
+	}
+	pattern := ".*"
+	for _, tc := range []struct {
+		name           string
+		byValue, byPtr any
+	}{
+		{"C_STRING", aom14.CString{Pattern: &pattern}, &aom14.CString{Pattern: &pattern}},
+		{"DV_TEXT", rm.DVText{Value: "text"}, &rm.DVText{Value: "text"}},
+	} {
+		want, err := canxml.Marshal(exprLeafWithItem(tc.byPtr))
+		if err != nil {
+			t.Fatalf("%s: canxml.Marshal(through a pointer) = %v", tc.name, err)
+		}
+		got, err := canxml.Marshal(exprLeafWithItem(tc.byValue))
+		if err != nil {
+			t.Errorf("%s: canxml.Marshal(by value) = %v; want nil", tc.name, err)
+			continue
+		}
+		if !bytes.Equal(got, want) {
+			t.Errorf("%s: by value written\n%s\nwant it written as through a pointer\n%s", tc.name, got, want)
+		}
+		var back aom14.ExprLeaf
+		if err := canxml.Unmarshal(got, &back, canxml.WithStrict()); err != nil {
+			t.Errorf("%s: canxml.Unmarshal(%s) = %v", tc.name, got, err)
+			continue
+		}
+		if !reflect.DeepEqual(back.Item, tc.byPtr) {
+			t.Errorf("%s: the item reads back as %#v; want %#v", tc.name, back.Item, tc.byPtr)
+		}
+	}
+	for _, item := range []any{cStringImpostor{Pattern: ".*"}, &cStringImpostor{Pattern: ".*"}, 42, []string{"a"}} {
+		out, err := canxml.Marshal(exprLeafWithItem(item))
+		if !errors.Is(err, canxml.ErrInvalidShape) {
+			t.Errorf("canxml.Marshal(an item of %T) = %s, %v; want canxml.ErrInvalidShape", item, out, err)
 		}
 	}
 }

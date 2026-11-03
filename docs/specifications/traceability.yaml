@@ -688,6 +688,7 @@ requirements:
     tests:
       - internal/bmmgen/itsxml_test.go
       - internal/bmmgen/render_interval_bound_test.go
+      - internal/bmmgen/render_jsonmar_any_test.go
       - internal/bmmgen/render_xml_attributes_test.go
       - internal/bmmgen/render_xml_hash_test.go
       - internal/bmmgen/render_xmlchoice_optional_test.go

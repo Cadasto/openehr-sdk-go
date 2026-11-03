@@ -5,6 +5,7 @@ package aom14
 
 import (
 	"encoding/xml"
+	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlschema"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
@@ -165,7 +166,11 @@ func (e *ExprLeaf) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 			return err
 		}
 	default:
-		if err := canxml.EncodePoly(_e, "item", _v); err != nil {
+		_c, _ok := anyMemberValue(_v)
+		if !_ok {
+			return fmt.Errorf("%w: EXPR_LEAF.item holds %T, which is no registered class, typed string or string", canxml.ErrInvalidShape, _v)
+		}
+		if err := canxml.EncodePoly(_e, "item", _c); err != nil {
 			return err
 		}
 	}

@@ -23,7 +23,9 @@ const typeregImportPath = "github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 // [PlannedFile], and for the abstract BASE Interval struct ([codecClassesIn]).
 // It also emits the per-class wire type, a method-free alias, a flat wire
 // struct or an interval wire struct, that the UnmarshalJSONFrom companion in
-// the sibling _jsonunmar_gen.go references.
+// the sibling _jsonunmar_gen.go references. The companion of the file
+// [anyMemberFile] names also declares [anyMemberFunc], once for the target's
+// package.
 //
 // The output is byte-stable per file. Returns (nil, nil) when the file has no
 // such classes.
@@ -72,13 +74,20 @@ func RenderMarshalJSONFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 		return nil, nil
 	}
 
-	chunks := make([]string, 0, len(concrete))
+	chunks := make([]string, 0, len(concrete)+1)
 	for _, pc := range concrete {
 		chunk, err := renderMarshalJSON(plan, pc)
 		if err != nil {
 			return nil, fmt.Errorf("render MarshalJSONTo %s: %w", pc.BMMName, err)
 		}
 		chunks = append(chunks, chunk)
+	}
+	anyFile, err := anyMemberFile(plan)
+	if err != nil {
+		return nil, err
+	}
+	if anyFile == file {
+		chunks = append(chunks, renderAnyMemberValue(plan))
 	}
 
 	needExternal := needsExternalImportForJSONMar(plan, chunks)
@@ -424,11 +433,11 @@ func renderMarshalJSON(plan *Plan, pc *PlannedClass) (string, error) {
 // not read back, as the canonical-XML encoder refuses it, so the SDK reads its
 // own output. A member whose canonical XML takes a choice of shapes
 // ([xmlChoiceOf]), such as the AOM 1.4 `ORDINAL.symbol`, holds one of the
-// shapes, through a pointer or by value; any other, such as `EXPR_LEAF.item`,
-// a string, an xmlschema.TypedString or a pointer to one, or a class value,
-// one with a BMMName method. Either may be nil. The refusal names the member
-// and the Go type it holds, never the value. It returns "" for a class with
-// no such member.
+// shapes, through a pointer or by value, or nil; any other, such as
+// `EXPR_LEAF.item`, a value [anyMemberFunc] accepts: nil, a string, a typed
+// string or a value of a class the type registry constructs, through a
+// pointer or by value. The refusal names the member and the Go type it holds,
+// never the value. It returns "" for a class with no such member.
 func jsonAnyChecks(plan *Plan, pc *PlannedClass, recv string) (string, error) {
 	fields, err := effectiveFields(plan, pc)
 	if err != nil {
@@ -451,25 +460,27 @@ func jsonAnyChecks(plan *Plan, pc *PlannedClass, recv string) (string, error) {
 			value = "(*" + value + ")"
 			indent = "\t\t"
 		}
-		label := pc.BMMName + "." + p.PropertyName()
-		accepted := "nil, string, xmlschema.TypedString, *xmlschema.TypedString, interface{ BMMName() string }"
-		refusal := "which is no class value, typed string or string"
-		if choice != nil {
-			label = choice.label
-			types := []string{"nil"}
-			for _, shape := range choice.shapes {
-				types = append(types, "*"+shape.goType)
+		if choice == nil {
+			label := pc.BMMName + "." + p.PropertyName()
+			fmt.Fprintf(&b, "%sif _, ok := %s(%s); !ok {\n", indent, anyMemberFunc, value)
+			fmt.Fprintf(&b, "%s\treturn fmt.Errorf(\"canjson: %s holds %%T, %s\", %s)\n", indent, label, anyMemberRefusal, value)
+			fmt.Fprintf(&b, "%s}\n", indent)
+			if !p.IsMandatory {
+				b.WriteString("\t}\n")
 			}
-			for _, shape := range choice.shapes {
-				types = append(types, shape.goType)
-			}
-			accepted = strings.Join(types, ", ")
-			refusal = "which is none of the shapes its canonical XML takes"
+			continue
+		}
+		types := []string{"nil"}
+		for _, shape := range choice.shapes {
+			types = append(types, "*"+shape.goType)
+		}
+		for _, shape := range choice.shapes {
+			types = append(types, shape.goType)
 		}
 		fmt.Fprintf(&b, "%sswitch _v := %s.(type) {\n", indent, value)
-		fmt.Fprintf(&b, "%scase %s:\n", indent, accepted)
+		fmt.Fprintf(&b, "%scase %s:\n", indent, strings.Join(types, ", "))
 		fmt.Fprintf(&b, "%sdefault:\n", indent)
-		fmt.Fprintf(&b, "%s\treturn fmt.Errorf(\"canjson: %s holds %%T, %s\", _v)\n", indent, label, refusal)
+		fmt.Fprintf(&b, "%s\treturn fmt.Errorf(\"canjson: %s holds %%T, which is none of the shapes its canonical XML takes\", _v)\n", indent, choice.label)
 		fmt.Fprintf(&b, "%s}\n", indent)
 		if !p.IsMandatory {
 			b.WriteString("\t}\n")
