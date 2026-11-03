@@ -160,8 +160,13 @@ type Decoder struct {
 	trk *xmlunmatched.Tracker
 	// rec records what dec has read of the stream since the value being
 	// decoded began, for a decoder given none of those options that reads
-	// through a plain encoding/xml decoder; nil otherwise.
+	// through a plain encoding/xml decoder from a source it cannot seek; nil
+	// otherwise.
 	rec *recorder
+	// seeker is the source of a decoder given none of those options when it
+	// is an io.ByteReader and an io.Seeker, which dec reads directly and the
+	// decoder seeks back in to decode a value again; nil otherwise.
+	seeker io.ReadSeeker
 	// scope keeps the namespace declarations in scope for a decoder given
 	// none of those options once it has decoded a value a second time to
 	// resolve a prefix: it reads the rest of the stream through scope. nil
@@ -177,24 +182,38 @@ type Decoder struct {
 // When r is an io.ByteReader, such as a *bufio.Reader, the Decoder reads it a
 // byte at a time and takes from it no byte past the end of the value it
 // decodes, whatever its options, so what follows the value stays in r. Any
-// other r it reads ahead, as encoding/xml does.
+// other r it reads ahead, as encoding/xml does. When r is also an io.Seeker,
+// such as a *bytes.Reader, a Decoder given no option seeks r back to decode a
+// value a second time (see [Decoder.Decode]).
 func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 	cfg := newDecoderConfig(opts)
 	if t := cfg.tracker(); t != nil {
 		return &Decoder{dec: t.NewDecoder(r), cfg: cfg, trk: t}
+	}
+	if s, ok := r.(byteSeeker); ok {
+		return &Decoder{dec: xml.NewDecoder(s), cfg: cfg, seeker: s}
 	}
 	rec := &recorder{src: r}
 	rec.bsrc, _ = r.(io.ByteReader)
 	return &Decoder{dec: xml.NewDecoder(rec), cfg: cfg, rec: rec}
 }
 
+// byteSeeker is a source a [Decoder] given no option reads directly, as
+// encoding/xml reads an io.ByteReader, and seeks back in to decode a value
+// again, so that it keeps none of the bytes it reads.
+type byteSeeker interface {
+	io.ByteReader
+	io.ReadSeeker
+}
+
 // recorder is the reader a [Decoder] given no option reads its stream
-// through. It keeps the bytes read from src since the value being decoded
-// began, so that the value can be read again. encoding/xml reads it a byte at
-// a time, as an io.ByteReader, so it buffers nothing else and the bytes it
-// keeps are the only copy of them. A src that is an io.ByteReader is read a
-// byte at a time too, so the recorder takes from it no byte past the last one
-// encoding/xml asks for; any other src is read ahead, in blocks.
+// through when the stream is no [byteSeeker]. It keeps the bytes read from
+// src since the value being decoded began, so that the value can be read
+// again. encoding/xml reads it a byte at a time, as an io.ByteReader, so it
+// buffers nothing else and the bytes it keeps are the only copy of them. A
+// src that is an io.ByteReader is read a byte at a time too, so the recorder
+// takes from it no byte past the last one encoding/xml asks for; any other
+// src is read ahead, in blocks.
 type recorder struct {
 	src  io.Reader
 	bsrc io.ByteReader // src, when it is an io.ByteReader; nil otherwise
@@ -361,13 +380,17 @@ func (f failedReader) Read([]byte) (int, error) { return 0, f.err }
 // A prefixed `xsi:type` is resolved against the namespace declarations in
 // scope where the attribute stands (see [XSITypeOf]). A Decoder given any of
 // those options keeps every declaration in scope as it reads. One given none
-// reads an element's own declarations as it goes and keeps the bytes of the
-// value it is decoding; when a prefix is declared on an element around the
-// attribute, Decode decodes the value a second time, from where the call
-// began, through a reader that keeps every declaration in scope, into v
-// cleared to its zero value. The Decoder then reads the rest of the stream
-// through that reader. So only a value that needs the second decode pays for
-// it, and any other pays for keeping its bytes.
+// reads an element's own declarations as it goes; when a prefix is declared
+// on an element around the attribute, Decode decodes the value a second time,
+// from where the call began, through a reader that keeps every declaration in
+// scope, into v cleared to its zero value. The Decoder then reads the rest of
+// the stream through that reader. To read the value again, a Decoder whose
+// reader is an io.ByteReader and an io.Seeker, such as a *bytes.Reader, seeks
+// the reader back to where the value began, and a seek that fails is the
+// error Decode returns; a Decoder over any other reader keeps the bytes of
+// the value it is decoding instead. So only a value that needs the second
+// decode pays for it, and over a reader that cannot seek any other pays for
+// keeping its bytes.
 //
 // Decode reads no further than the end of that element, so whatever
 // follows it, another element included, is left for the next call. A
@@ -382,15 +405,38 @@ func (d *Decoder) Decode(v any) error {
 	case d.scope != nil:
 		return d.scope.Decode(d.dec, v)
 	}
-	d.rec.from(d.dec.InputOffset())
+	start := d.dec.InputOffset()
+	if d.rec != nil {
+		d.rec.from(start)
+	}
 	err := d.dec.Decode(v)
 	if !xmlunmatched.IsUnresolvedPrefix(err) {
 		return err
 	}
+	src, err := d.rewind(start)
+	if err != nil {
+		return err
+	}
 	d.scope = new(xmlunmatched.Scope)
-	d.dec = d.scope.NewDecoder(d.rec.replay())
-	d.rec = nil
+	d.dec = d.scope.NewDecoder(src)
+	d.rec, d.seeker = nil, nil
 	return d.scope.DecodeAgain(d.dec, v)
+}
+
+// rewind returns a reader of the stream from start, the input offset of d.dec
+// where the value being decoded began: the seeker sought back by the bytes
+// d.dec has taken since start, or else the recorder's replay. A decode stops
+// at a prefix it cannot resolve at the end of a start element, where
+// encoding/xml holds back no byte it has read, so the seeker stands that many
+// bytes past where the value began.
+func (d *Decoder) rewind(start int64) (io.Reader, error) {
+	if d.seeker == nil {
+		return d.rec.replay(), nil
+	}
+	if _, err := d.seeker.Seek(start-d.dec.InputOffset(), io.SeekCurrent); err != nil {
+		return nil, fmt.Errorf("canxml: seek back to the value to decode it again: %w", err)
+	}
+	return d.seeker, nil
 }
 
 // RelaxedTypeDispatch reports whether the decoder was configured

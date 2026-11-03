@@ -1,6 +1,7 @@
 package canxml_test
 
 import (
+	"bufio"
 	"bytes"
 	"io"
 	"os"
@@ -65,10 +66,11 @@ func BenchmarkUnmarshalComposition(b *testing.B) {
 
 // BenchmarkDecoderComposition pins the decode throughput of a stream Decoder
 // given no option, on the input BenchmarkUnmarshalComposition decodes. The
-// composition holds no prefixed `xsi:type`, so the Decoder decodes it once
-// and pays only for keeping the bytes of the value. Its reader, a
-// *bytes.Reader, is an io.ByteReader, which the Decoder reads a byte at a
-// time so that it reads no byte past the value.
+// composition holds no prefixed `xsi:type`, so the Decoder decodes it once,
+// as encoding/xml does. Its reader, a *bytes.Reader, is an io.ByteReader and an
+// io.Seeker, which the Decoder reads directly, a byte at a time, so that it
+// reads no byte past the value, and would seek back in to decode a value
+// again, so that it keeps none of the value's bytes.
 func BenchmarkDecoderComposition(b *testing.B) {
 	body := encodedComposition(b)
 	for b.Loop() {
@@ -80,12 +82,31 @@ func BenchmarkDecoderComposition(b *testing.B) {
 }
 
 // BenchmarkDecoderCompositionReadAhead is BenchmarkDecoderComposition over a
-// reader that is no io.ByteReader, which the Decoder reads ahead, in blocks.
+// reader that is no io.ByteReader, which the Decoder reads ahead, in blocks,
+// keeping the bytes of the value.
 func BenchmarkDecoderCompositionReadAhead(b *testing.B) {
 	body := encodedComposition(b)
 	for b.Loop() {
 		var into rm.Composition
 		if err := canxml.NewDecoder(struct{ io.Reader }{bytes.NewReader(body)}).Decode(&into); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkDecoderCompositionBuffered is BenchmarkDecoderComposition over a
+// *bufio.Reader, an io.ByteReader that cannot seek, whose bytes the Decoder
+// keeps as it reads them, one at a time. The bufio.Reader is reset for each
+// decode rather than made anew, so its buffer is not counted.
+func BenchmarkDecoderCompositionBuffered(b *testing.B) {
+	body := encodedComposition(b)
+	src := bytes.NewReader(body)
+	buf := bufio.NewReader(src)
+	for b.Loop() {
+		src.Reset(body)
+		buf.Reset(src)
+		var into rm.Composition
+		if err := canxml.NewDecoder(buf).Decode(&into); err != nil {
 			b.Fatal(err)
 		}
 	}

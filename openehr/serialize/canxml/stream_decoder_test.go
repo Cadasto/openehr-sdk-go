@@ -70,13 +70,25 @@ func secondItem(t *testing.T, s *aom14.ArchetypeSlot) any {
 }
 
 // streamReaders are the readers a stream test reads its input through: whole,
-// a byte at a time, and half of each request at a time, so that the bytes a
-// Decoder keeps of a value end wherever a read ends.
+// a *bytes.Reader the Decoder seeks back in to decode a value again; buffered,
+// an io.ByteReader that cannot seek, whose bytes the Decoder keeps one at a
+// time; and a byte at a time and half of each request at a time, readers the
+// Decoder reads ahead, so that the bytes it keeps of a value end wherever a
+// read ends.
 var streamReaders = map[string]func([]byte) io.Reader{
 	"whole":       func(b []byte) io.Reader { return bytes.NewReader(b) },
+	"buffered":    func(b []byte) io.Reader { return bufio.NewReader(bytes.NewReader(b)) },
 	"one byte":    func(b []byte) io.Reader { return iotest.OneByteReader(bytes.NewReader(b)) },
 	"half a read": func(b []byte) io.Reader { return iotest.HalfReader(bytes.NewReader(b)) },
 }
+
+// streamOnce is a value a Decoder given no option decodes once, its item
+// declaring nothing, and streamAgain one it decodes a second time, its item's
+// prefix being declared on the item's parent.
+var (
+	streamOnce  = streamValue{item: ` xsi:type="C_STRING"`, content: "<pattern>.*</pattern>"}
+	streamAgain = streamValue{parent: ` xmlns:xs="` + xsdNamespace + `"`, item: ` xsi:type="xs:string"`, content: "archetype_id/value"}
+)
 
 // TestREQ056_DecoderDecodesAValueAgainWhenItsPrefixIsOutOfSight pins a stream
 // of four values, decoded one after another by a Decoder given no option. The
@@ -224,24 +236,29 @@ func TestREQ056_DecoderRefusesAReaderThatMakesNoProgress(t *testing.T) {
 	}
 }
 
-// TestREQ056_DecoderReadsNoFurtherThanTheValue pins a Decoder over a
-// bufio.Reader, an io.ByteReader, in every mode: Decode takes from the reader
-// no byte past the end of the value it decodes, so what follows the stream's
-// values is left in the reader for the caller. It holds for a stream of
-// values each decoded once, and for one whose first value is decoded a
-// second time to resolve a prefix declared around its item, after which the
-// Decoder reads the rest of the stream through the reader it replays the
-// value from.
+// TestREQ056_DecoderReadsNoFurtherThanTheValue pins a Decoder over an
+// io.ByteReader, in every mode: Decode takes from the reader no byte past the
+// end of the value it decodes, so what follows the stream's values is left in
+// the reader for the caller. It holds for a bufio.Reader, which cannot seek,
+// and for a strings.Reader, which can, for a stream of values each decoded
+// once, and for one whose first value is decoded a second time to resolve a
+// prefix declared around its item, after which the Decoder reads the rest of
+// the stream through the reader it decodes the value again from.
 func TestREQ056_DecoderReadsNoFurtherThanTheValue(t *testing.T) {
 	const trailer = "TRAILER-BYTES"
-	once := streamValue{item: ` xsi:type="C_STRING"`, content: "<pattern>.*</pattern>"}
-	again := streamValue{parent: ` xmlns:xs="` + xsdNamespace + `"`, item: ` xsi:type="xs:string"`, content: "archetype_id/value"}
 	streams := []struct {
 		name   string
 		values []streamValue
 	}{
-		{"values decoded once", []streamValue{once, once}},
-		{"a value decoded again, then one more", []streamValue{again, once}},
+		{"values decoded once", []streamValue{streamOnce, streamOnce}},
+		{"a value decoded again, then one more", []streamValue{streamAgain, streamOnce}},
+	}
+	readers := []struct {
+		name string
+		open func(string) io.Reader
+	}{
+		{"bufio.Reader", func(s string) io.Reader { return bufio.NewReader(strings.NewReader(s)) }},
+		{"strings.Reader", func(s string) io.Reader { return strings.NewReader(s) }},
 	}
 	modes := []struct {
 		name string
@@ -258,17 +275,104 @@ func TestREQ056_DecoderReadsNoFurtherThanTheValue(t *testing.T) {
 			stream.WriteString(v.slot())
 		}
 		stream.WriteString(trailer)
-		for _, m := range modes {
-			br := bufio.NewReader(strings.NewReader(stream.String()))
-			dec := canxml.NewDecoder(br, m.opts...)
-			for i := range s.values {
-				if err := dec.Decode(new(aom14.ArchetypeSlot)); err != nil {
-					t.Fatalf("%s, %s: Decode of value %d = %v; want nil", s.name, m.name, i+1, err)
+		for _, rd := range readers {
+			for _, m := range modes {
+				r := rd.open(stream.String())
+				dec := canxml.NewDecoder(r, m.opts...)
+				for i := range s.values {
+					if err := dec.Decode(new(aom14.ArchetypeSlot)); err != nil {
+						t.Fatalf("%s, %s, %s: Decode of value %d = %v; want nil", s.name, rd.name, m.name, i+1, err)
+					}
+				}
+				if rest, err := io.ReadAll(r); err != nil || string(rest) != trailer {
+					t.Errorf("%s, %s, %s: io.ReadAll after the last Decode = %q, %v; want %q, nil", s.name, rd.name, m.name, rest, err, trailer)
 				}
 			}
-			if rest, err := io.ReadAll(br); err != nil || string(rest) != trailer {
-				t.Errorf("%s, %s: io.ReadAll after the last Decode = %q, %v; want %q, nil", s.name, m.name, rest, err, trailer)
-			}
 		}
+	}
+}
+
+// TestREQ056_DecoderSeeksBackToDecodeAValueAgain pins a Decoder given no
+// option over a *bytes.Reader, an io.ByteReader that is also an io.Seeker:
+// a value decoded once, a value whose prefix is declared around its item, which
+// the Decoder decodes again from where Decode began, and a value after it each
+// decode, and each Decode leaves the reader at the end of its value.
+func TestREQ056_DecoderSeeksBackToDecodeAValueAgain(t *testing.T) {
+	pattern := ".*"
+	once := &aom14.CString{Pattern: &pattern}
+	values := []struct {
+		value streamValue
+		want  any
+	}{
+		{streamOnce, once},
+		{streamAgain, &aom14.TypedString{Value: "archetype_id/value", Type: "xs:string"}},
+		{streamOnce, once},
+	}
+	var stream []byte
+	for _, v := range values {
+		stream = append(stream, v.value.slot()...)
+	}
+	r := bytes.NewReader(append(stream, "TRAILER-BYTES"...))
+	dec := canxml.NewDecoder(r)
+	var end int64
+	for i, v := range values {
+		var slot aom14.ArchetypeSlot
+		if err := dec.Decode(&slot); err != nil {
+			t.Fatalf("Decode of value %d = %v; want nil", i+1, err)
+		}
+		if got := secondItem(t, &slot); !reflect.DeepEqual(got, v.want) {
+			t.Errorf("value %d's second item = %#v; want %#v", i+1, got, v.want)
+		}
+		end += int64(len(v.value.slot()))
+		if got := r.Size() - int64(r.Len()); got != end {
+			t.Errorf("after Decode of value %d the reader stands at offset %d; want %d, the value's end", i+1, got, end)
+		}
+	}
+}
+
+// TestREQ056_DecoderKeepsNoBytesFromAReaderThatCanSeek pins a Decoder given no
+// option over a *bytes.Reader, which it would seek back in to decode a value
+// again: it keeps no copy of the bytes it reads, so a Decode allocates less
+// than one over the same bytes through an io.ByteReader that cannot seek,
+// whose bytes the Decoder keeps as it reads them.
+func TestREQ056_DecoderKeepsNoBytesFromAReaderThatCanSeek(t *testing.T) {
+	data := []byte(streamOnce.slot())
+	r := bytes.NewReader(data)
+	var unseekable io.Reader = struct {
+		io.ByteReader
+		io.Reader
+	}{r, r}
+	allocs := func(src io.Reader) float64 {
+		return testing.AllocsPerRun(20, func() {
+			r.Reset(data)
+			if err := canxml.NewDecoder(src).Decode(new(aom14.ArchetypeSlot)); err != nil {
+				t.Fatalf("Decode = %v; want nil", err)
+			}
+		})
+	}
+	if seeking, keeping := allocs(r), allocs(unseekable); seeking >= keeping {
+		t.Errorf("a Decode over a *bytes.Reader allocates %v times, over an io.ByteReader that cannot seek %v; want fewer", seeking, keeping)
+	}
+}
+
+// errSeek is the failure of a stream test's seeker.
+var errSeek = errors.New("the reader cannot seek")
+
+// failingSeeker is a strings.Reader whose Seek fails.
+type failingSeeker struct{ *strings.Reader }
+
+func (failingSeeker) Seek(int64, int) (int64, error) { return 0, errSeek }
+
+// TestREQ056_DecoderReportsASeekThatFails pins a Decoder given no option over
+// an io.ByteReader whose Seek fails: a value it decodes once needs no seek and
+// decodes, and the decode of a value it decodes again, which seeks back to
+// where Decode began, fails with the seek's error.
+func TestREQ056_DecoderReportsASeekThatFails(t *testing.T) {
+	dec := canxml.NewDecoder(failingSeeker{strings.NewReader(streamOnce.slot() + streamAgain.slot())})
+	if err := dec.Decode(new(aom14.ArchetypeSlot)); err != nil {
+		t.Fatalf("Decode of the value decoded once = %v; want nil", err)
+	}
+	if err := dec.Decode(new(aom14.ArchetypeSlot)); !errors.Is(err, errSeek) {
+		t.Errorf("Decode of the value decoded again = %v; want the seek's error", err)
 	}
 }
