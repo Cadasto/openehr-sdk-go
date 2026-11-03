@@ -39,7 +39,7 @@ node /context/other_context
 
 node /context/other_context/items[at0002]
   rm_type="CLUSTER" node_id="at0002" archetype_id="" node_name="" occurrences=none slot=true
-  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                    <type>Boolean</type>\n                    <operator>2007</operator>\n                    <precedence_overridden>false</precedence_overridden>\n                    <left_operand xsi:type=\"EXPR_LEAF\">\n                      <type>String</type>\n                      <item xsi:type=\"xsd:string\">archetype_id/value</item>\n                      <reference_type>attribute</reference_type>\n                    </left_operand>\n                    <right_operand xsi:type=\"EXPR_LEAF\">\n                      <type>C_STRING</type>\n                      <item xsi:type=\"C_STRING\">\n                        <pattern>.*</pattern>\n                      </item>\n                      <reference_type>constraint</reference_type>\n                    </right_operand>\n                  </expression>"] slot_excludes=[]
+  slot_includes=[".*"] slot_excludes=[]
   slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
   term[nl] "at0002" code="at0002" comment="Bijvoorbeeld lokale ziekenhuisafdeling informatie of aanvullende metadata om uit in lijn te brengen met FHIR of CIMI-equivalenten." description="Aanvullende informatie die vereist is om de lokale context vast te leggen of in lijn te brengen met andere referentie-modellen/formalismen." text="Extensies"
 
@@ -567,13 +567,13 @@ node /content[openEHR-EHR-EVALUATION.education_summary.v1]/data/items[at0002]/va
 
 node /content[openEHR-EHR-EVALUATION.education_summary.v1]/data/items[at0029]
   rm_type="CLUSTER" node_id="at0029" archetype_id="" node_name="" occurrences=none slot=true
-  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                    <type>Boolean</type>\n                    <operator>2007</operator>\n                    <precedence_overridden>false</precedence_overridden>\n                    <left_operand xsi:type=\"EXPR_LEAF\">\n                      <type>String</type>\n                      <item xsi:type=\"xsd:string\">archetype_id/value</item>\n                      <reference_type>attribute</reference_type>\n                    </left_operand>\n                    <right_operand xsi:type=\"EXPR_LEAF\">\n                      <type>C_STRING</type>\n                      <item xsi:type=\"C_STRING\">\n                        <pattern>.*</pattern>\n                      </item>\n                      <reference_type>constraint</reference_type>\n                    </right_operand>\n                  </expression>"] slot_excludes=[]
+  slot_includes=[".*"] slot_excludes=[]
   slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
   term[nl] "at0029" code="at0029" description="Gestructureerde details over elke opleiding of training, zowel huidig als verleden." text="Opleidingsrecord"
 
 node /content[openEHR-EHR-EVALUATION.education_summary.v1]/data/items[at0030]
   rm_type="CLUSTER" node_id="at0030" archetype_id="" node_name="" occurrences=none slot=true
-  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                    <type>Boolean</type>\n                    <operator>2007</operator>\n                    <precedence_overridden>false</precedence_overridden>\n                    <left_operand xsi:type=\"EXPR_LEAF\">\n                      <type>String</type>\n                      <item xsi:type=\"xsd:string\">archetype_id/value</item>\n                      <reference_type>attribute</reference_type>\n                    </left_operand>\n                    <right_operand xsi:type=\"EXPR_LEAF\">\n                      <type>C_STRING</type>\n                      <item xsi:type=\"C_STRING\">\n                        <pattern>.*</pattern>\n                      </item>\n                      <reference_type>constraint</reference_type>\n                    </right_operand>\n                  </expression>"] slot_excludes=[]
+  slot_includes=[".*"] slot_excludes=[]
   slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
   term[nl] "at0030" code="at0030" comment="*For example: 'Special education needs'.(en)" description="Aanvullende details over de opleiding of training, of voorgaande opleidingshistorie van een individu." text="Optionele details"
 

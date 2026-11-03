@@ -141,7 +141,7 @@ node /content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/protocol
 
 node /content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/protocol/items[at1025]
   rm_type="CLUSTER" node_id="at1025" archetype_id="" node_name="" occurrences=none slot=true
-  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                    <type>Boolean</type>\n                    <operator>2007</operator>\n                    <precedence_overridden>false</precedence_overridden>\n                    <left_operand xsi:type=\"EXPR_LEAF\">\n                      <type>String</type>\n                      <item xsi:type=\"xsd:string\">archetype_id/value</item>\n                      <reference_type>attribute</reference_type>\n                    </left_operand>\n                    <right_operand xsi:type=\"EXPR_LEAF\">\n                      <type>C_STRING</type>\n                      <item xsi:type=\"C_STRING\">\n                        <pattern>openEHR-EHR-CLUSTER.device(-[a-zA-Z0-9_]+)*\\.v1</pattern>\n                      </item>\n                      <reference_type>constraint</reference_type>\n                    </right_operand>\n                  </expression>"] slot_excludes=[]
+  slot_includes=["openEHR-EHR-CLUSTER.device(-[a-zA-Z0-9_]+)*\\.v1"] slot_excludes=[]
   slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER.device(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[] raw_include_count=1
   term[en] "at1025" code="at1025" description="Details about sphygmomanometer or other device used to measure the blood pressure" text="Device"
 
@@ -229,67 +229,19 @@ node /content[openEHR-EHR-OBSERVATION.body_temperature.v1]/data/events[at0003]/s
   attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
-node /content[openEHR-EHR-OBSERVATION.body_temperature.v1]/data/events[at0003]/state/items[<expression xsi:type="EXPR_BINARY_OPERATOR">
-                            <type>Boolean</type>
-                            <operator>2007</operator>
-                            <precedence_overridden>false</precedence_overridden>
-                            <left_operand xsi:type="EXPR_LEAF">
-                              <type>String</type>
-                              <item xsi:type="xsd:string">archetype_id/value</item>
-                              <reference_type>attribute</reference_type>
-                            </left_operand>
-                            <right_operand xsi:type="EXPR_LEAF">
-                              <type>C_STRING</type>
-                              <item xsi:type="C_STRING">
-                                <pattern>openEHR-EHR-CLUSTER.environmental_conditions.v1</pattern>
-                              </item>
-                              <reference_type>constraint</reference_type>
-                            </right_operand>
-                          </expression>]
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v1]/data/events[at0003]/state/items[openEHR-EHR-CLUSTER.environmental_conditions.v1]
   rm_type="CLUSTER" node_id="" archetype_id="" node_name="" occurrences=none slot=true
-  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                            <type>Boolean</type>\n                            <operator>2007</operator>\n                            <precedence_overridden>false</precedence_overridden>\n                            <left_operand xsi:type=\"EXPR_LEAF\">\n                              <type>String</type>\n                              <item xsi:type=\"xsd:string\">archetype_id/value</item>\n                              <reference_type>attribute</reference_type>\n                            </left_operand>\n                            <right_operand xsi:type=\"EXPR_LEAF\">\n                              <type>C_STRING</type>\n                              <item xsi:type=\"C_STRING\">\n                                <pattern>openEHR-EHR-CLUSTER\\.environmental_conditions\\.v1</pattern>\n                              </item>\n                              <reference_type>constraint</reference_type>\n                            </right_operand>\n                          </expression>"] slot_excludes=[]
+  slot_includes=["openEHR-EHR-CLUSTER\\.environmental_conditions\\.v1"] slot_excludes=[]
   slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.environmental_conditions\\.v1"] excludes=[] raw_include_count=1
 
-node /content[openEHR-EHR-OBSERVATION.body_temperature.v1]/data/events[at0003]/state/items[<expression xsi:type="EXPR_BINARY_OPERATOR">
-                            <type>Boolean</type>
-                            <operator>2007</operator>
-                            <precedence_overridden>false</precedence_overridden>
-                            <left_operand xsi:type="EXPR_LEAF">
-                              <type>String</type>
-                              <item xsi:type="xsd:string">archetype_id/value</item>
-                              <reference_type>attribute</reference_type>
-                            </left_operand>
-                            <right_operand xsi:type="EXPR_LEAF">
-                              <type>C_STRING</type>
-                              <item xsi:type="C_STRING">
-                                <pattern>openEHR-EHR-CLUSTER.exertion.v1</pattern>
-                              </item>
-                              <reference_type>constraint</reference_type>
-                            </right_operand>
-                          </expression>]
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v1]/data/events[at0003]/state/items[openEHR-EHR-CLUSTER.exertion.v1]
   rm_type="CLUSTER" node_id="" archetype_id="" node_name="" occurrences=none slot=true
-  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                            <type>Boolean</type>\n                            <operator>2007</operator>\n                            <precedence_overridden>false</precedence_overridden>\n                            <left_operand xsi:type=\"EXPR_LEAF\">\n                              <type>String</type>\n                              <item xsi:type=\"xsd:string\">archetype_id/value</item>\n                              <reference_type>attribute</reference_type>\n                            </left_operand>\n                            <right_operand xsi:type=\"EXPR_LEAF\">\n                              <type>C_STRING</type>\n                              <item xsi:type=\"C_STRING\">\n                                <pattern>openEHR-EHR-CLUSTER\\.exertion\\.v1</pattern>\n                              </item>\n                              <reference_type>constraint</reference_type>\n                            </right_operand>\n                          </expression>"] slot_excludes=[]
+  slot_includes=["openEHR-EHR-CLUSTER\\.exertion\\.v1"] slot_excludes=[]
   slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.exertion\\.v1"] excludes=[] raw_include_count=1
 
-node /content[openEHR-EHR-OBSERVATION.body_temperature.v1]/data/events[at0003]/state/items[<expression xsi:type="EXPR_BINARY_OPERATOR">
-                            <type>Boolean</type>
-                            <operator>2007</operator>
-                            <precedence_overridden>false</precedence_overridden>
-                            <left_operand xsi:type="EXPR_LEAF">
-                              <type>String</type>
-                              <item xsi:type="xsd:string">archetype_id/value</item>
-                              <reference_type>attribute</reference_type>
-                            </left_operand>
-                            <right_operand xsi:type="EXPR_LEAF">
-                              <type>C_STRING</type>
-                              <item xsi:type="C_STRING">
-                                <pattern>openEHR-EHR-ELEMENT.last_normal_menstrual_period.v1|openEHR-EHR-ELEMENT.menstrual_cycle_day.v1</pattern>
-                              </item>
-                              <reference_type>constraint</reference_type>
-                            </right_operand>
-                          </expression>]
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v1]/data/events[at0003]/state/items[openEHR-EHR-ELEMENT.last_normal_menstrual_period.v1|openEHR-EHR-ELEMENT.menstrual_cycle_day.v1]
   rm_type="ELEMENT" node_id="" archetype_id="" node_name="" occurrences=none slot=true
-  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                            <type>Boolean</type>\n                            <operator>2007</operator>\n                            <precedence_overridden>false</precedence_overridden>\n                            <left_operand xsi:type=\"EXPR_LEAF\">\n                              <type>String</type>\n                              <item xsi:type=\"xsd:string\">archetype_id/value</item>\n                              <reference_type>attribute</reference_type>\n                            </left_operand>\n                            <right_operand xsi:type=\"EXPR_LEAF\">\n                              <type>C_STRING</type>\n                              <item xsi:type=\"C_STRING\">\n                                <pattern>openEHR-EHR-ELEMENT\\.last_normal_menstrual_period\\.v1|openEHR-EHR-ELEMENT\\.menstrual_cycle_day\\.v1</pattern>\n                              </item>\n                              <reference_type>constraint</reference_type>\n                            </right_operand>\n                          </expression>"] slot_excludes=[]
+  slot_includes=["openEHR-EHR-ELEMENT\\.last_normal_menstrual_period\\.v1|openEHR-EHR-ELEMENT\\.menstrual_cycle_day\\.v1"] slot_excludes=[]
   slot_rules rm_type="ELEMENT" includes=["openEHR-EHR-ELEMENT\\.last_normal_menstrual_period\\.v1|openEHR-EHR-ELEMENT\\.menstrual_cycle_day\\.v1"] excludes=[] raw_include_count=1
 
 node /content[openEHR-EHR-OBSERVATION.body_temperature.v1]/protocol
@@ -299,25 +251,9 @@ node /content[openEHR-EHR-OBSERVATION.body_temperature.v1]/protocol
   attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
-node /content[openEHR-EHR-OBSERVATION.body_temperature.v1]/protocol/items[<expression xsi:type="EXPR_BINARY_OPERATOR">
-                    <type>Boolean</type>
-                    <operator>2007</operator>
-                    <precedence_overridden>false</precedence_overridden>
-                    <left_operand xsi:type="EXPR_LEAF">
-                      <type>String</type>
-                      <item xsi:type="xsd:string">archetype_id/value</item>
-                      <reference_type>attribute</reference_type>
-                    </left_operand>
-                    <right_operand xsi:type="EXPR_LEAF">
-                      <type>C_STRING</type>
-                      <item xsi:type="C_STRING">
-                        <pattern>openEHR-EHR-CLUSTER.device.v1</pattern>
-                      </item>
-                      <reference_type>constraint</reference_type>
-                    </right_operand>
-                  </expression>]
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v1]/protocol/items[openEHR-EHR-CLUSTER.device.v1]
   rm_type="CLUSTER" node_id="" archetype_id="" node_name="" occurrences=none slot=true
-  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                    <type>Boolean</type>\n                    <operator>2007</operator>\n                    <precedence_overridden>false</precedence_overridden>\n                    <left_operand xsi:type=\"EXPR_LEAF\">\n                      <type>String</type>\n                      <item xsi:type=\"xsd:string\">archetype_id/value</item>\n                      <reference_type>attribute</reference_type>\n                    </left_operand>\n                    <right_operand xsi:type=\"EXPR_LEAF\">\n                      <type>C_STRING</type>\n                      <item xsi:type=\"C_STRING\">\n                        <pattern>openEHR-EHR-CLUSTER\\.device\\.v1</pattern>\n                      </item>\n                      <reference_type>constraint</reference_type>\n                    </right_operand>\n                  </expression>"] slot_excludes=[]
+  slot_includes=["openEHR-EHR-CLUSTER\\.device\\.v1"] slot_excludes=[]
   slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.device\\.v1"] excludes=[] raw_include_count=1
 
 node /content[openEHR-EHR-OBSERVATION.heart_rate.v1]

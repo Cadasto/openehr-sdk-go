@@ -9,7 +9,6 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
@@ -166,10 +165,7 @@ func TestCompile_InjectsImplicitRMAttributes(t *testing.T) {
 // emits only OPT-declared attributes. Useful for serialisation
 // round-trip and pure-OPT introspection.
 func TestCompile_SkipImplicitAttributes(t *testing.T) {
-	opt, err := template.ParseFile(fixtures.TemplateOptForName("vital_signs"))
-	if err != nil {
-		t.Fatalf("ParseFile: %v", err)
-	}
+	opt := mustReadModelFile(t, fixtures.TemplateOptForName("vital_signs"))
 	c, err := templatecompile.Compile(opt, templatecompile.Options{SkipImplicitAttributes: true})
 	if err != nil {
 		t.Fatalf("Compile: %v", err)
@@ -381,10 +377,7 @@ func TestCompile_ClinicalNoteDurationPrimitive(t *testing.T) {
 // a synthetic lookup with no mandatory attributes should skip
 // implicit injection entirely.
 func TestCompile_HonoursCustomLookup(t *testing.T) {
-	opt, err := template.ParseFile(fixtures.TemplateOptForName("vital_signs"))
-	if err != nil {
-		t.Fatalf("ParseFile: %v", err)
-	}
+	opt := mustReadModelFile(t, fixtures.TemplateOptForName("vital_signs"))
 	// Empty lookup → no RM info, no implicit injection.
 	c, err := templatecompile.Compile(opt, templatecompile.Options{Lookup: rminfo.New(nil)})
 	if err != nil {
@@ -438,80 +431,56 @@ func TestCompile_SlotsPreserved(t *testing.T) {
 	}
 }
 
-// Phase 4 / REQ-103 — Compile threads the typed
-// [constraints.PrimitiveConstraint] from each wire-side ComplexObject
-// onto the matching CompiledNode unchanged. Catches regressions where
-// the compile step drops, mutates, or rebuilds the primitive (e.g. a
-// "DeepCopy"-style refactor that loses pointer identity on
-// *float64 / *int64 default fields).
+// REQ-103 — Compile builds the typed primitive constraint of a
+// C_PRIMITIVE_OBJECT from the model and sets it on the matching
+// CompiledNode: its range, its list and its assumed value, which becomes the
+// constraint's default.
 //
-// Uses a synthetic OPT with a C_INTEGER child so the path is
-// predictable and the constraint value is small enough to compare
-// via reflect.DeepEqual.
+// Uses a synthetic OPT with a C_INTEGER item so the path is predictable and
+// the constraint value is small enough to compare via reflect.DeepEqual.
 func TestCompile_ThreadsPrimitiveConstraint(t *testing.T) {
 	const body = `<?xml version="1.0" encoding="UTF-8"?>
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <template_id><value>primitive_thread</value></template_id>
   <concept>primitive_thread</concept>
-  <definition xsi:type="C_COMPLEX_OBJECT">
+  <definition>
     <rm_type_name>COMPOSITION</rm_type_name>
     <node_id>at0000</node_id>
     <attributes xsi:type="C_MULTIPLE_ATTRIBUTE">
       <rm_attribute_name>content</rm_attribute_name>
-      <children xsi:type="C_INTEGER">
+      <children xsi:type="C_PRIMITIVE_OBJECT">
         <rm_type_name>INTEGER</rm_type_name>
         <node_id>at0001</node_id>
-        <range>
-          <lower_included>true</lower_included>
-          <upper_included>true</upper_included>
-          <lower_unbounded>false</lower_unbounded>
-          <upper_unbounded>false</upper_unbounded>
-          <lower>0</lower>
-          <upper>100</upper>
-        </range>
-        <list>1</list>
-        <list>5</list>
-        <list>10</list>
-        <assumed_value>5</assumed_value>
+        <item xsi:type="C_INTEGER">
+          <list>1</list>
+          <list>5</list>
+          <list>10</list>
+          <range>
+            <lower_included>true</lower_included>
+            <upper_included>true</upper_included>
+            <lower_unbounded>false</lower_unbounded>
+            <upper_unbounded>false</upper_unbounded>
+            <lower>0</lower>
+            <upper>100</upper>
+          </range>
+          <assumed_value>5</assumed_value>
+        </item>
       </children>
     </attributes>
   </definition>
 </template>`
-	opt, err := template.ParseOPT(strings.NewReader(body))
-	if err != nil {
-		t.Fatalf("ParseOPT: %v", err)
-	}
-
-	// Wire-side: locate the C_INTEGER child via the root → attribute → children chain.
-	rootCO, ok := opt.Root().(*template.ComplexObject)
-	if !ok {
-		t.Fatalf("Root not *ComplexObject: %T", opt.Root())
-	}
-	wireChild, ok := rootCO.Attributes()[0].Children()[0].(*template.ComplexObject)
-	if !ok {
-		t.Fatalf("expected wire leaf *ComplexObject, got %T", rootCO.Attributes()[0].Children()[0])
-	}
-	wirePrim := wireChild.PrimitiveConstraint()
-	if _, isInt := wirePrim.(constraints.CInteger); !isInt {
-		t.Fatalf("wire primitive = %T, want constraints.CInteger", wirePrim)
-	}
-
-	// Compile-side: the C_INTEGER node appears under /content with its
-	// at-code predicate (multi-cardinality attribute).
-	c, err := templatecompile.Compile(opt)
-	if err != nil {
-		t.Fatalf("Compile: %v", err)
-	}
+	c := mustCompileXML(t, body)
 	cn, err := c.NodeAt("/content[at0001]")
 	if err != nil {
 		t.Fatalf("NodeAt(/content[at0001]): %v", err)
 	}
-	compiledPrim := cn.PrimitiveConstraint()
-	if compiledPrim == nil {
-		t.Fatal("CompiledNode.PrimitiveConstraint() returned nil — Compile dropped the wire primitive")
+	want := constraints.CInteger{
+		Range:   constraints.NumericRange{Lower: 0, Upper: 100, LowerInclusive: true, UpperInclusive: true},
+		List:    []int64{1, 5, 10},
+		Default: new(int64(5)),
 	}
-	if !reflect.DeepEqual(wirePrim, compiledPrim) {
-		t.Errorf("primitive constraint mutated by Compile:\n  wire     = %#v\n  compiled = %#v", wirePrim, compiledPrim)
+	if got := cn.PrimitiveConstraint(); !reflect.DeepEqual(got, want) {
+		t.Errorf("PrimitiveConstraint() = %#v\nwant %#v", got, want)
 	}
 }
 
@@ -559,10 +528,7 @@ func TestCompile_ChildMultiplicity(t *testing.T) {
     </attributes>
   </definition>
 </template>`
-	opt, err := template.ParseOPT(strings.NewReader(body))
-	if err != nil {
-		t.Fatalf("ParseOPT: %v", err)
-	}
+	opt := mustReadModel(t, body)
 	c, err := templatecompile.Compile(opt, templatecompile.Options{SkipImplicitAttributes: true})
 	if err != nil {
 		t.Fatalf("Compile: %v", err)
@@ -663,10 +629,7 @@ func TestCompile_SingleAttributeAlternativesShareAQLPath(t *testing.T) {
     </attributes>
   </definition>
 </template>`
-	opt, err := template.ParseOPT(strings.NewReader(body))
-	if err != nil {
-		t.Fatalf("ParseOPT: %v", err)
-	}
+	opt := mustReadModel(t, body)
 	c, err := templatecompile.Compile(opt, templatecompile.Options{SkipImplicitAttributes: true})
 	if err != nil {
 		t.Fatalf("Compile rejected legitimate C_SINGLE_ATTRIBUTE alternatives: %v", err)
@@ -700,10 +663,7 @@ func TestCompile_SingleAttributeAlternativesShareAQLPath(t *testing.T) {
 
 func mustCompile(t *testing.T, slug string) *templatecompile.Compiled {
 	t.Helper()
-	opt, err := template.ParseFile(fixtures.TemplateOptForName(slug))
-	if err != nil {
-		t.Fatalf("ParseFile(%s): %v", slug, err)
-	}
+	opt := mustReadModelFile(t, fixtures.TemplateOptForName(slug))
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
 		t.Fatalf("Compile(%s): %v", slug, err)

@@ -63,7 +63,7 @@ node /context/other_context/items[at0005]/value
 
 node /context/other_context/items[at0006]
   rm_type="CLUSTER" node_id="at0006" archetype_id="" node_name="" occurrences=none slot=true
-  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                    <type>Boolean</type>\n                    <operator>2007</operator>\n                    <precedence_overridden>false</precedence_overridden>\n                    <left_operand xsi:type=\"EXPR_LEAF\">\n                      <type>String</type>\n                      <item xsi:type=\"xsd:string\">archetype_id/value</item>\n                      <reference_type>attribute</reference_type>\n                    </left_operand>\n                    <right_operand xsi:type=\"EXPR_LEAF\">\n                      <type>C_STRING</type>\n                      <item xsi:type=\"C_STRING\">\n                        <pattern>.*</pattern>\n                      </item>\n                      <reference_type>constraint</reference_type>\n                    </right_operand>\n                  </expression>"] slot_excludes=[]
+  slot_includes=[".*"] slot_excludes=[]
   slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
   term[en] "at0006" code="at0006" comment="For example: local information requirements or additional metadata to align with FHIR or CIMI equivalents." description="Additional information required to capture local context or to align with other reference models/formalisms." text="Extension"
 
@@ -286,7 +286,7 @@ node /content[openEHR-EHR-OBSERVATION.body_weight.v1]/protocol
 
 node /content[openEHR-EHR-OBSERVATION.body_weight.v1]/protocol/items[at0020]
   rm_type="CLUSTER" node_id="at0020" archetype_id="" node_name="" occurrences=none slot=true
-  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                    <type>Boolean</type>\n                    <operator>2007</operator>\n                    <precedence_overridden>false</precedence_overridden>\n                    <left_operand xsi:type=\"EXPR_LEAF\">\n                      <type>String</type>\n                      <item xsi:type=\"xsd:string\">archetype_id/value</item>\n                      <reference_type>attribute</reference_type>\n                    </left_operand>\n                    <right_operand xsi:type=\"EXPR_LEAF\">\n                      <type>C_STRING</type>\n                      <item xsi:type=\"C_STRING\">\n                        <pattern>openEHR-EHR-CLUSTER\\.device(-[a-zA-Z0-9_]+)*\\.v1</pattern>\n                      </item>\n                      <reference_type>constraint</reference_type>\n                    </right_operand>\n                  </expression>"] slot_excludes=[]
+  slot_includes=["openEHR-EHR-CLUSTER\\.device(-[a-zA-Z0-9_]+)*\\.v1"] slot_excludes=[]
   slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.device(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[] raw_include_count=1
   term[en] "at0020" code="at0020" description="Details about the weighing device." text="Device"
 
@@ -398,7 +398,7 @@ node /content[openEHR-EHR-OBSERVATION.height.v1]/protocol
 
 node /content[openEHR-EHR-OBSERVATION.height.v1]/protocol/items[at0011]
   rm_type="CLUSTER" node_id="at0011" archetype_id="" node_name="" occurrences=none slot=true
-  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                    <type>Boolean</type>\n                    <operator>2007</operator>\n                    <precedence_overridden>false</precedence_overridden>\n                    <left_operand xsi:type=\"EXPR_LEAF\">\n                      <type>String</type>\n                      <item xsi:type=\"xsd:string\">archetype_id/value</item>\n                      <reference_type>attribute</reference_type>\n                    </left_operand>\n                    <right_operand xsi:type=\"EXPR_LEAF\">\n                      <type>C_STRING</type>\n                      <item xsi:type=\"C_STRING\">\n                        <pattern>openEHR-EHR-CLUSTER\\.device(-[a-zA-Z0-9_]+)*\\.v1</pattern>\n                      </item>\n                      <reference_type>constraint</reference_type>\n                    </right_operand>\n                  </expression>"] slot_excludes=[]
+  slot_includes=["openEHR-EHR-CLUSTER\\.device(-[a-zA-Z0-9_]+)*\\.v1"] slot_excludes=[]
   slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.device(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[] raw_include_count=1
   term[en] "at0011" code="at0011" description="Description of the device used to measure height or body length." text="Device"
 

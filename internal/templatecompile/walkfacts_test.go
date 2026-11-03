@@ -11,12 +11,10 @@ package templatecompile_test
 
 import (
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -102,18 +100,18 @@ func TestREQ171_WalkFactsEqualTheRuntimeAnswers(t *testing.T) {
 	var templates, nodes, attributes int
 	var unparsed []string // "name: error" of each OPT skipped because it does not parse
 	for _, ref := range refs {
-		parsed, err := template.ParseFile(ref.Path)
+		model, err := readModelFile(ref.Path)
 		if err != nil {
-			// A template that does not parse is the parser's tests' concern,
+			// A template that does not read is the reader's tests' concern,
 			// and TestCompiledPathSnapshot records each one. It is counted and
-			// named in the log, with its parse error, so the comparison never
+			// named in the log, with its read error, so the comparison never
 			// loses one unseen.
 			unparsed = append(unparsed, ref.Name+": "+err.Error())
 			continue
 		}
-		c, err := templatecompile.Compile(parsed)
+		c, err := templatecompile.Compile(model)
 		if err != nil {
-			// Every vendored OPT that parses also compiles, so a compile
+			// Every vendored OPT that reads also compiles, so a compile
 			// failure would drop the template from the comparison.
 			t.Errorf("%s: Compile: %v", ref.Name, err)
 			continue
@@ -205,10 +203,7 @@ var prohibitingOPT = `<?xml version="1.0" encoding="utf-8"?>
 // child and no existence, is open. Each answer equals the runtime one.
 func TestREQ171_AllowedChildrenAndProhibitionResolvedAtCompile(t *testing.T) {
 	t.Parallel()
-	parsed, err := template.ParseOPT(strings.NewReader(prohibitingOPT))
-	if err != nil {
-		t.Fatalf("ParseOPT: %v", err)
-	}
+	parsed := mustReadModel(t, prohibitingOPT)
 	c, err := templatecompile.Compile(parsed)
 	if err != nil {
 		t.Fatalf("Compile: %v", err)

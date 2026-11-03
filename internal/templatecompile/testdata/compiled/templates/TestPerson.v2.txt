@@ -78,7 +78,7 @@ node /details/items[at0001]/items[at2401]/value
 
 node /details/items[at0001]/items[at0006]
   rm_type="CLUSTER" node_id="at0006" archetype_id="" node_name="" occurrences=none slot=true
-  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                    <type>Boolean</type>\n                    <operator>2007</operator>\n                    <precedence_overridden>false</precedence_overridden>\n                    <left_operand xsi:type=\"EXPR_LEAF\">\n                      <type>String</type>\n                      <item>archetype_id/value</item>\n                      <reference_type>attribute</reference_type>\n                    </left_operand>\n                    <right_operand xsi:type=\"EXPR_LEAF\">\n                      <type>C_STRING</type>\n                      <item xsi:type=\"C_STRING\">\n                        <pattern>openEHR-EHR-CLUSTER\\.(birth_data_additional_detail)[a-zA-Z0-9_-]*\\.v1</pattern>\n                      </item>\n                      <reference_type>constraint</reference_type>\n                    </right_operand>\n                  </expression>"] slot_excludes=[]
+  slot_includes=["openEHR-EHR-CLUSTER\\.(birth_data_additional_detail)[a-zA-Z0-9_-]*\\.v1"] slot_excludes=[]
   slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.(birth_data_additional_detail)[a-zA-Z0-9_-]*\\.v1"] excludes=[] raw_include_count=1
   term[nl] "at0006" code="at0006" description="Additional birth data that are country specific" text="Aanvullend land geboden geboortedatum"
 

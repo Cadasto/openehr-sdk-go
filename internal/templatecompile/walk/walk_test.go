@@ -2,13 +2,13 @@ package walk_test
 
 import (
 	"errors"
+	"os"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile/walk"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -359,9 +359,13 @@ func TestWalk_PostHandleErrorAborts(t *testing.T) {
 
 func mustCompile(t *testing.T, fixture string) *templatecompile.Compiled {
 	t.Helper()
-	opt, err := template.ParseFile(fixtures.TemplateOptForName(fixture))
+	raw, err := os.ReadFile(fixtures.TemplateOptForName(fixture))
 	if err != nil {
-		t.Fatalf("ParseFile(%s): %v", fixture, err)
+		t.Fatal(err)
+	}
+	opt, err := fixtures.ReadOperationalTemplate(raw)
+	if err != nil {
+		t.Fatalf("ReadOperationalTemplate(%s): %v", fixture, err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {

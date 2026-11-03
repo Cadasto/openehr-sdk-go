@@ -1822,75 +1822,11 @@
 /content[openEHR-EHR-OBSERVATION.body_temperature.v1]/data/events[at0003]/data/item
 /content[openEHR-EHR-OBSERVATION.body_temperature.v1]/data/events[at0003]/data/item/value
 /content[openEHR-EHR-OBSERVATION.body_temperature.v1]/data/events[at0003]/state
-/content[openEHR-EHR-OBSERVATION.body_temperature.v1]/data/events[at0003]/state/items[<expression xsi:type="EXPR_BINARY_OPERATOR">
-                            <type>Boolean</type>
-                            <operator>2007</operator>
-                            <precedence_overridden>false</precedence_overridden>
-                            <left_operand xsi:type="EXPR_LEAF">
-                              <type>String</type>
-                              <item xsi:type="xsd:string">archetype_id/value</item>
-                              <reference_type>attribute</reference_type>
-                            </left_operand>
-                            <right_operand xsi:type="EXPR_LEAF">
-                              <type>C_STRING</type>
-                              <item xsi:type="C_STRING">
-                                <pattern>openEHR-EHR-CLUSTER.environmental_conditions.v1</pattern>
-                              </item>
-                              <reference_type>constraint</reference_type>
-                            </right_operand>
-                          </expression>]
-/content[openEHR-EHR-OBSERVATION.body_temperature.v1]/data/events[at0003]/state/items[<expression xsi:type="EXPR_BINARY_OPERATOR">
-                            <type>Boolean</type>
-                            <operator>2007</operator>
-                            <precedence_overridden>false</precedence_overridden>
-                            <left_operand xsi:type="EXPR_LEAF">
-                              <type>String</type>
-                              <item xsi:type="xsd:string">archetype_id/value</item>
-                              <reference_type>attribute</reference_type>
-                            </left_operand>
-                            <right_operand xsi:type="EXPR_LEAF">
-                              <type>C_STRING</type>
-                              <item xsi:type="C_STRING">
-                                <pattern>openEHR-EHR-CLUSTER.exertion.v1</pattern>
-                              </item>
-                              <reference_type>constraint</reference_type>
-                            </right_operand>
-                          </expression>]
-/content[openEHR-EHR-OBSERVATION.body_temperature.v1]/data/events[at0003]/state/items[<expression xsi:type="EXPR_BINARY_OPERATOR">
-                            <type>Boolean</type>
-                            <operator>2007</operator>
-                            <precedence_overridden>false</precedence_overridden>
-                            <left_operand xsi:type="EXPR_LEAF">
-                              <type>String</type>
-                              <item xsi:type="xsd:string">archetype_id/value</item>
-                              <reference_type>attribute</reference_type>
-                            </left_operand>
-                            <right_operand xsi:type="EXPR_LEAF">
-                              <type>C_STRING</type>
-                              <item xsi:type="C_STRING">
-                                <pattern>openEHR-EHR-ELEMENT.last_normal_menstrual_period.v1|openEHR-EHR-ELEMENT.menstrual_cycle_day.v1</pattern>
-                              </item>
-                              <reference_type>constraint</reference_type>
-                            </right_operand>
-                          </expression>]
+/content[openEHR-EHR-OBSERVATION.body_temperature.v1]/data/events[at0003]/state/items[openEHR-EHR-CLUSTER.environmental_conditions.v1]
+/content[openEHR-EHR-OBSERVATION.body_temperature.v1]/data/events[at0003]/state/items[openEHR-EHR-CLUSTER.exertion.v1]
+/content[openEHR-EHR-OBSERVATION.body_temperature.v1]/data/events[at0003]/state/items[openEHR-EHR-ELEMENT.last_normal_menstrual_period.v1|openEHR-EHR-ELEMENT.menstrual_cycle_day.v1]
 /content[openEHR-EHR-OBSERVATION.body_temperature.v1]/protocol
-/content[openEHR-EHR-OBSERVATION.body_temperature.v1]/protocol/items[<expression xsi:type="EXPR_BINARY_OPERATOR">
-                    <type>Boolean</type>
-                    <operator>2007</operator>
-                    <precedence_overridden>false</precedence_overridden>
-                    <left_operand xsi:type="EXPR_LEAF">
-                      <type>String</type>
-                      <item xsi:type="xsd:string">archetype_id/value</item>
-                      <reference_type>attribute</reference_type>
-                    </left_operand>
-                    <right_operand xsi:type="EXPR_LEAF">
-                      <type>C_STRING</type>
-                      <item xsi:type="C_STRING">
-                        <pattern>openEHR-EHR-CLUSTER.device.v1</pattern>
-                      </item>
-                      <reference_type>constraint</reference_type>
-                    </right_operand>
-                  </expression>]
+/content[openEHR-EHR-OBSERVATION.body_temperature.v1]/protocol/items[openEHR-EHR-CLUSTER.device.v1]
 /content[openEHR-EHR-OBSERVATION.heart_rate.v1]
 /content[openEHR-EHR-OBSERVATION.heart_rate.v1]/data
 /content[openEHR-EHR-OBSERVATION.heart_rate.v1]/data/events[at0003]

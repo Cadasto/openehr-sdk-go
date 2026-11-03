@@ -2,8 +2,8 @@ package templatecompile
 
 import (
 	impl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 )
 
 // Compiled is the public, externally-constructable compiled template.
@@ -64,19 +64,37 @@ func WithoutImplicitAttributes() Option {
 	return func(c *config) { c.skipImplicit = true }
 }
 
-// Compile turns a parsed OPT (the output of [template.ParseFile] /
-// [template.ParseOPT]) into the compiled driver used by the composition
-// builder and the validator. The input is read-only.
+// Compile turns an operational template, read into the model with
+// [aom14.ReadOperationalTemplate], into the compiled driver used by the
+// composition builder and the validator. The input is read-only.
 //
-// Returns an error wrapping [ErrInvalidInput] when opt is nil, when it
-// has no root, and when two nodes under different attributes have the
-// same AQL path, which is a defect in the OPT. Nodes under one attribute
-// that share a path (alternatives, or siblings with the same node id)
-// and the descendants of such nodes are admitted, and [Compiled.NodeAt]
-// resolves the path to the first one walked. Returns an error that does
-// not wrap ErrInvalidInput when the tree holds a node of a kind Compile
-// does not handle, which a parsed OPT does not contain.
-func Compile(opt *template.OperationalTemplate, opts ...Option) (*Compiled, error) {
+// Compile reads identifiers, codes, list entries and term texts without
+// their leading and trailing white space, reads an ELEMENT attribute named
+// null_flavor as null_flavour, and closes each occurrences, existence and
+// cardinality interval into a
+// [github.com/cadasto/openehr-sdk-go/openehr/template.Multiplicity]. An interval the model
+// leaves at its zero value, as it holds one the template leaves out, is read
+// as absent. A slot's includes and excludes are its archetype-id patterns,
+// one per assertion, and a slot with no node id takes the first of its
+// includes, without its regex escapes, as the predicate of its AQL path
+// segment.
+//
+// Returns an error wrapping [ErrInvalidInput] when opt is nil, when it has
+// no template_id or no definition (a definition that names no RM type),
+// when an interval is inverted or closing leaves it empty, when a primitive
+// constraint holds a value it cannot carry (a temporal range bound that is
+// not ISO 8601 text of its type, a mandatory timezone validity on a date, a
+// constraint reference with no reference), when a constraint object or an
+// attribute is missing, when constraint objects nest more than 128 levels
+// below the definition, and when two nodes under different attributes have
+// the same AQL path, which is a defect in the template. Nodes under one
+// attribute that share a path (alternatives, or siblings with the same node
+// id) and the descendants of such nodes are admitted, and [Compiled.NodeAt]
+// resolves the path to the first one walked. Returns an error that does not
+// wrap ErrInvalidInput when the model holds a constraint object or an
+// attribute of a kind Compile does not handle, which
+// [aom14.ReadOperationalTemplate] does not produce.
+func Compile(opt *aom14.OperationalTemplate, opts ...Option) (*Compiled, error) {
 	var cfg config
 	for _, fn := range opts {
 		if fn != nil {
@@ -89,11 +107,9 @@ func Compile(opt *template.OperationalTemplate, opts ...Option) (*Compiled, erro
 	})
 }
 
-// ErrInvalidInput is returned, wrapped, by [Compile] for a nil
-// template, a template with no root, and a template in which two nodes
-// under different attributes have the same AQL path. It is the same
-// sentinel the engine returns, so external callers can match it with
-// errors.Is.
+// ErrInvalidInput is returned, wrapped, by [Compile] for a template it
+// refuses, as [Compile] lists them. It is the same sentinel the engine
+// returns, so external callers can match it with errors.Is.
 var ErrInvalidInput = impl.ErrInvalidInput
 
 // ErrPathNotFound is returned by [Compiled.NodeAt] when a path string

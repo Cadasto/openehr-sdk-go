@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -68,10 +67,7 @@ func TestCompile_WebTemplateOracleOPTs(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.templateID, func(t *testing.T) {
-			opt, err := template.ParseFile(fixtures.WebTemplateOpt(tc.templateID))
-			if err != nil {
-				t.Fatalf("ParseFile: %v", err)
-			}
+			opt := mustReadModelFile(t, fixtures.WebTemplateOpt(tc.templateID))
 			c, err := templatecompile.Compile(opt)
 			if err != nil {
 				t.Fatalf("Compile: %v", err)
@@ -107,10 +103,7 @@ func TestCompile_WebTemplateOracleOPTs(t *testing.T) {
 // precondition every downstream consumer (validation, generation, and the simplified formats) needs in order
 // to address the second-through-fourth occurrence at all.
 func TestCompile_CoronaSiblingsResolveDistinctly(t *testing.T) {
-	opt, err := template.ParseFile(fixtures.WebTemplateOpt("Corona_Anamnese"))
-	if err != nil {
-		t.Fatalf("ParseFile: %v", err)
-	}
+	opt := mustReadModelFile(t, fixtures.WebTemplateOpt("Corona_Anamnese"))
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
 		t.Fatalf("Compile: %v", err)
@@ -147,10 +140,7 @@ func TestCompile_CoronaSiblingsResolveDistinctly(t *testing.T) {
 // route keeps the two mechanisms honest: named siblings separate, un-named
 // alternatives stay shared.
 func TestCompile_AlternativesStillShareAPath(t *testing.T) {
-	opt, err := template.ParseFile(fixtures.WebTemplateOpt("constrain_test"))
-	if err != nil {
-		t.Fatalf("ParseFile: %v", err)
-	}
+	opt := mustReadModelFile(t, fixtures.WebTemplateOpt("constrain_test"))
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
 		t.Fatalf("Compile: %v", err)

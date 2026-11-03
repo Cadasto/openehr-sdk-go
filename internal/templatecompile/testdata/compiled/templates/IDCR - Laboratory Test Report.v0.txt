@@ -37,25 +37,9 @@ node /context/other_context
   attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
-node /context/other_context/items[<expression xsi:type="EXPR_BINARY_OPERATOR">
-                    <type>Boolean</type>
-                    <operator>2007</operator>
-                    <precedence_overridden>false</precedence_overridden>
-                    <left_operand xsi:type="EXPR_LEAF">
-                      <type>String</type>
-                      <item xsi:type="xsd:string">archetype_id/value</item>
-                      <reference_type>attribute</reference_type>
-                    </left_operand>
-                    <right_operand xsi:type="EXPR_LEAF">
-                      <type>C_STRING</type>
-                      <item xsi:type="C_STRING">
-                        <pattern>.*</pattern>
-                      </item>
-                      <reference_type>constraint</reference_type>
-                    </right_operand>
-                  </expression>]
+node /context/other_context/items[.*]
   rm_type="CLUSTER" node_id="" archetype_id="" node_name="" occurrences=none slot=true
-  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                    <type>Boolean</type>\n                    <operator>2007</operator>\n                    <precedence_overridden>false</precedence_overridden>\n                    <left_operand xsi:type=\"EXPR_LEAF\">\n                      <type>String</type>\n                      <item xsi:type=\"xsd:string\">archetype_id/value</item>\n                      <reference_type>attribute</reference_type>\n                    </left_operand>\n                    <right_operand xsi:type=\"EXPR_LEAF\">\n                      <type>C_STRING</type>\n                      <item xsi:type=\"C_STRING\">\n                        <pattern>.*</pattern>\n                      </item>\n                      <reference_type>constraint</reference_type>\n                    </right_operand>\n                  </expression>"] slot_excludes=[]
+  slot_includes=[".*"] slot_excludes=[]
   slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
 
 node /name
@@ -114,7 +98,7 @@ node /content[openEHR-EHR-OBSERVATION.laboratory_test.v0]/data/events[at0002]/da
 
 node /content[openEHR-EHR-OBSERVATION.laboratory_test.v0]/data/events[at0002]/data/items[at0065]
   rm_type="CLUSTER" node_id="at0065" archetype_id="" node_name="" occurrences=none slot=true
-  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                            <type>Boolean</type>\n                            <operator>2007</operator>\n                            <precedence_overridden>false</precedence_overridden>\n                            <left_operand xsi:type=\"EXPR_LEAF\">\n                              <type>String</type>\n                              <item xsi:type=\"xsd:string\">archetype_id/value</item>\n                              <reference_type>attribute</reference_type>\n                            </left_operand>\n                            <right_operand xsi:type=\"EXPR_LEAF\">\n                              <type>C_STRING</type>\n                              <item xsi:type=\"C_STRING\">\n                                <pattern>openEHR-EHR-CLUSTER\\.specimen(-[a-zA-Z0-9_]+)*\\.v1</pattern>\n                              </item>\n                              <reference_type>constraint</reference_type>\n                            </right_operand>\n                          </expression>"] slot_excludes=[]
+  slot_includes=["openEHR-EHR-CLUSTER\\.specimen(-[a-zA-Z0-9_]+)*\\.v1"] slot_excludes=[]
   slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.specimen(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[] raw_include_count=1
   term[en] "at0065" code="at0065" description="Details about the specimen if all individual test results are derived from the same specimen. If the specimen type is sufficiently specified with a code in the Test result name, then this additional data is not required.  If there are multiple specimens, these may be represented per 'Result group'." fhir_Mapping="DiagnosticReport.specimen" text="Specimen detail"
 
@@ -194,7 +178,7 @@ node /content[openEHR-EHR-OBSERVATION.laboratory_test.v0]/data/events[at0002]/da
 
 node /content[openEHR-EHR-OBSERVATION.laboratory_test.v0]/data/events[at0002]/data/items[openEHR-EHR-CLUSTER.laboratory_test_panel.v0]/items[at0013]
   rm_type="CLUSTER" node_id="at0013" archetype_id="" node_name="" occurrences=none slot=true
-  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                                <type>Boolean</type>\n                                <operator>2007</operator>\n                                <precedence_overridden>false</precedence_overridden>\n                                <left_operand xsi:type=\"EXPR_LEAF\">\n                                  <type>String</type>\n                                  <item xsi:type=\"xsd:string\">archetype_id/value</item>\n                                  <reference_type>attribute</reference_type>\n                                </left_operand>\n                                <right_operand xsi:type=\"EXPR_LEAF\">\n                                  <type>C_STRING</type>\n                                  <item xsi:type=\"C_STRING\">\n                                    <pattern>.*</pattern>\n                                  </item>\n                                  <reference_type>constraint</reference_type>\n                                </right_operand>\n                              </expression>"] slot_excludes=[]
+  slot_includes=[".*"] slot_excludes=[]
   slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
   term[en] "at0013" code="at0013" description="Further details including the specimen for the panel or a further nested panel." text="Other detail"
 
@@ -218,7 +202,7 @@ node /content[openEHR-EHR-OBSERVATION.laboratory_test.v0]/data/events[at0002]/st
 
 node /content[openEHR-EHR-OBSERVATION.laboratory_test.v0]/data/events[at0002]/state/items[at0114]
   rm_type="CLUSTER" node_id="at0114" archetype_id="" node_name="" occurrences=none slot=true
-  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                            <type>Boolean</type>\n                            <operator>2007</operator>\n                            <precedence_overridden>false</precedence_overridden>\n                            <left_operand xsi:type=\"EXPR_LEAF\">\n                              <type>String</type>\n                              <item xsi:type=\"xsd:string\">archetype_id/value</item>\n                              <reference_type>attribute</reference_type>\n                            </left_operand>\n                            <right_operand xsi:type=\"EXPR_LEAF\">\n                              <type>C_STRING</type>\n                              <item xsi:type=\"C_STRING\">\n                                <pattern>.*</pattern>\n                              </item>\n                              <reference_type>constraint</reference_type>\n                            </right_operand>\n                          </expression>"] slot_excludes=[]
+  slot_includes=[".*"] slot_excludes=[]
   slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
   term[en] "at0114" code="at0114" description="Details of patient state that may alter interpretation of the laboratory test." text="Patient state details"
 
@@ -231,19 +215,19 @@ node /content[openEHR-EHR-OBSERVATION.laboratory_test.v0]/protocol
 
 node /content[openEHR-EHR-OBSERVATION.laboratory_test.v0]/protocol/items[at0017]
   rm_type="CLUSTER" node_id="at0017" archetype_id="" node_name="" occurrences=none slot=true
-  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                    <type>Boolean</type>\n                    <operator>2007</operator>\n                    <precedence_overridden>false</precedence_overridden>\n                    <left_operand xsi:type=\"EXPR_LEAF\">\n                      <type>String</type>\n                      <item xsi:type=\"xsd:string\">archetype_id/value</item>\n                      <reference_type>attribute</reference_type>\n                    </left_operand>\n                    <right_operand xsi:type=\"EXPR_LEAF\">\n                      <type>C_STRING</type>\n                      <item xsi:type=\"C_STRING\">\n                        <pattern>.*</pattern>\n                      </item>\n                      <reference_type>constraint</reference_type>\n                    </right_operand>\n                  </expression>"] slot_excludes=[]
+  slot_includes=[".*"] slot_excludes=[]
   slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
   term[en] "at0017" code="at0017" description="Demographic details of the laboratory with responsibility for the test." fhir_mapping="DiagnosticReport.performer" text="Responsible laboratory"
 
 node /content[openEHR-EHR-OBSERVATION.laboratory_test.v0]/protocol/items[at0110]
   rm_type="CLUSTER" node_id="at0110" archetype_id="" node_name="" occurrences=none slot=true
-  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                    <type>Boolean</type>\n                    <operator>2007</operator>\n                    <precedence_overridden>false</precedence_overridden>\n                    <left_operand xsi:type=\"EXPR_LEAF\">\n                      <type>String</type>\n                      <item xsi:type=\"xsd:string\">archetype_id/value</item>\n                      <reference_type>attribute</reference_type>\n                    </left_operand>\n                    <right_operand xsi:type=\"EXPR_LEAF\">\n                      <type>C_STRING</type>\n                      <item xsi:type=\"C_STRING\">\n                        <pattern>openEHR-EHR-CLUSTER\\.device(-[a-zA-Z0-9_]+)*\\.v1</pattern>\n                      </item>\n                      <reference_type>constraint</reference_type>\n                    </right_operand>\n                  </expression>"] slot_excludes=[]
+  slot_includes=["openEHR-EHR-CLUSTER\\.device(-[a-zA-Z0-9_]+)*\\.v1"] slot_excludes=[]
   slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.device(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[] raw_include_count=1
   term[en] "at0110" code="at0110" description="Additional structured details of laboratory test methodology followed. For example, structured details about the laboratory method and data interpretation used." text="Test method/device details"
 
 node /content[openEHR-EHR-OBSERVATION.laboratory_test.v0]/protocol/items[at0117]
   rm_type="CLUSTER" node_id="at0117" archetype_id="" node_name="" occurrences=none slot=true
-  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                    <type>Boolean</type>\n                    <operator>2007</operator>\n                    <precedence_overridden>false</precedence_overridden>\n                    <left_operand xsi:type=\"EXPR_LEAF\">\n                      <type>String</type>\n                      <item xsi:type=\"xsd:string\">archetype_id/value</item>\n                      <reference_type>attribute</reference_type>\n                    </left_operand>\n                    <right_operand xsi:type=\"EXPR_LEAF\">\n                      <type>C_STRING</type>\n                      <item xsi:type=\"C_STRING\">\n                        <pattern>.*</pattern>\n                      </item>\n                      <reference_type>constraint</reference_type>\n                    </right_operand>\n                  </expression>"] slot_excludes=[]
+  slot_includes=[".*"] slot_excludes=[]
   slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
   term[en] "at0117" code="at0117" description="Slot to allow extension to support localisation or alignment with other standards/ reference models." text="Extension"
 

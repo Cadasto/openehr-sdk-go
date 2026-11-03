@@ -31,7 +31,6 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile/walk"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -43,11 +42,11 @@ var updateSnapshot = flag.Bool("update", false, "update the compiled-path snapsh
 // path each contribute a line, which is what makes a predicate landing
 // on one of them visible in the diff.
 func optPaths(path string) (paths []string, pinsName bool, err error) {
-	parsed, err := template.ParseFile(path)
+	model, err := readModelFile(path)
 	if err != nil {
 		return nil, false, err
 	}
-	c, err := templatecompile.Compile(parsed)
+	c, err := templatecompile.Compile(model)
 	if err != nil {
 		return nil, false, err
 	}

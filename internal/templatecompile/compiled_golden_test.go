@@ -117,19 +117,19 @@ func firstDifference(got, want []byte) (line int, g, w string, differ bool) {
 	return 0, "", "", false
 }
 
-// dumpCompiledTemplate reads the corpus operational template name, compiles
-// it on today's path and renders the result. A template that does not read
+// dumpCompiledTemplate reads the corpus operational template name into the
+// model, compiles it and renders the result. A template that does not read
 // or compile renders as that error, so a change in which templates compile
 // shows on the golden too.
 func dumpCompiledTemplate(root, name string) []byte {
 	var b bytes.Buffer
 	fmt.Fprintf(&b, "# compiled tree of %s\n", name)
-	parsed, err := template.ParseFile(filepath.Join(root, filepath.FromSlash(name)))
+	model, err := readModelFile(filepath.Join(root, filepath.FromSlash(name)))
 	if err != nil {
-		fmt.Fprintf(&b, "!! does not parse: %s\n", strings.ReplaceAll(err.Error(), root, "<corpus>"))
+		fmt.Fprintf(&b, "!! does not read: %s\n", strings.ReplaceAll(err.Error(), root, "<corpus>"))
 		return b.Bytes()
 	}
-	c, err := templatecompile.Compile(parsed)
+	c, err := templatecompile.Compile(model)
 	if err != nil {
 		fmt.Fprintf(&b, "!! does not compile: %s\n", strings.ReplaceAll(err.Error(), root, "<corpus>"))
 		return b.Bytes()

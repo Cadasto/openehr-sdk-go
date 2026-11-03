@@ -1,7 +1,6 @@
 package templatecompile_test
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
@@ -85,10 +84,7 @@ func TestCompile_GenericEventNodeAttributes(t *testing.T) {
     </attributes>
   </definition>
 </template>`
-	opt, err := template.ParseOPT(strings.NewReader(body))
-	if err != nil {
-		t.Fatalf("ParseOPT: %v", err)
-	}
+	opt := mustReadModel(t, body)
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
 		t.Fatalf("Compile: %v", err)

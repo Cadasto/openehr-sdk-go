@@ -9,7 +9,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 )
 
 // Set SCAN_EHRBASE_TMP=1 to validate candidate pairs under testkit/ehrbase_sdk.tmp.
@@ -39,10 +38,7 @@ func TestEhrbaseSDKTmpPairs(t *testing.T) {
 		t.Run(filepath.Base(p.opt)+"+"+filepath.Base(p.comp), func(t *testing.T) {
 			optPath := filepath.Join(root, p.opt)
 			compPath := filepath.Join(root, p.comp)
-			opt, err := template.ParseFile(optPath)
-			if err != nil {
-				t.Fatalf("parse: %v", err)
-			}
+			opt := mustReadModelFile(t, optPath)
 			if _, err := templatecompile.Compile(opt); err != nil {
 				t.Fatalf("compile: %v", err)
 			}
@@ -69,7 +65,7 @@ func TestEhrbaseSDKTmpPairs(t *testing.T) {
 			default:
 				t.Fatalf("unknown ext %s", compPath)
 			}
-			t.Logf("template_id=%s", opt.TemplateID())
+			t.Logf("template_id=%s", opt.TemplateID.Value)
 		})
 	}
 }

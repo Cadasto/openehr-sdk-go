@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 )
 
 // closedInterval is the body of an OPT interval from lower to upper, both
@@ -98,11 +97,7 @@ func TestREQ102_REQ107_AsksForMember(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			opt, err := template.ParseOPT(strings.NewReader(membersOPT(tc.cardinality, tc.occurrences...)))
-			if err != nil {
-				t.Fatalf("ParseOPT: %v", err)
-			}
-			c, err := templatecompile.Compile(opt)
+			c, err := templatecompile.Compile(mustReadModel(t, membersOPT(tc.cardinality, tc.occurrences...)))
 			if err != nil {
 				t.Fatalf("Compile: %v", err)
 			}
@@ -216,10 +211,7 @@ func TestREQ102_REQ107_MandatoryListChildren(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			opt, err := template.ParseOPT(strings.NewReader(tc.opt))
-			if err != nil {
-				t.Fatalf("ParseOPT: %v", err)
-			}
+			opt := mustReadModel(t, tc.opt)
 			c, err := templatecompile.Compile(opt)
 			if err != nil {
 				t.Fatalf("Compile: %v", err)

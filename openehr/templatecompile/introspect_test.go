@@ -40,10 +40,7 @@ func countNodes(nodes []*templatecompile.CompiledNode) int { return len(nodes) }
 // REQ-111: the public compiled form and its node tree can be walked through
 // public packages alone.
 func TestCompiledNode_ExternallyNavigable(t *testing.T) {
-	opt, err := template.ParseFile(fixtures.TemplateOptForName("vital_signs"))
-	if err != nil {
-		t.Fatalf("ParseFile: %v", err)
-	}
+	opt := mustReadModelFile(t, fixtures.TemplateOptForName("vital_signs"))
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
 		t.Fatalf("Compile: %v", err)
