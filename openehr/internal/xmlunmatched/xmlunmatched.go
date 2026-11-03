@@ -100,9 +100,12 @@
 // [DecodeText] and [DecodeBase64] return a *typereg.DecodeError whose cause
 // wraps [ErrInvalidShape] and the conversion's own error, never the bare
 // error encoding/xml or a TextUnmarshaler gives, whose text may quote the
-// value. A tracked decode names the element by its path from the root of
-// the value and [Tracker.Decode] returns the failure on its own; an
-// untracked decode names the element alone, and the failure travels out
+// value. [DropElement] returns one for an element whose text is not its one
+// value, and [DecodeEntry] and [DecodeEntryKeyedBy] for a `Hash` entry with
+// no key or with the key of an earlier entry, each with a cause whose fixed
+// text names no value. A tracked decode names the element by its path from
+// the root of the value and [Tracker.Decode] returns the failure on its own;
+// an untracked decode names the element alone, and the failure travels out
 // inside the dispatch envelopes it passes through. [IsPrimitiveFailure] tells
 // such a failure apart, so canxml can decode the input again, tracked, to
 // find the path.
