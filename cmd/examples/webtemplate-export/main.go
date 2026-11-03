@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
@@ -44,13 +44,17 @@ func run() error {
 
 	// Step 1: parse and compile the OPT. The Web Template is derived from the
 	// compiled form, so the template has to be compiled first.
-	// ParseFileStrict rejects an unknown node type that has attributes under
-	// it. The lenient ParseFile would keep such a node as a leaf and silently
-	// drop everything beneath it, so the export would be an incomplete Web
+	// ReadOperationalTemplate reads the OPT into the operational template
+	// model, and refuses a node type it does not know rather than drop
+	// everything beneath it, so the export is never an incomplete Web
 	// Template with nothing to say so.
-	opt, err := template.ParseFileStrict(optPath)
+	raw, err := os.ReadFile(optPath)
 	if err != nil {
-		return fmt.Errorf("parse OPT %s: %w", optPath, err)
+		return fmt.Errorf("read OPT %s: %w", optPath, err)
+	}
+	opt, err := aom14.ReadOperationalTemplate(bytes.NewReader(raw))
+	if err != nil {
+		return fmt.Errorf("read OPT %s: %w", optPath, err)
 	}
 	compiled, err := templatecompile.Compile(opt)
 	if err != nil {

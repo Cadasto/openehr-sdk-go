@@ -15,6 +15,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,10 +25,10 @@ import (
 	"reflect"
 	"slices"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
@@ -135,17 +136,20 @@ func report(result validation.Result) bool {
 	return result.OK
 }
 
-// loadTemplate parses the vendored OPT, compiles it, and builds its Web
-// Template. Do this once per template in your own code and reuse both results.
-// ParseFileStrict rejects an unknown node type that has attributes under it,
-// where the lenient ParseFile would keep it as a leaf and silently drop the
-// constraints beneath it. That matters here because the compiled template
-// drives the validation below.
+// loadTemplate reads the vendored OPT into the operational template model,
+// compiles it, and builds its Web Template. Do this once per template in your
+// own code and reuse both results. ReadOperationalTemplate refuses a node
+// type it does not know rather than drop the constraints beneath it. That
+// matters here because the compiled template drives the validation below.
 func loadTemplate() (*templatecompile.Compiled, *webtemplate.WebTemplate, error) {
 	optPath := fixtures.TemplateOpt(templateID)
-	opt, err := template.ParseFileStrict(optPath)
+	raw, err := os.ReadFile(optPath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("parse OPT %s: %w", optPath, err)
+		return nil, nil, fmt.Errorf("read OPT %s: %w", optPath, err)
+	}
+	opt, err := aom14.ReadOperationalTemplate(bytes.NewReader(raw))
+	if err != nil {
+		return nil, nil, fmt.Errorf("read OPT %s: %w", optPath, err)
 	}
 	compiled, err := templatecompile.Compile(opt)
 	if err != nil {

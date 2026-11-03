@@ -14,6 +14,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -21,10 +22,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
@@ -48,15 +49,19 @@ func run() error {
 		optPath = args[0]
 	}
 
-	// Step 1: parse the OPT. An operational template is the ADL 1.4 XML file
+	// Step 1: read the OPT. An operational template is the ADL 1.4 XML file
 	// a clinical modeller exports; it fixes which archetypes, nodes and value
-	// constraints a composition may contain. ParseFileStrict rejects an
-	// unknown node type that has attributes under it; the lenient ParseFile
-	// would keep such a node as a leaf and silently drop the constraints
-	// beneath it, which a program that builds and validates data must not do.
-	opt, err := template.ParseFileStrict(optPath)
+	// constraints a composition may contain. ReadOperationalTemplate reads it
+	// into the operational template model, and refuses a node type it does
+	// not know rather than drop the constraints beneath it, which a program
+	// that builds and validates data must not do.
+	raw, err := os.ReadFile(optPath)
 	if err != nil {
-		return fmt.Errorf("parse OPT %s: %w", optPath, err)
+		return fmt.Errorf("read OPT %s: %w", optPath, err)
+	}
+	opt, err := aom14.ReadOperationalTemplate(bytes.NewReader(raw))
+	if err != nil {
+		return fmt.Errorf("read OPT %s: %w", optPath, err)
 	}
 
 	// Step 2: compile it. The compiled template is the one artefact the
@@ -66,7 +71,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("compile template: %w", err)
 	}
-	fmt.Printf("template             : %s (%s)\n", opt.TemplateID(), filepath.Base(optPath))
+	fmt.Printf("template             : %s (%s)\n", compiled.TemplateID(), filepath.Base(optPath))
 
 	// Step 3: build a composition the template allows.
 	comp, err := buildComposition(context.Background(), compiled)

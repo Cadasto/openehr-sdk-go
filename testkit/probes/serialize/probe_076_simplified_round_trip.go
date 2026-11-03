@@ -60,9 +60,9 @@ func Probe076SimplifiedRoundTrip(optBody, compBody []byte) (Result, error) { // 
 	if optBody == nil || compBody == nil {
 		return r, errors.New("PROBE-076: nil opt/composition body")
 	}
-	opt, err := fixtures.ParseOPTBytes(optBody)
+	opt, err := fixtures.ReadOperationalTemplate(optBody)
 	if err != nil {
-		r.Status, r.Detail = "fail", "parse opt: "+err.Error()
+		r.Status, r.Detail = "fail", "read opt: "+err.Error()
 		return r, nil
 	}
 	compiled, err := templatecompile.Compile(opt)
@@ -296,13 +296,13 @@ func Probe076SkeletonRoundTrip(ctx context.Context, optBody []byte, policy insta
 	if optBody == nil {
 		return r, errors.New("PROBE-076: nil opt body")
 	}
-	opt, err := fixtures.ParseOPTBytes(optBody)
+	opt, err := fixtures.ReadOperationalTemplate(optBody)
 	if err != nil {
-		r.Status, r.Detail = "fail", "parse opt: "+err.Error()
+		r.Status, r.Detail = "fail", "read opt: "+err.Error()
 		return r, nil
 	}
-	id := opt.TemplateID()
-	if root := opt.Root(); root == nil || root.RMTypeName() != "COMPOSITION" {
+	id := strings.TrimSpace(opt.TemplateID.Value)
+	if strings.TrimSpace(opt.Definition.RMTypeName) != "COMPOSITION" {
 		return r, fmt.Errorf("PROBE-076: the skeleton leg takes a COMPOSITION OPT, and the root of %s is not one", id)
 	}
 	compiled, err := templatecompile.Compile(opt)

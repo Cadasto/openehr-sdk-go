@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
@@ -86,9 +86,9 @@ func Probe026MissingNodes(cases []ValidateCase) (Result, error) { // PROBE-026 (
 }
 
 func runCase(tc ValidateCase) string {
-	opt, err := template.ParseOPT(bytes.NewReader(tc.OPT))
+	opt, err := aom14.ReadOperationalTemplate(bytes.NewReader(tc.OPT))
 	if err != nil {
-		return fmt.Sprintf("ParseOPT: %v", err)
+		return fmt.Sprintf("ReadOperationalTemplate: %v", err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {

@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/lint"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 )
 
 // LintCase describes one fixture tuple consumed by PROBE-028. The probe
@@ -79,9 +79,9 @@ func Probe028AQLLint(cases []LintCase) (Result, error) { // PROBE-028 (REQ-109)
 func runLintCase(tc LintCase) string {
 	var c *templatecompile.Compiled
 	if len(tc.OPT) > 0 {
-		opt, err := template.ParseOPT(bytes.NewReader(tc.OPT))
+		opt, err := aom14.ReadOperationalTemplate(bytes.NewReader(tc.OPT))
 		if err != nil {
-			return fmt.Sprintf("ParseOPT: %v", err)
+			return fmt.Sprintf("ReadOperationalTemplate: %v", err)
 		}
 		c, err = templatecompile.Compile(opt)
 		if err != nil {

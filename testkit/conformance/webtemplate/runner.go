@@ -18,7 +18,6 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	wt "github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
@@ -40,17 +39,21 @@ type Target struct {
 	Root string
 }
 
-// NewTarget parses, compiles, and exports the corpus OPT.
+// NewTarget reads, compiles, and exports the corpus OPT.
 func NewTarget() (*Target, error) {
 	return NewTargetFromOPT(fixtures.FlatConformanceOpt())
 }
 
-// NewTargetFromOPT parses, compiles, and exports the OPT at path, for a
+// NewTargetFromOPT reads, compiles, and exports the OPT at path, for a
 // harness whose bodies instantiate a template other than the FLAT corpus's.
 func NewTargetFromOPT(path string) (*Target, error) {
-	opt, err := template.ParseFile(path)
+	raw, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("parse corpus OPT: %w", err)
+		return nil, fmt.Errorf("read corpus OPT: %w", err)
+	}
+	opt, err := fixtures.ReadOperationalTemplate(raw)
+	if err != nil {
+		return nil, fmt.Errorf("read corpus OPT: %w", err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {

@@ -26,8 +26,8 @@ import (
 	"slices"
 	"time"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
@@ -103,13 +103,14 @@ func run() error {
 	fmt.Printf("downloaded OPT       : %d bytes, identical to the upload: %t\n", len(raw), bytes.Equal(raw, opt))
 
 	// Step 5: turn the bytes into the local handle. Whatever form the server
-	// sent, the download has to parse and compile. ParseOPTStrict fails on a
-	// node type it does not know instead of silently dropping what is under
-	// it. The compiled template is what the builder, validator and generator
-	// take; compile it once and reuse it.
-	parsed, err := template.ParseOPTStrict(bytes.NewReader(raw))
+	// sent, the download has to be read and compiled.
+	// ReadOperationalTemplate fails on a node type it does not know instead
+	// of silently dropping what is under it. The compiled template is what
+	// the builder, validator and generator take; compile it once and reuse
+	// it.
+	parsed, err := aom14.ReadOperationalTemplate(bytes.NewReader(raw))
 	if err != nil {
-		return fmt.Errorf("parse OPT: %w", err)
+		return fmt.Errorf("read OPT: %w", err)
 	}
 	compiled, err := templatecompile.Compile(parsed)
 	if err != nil {

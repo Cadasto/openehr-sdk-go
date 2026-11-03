@@ -20,14 +20,16 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
@@ -48,12 +50,16 @@ func run() error {
 		optPath = args[0]
 	}
 
-	// Step 1: parse the OPT. Strict mode rejects an unknown node type that
-	// has attributes under it; the lenient ParseFile keeps such a node as a
-	// leaf and silently drops everything beneath it.
-	opt, err := template.ParseFileStrict(optPath)
+	// Step 1: read the OPT into the operational template model.
+	// ReadOperationalTemplate refuses a node type it does not know rather
+	// than drop everything beneath it.
+	raw, err := os.ReadFile(optPath)
 	if err != nil {
-		return fmt.Errorf("parse OPT %s: %w", optPath, err)
+		return fmt.Errorf("read OPT %s: %w", optPath, err)
+	}
+	opt, err := aom14.ReadOperationalTemplate(bytes.NewReader(raw))
+	if err != nil {
+		return fmt.Errorf("read OPT %s: %w", optPath, err)
 	}
 
 	// Step 2: compile it. The validator works from the compiled template.
@@ -61,7 +67,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("compile template: %w", err)
 	}
-	fmt.Printf("template             : %s (%s)\n", opt.TemplateID(), filepath.Base(optPath))
+	fmt.Printf("template             : %s (%s)\n", compiled.TemplateID(), filepath.Base(optPath))
 	fmt.Printf("compiled             : root %s\n", compiled.Root().RMTypeName())
 
 	// Step 3: the composition under test.
