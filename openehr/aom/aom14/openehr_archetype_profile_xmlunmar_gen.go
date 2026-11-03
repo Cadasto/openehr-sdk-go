@@ -32,8 +32,10 @@ var xmlClassCCodePhrase = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CCodePhrase) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCCodePhrase); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassCCodePhrase); _err != nil {
 		return _err
+	} else if _fresh {
+		*c = CCodePhrase{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -108,8 +110,10 @@ var xmlClassCDVOrdinal = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CDVOrdinal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCDVOrdinal); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassCDVOrdinal); _err != nil {
 		return _err
+	} else if _fresh {
+		*c = CDVOrdinal{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -175,8 +179,10 @@ var xmlClassCDVQuantity = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CDVQuantity) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCDVQuantity); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassCDVQuantity); _err != nil {
 		return _err
+	} else if _fresh {
+		*c = CDVQuantity{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -248,8 +254,10 @@ var xmlClassCDVScale = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CDVScale) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCDVScale); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassCDVScale); _err != nil {
 		return _err
+	} else if _fresh {
+		*c = CDVScale{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -314,8 +322,10 @@ var xmlClassCDVState = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CDVState) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCDVState); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassCDVState); _err != nil {
 		return _err
+	} else if _fresh {
+		*c = CDVState{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -378,8 +388,10 @@ var xmlClassCQuantityItem = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CQuantityItem) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCQuantityItem); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassCQuantityItem); _err != nil {
 		return _err
+	} else if _fresh {
+		*c = CQuantityItem{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -449,8 +461,10 @@ var xmlClassNonTerminalState = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (n *NonTerminalState) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassNonTerminalState); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassNonTerminalState); _err != nil {
 		return _err
+	} else if _fresh {
+		*n = NonTerminalState{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -508,8 +522,10 @@ var xmlChoiceOrdinalSymbol = []xmlunmatched.Shape{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (o *Ordinal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassOrdinal); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassOrdinal); _err != nil {
 		return _err
+	} else if _fresh {
+		*o = Ordinal{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -585,8 +601,10 @@ var xmlChoiceScaleSymbol = []xmlunmatched.Shape{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (s *Scale) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassScale); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassScale); _err != nil {
 		return _err
+	} else if _fresh {
+		*s = Scale{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -656,8 +674,10 @@ var xmlClassStateMachine = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (s *StateMachine) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassStateMachine); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassStateMachine); _err != nil {
 		return _err
+	} else if _fresh {
+		*s = StateMachine{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -704,8 +724,10 @@ var xmlClassTerminalState = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TerminalState) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassTerminalState); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassTerminalState); _err != nil {
 		return _err
+	} else if _fresh {
+		*t = TerminalState{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -750,8 +772,10 @@ var xmlClassTransition = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *Transition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassTransition); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassTransition); _err != nil {
 		return _err
+	} else if _fresh {
+		*t = Transition{}
 	}
 	for {
 		_tok, _err := _dec.Token()

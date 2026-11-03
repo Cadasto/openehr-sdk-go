@@ -66,8 +66,10 @@ func (t *TerminologyCode) MarshalXML(e *xml.Encoder, start xml.StartElement) err
 // between its child elements among it, is unmatched: skipped, or reported or
 // refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TerminologyCode) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error {
-	if err := xmlunmatched.Enter(dec, start, &xmlClassTerminologyCode); err != nil {
+	if fresh, err := xmlunmatched.Enter(dec, start, &xmlClassTerminologyCode); err != nil {
 		return err
+	} else if fresh {
+		*t = TerminologyCode{}
 	}
 	for {
 		tok, err := dec.Token()

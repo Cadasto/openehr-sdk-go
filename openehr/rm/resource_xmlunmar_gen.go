@@ -30,8 +30,10 @@ var xmlClassResourceAnnotations = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (r *ResourceAnnotations) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassResourceAnnotations); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassResourceAnnotations); _err != nil {
 		return _err
+	} else if _fresh {
+		*r = ResourceAnnotations{}
 	}
 	for {
 		_tok, _err := _dec.Token()

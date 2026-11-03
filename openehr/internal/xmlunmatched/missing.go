@@ -48,20 +48,25 @@ const maxRequired = 64
 // as the element closes. start must be the token the decoder read last, and
 // no child token may have been read since.
 //
+// fresh reports that the decoder is to clear its receiver before it reads
+// the element: start opens the root of a document [Unmarshal] decodes a
+// second time into the value the first decode filled in part, which the
+// second decode is to fill again from nothing.
+//
 // By default it does nothing. A description with more than [maxRequired]
 // names in its Required is a programming error, and Enter panics on it
 // before any decode, tracked or not: a frame records the members it has
 // seen in one word of that many bits, and a name past it would be reported
 // missing whatever the document carries.
-func Enter(dec *xml.Decoder, start xml.StartElement, c *Class) error {
+func Enter(dec *xml.Decoder, start xml.StartElement, c *Class) (fresh bool, err error) {
 	if len(c.Required) > maxRequired {
 		panic(fmt.Sprintf("xmlunmatched.Enter: class %s lists %d required members, more than the %d a description holds", c.Name, len(c.Required), maxRequired))
 	}
 	t := trackerOf(dec)
 	if t == nil {
-		return nil
+		return false, nil
 	}
-	return t.enter(start, c)
+	return t.again && len(t.open) == 2, t.enter(start, c)
 }
 
 // enter records c on the innermost open element, the one start opened, marks

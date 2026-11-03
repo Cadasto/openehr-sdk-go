@@ -30,8 +30,10 @@ var xmlClassArchetyped = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *Archetyped) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassArchetyped); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassArchetyped); _err != nil {
 		return _err
+	} else if _fresh {
+		*a = Archetyped{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -87,8 +89,10 @@ var xmlClassFeederAudit = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (f *FeederAudit) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassFeederAudit); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassFeederAudit); _err != nil {
 		return _err
+	} else if _fresh {
+		*f = FeederAudit{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -157,8 +161,10 @@ var xmlClassFeederAuditDetails = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (f *FeederAuditDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassFeederAuditDetails); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassFeederAuditDetails); _err != nil {
 		return _err
+	} else if _fresh {
+		*f = FeederAuditDetails{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -239,8 +245,10 @@ var xmlClassLink = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (l *Link) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassLink); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassLink); _err != nil {
 		return _err
+	} else if _fresh {
+		*l = Link{}
 	}
 	for {
 		_tok, _err := _dec.Token()

@@ -31,8 +31,10 @@ var xmlClassAttestation = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *Attestation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassAttestation); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassAttestation); _err != nil {
 		return _err
+	} else if _fresh {
+		*a = Attestation{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -125,8 +127,10 @@ var xmlClassAuditDetails = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *AuditDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassAuditDetails); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassAuditDetails); _err != nil {
 		return _err
+	} else if _fresh {
+		*a = AuditDetails{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -191,8 +195,10 @@ var xmlClassParticipation = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (p *Participation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassParticipation); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassParticipation); _err != nil {
 		return _err
+	} else if _fresh {
+		*p = Participation{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -257,8 +263,10 @@ var xmlClassPartyIdentified = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (p *PartyIdentified) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassPartyIdentified); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassPartyIdentified); _err != nil {
 		return _err
+	} else if _fresh {
+		*p = PartyIdentified{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -318,8 +326,10 @@ var xmlClassPartyRelated = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (p *PartyRelated) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassPartyRelated); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassPartyRelated); _err != nil {
 		return _err
+	} else if _fresh {
+		*p = PartyRelated{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -381,8 +391,10 @@ var xmlClassPartySelf = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (p *PartySelf) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassPartySelf); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassPartySelf); _err != nil {
 		return _err
+	} else if _fresh {
+		*p = PartySelf{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -430,8 +442,10 @@ var xmlClassRevisionHistory = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (r *RevisionHistory) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassRevisionHistory); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassRevisionHistory); _err != nil {
 		return _err
+	} else if _fresh {
+		*r = RevisionHistory{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -479,8 +493,10 @@ var xmlClassRevisionHistoryItem = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (r *RevisionHistoryItem) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassRevisionHistoryItem); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassRevisionHistoryItem); _err != nil {
 		return _err
+	} else if _fresh {
+		*r = RevisionHistoryItem{}
 	}
 	for {
 		_tok, _err := _dec.Token()

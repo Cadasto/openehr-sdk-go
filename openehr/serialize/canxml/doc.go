@@ -42,7 +42,13 @@
 //     site. The decoder requires it at polymorphic sites;
 //     [WithRelaxedTypeDispatch], which would relax that, is accepted but
 //     not yet enforced. Discriminator values are
-//     matched unprefixed; namespace-prefixed values (the Better/Marand
+//     matched unprefixed, with one exception: a value whose prefix is
+//     bound, where the attribute stands, to the XML Schema namespace
+//     `http://www.w3.org/2001/XMLSchema` names an XML Schema built-in
+//     datatype and reads as its BMM primitive, whatever the prefix, so
+//     `xs:string` and `xsd:string` both read as `String`, and so does a
+//     literal `xsd:` that no declaration in scope binds. Other
+//     namespace-prefixed values (the Better/Marand
 //     `xsi:type="ns2:DV_QUANTITY"` dialect) are not supported and fail
 //     closed with [typereg.ErrUnknownType]. A type alias a generated
 //     package registers, the AOM 1.4 `T_ARCHETYPE_ROOT` that some tools

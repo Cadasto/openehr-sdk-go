@@ -31,8 +31,10 @@ var xmlClassArchetypeOntology = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *ArchetypeOntology) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassArchetypeOntology); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassArchetypeOntology); _err != nil {
 		return _err
+	} else if _fresh {
+		*a = ArchetypeOntology{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -99,8 +101,10 @@ var xmlClassArchetypeTerm = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *ArchetypeTerm) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassArchetypeTerm); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassArchetypeTerm); _err != nil {
 		return _err
+	} else if _fresh {
+		*a = ArchetypeTerm{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "code" && _a.Name.Space == "" {
@@ -157,8 +161,10 @@ var xmlClassCodeDefinitionSet = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CodeDefinitionSet) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCodeDefinitionSet); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassCodeDefinitionSet); _err != nil {
 		return _err
+	} else if _fresh {
+		*c = CodeDefinitionSet{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "language" && _a.Name.Space == "" {
@@ -216,8 +222,10 @@ var xmlClassConstraintBindingItem = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *ConstraintBindingItem) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassConstraintBindingItem); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassConstraintBindingItem); _err != nil {
 		return _err
+	} else if _fresh {
+		*c = ConstraintBindingItem{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "code" && _a.Name.Space == "" {
@@ -274,8 +282,10 @@ var xmlClassConstraintBindingSet = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *ConstraintBindingSet) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassConstraintBindingSet); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassConstraintBindingSet); _err != nil {
 		return _err
+	} else if _fresh {
+		*c = ConstraintBindingSet{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "terminology" && _a.Name.Space == "" {
@@ -333,8 +343,10 @@ var xmlClassTermBindingItem = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TermBindingItem) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassTermBindingItem); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassTermBindingItem); _err != nil {
 		return _err
+	} else if _fresh {
+		*t = TermBindingItem{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "code" && _a.Name.Space == "" {
@@ -391,8 +403,10 @@ var xmlClassTermBindingSet = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TermBindingSet) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassTermBindingSet); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassTermBindingSet); _err != nil {
 		return _err
+	} else if _fresh {
+		*t = TermBindingSet{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "terminology" && _a.Name.Space == "" {

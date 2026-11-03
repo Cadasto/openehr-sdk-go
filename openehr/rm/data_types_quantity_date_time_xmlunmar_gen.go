@@ -31,8 +31,10 @@ var xmlClassDVDate = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVDate); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVDate); _err != nil {
 		return _err
+	} else if _fresh {
+		*d = DVDate{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -108,8 +110,10 @@ var xmlClassDVDateTime = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVDateTime); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVDateTime); _err != nil {
 		return _err
+	} else if _fresh {
+		*d = DVDateTime{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -185,8 +189,10 @@ var xmlClassDVDuration = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVDuration); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVDuration); _err != nil {
 		return _err
+	} else if _fresh {
+		*d = DVDuration{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -268,8 +274,10 @@ var xmlClassDVTime = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVTime); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVTime); _err != nil {
 		return _err
+	} else if _fresh {
+		*d = DVTime{}
 	}
 	for {
 		_tok, _err := _dec.Token()

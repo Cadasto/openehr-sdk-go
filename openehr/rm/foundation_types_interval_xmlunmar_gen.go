@@ -46,8 +46,10 @@ var xmlClassInterval = xmlunmatched.Class{
 // An empty or whitespace-only flag element carries no boolean and reads as
 // a flag the document leaves out.
 func (i *Interval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassInterval); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassInterval); _err != nil {
 		return _err
+	} else if _fresh {
+		*i = Interval[T]{}
 	}
 	var _seen intervalFlagsSeen
 	for {
@@ -129,8 +131,10 @@ var xmlClassPointInterval = xmlunmatched.Class{
 // An empty or whitespace-only flag element carries no boolean and reads as
 // a flag the document leaves out.
 func (p *PointInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassPointInterval); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassPointInterval); _err != nil {
 		return _err
+	} else if _fresh {
+		*p = PointInterval[T]{}
 	}
 	var _seen intervalFlagsSeen
 	for {
@@ -212,8 +216,10 @@ var xmlClassProperInterval = xmlunmatched.Class{
 // An empty or whitespace-only flag element carries no boolean and reads as
 // a flag the document leaves out.
 func (p *ProperInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassProperInterval); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassProperInterval); _err != nil {
 		return _err
+	} else if _fresh {
+		*p = ProperInterval[T]{}
 	}
 	var _seen intervalFlagsSeen
 	for {

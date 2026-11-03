@@ -30,8 +30,10 @@ var xmlClassDVBoolean = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVBoolean) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVBoolean); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVBoolean); _err != nil {
 		return _err
+	} else if _fresh {
+		*d = DVBoolean{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -76,8 +78,10 @@ var xmlClassDVIdentifier = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVIdentifier) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVIdentifier); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVIdentifier); _err != nil {
 		return _err
+	} else if _fresh {
+		*d = DVIdentifier{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -140,8 +144,10 @@ var xmlClassDVState = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVState) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVState); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVState); _err != nil {
 		return _err
+	} else if _fresh {
+		*d = DVState{}
 	}
 	for {
 		_tok, _err := _dec.Token()

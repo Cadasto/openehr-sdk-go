@@ -4,7 +4,9 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"strings"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlschema"
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
@@ -156,6 +158,10 @@ type Decoder struct {
 	// trk is the decoder's tracker when an option reports or refuses
 	// unmatched content or reports missing members, and nil otherwise.
 	trk *xmlunmatched.Tracker
+	// scope keeps the namespace declarations in scope for a decoder given
+	// none of those options, which cannot read its stream again to find them
+	// as [Unmarshal] does.
+	scope *xmlunmatched.Scope
 }
 
 // NewDecoder returns a [Decoder] that reads canonical-XML from r. The
@@ -166,7 +172,8 @@ func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 	cfg := newDecoderConfig(opts)
 	t := cfg.tracker()
 	if t == nil {
-		return &Decoder{dec: xml.NewDecoder(r), cfg: cfg}
+		s := new(xmlunmatched.Scope)
+		return &Decoder{dec: s.NewDecoder(r), cfg: cfg, scope: s}
 	}
 	return &Decoder{dec: t.NewDecoder(r), cfg: cfg, trk: t}
 }
@@ -179,7 +186,9 @@ func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 // element that does not decode as its type names the element alone, such as
 // "/is_queryable", inside the envelope of each polymorphic slot it sits in.
 // A Decoder given any of them returns it on its own, with the element's
-// path from the root of the value, as [Unmarshal] does.
+// path from the root of the value, as [Unmarshal] does. Every Decoder keeps
+// the namespace declarations in scope as it reads, so it resolves the prefix
+// of an `xsi:type` where the attribute stands (see [XSITypeOf]).
 //
 // Decode reads no further than the end of that element, so whatever
 // follows it, another element included, is left for the next call. A
@@ -189,7 +198,7 @@ func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 // what comes before and after it.
 func (d *Decoder) Decode(v any) error {
 	if d.trk == nil {
-		return d.dec.Decode(v)
+		return d.scope.Decode(d.dec, v)
 	}
 	return d.trk.Decode(d.dec, v)
 }
@@ -242,6 +251,14 @@ func (d *Decoder) RelaxedTypeDispatch() bool { return d.cfg.relaxedTypeDispatch 
 // data a second time once the first decode has failed so, which a decode
 // that succeeds never does.
 //
+// A prefixed `xsi:type` is resolved against the namespace declarations in
+// scope where the attribute stands (see [XSITypeOf]). Given no option,
+// Unmarshal reads an element's own declarations as it goes; when the prefix
+// is declared on an element around it, Unmarshal decodes data a second time,
+// through a decoder that keeps every declaration in scope, into v cleared to
+// its zero value, so only a document with such a value pays for the second
+// decode.
+//
 // Content the decode does not read is ignored by default. [WithUnmatched]
 // reports each such item and [WithStrict] refuses the first, wrapping
 // [ErrUnknownElement]. A mandatory member the input leaves out is decoded
@@ -266,12 +283,17 @@ func Unmarshal(data []byte, v any, opts ...DecoderOption) error {
 // carries no `xsi:type` in either form above: an `xsi:type` wins
 // wherever it is written.
 //
-// The returned discriminator is normalised: a leading `xsd:` (XML
-// Schema datatype) prefix is stripped so foundation primitives like
-// `xsd:string` decode against the BMM primitive name `String`. A
-// namespace-prefixed RM value (e.g. Better's `ns2:DV_QUANTITY`) is
-// not stripped and so fails registry lookup as an unknown type;
-// namespace-prefixed discriminators are not supported.
+// The returned discriminator is an openEHR class name, matched as written,
+// with no prefix. A value whose prefix is bound to the XML Schema namespace
+// `http://www.w3.org/2001/XMLSchema` names an XML Schema built-in datatype
+// and is returned as the BMM primitive it reads as, whatever the prefix, so
+// `xs:string` and `xsd:string` both return `String`; so is a value with the
+// literal prefix `xsd:` that no declaration binds. Any other prefixed value,
+// such as Better's `ns2:DV_QUANTITY`, is returned as written and so fails
+// registry lookup as an unknown type: namespace-prefixed class names are not
+// supported. XSITypeOf sees only the namespace declarations start carries
+// itself; the decoder resolves a prefix against every declaration in scope
+// where the attribute stands.
 //
 // Returns [ErrInvalidShape] when an `xmi:type` attribute is
 // encountered: ITS-XML specifies `xsi:type` and the SDK rejects XMI
@@ -281,24 +303,42 @@ func Unmarshal(data []byte, v any, opts ...DecoderOption) error {
 // all; the caller decides whether that is an error (strict) or
 // acceptable (relaxed dispatch).
 func XSITypeOf(start xml.StartElement) (string, error) {
-	_, typeName, err := discriminator(start)
-	return typeName, err
+	d, err := discriminator(nil, start)
+	return d.name, err
 }
 
-// discriminator returns the attribute of start that [XSITypeOf] reads as the
-// `xsi:type` discriminator, by name, with its normalised value. An `xsi:type`
-// in the XSI namespace or written literally wins; a bare `type` is read only
-// when there is none, so a bare `type` beside an `xsi:type` stays unmatched
-// content. The name lets dispatch record which attribute it read.
-func discriminator(start xml.StartElement) (xml.Name, string, error) {
+// discriminated is what the discriminator of an element says about the type
+// the element decodes as.
+type discriminated struct {
+	// attr names the attribute read as the discriminator, so that dispatch
+	// can record which attribute it read; the zero name when there is none.
+	attr xml.Name
+	// name is the type the element decodes as: an openEHR class name, or the
+	// BMM primitive an XML Schema built-in datatype reads as; empty when the
+	// element carries no discriminator.
+	name string
+	// written is the discriminator as written, its prefix included.
+	written string
+	// builtin reports that name is the BMM primitive of the XML Schema
+	// built-in datatype written names.
+	builtin bool
+}
+
+// discriminator returns what the attribute of start that [XSITypeOf] reads as
+// the `xsi:type` discriminator says. An `xsi:type` in the XSI namespace or
+// written literally wins; a bare `type` is read only when there is none, so a
+// bare `type` beside an `xsi:type` stays unmatched content. A prefixed value
+// resolves against the namespace declarations in scope where the attribute
+// stands, which dec knows, or, when dec is nil, against those start carries.
+func discriminator(dec *xml.Decoder, start xml.StartElement) (discriminated, error) {
 	bare := -1
 	for i, attr := range start.Attr {
 		// Reject xmi:type (both resolved and literal forms).
 		if attr.Name.Local == "type" && attr.Name.Space == NSXMI {
-			return xml.Name{}, "", fmt.Errorf("canxml: %w: xmi:type on the wire is rejected (use xsi:type)", ErrInvalidShape)
+			return discriminated{}, fmt.Errorf("canxml: %w: xmi:type on the wire is rejected (use xsi:type)", ErrInvalidShape)
 		}
 		if attr.Name.Local == "xmi:type" {
-			return xml.Name{}, "", fmt.Errorf("canxml: %w: xmi:type on the wire is rejected (use xsi:type)", ErrInvalidShape)
+			return discriminated{}, fmt.Errorf("canxml: %w: xmi:type on the wire is rejected (use xsi:type)", ErrInvalidShape)
 		}
 		if !xmlunmatched.IsDiscriminator(attr.Name) {
 			continue
@@ -306,31 +346,48 @@ func discriminator(start xml.StartElement) (xml.Name, string, error) {
 		// Accept xsi:type (resolved and literal forms) at once; keep a bare
 		// type for when there is none.
 		if attr.Name.Space != "" || attr.Name.Local != "type" {
-			return attr.Name, stripXSDPrefix(attr.Value), nil
+			return resolveType(dec, start, attr)
 		}
 		if bare < 0 {
 			bare = i
 		}
 	}
 	if bare >= 0 {
-		return start.Attr[bare].Name, stripXSDPrefix(start.Attr[bare].Value), nil
+		return resolveType(dec, start, start.Attr[bare])
 	}
-	return xml.Name{}, "", nil
+	return discriminated{}, nil
 }
 
-// stripXSDPrefix strips a leading `xsd:` namespace prefix from a
-// discriminator. Some ITS-XML producers tag foundation primitives
-// with their XML Schema datatype (`xsd:string`, `xsd:int`, …); the
-// SDK's type registry indexes the BMM primitive name (`String`,
-// `Integer`, …). The stripped name is fed to typereg.Lookup.
-//
-// Idempotent for inputs that already lack the prefix.
-func stripXSDPrefix(s string) string {
-	const prefix = "xsd:"
-	if len(s) > len(prefix) && s[:len(prefix)] == prefix {
-		return s[len(prefix):]
+// resolveType returns what attr, the discriminator of start, says. A value
+// with no prefix names an openEHR class. A prefixed value names an XML Schema
+// built-in datatype, and reads as its BMM primitive, when its prefix is bound
+// to the XML Schema namespace where attr stands, or is the literal `xsd`
+// bound by no declaration in scope; any other prefixed value is kept as
+// written, which names no type. A value whose local name is no built-in
+// datatype is kept as written whatever its prefix, so only a built-in's
+// prefix is resolved. When dec cannot tell the declarations around start,
+// which a plain encoding/xml decoder does not keep, and start does not
+// declare the prefix itself, resolveType refuses the value with
+// [xmlunmatched.UnresolvedPrefix], for [Unmarshal] to decode the document
+// again through a decoder that does.
+func resolveType(dec *xml.Decoder, start xml.StartElement, attr xml.Attr) (discriminated, error) {
+	d := discriminated{attr: attr.Name, name: attr.Value, written: attr.Value}
+	prefix, local, prefixed := strings.Cut(attr.Value, ":")
+	if !prefixed {
+		return d, nil
 	}
-	return s
+	primitive, ok := xmlschema.Builtin(local)
+	if !ok {
+		return d, nil
+	}
+	uri, bound, known := xmlunmatched.LookupPrefix(dec, start, prefix)
+	if !known && dec != nil {
+		return discriminated{}, xmlunmatched.UnresolvedPrefix()
+	}
+	if (bound && uri == xmlschema.NS) || (!bound && prefix == xmlschema.LiteralPrefix) {
+		d.name, d.builtin = primitive, true
+	}
+	return d, nil
 }
 
 // DecodeAs reads one polymorphic child element from dec (the
@@ -355,10 +412,11 @@ func stripXSDPrefix(s string) string {
 //     the next child.
 func DecodeAs[T any](dec *xml.Decoder, start xml.StartElement) (T, error) {
 	var zero T
-	attrName, typeName, err := discriminator(start)
+	d, err := discriminator(dec, start)
 	if err != nil {
 		return zero, &DecodeError{Path: "/" + start.Name.Local, Inner: err}
 	}
+	attrName, typeName := d.attr, d.name
 	if typeName == "" {
 		return zero, &DecodeError{Path: "/" + start.Name.Local, Inner: fmt.Errorf("canxml: %w", typereg.ErrMissingType)}
 	}
@@ -403,10 +461,11 @@ func DecodeAs[T any](dec *xml.Decoder, start xml.StartElement) (T, error) {
 // field type fixes the concrete subtype.
 func DecodeAsOrDefault[T any](dec *xml.Decoder, start xml.StartElement, defaultCtor func() any) (T, error) {
 	var zero T
-	attrName, typeName, err := discriminator(start)
+	d, err := discriminator(dec, start)
 	if err != nil {
 		return zero, &DecodeError{Path: "/" + start.Name.Local, Inner: err}
 	}
+	attrName, typeName := d.attr, d.name
 	var v any
 	if typeName == "" {
 		if defaultCtor == nil {

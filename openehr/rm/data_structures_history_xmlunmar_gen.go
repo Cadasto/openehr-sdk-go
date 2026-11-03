@@ -32,8 +32,10 @@ var xmlClassHistory = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (h *History[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassHistory); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassHistory); _err != nil {
 		return _err
+	} else if _fresh {
+		*h = History[T]{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "archetype_node_id" && _a.Name.Space == "" {
@@ -144,8 +146,10 @@ var xmlClassIntervalEvent = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (i *IntervalEvent[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassIntervalEvent); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassIntervalEvent); _err != nil {
 		return _err
+	} else if _fresh {
+		*i = IntervalEvent[T]{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "archetype_node_id" && _a.Name.Space == "" {
@@ -258,8 +262,10 @@ var xmlClassPointEvent = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (p *PointEvent[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassPointEvent); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassPointEvent); _err != nil {
 		return _err
+	} else if _fresh {
+		*p = PointEvent[T]{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "archetype_node_id" && _a.Name.Space == "" {

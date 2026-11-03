@@ -53,6 +53,20 @@
 //     bare `type`. Each helper looks the decoder up; an untracked decode
 //     finds nothing and behaves as encoding/xml does, but for one thing.
 //
+// # Namespace scope
+//
+// An `xsi:type` written with a prefix, such as `xs:string`, is resolved
+// against the namespace declarations in scope where the attribute stands.
+// encoding/xml resolves element and attribute names but not a prefix inside
+// an attribute value, and hands a decoder none of the declarations of the
+// elements around the one it reads. So the token source of a tracked decode
+// keeps the declarations of the open elements, and so does that of a
+// [Scope], which a decode that applies no policy reads through when it cannot
+// read its input again; [LookupPrefix] answers from them. An untracked decode
+// through a plain encoding/xml decoder sees only the declarations an element
+// carries itself; [Unmarshal] decodes the document again when a prefix needs
+// more ([UnresolvedPrefix]).
+//
 // # Missing members
 //
 // The dual of unmatched content is a mandatory member the document leaves
@@ -157,6 +171,10 @@ type Tracker struct {
 	// reader is the token source of the decoder [Tracker.NewDecoder] returned,
 	// which [DecodeChoice] reads ahead through; nil until then.
 	reader *trackingReader
+	// again marks the second decode [Unmarshal] runs of a document into the
+	// value its first decode filled in part, whose root decoder [Enter] tells
+	// to clear its receiver first.
+	again bool
 }
 
 // frame is one open element: its local name, its 1-based position among its
@@ -506,14 +524,18 @@ func trackerOf(dec *xml.Decoder) *Tracker {
 	return nil
 }
 
-// trackingReader is the token source of a tracked decode. It reads src with
-// Token, so the namespaces are resolved and the nesting checked there, and
-// records every element opened and closed in t. It drops the namespace
-// declarations from each start element: the decoder built on it then has no
-// prefix to resolve and passes every name through as src resolved it.
+// trackingReader is the token source of a tracked decode, and of a scoped one
+// ([Scope]). It reads src with Token, so the namespaces are resolved and the
+// nesting checked there, records in t every element opened and closed, when t
+// is not nil, and keeps in scope the namespace prefixes the open elements
+// declare. It drops the namespace declarations from each start element: the
+// decoder built on it then has no prefix to resolve and passes every name
+// through as src resolved it.
 type trackingReader struct {
 	src *xml.Decoder
-	t   *Tracker
+	t   *Tracker // nil for a scoped decode, which records no element
+	// scope holds the prefixes the open elements declare, for [LookupPrefix].
+	scope scope
 	// pending holds the tokens [trackingReader.peekChild] read ahead of the
 	// decoder, which Token returns, and records, before it reads src again.
 	pending []xml.Token
@@ -535,17 +557,22 @@ func (r *trackingReader) Token() (xml.Token, error) {
 	}
 	switch tk := tok.(type) {
 	case xml.StartElement:
-		r.t.push(tk.Name.Local)
-		if r.t.missing != nil {
-			n := len(r.t.open)
-			r.t.open[n-1].nilled = r.t.open[n-2].nilled || isNilled(tk.Attr)
+		if r.t != nil {
+			r.t.push(tk.Name.Local)
+			if r.t.missing != nil {
+				n := len(r.t.open)
+				r.t.open[n-1].nilled = r.t.open[n-2].nilled || isNilled(tk.Attr)
+			}
 		}
-		tk.Attr = withoutNamespaceDecls(tk.Attr)
+		tk.Attr = r.scope.open(tk.Attr)
 		return tk, err
 	case xml.EndElement:
-		r.t.pop()
+		if r.t != nil {
+			r.t.pop()
+		}
+		r.scope.close()
 	case xml.CharData:
-		if r.t.missing != nil && !isXMLSpace(tk) {
+		if r.t != nil && r.t.missing != nil && !isXMLSpace(tk) {
 			r.t.open[len(r.t.open)-1].hasText = true
 		}
 	}

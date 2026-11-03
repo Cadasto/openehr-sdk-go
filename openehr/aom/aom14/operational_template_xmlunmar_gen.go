@@ -33,8 +33,10 @@ var xmlClassAnnotation = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *Annotation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassAnnotation); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassAnnotation); _err != nil {
 		return _err
+	} else if _fresh {
+		*a = Annotation{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "path" && _a.Name.Space == "" {
@@ -90,8 +92,10 @@ var xmlClassCArchetypeRoot = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CArchetypeRoot) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCArchetypeRoot); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassCArchetypeRoot); _err != nil {
 		return _err
+	} else if _fresh {
+		*c = CArchetypeRoot{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -173,8 +177,10 @@ var xmlClassCCodeReference = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CCodeReference) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCCodeReference); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassCCodeReference); _err != nil {
 		return _err
+	} else if _fresh {
+		*c = CCodeReference{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -254,8 +260,10 @@ var xmlClassFlatArchetypeOntology = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (f *FlatArchetypeOntology) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassFlatArchetypeOntology); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassFlatArchetypeOntology); _err != nil {
 		return _err
+	} else if _fresh {
+		*f = FlatArchetypeOntology{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "archetype_id" && _a.Name.Space == "" {
@@ -331,8 +339,10 @@ var xmlClassOperationalTemplate = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (o *OperationalTemplate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassOperationalTemplate); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassOperationalTemplate); _err != nil {
 		return _err
+	} else if _fresh {
+		*o = OperationalTemplate{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -444,8 +454,10 @@ var xmlClassTAttribute = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TAttribute) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassTAttribute); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassTAttribute); _err != nil {
 		return _err
+	} else if _fresh {
+		*t = TAttribute{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -501,8 +513,10 @@ var xmlClassTComplexObject = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TComplexObject) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassTComplexObject); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassTComplexObject); _err != nil {
 		return _err
+	} else if _fresh {
+		*t = TComplexObject{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -567,8 +581,10 @@ var xmlClassTConstraint = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TConstraint) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassTConstraint); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassTConstraint); _err != nil {
 		return _err
+	} else if _fresh {
+		*t = TConstraint{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -615,8 +631,10 @@ var xmlClassTView = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TView) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassTView); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassTView); _err != nil {
 		return _err
+	} else if _fresh {
+		*t = TView{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -665,8 +683,10 @@ var xmlClassTViewConstraint = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TViewConstraint) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassTViewConstraint); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassTViewConstraint); _err != nil {
 		return _err
+	} else if _fresh {
+		*t = TViewConstraint{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "path" && _a.Name.Space == "" {
@@ -724,8 +744,10 @@ var xmlClassTViewConstraintItem = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TViewConstraintItem) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassTViewConstraintItem); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassTViewConstraintItem); _err != nil {
 		return _err
+	} else if _fresh {
+		*t = TViewConstraintItem{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "id" && _a.Name.Space == "" {

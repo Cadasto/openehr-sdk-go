@@ -32,8 +32,10 @@ var xmlClassComposition = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *Composition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassComposition); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassComposition); _err != nil {
 		return _err
+	} else if _fresh {
+		*c = Composition{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "archetype_node_id" && _a.Name.Space == "" {
@@ -145,8 +147,10 @@ var xmlClassEventContext = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (e *EventContext) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassEventContext); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassEventContext); _err != nil {
 		return _err
+	} else if _fresh {
+		*e = EventContext{}
 	}
 	for {
 		_tok, _err := _dec.Token()

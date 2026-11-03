@@ -24,7 +24,7 @@ type entryItem struct {
 var entryItemClass = &Class{Name: "ITEM", Required: []string{"language", "purpose"}}
 
 func (v *entryItem) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error {
-	if err := Enter(dec, start, entryItemClass); err != nil {
+	if _, err := Enter(dec, start, entryItemClass); err != nil {
 		return err
 	}
 	for {
@@ -70,7 +70,7 @@ type entryHolder struct {
 var entryHolderClass = &Class{Name: "HOLDER", Required: []string{"author", "details"}}
 
 func (h *entryHolder) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error {
-	if err := Enter(dec, start, entryHolderClass); err != nil {
+	if _, err := Enter(dec, start, entryHolderClass); err != nil {
 		return err
 	}
 	for {

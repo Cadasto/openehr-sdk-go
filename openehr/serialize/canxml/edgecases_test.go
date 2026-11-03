@@ -3,6 +3,7 @@ package canxml_test
 import (
 	"encoding/xml"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -26,38 +27,45 @@ func TestDecoderAcceptsSelfClosingEmptyElements(t *testing.T) {
 	}
 }
 
-// TestXSITypeOfStripsXSDPrefix asserts the helper strips a leading
-// `xsd:` from foundation-primitive discriminators so they index into
-// the type registry under the BMM name (`String` vs `xsd:string`).
-func TestXSITypeOfStripsXSDPrefix(t *testing.T) {
+// TestREQ056_XSITypeOfReadsXMLSchemaPrefix pins how XSITypeOf reads a
+// prefixed discriminator against the namespace declarations the element
+// carries (wire.md § REQ-056): a prefix bound to the XML Schema namespace
+// names a built-in datatype, returned as the BMM primitive it reads as,
+// whatever the prefix, and so does the literal `xsd:` that no declaration
+// binds; any other prefixed value, and a prefixed name that is no built-in
+// datatype, comes back as written, which names no type. An unprefixed value
+// and an absent one come back unchanged.
+func TestREQ056_XSITypeOfReadsXMLSchemaPrefix(t *testing.T) {
+	const xsd = "http://www.w3.org/2001/XMLSchema"
 	cases := []struct {
-		in   string
-		want string
+		name  string
+		value string
+		decls []xml.Attr
+		want  string
 	}{
-		{"xsd:string", "String"},
-		{"xsd:integer", "integer"},
-		{"DV_QUANTITY", "DV_QUANTITY"}, // unchanged
-		{"", ""},
+		{name: "xsd:string with no declaration", value: "xsd:string", want: "String"},
+		{name: "xsd:integer with no declaration", value: "xsd:integer", want: "Integer"},
+		{name: "xs:string bound on the element", value: "xs:string", decls: []xml.Attr{{Name: xml.Name{Space: "xmlns", Local: "xs"}, Value: xsd}}, want: "String"},
+		{name: "xsd:string bound on the element", value: "xsd:string", decls: []xml.Attr{{Name: xml.Name{Space: "xmlns", Local: "xsd"}, Value: xsd}}, want: "String"},
+		{name: "xsd:string bound to another namespace", value: "xsd:string", decls: []xml.Attr{{Name: xml.Name{Space: "xmlns", Local: "xsd"}, Value: "urn:example:other"}}, want: "xsd:string"},
+		{name: "xs:string with no declaration", value: "xs:string", want: "xs:string"},
+		{name: "ns2:DV_QUANTITY", value: "ns2:DV_QUANTITY", want: "ns2:DV_QUANTITY"},
+		{name: "xsd:DV_QUANTITY, no built-in datatype", value: "xsd:DV_QUANTITY", want: "xsd:DV_QUANTITY"},
+		{name: "DV_QUANTITY", value: "DV_QUANTITY", want: "DV_QUANTITY"},
+		{name: "absent", value: "", want: ""},
 	}
 	for _, tc := range cases {
-		t.Run(tc.in, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			start := xml.StartElement{
 				Name: xml.Name{Local: "x"},
-				Attr: []xml.Attr{{Name: canxml.XSITypeAttrName(), Value: tc.in}},
+				Attr: append(slices.Clone(tc.decls), xml.Attr{Name: canxml.XSITypeAttrName(), Value: tc.value}),
 			}
 			got, err := canxml.XSITypeOf(start)
 			if err != nil {
-				t.Fatalf("err = %v", err)
+				t.Fatalf("XSITypeOf(%q) err = %v", tc.value, err)
 			}
-			// stripXSDPrefix lower-cases nothing — it strips literally; the
-			// expected values reflect that. For "xsd:integer" the test
-			// captures the strip behaviour without forcing camelCase.
-			want := tc.want
-			if tc.in == "xsd:string" {
-				want = "string"
-			}
-			if got != want {
-				t.Errorf("XSITypeOf(%q) = %q; want %q", tc.in, got, want)
+			if got != tc.want {
+				t.Errorf("XSITypeOf(%q) = %q; want %q", tc.value, got, tc.want)
 			}
 		})
 	}
