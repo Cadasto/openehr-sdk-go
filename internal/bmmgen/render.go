@@ -1129,9 +1129,29 @@ func propertyDoc(goName, doc string) string {
 	return b.String()
 }
 
+// The two parts of the note a root schema's declaration ends its
+// documentation with: a reason, then the upstream reference it rests on.
+const (
+	rootNoteReason   = "Reason: "
+	rootNoteUpstream = "Upstream: "
+)
+
+// withoutRootNote returns doc less the note a root schema's declaration ends
+// its documentation with, which documents the schema and not the Go type: the
+// text from the first "Reason: " that an "Upstream: " follows to the end.
+func withoutRootNote(doc string) string {
+	before, rest, ok := strings.Cut(doc, rootNoteReason)
+	if !ok || !strings.Contains(rest, rootNoteUpstream) {
+		return doc
+	}
+	return before
+}
+
 // cleanDoc collapses leading/trailing whitespace per line and trims
-// the whole block. Returns "" if the doc is effectively empty.
+// the whole block, leaving out a root schema's note ([withoutRootNote]).
+// Returns "" if the doc is effectively empty.
 func cleanDoc(doc string) string {
+	doc = withoutRootNote(doc)
 	if doc == "" {
 		return ""
 	}
