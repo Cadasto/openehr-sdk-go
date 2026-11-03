@@ -8,6 +8,7 @@ Leftovers of merged branches: defects the branch that found them did not fix, an
 
 ## Unsorted
 - important · openehr/rm/common_resource_xmlunmar_gen.go:60 · canxml decodes a list member into a value that already holds items by appending to them, where canjson replaces them, so the same document decoded into a reused value gives different lists in the two codecs. · evidence: throwaway test (Triage 2 worker): a ResourceDescription holding OtherContributors ["y"], decoded from a document with one contributor "x", gives ["y" "x"] through canxml.Unmarshal and ["x"] through canjson.Unmarshal; the generated decoders append on main too · by: sdd-implementer · from: feat/operational-template-model-req-176
+- testkit/probes/template/probe_111_operational_template_compare.go:406 · probe111SameText compares the text of every element by numeric or boolean value, not only numeric and boolean elements, so a string element "1.0" re-encoded as "1", or "1" re-encoded as "true", passes PROBE-111. · by: sdd-spec-conformance-reviewer, go-reviewer · from: feat/operational-template-model-req-176
 
 ## Generator and validator: a required attribute with no child, and an untyped node (REQ-102, REQ-107)
 Two defects where a root `Generate` returns breaks REQ-107 § Contract *Output*, or the template validator reads a node otherwise than the generator builds it; code in openehr/instance and openehr/validation/engine.go, under sentences that already bind (REQ-100 *Node taxonomy*, REQ-107 *Generic and untyped types*). Lane: maintenance. Size: S–M.
