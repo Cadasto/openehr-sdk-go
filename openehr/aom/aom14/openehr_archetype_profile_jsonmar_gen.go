@@ -6,7 +6,9 @@ package aom14
 import (
 	"encoding/json/jsontext"
 	json "encoding/json/v2"
+	"fmt"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
@@ -181,7 +183,14 @@ type rawOrdinal Ordinal
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
+// A member typed Any that holds a value its decoder would not read
+// back is refused, as the canonical-XML encoder refuses it.
 func (o Ordinal) MarshalJSONTo(enc *jsontext.Encoder) error {
+	switch _v := o.Symbol.(type) {
+	case nil, *rm.DVCodedText, *rm.CodePhrase, rm.DVCodedText, rm.CodePhrase:
+	default:
+		return fmt.Errorf("canjson: ORDINAL.symbol holds %T, which is none of the shapes its canonical XML takes", _v)
+	}
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawOrdinal
@@ -203,7 +212,14 @@ type rawScale Scale
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
+// A member typed Any that holds a value its decoder would not read
+// back is refused, as the canonical-XML encoder refuses it.
 func (s Scale) MarshalJSONTo(enc *jsontext.Encoder) error {
+	switch _v := s.Symbol.(type) {
+	case nil, *rm.DVCodedText, *rm.CodePhrase, rm.DVCodedText, rm.CodePhrase:
+	default:
+		return fmt.Errorf("canjson: SCALE.symbol holds %T, which is none of the shapes its canonical XML takes", _v)
+	}
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawScale

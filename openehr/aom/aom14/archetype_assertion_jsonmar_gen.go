@@ -6,7 +6,9 @@ package aom14
 import (
 	"encoding/json/jsontext"
 	json "encoding/json/v2"
+	"fmt"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlschema"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
@@ -93,7 +95,14 @@ type rawExprLeaf ExprLeaf
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
+// A member typed Any that holds a value its decoder would not read
+// back is refused, as the canonical-XML encoder refuses it.
 func (e ExprLeaf) MarshalJSONTo(enc *jsontext.Encoder) error {
+	switch _v := e.Item.(type) {
+	case nil, string, xmlschema.TypedString, *xmlschema.TypedString, interface{ BMMName() string }:
+	default:
+		return fmt.Errorf("canjson: EXPR_LEAF.item holds %T, which is no class value, typed string or string", _v)
+	}
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawExprLeaf

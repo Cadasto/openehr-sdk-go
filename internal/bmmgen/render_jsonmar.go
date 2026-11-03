@@ -88,7 +88,14 @@ func RenderMarshalJSONFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	body.WriteString("\n")
 	body.WriteString("import (\n")
 	body.WriteString("\t\"encoding/json/jsontext\"\n")
-	body.WriteString("\tjson \"encoding/json/v2\"\n\n")
+	body.WriteString("\tjson \"encoding/json/v2\"\n")
+	if slices.ContainsFunc(chunks, func(c string) bool { return strings.Contains(c, "fmt.Errorf(") }) {
+		body.WriteString("\t\"fmt\"\n")
+	}
+	body.WriteString("\n")
+	if slices.ContainsFunc(chunks, func(c string) bool { return strings.Contains(c, "xmlschema.TypedString") }) {
+		fmt.Fprintf(&body, "\t%q\n", xmlschemaImportPath)
+	}
 	fmt.Fprintf(&body, "\t%q\n", typeregImportPath)
 	if needExternal {
 		fmt.Fprintf(&body, "\t%q\n", plan.Target.ExternalImport)
@@ -389,6 +396,13 @@ func renderMarshalJSON(plan *Plan, pc *PlannedClass) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	checks, err := jsonAnyChecks(plan, pc, recv)
+	if err != nil {
+		return "", err
+	}
+	if checks != "" && shape != shapeAlias {
+		return "", fmt.Errorf("%s has an Any member and takes JSON wire shape %d, whose encoder does not check one", pc.BMMName, shape)
+	}
 	switch shape {
 	case shapeFlat:
 		return renderMarshalFlat(plan, pc, recv, typeParams, typeArgs)
@@ -399,9 +413,69 @@ func renderMarshalJSON(plan *Plan, pc *PlannedClass) (string, error) {
 	case shapeIntervalAlias:
 		return renderMarshalAliasInterval(pc, recv, typeParams, typeArgs), nil
 	case shapeAlias:
-		return renderMarshalAlias(pc, recv, typeParams, typeArgs), nil
+		return renderMarshalAlias(pc, recv, typeParams, typeArgs, checks), nil
 	}
 	return "", fmt.Errorf("%s: unhandled JSON wire shape %d", pc.BMMName, shape)
+}
+
+// jsonAnyChecks returns the statements a class's MarshalJSONTo runs before it
+// writes its members typed by the BMM root type Any, held as a Go any, or as a
+// *any when optional: each refuses a value its canonical-JSON decoder would
+// not read back, as the canonical-XML encoder refuses it, so the SDK reads its
+// own output. A member whose canonical XML takes a choice of shapes
+// ([xmlChoiceOf]), such as the AOM 1.4 `ORDINAL.symbol`, holds one of the
+// shapes, through a pointer or by value; any other, such as `EXPR_LEAF.item`,
+// a string, an xmlschema.TypedString or a pointer to one, or a class value,
+// one with a BMMName method. Either may be nil. The refusal names the member
+// and the Go type it holds, never the value. It returns "" for a class with
+// no such member.
+func jsonAnyChecks(plan *Plan, pc *PlannedClass, recv string) (string, error) {
+	fields, err := effectiveFields(plan, pc)
+	if err != nil {
+		return "", err
+	}
+	var b strings.Builder
+	for _, ef := range fields {
+		p, ok := ef.Prop.(*bmm.SingleProperty)
+		if !ok || p.TypeName != bmmAnyType {
+			continue
+		}
+		choice, err := xmlChoiceOf(plan, pc, ef)
+		if err != nil {
+			return "", err
+		}
+		value := recv + "." + FieldName(p.PropertyName())
+		indent := "\t"
+		if !p.IsMandatory {
+			fmt.Fprintf(&b, "\tif %s != nil {\n", value)
+			value = "(*" + value + ")"
+			indent = "\t\t"
+		}
+		label := pc.BMMName + "." + p.PropertyName()
+		accepted := "nil, string, xmlschema.TypedString, *xmlschema.TypedString, interface{ BMMName() string }"
+		refusal := "which is no class value, typed string or string"
+		if choice != nil {
+			label = choice.label
+			types := []string{"nil"}
+			for _, shape := range choice.shapes {
+				types = append(types, "*"+shape.goType)
+			}
+			for _, shape := range choice.shapes {
+				types = append(types, shape.goType)
+			}
+			accepted = strings.Join(types, ", ")
+			refusal = "which is none of the shapes its canonical XML takes"
+		}
+		fmt.Fprintf(&b, "%sswitch _v := %s.(type) {\n", indent, value)
+		fmt.Fprintf(&b, "%scase %s:\n", indent, accepted)
+		fmt.Fprintf(&b, "%sdefault:\n", indent)
+		fmt.Fprintf(&b, "%s\treturn fmt.Errorf(\"canjson: %s holds %%T, %s\", _v)\n", indent, label, refusal)
+		fmt.Fprintf(&b, "%s}\n", indent)
+		if !p.IsMandatory {
+			b.WriteString("\t}\n")
+		}
+	}
+	return b.String(), nil
 }
 
 // renderMarshalAlias emits the alias shape: a method-free alias and a
@@ -409,7 +483,8 @@ func renderMarshalJSON(plan *Plan, pc *PlannedClass) (string, error) {
 // The wrapper embeds the alias by value, so encode copies the value receiver
 // into it once. Converting a pointer to the receiver instead would move the
 // receiver to the heap, which costs a second allocation per encoded value.
-func renderMarshalAlias(pc *PlannedClass, recv, typeParams, typeArgs string) string {
+// checks, from [jsonAnyChecks], run first.
+func renderMarshalAlias(pc *PlannedClass, recv, typeParams, typeArgs, checks string) string {
 	alias := aliasTypeName(pc.GoName)
 	var b strings.Builder
 	b.WriteString(renderMarshalAliasDecl(pc, typeParams, typeArgs))
@@ -423,7 +498,12 @@ func renderMarshalAlias(pc *PlannedClass, recv, typeParams, typeArgs string) str
 	b.WriteString("// The receiver is a value so a concrete instance sitting\n")
 	b.WriteString("// in a polymorphic interface slot by value, the shape the like-interface\n")
 	b.WriteString("// accessors admit, still carries its `_type`.\n")
+	if checks != "" {
+		b.WriteString("// A member typed Any that holds a value its decoder would not read\n")
+		b.WriteString("// back is refused, as the canonical-XML encoder refuses it.\n")
+	}
 	fmt.Fprintf(&b, "func (%s %s%s) MarshalJSONTo(enc *jsontext.Encoder) error {\n", recv, pc.GoName, typeArgs)
+	b.WriteString(checks)
 	b.WriteString("\treturn json.MarshalEncode(enc, &struct {\n")
 	b.WriteString("\t\tType string `json:\"_type\"`\n")
 	fmt.Fprintf(&b, "\t\t%s%s\n", alias, typeArgs)

@@ -66,3 +66,41 @@ func TestREQ176_REQ052_SymbolCanonicalJSONRefusals(t *testing.T) {
 		t.Errorf("canjson.Unmarshal(null symbol) = %v, symbol %#v; want nil, nil", err, null.Symbol)
 	}
 }
+
+// TestREQ176_REQ052_SymbolCanonicalJSONEncodeRefusals pins that canonical JSON
+// refuses to write an ORDINAL or SCALE symbol its decoder would not read back,
+// as the canonical-XML encoder refuses one: a value that is none of the two
+// shapes, such as a string, a *rm.DVText or a number, fails with
+// canjson.ErrInvalidValue, and so does an EXPR_LEAF item that is neither a
+// class value, a typed string, a string nor nil, such as a number, a boolean,
+// a list or a map. Either shape by value, a class value and nil are written.
+func TestREQ176_REQ052_SymbolCanonicalJSONEncodeRefusals(t *testing.T) {
+	code := rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "local"}, CodeString: "at1"}
+	refused := []any{"at0001", &rm.DVText{Value: "x"}, rm.DVText{Value: "x"}, 42, &code.TerminologyID}
+	for _, symbol := range refused {
+		for _, v := range []any{&aom14.Ordinal{Value: 1, Symbol: symbol}, &aom14.Scale{Value: 1.5, Symbol: symbol}} {
+			if b, err := canjson.Marshal(v); !errors.Is(err, canjson.ErrInvalidValue) {
+				t.Errorf("canjson.Marshal(%T holding %T) = %s, %v; want canjson.ErrInvalidValue", v, symbol, b, err)
+			}
+		}
+	}
+	for _, symbol := range []any{nil, rm.DVCodedText{DefiningCode: code}, code} {
+		for _, v := range []any{&aom14.Ordinal{Value: 1, Symbol: symbol}, &aom14.Scale{Value: 1.5, Symbol: symbol}} {
+			if _, err := canjson.Marshal(v); err != nil {
+				t.Errorf("canjson.Marshal(%T holding %T) = %v; want nil", v, symbol, err)
+			}
+		}
+	}
+	for _, item := range []any{42, 2.5, true, []string{"a"}, map[string]any{}, &code.CodeString} {
+		leaf := &aom14.ExprLeaf{Type: "String", ReferenceType: "constant", Item: item}
+		if b, err := canjson.Marshal(leaf); !errors.Is(err, canjson.ErrInvalidValue) {
+			t.Errorf("canjson.Marshal(EXPR_LEAF holding %T) = %s, %v; want canjson.ErrInvalidValue", item, b, err)
+		}
+	}
+	for _, item := range []any{nil, "x", &aom14.CString{}, &rm.DVText{Value: "x"}, aom14.TypedString{Value: "x", Type: "xs:string"}} {
+		leaf := &aom14.ExprLeaf{Type: "String", ReferenceType: "constant", Item: item}
+		if _, err := canjson.Marshal(leaf); err != nil {
+			t.Errorf("canjson.Marshal(EXPR_LEAF holding %T) = %v; want nil", item, err)
+		}
+	}
+}
