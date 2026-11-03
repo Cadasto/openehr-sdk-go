@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
@@ -238,9 +238,9 @@ func TestTextInput_REQ106_REQ103_CStringList(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			opt, err := template.ParseOPT(bytes.NewReader(tc.opt))
+			opt, err := aom14.ReadOperationalTemplate(bytes.NewReader(tc.opt))
 			if err != nil {
-				t.Fatalf("ParseOPT: %v", err)
+				t.Fatalf("ReadOperationalTemplate: %v", err)
 			}
 			c, err := templatecompile.Compile(opt)
 			if err != nil {

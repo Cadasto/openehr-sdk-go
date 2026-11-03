@@ -12,14 +12,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
 func compileFixture(t *testing.T, path string) *templatecompile.Compiled {
 	t.Helper()
-	opt, err := template.ParseFile(path)
+	opt, err := readOPTFile(path)
 	if err != nil {
 		t.Fatalf("parse %s: %v", path, err)
 	}
@@ -69,9 +69,9 @@ func TestBuildNoDefaultLanguage(t *testing.T) {
 	}
 	stripped := slices.Concat(before, after)
 
-	opt, err := template.ParseOPT(bytes.NewReader(stripped))
+	opt, err := aom14.ReadOperationalTemplate(bytes.NewReader(stripped))
 	if err != nil {
-		t.Fatalf("ParseOPT (language stripped): %v", err)
+		t.Fatalf("ReadOperationalTemplate (language stripped): %v", err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
