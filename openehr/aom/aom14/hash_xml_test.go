@@ -8,6 +8,8 @@ package aom14_test
 
 import (
 	"encoding/xml"
+	"errors"
+	"os"
 	"reflect"
 	"slices"
 	"strings"
@@ -144,5 +146,37 @@ func TestREQ176_REQ056_ArchetypeTranslations(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got.Translations, in.Translations) {
 		t.Errorf("round trip of %s gives the translations %#v; want %#v", out, got.Translations, *in.Translations)
+	}
+}
+
+// TestREQ176_REQ170_RepeatedHashKeyRefused pins that an OPT repeating the key
+// of a Hash entry, which the pinned schemas do not forbid, is refused in every
+// mode rather than decoded with the earlier entry replaced: a corpus OPT given
+// a second `original_author` with the `id` of an earlier one fails with
+// canxml.ErrInvalidShape, naming the entry by its path and not its key.
+func TestREQ176_REQ170_RepeatedHashKeyRefused(t *testing.T) {
+	raw, err := os.ReadFile("../../../testkit/corpus/crossformat/consult_record/template.opt")
+	if err != nil {
+		t.Fatalf("read the corpus OPT: %v", err)
+	}
+	const last = `<original_author id="date">2023-03-30</original_author>`
+	if !strings.Contains(string(raw), last) {
+		t.Fatalf("the corpus OPT holds no %s", last)
+	}
+	doc := strings.Replace(string(raw), last, last+`<original_author id="email">second@example.org</original_author>`, 1)
+	var reported []string
+	for mode, opts := range decodeModes(&reported) {
+		var ot aom14.OperationalTemplate
+		err := canxml.Unmarshal([]byte(doc), &ot, opts...)
+		if !errors.Is(err, canxml.ErrInvalidShape) {
+			t.Fatalf("canxml.Unmarshal(%s) = %v; want canxml.ErrInvalidShape", mode, err)
+		}
+		const path = "/template[1]/description[1]/original_author[5]"
+		if de, ok := errors.AsType[*canxml.DecodeError](err); !ok || de == nil || de.Path != path {
+			t.Errorf("canxml.Unmarshal(%s) = %v; want a DecodeError naming %s", mode, err, path)
+		}
+		if msg := err.Error(); strings.Contains(msg, "email") || strings.Contains(msg, "example.org") {
+			t.Errorf("canxml.Unmarshal(%s) error %q quotes the entry's key or value", mode, msg)
+		}
 	}
 }

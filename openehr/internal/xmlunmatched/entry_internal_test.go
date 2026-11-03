@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
 // The targets below read a Hash member as the generated decoders do
@@ -233,5 +235,140 @@ func TestREQ176_EntryValueFailureNamesNoValue(t *testing.T) {
 	}
 	if len(got.Parts) != 0 {
 		t.Errorf("Parts = %#v; want no entry for a value that failed", got.Parts)
+	}
+}
+
+// entryModes are the decodes a Hash entry is refused in alike: a whole
+// document read untracked, as canxml.Unmarshal reads one given no option, and
+// read through a tracker that reports unmatched content or refuses it.
+var entryModes = map[string]func(doc string, v any) error{
+	"default": func(doc string, v any) error { return Unmarshal([]byte(doc), v, nil) },
+	"report":  func(doc string, v any) error { return Unmarshal([]byte(doc), v, NewTracker(func(string) {}, false)) },
+	"strict":  func(doc string, v any) error { return Unmarshal([]byte(doc), v, NewTracker(nil, true)) },
+}
+
+// TestREQ176_REQ170_EntryRepeatedOrMissingKeyRefused pins that a Hash entry
+// whose key an earlier entry of the same member holds, or that has none, is
+// refused in every mode, whether its value is a String or a class keyed by an
+// attribute or by its language: the error wraps ErrInvalidShape, is a
+// *typereg.DecodeError naming the entry by its path from the root, and
+// carries none of the key's text. An empty `id` is a key.
+func TestREQ176_REQ170_EntryRepeatedOrMissingKeyRefused(t *testing.T) {
+	const key = "secret-key"
+	item := func(lang string) string {
+		return `<language>` + lang + `</language><purpose>p</purpose>`
+	}
+	for _, tc := range []struct {
+		name, body, path string
+	}{
+		{
+			name: "a String entry repeating an id",
+			body: `<author id="` + key + `">A</author><author id="b">B</author><author id="` + key + `">C</author>` +
+				`<details>` + item("en") + `</details>`,
+			path: "/holder[1]/author[3]",
+		},
+		{
+			name: "a String entry with no id",
+			body: `<author id="a">A</author><author>B</author><details>` + item("en") + `</details>`,
+			path: "/holder[1]/author[2]",
+		},
+		{
+			name: "a class entry repeating an id",
+			body: `<author id="a">A</author><details>` + item("en") + `</details>` +
+				`<parts id="` + key + `">` + item("fr") + `</parts><parts id="` + key + `">` + item("de") + `</parts>`,
+			path: "/holder[1]/parts[2]",
+		},
+		{
+			name: "a class entry with no id",
+			body: `<author id="a">A</author><details>` + item("en") + `</details><parts>` + item("fr") + `</parts>`,
+			path: "/holder[1]/parts[1]",
+		},
+		{
+			name: "a language-keyed entry repeating a language",
+			body: `<author id="a">A</author><details>` + item(key) + `</details><details>` + item(key) + `</details>`,
+			path: "/holder[1]/details[2]",
+		},
+		{
+			name: "a language-keyed entry with no language",
+			body: `<author id="a">A</author><details>` + item("en") + `</details><details><purpose>q</purpose></details>`,
+			path: "/holder[1]/details[2]",
+		},
+	} {
+		doc := `<holder ` + xmlnsDecl + `>` + tc.body + `</holder>`
+		for mode, decode := range entryModes {
+			t.Run(tc.name+"/"+mode, func(t *testing.T) {
+				err := decode(doc, new(entryHolder))
+				if !errors.Is(err, ErrInvalidShape) {
+					t.Fatalf("decode = %v; want an error wrapping ErrInvalidShape", err)
+				}
+				de, ok := errors.AsType[*typereg.DecodeError](err)
+				if !ok || de == nil || de.Path != tc.path {
+					t.Errorf("decode = %v; want a *typereg.DecodeError naming %s", err, tc.path)
+				}
+				if strings.Contains(err.Error(), key) {
+					t.Errorf("decode error %q quotes the key", err)
+				}
+			})
+		}
+	}
+	for mode, decode := range entryModes {
+		var got entryHolder
+		doc := `<holder ` + xmlnsDecl + `><author id="">A</author><details>` + item("en") + `</details></holder>`
+		if err := decode(doc, &got); err != nil || got.Author[""] != "A" {
+			t.Errorf("%s decode of an entry with an empty id = %#v, %v; want it under the empty key", mode, got.Author, err)
+		}
+	}
+}
+
+// countHolder holds a Hash member and a whole number after it, whose text may
+// fail to decode.
+type countHolder struct {
+	Author map[string]string
+	Count  int
+}
+
+var countHolderClass = &Class{Name: "COUNTED"}
+
+func (h *countHolder) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error {
+	if _, err := Enter(dec, start, countHolderClass); err != nil {
+		return err
+	}
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			return err
+		}
+		switch tk := tok.(type) {
+		case xml.StartElement:
+			switch LocalName(tk.Name) {
+			case "author":
+				if err := DecodeEntry(dec, &tk, "id", &h.Author); err != nil {
+					return err
+				}
+			case "count":
+				if err := DecodeElement(dec, &tk, &h.Count); err != nil {
+					return err
+				}
+			default:
+				if err := SkipUnmatched(dec, tk); err != nil {
+					return err
+				}
+			}
+		case xml.EndElement:
+			return nil
+		}
+	}
+}
+
+// TestREQ176_EntryKeysOfASecondDecode pins that the entries a first decode put
+// in a map are no earlier entries of the document: a document with a primitive
+// failure after a Hash member, which Unmarshal given no tracker decodes a
+// second time into the same value to name the failure's path, fails at that
+// element, not at an entry of the member.
+func TestREQ176_EntryKeysOfASecondDecode(t *testing.T) {
+	doc := `<counted ` + xmlnsDecl + `><author id="a">A</author><author id="b">B</author><count>many</count></counted>`
+	err := Unmarshal([]byte(doc), new(countHolder), nil)
+	if de, ok := errors.AsType[*typereg.DecodeError](err); !ok || de == nil || de.Path != "/counted[1]/count[1]" || !IsPrimitiveFailure(err) {
+		t.Errorf("Unmarshal = %v; want the primitive failure of /counted[1]/count[1]", err)
 	}
 }
