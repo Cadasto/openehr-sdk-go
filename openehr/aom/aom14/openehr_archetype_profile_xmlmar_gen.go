@@ -369,12 +369,16 @@ func (o *Ordinal) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	}
 	switch _v := o.Symbol.(type) {
 	case nil:
-	case *rm.DVCodedText, *rm.CodePhrase:
+	case *rm.DVCodedText:
+		if err := canxml.EncodeElementOmittingEmpty(_e, _v, xml.StartElement{Name: xml.Name{Local: "symbol"}}, "value"); err != nil {
+			return err
+		}
+	case *rm.CodePhrase:
 		if err := _e.EncodeElement(_v, xml.StartElement{Name: xml.Name{Local: "symbol"}}); err != nil {
 			return err
 		}
 	case rm.DVCodedText:
-		if err := _e.EncodeElement(&_v, xml.StartElement{Name: xml.Name{Local: "symbol"}}); err != nil {
+		if err := canxml.EncodeElementOmittingEmpty(_e, &_v, xml.StartElement{Name: xml.Name{Local: "symbol"}}, "value"); err != nil {
 			return err
 		}
 	case rm.CodePhrase:
@@ -430,12 +434,16 @@ func (s *Scale) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	}
 	switch _v := s.Symbol.(type) {
 	case nil:
-	case *rm.DVCodedText, *rm.CodePhrase:
+	case *rm.DVCodedText:
+		if err := canxml.EncodeElementOmittingEmpty(_e, _v, xml.StartElement{Name: xml.Name{Local: "symbol"}}, "value"); err != nil {
+			return err
+		}
+	case *rm.CodePhrase:
 		if err := _e.EncodeElement(_v, xml.StartElement{Name: xml.Name{Local: "symbol"}}); err != nil {
 			return err
 		}
 	case rm.DVCodedText:
-		if err := _e.EncodeElement(&_v, xml.StartElement{Name: xml.Name{Local: "symbol"}}); err != nil {
+		if err := canxml.EncodeElementOmittingEmpty(_e, &_v, xml.StartElement{Name: xml.Name{Local: "symbol"}}, "value"); err != nil {
 			return err
 		}
 	case rm.CodePhrase:

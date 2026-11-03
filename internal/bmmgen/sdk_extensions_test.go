@@ -400,7 +400,8 @@ func TestSDKExtensions_REQ041_REQ176_SchemaFormChoice(t *testing.T) {
 	encoder := method(files["org_test_model_xmlmar_gen.go"], "func (o *Ordinal) MarshalXML")
 	for _, want := range []string{
 		"switch _v := o.Symbol.(type) {",
-		"case *Text, *Code:\n\t\tif err := _e.EncodeElement(_v, xml.StartElement{Name: xml.Name{Local: \"symbol\"}}); err != nil {",
+		"case *Text:\n\t\tif err := _e.EncodeElement(_v, xml.StartElement{Name: xml.Name{Local: \"symbol\"}}); err != nil {",
+		"case *Code:\n\t\tif err := _e.EncodeElement(_v, xml.StartElement{Name: xml.Name{Local: \"symbol\"}}); err != nil {",
 		"case Text:\n\t\tif err := _e.EncodeElement(&_v, xml.StartElement{Name: xml.Name{Local: \"symbol\"}}); err != nil {",
 		"case Code:\n",
 		"default:\n\t\treturn fmt.Errorf(",

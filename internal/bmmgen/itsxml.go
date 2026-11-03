@@ -528,6 +528,90 @@ func (s *xsdSet) appendParticle(out []string, n *xsdNode, groups []string) ([]st
 	}
 }
 
+// elementType returns the local name of the type the named type declares for
+// its child element elem, in its own particle or its extension bases', and
+// false when it declares no such element or gives it no named type.
+func (s *xsdSet) elementType(name, elem string) (string, bool) {
+	visiting := []string{}
+	for t, ok := s.types[name]; ok && !slices.Contains(visiting, t.name); t, ok = s.types[t.base] {
+		visiting = append(visiting, t.name)
+		if t.content == nil {
+			continue
+		}
+		if n := s.findElement(t.content, elem, nil); n != nil {
+			typ := schemaLocalName(n.attr("type"))
+			return typ, typ != ""
+		}
+	}
+	return "", false
+}
+
+// findElement returns the first declaration of the element elem in particle n,
+// at any depth, through the groups it refers to, or nil.
+func (s *xsdSet) findElement(n *xsdNode, elem string, groups []string) *xsdNode {
+	switch {
+	case n.is("element"):
+		if n.attr("name") == elem {
+			return n
+		}
+	case n.is("sequence"), n.is("choice"), n.is("all"):
+		for i := range n.Children {
+			if found := s.findElement(&n.Children[i], elem, groups); found != nil {
+				return found
+			}
+		}
+	case n.is("group"):
+		ref := schemaLocalName(n.attr("ref"))
+		if g, ok := s.groups[ref]; ok && !slices.Contains(groups, ref) {
+			return s.findElement(g, elem, append(groups, ref))
+		}
+	}
+	return nil
+}
+
+// optionalElements returns the names of the elements the named type's own
+// particle declares optional: each declaration of the element has
+// minOccurs="0", on itself or on a particle around it. The branches of an
+// xs:choice count each as a particle of its own, so an element a branch
+// requires is not optional, although the choice may take another branch.
+func (s *xsdSet) optionalElements(name string) []string {
+	t, ok := s.types[name]
+	if !ok || t.content == nil {
+		return nil
+	}
+	optional := map[string]bool{}
+	var walk func(n *xsdNode, around bool, groups []string)
+	walk = func(n *xsdNode, around bool, groups []string) {
+		around = around || n.attr("minOccurs") == "0"
+		switch {
+		case n.is("element"):
+			name := n.attr("name")
+			if seen, ok := optional[name]; ok {
+				optional[name] = seen && around
+			} else {
+				optional[name] = around
+			}
+		case n.is("sequence"), n.is("choice"), n.is("all"):
+			for i := range n.Children {
+				walk(&n.Children[i], around, groups)
+			}
+		case n.is("group"):
+			ref := schemaLocalName(n.attr("ref"))
+			if g, ok := s.groups[ref]; ok && !slices.Contains(groups, ref) {
+				walk(g, around, append(groups, ref))
+			}
+		}
+	}
+	walk(t.content, false, nil)
+	var out []string
+	for _, name := range sortedStringKeys(optional) {
+		if optional[name] {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
 // xmlChildOrder gives one target's XML encoders their child order, from the
 // ITS-XML schema sets in the target's lookup order.
 type xmlChildOrder struct {
@@ -686,6 +770,23 @@ func (o *xmlChildOrder) rootElementFor(class string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// optionalChildrenOf returns the child elements the schemas make optional in
+// the type of the element elem of class: the type class's schema type, as
+// [xmlChildOrder.typeFor] finds it, declares for elem, read from the set that
+// declares class's type. It returns nil when the schemas declare no such
+// element or give it no named type.
+func (o *xmlChildOrder) optionalChildrenOf(plan *Plan, class, elem string) []string {
+	i, name, ok := o.typeFor(plan, class)
+	if !ok {
+		return nil
+	}
+	typ, ok := o.sets[i].elementType(name, elem)
+	if !ok {
+		return nil
+	}
+	return o.sets[i].optionalElements(typ)
 }
 
 // nearestLineage returns class and every class it descends from, nearest

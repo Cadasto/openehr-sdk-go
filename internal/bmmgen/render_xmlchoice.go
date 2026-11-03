@@ -23,12 +23,16 @@ type xmlChoice struct {
 	shapes []xmlChoiceShape
 }
 
-// xmlChoiceShape is one shape of an [xmlChoice]: the Go type of its class and
-// the child elements its schema type declares.
+// xmlChoiceShape is one shape of an [xmlChoice]: the Go type of its class, the
+// child elements its schema type declares, and those of them the member's own
+// schema type makes optional that the class holds as a mandatory member, which
+// the class's encoder always writes: the member's encoder leaves each out when
+// it is empty.
 type xmlChoiceShape struct {
-	class    string
-	goType   string
-	elements []string
+	class     string
+	goType    string
+	elements  []string
+	omitEmpty []string
 }
 
 // xmlChoiceOf returns the choice ef, a member of the class pc, takes, or nil
@@ -38,7 +42,10 @@ type xmlChoiceShape struct {
 // shapes is a class with no generated XML decoder or a generic class; and when
 // two of its shapes share an element, so the first child could not choose.
 // Each shape's elements are its schema type's, or, in a plan built without the
-// schemas, its members'.
+// schemas, its members'. A shape's mandatory member whose element the type the
+// schemas give the member's own element makes optional, such as the `value` of
+// the DV_CODED_TEXT shape of ORDINAL.symbol, is left out when empty; a plan
+// built without the schemas leaves out none.
 func xmlChoiceOf(plan *Plan, pc *PlannedClass, ef emittedField) (*xmlChoice, error) {
 	prop := ef.Prop.PropertyName()
 	var form schemaForm
@@ -56,9 +63,13 @@ func xmlChoiceOf(plan *Plan, pc *PlannedClass, ef emittedField) (*xmlChoice, err
 		return nil, fmt.Errorf("%s.schema_forms: %s is typed %s; a choice needs a member typed %s", sdkExtensionsMember, label, propertyTypeName(ef.Prop), bmmAnyType)
 	}
 	c := &xmlChoice{label: label, varName: "xmlChoice" + pc.GoName + FieldName(prop)}
+	var optional []string
+	if plan.xmlOrder != nil {
+		optional = plan.xmlOrder.optionalChildrenOf(plan, pc.BMMName, prop)
+	}
 	owner := map[string]string{} // element → the shape that declares it
 	for _, class := range form.Shapes {
-		shape, err := xmlChoiceShapeOf(plan, label, class)
+		shape, err := xmlChoiceShapeOf(plan, label, class, optional)
 		if err != nil {
 			return nil, err
 		}
@@ -73,8 +84,9 @@ func xmlChoiceOf(plan *Plan, pc *PlannedClass, ef emittedField) (*xmlChoice, err
 	return c, nil
 }
 
-// xmlChoiceShapeOf returns the shape class takes in the choice label names.
-func xmlChoiceShapeOf(plan *Plan, label, class string) (xmlChoiceShape, error) {
+// xmlChoiceShapeOf returns the shape class takes in the choice label names,
+// whose element's schema type makes the elements optional names optional.
+func xmlChoiceShapeOf(plan *Plan, label, class string, optional []string) (xmlChoiceShape, error) {
 	decoding, err := xmlClassDecoding(plan, class)
 	if err != nil {
 		return xmlChoiceShape{}, err
@@ -98,8 +110,13 @@ func xmlChoiceShapeOf(plan *Plan, label, class string) (xmlChoiceShape, error) {
 	}
 	shape := xmlChoiceShape{class: class, goType: qualifyClassRef(plan, pc)}
 	for _, f := range ordered {
-		if name := f.Prop.PropertyName(); !slices.Contains(attrs.members, name) {
-			shape.elements = append(shape.elements, name)
+		name := f.Prop.PropertyName()
+		if slices.Contains(attrs.members, name) {
+			continue
+		}
+		shape.elements = append(shape.elements, name)
+		if isMandatoryProperty(f.Prop) && slices.Contains(optional, name) {
+			shape.omitEmpty = append(shape.omitEmpty, name)
 		}
 	}
 	return shape, nil
@@ -154,7 +171,9 @@ func unmarshalXMLChoice(recv, field, elem string, c *xmlChoice, mandatory bool) 
 // marshalXMLChoice emits the encoding of a choice member: the value it holds,
 // a pointer to one of the shapes or a shape by value, under the member's
 // element, through the shape's own MarshalXML, which writes no `xsi:type`; a
-// nil member writes nothing, and a value of any other type is refused.
+// nil member writes nothing, and a value of any other type is refused. A
+// shape with members to leave out when empty is written through
+// canxml.EncodeElementOmittingEmpty.
 func marshalXMLChoice(recv, field, elem string, c *xmlChoice, mandatory bool) string {
 	start := fmt.Sprintf("xml.StartElement{Name: xml.Name{Local: %q}}", elem)
 	var b strings.Builder
@@ -165,17 +184,26 @@ func marshalXMLChoice(recv, field, elem string, c *xmlChoice, mandatory bool) st
 		value = "*" + value
 		indent = "\t\t"
 	}
-	pointers := make([]string, len(c.shapes))
-	for i, s := range c.shapes {
-		pointers[i] = "*" + s.goType
+	encode := func(s xmlChoiceShape, v string) {
+		call := fmt.Sprintf("_e.EncodeElement(%s, %s)", v, start)
+		if len(s.omitEmpty) > 0 {
+			args := make([]string, len(s.omitEmpty))
+			for i, name := range s.omitEmpty {
+				args[i] = fmt.Sprintf("%q", name)
+			}
+			call = fmt.Sprintf("canxml.EncodeElementOmittingEmpty(_e, %s, %s, %s)", v, start, strings.Join(args, ", "))
+		}
+		fmt.Fprintf(&b, "%s\tif err := %s; err != nil {\n%s\t\treturn err\n%s\t}\n", indent, call, indent, indent)
 	}
 	fmt.Fprintf(&b, "%sswitch _v := %s.(type) {\n", indent, value)
 	fmt.Fprintf(&b, "%scase nil:\n", indent)
-	fmt.Fprintf(&b, "%scase %s:\n", indent, strings.Join(pointers, ", "))
-	fmt.Fprintf(&b, "%s\tif err := _e.EncodeElement(_v, %s); err != nil {\n%s\t\treturn err\n%s\t}\n", indent, start, indent, indent)
+	for _, s := range c.shapes {
+		fmt.Fprintf(&b, "%scase *%s:\n", indent, s.goType)
+		encode(s, "_v")
+	}
 	for _, s := range c.shapes {
 		fmt.Fprintf(&b, "%scase %s:\n", indent, s.goType)
-		fmt.Fprintf(&b, "%s\tif err := _e.EncodeElement(&_v, %s); err != nil {\n%s\t\treturn err\n%s\t}\n", indent, start, indent, indent)
+		encode(s, "&_v")
 	}
 	fmt.Fprintf(&b, "%sdefault:\n", indent)
 	fmt.Fprintf(&b, "%s\treturn fmt.Errorf(\"canxml: %s holds %%T, which is none of the shapes its element takes\", _v)\n", indent, c.label)
