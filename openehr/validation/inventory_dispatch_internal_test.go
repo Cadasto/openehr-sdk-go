@@ -333,7 +333,7 @@ func TestInventory_REQ171_DispatchCheckFailsOnEachGap(t *testing.T) {
 // that the inventory does not would be dispatched nothing.
 func TestInventory_REQ171_CoversEveryRegisteredClass(t *testing.T) {
 	t.Parallel()
-	names := typereg.Default.Names()
+	names := rmClassNames()
 	if len(names) == 0 {
 		t.Fatal("the registry knows no class; registrations missing?")
 	}
@@ -354,7 +354,7 @@ func TestInventory_REQ171_CoversEveryRegisteredClass(t *testing.T) {
 func TestCoverage_REQ171_EveryRootListsItsUnevaluatedInvariants(t *testing.T) {
 	t.Parallel()
 	listed := 0
-	for _, name := range typereg.Default.Names() {
+	for _, name := range rmClassNames() {
 		ctor, _ := typereg.Default.Lookup(name)
 		got := ValidateRM(ctor()).Coverage.Unevaluated
 		for i, key := range got {
