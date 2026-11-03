@@ -24,7 +24,7 @@ import (
 func TestREQ175_RenderUnmarshalXMLClassDescriptor(t *testing.T) {
 	flagged, parentResource := 0, false
 	for _, target := range []Target{TargetRM, TargetAOM14} {
-		plan, err := BuildPlanForTarget(context.Background(), target, bmm.FSResolver{Root: testResources})
+		plan, err := BuildPlanForTarget(context.Background(), target, testResolver())
 		if err != nil {
 			t.Fatalf("BuildPlanForTarget: %v", err)
 		}
@@ -141,7 +141,7 @@ func mandatoryProperty(prop bmm.Property) bool {
 // DV_COUNT renders to the literal its one mandatory member and one
 // multi-valued member give, before gofmt aligns it.
 func TestREQ175_XMLClassDescriptorOrderAndShape(t *testing.T) {
-	plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlanForTarget(context.Background(), TargetRM, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget: %v", err)
 	}

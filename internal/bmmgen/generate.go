@@ -1,10 +1,11 @@
 // Package bmmgen is the BMM-driven code generator for the SDK.
 //
-// It reads the pinned BMM files in resources/bmm/ via openehr/bmm and
-// emits Go source under one or more target output directories. The
-// canonical-XML encoders also take their child order from the ITS-XML
-// schemas vendored in resources/its-xml/, since the BMM gives none. Per
-// target it writes:
+// It reads, via openehr/bmm, the schema each target names, either a root
+// schema the SDK authors in resources/bmm/sdk/ over the pinned BMM files in
+// resources/bmm/ or a pinned file itself, and emits Go source under one or
+// more target output directories. The canonical-XML encoders also take
+// their child order from the ITS-XML schemas vendored in resources/its-xml/,
+// since the BMM gives none. Per target it writes:
 //
 //   - one <package>_gen.go per BMM top-level package, with its
 //     canonical JSON and XML companions (_jsonmar_gen.go,
@@ -83,7 +84,10 @@ import (
 // Options controls a single generator invocation.
 type Options struct {
 	// ResourcesDir is the path to the directory containing the pinned
-	// `*.bmm.json` files. Required.
+	// `*.bmm.json` files, with the root schemas the SDK authors over them
+	// in its `sdk` sub-directory. A target's root id resolves among the
+	// roots first and the pinned schemas second, and an id both hold fails
+	// the run. Required.
 	ResourcesDir string
 	// ITSXMLDir is the directory of the vendored ITS-XML schemas, whose
 	// element sequences give the XML encoders their child order (see
@@ -183,7 +187,7 @@ func Run(opts Options) (*Result, error) {
 		opts.ITSXMLDir = filepath.Join(filepath.Dir(filepath.Clean(opts.ResourcesDir)), "its-xml")
 	}
 
-	resolver := wrappedResolver{root: opts.ResourcesDir}
+	resolver := newSchemaResolver(opts.ResourcesDir)
 	schemas := &itsXMLSchemas{dir: opts.ITSXMLDir}
 	result := &Result{}
 
@@ -199,7 +203,7 @@ func Run(opts Options) (*Result, error) {
 
 // runTarget generates (or verifies) one target. Returns the
 // per-target diagnostic counters and appends to the global Result.
-func runTarget(opts Options, t Target, resolver wrappedResolver, schemas *itsXMLSchemas, result *Result) (TargetResult, error) {
+func runTarget(opts Options, t Target, resolver schemaResolver, schemas *itsXMLSchemas, result *Result) (TargetResult, error) {
 	tr := TargetResult{Target: t}
 	plan, err := BuildPlanForTarget(context.Background(), t, resolver)
 	if err != nil {

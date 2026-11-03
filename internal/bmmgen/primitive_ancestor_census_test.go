@@ -62,12 +62,6 @@ var primitiveAncestorDrops = map[string][]string{
 	},
 }
 
-// schemaFileSuffix is the filename suffix of a vendored BMM schema. It alone
-// defines what counts as a schema root on disk — bmm.FSResolver resolves a
-// root as <Root>/<id>.bmm.json, so any file carrying the suffix is a root the
-// census must walk, whatever its prefix.
-const schemaFileSuffix = ".bmm.json"
-
 // dvTemporalRoot is the schema root that carries the DV temporal types, and
 // dvTemporalRedeclarers the four types themselves. They descend from the
 // primitive-mapped Iso8601_type yet stay out of the census: each redeclares

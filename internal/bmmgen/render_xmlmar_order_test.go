@@ -244,7 +244,7 @@ func TestXMLEncodersFollowSchemaOrder(t *testing.T) {
 		{TargetRM, []*xsdSet{rmSet, amSet}},
 		{TargetAOM14, []*xsdSet{amSet, rmSet}},
 	} {
-		plan, err := BuildPlanForTarget(context.Background(), tc.target, bmm.FSResolver{Root: testResources})
+		plan, err := BuildPlanForTarget(context.Background(), tc.target, testResolver())
 		if err != nil {
 			t.Fatalf("BuildPlanForTarget(%s): %v", tc.target.GoPackage, err)
 		}
@@ -285,7 +285,7 @@ func TestXMLEncodersFollowSchemaOrder(t *testing.T) {
 // the checker looked away.
 func TestSchemaOrderProblemsCatches(t *testing.T) {
 	rmSet, amSet := loadTestXSDSets(t)
-	plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlanForTarget(context.Background(), TargetRM, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(rm): %v", err)
 	}

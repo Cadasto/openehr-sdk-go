@@ -131,7 +131,7 @@ func TestDriftDetectionCoversFunctionTable_REQ042(t *testing.T) {
 	opts := Options{
 		ResourcesDir:  testResources,
 		OutDir:        dir,
-		RootID:        "openehr_rm_1.2.0",
+		RootID:        TargetRM.RootID,
 		SkipInventory: true,
 	}
 	if _, err := Run(opts); err != nil {

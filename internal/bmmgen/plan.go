@@ -116,6 +116,11 @@ type Plan struct {
 	// referenced a class that was skipped (FUNCTION, ROUTINE, etc.).
 	// Diagnostic only; populated by the renderer.
 	MethodTodoEscapes int
+	// SourceLabel names the files the plan's schemas were read from, the
+	// target's root first and then every schema it includes, as the
+	// generated headers print it after "// Source: ". [BuildPlanForTarget]
+	// sets it; a plan computed from a schema already in memory has none.
+	SourceLabel string
 	// xmlOrder gives the XML encoders their child order from the ITS-XML
 	// schemas. [Run] sets it from [Target.ITSXMLSchemaSets]; when it is nil
 	// the encoders write their children in the generator's property order.
@@ -137,12 +142,24 @@ func BuildPlan(ctx context.Context, rootID string, resolver bmm.Resolver) (*Plan
 // BuildPlanForTarget loads the BMM root schema for the given target
 // (via the supplied resolver) and computes a [Plan].
 func BuildPlanForTarget(ctx context.Context, t Target, resolver bmm.Resolver) (*Plan, error) {
-	_ = ctx                                        // reserved; bmm.LoadAll does not yet thread context.
 	schema, err := bmm.LoadAll(t.RootID, resolver) //nolint:contextcheck // ctx reserved; public bmm.LoadAll does not thread context yet
 	if err != nil {
 		return nil, fmt.Errorf("bmmgen: load %q: %w", t.RootID, err)
 	}
-	return PlanFromSchemaForTarget(schema, t)
+	ids, _, err := loadSchemaChain(ctx, t.RootID, resolver)
+	if err != nil {
+		return nil, err
+	}
+	label, err := sourceLabel(ids, resolver)
+	if err != nil {
+		return nil, err
+	}
+	p, err := PlanFromSchemaForTarget(schema, t)
+	if err != nil {
+		return nil, err
+	}
+	p.SourceLabel = label
+	return p, nil
 }
 
 // PlanFromSchema computes a [Plan] from an already-loaded schema.

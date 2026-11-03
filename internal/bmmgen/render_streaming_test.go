@@ -5,8 +5,6 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-
-	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
 )
 
 // typeTag is the struct tag of the `_type` member in every wire shape.
@@ -171,7 +169,7 @@ func TestRenderMarshalLeadsWithType(t *testing.T) {
 		}
 	}
 
-	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlan(context.Background(), TargetRM.RootID, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlan: %v", err)
 	}
@@ -217,7 +215,7 @@ func TestRenderMarshalLeadsWithType(t *testing.T) {
 // no `_type`, so the census above does not reach its encoder; this test checks
 // it beside the three classes that embed it.
 func TestRenderIntervalEncodersCopyTheReceiverOnce(t *testing.T) {
-	plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlanForTarget(context.Background(), TargetRM, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(RM): %v", err)
 	}
@@ -271,7 +269,7 @@ func TestRenderIntervalEncodersCopyTheReceiverOnce(t *testing.T) {
 // cannot use the alias shape, ruling R19), which is exactly the shape whose
 // per-field copy a dropped assignment would break.
 func TestRenderFlatDecodeDropPropertyLosesCopy(t *testing.T) {
-	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlan(context.Background(), TargetRM.RootID, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlan: %v", err)
 	}
@@ -319,7 +317,7 @@ func TestRenderFlatDecodeDropPropertyLosesCopy(t *testing.T) {
 // discriminator and accept a mislabelled body silently. The runtime twin is
 // TestUnmarshalTypeMismatchCensus in openehr/serialize/canjson.
 func TestRenderUnmarshalPassesDeclaredTypeField(t *testing.T) {
-	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlan(context.Background(), TargetRM.RootID, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlan: %v", err)
 	}

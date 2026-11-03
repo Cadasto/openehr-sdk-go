@@ -29,7 +29,7 @@ func TestIntervalShapedCensus(t *testing.T) {
 		{target: TargetAOM14, want: nil},
 	} {
 		t.Run(tc.target.RootID, func(t *testing.T) {
-			plan, err := BuildPlanForTarget(context.Background(), tc.target, bmm.FSResolver{Root: testResources})
+			plan, err := BuildPlanForTarget(context.Background(), tc.target, testResolver())
 			if err != nil {
 				t.Fatalf("BuildPlanForTarget(%s): %v", tc.target.RootID, err)
 			}
@@ -70,7 +70,7 @@ func TestIntervalShapedCensus(t *testing.T) {
 // of DV_INTERVAL's type parameter. BASE Interval's bound, the primitive
 // Ordered, is covered by the scalar case instead.
 func TestIntervalBoundClasses(t *testing.T) {
-	plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlanForTarget(context.Background(), TargetRM, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(RM): %v", err)
 	}
@@ -100,11 +100,11 @@ func TestIntervalBoundClasses(t *testing.T) {
 // nothing for either would let the emptiness test fall back to "never empty"
 // without a word.
 func TestZeroPredicateRefusals(t *testing.T) {
-	rmPlan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+	rmPlan, err := BuildPlanForTarget(context.Background(), TargetRM, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(RM): %v", err)
 	}
-	aomPlan, err := BuildPlanForTarget(context.Background(), TargetAOM14, bmm.FSResolver{Root: testResources})
+	aomPlan, err := BuildPlanForTarget(context.Background(), TargetAOM14, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(AOM14): %v", err)
 	}
@@ -138,7 +138,7 @@ func TestZeroPredicateRefusals(t *testing.T) {
 // primitive Ordered, which the scalar case covers; their encoders still call
 // omitIntervalBound, so a missing file would not compile.
 func TestIntervalBoundFileWithoutBoundClasses(t *testing.T) {
-	plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlanForTarget(context.Background(), TargetRM, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(RM): %v", err)
 	}
@@ -167,7 +167,7 @@ func TestIntervalBoundFileWithoutBoundClasses(t *testing.T) {
 // a generic parameter, gets that class's zero predicate. The test retypes
 // BASE Interval's bounds as DV_BOOLEAN, which no generic parameter names.
 func TestIntervalBoundFromFieldType(t *testing.T) {
-	plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlanForTarget(context.Background(), TargetRM, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(RM): %v", err)
 	}
@@ -199,7 +199,7 @@ func TestIntervalBoundFromFieldType(t *testing.T) {
 func TestIntervalBoundRefusesUnhandledBound(t *testing.T) {
 	for _, bound := range []string{"NO_SUCH_TYPE", "REFERENCE_RANGE"} {
 		t.Run(bound, func(t *testing.T) {
-			plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+			plan, err := BuildPlanForTarget(context.Background(), TargetRM, testResolver())
 			if err != nil {
 				t.Fatalf("BuildPlanForTarget(RM): %v", err)
 			}
@@ -253,7 +253,7 @@ func intervalSwitchArms(t *testing.T, src string) map[string]string {
 // generator leaves that combination writing its empty bound and only
 // `make codegen-check` notices, as a diff.
 func TestIntervalMarshalJSONOpenSideArms(t *testing.T) {
-	plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlanForTarget(context.Background(), TargetRM, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(RM): %v", err)
 	}
@@ -326,7 +326,7 @@ func TestIntervalMarshalJSONOpenSideArms(t *testing.T) {
 // lower open flag, and the `upper` element in the one that reads the upper
 // flag.
 func TestIntervalMarshalXMLOpenSideGuards(t *testing.T) {
-	plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlanForTarget(context.Background(), TargetRM, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(RM): %v", err)
 	}
@@ -388,7 +388,7 @@ func TestIntervalBaseCodecClasses(t *testing.T) {
 		{target: TargetAOM14, want: nil},
 	} {
 		t.Run(tc.target.RootID, func(t *testing.T) {
-			plan, err := BuildPlanForTarget(context.Background(), tc.target, bmm.FSResolver{Root: testResources})
+			plan, err := BuildPlanForTarget(context.Background(), tc.target, testResolver())
 			if err != nil {
 				t.Fatalf("BuildPlanForTarget(%s): %v", tc.target.RootID, err)
 			}
@@ -417,7 +417,7 @@ func TestIntervalBaseCodecClasses(t *testing.T) {
 // polymorphic discriminator value, and a BMMName on it would be promoted into
 // every class that embeds it.
 func TestIntervalBaseHasNoDiscriminatorMethods(t *testing.T) {
-	plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlanForTarget(context.Background(), TargetRM, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(RM): %v", err)
 	}
@@ -459,7 +459,7 @@ func TestIntervalBaseHasNoDiscriminatorMethods(t *testing.T) {
 // the base through the base's own alias, and no embedding class may keep a
 // `type rawX X` alias of itself.
 func TestIntervalDerivedWireEmbedsMethodFreeBase(t *testing.T) {
-	plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlanForTarget(context.Background(), TargetRM, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(RM): %v", err)
 	}
@@ -490,7 +490,7 @@ func TestIntervalDerivedWireEmbedsMethodFreeBase(t *testing.T) {
 // wrapper over it, and documents it for SDK users, as a sentence starting with
 // the name and free of requirement identifiers (AGENTS.md).
 func TestIntervalBoundFileExportsEmptinessTest(t *testing.T) {
-	plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlanForTarget(context.Background(), TargetRM, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(RM): %v", err)
 	}
@@ -522,7 +522,7 @@ func TestIntervalBoundFileExportsEmptinessTest(t *testing.T) {
 // also reads the Go field names SDK v0.28.0 and earlier wrote (REQ-056), and
 // that no other interval class does: their encoders always wrote snake_case.
 func TestIntervalBaseReadsLegacyXMLNames(t *testing.T) {
-	plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlanForTarget(context.Background(), TargetRM, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(RM): %v", err)
 	}
@@ -566,7 +566,7 @@ func TestIntervalBaseReadsLegacyXMLNames(t *testing.T) {
 // defaults only after a decode that succeeds: a failed decode returns first
 // and leaves what was read, as an in-place decode does.
 func TestREQ169IntervalDecodeReadsFlagsInPlace(t *testing.T) {
-	plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlanForTarget(context.Background(), TargetRM, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(RM): %v", err)
 	}
@@ -633,7 +633,7 @@ func TestREQ169IntervalFlaggedDecoderCensus(t *testing.T) {
 		{target: TargetAOM14, want: nil},
 	} {
 		t.Run(tc.target.RootID, func(t *testing.T) {
-			plan, err := BuildPlanForTarget(context.Background(), tc.target, bmm.FSResolver{Root: testResources})
+			plan, err := BuildPlanForTarget(context.Background(), tc.target, testResolver())
 			if err != nil {
 				t.Fatalf("BuildPlanForTarget(%s): %v", tc.target.RootID, err)
 			}
@@ -779,7 +779,7 @@ func TestREQ169IntervalFlaggedRefusals(t *testing.T) {
 // decoder reads its text through xmlunmatched.DecodeText, so a flag that is no
 // boolean fails as a primitive element's text fails (REQ-056).
 func TestREQ169IntervalFlagHelpersSettleOpenFlagsFirst(t *testing.T) {
-	plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlanForTarget(context.Background(), TargetRM, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(RM): %v", err)
 	}
@@ -810,7 +810,7 @@ func TestREQ169IntervalFlagHelpersSettleOpenFlagsFirst(t *testing.T) {
 // neighbours, and the refusal of an interval-shaped class that embeds a
 // marshaler-bearing concrete class.
 func TestJSONWireShapeCensus(t *testing.T) {
-	plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlanForTarget(context.Background(), TargetRM, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(RM): %v", err)
 	}

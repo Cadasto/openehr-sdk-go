@@ -129,9 +129,9 @@ func TestSimulatedVersionBump(t *testing.T) {
 	}
 	baselineTypereg := mustReadFile(t, filepath.Join(baselineOutDir, "openehr/rm/typereg_gen.go"))
 	bumpedTypereg := mustReadFile(t, filepath.Join(outDir, "openehr/rm/typereg_gen.go"))
-	// typereg files differ only in the SourceLabel inside the header
-	// comment (1.2.0 vs 1.2.1). Strip both file headers before
-	// comparing so we observe the *structural* content.
+	// typereg files differ only in the Source line of the header, which
+	// names the schema files (1.2.0 vs 1.2.1). Strip both file headers
+	// before comparing so we observe the *structural* content.
 	baselineTrim := stripHeader(string(baselineTypereg))
 	bumpedTrim := stripHeader(string(bumpedTypereg))
 	if baselineTrim != bumpedTrim {
@@ -141,9 +141,10 @@ func TestSimulatedVersionBump(t *testing.T) {
 
 	// --- 3c. The Go-side diff vs the baseline data_types_quantity
 	//        file must be small (the only structural change is the
-	//        added field).
+	//        added field). The headers name the schema files, so they
+	//        are left out of the count.
 	baselineQuant := mustReadFile(t, filepath.Join(baselineOutDir, "openehr/rm/data_types_quantity_gen.go"))
-	added, removed := lineDelta(string(baselineQuant), string(body))
+	added, removed := lineDelta(stripHeader(string(baselineQuant)), stripHeader(string(body)))
 	if removed != 0 {
 		t.Errorf("expected 0 removed lines from data_types_quantity_gen.go, got %d", removed)
 	}

@@ -5,8 +5,6 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-
-	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
 )
 
 // TestRenderJSONHooksRegistersTheWalkersTable pins the interface table the RM
@@ -20,7 +18,7 @@ import (
 // internal/rmjsonwalk/polyreg. The AOM 1.4 hooks file gets no table, since
 // the JSON walk does not check AOM 1.4 classes.
 func TestRenderJSONHooksRegistersTheWalkersTable(t *testing.T) {
-	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlan(context.Background(), TargetRM.RootID, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlan: %v", err)
 	}
@@ -76,7 +74,7 @@ func TestRenderJSONHooksRegistersTheWalkersTable(t *testing.T) {
 		}
 	}
 
-	aom, err := BuildPlanForTarget(context.Background(), TargetAOM14, bmm.FSResolver{Root: testResources})
+	aom, err := BuildPlanForTarget(context.Background(), TargetAOM14, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(AOM 1.4): %v", err)
 	}

@@ -41,7 +41,7 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 	plans := map[string]*Plan{}
 	withDecoder := map[string]bool{}
 	for _, target := range []Target{TargetRM, TargetAOM14} {
-		plan, err := BuildPlanForTarget(context.Background(), target, bmm.FSResolver{Root: testResources})
+		plan, err := BuildPlanForTarget(context.Background(), target, testResolver())
 		if err != nil {
 			t.Fatalf("BuildPlanForTarget: %v", err)
 		}
@@ -212,7 +212,7 @@ func isOctetProperty(prop bmm.Property) bool {
 func TestREQ056_RenderMarshalXMLOctetListAsBase64(t *testing.T) {
 	octets := 0
 	for _, target := range []Target{TargetRM, TargetAOM14} {
-		plan, err := BuildPlanForTarget(context.Background(), target, bmm.FSResolver{Root: testResources})
+		plan, err := BuildPlanForTarget(context.Background(), target, testResolver())
 		if err != nil {
 			t.Fatalf("BuildPlanForTarget: %v", err)
 		}
@@ -288,7 +288,7 @@ func decodedClassName(prop bmm.Property) string {
 // the case cannot decode alone, an interface or an Octet, or a list with no
 // item type, is refused at generation rather than skipped.
 func TestREQ056_GenericListDecode(t *testing.T) {
-	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(aom14): %v", err)
 	}
