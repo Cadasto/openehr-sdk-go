@@ -12,9 +12,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
@@ -166,6 +168,18 @@ func unpaddedIdentifierOPT() string {
 // "defining_code\n   ".
 func paddedIdentifierOPT() string {
 	return identifierText.ReplaceAllString(unpaddedIdentifierOPT(), "$1$4\n \t\t  $2$5\n\t   $3$6")
+}
+
+// elementText is identifierText without the xsi:type values: the operational
+// template model refuses an xsi:type padded with white space, as it refuses
+// an unknown one, so a test that reads the model pads the other identifiers
+// only.
+var elementText = regexp.MustCompile(`(<(?:rm_attribute_name|rm_type_name|node_id|value|code_list|code_string)>)([^<]*)(</)|(path=")([^"]*)(")`)
+
+// paddedElementOPT is paddedIdentifierOPT with every xsi:type value left as
+// written.
+func paddedElementOPT() string {
+	return elementText.ReplaceAllString(unpaddedIdentifierOPT(), "$1$4\n \t\t  $2$5\n\t   $3$6")
 }
 
 // dumpNode writes n and its subtree, one line per node or attribute, with
@@ -427,17 +441,18 @@ func holdsType(t *testing.T, raw []byte, typ string) bool {
 
 // TestREQ100_PaddedIdentifiersCompileGenerateAndValidate pins the effect of
 // § REQ-100 Node taxonomy on the compile, the generator (REQ-107) and the
-// validators (REQ-102): the padded OPT compiles to the attributes the
-// unpadded one compiles to, none marked NotInRM, and under every policy and
+// validators (REQ-102): the padded OPT (paddedElementOPT, which leaves the
+// xsi:type values as written) compiles to the attributes the unpadded one
+// compiles to, none marked NotInRM, and under every policy and
 // value fill the generator writes the root it writes for the unpadded OPT,
 // which both validators accept. Medium and Large build the optional
 // OBSERVATION, so their root holds the interval and its two bounds.
 func TestREQ100_PaddedIdentifiersCompileGenerateAndValidate(t *testing.T) {
 	compile := func(t *testing.T, body string) *templatecompile.Compiled {
 		t.Helper()
-		opt, err := template.ParseOPTStrict(strings.NewReader(body))
+		opt, err := aom14.ReadOperationalTemplate(strings.NewReader(body), canxml.WithStrict())
 		if err != nil {
-			t.Fatalf("ParseOPTStrict: %v", err)
+			t.Fatalf("ReadOperationalTemplate(strict): %v", err)
 		}
 		c, err := templatecompile.Compile(opt)
 		if err != nil {
@@ -446,7 +461,7 @@ func TestREQ100_PaddedIdentifiersCompileGenerateAndValidate(t *testing.T) {
 		return c
 	}
 	plain := compile(t, unpaddedIdentifierOPT())
-	padded := compile(t, paddedIdentifierOPT())
+	padded := compile(t, paddedElementOPT())
 
 	var got, want []string
 	compiledAttributes(padded.Root(), "", &got)
