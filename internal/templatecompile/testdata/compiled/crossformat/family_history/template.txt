@@ -182,6 +182,7 @@ node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items
 
 node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0008]/items[at0009]/value/defining_code
   rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=0..1 slot=false
+  primitive=constraints.CodeReference{CodePhrase:constraints.CodePhrase{Terminology:"" CodeList:[]} ReferenceSetURI:"terminology://fhir.hl7.org/ValueSet/$expand?url=http://hl7.org/fhir/ValueSet/condition-code"}
   attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 

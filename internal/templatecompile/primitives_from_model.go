@@ -18,10 +18,10 @@ import (
 )
 
 // primitiveFromModel returns the primitive constraint of the model node o:
-// the one its C_PRIMITIVE_OBJECT item, C_CODE_PHRASE, C_DV_QUANTITY,
-// C_DV_ORDINAL or CONSTRAINT_REF states, or nil for any other node, and for a
-// C_PRIMITIVE_OBJECT with no item, which allows any value. A C_CODE_REFERENCE
-// carries none yet.
+// the one its C_PRIMITIVE_OBJECT item, C_CODE_PHRASE, C_CODE_REFERENCE,
+// C_DV_QUANTITY, C_DV_ORDINAL or CONSTRAINT_REF states, or nil for any other
+// node, and for a C_PRIMITIVE_OBJECT with no item, which allows any value. A
+// C_CODE_REFERENCE's code phrase is read as a C_CODE_PHRASE's.
 //
 // An error reports a value the constraint cannot carry: a temporal range
 // bound that is not ISO 8601 text of its type, a timezone_validity that names
@@ -38,6 +38,11 @@ func primitiveFromModel(o aom14.CObject) (constraints.PrimitiveConstraint, error
 		return primitiveItemFromModel(n.Item)
 	case *aom14.CCodePhrase:
 		return codePhraseFromModel(n), nil
+	case *aom14.CCodeReference:
+		return constraints.CodeReference{
+			CodePhrase:      codePhraseFromModel(&n.CCodePhrase),
+			ReferenceSetURI: strings.TrimSpace(n.ReferenceSetURI),
+		}, nil
 	case *aom14.CDVQuantity:
 		return dvQuantityFromModel(n), nil
 	case *aom14.CDVOrdinal:

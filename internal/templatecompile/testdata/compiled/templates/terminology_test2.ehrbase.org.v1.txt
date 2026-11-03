@@ -112,6 +112,7 @@ node /content[openEHR-EHR-OBSERVATION.terminology_test.v0]/data/events[at0002]/d
 
 node /content[openEHR-EHR-OBSERVATION.terminology_test.v0]/data/events[at0002]/data/items[at0004]/value/defining_code
   rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=0..1 slot=false
+  primitive=constraints.CodeReference{CodePhrase:constraints.CodePhrase{Terminology:"" CodeList:[]} ReferenceSetURI:"terminology://fhir.hl7.org/ValueSet/$expand?url=urn:oid:2.16.724.4.21.5.8.16"}
   attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 

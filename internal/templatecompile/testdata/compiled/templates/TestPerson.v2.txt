@@ -136,6 +136,7 @@ node /details/items[at0033]/value
 
 node /details/items[at0033]/value/defining_code
   rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodeReference{CodePhrase:constraints.CodePhrase{Terminology:"" CodeList:[]} ReferenceSetURI:"terminology:code24?subset=marital_status"}
   attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
@@ -175,6 +176,7 @@ node /details/items[at2402]/value
 
 node /details/items[at2402]/value/defining_code
   rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodeReference{CodePhrase:constraints.CodePhrase{Terminology:"" CodeList:[]} ReferenceSetURI:"terminology:code24?subset=nationalities"}
   attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
@@ -192,6 +194,7 @@ node /details/items[at2403]/value
 
 node /details/items[at2403]/value/defining_code
   rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodeReference{CodePhrase:constraints.CodePhrase{Terminology:"" CodeList:[]} ReferenceSetURI:"terminology:code24?subset=life_stances"}
   attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
@@ -327,6 +330,7 @@ node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[
 
 node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0002]/value/defining_code
   rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodeReference{CodePhrase:constraints.CodePhrase{Terminology:"" CodeList:[]} ReferenceSetURI:"terminology:code24?subset=wid_document_type"}
   attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
@@ -366,6 +370,7 @@ node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[
 
 node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0005]/value/defining_code
   rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodeReference{CodePhrase:constraints.CodePhrase{Terminology:"" CodeList:[]} ReferenceSetURI:"terminology:code24?subset=ja_nee_onbekend"}
   attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
@@ -547,6 +552,7 @@ node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.annotations.v1]/items[at0001]/na
 
 node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.annotations.v1]/items[at0001]/name/defining_code
   rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodeReference{CodePhrase:constraints.CodePhrase{Terminology:"" CodeList:[]} ReferenceSetURI:"terminology:code24?subset=party_annotations"}
   attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
@@ -695,6 +701,7 @@ node /identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2]/details/item
 
 node /identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2]/details/items[at2410]/value/defining_code
   rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodeReference{CodePhrase:constraints.CodePhrase{Terminology:"" CodeList:[]} ReferenceSetURI:"terminology:code24?subset=full_name_assembly_order"}
   attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
@@ -803,6 +810,7 @@ node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/details
 
 node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/details/items[at0002]/items[at2403]/value/defining_code
   rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodeReference{CodePhrase:constraints.CodePhrase{Terminology:"" CodeList:[]} ReferenceSetURI:"terminology:code24?subset=address_house_number_indication"}
   attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 

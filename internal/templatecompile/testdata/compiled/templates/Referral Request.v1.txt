@@ -58,6 +58,7 @@ node /context/other_context/items[openEHR-EHR-CLUSTER.annotations.v1]/items[at00
 
 node /context/other_context/items[openEHR-EHR-CLUSTER.annotations.v1]/items[at0001]/name/defining_code
   rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodeReference{CodePhrase:constraints.CodePhrase{Terminology:"" CodeList:[]} ReferenceSetURI:"terminology:code24?subset=context_annotations"}
   attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 

@@ -99,6 +99,7 @@ node /details/items[at0002]/items[at2403]/value
 
 node /details/items[at0002]/items[at2403]/value/defining_code
   rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodeReference{CodePhrase:constraints.CodePhrase{Terminology:"" CodeList:[]} ReferenceSetURI:"terminology:code24?subset=address_house_number_indication"}
   attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 

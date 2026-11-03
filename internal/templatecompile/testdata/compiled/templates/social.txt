@@ -90,6 +90,7 @@ node /content[openEHR-EHR-OBSERVATION.livingsituation.v1]/data/events[at0002]/da
 
 node /content[openEHR-EHR-OBSERVATION.livingsituation.v1]/data/events[at0002]/data/items[at0004]/value/defining_code
   rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodeReference{CodePhrase:constraints.CodePhrase{Terminology:"" CodeList:[]} ReferenceSetURI:"terminology:code24?subset=livingsituation_housetype"}
   attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
@@ -158,6 +159,7 @@ node /content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002
 
 node /content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002]/data/items[at0004]/items[at0005]/value/defining_code
   rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodeReference{CodePhrase:constraints.CodePhrase{Terminology:"" CodeList:[]} ReferenceSetURI:"terminology:code24?subset=communication_language"}
   attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
@@ -175,6 +177,7 @@ node /content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002
 
 node /content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002]/data/items[at0004]/items[at0006]/value/defining_code
   rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodeReference{CodePhrase:constraints.CodePhrase{Terminology:"" CodeList:[]} ReferenceSetURI:"terminology:code24?subset=languagecontrol_listening"}
   attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
@@ -192,6 +195,7 @@ node /content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002
 
 node /content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002]/data/items[at0004]/items[at0007]/value/defining_code
   rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodeReference{CodePhrase:constraints.CodePhrase{Terminology:"" CodeList:[]} ReferenceSetURI:"terminology:code24?subset=languagecontrol_speaking"}
   attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
@@ -209,6 +213,7 @@ node /content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002
 
 node /content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002]/data/items[at0004]/items[at0008]/value/defining_code
   rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodeReference{CodePhrase:constraints.CodePhrase{Terminology:"" CodeList:[]} ReferenceSetURI:"terminology:code24?subset=languagecontrol_reading"}
   attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
@@ -226,6 +231,7 @@ node /content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002
 
 node /content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002]/data/items[at0004]/items[at0010]/value/defining_code
   rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodeReference{CodePhrase:constraints.CodePhrase{Terminology:"" CodeList:[]} ReferenceSetURI:"terminology:code24?subset=languagecontrol_specialneeds"}
   attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
@@ -386,6 +392,7 @@ node /content[openEHR-EHR-OBSERVATION.helpfromothers.v1]/data/events[at0002]/dat
 
 node /content[openEHR-EHR-OBSERVATION.helpfromothers.v1]/data/events[at0002]/data/items[at0006]/value/defining_code
   rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodeReference{CodePhrase:constraints.CodePhrase{Terminology:"" CodeList:[]} ReferenceSetURI:"terminology:code24?subset=type_of_help"}
   attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
@@ -449,6 +456,7 @@ node /content[openEHR-EHR-EVALUATION.familysituation.v1]/data/items[at0002]/valu
 
 node /content[openEHR-EHR-EVALUATION.familysituation.v1]/data/items[at0002]/value/defining_code
   rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodeReference{CodePhrase:constraints.CodePhrase{Terminology:"" CodeList:[]} ReferenceSetURI:"terminology:code24?subset=family_composition"}
   attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
@@ -517,6 +525,7 @@ node /content[openEHR-EHR-EVALUATION.familysituation.v1]/data/items[at0006]/item
 
 node /content[openEHR-EHR-EVALUATION.familysituation.v1]/data/items[at0006]/items[at0008]/value/defining_code
   rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodeReference{CodePhrase:constraints.CodePhrase{Terminology:"" CodeList:[]} ReferenceSetURI:"terminology:code24/1.0?subset=ja_nee"}
   attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
@@ -562,6 +571,7 @@ node /content[openEHR-EHR-EVALUATION.education_summary.v1]/data/items[at0002]/va
 
 node /content[openEHR-EHR-EVALUATION.education_summary.v1]/data/items[at0002]/value/defining_code
   rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodeReference{CodePhrase:constraints.CodePhrase{Terminology:"" CodeList:[]} ReferenceSetURI:"terminology:code24?subset=educational_qualification"}
   attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 

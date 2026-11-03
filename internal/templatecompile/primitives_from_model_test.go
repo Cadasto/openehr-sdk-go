@@ -175,6 +175,21 @@ func TestREQ103_REQ111_PrimitiveFromModelMatchesParserOverCorpus(t *testing.T) {
 			t.Errorf("%s: primitiveFromModel(%T) = %v; want the parser's %s", p.where, p.model, err, renderPrimitive(want))
 			continue
 		}
+		if ref, ok := p.model.(*aom14.CCodeReference); ok {
+			// The parser reads no constraint on a C_CODE_REFERENCE; the
+			// compile step reads its code phrase as a C_CODE_PHRASE's, with
+			// the reference set's URI beside it.
+			if want != nil {
+				t.Errorf("%s: the parser reads %s on a C_CODE_REFERENCE; want none", p.where, renderPrimitive(want))
+			}
+			want = constraints.CodeReference{
+				CodePhrase:      codePhraseFromModel(&ref.CCodePhrase),
+				ReferenceSetURI: strings.TrimSpace(ref.ReferenceSetURI),
+			}
+			if want.(constraints.CodeReference).ReferenceSetURI == "" {
+				t.Errorf("%s: a corpus C_CODE_REFERENCE with no reference set URI", p.where)
+			}
+		}
 		if g, w := renderPrimitive(got), renderPrimitive(want); g != w {
 			t.Errorf("%s: primitiveFromModel(%T) =\n  %s\nwant the parser's\n  %s", p.where, p.model, g, w)
 		}
@@ -194,6 +209,7 @@ func TestREQ103_REQ111_PrimitiveFromModelMatchesParserOverCorpus(t *testing.T) {
 		constraints.CDateTime{},
 		constraints.CDuration{},
 		constraints.CodePhrase{},
+		constraints.CodeReference{},
 		constraints.DvQuantity{},
 		constraints.CDvOrdinal{},
 		constraints.ConstraintRef{},
@@ -277,9 +293,22 @@ func TestREQ103_PrimitiveFromModelReadings(t *testing.T) {
 			want: constraints.CodePhrase{Terminology: "local", CodeList: []string{"at0001", "at0002"}},
 		},
 		{
-			name:  "C_CODE_REFERENCE carries no constraint yet",
-			model: &aom14.CCodeReference{RMTypeName: "CODE_PHRASE", TerminologyID: &rm.TerminologyID{Value: "local"}},
-			want:  nil,
+			name: "C_CODE_REFERENCE: its code phrase read as a C_CODE_PHRASE's, the reference set URI trimmed",
+			model: &aom14.CCodeReference{
+				RMTypeName:      "CODE_PHRASE",
+				TerminologyID:   &rm.TerminologyID{Value: " SNOMED-CT "},
+				CodeList:        &[]string{" 22298006 ", " "},
+				ReferenceSetURI: " terminology:SNOMED-CT ",
+			},
+			want: constraints.CodeReference{
+				CodePhrase:      constraints.CodePhrase{Terminology: "SNOMED-CT", CodeList: []string{"22298006"}},
+				ReferenceSetURI: "terminology:SNOMED-CT",
+			},
+		},
+		{
+			name:  "C_CODE_REFERENCE with only a reference set",
+			model: &aom14.CCodeReference{RMTypeName: "CODE_PHRASE", ReferenceSetURI: "terminology:code24?subset=marital_status"},
+			want:  constraints.CodeReference{ReferenceSetURI: "terminology:code24?subset=marital_status"},
 		},
 		{
 			name: "C_DV_QUANTITY: an openehr property fills its units, an empty item is left out",
