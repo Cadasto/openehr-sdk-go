@@ -1,10 +1,12 @@
 package ehr_test
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
 func TestItemTagHeaderRoundTrip(t *testing.T) {
@@ -95,6 +97,9 @@ func TestFormatItemTagHeader_ControlCharsRejected(t *testing.T) {
 			}
 			if !strings.Contains(err.Error(), "control characters") {
 				t.Errorf("error should mention 'control characters', got: %v", err)
+			}
+			if !errors.Is(err, transport.ErrInvalidConfig) {
+				t.Errorf("FormatItemTagHeader(%+v) error = %v, want ErrInvalidConfig", tc.tag, err)
 			}
 			if !strings.Contains(err.Error(), "item tag[0]") {
 				t.Errorf("error should identify the offending tag index, got: %v", err)
