@@ -678,15 +678,16 @@ func (e *engine) judgeLeaf(n engineNode, class string, pc constraints.PrimitiveC
 
 // appendLeftIssues appends to issues what the primitive constraint pc,
 // bound to node n of the bare RM class class, judges of what the empty part
-// of n's value leaves: a C_CODE_PHRASE judges the terminology by its own
-// rule, its code list set aside, and the constraint of a DV_ORDINAL judges
-// the ordinal's value alone, which [primitiveInput] passes on as it is. Any
-// other constraint is left nothing to judge: a C_DV_QUANTITY's ranges are
-// per unit, and a temporal short name reads the value alone.
+// of n's value leaves: a C_CODE_PHRASE, or the one a C_CODE_REFERENCE
+// carries, judges the terminology by its own rule, its code list set aside,
+// and the constraint of a DV_ORDINAL judges the ordinal's value alone, which
+// [primitiveInput] passes on as it is. Any other constraint is left nothing
+// to judge: a C_DV_QUANTITY's ranges are per unit, and a temporal short name
+// reads the value alone.
 func appendLeftIssues(issues []Issue, n engineNode, class string, pc constraints.PrimitiveConstraint) []Issue {
 	switch class {
 	case "CODE_PHRASE":
-		if cp, ok := pc.(constraints.CodePhrase); ok {
+		if cp, ok := constraints.CodePhraseOf(pc); ok {
 			return appendPrimitiveIssues(issues, n.value, n.path, constraints.CodePhrase{Terminology: cp.Terminology})
 		}
 	case "DV_ORDINAL":

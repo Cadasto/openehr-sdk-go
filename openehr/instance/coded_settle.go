@@ -371,18 +371,18 @@ func (s codedSlot) write(node *tcimpl.CompiledNode, code rm.CodePhrase, isDefaul
 
 // listedCodes returns, in the order the OPT lists them, the codes node
 // lists for a code phrase, or for a coded text's defining code: a
-// C_CODE_PHRASE's codes, in its terminology, or in terminologyID where it
-// names none; or, for a CODE_PHRASE node whose code string carries a
-// C_STRING list, each listed code string in each terminology the C_STRING
-// on its terminology id lists, or in terminologyID where it lists none.
-// Below node it reads, like the walk, the alternative the walk builds
-// under ([bindingChild]). A nil node, a code list that is empty and a
-// pattern list nothing.
+// C_CODE_PHRASE's codes, or those of the one a C_CODE_REFERENCE carries, in
+// its terminology, or in terminologyID where it names none; or, for a
+// CODE_PHRASE node whose code string carries a C_STRING list, each listed
+// code string in each terminology the C_STRING on its terminology id lists,
+// or in terminologyID where it lists none. Below node it reads, like the
+// walk, the alternative the walk builds under ([bindingChild]). A nil node,
+// a code list that is empty and a pattern list nothing.
 func listedCodes(node *tcimpl.CompiledNode, terminologyID string) []rm.CodePhrase {
 	if node == nil {
 		return nil
 	}
-	if cp, ok := node.PrimitiveConstraint().(constraints.CodePhrase); ok {
+	if cp, ok := constraints.CodePhraseOf(node.PrimitiveConstraint()); ok {
 		term := cp.Terminology
 		if term == "" {
 			term = terminologyID

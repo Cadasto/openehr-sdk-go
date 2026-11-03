@@ -105,12 +105,12 @@ func useTermText(node *tcimpl.CompiledNode, v *rm.DVCodedText) {
 }
 
 // useListedCode gives v, a locatable's name the walk built under node, the
-// first code that the C_CODE_PHRASE on node's defining_code lists whose
-// term text (termText) node admits, with that text, so that the name's
-// text is its code's term. v keeps the code and the text the walk wrote
-// where node lists no such code.
+// first code that the C_CODE_PHRASE on node's defining_code, or the one a
+// C_CODE_REFERENCE there carries, lists whose term text (termText) node
+// admits, with that text, so that the name's text is its code's term. v
+// keeps the code and the text the walk wrote where node lists no such code.
 func useListedCode(node *tcimpl.CompiledNode, v *rm.DVCodedText) {
-	cp, ok := primitiveOf(bindingChild(node, "defining_code")).(constraints.CodePhrase)
+	cp, ok := constraints.CodePhraseOf(primitiveOf(bindingChild(node, "defining_code")))
 	if !ok {
 		return
 	}

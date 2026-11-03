@@ -2322,20 +2322,21 @@ func codedNameOf(n *templatecompile.CompiledNode) codedName {
 // codedValueOf returns the coded value c, a child of a node's name,
 // determines, or the zero codedName where it determines none. c must be a
 // DV_CODED_TEXT whose defining_code the template constrains through one
-// C_CODE_PHRASE, of a named terminology, that lists either exactly one code,
-// or several of which exactly one has a term text ([codeTermText]) equal to
-// the text the template pins on c's value: a closed C_STRING list of one
-// entry. The value's text is the pinned text, else the code's term text, and
-// the C_STRING on c's value, if any, must admit it. This is the name the
-// generator writes there. A C_CODE_PHRASE that lists no code, an external
-// reference set (C_CODE_REFERENCE) and several codes with no pinned text
-// leave the code open, and a code with no term text and no pinned text leaves
-// the text open: decode invents neither.
+// C_CODE_PHRASE, or one C_CODE_REFERENCE read as the code phrase it carries,
+// of a named terminology, that lists either exactly one code, or several of
+// which exactly one has a term text ([codeTermText]) equal to the text the
+// template pins on c's value: a closed C_STRING list of one entry. The
+// value's text is the pinned text, else the code's term text, and the
+// C_STRING on c's value, if any, must admit it. This is the name the
+// generator writes there. A code phrase that names no terminology or lists
+// no code, such as a reference set that names only its URI, and several
+// codes with no pinned text leave the code open, and a code with no term
+// text and no pinned text leaves the text open: decode invents neither.
 func codedValueOf(c *templatecompile.CompiledNode) codedName {
 	if c.RMTypeName() != "DV_CODED_TEXT" {
 		return codedName{}
 	}
-	phrase, ok := onePrimitive(c, "defining_code").(constraints.CodePhrase)
+	phrase, ok := constraints.CodePhraseOf(onePrimitive(c, "defining_code"))
 	if !ok || phrase.Terminology == "" {
 		return codedName{}
 	}

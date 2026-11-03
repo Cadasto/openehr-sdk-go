@@ -265,3 +265,66 @@ func TestTextInput_REQ106_REQ103_CStringList(t *testing.T) {
 		})
 	}
 }
+
+// REQ-106, REQ-103 — a DV_CODED_TEXT whose defining_code is a
+// C_CODE_REFERENCE emits the CODED_TEXT input of the code phrase constraint
+// it carries: the same input a C_CODE_PHRASE listing those codes emits. The
+// case edits the vendored fixture's local C_CODE_PHRASE on at0034 into a
+// C_CODE_REFERENCE with the same codes and a reference set URI.
+func TestCodedTextInput_REQ106_REQ103_CodeReference(t *testing.T) {
+	t.Parallel()
+	const fixture = "../../../testkit/corpus/templates/Test_dv_coded_text_with_local_codes.v0.opt"
+	raw, err := os.ReadFile(fixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const (
+		phrase   = `<children xsi:type="C_CODE_PHRASE">`
+		lastCode = "<code_list>at0036</code_list>"
+	)
+	if bytes.Count(raw, []byte(lastCode)) != 1 {
+		t.Fatalf("fixture %s does not hold %q exactly once", fixture, lastCode)
+	}
+	at := bytes.LastIndex(raw[:bytes.Index(raw, []byte(lastCode))], []byte(phrase))
+	if at < 0 {
+		t.Fatalf("fixture %s holds no C_CODE_PHRASE before %q", fixture, lastCode)
+	}
+	edited := bytes.Clone(raw[:at])
+	edited = append(edited, `<children xsi:type="C_CODE_REFERENCE">`...)
+	rest := bytes.Replace(raw[at+len(phrase):], []byte(lastCode),
+		[]byte(lastCode+"<referenceSetUri>terminology:local?subset=options</referenceSetUri>"), 1)
+	edited = append(edited, rest...)
+
+	inputsOf := func(t *testing.T, opt []byte) []webtemplate.Input {
+		t.Helper()
+		model, err := aom14.ReadOperationalTemplate(bytes.NewReader(opt))
+		if err != nil {
+			t.Fatalf("ReadOperationalTemplate: %v", err)
+		}
+		c, err := templatecompile.Compile(model)
+		if err != nil {
+			t.Fatalf("Compile: %v", err)
+		}
+		wt, err := webtemplate.Build(c)
+		if err != nil {
+			t.Fatalf("Build: %v", err)
+		}
+		var got *webtemplate.Node
+		walkOurTree(wt.Tree, func(n *webtemplate.Node) {
+			if n.NodeID == "at0034" && n.RMType == "DV_CODED_TEXT" {
+				got = n
+			}
+		})
+		if got == nil {
+			t.Fatal("no DV_CODED_TEXT leaf at0034 in the built tree")
+		}
+		return got.Inputs
+	}
+	want := inputsOf(t, raw)
+	if len(want) != 1 || len(want[0].List) != 2 || want[0].ListOpen {
+		t.Fatalf("C_CODE_PHRASE inputs = %+v, want one closed list of two codes — fixture changed?", want)
+	}
+	if got := inputsOf(t, edited); !reflect.DeepEqual(got, want) {
+		t.Errorf("C_CODE_REFERENCE inputs = %+v, want the C_CODE_PHRASE's %+v", got, want)
+	}
+}

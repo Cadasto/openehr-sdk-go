@@ -124,14 +124,9 @@ func sampleByConstraint(pc constraints.PrimitiveConstraint, s sampler) any {
 		return nil // pattern-only / unbounded: ExampleValue handles it
 
 	case constraints.CodePhrase:
-		if len(c.CodeList) > 0 {
-			term := c.Terminology
-			if term == "" {
-				term = "local"
-			}
-			return constraints.CodedTermRef{Terminology: term, CodeString: c.CodeList[s.intN(len(c.CodeList))]}
-		}
-		return nil
+		return sampleCode(c, s)
+	case constraints.CodeReference:
+		return sampleCode(c.CodePhrase, s)
 
 	case constraints.CDvOrdinal:
 		if len(c.Values) > 0 {
@@ -333,4 +328,18 @@ func (s sampler) randomDateTime() []string {
 		out = append(out, dates[0]+"T"+times[i+1], dates[0]+"T"+times[i])
 	}
 	return append(out, dates...)
+}
+
+// sampleCode draws a member of the code phrase constraint c's code list,
+// under its terminology or under local where it names none, or returns nil
+// when the list is empty.
+func sampleCode(c constraints.CodePhrase, s sampler) any {
+	if len(c.CodeList) == 0 {
+		return nil
+	}
+	term := c.Terminology
+	if term == "" {
+		term = "local"
+	}
+	return constraints.CodedTermRef{Terminology: term, CodeString: c.CodeList[s.intN(len(c.CodeList))]}
 }
