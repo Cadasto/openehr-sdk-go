@@ -375,3 +375,33 @@ func TestREQ176_EntryKeysOfASecondDecode(t *testing.T) {
 		t.Errorf("Unmarshal = %v; want the primitive failure of /counted[1]/count[1]", err)
 	}
 }
+
+// TestREQ176_REQ052_EntryRefusalsKeepTheirText pins that the text of a Hash
+// entry's refusal, a repeated key or none, keeps the refusal's own text, which
+// holds no value, rather than naming it by its Go type alone, in every mode.
+//
+// Can-fail control: drop the two texts from typereg's whole-message forms and
+// each case reads "cause withheld (*errors.errorString)".
+func TestREQ176_REQ052_EntryRefusalsKeepTheirText(t *testing.T) {
+	for _, tc := range []struct {
+		name, body string
+		cause      error
+	}{
+		{name: "a repeated key", body: `<author id="a">A</author><author id="a">B</author>`, cause: errEntryRepeatedKey},
+		{name: "no key", body: `<author>A</author>`, cause: errEntryNoKey},
+	} {
+		doc := `<holder ` + xmlnsDecl + `>` + tc.body + `</holder>`
+		for mode, decode := range entryModes {
+			t.Run(tc.name+"/"+mode, func(t *testing.T) {
+				err := decode(doc, new(entryHolder))
+				if err == nil {
+					t.Fatalf("decode(%s) = nil; want a refusal", doc)
+				}
+				got, keep := err.Error(), "canxml: invalid XML shape: "+tc.cause.Error()
+				if !strings.Contains(got, keep) || strings.Contains(got, "cause withheld") {
+					t.Errorf("decode(%s) = %q; want it to keep %q", doc, got, keep)
+				}
+			})
+		}
+	}
+}

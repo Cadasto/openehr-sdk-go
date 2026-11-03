@@ -183,3 +183,25 @@ func TestDropElement_REQ041_REQ170_AttributeIsUnmatched(t *testing.T) {
 		t.Errorf("Unmarshal(%q, strict) = %v; want ErrUnknownElement", in, err)
 	}
 }
+
+// TestDropElement_REQ052_RefusalKeepsItsText pins that the text of a dropped
+// element's refusal keeps the refusal's own text, which holds no value,
+// rather than naming it by its Go type alone, in every mode.
+//
+// Can-fail control: drop the text from typereg's whole-message forms and each
+// case reads "cause withheld (*errors.errorString)".
+func TestDropElement_REQ052_RefusalKeepsItsText(t *testing.T) {
+	in := flaggedDoc("", "true")
+	keep := "canxml: invalid XML shape: " + errDroppedValue.Error()
+	for mode, tracker := range documentModes() {
+		t.Run(mode, func(t *testing.T) {
+			err := Unmarshal([]byte(in), new(flagged), tracker())
+			if err == nil {
+				t.Fatalf("Unmarshal(%q) = nil; want a refusal", in)
+			}
+			if got := err.Error(); !strings.Contains(got, keep) || strings.Contains(got, "cause withheld") {
+				t.Errorf("Unmarshal(%q) = %q; want it to keep %q", in, got, keep)
+			}
+		})
+	}
+}
