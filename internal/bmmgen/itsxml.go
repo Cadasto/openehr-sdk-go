@@ -629,15 +629,35 @@ func (o *xmlChildOrder) sequenceFor(plan *Plan, class string) ([]string, error) 
 
 // attributesFor returns the names of the XML attributes of the schema type
 // class takes, as [xmlChildOrder.typeFor] finds it, its extension bases'
-// first. Only that set is read: another set's type of the same name does not
-// add attributes. A nil result means the type declares none, or no set
-// declares the class or an ancestor.
+// first, that every other set declaring a type of the same name declares too.
+// Another set's type never adds an attribute, and one it lacks is dropped: a
+// class two sets declare with different attributes takes those both agree on,
+// so every target, whatever order it looks the sets up in, gives a class the
+// same attributes. That gives the resource classes the AM Release-1.4 shape
+// in both targets: BASE Release-1.2.0 declares an `id` on
+// RESOURCE_DESCRIPTION_ITEM and TRANSLATION_DETAILS that AM Release-1.4 does
+// not, so the Hash holding them is keyed by their language. A nil result means
+// the type declares none, or no set declares the class or an ancestor.
 func (o *xmlChildOrder) attributesFor(plan *Plan, class string) ([]string, error) {
 	i, name, ok := o.typeFor(plan, class)
 	if !ok {
 		return nil, nil
 	}
-	return o.sets[i].attributes(name)
+	attrs, err := o.sets[i].attributes(name)
+	if err != nil {
+		return nil, err
+	}
+	for j, other := range o.sets {
+		if j == i || !other.has(name) {
+			continue
+		}
+		agreed, err := other.attributes(name)
+		if err != nil {
+			return nil, err
+		}
+		attrs = slices.DeleteFunc(attrs, func(a string) bool { return !slices.Contains(agreed, a) })
+	}
+	return attrs, nil
 }
 
 // nearestLineage returns class and every class it descends from, nearest

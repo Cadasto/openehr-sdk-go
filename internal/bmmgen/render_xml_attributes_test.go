@@ -3,14 +3,19 @@ package bmmgen
 // REQ-056 — the generated canonical-XML codec writes and reads as an XML
 // attribute each member the class's ITS-XML schema type declares as one,
 // found through the type's extension bases; an attribute that names no
-// member is recorded as the key of the Hash that holds the class.
+// member is recorded as the key of the Hash that holds the class; and a class
+// two schema sets declare takes the attributes both agree on, so the two
+// targets give it one form (REQ-176 § Round trip).
 
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
 )
 
 // buildPlanWithITSXML builds the plan of target over the vendored BMM and
@@ -60,10 +65,15 @@ func classXMLAttributes(t *testing.T, plan *Plan, class string) xmlAttributeSet 
 // descendant, by the base chain of its schema type; `code` on the AOM 1.4
 // ARCHETYPE_TERM, which the AM Release-1.4 schema declares as an attribute;
 // and the BASE `id` of the resource classes, which names no member and is
-// recorded as the key of the Hash that holds the class.
+// recorded as the key of the Hash that holds the class when the BASE schemas
+// alone declare the class, and is dropped in both targets, whose AM
+// Release-1.4 schemas declare the class with no `id` (REQ-176 § Round trip).
 func TestXMLAttributesFromVendoredSchemas(t *testing.T) {
 	rmPlan := buildPlanWithITSXML(t, TargetRM)
 	aomPlan := buildPlanWithITSXML(t, TargetAOM14)
+	rmOnly := TargetRM
+	rmOnly.ITSXMLSchemaSets = [][]string{itsXMLRMRoots}
+	rmOnlyPlan := buildPlanWithITSXML(t, rmOnly)
 	for _, tc := range []struct {
 		plan          *Plan
 		class         string
@@ -73,8 +83,12 @@ func TestXMLAttributesFromVendoredSchemas(t *testing.T) {
 		{plan: rmPlan, class: "ELEMENT", members: []string{"archetype_node_id"}},
 		{plan: rmPlan, class: "COMPOSITION", members: []string{"archetype_node_id"}},
 		{plan: rmPlan, class: "DV_TEXT"},
-		{plan: rmPlan, class: "RESOURCE_DESCRIPTION_ITEM", keys: []string{"id"}},
-		{plan: rmPlan, class: "TRANSLATION_DETAILS", keys: []string{"id"}},
+		{plan: rmOnlyPlan, class: "RESOURCE_DESCRIPTION_ITEM", keys: []string{"id"}},
+		{plan: rmOnlyPlan, class: "TRANSLATION_DETAILS", keys: []string{"id"}},
+		{plan: rmPlan, class: "RESOURCE_DESCRIPTION_ITEM"},
+		{plan: rmPlan, class: "TRANSLATION_DETAILS"},
+		{plan: aomPlan, class: "RESOURCE_DESCRIPTION_ITEM"},
+		{plan: aomPlan, class: "TRANSLATION_DETAILS"},
 		{plan: aomPlan, class: "ARCHETYPE_TERM", members: []string{"code"}},
 		{plan: aomPlan, class: "C_COMPLEX_OBJECT"},
 		// REQ-176: the AOM 1.4 root's classes, the two of T_VIEW's anonymous
@@ -90,7 +104,7 @@ func TestXMLAttributesFromVendoredSchemas(t *testing.T) {
 		{plan: aomPlan, class: "T_VIEW_CONSTRAINT_ITEM", members: []string{"id"}},
 		{plan: aomPlan, class: "C_ARCHETYPE_ROOT"},
 	} {
-		t.Run(tc.plan.Target.GoPackage+"/"+tc.class, func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s(%d sets)/%s", tc.plan.Target.GoPackage, len(tc.plan.xmlOrder.sets), tc.class), func(t *testing.T) {
 			got := classXMLAttributes(t, tc.plan, tc.class)
 			if !slices.Equal(got.members, tc.members) || !slices.Equal(got.keys, tc.keys) {
 				t.Errorf("XML attributes of %s = members %q, keys %q; want members %q, keys %q",
@@ -137,6 +151,34 @@ func TestXMLAttributeCodecOfArchetypeTerm(t *testing.T) {
 		if !strings.Contains(dec, want) {
 			t.Errorf("ARCHETYPE_TERM decoder lacks %q:\n%s", want, dec)
 		}
+	}
+}
+
+// TestREQ176_XMLAttributesAgreeAcrossTargets pins that the two targets give
+// every class both hold the same XML attributes, members and Hash keys
+// alike, although each looks its own schema set up first: a class one target
+// emits and the other holds by value, rm.TranslationDetails in ARCHETYPE's
+// translations, has one canonical-XML form.
+func TestREQ176_XMLAttributesAgreeAcrossTargets(t *testing.T) {
+	rmPlan := buildPlanWithITSXML(t, TargetRM)
+	aomPlan := buildPlanWithITSXML(t, TargetAOM14)
+	compared := 0
+	for _, name := range sortedStringKeys(rmPlan.Classes) {
+		if _, ok := aomPlan.Classes[name]; !ok {
+			continue
+		}
+		if _, ok := rmPlan.Classes[name].Class.(*bmm.SimpleClass); !ok {
+			continue
+		}
+		compared++
+		inRM, inAOM := classXMLAttributes(t, rmPlan, name), classXMLAttributes(t, aomPlan, name)
+		if !slices.Equal(inRM.members, inAOM.members) || !slices.Equal(inRM.keys, inAOM.keys) {
+			t.Errorf("%s: the RM target gives members %q, keys %q; the AOM 1.4 target members %q, keys %q",
+				name, inRM.members, inRM.keys, inAOM.members, inAOM.keys)
+		}
+	}
+	if compared < 100 {
+		t.Errorf("compared %d classes; want every RM class the AOM 1.4 target holds, over 100", compared)
 	}
 }
 
