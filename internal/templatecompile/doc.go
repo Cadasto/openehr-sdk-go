@@ -20,6 +20,9 @@
 //     Term bindings flatten to [Compiled.TermBindings].
 //   - Flat indexes by RM type name and by archetype node id for
 //     O(1) lookup during walks.
+//   - Path lookup over the compiled tree: [Compiled.Resolve] and
+//     [Compiled.ValidatePath] walk a path that template.ParsePath reads,
+//     and [Compiled.NodeAt] looks up the exact AQL path the compile wrote.
 //
 // This is an internal package. Code outside the SDK module reaches the
 // compiled form through the public openehr/templatecompile bridge.
