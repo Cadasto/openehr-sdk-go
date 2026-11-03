@@ -171,7 +171,8 @@ func TestREQ176_REQ052_ExprLeafItemCanonicalJSONRefusals(t *testing.T) {
 // it, a prefix that is no XML NCName or is `xsi` or `xmlns` among them; and
 // text the built-in's primitive does not read: a Boolean other than true,
 // false, 1 or 0; an
-// Integer or Integer64 that is no whole number in its range; and a Real or
+// Integer or Integer64 that is no whole number in its range or in that of the
+// built-in, such as an `xs:unsignedByte` written 300; and a Real or
 // Double that is no decimal number in the float64 range, an infinity and a
 // not-a-number among them. Where the text is refused for its spelling or its
 // range, the refusal wraps strconv.ErrSyntax or strconv.ErrRange, so a Real
@@ -195,6 +196,8 @@ func TestREQ176_REQ052_ExprLeafItemCanonicalJSONEncodeRefusals(t *testing.T) {
 		{item: aom14.TypedString{Type: "xs:long", Value: "9223372036854775808"}, cause: strconv.ErrRange},
 		{item: aom14.TypedString{Type: "xs:integer", Value: "9223372036854775808"}, cause: strconv.ErrRange},
 		{item: aom14.TypedString{Type: "xs:unsignedLong", Value: "18446744073709551615"}, cause: strconv.ErrRange},
+		{item: aom14.TypedString{Type: "xs:unsignedByte", Value: "300"}, cause: strconv.ErrRange},
+		{item: aom14.TypedString{Type: "xs:unsignedInt", Value: "-1"}, cause: strconv.ErrRange},
 		{item: aom14.TypedString{Type: "xs:decimal", Value: "2.5.1"}, cause: strconv.ErrSyntax},
 		{item: aom14.TypedString{Type: "xs:float", Value: "0x1p-2"}, cause: strconv.ErrSyntax},
 		{item: aom14.TypedString{Type: "xs:double", Value: "1_000"}, cause: strconv.ErrSyntax},

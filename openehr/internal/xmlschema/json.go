@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -22,24 +23,27 @@ import (
 // string. A Boolean writes `true` or `1` as true and `false` or `0` as false,
 // XML white space around the text removed as XML Schema reads a boolean. An
 // Integer or an Integer64 writes a JSON integer, a whole number of 32 or 64
-// bits. A Real or a Double writes the text itself as a JSON number, a literal
-// of the XML Schema built-in Type names in the float64 range, a decimal with
-// no exponent for `decimal` and a floating-point literal for `float` and
-// `double`, so the number written has the text's value exactly, digits a
-// float64 would not keep included: XML white space around the text is
-// removed, and the text is
-// rewritten only where JSON's number grammar differs from XML Schema's, a
-// leading `+` and leading zeros dropped, `0` written before a leading decimal
-// point and a trailing one dropped, so `+.5` is written `0.5` and `1.E3`
-// `1E3`. The JSON keeps neither Type's prefix nor which of the primitive's
-// built-ins Type names.
+// bits in the range of the XML Schema built-in Type names, such as 0 to 255
+// for `unsignedByte`. A Real or a Double writes the text itself as a JSON
+// number, a literal of the XML Schema built-in Type names in the float64
+// range, a decimal with no exponent for `decimal` and a floating-point
+// literal for `float` and `double`, so the number written has the text's
+// value exactly, digits a float64 would not keep included: XML white space
+// around the text is removed, and the text is rewritten only where JSON's
+// number grammar differs from XML Schema's, a leading `+` and leading zeros
+// dropped, `0` written before a leading decimal point and a trailing one
+// dropped, so `+.5` is written `0.5` and `1.E3` `1E3`. The JSON keeps neither
+// Type's prefix nor which of the primitive's built-ins Type names.
 //
 // A Type that is no prefixed XML Schema built-in datatype is refused, as the
 // XML encoder refuses it ([TypedString.MarshalXML]), and so is text that is
 // no literal of the primitive, such as a Boolean written `yes`, an Integer
 // out of its 32-bit range or a Double written `INF`, which a JSON number
-// cannot hold, and an `xs:decimal` written with an exponent, such as `1e3`,
-// which XML Schema's decimal does not have. Neither refusal quotes the text.
+// cannot hold, and text the built-in Type names does not read although its
+// primitive does: an `xs:decimal` written with an exponent, such as `1e3`,
+// which XML Schema's decimal does not have, and an integer out of the
+// built-in's range, such as an `xs:unsignedByte` written `300` or an
+// `xs:unsignedInt` written `-1`. Neither refusal quotes the text.
 func (s TypedString) MarshalJSONTo(enc *jsontext.Encoder) error {
 	primitive, ok := typedPrimitive(s.Type)
 	if !ok {
@@ -152,12 +156,35 @@ func jsonValue(primitive, builtin, text string) (value jsontext.Token, number js
 		if err != nil {
 			return jsontext.Token{}, nil, textRefusal(primitive, numCause(err))
 		}
+		if r, ok := integerRanges[builtin]; ok && (n < r.least || n > r.greatest) {
+			return jsontext.Token{}, nil, textRefusal(primitive, strconv.ErrRange)
+		}
 		return jsontext.Int(n), nil, nil
 	case "Real", "Double":
 		number, err := jsonNumber(primitive, builtin, text)
 		return jsontext.Token{}, number, err
 	}
 	return jsontext.String(text), nil, nil
+}
+
+// integerRanges holds the least and the greatest value of each XML Schema
+// integer built-in whose range is narrower than that of the primitive it
+// reads as ([Builtin]), an Integer's 32 bits or an Integer64's 64. The other
+// integer built-ins, `int`, `long` and `integer`, and the side of a range XML
+// Schema leaves unbounded, such as the top of `nonNegativeInteger`, are held
+// to the primitive's range; so is the top of `unsignedLong`, which an
+// Integer64 cannot reach.
+var integerRanges = map[string]struct{ least, greatest int64 }{
+	"byte":               {math.MinInt8, math.MaxInt8},
+	"short":              {math.MinInt16, math.MaxInt16},
+	"unsignedByte":       {0, math.MaxUint8},
+	"unsignedShort":      {0, math.MaxUint16},
+	"unsignedInt":        {0, math.MaxUint32},
+	"unsignedLong":       {0, math.MaxInt64},
+	"nonNegativeInteger": {0, math.MaxInt64},
+	"positiveInteger":    {1, math.MaxInt64},
+	"nonPositiveInteger": {math.MinInt64, 0},
+	"negativeInteger":    {math.MinInt64, -1},
 }
 
 // jsonNumber returns text, the text of a typed item whose type, the XML

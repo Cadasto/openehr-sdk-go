@@ -224,6 +224,55 @@ func TestREQ176_REQ052_DecimalItemHasNoExponent(t *testing.T) {
 	}
 }
 
+// TestREQ176_REQ052_IntegerItemInItsBuiltinsRange pins that a typed item's
+// JSON integer follows the range of the XML Schema built-in its Type names,
+// not only that of the BMM primitive the built-in reads as: each integer
+// built-in writes its least and its greatest value and refuses the integer
+// below the one and above the other with strconv.ErrRange, a side XML Schema
+// leaves unbounded held to the 64 bits of an Integer64, as the greatest
+// `unsignedLong` is.
+func TestREQ176_REQ052_IntegerItemInItsBuiltinsRange(t *testing.T) {
+	const (
+		min64      = "-9223372036854775808"
+		max64      = "9223372036854775807"
+		belowMin64 = "-9223372036854775809"
+		aboveMax64 = "9223372036854775808"
+	)
+	for _, tc := range []struct {
+		builtin, primitive string
+		least, greatest    string // written
+		below, above       string // refused
+	}{
+		{"byte", "Integer", "-128", "127", "-129", "128"},
+		{"short", "Integer", "-32768", "32767", "-32769", "32768"},
+		{"int", "Integer", "-2147483648", "2147483647", "-2147483649", "2147483648"},
+		{"unsignedByte", "Integer", "0", "255", "-1", "256"},
+		{"unsignedShort", "Integer", "0", "65535", "-1", "65536"},
+		{"unsignedInt", "Integer64", "0", "4294967295", "-1", "4294967296"},
+		{"unsignedLong", "Integer64", "0", max64, "-1", aboveMax64},
+		{"long", "Integer64", min64, max64, belowMin64, aboveMax64},
+		{"integer", "Integer64", min64, max64, belowMin64, aboveMax64},
+		{"nonNegativeInteger", "Integer64", "0", max64, "-1", aboveMax64},
+		{"positiveInteger", "Integer64", "1", max64, "0", aboveMax64},
+		{"nonPositiveInteger", "Integer64", min64, "0", belowMin64, "1"},
+		{"negativeInteger", "Integer64", min64, "-1", belowMin64, "0"},
+	} {
+		for _, text := range []string{tc.least, tc.greatest} {
+			item := xmlschema.TypedString{Type: "xs:" + tc.builtin, Value: text}
+			want := `{"_type":"` + tc.primitive + `","value":` + text + `}`
+			if got, err := json.Marshal(item); err != nil || string(got) != want {
+				t.Errorf("json.Marshal(%#v) = %s, %v; want %s, nil", item, got, err, want)
+			}
+		}
+		for _, text := range []string{tc.below, tc.above} {
+			item := xmlschema.TypedString{Type: "xs:" + tc.builtin, Value: text}
+			if got, err := json.Marshal(item); !errors.Is(err, strconv.ErrRange) {
+				t.Errorf("json.Marshal(%#v) = %s, %v; want a refusal wrapping strconv.ErrRange", item, got, err)
+			}
+		}
+	}
+}
+
 // registerUriClass registers a class under the name of the BMM primitive Uri,
 // once per test binary, so that a test can tell whether a decoder asks the
 // type registry before it reads a primitive's `_type` as a typed item.
