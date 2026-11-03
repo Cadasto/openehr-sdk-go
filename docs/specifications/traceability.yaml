@@ -468,6 +468,7 @@ requirements:
       - openehr/instance/instance_test.go
       - openehr/instance/polymorphic_roundtrip_test.go
       - openehr/internal/refused/refused_test.go
+      - openehr/internal/xmlschema/builtin_internal_test.go
       - openehr/internal/xmlschema/json_test.go
       - openehr/internal/xmlunmatched/document_internal_test.go
       - openehr/rm/character_test.go
@@ -724,6 +725,7 @@ requirements:
       - openehr/serialize/canxml/real_precision_test.go
       - openehr/serialize/canxml/real_xsd_text_test.go
       - openehr/serialize/canxml/roundtrip_test.go
+      - openehr/serialize/canxml/stream_decoder_test.go
       - openehr/serialize/canxml/unmatched_test.go
       - openehr/serialize/canxml/xsd_prefix_test.go
       - testkit/conformance/crossformat/census_test.go
@@ -2660,6 +2662,7 @@ requirements:
       - openehr/aom/aom14/schema_names_xml_test.go
       - openehr/aom/aom14/symbol_json_test.go
       - openehr/aom/aom14/symbol_value_xml_test.go
+      - openehr/internal/xmlschema/builtin_internal_test.go
       - openehr/internal/xmlschema/json_test.go
       - openehr/internal/xmlschema/names_test.go
       - openehr/internal/xmlschema/omit_test.go
