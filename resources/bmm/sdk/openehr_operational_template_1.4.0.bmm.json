@@ -1,0 +1,1042 @@
+{
+    "bmm_version": "2.4",
+    "rm_publisher": "openehr",
+    "schema_name": "operational_template",
+    "rm_release": "1.4.0",
+    "schema_revision": "1.4.0.1",
+    "schema_lifecycle_state": "stable",
+    "schema_description": "The openEHR ADL 1.4 operational template as openehr-sdk-go generates it: the pinned openehr_am_1.4.0 schema over the RM root, with the classes of the AM Release-1.4 template schema and each AOM 1.4 class in the form the AM Release-1.4 schemas give it.",
+    "schema_author": "openehr-sdk-go maintainers <https://github.com/cadasto/openehr-sdk-go>",
+    "includes": {
+        "openehr_am_1.4.0": {
+            "id": "openehr_am_1.4.0"
+        },
+        "openehr_reference_model_1.2.0": {
+            "id": "openehr_reference_model_1.2.0"
+        }
+    },
+    "sdk_extensions": {
+        "classes_left_out": [
+            {
+                "class": "C_CODED_TEXT",
+                "reason": "the AM Release-1.4 schema names the class C_CODE_PHRASE, which the root declares in the schema's form.",
+                "upstream": "resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:10"
+            },
+            {
+                "class": "C_ORDINAL",
+                "reason": "the AM Release-1.4 schema names the class C_DV_ORDINAL, which the root declares in the schema's form.",
+                "upstream": "resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:30"
+            },
+            {
+                "class": "C_QUANTITY",
+                "reason": "the AM Release-1.4 schema names the class C_DV_QUANTITY, which the root declares in the schema's form.",
+                "upstream": "resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:105"
+            }
+        ],
+        "type_aliases": [
+            {
+                "alias": "T_ARCHETYPE_ROOT",
+                "class": "C_ARCHETYPE_ROOT",
+                "reason": "older template tools write an archetype root of an operational template as xsi:type T_ARCHETYPE_ROOT, a name no schema declares; it reads as the C_ARCHETYPE_ROOT the template schema declares.",
+                "upstream": "resources/its-xml/components/AM/Release-1.4/Template.xsd:42"
+            }
+        ],
+        "dropped_elements": [
+            {
+                "class": "C_ATTRIBUTE",
+                "element": "match_negated",
+                "texts": [
+                    "false",
+                    "0"
+                ],
+                "reason": "a legacy element Archetype Designer writes on every attribute constraint, which no AOM class declares and the schema accepts fixed to false, at two positions; false is written false or 0, as the schema's boolean allows.",
+                "upstream": "resources/its-xml/components/AM/Release-1.4/Archetype.xsd:52"
+            }
+        ],
+        "anonymous_type_names": [
+            {
+                "schema_type": "T_VIEW",
+                "element_path": "constraints",
+                "class": "T_VIEW_CONSTRAINT",
+                "reason": "the schema declares the type of the constraints element anonymously.",
+                "upstream": "resources/its-xml/components/AM/Release-1.4/Template.xsd:73"
+            },
+            {
+                "schema_type": "T_VIEW",
+                "element_path": "constraints/items",
+                "class": "T_VIEW_CONSTRAINT_ITEM",
+                "reason": "the schema declares the type of the items element anonymously.",
+                "upstream": "resources/its-xml/components/AM/Release-1.4/Template.xsd:76"
+            }
+        ],
+        "schema_forms": [
+            {
+                "class": "ORDINAL",
+                "property": "symbol",
+                "form": "choice",
+                "shapes": [
+                    "DV_CODED_TEXT",
+                    "CODE_PHRASE"
+                ],
+                "reason": "the schema type ORDINAL_SYMBOL is a choice between the elements of a DV_CODED_TEXT and those of a CODE_PHRASE, which P_BMM cannot express.",
+                "upstream": "resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:87"
+            }
+        ]
+    },
+    "packages": {
+        "org.openehr.am.aom14": {
+            "name": "org.openehr.am.aom14",
+            "packages": {
+                "operational_template": {
+                    "name": "operational_template",
+                    "classes": [
+                        "OPERATIONAL_TEMPLATE",
+                        "C_ARCHETYPE_ROOT",
+                        "FLAT_ARCHETYPE_ONTOLOGY",
+                        "ANNOTATION",
+                        "T_VIEW",
+                        "T_VIEW_CONSTRAINT",
+                        "T_VIEW_CONSTRAINT_ITEM",
+                        "T_CONSTRAINT",
+                        "T_ATTRIBUTE",
+                        "T_COMPLEX_OBJECT",
+                        "C_CODE_REFERENCE"
+                    ]
+                },
+                "archetype": {
+                    "name": "archetype",
+                    "packages": {
+                        "ontology": {
+                            "name": "ontology",
+                            "classes": [
+                                "ARCHETYPE_ONTOLOGY",
+                                "CodeDefinitionSet",
+                                "ARCHETYPE_TERM",
+                                "TermBindingSet",
+                                "TERM_BINDING_ITEM",
+                                "ConstraintBindingSet",
+                                "CONSTRAINT_BINDING_ITEM"
+                            ]
+                        }
+                    }
+                },
+                "openehr_archetype_profile": {
+                    "name": "openehr_archetype_profile",
+                    "classes": [
+                        "C_CODE_PHRASE",
+                        "C_DV_ORDINAL",
+                        "C_DV_QUANTITY",
+                        "C_QUANTITY_ITEM",
+                        "ORDINAL"
+                    ]
+                }
+            }
+        }
+    },
+    "class_definitions": {
+        "OPERATIONAL_TEMPLATE": {
+            "name": "OPERATIONAL_TEMPLATE",
+            "documentation": "An ADL 1.4 operational template: a template flattened with the archetypes it uses into one constraint tree, as the AM Release-1.4 template schema defines it.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published; it inherits from no class and declares its own members, so it has language and not original_language, and no translations. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:12.",
+            "properties": {
+                "language": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "language",
+                    "documentation": "Language of the template.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:22.",
+                    "is_mandatory": true,
+                    "type": "CODE_PHRASE"
+                },
+                "is_controlled": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "is_controlled",
+                    "documentation": "True if the template is under change control, in which case revision history is created.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:23.",
+                    "type": "Boolean"
+                },
+                "description": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "description",
+                    "documentation": "Description and lifecycle information of the template.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:24.",
+                    "type": "RESOURCE_DESCRIPTION"
+                },
+                "revision_history": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "revision_history",
+                    "documentation": "The revision history of the template.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:25.",
+                    "type": "REVISION_HISTORY"
+                },
+                "uid": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "uid",
+                    "documentation": "Unique identifier of the template.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:27.",
+                    "type": "HIER_OBJECT_ID"
+                },
+                "template_id": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "template_id",
+                    "documentation": "Identifier of the template.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:28.",
+                    "is_mandatory": true,
+                    "type": "TEMPLATE_ID"
+                },
+                "concept": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "concept",
+                    "documentation": "The normative meaning of the template as a whole.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:30.",
+                    "is_mandatory": true,
+                    "type": "String"
+                },
+                "definition": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "definition",
+                    "documentation": "Root node of the template's constraint tree.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:31.",
+                    "is_mandatory": true,
+                    "type": "C_ARCHETYPE_ROOT"
+                },
+                "ontology": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "ontology",
+                    "documentation": "The ontology of the root archetype.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:32.",
+                    "type": "FLAT_ARCHETYPE_ONTOLOGY"
+                },
+                "component_ontologies": {
+                    "_type": "P_BMM_CONTAINER_PROPERTY",
+                    "name": "component_ontologies",
+                    "documentation": "The ontologies of the archetypes the template uses below its root.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:33.",
+                    "type_def": {
+                        "container_type": "List",
+                        "type": "FLAT_ARCHETYPE_ONTOLOGY"
+                    },
+                    "cardinality": {
+                        "lower": 0,
+                        "upper_unbounded": true
+                    }
+                },
+                "annotations": {
+                    "_type": "P_BMM_CONTAINER_PROPERTY",
+                    "name": "annotations",
+                    "documentation": "Annotations on nodes of the template, each by its path.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:35.",
+                    "type_def": {
+                        "container_type": "List",
+                        "type": "ANNOTATION"
+                    },
+                    "cardinality": {
+                        "lower": 0,
+                        "upper_unbounded": true
+                    }
+                },
+                "constraints": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "constraints",
+                    "documentation": "Constraints the template adds to the nodes of its archetypes.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:37.",
+                    "type": "T_CONSTRAINT"
+                },
+                "view": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "view",
+                    "documentation": "Display constraints on nodes of the template.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:38.",
+                    "type": "T_VIEW"
+                }
+            }
+        },
+        "C_ARCHETYPE_ROOT": {
+            "name": "C_ARCHETYPE_ROOT",
+            "documentation": "The root node of an archetype within an operational template, which carries the archetype's identifier and the terms of the archetype it roots.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:42.",
+            "ancestors": [
+                "C_COMPLEX_OBJECT"
+            ],
+            "properties": {
+                "archetype_id": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "archetype_id",
+                    "documentation": "Identifier of the archetype this node roots.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:46.",
+                    "is_mandatory": true,
+                    "type": "ARCHETYPE_ID"
+                },
+                "template_id": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "template_id",
+                    "documentation": "Identifier of the template whose archetype this node roots, where it roots one.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:47.",
+                    "type": "TEMPLATE_ID"
+                },
+                "term_definitions": {
+                    "_type": "P_BMM_CONTAINER_PROPERTY",
+                    "name": "term_definitions",
+                    "documentation": "The term definitions of the archetype this node roots.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:48.",
+                    "type_def": {
+                        "container_type": "List",
+                        "type": "ARCHETYPE_TERM"
+                    },
+                    "cardinality": {
+                        "lower": 0,
+                        "upper_unbounded": true
+                    }
+                },
+                "term_bindings": {
+                    "_type": "P_BMM_CONTAINER_PROPERTY",
+                    "name": "term_bindings",
+                    "documentation": "The term bindings of the archetype this node roots, one set per terminology.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:49.",
+                    "type_def": {
+                        "container_type": "List",
+                        "type": "TermBindingSet"
+                    },
+                    "cardinality": {
+                        "lower": 0,
+                        "upper_unbounded": true
+                    }
+                }
+            }
+        },
+        "FLAT_ARCHETYPE_ONTOLOGY": {
+            "name": "FLAT_ARCHETYPE_ONTOLOGY",
+            "documentation": "The flattened ontology of one archetype of an operational template.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:55.",
+            "ancestors": [
+                "ARCHETYPE_ONTOLOGY"
+            ],
+            "properties": {
+                "archetype_id": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "archetype_id",
+                    "documentation": "Identifier of the archetype whose ontology this is.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:58.",
+                    "is_mandatory": true,
+                    "type": "String"
+                }
+            }
+        },
+        "ANNOTATION": {
+            "name": "ANNOTATION",
+            "documentation": "Annotations on one node of an operational template: a table of String values keyed by String tags.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:63.",
+            "properties": {
+                "path": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "path",
+                    "documentation": "Path of the node annotated.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:67.",
+                    "is_mandatory": true,
+                    "type": "String"
+                },
+                "items": {
+                    "_type": "P_BMM_GENERIC_PROPERTY",
+                    "name": "items",
+                    "documentation": "The annotations, each a value under its tag.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:65.",
+                    "is_mandatory": true,
+                    "type_def": {
+                        "root_type": "Hash",
+                        "generic_parameters": [
+                            "String",
+                            "String"
+                        ]
+                    }
+                }
+            }
+        },
+        "T_VIEW": {
+            "name": "T_VIEW",
+            "documentation": "Display constraints of an operational template, which tell a user interface how to show its nodes.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:70.",
+            "properties": {
+                "constraints": {
+                    "_type": "P_BMM_CONTAINER_PROPERTY",
+                    "name": "constraints",
+                    "documentation": "The display constraints, each on one node.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:72.",
+                    "type_def": {
+                        "container_type": "List",
+                        "type": "T_VIEW_CONSTRAINT"
+                    },
+                    "cardinality": {
+                        "lower": 0,
+                        "upper_unbounded": true
+                    }
+                }
+            }
+        },
+        "T_VIEW_CONSTRAINT": {
+            "name": "T_VIEW_CONSTRAINT",
+            "documentation": "The display constraints on one node of an operational template.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published; the schema declares its type anonymously, inside T_VIEW, and the root names it. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:73.",
+            "properties": {
+                "path": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "path",
+                    "documentation": "Path of the node constrained.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:84.",
+                    "is_mandatory": true,
+                    "type": "String"
+                },
+                "items": {
+                    "_type": "P_BMM_CONTAINER_PROPERTY",
+                    "name": "items",
+                    "documentation": "The display constraints on the node, each a value under its identifier.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:75.",
+                    "is_mandatory": true,
+                    "type_def": {
+                        "container_type": "List",
+                        "type": "T_VIEW_CONSTRAINT_ITEM"
+                    },
+                    "cardinality": {
+                        "lower": 1,
+                        "upper_unbounded": true
+                    }
+                }
+            }
+        },
+        "T_VIEW_CONSTRAINT_ITEM": {
+            "name": "T_VIEW_CONSTRAINT_ITEM",
+            "documentation": "One display constraint on a node of an operational template: a value under an identifier.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published; the schema declares its type anonymously, inside T_VIEW, and the root names it. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:76.",
+            "properties": {
+                "id": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "id",
+                    "documentation": "Identifier of the display constraint.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:80.",
+                    "is_mandatory": true,
+                    "type": "String"
+                },
+                "value": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "value",
+                    "documentation": "Value of the display constraint.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:78.",
+                    "is_mandatory": true,
+                    "type": "String"
+                }
+            }
+        },
+        "T_CONSTRAINT": {
+            "name": "T_CONSTRAINT",
+            "documentation": "The constraints an operational template adds to the nodes of its archetypes, such as default values.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:90.",
+            "properties": {
+                "attributes": {
+                    "_type": "P_BMM_CONTAINER_PROPERTY",
+                    "name": "attributes",
+                    "documentation": "The constraints, each on one attribute of a node.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:92.",
+                    "type_def": {
+                        "container_type": "List",
+                        "type": "T_ATTRIBUTE"
+                    },
+                    "cardinality": {
+                        "lower": 0,
+                        "upper_unbounded": true
+                    }
+                }
+            }
+        },
+        "T_ATTRIBUTE": {
+            "name": "T_ATTRIBUTE",
+            "documentation": "A template constraint on one attribute of an archetype node, addressed by the path of the node that holds it.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published; it is no C_ATTRIBUTE. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:96.",
+            "properties": {
+                "rm_attribute_name": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "rm_attribute_name",
+                    "documentation": "Reference model attribute constrained, within the node the differential path addresses.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:98.",
+                    "is_mandatory": true,
+                    "type": "String"
+                },
+                "children": {
+                    "_type": "P_BMM_CONTAINER_PROPERTY",
+                    "name": "children",
+                    "documentation": "The constraints on the attribute's objects.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:99.",
+                    "type_def": {
+                        "container_type": "List",
+                        "type": "T_COMPLEX_OBJECT"
+                    },
+                    "cardinality": {
+                        "lower": 0,
+                        "upper_unbounded": true
+                    }
+                },
+                "differential_path": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "differential_path",
+                    "documentation": "Path of the node that holds the attribute.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:101.",
+                    "is_mandatory": true,
+                    "type": "String"
+                }
+            }
+        },
+        "T_COMPLEX_OBJECT": {
+            "name": "T_COMPLEX_OBJECT",
+            "documentation": "A template constraint on a complex object, which can give the object a default value.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:105.",
+            "ancestors": [
+                "C_COMPLEX_OBJECT"
+            ],
+            "properties": {
+                "default_value": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "default_value",
+                    "documentation": "Value the object takes by default.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:109.",
+                    "type": "DATA_VALUE"
+                }
+            }
+        },
+        "C_CODE_REFERENCE": {
+            "name": "C_CODE_REFERENCE",
+            "documentation": "Constraint on a coded term whose codes come from a reference set, named by its URI.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:115.",
+            "ancestors": [
+                "C_CODE_PHRASE"
+            ],
+            "properties": {
+                "referenceSetUri": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "referenceSetUri",
+                    "documentation": "URI of the reference set the codes come from.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:119.",
+                    "is_mandatory": true,
+                    "type": "Uri"
+                }
+            }
+        },
+        "ARCHETYPE_ONTOLOGY": {
+            "name": "ARCHETYPE_ONTOLOGY",
+            "documentation": "Local ontology of an archetype: its term and constraint definitions, each set in one language, and its term and constraint bindings, each set to one terminology.\n\nReason: the AM Release-1.4 schema writes the ontology as sets of term and constraint definitions keyed by language and sets of bindings keyed by terminology, where the BMM gives it code lists and derived members no document carries. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:369.",
+            "properties": {
+                "term_definitions": {
+                    "_type": "P_BMM_CONTAINER_PROPERTY",
+                    "name": "term_definitions",
+                    "documentation": "The term definitions, one set per language.\n\nReason: the schema's form. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:371.",
+                    "is_mandatory": true,
+                    "type_def": {
+                        "container_type": "List",
+                        "type": "CodeDefinitionSet"
+                    },
+                    "cardinality": {
+                        "lower": 1,
+                        "upper_unbounded": true
+                    }
+                },
+                "constraint_definitions": {
+                    "_type": "P_BMM_CONTAINER_PROPERTY",
+                    "name": "constraint_definitions",
+                    "documentation": "The constraint definitions, one set per language.\n\nReason: the schema's form. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:372.",
+                    "type_def": {
+                        "container_type": "List",
+                        "type": "CodeDefinitionSet"
+                    },
+                    "cardinality": {
+                        "lower": 0,
+                        "upper_unbounded": true
+                    }
+                },
+                "term_bindings": {
+                    "_type": "P_BMM_CONTAINER_PROPERTY",
+                    "name": "term_bindings",
+                    "documentation": "The term bindings, one set per terminology.\n\nReason: the schema's form. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:374.",
+                    "type_def": {
+                        "container_type": "List",
+                        "type": "TermBindingSet"
+                    },
+                    "cardinality": {
+                        "lower": 0,
+                        "upper_unbounded": true
+                    }
+                },
+                "constraint_bindings": {
+                    "_type": "P_BMM_CONTAINER_PROPERTY",
+                    "name": "constraint_bindings",
+                    "documentation": "The constraint bindings, one set per terminology.\n\nReason: the schema's form. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:376.",
+                    "type_def": {
+                        "container_type": "List",
+                        "type": "ConstraintBindingSet"
+                    },
+                    "cardinality": {
+                        "lower": 0,
+                        "upper_unbounded": true
+                    }
+                }
+            },
+            "functions": {
+                "has_language": {
+                    "name": "has_language",
+                    "documentation": "True if terminology ‘a_terminology’ is present in archetype ontology.",
+                    "parameters": {
+                        "a_lang": {
+                            "_type": "P_BMM_SINGLE_FUNCTION_PARAMETER",
+                            "name": "a_lang",
+                            "type": "String"
+                        }
+                    },
+                    "result": {
+                        "_type": "P_BMM_SIMPLE_TYPE",
+                        "type": "Boolean"
+                    }
+                },
+                "has_terminology": {
+                    "name": "has_terminology",
+                    "documentation": "True if terminology `a_terminology' is present in archetype ontology. ",
+                    "parameters": {
+                        "a_terminology_id": {
+                            "_type": "P_BMM_SINGLE_FUNCTION_PARAMETER",
+                            "name": "a_terminology_id",
+                            "type": "String"
+                        }
+                    },
+                    "result": {
+                        "_type": "P_BMM_SIMPLE_TYPE",
+                        "type": "Boolean"
+                    }
+                },
+                "has_term_code": {
+                    "name": "has_term_code",
+                    "documentation": "True if term_codes has a_code.",
+                    "parameters": {
+                        "a_code": {
+                            "_type": "P_BMM_SINGLE_FUNCTION_PARAMETER",
+                            "name": "a_code",
+                            "type": "String"
+                        }
+                    },
+                    "result": {
+                        "_type": "P_BMM_SIMPLE_TYPE",
+                        "type": "Boolean"
+                    }
+                },
+                "has_constraint_code": {
+                    "name": "has_constraint_code",
+                    "documentation": "True if constraint_codes has a_code.",
+                    "parameters": {
+                        "a_code": {
+                            "_type": "P_BMM_SINGLE_FUNCTION_PARAMETER",
+                            "name": "a_code",
+                            "type": "String"
+                        }
+                    },
+                    "result": {
+                        "_type": "P_BMM_SIMPLE_TYPE",
+                        "type": "Boolean"
+                    }
+                },
+                "term_definition": {
+                    "name": "term_definition",
+                    "documentation": "Term definition for a code, in a specified language. ",
+                    "parameters": {
+                        "a_lang": {
+                            "_type": "P_BMM_SINGLE_FUNCTION_PARAMETER",
+                            "name": "a_lang",
+                            "type": "String"
+                        },
+                        "a_code": {
+                            "_type": "P_BMM_SINGLE_FUNCTION_PARAMETER",
+                            "name": "a_code",
+                            "type": "String"
+                        }
+                    },
+                    "pre_conditions": {
+                        "Pre": "has_language (a_lang)",
+                        "Pre2": "has_term_code (a_code)"
+                    },
+                    "result": {
+                        "_type": "P_BMM_SIMPLE_TYPE",
+                        "type": "ARCHETYPE_TERM"
+                    }
+                },
+                "constraint_definition": {
+                    "name": "constraint_definition",
+                    "documentation": "Constraint definition for a code, in a specified language.",
+                    "parameters": {
+                        "a_code": {
+                            "_type": "P_BMM_SINGLE_FUNCTION_PARAMETER",
+                            "name": "a_code",
+                            "type": "String"
+                        },
+                        "a_lang": {
+                            "_type": "P_BMM_SINGLE_FUNCTION_PARAMETER",
+                            "name": "a_lang",
+                            "type": "String"
+                        }
+                    },
+                    "pre_conditions": {
+                        "Pre": "has_language (a_lang)",
+                        "Pre_2": "has_constraint_code (a_code)"
+                    },
+                    "result": {
+                        "_type": "P_BMM_SIMPLE_TYPE",
+                        "type": "ARCHETYPE_TERM"
+                    }
+                },
+                "term_binding": {
+                    "name": "term_binding",
+                    "documentation": "Binding of constraint corresponding to a_code in target external terminology a_terminology_id, as a string, which is usually a formal query expression.",
+                    "parameters": {
+                        "a_terminology": {
+                            "_type": "P_BMM_SINGLE_FUNCTION_PARAMETER",
+                            "name": "a_terminology",
+                            "type": "String"
+                        },
+                        "a_code": {
+                            "_type": "P_BMM_SINGLE_FUNCTION_PARAMETER",
+                            "name": "a_code",
+                            "type": "String"
+                        }
+                    },
+                    "pre_conditions": {
+                        "Pre": "has_term_binding (a_terminology_id, a_code)"
+                    },
+                    "result": {
+                        "_type": "P_BMM_SIMPLE_TYPE",
+                        "type": "CODE_PHRASE"
+                    }
+                },
+                "constraint_binding": {
+                    "name": "constraint_binding",
+                    "documentation": "Binding of constraint corresponding to a_code in target external terminology a_terminology_id, as a string, which is usually a formal query expression.",
+                    "parameters": {
+                        "a_terminology_id": {
+                            "_type": "P_BMM_SINGLE_FUNCTION_PARAMETER",
+                            "name": "a_terminology_id",
+                            "type": "String"
+                        },
+                        "a_code": {
+                            "_type": "P_BMM_SINGLE_FUNCTION_PARAMETER",
+                            "name": "a_code",
+                            "type": "String"
+                        }
+                    },
+                    "result": {
+                        "_type": "P_BMM_SIMPLE_TYPE",
+                        "type": "String"
+                    }
+                }
+            }
+        },
+        "CodeDefinitionSet": {
+            "name": "CodeDefinitionSet",
+            "documentation": "The term or constraint definitions of an ontology in one language.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published; the root takes the schema's name for it. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:380.",
+            "properties": {
+                "language": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "language",
+                    "documentation": "Code of the language of the definitions.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:384.",
+                    "is_mandatory": true,
+                    "type": "String"
+                },
+                "items": {
+                    "_type": "P_BMM_CONTAINER_PROPERTY",
+                    "name": "items",
+                    "documentation": "The definitions, one per code.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:382.",
+                    "type_def": {
+                        "container_type": "List",
+                        "type": "ARCHETYPE_TERM"
+                    },
+                    "cardinality": {
+                        "lower": 0,
+                        "upper_unbounded": true
+                    }
+                }
+            }
+        },
+        "ARCHETYPE_TERM": {
+            "name": "ARCHETYPE_TERM",
+            "documentation": "Representation of any coded entity (term or constraint) in the archetype ontology.\n\nReason: the AM Release-1.4 schema requires one item or more, where the BMM makes items optional. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:386.",
+            "properties": {
+                "code": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "code",
+                    "documentation": "Code of this term.\n\nReason: unchanged; declared again with its class. Upstream: openehr_am_1.4.0.",
+                    "is_mandatory": true,
+                    "type": "String"
+                },
+                "items": {
+                    "_type": "P_BMM_GENERIC_PROPERTY",
+                    "name": "items",
+                    "documentation": "Hash of keys (“text”, “description” etc) and corresponding values.\n\nReason: the schema requires one item or more. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:388.",
+                    "is_mandatory": true,
+                    "type_def": {
+                        "root_type": "Hash",
+                        "generic_parameters": [
+                            "String",
+                            "String"
+                        ]
+                    }
+                }
+            },
+            "functions": {
+                "keys": {
+                    "name": "keys",
+                    "documentation": "List of all keys used in this term.",
+                    "result": {
+                        "_type": "P_BMM_CONTAINER_TYPE",
+                        "container_type": "List",
+                        "type": "String"
+                    },
+                    "is_nullable": true
+                }
+            },
+            "invariants": {
+                "Code_valid": "not code.is_empty"
+            }
+        },
+        "TermBindingSet": {
+            "name": "TermBindingSet",
+            "documentation": "The term bindings of an ontology to one terminology.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published; the root takes the schema's name for it. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:392.",
+            "properties": {
+                "terminology": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "terminology",
+                    "documentation": "Identifier of the terminology bound to.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:396.",
+                    "is_mandatory": true,
+                    "type": "String"
+                },
+                "items": {
+                    "_type": "P_BMM_CONTAINER_PROPERTY",
+                    "name": "items",
+                    "documentation": "The bindings, one per code.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:394.",
+                    "type_def": {
+                        "container_type": "List",
+                        "type": "TERM_BINDING_ITEM"
+                    },
+                    "cardinality": {
+                        "lower": 0,
+                        "upper_unbounded": true
+                    }
+                }
+            }
+        },
+        "TERM_BINDING_ITEM": {
+            "name": "TERM_BINDING_ITEM",
+            "documentation": "The binding of one term code to a code of a terminology.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:398.",
+            "properties": {
+                "code": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "code",
+                    "documentation": "The term code bound.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:402.",
+                    "is_mandatory": true,
+                    "type": "String"
+                },
+                "value": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "value",
+                    "documentation": "The code of the terminology the term is bound to.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:400.",
+                    "is_mandatory": true,
+                    "type": "CODE_PHRASE"
+                }
+            }
+        },
+        "ConstraintBindingSet": {
+            "name": "ConstraintBindingSet",
+            "documentation": "The constraint bindings of an ontology to one terminology.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published; the root takes the schema's name for it. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:404.",
+            "properties": {
+                "terminology": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "terminology",
+                    "documentation": "Identifier of the terminology bound to.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:409.",
+                    "is_mandatory": true,
+                    "type": "String"
+                },
+                "items": {
+                    "_type": "P_BMM_CONTAINER_PROPERTY",
+                    "name": "items",
+                    "documentation": "The bindings, one per code.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:406.",
+                    "type_def": {
+                        "container_type": "List",
+                        "type": "CONSTRAINT_BINDING_ITEM"
+                    },
+                    "cardinality": {
+                        "lower": 0,
+                        "upper_unbounded": true
+                    }
+                }
+            }
+        },
+        "CONSTRAINT_BINDING_ITEM": {
+            "name": "CONSTRAINT_BINDING_ITEM",
+            "documentation": "The binding of one constraint code to a query of a terminology.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:411.",
+            "properties": {
+                "code": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "code",
+                    "documentation": "The constraint code bound.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:415.",
+                    "is_mandatory": true,
+                    "type": "String"
+                },
+                "value": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "value",
+                    "documentation": "The query of the terminology, as a URI.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:413.",
+                    "is_mandatory": true,
+                    "type": "Uri"
+                }
+            }
+        },
+        "C_CODE_PHRASE": {
+            "name": "C_CODE_PHRASE",
+            "documentation": "Constrainer class for coded terms: a terminology and, optionally, the codes of it allowed.\n\nReason: the AM Release-1.4 schema names the class C_CODED_TEXT of the BMM C_CODE_PHRASE, identifies the terminology by a TERMINOLOGY_ID, declares no reference, and types assumed_value. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:10.",
+            "ancestors": [
+                "C_DOMAIN_TYPE"
+            ],
+            "properties": {
+                "assumed_value": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "assumed_value",
+                    "documentation": "Value to be assumed if none sent in data.\n\nReason: the schema types it CODE_PHRASE, where the BMM gives Any. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:14.",
+                    "type": "CODE_PHRASE"
+                },
+                "terminology_id": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "terminology_id",
+                    "documentation": "Identifier of the terminology the codes come from.\n\nReason: the schema identifies the terminology by a TERMINOLOGY_ID, where the BMM gives a String terminology. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:15.",
+                    "type": "TERMINOLOGY_ID"
+                },
+                "code_list": {
+                    "_type": "P_BMM_GENERIC_PROPERTY",
+                    "name": "code_list",
+                    "documentation": "Optional list of codes from the terminology. No list means any code from the terminology is allowed.\n\nReason: unchanged; declared again with its class. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:16.",
+                    "type_def": {
+                        "root_type": "List",
+                        "generic_parameters": [
+                            "String"
+                        ]
+                    }
+                }
+            }
+        },
+        "C_DV_ORDINAL": {
+            "name": "C_DV_ORDINAL",
+            "documentation": "Constrainer class for ordinal data.\n\nReason: the AM Release-1.4 schema names the class C_ORDINAL of the BMM C_DV_ORDINAL and types assumed_value. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:30.",
+            "ancestors": [
+                "C_DOMAIN_TYPE"
+            ],
+            "properties": {
+                "assumed_value": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "assumed_value",
+                    "documentation": "Value to be assumed if none sent in data.\n\nReason: the schema types it ORDINAL, where the BMM gives Any. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:34.",
+                    "type": "ORDINAL"
+                },
+                "list": {
+                    "_type": "P_BMM_CONTAINER_PROPERTY",
+                    "name": "list",
+                    "documentation": "Value set of allowed ordinals in the constraint. No list means any value is allowed.\n\nReason: unchanged; declared again with its class. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:35.",
+                    "type_def": {
+                        "container_type": "List",
+                        "type": "ORDINAL"
+                    },
+                    "cardinality": {
+                        "lower": 0,
+                        "upper_unbounded": true
+                    }
+                }
+            }
+        },
+        "C_DV_QUANTITY": {
+            "name": "C_DV_QUANTITY",
+            "documentation": "Constrainer class for quantity data.\n\nReason: the AM Release-1.4 schema names the class C_QUANTITY of the BMM C_DV_QUANTITY, makes property an optional CODE_PHRASE, and types assumed_value. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:105.",
+            "ancestors": [
+                "C_DOMAIN_TYPE"
+            ],
+            "properties": {
+                "assumed_value": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "assumed_value",
+                    "documentation": "Value to be assumed if none sent in data.\n\nReason: the schema types it DV_QUANTITY, where the BMM gives Any. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:109.",
+                    "type": "DV_QUANTITY"
+                },
+                "property": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "property",
+                    "documentation": "Physical property of the quantities constrained, as a code of the openEHR property terminology.\n\nReason: the schema makes it an optional CODE_PHRASE, where the BMM gives a mandatory String. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:110.",
+                    "type": "CODE_PHRASE"
+                },
+                "list": {
+                    "_type": "P_BMM_CONTAINER_PROPERTY",
+                    "name": "list",
+                    "documentation": "Value set of allowed individual quantity item constraints in this quantity constraint.\n\nReason: unchanged; declared again with its class. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:111.",
+                    "type_def": {
+                        "container_type": "List",
+                        "type": "C_QUANTITY_ITEM"
+                    },
+                    "cardinality": {
+                        "lower": 0,
+                        "upper_unbounded": true
+                    }
+                }
+            }
+        },
+        "C_QUANTITY_ITEM": {
+            "name": "C_QUANTITY_ITEM",
+            "documentation": "Constrainer class for a single quantity: its units and, optionally, ranges of its magnitude and precision.\n\nReason: the AM Release-1.4 schema adds precision, makes magnitude optional and units mandatory. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:117.",
+            "properties": {
+                "magnitude": {
+                    "_type": "P_BMM_GENERIC_PROPERTY",
+                    "name": "magnitude",
+                    "documentation": "Quantity magnitude constraint.\n\nReason: the schema makes it optional, where the BMM makes it mandatory. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:119.",
+                    "type_def": {
+                        "root_type": "Interval",
+                        "generic_parameters": [
+                            "Real"
+                        ]
+                    }
+                },
+                "precision": {
+                    "_type": "P_BMM_GENERIC_PROPERTY",
+                    "name": "precision",
+                    "documentation": "Quantity precision constraint: the number of decimal places allowed.\n\nReason: the schema declares it, where the BMM has no member for it. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:120.",
+                    "type_def": {
+                        "root_type": "Interval",
+                        "generic_parameters": [
+                            "Integer"
+                        ]
+                    }
+                },
+                "units": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "units",
+                    "documentation": "Units constraint.\n\nReason: the schema makes it mandatory, where the BMM makes it optional. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:121.",
+                    "is_mandatory": true,
+                    "type": "String"
+                },
+                "units_system": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "units_system",
+                    "documentation": "Optional units system from which the code in `_units_` is defined, as for `DV_QUANTITY._units_system_`: a URI identifying a terminology containing units concepts.\n\nIf not set, the UCUM standard (case-sensitive codes) is assumed as the units system.\n\nReason: unchanged; declared again with its class. Upstream: openehr_am_1.4.0.",
+                    "type": "String"
+                },
+                "units_display_name": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "units_display_name",
+                    "documentation": "Optional displayable form of `_units_`, as for `DV_QUANTITY._units_display_name_`, e.g. `'lb'` for `'[lb_av]'`.\n\nNOTE: The display name may be language-dependent, so it is better set in templates than in archetypes.\n\nReason: unchanged; declared again with its class. Upstream: openehr_am_1.4.0.",
+                    "type": "String"
+                }
+            }
+        },
+        "ORDINAL": {
+            "name": "ORDINAL",
+            "documentation": "Constrainer object representing a single ordinal value: its value, its symbol and, optionally, the elements of a DV_ORDERED.\n\nReason: the AM Release-1.4 schema adds the optional elements of DV_ORDERED and gives the symbol either of two shapes. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:40.",
+            "properties": {
+                "normal_range": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "normal_range",
+                    "documentation": "Optional normal range, as for `DV_ORDERED._normal_range_`.\n\nReason: the schema accepts the DvOrderedElements group, which the BMM has no member for. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:76.",
+                    "type": "DV_INTERVAL"
+                },
+                "other_reference_ranges": {
+                    "_type": "P_BMM_CONTAINER_PROPERTY",
+                    "name": "other_reference_ranges",
+                    "documentation": "Optional tagged other reference ranges, as for `DV_ORDERED._other_reference_ranges_`.\n\nReason: the schema accepts the DvOrderedElements group, which the BMM has no member for. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:77.",
+                    "type_def": {
+                        "container_type": "List",
+                        "type_def": {
+                            "_type": "P_BMM_GENERIC_TYPE",
+                            "root_type": "REFERENCE_RANGE",
+                            "generic_parameters": [
+                                "DV_ORDERED"
+                            ]
+                        }
+                    },
+                    "cardinality": {
+                        "lower": 0,
+                        "upper_unbounded": true
+                    }
+                },
+                "normal_status": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "normal_status",
+                    "documentation": "Optional normal status, as for `DV_ORDERED._normal_status_`.\n\nReason: the schema accepts the DvOrderedElements group, which the BMM has no member for. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:78.",
+                    "type": "CODE_PHRASE"
+                },
+                "value": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "value",
+                    "documentation": "Ordinal value.\n\nReason: unchanged; declared again with its class. Upstream: openehr_am_1.4.0.",
+                    "is_mandatory": true,
+                    "type": "Integer"
+                },
+                "symbol": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "symbol",
+                    "documentation": "Terminology code providing the ordinal's symbol, written as a DV_CODED_TEXT or as a CODE_PHRASE.\n\nReason: the schema gives the symbol the shape of a DV_CODED_TEXT or of a CODE_PHRASE, which the schema_forms entry for it names, where the BMM gives a CODE_PHRASE. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:87.",
+                    "is_mandatory": true,
+                    "type": "Any"
+                }
+            }
+        }
+    }
+}

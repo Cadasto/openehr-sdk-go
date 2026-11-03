@@ -520,7 +520,7 @@ func TestREQ170_StrictNeverRefusesAnAbsentMember(t *testing.T) {
 // of the options: a value of a class outside the RM, an AOM 1.4 archetype or
 // constraint, decodes as by default and none of its members is checked, the
 // RM values it holds included (its ARCHETYPE_ID, and its original_language,
-// an rm.TerminologyCode). Each input carries extension members at several
+// an rm.CodePhrase). Each input carries extension members at several
 // depths; the report sees none, strict refuses none, and the value is the
 // default's.
 func TestREQ170_ClassesOutsideTheRMAreNotChecked(t *testing.T) {
@@ -532,7 +532,7 @@ func TestREQ170_ClassesOutsideTheRMAreNotChecked(t *testing.T) {
 			name: "archetype",
 			in: `{"_type":"ARCHETYPE","x-archetype":"` + plantedValue + `",` +
 				`"archetype_id":{"value":"openEHR-EHR-OBSERVATION.x.v1","x-id":1},"concept":"at0000",` +
-				`"original_language":{"terminology_id":"ISO_639-1","code_string":"en","x-language":1},` +
+				`"original_language":{"terminology_id":{"value":"ISO_639-1","x-id":1},"code_string":"en","x-language":1},` +
 				`"definition":{"_type":"C_COMPLEX_OBJECT","rm_type_name":"OBSERVATION","node_id":"at0000","x-definition":1}}`,
 			into: func() any { return new(aom14.Archetype) },
 		},

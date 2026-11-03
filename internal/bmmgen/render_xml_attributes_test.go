@@ -31,6 +31,9 @@ func buildPlanWithSchemas(t *testing.T, target Target, dir string) *Plan {
 	if plan.xmlOrder, err = (&itsXMLSchemas{dir: dir}).orderFor(target.ITSXMLSchemaSets); err != nil {
 		t.Fatalf("ITS-XML schemas of %s under %s: %v", target.GoPackage, dir, err)
 	}
+	if err := plan.xmlOrder.checkAnonymousTypes(plan); err != nil {
+		t.Fatalf("ITS-XML schemas of %s under %s: %v", target.GoPackage, dir, err)
+	}
 	return plan
 }
 
@@ -74,6 +77,18 @@ func TestXMLAttributesFromVendoredSchemas(t *testing.T) {
 		{plan: rmPlan, class: "TRANSLATION_DETAILS", keys: []string{"id"}},
 		{plan: aomPlan, class: "ARCHETYPE_TERM", members: []string{"code"}},
 		{plan: aomPlan, class: "C_COMPLEX_OBJECT"},
+		// REQ-176: the AOM 1.4 root's classes, the two of T_VIEW's anonymous
+		// types among them, take the attributes their schema types declare.
+		{plan: aomPlan, class: "CodeDefinitionSet", members: []string{"language"}},
+		{plan: aomPlan, class: "TermBindingSet", members: []string{"terminology"}},
+		{plan: aomPlan, class: "TERM_BINDING_ITEM", members: []string{"code"}},
+		{plan: aomPlan, class: "ConstraintBindingSet", members: []string{"terminology"}},
+		{plan: aomPlan, class: "CONSTRAINT_BINDING_ITEM", members: []string{"code"}},
+		{plan: aomPlan, class: "FLAT_ARCHETYPE_ONTOLOGY", members: []string{"archetype_id"}},
+		{plan: aomPlan, class: "ANNOTATION", members: []string{"path"}},
+		{plan: aomPlan, class: "T_VIEW_CONSTRAINT", members: []string{"path"}},
+		{plan: aomPlan, class: "T_VIEW_CONSTRAINT_ITEM", members: []string{"id"}},
+		{plan: aomPlan, class: "C_ARCHETYPE_ROOT"},
 	} {
 		t.Run(tc.plan.Target.GoPackage+"/"+tc.class, func(t *testing.T) {
 			got := classXMLAttributes(t, tc.plan, tc.class)

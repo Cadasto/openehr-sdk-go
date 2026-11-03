@@ -62,7 +62,7 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 
 	for _, target := range []Target{TargetRM, TargetAOM14} {
 		plan := plans[target.GoPackage]
-		hashes, anys, params, octets, lists := 0, 0, 0, 0, 0
+		hashes, anys, params, octets, lists, choices := 0, 0, 0, 0, 0, 0
 		for _, f := range plan.Files {
 			classes, err := codecClassesIn(plan, f)
 			if err != nil {
@@ -96,7 +96,16 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 							t.Errorf("%s.%s is typed by a generic list; its arm must decode each element as one item and append it:\n%s", pc.BMMName, prop, arm)
 						}
 					}
+					choice, err := xmlChoiceOf(plan, pc, ef)
+					if err != nil {
+						t.Fatalf("xmlChoiceOf(%s.%s): %v", pc.BMMName, prop, err)
+					}
 					switch {
+					case choice != nil:
+						choices++
+						if !strings.Contains(arm, "xmlunmatched.DecodeChoice(_dec, _t, "+choice.varName+")") {
+							t.Errorf("%s.%s takes a choice of shapes; its arm must decode through xmlunmatched.DecodeChoice with its shapes:\n%s", pc.BMMName, prop, arm)
+						}
 					case isHashProperty(ef.Prop):
 						hashes++
 						if !strings.Contains(arm, "xmlunmatched.SkipUnmatched(_dec, _t)") {
@@ -135,8 +144,8 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 		if target.GoPackage == TargetRM.GoPackage && (hashes == 0 || params == 0 || octets == 0) {
 			t.Errorf("the RM target rendered %d Hash arms, %d generic-parameter arms and %d Octet arms; want the resource-metadata Hash members, VERSION<T>.data and DV_MULTIMEDIA.data covered", hashes, params, octets)
 		}
-		if target.GoPackage == TargetAOM14.GoPackage && (anys == 0 || lists == 0) {
-			t.Errorf("the AOM 1.4 target rendered %d Any arms and %d generic-list arms; want `assumed_value`, `EXPR_LEAF.item` and C_CODED_TEXT's `code_list` covered", anys, lists)
+		if target.GoPackage == TargetAOM14.GoPackage && (anys == 0 || lists == 0 || choices == 0) {
+			t.Errorf("the AOM 1.4 target rendered %d Any arms, %d generic-list arms and %d choice arms; want `assumed_value`, `EXPR_LEAF.item`, C_CODE_PHRASE's `code_list` and ORDINAL's `symbol` covered", anys, lists, choices)
 		}
 	}
 }
@@ -292,9 +301,9 @@ func TestREQ056_GenericListDecode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(aom14): %v", err)
 	}
-	owner, ok := plan.Classes["C_CODED_TEXT"].Class.(*bmm.SimpleClass)
+	owner, ok := plan.Classes["C_CODE_PHRASE"].Class.(*bmm.SimpleClass)
 	if !ok {
-		t.Fatalf("plan has no simple class C_CODED_TEXT")
+		t.Fatalf("plan has no simple class C_CODE_PHRASE")
 	}
 	field := func(mandatory bool, root string, items ...string) emittedField {
 		p := &bmm.GenericProperty{TypeDef: &bmm.GenericType{RootType: root}}
@@ -303,7 +312,7 @@ func TestREQ056_GenericListDecode(t *testing.T) {
 		}
 		p.Name = "probe"
 		p.IsMandatory = mandatory
-		return emittedField{Prop: p, Owner: owner, OwnerName: "C_CODED_TEXT"}
+		return emittedField{Prop: p, Owner: owner, OwnerName: "C_CODE_PHRASE"}
 	}
 	for _, tc := range []struct {
 		name string

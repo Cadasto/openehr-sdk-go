@@ -21,7 +21,7 @@ func TestTypeRegistryWired(t *testing.T) {
 		"C_COMPLEX_OBJECT",
 		"C_PRIMITIVE_OBJECT",
 		"C_STRING",
-		"C_QUANTITY",
+		"C_DV_QUANTITY",
 		"ASSERTION",
 	}
 	for _, name := range cases {
