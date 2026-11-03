@@ -723,6 +723,7 @@ requirements:
       - openehr/serialize/canxml/edgecases_test.go
       - openehr/serialize/canxml/interval_flag_defaults_test.go
       - openehr/serialize/canxml/interval_open_side_test.go
+      - openehr/serialize/canxml/max_depth_test.go
       - openehr/serialize/canxml/missing_test.go
       - openehr/serialize/canxml/names_test.go
       - openehr/serialize/canxml/oneroot_test.go
@@ -1754,6 +1755,7 @@ requirements:
       - openehr/rm/typereg/registry_test.go
       - openehr/rm/typereg/streaming_hotpath_test.go
       - openehr/serialize/canjson/edgecases_test.go
+      - openehr/serialize/canxml/max_depth_test.go
       - openehr/template/parse_cap_test.go
       - openehr/template/parse_depth_test.go
 
@@ -1817,6 +1819,7 @@ requirements:
     tests:
       - internal/templatecompile/compile_nodename_test.go
       - internal/templatecompile/compile_test.go
+      - internal/templatecompile/compiled_golden_test.go
       - openehr/instance/local_term_text_test.go
       - openehr/template/path_test.go
       - openehr/template/slot_assertion_test.go
