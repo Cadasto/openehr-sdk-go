@@ -17,7 +17,9 @@
 //     has any;
 //   - interval_bound_gen.go, the emptiness test the canonical encoders
 //     apply to an open interval side's bound, when the target owns an
-//     interval-shaped class.
+//     interval-shaped class;
+//   - integer_enumeration_gen.go, the canonical codecs of the target's
+//     integer enumerations, when it emits one.
 //
 // These fixed file names are reserved: a BMM package whose file stem would
 // produce one of them fails generation instead of being overwritten.
@@ -455,6 +457,36 @@ func runTarget(opts Options, t Target, resolver schemaResolver, schemas *itsXMLS
 		}
 	}
 
+	// Integer-enumeration codecs, one file per target that emits an integer
+	// enumeration; the per-package companions are skipped for a package with
+	// no concrete class, which an enumeration's package may be.
+	enumBody, err := RenderIntegerEnumFile(plan)
+	if err != nil {
+		return tr, err
+	}
+	enumPath := filepath.Join(outDir, integerEnumFile)
+	if enumBody == nil {
+		if opts.Verify {
+			if _, statErr := os.Stat(enumPath); statErr == nil {
+				result.Drifts = append(result.Drifts, DriftRecord{Path: enumPath, Existing: true})
+			}
+		}
+	} else {
+		tr.Files = append(tr.Files, enumPath)
+		result.Files = append(result.Files, enumPath)
+		if opts.Verify {
+			drift, err := compareFile(enumPath, enumBody)
+			if err != nil {
+				return tr, err
+			}
+			if drift != nil {
+				result.Drifts = append(result.Drifts, *drift)
+			}
+		} else if err := writeAtomic(enumPath, enumBody); err != nil {
+			return tr, err
+		}
+	}
+
 	// rminfo data tables — emitted alongside the RM target (one
 	// sub-package down). Both renderers return nil for non-RM targets,
 	// so AOM 1.4 doesn't get them. The package lives in its own
@@ -545,7 +577,7 @@ func runTarget(opts Options, t Target, resolver schemaResolver, schemas *itsXMLS
 // the ones not derived from a BMM package: a package whose file stem produced
 // one of them would be silently overwritten by it.
 //
-// The reservation is uniform: all four names, in every target. A BMM package
+// The reservation is uniform: all five names, in every target. A BMM package
 // named like a fixed file is refused even in a target that would not emit that
 // file (the AOM 1.4 target emits neither interval_bound_gen.go nor
 // release_gen.go), so the set of reserved names never depends on the target and
@@ -555,6 +587,7 @@ var fixedGeneratedFiles = []string{
 	"jsonhooks_gen.go",
 	intervalBoundFile,
 	releaseFileName,
+	integerEnumFile,
 }
 
 // checkFixedNameCollisions refuses a plan in which a BMM package file would
