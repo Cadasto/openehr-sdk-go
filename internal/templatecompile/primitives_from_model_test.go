@@ -8,8 +8,10 @@ package templatecompile
 import (
 	json "encoding/json/v2"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -19,8 +21,45 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
-	templateprobes "github.com/cadasto/openehr-sdk-go/testkit/probes/template"
 )
+
+// corpusTemplateFloor is the number of operational templates the corpus
+// vendors today. A walk that finds fewer fails, so a corpus that silently
+// empties, or a walk that stops finding a folder, cannot pass as clean.
+const corpusTemplateFloor = 74
+
+// corpusOperationalTemplates returns every operational template under the
+// corpus root, as PROBE-111 walks them: each regular *.opt file, named by its
+// slash-separated path relative to the root, sorted. It walks the corpus
+// itself because an in-package test cannot import testkit/probes/template,
+// which imports this package through the public compile step.
+func corpusOperationalTemplates(t *testing.T) []string {
+	t.Helper()
+	root := fixtures.CorpusRoot()
+	var names []string
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.Type().IsRegular() || filepath.Ext(path) != ".opt" {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		names = append(names, filepath.ToSlash(rel))
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk the corpus at %s: %v", root, err)
+	}
+	if len(names) < corpusTemplateFloor {
+		t.Fatalf("the corpus at %s holds %d operational templates, want at least %d", root, len(names), corpusTemplateFloor)
+	}
+	slices.Sort(names)
+	return names
+}
 
 // modelNodePair is one node of a corpus operational template as the parser
 // reads it and as the model's decode reads it, paired by its place: where
@@ -38,16 +77,9 @@ type modelNodePair struct {
 // trees of different shapes fails the test.
 func corpusModelNodePairs(t *testing.T) []modelNodePair {
 	t.Helper()
-	names, err := templateprobes.Probe111OperationalTemplates()
-	if err != nil {
-		t.Fatalf("Probe111OperationalTemplates: %v", err)
-	}
-	if len(names) == 0 {
-		t.Fatal("Probe111OperationalTemplates found no operational template: corpus layout changed?")
-	}
 	root := fixtures.CorpusRoot()
 	var pairs []modelNodePair
-	for _, name := range names {
+	for _, name := range corpusOperationalTemplates(t) {
 		path := filepath.Join(root, filepath.FromSlash(name))
 		parsed, err := template.ParseFile(path)
 		if err != nil {

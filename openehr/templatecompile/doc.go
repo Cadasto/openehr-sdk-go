@@ -32,14 +32,16 @@
 // # Public surface
 //
 // The public surface is [Compile], the [Compiled] handle, its
-// introspection tree ([CompiledNode] / [CompiledAttribute]), the
-// functional [Option]s, and the [ErrInvalidInput] / [ErrPathNotFound]
-// sentinels. All three types are aliases of the engine's compiled form,
-// so values returned by [Compile] are accepted as-is by the consuming
-// packages with no conversion. Downstream code (form generation, path
-// discovery, custom mapping) can walk the whole tree:
-// [Compiled.Root] / [Compiled.NodeAt] → [CompiledNode.Attributes]
-// → [CompiledAttribute.Children].
+// introspection tree ([CompiledNode] / [CompiledAttribute]), the path
+// lookup ([Compiled.Resolve] / [Compiled.ValidatePath], tuned by a
+// [ResolveOption] such as [WithStrictPaths]), the functional [Option]s,
+// and the [ErrInvalidInput] / [ErrPathNotFound] sentinels. The types are
+// aliases of the engine's compiled form, so values returned by [Compile]
+// are accepted as-is by the consuming packages with no conversion.
+// Downstream code (form generation, path discovery, custom mapping) can
+// walk the whole tree: [Compiled.Root] / [Compiled.NodeAt] /
+// [Compiled.Resolve] → [CompiledNode.Attributes] →
+// [CompiledAttribute.Children].
 //
 // Before 1.0, the one area expected to change is multi-language term
 // resolution. [CompiledNode.Term] accepts a lang parameter for forward

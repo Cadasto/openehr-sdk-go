@@ -14,8 +14,12 @@ import (
 // openehr/validation, and openehr/aql/lint without conversion. Beyond
 // the identity getters (TemplateID, Concept, UID, Language) it is the
 // entry point to the introspection tree: [Compiled.Root] /
-// [Compiled.NodeAt] return [CompiledNode], and [Compiled.AllByRMType] /
-// [Compiled.AllByNodeID] / [Compiled.AllByArchetypeID] index it.
+// [Compiled.NodeAt] / [Compiled.Resolve] return [CompiledNode], and
+// [Compiled.AllByRMType] / [Compiled.AllByNodeID] /
+// [Compiled.AllByArchetypeID] index it. [Compiled.Resolve] and
+// [Compiled.ValidatePath] walk the tree along a path that
+// [github.com/cadasto/openehr-sdk-go/openehr/template.OperationalTemplate.ParsePath]
+// reads; [Compiled.NodeAt] looks up the exact AQL path the compile wrote.
 type Compiled = impl.Compiled
 
 // CompiledNode is one node in the compiled OPT tree, the unit of
@@ -112,7 +116,23 @@ func Compile(opt *aom14.OperationalTemplate, opts ...Option) (*Compiled, error) 
 // returns, so external callers can match it with errors.Is.
 var ErrInvalidInput = impl.ErrInvalidInput
 
-// ErrPathNotFound is returned by [Compiled.NodeAt] when a path string
-// does not resolve to a compiled node. Re-exported so external callers
-// can match it with errors.Is without importing an internal package.
+// ErrPathNotFound is returned, wrapped, by [Compiled.NodeAt] when a path
+// string does not resolve to a compiled node, and by [Compiled.Resolve] and
+// [Compiled.ValidatePath] when a path reaches no node; an error of the
+// latter two also matches
+// [github.com/cadasto/openehr-sdk-go/openehr/template.ErrPathNotFound].
+// Re-exported so external callers can match it with errors.Is without
+// importing an internal package.
 var ErrPathNotFound = impl.ErrPathNotFound
+
+// ResolveOption tunes [Compiled.Resolve] and [Compiled.ValidatePath].
+// Construct one with [WithStrictPaths]. Like [Compiled] it is a type alias
+// of the engine form.
+type ResolveOption = impl.ResolveOption
+
+// WithStrictPaths makes [Compiled.Resolve] refuse a segment without a
+// predicate on an attribute that holds more than one child, with an error
+// wrapping
+// [github.com/cadasto/openehr-sdk-go/openehr/template.ErrAmbiguousPath],
+// where by default it takes the first child.
+func WithStrictPaths() ResolveOption { return impl.WithStrictPaths() }
