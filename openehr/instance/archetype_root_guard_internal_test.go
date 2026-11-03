@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/rmroots"
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
@@ -63,9 +63,9 @@ func TestREQ107_ImplicitSingleArchetypeRootRefusedWhenRequired(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			opt, err := template.ParseOPT(strings.NewReader(contentOPT(tc.lower)))
+			opt, err := aom14.ReadOperationalTemplate(strings.NewReader(contentOPT(tc.lower)))
 			if err != nil {
-				t.Fatalf("ParseOPT: %v", err)
+				t.Fatalf("ReadOperationalTemplate: %v", err)
 			}
 			c, err := templatecompile.Compile(opt)
 			if err != nil {

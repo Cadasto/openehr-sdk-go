@@ -15,7 +15,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -168,7 +167,7 @@ func requiredUIDsOPT() string {
 }
 
 // TestREQ107_SeededGenerateReturnsEqualRoots is the REQ-107 Reproducible
-// uids check, over every vendored template that parses and compiles and
+// uids check, over every vendored template that reads and compiles and
 // over requiredUIDsOPT, whose roots carry uids, that two Generate calls
 // with the same options, a fixed non-zero Now included, and a UIDSource
 // from UIDsFrom and a ValueSource each built on a source in the same
@@ -189,7 +188,7 @@ func TestREQ107_SeededGenerateReturnsEqualRoots(t *testing.T) {
 	var compared, refused, uids int
 	var unbuilt []string
 	for _, ref := range refs {
-		opt, err := template.ParseFile(ref.Path)
+		opt, err := readOPTFile(ref.Path)
 		if err != nil {
 			unbuilt = append(unbuilt, ref.Name)
 			continue

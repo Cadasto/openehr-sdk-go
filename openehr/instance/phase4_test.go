@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
@@ -60,9 +59,9 @@ func TestREQ107_FloorGapsFilled(t *testing.T) {
 			if !ok {
 				t.Fatalf("fixture %s not in ListAllOPTs", name)
 			}
-			opt, err := template.ParseFile(path)
+			opt, err := readOPTFile(path)
 			if err != nil {
-				t.Fatalf("ParseFile: %v", err)
+				t.Fatalf("readOPTFile: %v", err)
 			}
 			c, err := templatecompile.Compile(opt)
 			if err != nil {

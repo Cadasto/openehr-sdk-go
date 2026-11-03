@@ -3,7 +3,7 @@ package instance_test
 // generate_bench_test.go: the cost of generating an instance, which every
 // composition builder pays when it starts from a skeleton: on
 // Demonstration.v1, a large corpus template, and on vital_signs, a common
-// clinical one, under both policies. The OPT is parsed and compiled before
+// clinical one, under both policies. The OPT is read and compiled before
 // the timer starts; the clock is fixed and the uids come from a counter, so
 // every iteration does the same work.
 
@@ -15,7 +15,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -24,7 +23,7 @@ import (
 func BenchmarkGenerate(b *testing.B) {
 	now := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)
 	for _, id := range []string{"Demonstration.v1", "vital_signs"} {
-		opt, err := template.ParseFile(fixtures.TemplateOpt(id))
+		opt, err := readOPTFile(fixtures.TemplateOpt(id))
 		if err != nil {
 			b.Fatalf("parse %s: %v", id, err)
 		}
