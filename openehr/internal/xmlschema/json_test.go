@@ -9,12 +9,14 @@ import (
 	json "encoding/json/v2"
 	"errors"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlschema"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 )
 
 // TestREQ176_REQ052_AnyJSONDecoders pins what the two decoders store for each
@@ -111,6 +113,79 @@ func TestREQ176_REQ052_ChoiceJSONDecoders(t *testing.T) {
 	err := json.Unmarshal([]byte(`{"x":{"_type":"DV_TEXT","value":"a"}}`), &w, typereg.Unmarshalers())
 	if !errors.Is(err, typereg.ErrTypeMismatch) {
 		t.Errorf("ChoiceJSON(a class none of the shapes) = %v; want typereg.ErrTypeMismatch", err)
+	}
+}
+
+// TestREQ176_REQ052_JSONRefusalsKeepTheirText pins the value-free text of the
+// decode refusals the canonical-JSON decoders raise themselves, each of which
+// has a fixed text that holds no value: the text of the DecodeError
+// canjson.Unmarshal returns keeps that text rather than naming the refusal by
+// its Go type alone, and holds none of the input's values.
+//
+// Can-fail control: drop a refusal's text from the forms the value-free
+// renderer keeps, and its case reads "cause withheld (*errors.errorString)".
+func TestREQ176_REQ052_JSONRefusalsKeepTheirText(t *testing.T) {
+	type anyMember struct {
+		X xmlschema.AnyJSON `json:"x"`
+	}
+	type choiceMember struct {
+		X xmlschema.ChoiceJSON `json:"x"`
+	}
+	for _, tc := range []struct {
+		name   string
+		json   string
+		target func() any
+		keep   string
+		absent string
+	}{
+		{
+			name: "a typed item with no value", json: `{"_type":"String"}`,
+			target: func() any { return new(xmlschema.TypedString) },
+			keep:   "a typed item holds no value",
+		},
+		{
+			name: "a typed item with a null value", json: `{"_type":"String","value":null}`,
+			target: func() any { return new(xmlschema.TypedString) },
+			keep:   "a typed item holds no value",
+		},
+		{
+			name: "a typed item whose _type names no primitive", json: `{"_type":"Jane","value":"Doe"}`,
+			target: func() any { return new(xmlschema.TypedString) },
+			keep:   "the _type of a typed item names no primitive an XML Schema built-in datatype reads as",
+			absent: "Doe",
+		},
+		{
+			name: "an Any member holding a number", json: `{"x":98765.4321}`,
+			target: func() any {
+				var v any
+				return &anyMember{X: xmlschema.AnyJSON{To: &v}}
+			},
+			keep:   "an Any member holds a JSON object, a string or null",
+			absent: "98765",
+		},
+		{
+			name: "a member of a choice of shapes holding a string", json: `{"x":"Jane Doe"}`,
+			target: func() any {
+				var v any
+				return &choiceMember{X: xmlschema.ChoiceJSON{To: &v, Types: []string{"DV_BOOLEAN"}}}
+			},
+			keep:   "a member of a choice of shapes holds a JSON object or null",
+			absent: "Jane",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := canjson.Unmarshal([]byte(tc.json), tc.target())
+			if err == nil {
+				t.Fatalf("canjson.Unmarshal(%s) = nil; want a refusal", tc.json)
+			}
+			got := err.Error()
+			if !strings.Contains(got, tc.keep) || strings.Contains(got, "cause withheld") {
+				t.Errorf("canjson.Unmarshal(%s) = %q; want it to keep %q", tc.json, got, tc.keep)
+			}
+			if tc.absent != "" && strings.Contains(got, tc.absent) {
+				t.Errorf("canjson.Unmarshal(%s) = %q; it carries %q", tc.json, got, tc.absent)
+			}
+		})
 	}
 }
 
