@@ -317,6 +317,7 @@ requirements:
     tests:
       - internal/bmmgen/aom14_test.go
       - internal/bmmgen/container_bounds_test.go
+      - internal/bmmgen/itsxml_test.go
       - internal/bmmgen/pin_scripts_test.go
       - internal/bmmgen/plan_test.go
       - internal/bmmgen/render_interface_test.go
@@ -331,6 +332,8 @@ requirements:
       - internal/bmmgen/sdk_extensions_test.go
       - internal/bmmgen/sim_bump_test.go
       - internal/bmmgen/target_test.go
+      - openehr/aom/aom14/operational_template_shapes_xml_test.go
+      - openehr/internal/xmlunmatched/choice_internal_test.go
       - openehr/internal/xmlunmatched/drop_internal_test.go
       - openehr/rm/rminfo/hierarchy_test.go
       - openehr/rm/rminfo/probe_094_test.go
@@ -681,7 +684,7 @@ requirements:
       - internal/bmmgen/render_xmlunmar_class_test.go
       - internal/bmmgen/render_xmlunmar_unmatched_test.go
       - internal/rmaccess/interval_test.go
-      - openehr/aom/aom14/coded_text_code_list_xml_test.go
+      - openehr/aom/aom14/code_phrase_code_list_xml_test.go
       - openehr/aom/aom14/interval_open_side_test.go
       - openehr/aom/aom14/quantity_item_units_xml_test.go
       - openehr/internal/xmlunmatched/document_internal_test.go
@@ -2614,5 +2617,13 @@ requirements:
     packages: [openehr/aom/aom14, internal/bmmgen, resources/bmm, openehr/serialize/canxml]
     probes: [PROBE-111]
     tests:
+      - internal/bmmgen/itsxml_test.go
+      - internal/bmmgen/naming_test.go
+      - internal/bmmgen/render_xml_attributes_test.go
       - internal/bmmgen/sdk_extensions_test.go
+      - openehr/aom/aom14/code_phrase_code_list_xml_test.go
+      - openehr/aom/aom14/operational_template_shapes_xml_test.go
+      - openehr/aom/aom14/quantity_item_units_xml_test.go
+      - openehr/internal/xmlunmatched/choice_internal_test.go
       - openehr/internal/xmlunmatched/drop_internal_test.go
+      - openehr/serialize/canxml/unmatched_test.go
