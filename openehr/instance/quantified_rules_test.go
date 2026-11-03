@@ -16,9 +16,10 @@ import (
 // REQ-107 Precedence 3 rules on quantified values: DV_QUANTIFIED
 // Magnitude_status_valid on a magnitude_status, the DV_AMOUNT rules
 // Accuracy_is_percent_validity and Accuracy_validity on a percentage
-// accuracy, the lower bound -1 of a precision, and the 32-bit range of an
-// RM Integer on a DV_ORDINAL's value. Where nothing is left of the OPT's
-// constraint, Generate fails with ErrConstraintUnsatisfiable. Neither
+// accuracy, and the lower bound -1 of a precision. Where nothing is left of
+// the OPT's constraint, Generate fails with ErrConstraintUnsatisfiable. The
+// 32-bit range of an RM Integer on a DV_ORDINAL's value or a precision is
+// held when the template is read, which refuses a number past it. Neither
 // validator evaluates Magnitude_status_valid or the accuracy rules, so the
 // tests read the values.
 
@@ -258,6 +259,12 @@ func intAbove(lower, upper string) string { return intRangeOver(lower, upper, fa
 // intRangeOver is a C_INTEGER over lower..upper, upper included and lower
 // where lowerIncluded says so; an empty end is unbounded.
 func intRangeOver(lower, upper string, lowerIncluded bool) string {
+	return optPrimitive("INTEGER", "C_INTEGER", intRangeBody(lower, upper, lowerIncluded))
+}
+
+// intRangeBody is the C_INTEGER body of intRangeOver, with the ends in the
+// plain decimal digits the caller gives.
+func intRangeBody(lower, upper string, lowerIncluded bool) string {
 	body := fmt.Sprintf("<range><lower_included>%t</lower_included><upper_included>true</upper_included>", lowerIncluded)
 	if lower == "" {
 		body += "<lower_unbounded>true</lower_unbounded>"
@@ -269,105 +276,65 @@ func intRangeOver(lower, upper string, lowerIncluded bool) string {
 	} else {
 		body += "<upper_unbounded>false</upper_unbounded><upper>" + upper + "</upper>"
 	}
-	return optPrimitive("INTEGER", "C_INTEGER", body+"</range>")
+	return body + "</range>"
 }
 
-// TestREQ107_PrecisionBelowMinusOneIsNarrowed is the REQ-107 Precedence 3
-// check that a C_INTEGER on the precision of a DV_QUANTITY or a
-// DV_PROPORTION that reaches below -1, the least precision the RM admits
-// (-1 is no limit, § REQ-112), is narrowed to -1 and above: a range from
-// -10 to 10 gives -1 under ExampleFill and a draw from -1 to 10 under
-// RandomFill; a list keeps the members from -1 up; a range bounded above
-// alone keeps its upper end as ExampleFill's value, as its own example
-// value is; and a range that excludes -1 keeps it excluded. It holds under every policy, both value fills and both
-// compile modes, and the root passes both validators.
-func TestREQ107_PrecisionBelowMinusOneIsNarrowed(t *testing.T) {
-	holders := []struct {
-		name      string
-		value     func(attrs ...string) string
-		precision func(v rm.DataValue) *rm.Integer
+// TestREQ107_REQ056_PrecisionPastTheIntegerRangeIsRefusedAtRead is the
+// REQ-107 and REQ-056 check that a C_INTEGER on the precision of a
+// DV_QUANTITY or a DV_PROPORTION whose range reaches past the 32-bit range
+// of an RM Integer never reaches the generator: reading the template is
+// refused with an error wrapping canxml.ErrInvalidShape, and the same
+// range up to the greatest Integer is read.
+func TestREQ107_REQ056_PrecisionPastTheIntegerRangeIsRefusedAtRead(t *testing.T) {
+	for _, h := range []struct {
+		name  string
+		value func(attrs ...string) string
 	}{
-		{"DV_QUANTITY", func(a ...string) string { return quantityValue("4", a...) }, func(v rm.DataValue) *rm.Integer { return v.(*rm.DVQuantity).Precision }},
-		{"DV_PROPORTION", func(a ...string) string { return proportionValue("4", a...) }, func(v rm.DataValue) *rm.Integer { return v.(*rm.DVProportion).Precision }},
-	}
-	cases := []struct {
-		name        string
-		constraint  string
-		lower       rm.Integer
-		upper       rm.Integer
-		wantExample rm.Integer
-	}{
-		{name: "range from -10 to 10", constraint: intRange("-10", "10"), lower: -1, upper: 10, wantExample: -1},
-		{name: "list of -5 and 2", constraint: optPrimitive("INTEGER", "C_INTEGER", "<list>-5</list><list>2</list>"), lower: 2, upper: 2, wantExample: 2},
-		{name: "range up to 5", constraint: intRange("", "5"), lower: -1, upper: 5, wantExample: 5},
-		{name: "range above -1 to past the Integer range", constraint: intAbove("-1", "5000000000"), lower: 0, upper: math.MaxInt32, wantExample: 0},
-	}
-	for _, h := range holders {
-		for _, tc := range cases {
-			t.Run(h.name+"/"+tc.name, func(t *testing.T) {
-				opt := optTemplate("ELEMENT", optSingle("value", h.value(optSingle("precision", tc.constraint))))
-				generateEvery(t, opt, func(t *testing.T, call string, out any) {
-					p := h.precision(out.(*rm.Element).Value)
-					if p == nil {
-						t.Fatalf("%s: %s.precision is unset", call, h.name)
-					}
-					if *p < tc.lower || *p > tc.upper {
-						t.Errorf("%s: %s.precision = %d, want %d..%d", call, h.name, *p, tc.lower, tc.upper)
-					}
-					if strings.Contains(call, "example") && *p != tc.wantExample {
-						t.Errorf("%s: %s.precision = %d, want %d", call, h.name, *p, tc.wantExample)
-					}
-				})
-			})
-		}
-	}
-	t.Run("range below -1", func(t *testing.T) {
-		opt := optTemplate("ELEMENT", optSingle("value", quantityValue("4", optSingle("precision", intRange("-10", "-2")))))
-		generateUnsatisfiable(t, opt, "DV_QUANTITY.precision", "/value/precision", "-10", "-2")
-	})
-}
-
-// TestREQ107_OrdinalValueIsAnInteger is the REQ-107 Precedence 3 check
-// that a DV_ORDINAL's value, a 32-bit RM Integer, is never truncated: a
-// C_DV_ORDINAL keeps the pairs whose value is an Integer, and the walk
-// writes the first of them under ExampleFill and one of them under
-// RandomFill, with its symbol; a C_INTEGER on the value bounded above
-// alone past the Integer range gives the greatest Integer under
-// ExampleFill, the end on the side it bounds, one bounded below alone the
-// least, and one that excludes the least Integer the one above it. It holds under every policy, both value fills and both
-// compile modes, and the root passes both validators.
-func TestREQ107_OrdinalValueIsAnInteger(t *testing.T) {
-	t.Run("C_DV_ORDINAL with a pair past the Integer range", func(t *testing.T) {
-		opt := optTemplate("ELEMENT", optSingle("value", ordinalPairs("5000000000/at0001", "3/at0002")))
-		generateEvery(t, opt, func(t *testing.T, call string, out any) {
-			o := dvValue[*rm.DVOrdinal](t, out)
-			if o.Value != 3 || codeString(o.Symbol.DefiningCode) != "local::at0002" {
-				t.Errorf("%s: DV_ORDINAL = %d %s, want 3 local::at0002", call, o.Value, codeString(o.Symbol.DefiningCode))
+		{"DV_QUANTITY", func(a ...string) string { return quantityValue("4", a...) }},
+		{"DV_PROPORTION", func(a ...string) string { return proportionValue("4", a...) }},
+	} {
+		t.Run(h.name, func(t *testing.T) {
+			withPrecision := func(constraint string) string {
+				return optTemplate("ELEMENT", optSingle("value", h.value(optSingle("precision", constraint))))
 			}
+			requireReadRefused(t, withPrecision(intAbove("-1", "5000000000")))
+			compileOPTText(t, withPrecision(intAbove("-1", "2147483647")), true)
 		})
-	})
-	t.Run("C_DV_ORDINAL with no pair inside the Integer range", func(t *testing.T) {
-		opt := optTemplate("ELEMENT", optSingle("value", ordinalPairs("5000000000/at0001", "-5000000000/at0002")))
-		generateUnsatisfiable(t, opt, "DV_ORDINAL.value", "/value", "5000000000")
-	})
+	}
+}
+
+// TestREQ107_REQ056_OrdinalValuePastTheIntegerRangeIsRefusedAtRead is the
+// REQ-107 and REQ-056 check that a DV_ORDINAL's value, a 32-bit RM Integer,
+// is never given a value past that range by the template: a C_DV_ORDINAL
+// that lists a pair past it, alone or beside one inside it, and a C_INTEGER
+// on the value bounded past it on either side or above and below it, make
+// reading the template fail with an error wrapping canxml.ErrInvalidShape.
+// The pairs and ranges inside the range are read.
+func TestREQ107_REQ056_OrdinalValuePastTheIntegerRangeIsRefusedAtRead(t *testing.T) {
+	constrained := func(constraint string) string {
+		return optNode("DV_ORDINAL", "",
+			optSingle("value", constraint), optSingle("symbol", optCodedText("local", "at0001")))
+	}
 	for _, tc := range []struct {
-		name        string
-		constraint  string
-		wantExample rm.Integer
+		name    string
+		value   string // the ELEMENT's value node
+		refused bool
 	}{
-		{"C_INTEGER up to 5000000000", intRange("", "5000000000"), math.MaxInt32},
-		{"C_INTEGER from -5000000000", intRange("-5000000000", ""), math.MinInt32},
-		{"C_INTEGER above the least Integer to past the range", intAbove("-2147483648", "5000000000"), math.MinInt32 + 1},
+		{"C_DV_ORDINAL with a pair past the Integer range", ordinalPairs("5000000000/at0001", "3/at0002"), true},
+		{"C_DV_ORDINAL with no pair inside the Integer range", ordinalPairs("5000000000/at0001", "-5000000000/at0002"), true},
+		{"C_INTEGER up to 5000000000", constrained(intRange("", "5000000000")), true},
+		{"C_INTEGER from -5000000000", constrained(intRange("-5000000000", "")), true},
+		{"C_INTEGER above the least Integer to past the range", constrained(intAbove("-2147483648", "5000000000")), true},
+		{"C_DV_ORDINAL with the pairs at either end of the Integer range", ordinalPairs("2147483647/at0001", "-2147483648/at0002"), false},
+		{"C_INTEGER from the least Integer to the greatest", constrained(intRange("-2147483648", "2147483647")), false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			opt := optTemplate("ELEMENT", optSingle("value", optNode("DV_ORDINAL", "",
-				optSingle("value", tc.constraint), optSingle("symbol", optCodedText("local", "at0001")))))
-			generateEvery(t, opt, func(t *testing.T, call string, out any) {
-				o := dvValue[*rm.DVOrdinal](t, out)
-				if strings.Contains(call, "example") && o.Value != tc.wantExample {
-					t.Errorf("%s: DV_ORDINAL.value = %d, want %d", call, o.Value, tc.wantExample)
-				}
-			})
+			xml := optTemplate("ELEMENT", optSingle("value", tc.value))
+			if tc.refused {
+				requireReadRefused(t, xml)
+				return
+			}
+			compileOPTText(t, xml, true)
 		})
 	}
 }
