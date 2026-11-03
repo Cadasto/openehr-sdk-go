@@ -1,7 +1,9 @@
 package aom14_test
 
 // REQ-176 § Shapes, REQ-056: canonical XML writes the `value` of an ORDINAL or
-// SCALE symbol in the DV_CODED_TEXT shape only when it is non-empty.
+// SCALE symbol in the DV_CODED_TEXT shape only when it is non-empty; REQ-175:
+// the missing-member report holds that shape to the members its schema shape
+// requires, so it does not report the `value`.
 
 import (
 	"encoding/xml"
