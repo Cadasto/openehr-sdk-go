@@ -61,11 +61,12 @@
 // an attribute value, and hands a decoder none of the declarations of the
 // elements around the one it reads. So the token source of a tracked decode
 // keeps the declarations of the open elements, and so does that of a
-// [Scope], which a decode that applies no policy reads through when it cannot
-// read its input again; [LookupPrefix] answers from them. An untracked decode
-// through a plain encoding/xml decoder sees only the declarations an element
-// carries itself; [Unmarshal] decodes the document again when a prefix needs
-// more ([UnresolvedPrefix]).
+// [Scope]; [LookupPrefix] answers from them. An untracked decode through a
+// plain encoding/xml decoder sees only the declarations an element carries
+// itself. When a prefix needs more ([UnresolvedPrefix]), [Unmarshal] decodes
+// the document again through a tracker that applies no policy, and canxml's
+// stream decoder decodes the value again through a Scope
+// ([Scope.DecodeAgain]).
 //
 // # Missing members
 //
@@ -540,6 +541,10 @@ type trackingReader struct {
 	t   *Tracker // nil for a scoped decode, which records no element
 	// scope holds the prefixes the open elements declare, for [LookupPrefix].
 	scope scope
+	// again marks a scoped decode of a value a second time
+	// ([Scope.DecodeAgain]), whose root decoder [Enter] tells to clear its
+	// receiver first.
+	again bool
 	// pending holds the tokens [trackingReader.peekChild] read ahead of the
 	// decoder, which Token returns, and records, before it reads src again.
 	pending []xml.Token

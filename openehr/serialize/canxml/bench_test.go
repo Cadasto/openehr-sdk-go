@@ -1,6 +1,7 @@
 package canxml_test
 
 import (
+	"bytes"
 	"os"
 	"strings"
 	"testing"
@@ -56,6 +57,24 @@ func BenchmarkUnmarshalComposition(b *testing.B) {
 	for b.Loop() {
 		var into rm.Composition
 		if err := canxml.Unmarshal(body, &into); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkDecoderComposition pins the decode throughput of a stream Decoder
+// given no option, on the input BenchmarkUnmarshalComposition decodes. The
+// composition holds no prefixed `xsi:type`, so the Decoder decodes it once
+// and pays only for keeping the bytes of the value.
+func BenchmarkDecoderComposition(b *testing.B) {
+	c := loadCompositionFromJSON(b, "body_weight.json")
+	body, err := canxml.Marshal(c)
+	if err != nil {
+		b.Fatalf("seed encode: %v", err)
+	}
+	for b.Loop() {
+		var into rm.Composition
+		if err := canxml.NewDecoder(bytes.NewReader(body)).Decode(&into); err != nil {
 			b.Fatal(err)
 		}
 	}

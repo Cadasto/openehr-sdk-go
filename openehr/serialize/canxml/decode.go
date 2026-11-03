@@ -1,6 +1,7 @@
 package canxml
 
 import (
+	"bytes"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -156,9 +157,14 @@ type Decoder struct {
 	// trk is the decoder's tracker when an option reports or refuses
 	// unmatched content or reports missing members, and nil otherwise.
 	trk *xmlunmatched.Tracker
+	// rec records what dec has read of the stream since the value being
+	// decoded began, for a decoder given none of those options that reads
+	// through a plain encoding/xml decoder; nil otherwise.
+	rec *recorder
 	// scope keeps the namespace declarations in scope for a decoder given
-	// none of those options, which cannot read its stream again to find them
-	// as [Unmarshal] does.
+	// none of those options once it has decoded a value a second time to
+	// resolve a prefix: it reads the rest of the stream through scope. nil
+	// until then.
 	scope *xmlunmatched.Scope
 }
 
@@ -168,25 +174,63 @@ type Decoder struct {
 // relative to the value being decoded.
 func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 	cfg := newDecoderConfig(opts)
-	t := cfg.tracker()
-	if t == nil {
-		s := new(xmlunmatched.Scope)
-		return &Decoder{dec: s.NewDecoder(r), cfg: cfg, scope: s}
+	if t := cfg.tracker(); t != nil {
+		return &Decoder{dec: t.NewDecoder(r), cfg: cfg, trk: t}
 	}
-	return &Decoder{dec: t.NewDecoder(r), cfg: cfg, trk: t}
+	rec := &recorder{src: r}
+	return &Decoder{dec: xml.NewDecoder(rec), cfg: cfg, rec: rec}
+}
+
+// recorder is the reader a [Decoder] given no option reads its stream
+// through. It keeps the bytes read from src since the value being decoded
+// began, so that the value can be read again.
+type recorder struct {
+	src  io.Reader
+	buf  []byte // the bytes read from src from offset base on
+	base int64  // the offset in the stream of buf[0]
+}
+
+// Read reads from src into p and records what it read.
+func (r *recorder) Read(p []byte) (int, error) {
+	n, err := r.src.Read(p)
+	r.buf = append(r.buf, p[:n]...)
+	return n, err
+}
+
+// from drops the bytes before off, an offset in the stream, which a value
+// decoded from off on does not need.
+func (r *recorder) from(off int64) {
+	n := int(off - r.base)
+	r.buf = r.buf[:copy(r.buf, r.buf[n:])]
+	r.base = off
+}
+
+// replay returns a reader of the stream from where the record starts: the
+// bytes recorded, then the rest of src.
+func (r *recorder) replay() io.Reader {
+	return io.MultiReader(bytes.NewReader(r.buf), r.src)
 }
 
 // Decode reads the next XML element from the stream and stores it
 // in v. Errors follow the same classification as [Unmarshal], with one
 // difference: a Decoder given none of [WithUnmatched], [WithStrict] and
-// [WithMissing] reads the stream once and does not follow the path of the
-// elements it reads, so the [DecodeError] for the text of a primitive
-// element that does not decode as its type names the element alone, such as
-// "/is_queryable", inside the envelope of each polymorphic slot it sits in.
-// A Decoder given any of them returns it on its own, with the element's
-// path from the root of the value, as [Unmarshal] does. Every Decoder keeps
-// the namespace declarations in scope as it reads, so it resolves the prefix
-// of an `xsi:type` where the attribute stands (see [XSITypeOf]).
+// [WithMissing] does not follow the path of the elements it reads, so the
+// [DecodeError] for the text of a primitive element that does not decode as
+// its type names the element alone, such as "/is_queryable", inside the
+// envelope of each polymorphic slot it sits in. A Decoder given any of them
+// returns it on its own, with the element's path from the root of the value,
+// as [Unmarshal] does.
+//
+// A prefixed `xsi:type` is resolved against the namespace declarations in
+// scope where the attribute stands (see [XSITypeOf]). A Decoder given any of
+// those options keeps every declaration in scope as it reads. One given none
+// reads an element's own declarations as it goes and keeps the bytes of the
+// value it is decoding; when a prefix is declared on an element around the
+// attribute, Decode decodes the value a second time, from where the call
+// began, through a reader that keeps every declaration in scope, into v
+// cleared to its zero value. The Decoder then reads the rest of the stream
+// through that reader. So only a value that needs the second decode pays for
+// it, and any other pays for keeping its bytes.
 //
 // Decode reads no further than the end of that element, so whatever
 // follows it, another element included, is left for the next call. A
@@ -195,10 +239,21 @@ func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 // whole document, is the call that holds it to one root element and checks
 // what comes before and after it.
 func (d *Decoder) Decode(v any) error {
-	if d.trk == nil {
+	switch {
+	case d.trk != nil:
+		return d.trk.Decode(d.dec, v)
+	case d.scope != nil:
 		return d.scope.Decode(d.dec, v)
 	}
-	return d.trk.Decode(d.dec, v)
+	d.rec.from(d.dec.InputOffset())
+	err := d.dec.Decode(v)
+	if !xmlunmatched.IsUnresolvedPrefix(err) {
+		return err
+	}
+	d.scope = new(xmlunmatched.Scope)
+	d.dec = d.scope.NewDecoder(d.rec.replay())
+	d.rec = nil
+	return d.scope.DecodeAgain(d.dec, v)
 }
 
 // RelaxedTypeDispatch reports whether the decoder was configured

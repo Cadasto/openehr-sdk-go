@@ -49,9 +49,10 @@ const maxRequired = 64
 // no child token may have been read since.
 //
 // fresh reports that the decoder is to clear its receiver before it reads
-// the element: start opens the root of a document [Unmarshal] decodes a
-// second time into the value the first decode filled in part, which the
-// second decode is to fill again from nothing.
+// the element: start opens the root of a value decoded a second time into the
+// value the first decode filled in part, which the second decode is to fill
+// again from nothing: a document [Unmarshal] decodes again, or a value of a
+// stream a [Scope] decodes again ([Scope.DecodeAgain]).
 //
 // By default it does nothing. A description with more than [maxRequired]
 // names in its Required is a programming error, and Enter panics on it
@@ -64,7 +65,7 @@ func Enter(dec *xml.Decoder, start xml.StartElement, c *Class) (fresh bool, err 
 	}
 	t := trackerOf(dec)
 	if t == nil {
-		return false, nil
+		return againAtRoot(dec), nil
 	}
 	return t.again && len(t.open) == 2, t.enter(start, c)
 }

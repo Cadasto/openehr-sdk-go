@@ -255,9 +255,9 @@
 // "/ehr_status[1]/is_queryable[1]". Without an
 // option, [Unmarshal] decodes the input a second time to find that path,
 // once the first decode has failed so; a decode that succeeds never pays
-// for it. A [Decoder] given no option cannot read its stream again, so it
-// names the element alone, "/is_queryable", inside the envelope of each
-// polymorphic slot the element sits in.
+// for it. A [Decoder] given no option does not decode a value again to find
+// that path, so it names the element alone, "/is_queryable", inside the
+// envelope of each polymorphic slot the element sits in.
 //
 // # Polymorphic dispatch
 //
