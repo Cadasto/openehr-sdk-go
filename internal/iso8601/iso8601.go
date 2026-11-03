@@ -9,10 +9,12 @@
 // the openEHR BASE Time_definitions constants, BASE
 // Iso8601_duration.to_seconds ([Duration.ToSeconds]), the date, time and
 // date-time magnitudes ([Date.Magnitude], [Time.Magnitude],
-// [DateTimeMagnitude]) with [DateOfMagnitude], their inverse on dates, and
-// the instant order of two zoned values ([UTCMagnitude]), which the
-// validation floor (openehr/validation) uses too. The template layer may not
-// import the RM package, which is why all this lives here.
+// [DateTimeMagnitude]) with [DateOfMagnitude], their inverse on dates, the
+// instant order of two zoned values ([UTCMagnitude]), which the validation
+// floor (openehr/validation) uses too, and the order of two values at the
+// precision they share ([Fields]), which the template layer's range check
+// uses. The template layer may not import the RM package, which is why all
+// this lives here.
 //
 // Every function works on the string in memory: none reads a clock, a file or
 // the time zone database, and none panics on malformed input.
