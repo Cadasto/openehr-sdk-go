@@ -50,9 +50,10 @@ func (CDate) isPrimitive() {}
 // bound, the first that Validate accepts. The sentinel takes the fields
 // the pattern allows; a bound is tried as written, then with those fields,
 // which equal it at the precision the two share, and where the range
-// excludes it, moved by one unit of the last field they share: up for a
-// lower bound, down for an upper one. Under "yyyy-mm-dd" the range above
-// 2021 gives "2022-01-01". When none passes, it returns "2020-01-01",
+// excludes it, moved: a lower bound up by one unit of the last field they
+// share, to the start of the next period, and an upper bound down by one
+// unit of its own last field, to the end of the period before. Under
+// "yyyy-mm-dd" the range above 2021 gives "2022-01-01". When none passes, it returns "2020-01-01",
 // which Validate then refuses. That happens when no date
 // meets both the pattern and the range, or the pattern or a bound is
 // malformed, and also, though a date meets both, when the pattern writes
@@ -916,8 +917,9 @@ func clockExample(k clockKind, pattern string, r TemporalRange, tz ValidityKind,
 // field where the order against v asks it. Written with the zone designator
 // v carries, the result is compared with v at the precision the two share,
 // where it equals v but for a fraction of a second it leaves out: it moves
-// by one unit of the last field the two share, up when excluded or when it
-// left out a fraction, down when excluded and it left out none. Written with
+// up by one unit of the last field the two share when excluded or when it
+// left out a fraction, and down by one unit of its own last field when
+// excluded and it left out none. Written with
 // another zone, or none, it is compared with v as an instant, where a part
 // it drops puts it before v: it moves by one unit of its last field, up when
 // it dropped a part of v or excluded, down when excluded and it dropped
@@ -951,7 +953,14 @@ func (p clockPattern) fit(k clockKind, v clockValue, tz ValidityKind, toward int
 	// lies before v before any move.
 	at, before := cut-1, v.time.Fraction > 0
 	if zone == v.zone() {
-		at = min(cut, carried) - 1
+		// A lower bound moves past the whole period v names, its start the
+		// first value after it. An upper bound written at the start of that
+		// period lies before it after one unit of its last field, the latest
+		// value it can take, so it stays clear of a lower bound in another
+		// zone that the period's start would meet.
+		if toward > 0 {
+			at = min(cut, carried) - 1
+		}
 		before = before && cut == hi
 	} else {
 		for i := cut; i < hi; i++ {

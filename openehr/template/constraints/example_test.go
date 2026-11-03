@@ -396,6 +396,52 @@ func TestREQ103_TemporalExampleValue(t *testing.T) {
 // far enough apart, Validate(ExampleValue()) has no violation. The bounds
 // are written to every precision, with a fraction of a second, and, for a
 // time and a date-time, with a zone the pattern keeps or reads in UTC.
+// TestREQ103_TemporalExampleValueCloseBoundsAcrossZones pins the upper
+// bound's move under REQ-103 § Example value emission when the two excluded
+// bounds sit in different zones less than one unit of the upper bound's last
+// field apart. The lower bound, moved to the start of its next period, meets
+// the upper bound's instant, so only the upper bound can give the example; it
+// moves down by one unit of its own last field, to just before its period,
+// and so stays above the lower bound's instant. Moved by a whole shared field
+// to the start of the period before, it would meet that instant and the
+// example would be the sentinel Validate refuses.
+func TestREQ103_TemporalExampleValueCloseBoundsAcrossZones(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		c    constraints.PrimitiveConstraint
+		want string
+	}{
+		{
+			name: "date-time (10+02:00..09Z)",
+			c:    constraints.CDateTime{Range: constraints.TemporalRange{Lower: "2021-05-20T10+02:00", Upper: "2021-05-20T09Z"}, TimezoneValidity: constraints.ValidityMandatory},
+			want: "2021-05-20T08:59:59Z",
+		},
+		{
+			name: "time (10+02:00..09Z)",
+			c:    constraints.CTime{Range: constraints.TemporalRange{Lower: "10+02:00", Upper: "09Z"}, TimezoneValidity: constraints.ValidityMandatory},
+			want: "08:59:59Z",
+		},
+		{
+			name: "time (10:30+02:00..08:31Z)",
+			c:    constraints.CTime{Range: constraints.TemporalRange{Lower: "10:30+02:00", Upper: "08:31Z"}, TimezoneValidity: constraints.ValidityMandatory},
+			want: "08:30:59Z",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := tc.c.ExampleValue()
+			if got != tc.want {
+				t.Errorf("ExampleValue() = %#v, want %q", got, tc.want)
+			}
+			if v := tc.c.Validate(got); len(v) != 0 {
+				t.Errorf("Validate(ExampleValue()=%#v) = %v, want no violation", got, v)
+			}
+		})
+	}
+}
+
 func TestREQ103_TemporalExampleValueSweep(t *testing.T) {
 	t.Parallel()
 	ranges := func(lows, highs []string) []constraints.TemporalRange {
