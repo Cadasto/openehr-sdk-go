@@ -173,7 +173,7 @@ func unmarshalXMLChoice(recv, field, elem string, c *xmlChoice, mandatory bool) 
 // element, through the shape's own MarshalXML, which writes no `xsi:type`; a
 // nil member writes nothing, and a value of any other type is refused. A
 // shape with members to leave out when empty is written through
-// canxml.EncodeElementOmittingEmpty.
+// xmlschema.EncodeElementOmittingEmpty.
 func marshalXMLChoice(recv, field, elem string, c *xmlChoice, mandatory bool) string {
 	start := fmt.Sprintf("xml.StartElement{Name: xml.Name{Local: %q}}", elem)
 	var b strings.Builder
@@ -191,7 +191,7 @@ func marshalXMLChoice(recv, field, elem string, c *xmlChoice, mandatory bool) st
 			for i, name := range s.omitEmpty {
 				args[i] = fmt.Sprintf("%q", name)
 			}
-			call = fmt.Sprintf("canxml.EncodeElementOmittingEmpty(_e, %s, %s, %s)", v, start, strings.Join(args, ", "))
+			call = fmt.Sprintf("xmlschema.EncodeElementOmittingEmpty(_e, %s, %s, %s)", v, start, strings.Join(args, ", "))
 		}
 		fmt.Fprintf(&b, "%s\tif err := %s; err != nil {\n%s\t\treturn err\n%s\t}\n", indent, call, indent, indent)
 	}

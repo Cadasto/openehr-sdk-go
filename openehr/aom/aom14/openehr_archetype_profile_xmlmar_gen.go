@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"fmt"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlschema"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
@@ -370,7 +371,7 @@ func (o *Ordinal) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	switch _v := o.Symbol.(type) {
 	case nil:
 	case *rm.DVCodedText:
-		if err := canxml.EncodeElementOmittingEmpty(_e, _v, xml.StartElement{Name: xml.Name{Local: "symbol"}}, "value"); err != nil {
+		if err := xmlschema.EncodeElementOmittingEmpty(_e, _v, xml.StartElement{Name: xml.Name{Local: "symbol"}}, "value"); err != nil {
 			return err
 		}
 	case *rm.CodePhrase:
@@ -378,7 +379,7 @@ func (o *Ordinal) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 			return err
 		}
 	case rm.DVCodedText:
-		if err := canxml.EncodeElementOmittingEmpty(_e, &_v, xml.StartElement{Name: xml.Name{Local: "symbol"}}, "value"); err != nil {
+		if err := xmlschema.EncodeElementOmittingEmpty(_e, &_v, xml.StartElement{Name: xml.Name{Local: "symbol"}}, "value"); err != nil {
 			return err
 		}
 	case rm.CodePhrase:
@@ -435,7 +436,7 @@ func (s *Scale) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	switch _v := s.Symbol.(type) {
 	case nil:
 	case *rm.DVCodedText:
-		if err := canxml.EncodeElementOmittingEmpty(_e, _v, xml.StartElement{Name: xml.Name{Local: "symbol"}}, "value"); err != nil {
+		if err := xmlschema.EncodeElementOmittingEmpty(_e, _v, xml.StartElement{Name: xml.Name{Local: "symbol"}}, "value"); err != nil {
 			return err
 		}
 	case *rm.CodePhrase:
@@ -443,7 +444,7 @@ func (s *Scale) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 			return err
 		}
 	case rm.DVCodedText:
-		if err := canxml.EncodeElementOmittingEmpty(_e, &_v, xml.StartElement{Name: xml.Name{Local: "symbol"}}, "value"); err != nil {
+		if err := xmlschema.EncodeElementOmittingEmpty(_e, &_v, xml.StartElement{Name: xml.Name{Local: "symbol"}}, "value"); err != nil {
 			return err
 		}
 	case rm.CodePhrase:

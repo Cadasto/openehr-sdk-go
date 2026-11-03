@@ -45,16 +45,15 @@
 //     matched unprefixed; namespace-prefixed values (the Better/Marand
 //     `xsi:type="ns2:DV_QUANTITY"` dialect) are not supported and fail
 //     closed with [typereg.ErrUnknownType]. A type alias a generated
-//     package registers ([RegisterTypeAlias]), the AOM 1.4
-//     `T_ARCHETYPE_ROOT` that some tools write for `C_ARCHETYPE_ROOT`,
-//     reads as the class it names, which the encoder writes by its own
-//     name.
+//     package registers, the AOM 1.4 `T_ARCHETYPE_ROOT` that some tools
+//     write for `C_ARCHETYPE_ROOT`, reads as the class it names, which
+//     the encoder writes by its own name.
 //   - Element local names are snake_case BMM property/class names
 //     (identical to canjson JSON keys; e.g. `dv_quantity`,
 //     `magnitude_status`). The root element takes the class name, except
 //     where the class's ITS-XML schema declares a global element of
-//     another name for its type ([RegisterRootElement]): an AOM 1.4
-//     OPERATIONAL_TEMPLATE is written as `template`. The decoder does not
+//     another name for its type, which its generated package registers:
+//     an AOM 1.4 OPERATIONAL_TEMPLATE is written as `template`. The decoder does not
 //     match the root by name.
 //   - Child elements follow the `xs:sequence` of the class's type in
 //     the openEHR ITS-XML schemas (RM Release-1.1.0, BASE Release-1.2.0,

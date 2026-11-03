@@ -21,8 +21,8 @@ import (
 // global element, writes no file.
 func TestXMLNames_REQ176_REQ056_AOM14RegistersTheAliasAndTheRootElement(t *testing.T) {
 	const (
-		alias = `canxml.RegisterTypeAlias("T_ARCHETYPE_ROOT", "C_ARCHETYPE_ROOT")`
-		root  = `canxml.RegisterRootElement("OPERATIONAL_TEMPLATE", "template")`
+		alias = `xmlschema.RegisterTypeAlias("T_ARCHETYPE_ROOT", "C_ARCHETYPE_ROOT")`
+		root  = `xmlschema.RegisterRootElement("OPERATIONAL_TEMPLATE", "template")`
 	)
 	b, err := RenderXMLNamesFile(buildPlanWithITSXML(t, TargetAOM14))
 	if err != nil {
@@ -59,7 +59,7 @@ func TestXMLNames_REQ176_REQ056_AOM14RegistersTheAliasAndTheRootElement(t *testi
 // the keys merge across the include chain, so the alias is registered once.
 func TestXMLNames_REQ176_AnAliasIsTheOwningTargets(t *testing.T) {
 	t.Parallel()
-	const reg = `canxml.RegisterTypeAlias("LEGACY_ROOT_OBJECT", "ROOT_OBJECT")`
+	const reg = `xmlschema.RegisterTypeAlias("LEGACY_ROOT_OBJECT", "ROOT_OBJECT")`
 	owner := extensionPlan(t, extensionRootID)
 	if want := map[string]string{"LEGACY_ROOT_OBJECT": "ROOT_OBJECT"}; !maps.Equal(owner.extensions.typeAliases, want) {
 		t.Fatalf("the owning target's type aliases = %v; want %v", owner.extensions.typeAliases, want)

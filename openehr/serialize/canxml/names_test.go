@@ -2,13 +2,13 @@ package canxml_test
 
 // REQ-176 § Shapes and § Round trip, REQ-056: canonical-XML dispatch reads a
 // registered type alias as the class it names, at an abstract slot and a
-// narrow one, while a name the type registry holds reads as itself; the
-// registrations refuse what a generated package would only get wrong.
+// narrow one, while a name the type registry holds reads as itself.
 
 import (
 	"errors"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlschema"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
@@ -17,10 +17,10 @@ import (
 // The aliases the tests below read, registered once for the test binary, as a
 // generated package registers its own from its init function.
 func init() {
-	canxml.RegisterTypeAlias("TEST_LEGACY_PARTY_SELF", "PARTY_SELF")
-	canxml.RegisterTypeAlias("TEST_LEGACY_DV_CODED_TEXT", "DV_CODED_TEXT")
-	canxml.RegisterTypeAlias("PARTY_IDENTIFIED", "PARTY_SELF")
-	canxml.RegisterTypeAlias("TEST_ALIAS_OF_NOTHING", "NO_SUCH_TYPE")
+	xmlschema.RegisterTypeAlias("TEST_LEGACY_PARTY_SELF", "PARTY_SELF")
+	xmlschema.RegisterTypeAlias("TEST_LEGACY_DV_CODED_TEXT", "DV_CODED_TEXT")
+	xmlschema.RegisterTypeAlias("PARTY_IDENTIFIED", "PARTY_SELF")
+	xmlschema.RegisterTypeAlias("TEST_ALIAS_OF_NOTHING", "NO_SUCH_TYPE")
 }
 
 // compositionWith returns a COMPOSITION whose name, a coded text, carries the
@@ -71,32 +71,5 @@ func TestREQ176_REQ056_TypeAliasDispatch(t *testing.T) {
 		if !errors.Is(err, typereg.ErrUnknownType) {
 			t.Errorf("canxml.Unmarshal(an alias of nothing, %s) = %v; want typereg.ErrUnknownType", mode, err)
 		}
-	}
-}
-
-// TestRegisterTypeAliasAndRootElementRefuse pins the programmer errors the two
-// registrations refuse, by panicking: an empty name, and a name registered
-// twice.
-func TestRegisterTypeAliasAndRootElementRefuse(t *testing.T) {
-	for name, register := range map[string]func(){
-		"an empty alias":        func() { canxml.RegisterTypeAlias("", "PARTY_SELF") },
-		"an empty type name":    func() { canxml.RegisterTypeAlias("TEST_EMPTY_TARGET", "") },
-		"an alias twice":        func() { canxml.RegisterTypeAlias("TEST_LEGACY_PARTY_SELF", "PARTY_SELF") },
-		"an empty class name":   func() { canxml.RegisterRootElement("", "root") },
-		"an empty element name": func() { canxml.RegisterRootElement("TEST_CLASS", "") },
-		"a root element twice": func() {
-			canxml.RegisterRootElement("TEST_ROOT_TWICE", "a")
-			canxml.RegisterRootElement("TEST_ROOT_TWICE", "b")
-		},
-		"an empty alias and name": func() { canxml.RegisterTypeAlias("", "") },
-	} {
-		t.Run(name, func(t *testing.T) {
-			defer func() {
-				if recover() == nil {
-					t.Errorf("registering %s did not panic", name)
-				}
-			}()
-			register()
-		})
 	}
 }

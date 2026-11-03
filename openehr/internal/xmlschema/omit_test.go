@@ -1,4 +1,4 @@
-package canxml_test
+package xmlschema_test
 
 // REQ-176 § Shapes, REQ-056: the encoder leaves out the empty children it is
 // told to, writing the rest as the value's own encoder does.
@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlschema"
 )
 
 // children is a value whose encoder writes the child elements it holds, each
@@ -27,7 +27,7 @@ func (c children) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 	for _, ch := range c {
 		s := xml.StartElement{Name: xml.Name{Local: ch.name}}
 		if ch.attr {
-			s.Attr = []xml.Attr{{Name: canxml.XSITypeAttrName(), Value: "DV_TEXT"}}
+			s.Attr = []xml.Attr{{Name: xml.Name{Local: "xsi:type"}, Value: "DV_TEXT"}}
 		}
 		if err := e.EncodeToken(s); err != nil {
 			return err
@@ -49,7 +49,7 @@ func (c children) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 	return e.EncodeToken(start.End())
 }
 
-// TestEncodeElementOmittingEmpty pins canxml.EncodeElementOmittingEmpty: of the
+// TestEncodeElementOmittingEmpty pins xmlschema.EncodeElementOmittingEmpty: of the
 // children of the element it writes, it leaves out each one it names that holds
 // no attribute, no text and no child element, and writes everything else as
 // the value's own encoder does, an `xsi:type` written literally and an
@@ -73,7 +73,7 @@ func TestEncodeElementOmittingEmpty(t *testing.T) {
 		var b strings.Builder
 		e := xml.NewEncoder(&b)
 		e.Indent("", indent)
-		if err := canxml.EncodeElementOmittingEmpty(e, v, xml.StartElement{Name: xml.Name{Local: "symbol"}}, "value"); err != nil {
+		if err := xmlschema.EncodeElementOmittingEmpty(e, v, xml.StartElement{Name: xml.Name{Local: "symbol"}}, "value"); err != nil {
 			t.Fatalf("EncodeElementOmittingEmpty: %v", err)
 		}
 		if err := e.Flush(); err != nil {

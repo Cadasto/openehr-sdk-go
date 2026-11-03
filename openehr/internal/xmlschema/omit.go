@@ -1,4 +1,4 @@
-package canxml
+package xmlschema
 
 import (
 	"bytes"
@@ -18,7 +18,6 @@ import (
 // as makes a child optional that v's own encoder writes always, such as the
 // `value` of the DV_CODED_TEXT shape of an AOM 1.4 ORDINAL symbol, which the
 // AM Release-1.4 schemas make optional and an RM DV_CODED_TEXT always holds.
-// Consumers rarely need it.
 func EncodeElementOmittingEmpty(e *xml.Encoder, v any, start xml.StartElement, names ...string) error {
 	var buf bytes.Buffer
 	scratch := xml.NewEncoder(&buf)

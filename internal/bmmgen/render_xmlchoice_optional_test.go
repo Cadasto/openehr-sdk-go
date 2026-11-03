@@ -51,12 +51,12 @@ func TestXSDOptionalElements(t *testing.T) {
 // DV_CODED_TEXT shape of ORDINAL.symbol and SCALE.symbol: OpenehrProfile.xsd's
 // ORDINAL_SYMBOL makes `value` optional, which DV_CODED_TEXT holds as a
 // mandatory member, so the encoder writes that shape through
-// canxml.EncodeElementOmittingEmpty, leaving `value` out when empty, and the
+// xmlschema.EncodeElementOmittingEmpty, leaving `value` out when empty, and the
 // CODE_PHRASE shape, whose mandatory members the schema type requires, as it
 // writes any value. Without the schemas no member is left out.
 func TestChoice_REQ176_EmptySymbolValueIsLeftOut(t *testing.T) {
 	const (
-		omitting = "canxml.EncodeElementOmittingEmpty(_e, %s, xml.StartElement{Name: xml.Name{Local: \"symbol\"}}, \"value\")"
+		omitting = "xmlschema.EncodeElementOmittingEmpty(_e, %s, xml.StartElement{Name: xml.Name{Local: \"symbol\"}}, \"value\")"
 		plain    = "_e.EncodeElement(%s, xml.StartElement{Name: xml.Name{Local: \"symbol\"}})"
 	)
 	encoder := func(t *testing.T, p *Plan, recv string) string {

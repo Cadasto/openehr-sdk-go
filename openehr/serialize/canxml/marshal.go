@@ -122,8 +122,8 @@ func MarshalIndent(v any, prefix, indent string) ([]byte, error) {
 
 // rootStartElement builds the canonical root xml.StartElement for v.
 // The element local name is the global element the class's ITS-XML
-// schema declares for its type, where its package registered one
-// ([RegisterRootElement]), such as `template`, and otherwise the
+// schema declares for its type, where its generated package registered
+// one, such as `template`, and otherwise the
 // snake-cased BMM class name (e.g. `dv_quantity`), which matches the
 // canjson key convention. The default namespace `http://schemas.openehr.org/v1`
 // is declared on the root via an explicit `xmlns` attribute (rather

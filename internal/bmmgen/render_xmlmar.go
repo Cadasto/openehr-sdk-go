@@ -104,7 +104,11 @@ func RenderMarshalXMLFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	if slices.ContainsFunc(chunks, func(c string) bool { return strings.Contains(c, "slices.Sorted(maps.Keys(") }) {
 		body.WriteString("\t\"maps\"\n\t\"slices\"\n")
 	}
-	body.WriteString("\n\t\"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml\"\n")
+	body.WriteString("\n")
+	if slices.ContainsFunc(chunks, func(c string) bool { return strings.Contains(c, "xmlschema.") }) {
+		fmt.Fprintf(&body, "\t%q\n", xmlschemaImportPath)
+	}
+	body.WriteString("\t\"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml\"\n")
 	if needsExternalImportForJSONMar(plan, chunks) {
 		fmt.Fprintf(&body, "\t%q\n", plan.Target.ExternalImport)
 	}

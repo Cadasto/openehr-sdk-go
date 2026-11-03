@@ -3,13 +3,13 @@
 
 package aom14
 
-import "github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
+import "github.com/cadasto/openehr-sdk-go/openehr/internal/xmlschema"
 
 // init registers with the canonical-XML codec the names this package's
 // classes take beyond their own BMM names: each type alias the decoder
 // reads as one of them, and the root element of each class whose ITS-XML
 // schema gives its global element another name.
 func init() {
-	canxml.RegisterTypeAlias("T_ARCHETYPE_ROOT", "C_ARCHETYPE_ROOT")
-	canxml.RegisterRootElement("OPERATIONAL_TEMPLATE", "template")
+	xmlschema.RegisterTypeAlias("T_ARCHETYPE_ROOT", "C_ARCHETYPE_ROOT")
+	xmlschema.RegisterRootElement("OPERATIONAL_TEMPLATE", "template")
 }

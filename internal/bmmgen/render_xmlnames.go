@@ -12,6 +12,10 @@ import (
 // aliases the decoder reads and the root elements the encoder writes.
 const xmlNamesFile = "xml_names_gen.go"
 
+// xmlschemaImportPath is the internal package that holds the canonical-XML
+// names and schema forms the generated packages register and call.
+const xmlschemaImportPath = "github.com/cadasto/openehr-sdk-go/openehr/internal/xmlschema"
+
 // xmlRootElement is one class whose root element is not its lower-cased name.
 type xmlRootElement struct {
 	class, element string
@@ -51,17 +55,17 @@ func RenderXMLNamesFile(plan *Plan) ([]byte, error) {
 	}
 	var b bytes.Buffer
 	b.WriteString(renderGeneratedHeader(plan))
-	b.WriteString("\nimport \"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml\"\n\n")
+	fmt.Fprintf(&b, "\nimport %q\n\n", xmlschemaImportPath)
 	b.WriteString("// init registers with the canonical-XML codec the names this package's\n")
 	b.WriteString("// classes take beyond their own BMM names: each type alias the decoder\n")
 	b.WriteString("// reads as one of them, and the root element of each class whose ITS-XML\n")
 	b.WriteString("// schema gives its global element another name.\n")
 	b.WriteString("func init() {\n")
 	for _, alias := range aliases {
-		fmt.Fprintf(&b, "\tcanxml.RegisterTypeAlias(%q, %q)\n", alias, plan.extensions.typeAliases[alias])
+		fmt.Fprintf(&b, "\txmlschema.RegisterTypeAlias(%q, %q)\n", alias, plan.extensions.typeAliases[alias])
 	}
 	for _, r := range roots {
-		fmt.Fprintf(&b, "\tcanxml.RegisterRootElement(%q, %q)\n", r.class, r.element)
+		fmt.Fprintf(&b, "\txmlschema.RegisterRootElement(%q, %q)\n", r.class, r.element)
 	}
 	b.WriteString("}\n")
 	formatted, err := format.Source(b.Bytes())
