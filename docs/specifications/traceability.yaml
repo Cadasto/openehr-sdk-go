@@ -324,11 +324,14 @@ requirements:
       - internal/bmmgen/render_release_test.go
       - internal/bmmgen/render_rminfo_functions_test.go
       - internal/bmmgen/render_rminfo_hierarchy_test.go
+      - internal/bmmgen/render_root_note_test.go
       - internal/bmmgen/render_test.go
       - internal/bmmgen/resolver_test.go
       - internal/bmmgen/root_check_test.go
+      - internal/bmmgen/sdk_extensions_test.go
       - internal/bmmgen/sim_bump_test.go
       - internal/bmmgen/target_test.go
+      - openehr/internal/xmlunmatched/drop_internal_test.go
       - openehr/rm/rminfo/hierarchy_test.go
       - openehr/rm/rminfo/probe_094_test.go
 
@@ -2607,3 +2610,6 @@ requirements:
     implementation: planned
     packages: [openehr/aom/aom14, internal/bmmgen, resources/bmm, openehr/serialize/canxml]
     probes: [PROBE-111]
+    tests:
+      - internal/bmmgen/sdk_extensions_test.go
+      - openehr/internal/xmlunmatched/drop_internal_test.go
