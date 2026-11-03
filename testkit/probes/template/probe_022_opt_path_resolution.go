@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
 // PathAssertion describes one expected path → node match for
@@ -17,7 +19,8 @@ import (
 // ExpectNotFound).
 type PathAssertion struct {
 	// Path is the openEHR path string, in the path-syntax subset that
-	// OperationalTemplate.NodeAt resolves.
+	// [template.OperationalTemplate.ParsePath] reads and
+	// [templatecompile.Compiled.Resolve] resolves.
 	Path string
 
 	// WantRMType, when non-empty, must equal the resolved node's
@@ -29,19 +32,22 @@ type PathAssertion struct {
 	WantNodeID string
 
 	// WantArchetypeID, when non-empty, requires the resolved node to
-	// be an *ArchetypeRoot whose ArchetypeID() matches exactly.
+	// be an archetype root whose ArchetypeID() matches exactly.
 	WantArchetypeID string
 
-	// ExpectNotFound flips the expectation: NodeAt must return
-	// ErrPathNotFound (wrapped). Used to negatively assert that
-	// unknown attributes or predicates fail cleanly.
+	// ExpectNotFound flips the expectation: Resolve must return an
+	// error wrapping [template.ErrPathNotFound]. Used to negatively
+	// assert that unknown attributes or predicates fail cleanly.
 	ExpectNotFound bool
 }
 
-// Probe022OPTPathResolution implements PROBE-022: parse an OPT body
-// and resolve a fixture-defined list of paths, verifying each one
-// returns the expected node shape (or ErrPathNotFound for negative
-// cases). It needs no client or server.
+// Probe022OPTPathResolution implements PROBE-022: read an OPT body into
+// the operational template model with [aom14.ReadOperationalTemplate],
+// compile it with [templatecompile.Compile], and resolve a
+// fixture-defined list of paths with [templatecompile.Compiled.Resolve],
+// verifying each one returns the expected node shape (or
+// [template.ErrPathNotFound] for negative cases). It needs no client or
+// server.
 //
 // The probe is invariant under reformatting that preserves OPT XML
 // semantics; backends or generators that reorder children may
@@ -57,16 +63,16 @@ func Probe022OPTPathResolution(opt []byte, assertions []PathAssertion) (Result, 
 		return r, errors.New("PROBE-022: at least one assertion required")
 	}
 
-	tmpl, err := template.ParseOPT(bytes.NewReader(opt))
-	if err != nil {
+	c, detail := compileOPT(opt)
+	if c == nil {
 		r.Status = "fail"
-		r.Detail = fmt.Sprintf("parse: %v", err)
+		r.Detail = detail
 		return r, nil
 	}
 
 	var failures []string
 	for _, a := range assertions {
-		if msg := checkAssertion(tmpl, a); msg != "" {
+		if msg := checkAssertion(c, a); msg != "" {
 			failures = append(failures, msg)
 		}
 	}
@@ -79,12 +85,33 @@ func Probe022OPTPathResolution(opt []byte, assertions []PathAssertion) (Result, 
 	return r, nil
 }
 
-func checkAssertion(t *template.OperationalTemplate, a PathAssertion) string {
-	p, err := t.ParsePath(a.Path)
+// compileOPT reads opt into the operational template model and compiles
+// it. On failure it returns nil and the detail of a failed probe.
+func compileOPT(opt []byte) (*templatecompile.Compiled, string) {
+	model, err := aom14.ReadOperationalTemplate(bytes.NewReader(opt))
+	if err != nil {
+		return nil, fmt.Sprintf("read: %v", err)
+	}
+	c, err := templatecompile.Compile(model)
+	if err != nil {
+		return nil, fmt.Sprintf("compile: %v", err)
+	}
+	return c, ""
+}
+
+// parsePath parses s with the openEHR path grammar of
+// [template.OperationalTemplate.ParsePath], which reads the grammar alone
+// and needs no template.
+func parsePath(s string) (template.Path, error) {
+	return (*template.OperationalTemplate)(nil).ParsePath(s)
+}
+
+func checkAssertion(c *templatecompile.Compiled, a PathAssertion) string {
+	p, err := parsePath(a.Path)
 	if err != nil {
 		return fmt.Sprintf("%s: parse: %v", a.Path, err)
 	}
-	n, err := t.NodeAt(p)
+	n, err := c.Resolve(p)
 	if err != nil {
 		if a.ExpectNotFound {
 			// REQ-100 error taxonomy: negative assertions MUST be
@@ -106,14 +133,8 @@ func checkAssertion(t *template.OperationalTemplate, a PathAssertion) string {
 	if a.WantNodeID != "" && n.NodeID() != a.WantNodeID {
 		return fmt.Sprintf("%s: NodeID=%q want %q", a.Path, n.NodeID(), a.WantNodeID)
 	}
-	if a.WantArchetypeID != "" {
-		ar, ok := n.(*template.ArchetypeRoot)
-		if !ok {
-			return fmt.Sprintf("%s: not an ArchetypeRoot (got %T)", a.Path, n)
-		}
-		if ar.ArchetypeID() != a.WantArchetypeID {
-			return fmt.Sprintf("%s: ArchetypeID=%q want %q", a.Path, ar.ArchetypeID(), a.WantArchetypeID)
-		}
+	if a.WantArchetypeID != "" && n.ArchetypeID() != a.WantArchetypeID {
+		return fmt.Sprintf("%s: ArchetypeID=%q want %q", a.Path, n.ArchetypeID(), a.WantArchetypeID)
 	}
 	return ""
 }

@@ -1,19 +1,18 @@
 package templateprobes
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
 // ValidateCase is one (path, value, expectations) tuple for
-// PROBE-024. The probe parses the OPT body, walks to the node at
-// Path, calls [constraints.PrimitiveConstraint.Validate] with Value,
-// and checks the returned [constraints.Violation] codes match the
+// PROBE-024. The probe reads and compiles the OPT body, resolves the
+// node at Path, calls [constraints.PrimitiveConstraint.Validate] with
+// Value, and checks the returned [constraints.Violation] codes match the
 // case's expectations.
 //
 // ExpectNoConstraint flips the expectation: the addressed node must
@@ -22,8 +21,8 @@ import (
 // primitive xsi:type values carry a constraint.
 type ValidateCase struct {
 	// Path is the openEHR path string addressing a leaf node. Must
-	// resolve via OperationalTemplate.NodeAt; otherwise the probe
-	// reports the resolution failure as a probe-level fail.
+	// resolve via [templatecompile.Compiled.Resolve]; otherwise the
+	// probe reports the resolution failure as a probe-level fail.
 	Path string
 
 	// Value is the input passed to PrimitiveConstraint.Validate.
@@ -41,10 +40,11 @@ type ValidateCase struct {
 	ExpectNoConstraint bool
 }
 
-// Probe024PrimitiveValidate implements PROBE-024: parse the OPT body
-// and exercise its primitive-constraint surface against a
-// fixture-supplied list of validate cases. It needs no client or
-// server.
+// Probe024PrimitiveValidate implements PROBE-024: read the OPT body
+// into the operational template model, compile it, and exercise the
+// primitive-constraint surface of the nodes
+// [templatecompile.Compiled.Resolve] reaches against a fixture-supplied
+// list of validate cases. It needs no client or server.
 //
 // The probe is invariant under any backend / generator that produces
 // the same primitive xsi:type values; consumers should include
@@ -60,16 +60,16 @@ func Probe024PrimitiveValidate(opt []byte, cases []ValidateCase) (Result, error)
 		return r, errors.New("PROBE-024: at least one case required")
 	}
 
-	tmpl, err := template.ParseOPT(bytes.NewReader(opt))
-	if err != nil {
+	compiled, detail := compileOPT(opt)
+	if compiled == nil {
 		r.Status = "fail"
-		r.Detail = fmt.Sprintf("parse: %v", err)
+		r.Detail = detail
 		return r, nil
 	}
 
 	var failures []string
 	for _, c := range cases {
-		if msg := checkValidateCase(tmpl, c); msg != "" {
+		if msg := checkValidateCase(compiled, c); msg != "" {
 			failures = append(failures, msg)
 		}
 	}
@@ -82,23 +82,16 @@ func Probe024PrimitiveValidate(opt []byte, cases []ValidateCase) (Result, error)
 	return r, nil
 }
 
-func checkValidateCase(t *template.OperationalTemplate, c ValidateCase) string {
-	p, err := t.ParsePath(c.Path)
+func checkValidateCase(compiled *templatecompile.Compiled, c ValidateCase) string {
+	p, err := parsePath(c.Path)
 	if err != nil {
 		return fmt.Sprintf("%s: parse: %v", c.Path, err)
 	}
-	n, err := t.NodeAt(p)
+	n, err := compiled.Resolve(p)
 	if err != nil {
 		return fmt.Sprintf("%s: resolve: %v", c.Path, err)
 	}
-	co, ok := n.(*template.ComplexObject)
-	if !ok {
-		if c.ExpectNoConstraint {
-			return ""
-		}
-		return fmt.Sprintf("%s: not a *ComplexObject (got %T)", c.Path, n)
-	}
-	primitive := co.PrimitiveConstraint()
+	primitive := n.PrimitiveConstraint()
 	if c.ExpectNoConstraint {
 		if primitive != nil {
 			return fmt.Sprintf("%s: PrimitiveConstraint=%T, want nil", c.Path, primitive)
