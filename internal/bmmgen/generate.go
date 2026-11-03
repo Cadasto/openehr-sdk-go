@@ -222,6 +222,9 @@ func runTarget(opts Options, t Target, resolver schemaResolver, schemas *itsXMLS
 		if plan.xmlOrder, err = schemas.orderFor(t.ITSXMLSchemaSets); err != nil {
 			return tr, fmt.Errorf("bmmgen: %w", err)
 		}
+		if err := plan.xmlOrder.checkAnonymousTypes(plan); err != nil {
+			return tr, err
+		}
 	}
 	for _, f := range plan.Files {
 		if !safeFileBase(f.FileBase) {

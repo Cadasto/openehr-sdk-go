@@ -10,7 +10,9 @@ import (
 // appear as a segment of a BMM ALL_CAPS or snake_case name.
 //
 // Rule (per Phase 2 spec § Naming):
-//   - Split BMM name on '_'.
+//   - Split BMM name on '_', and a camel-case segment before each upper-case
+//     letter that follows a lower-case one ("CodeDefinitionSet" → "Code",
+//     "Definition", "Set").
 //   - For each segment: lowercase it, then capitalise the first rune.
 //   - Exception: if the original (uppercase-snake) segment is in the
 //     acronym set, keep it uppercase verbatim.
@@ -47,11 +49,13 @@ var acronyms = map[string]bool{
 //	CODE_PHRASE       -> CodePhrase
 //	Multiplicity_interval -> MultiplicityInterval
 //	X_VERSIONED_PARTY -> XVersionedParty
+//	CodeDefinitionSet -> CodeDefinitionSet
+//	referenceSetUri   -> ReferenceSetURI
 func PascalCase(name string) string {
 	if name == "" {
 		return ""
 	}
-	segs := strings.Split(name, "_")
+	segs := nameSegments(name)
 	var out strings.Builder
 	for _, seg := range segs {
 		if seg == "" {
@@ -81,6 +85,24 @@ func PascalCase(name string) string {
 		}
 	}
 	return out.String()
+}
+
+// nameSegments splits a BMM name into the segments [PascalCase] spells: at
+// each '_', and inside a segment before each upper-case ASCII letter that
+// follows a lower-case one, so a camel-case name keeps its words.
+func nameSegments(name string) []string {
+	var segs []string
+	for seg := range strings.SplitSeq(name, "_") {
+		start := 0
+		for i := 1; i < len(seg); i++ {
+			if seg[i-1] >= 'a' && seg[i-1] <= 'z' && seg[i] >= 'A' && seg[i] <= 'Z' {
+				segs = append(segs, seg[start:i])
+				start = i
+			}
+		}
+		segs = append(segs, seg[start:])
+	}
+	return segs
 }
 
 // titleSegment lowercases the segment then capitalises its first

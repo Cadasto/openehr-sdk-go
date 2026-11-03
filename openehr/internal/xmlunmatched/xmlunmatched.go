@@ -39,8 +39,10 @@
 //     decoded as text, [DecodeText] for one whose text they convert
 //     themselves, such as an interval boundary flag, [DecodeBase64] for an
 //     Octet list, [DecodeParam] for a member typed by an open generic
-//     parameter, and [DropElement] for an element the class's schema accepts
-//     that no member holds. The hand-written TERMINOLOGY_CODE decoder calls the same
+//     parameter, [DropElement] for an element the class's schema accepts
+//     that no member holds, and [DecodeChoice] for a member whose element
+//     takes one of several shapes, which its first child chooses. The
+//     hand-written TERMINOLOGY_CODE decoder calls the same
 //     helpers, [CheckUnmatchedAttrs] for the attributes of its inner
 //     TERMINOLOGY_ID element, [CheckUnmatchedTextBefore] for text it keeps
 //     until a child shows that the text is not its value, and
@@ -150,6 +152,9 @@ type Tracker struct {
 	// failure is the primitive failure the value being decoded raised, kept
 	// so that [Tracker.Decode] returns it on its own; nil until one is raised.
 	failure *typereg.DecodeError
+	// reader is the token source of the decoder [Tracker.NewDecoder] returned,
+	// which [DecodeChoice] reads ahead through; nil until then.
+	reader *trackingReader
 }
 
 // frame is one open element: its local name, its 1-based position among its
@@ -211,7 +216,8 @@ func NewTracker(report func(path string), strict bool) *Tracker {
 // every element it opens and closes in t. Decode values from it with
 // [Tracker.Decode].
 func (t *Tracker) NewDecoder(r io.Reader) *xml.Decoder {
-	return xml.NewTokenDecoder(&trackingReader{src: xml.NewDecoder(r), t: t})
+	t.reader = &trackingReader{src: xml.NewDecoder(r), t: t}
+	return xml.NewTokenDecoder(t.reader)
 }
 
 // Decode decodes the next value of dec, a decoder from [Tracker.NewDecoder],
@@ -495,11 +501,25 @@ func trackerOf(dec *xml.Decoder) *Tracker {
 type trackingReader struct {
 	src *xml.Decoder
 	t   *Tracker
+	// pending holds the tokens [trackingReader.peekChild] read ahead of the
+	// decoder, which Token returns, and records, before it reads src again.
+	pending []xml.Token
 }
 
-// Token returns the next token of src, after recording it.
+// Token returns the next token, the first read ahead or else the next of src,
+// after recording it.
 func (r *trackingReader) Token() (xml.Token, error) {
-	tok, err := r.src.Token()
+	var tok xml.Token
+	var err error
+	if len(r.pending) > 0 {
+		tok = r.pending[0]
+		r.pending = r.pending[1:]
+		if len(r.pending) == 0 {
+			r.pending = nil
+		}
+	} else {
+		tok, err = r.src.Token()
+	}
 	switch tk := tok.(type) {
 	case xml.StartElement:
 		r.t.push(tk.Name.Local)
@@ -1064,19 +1084,19 @@ func dropXMLSpace(r rune) rune {
 
 // DropElement reads the element start opens and drops it: an element the
 // schema type of the class being decoded accepts but no member of the class
-// holds, which may hold one value only, want, such as the legacy
-// `match_negated` of an ADL 1.4 attribute constraint. start must be the token
-// the decoder read last.
+// holds, which may hold one value only, written as one of wants, such as the
+// legacy `match_negated` of an ADL 1.4 attribute constraint, false written
+// `false` or `0`. start must be the token the decoder read last.
 //
-// With want for text, less the XML whitespace around it, the element is read
-// and dropped in every decode: neither reported nor refused. Any other text,
-// none included, is refused in every decode, as a primitive failure is in
-// [DecodeText]: a *typereg.DecodeError whose cause wraps [ErrInvalidShape] and
-// whose text carries none of the element's. A tracked decode reports an
+// With one of wants for text, less the XML whitespace around it, the element
+// is read and dropped in every decode: neither reported nor refused. Any other
+// text, none included, is refused in every decode, as a primitive failure is
+// in [DecodeText]: a *typereg.DecodeError whose cause wraps [ErrInvalidShape]
+// and whose text carries none of the element's. A tracked decode reports an
 // attribute or child element on the element, as for any primitive.
-func DropElement(dec *xml.Decoder, start *xml.StartElement, want string) error {
+func DropElement(dec *xml.Decoder, start *xml.StartElement, wants ...string) error {
 	return DecodeText(dec, start, func(text string) error {
-		if strings.Trim(text, xmlSpace) != want {
+		if !slices.Contains(wants, strings.Trim(text, xmlSpace)) {
 			return errDroppedValue
 		}
 		return nil

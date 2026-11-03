@@ -159,9 +159,9 @@ func TestSDKExtensions_REQ041_ParseRefusesWhatItCannotRead(t *testing.T) {
 	t.Parallel()
 	checkRefusals(t, []refusal{
 		{name: "an unknown key", old: `"classes_left_out": [`, new: `"classes_left_aside": [`, want: "classes_left_aside"},
-		{name: "an unknown entry member", old: `"text": "false",`, new: `"text": "false", "value": "false",`, want: `"value"`},
+		{name: "an unknown entry member", old: `"texts": ["false"],`, new: `"texts": ["false"], "value": "false",`, want: `"value"`},
 		{name: "an entry with no subject", old: `{"class": "CODED_ITEM", `, new: `{`, want: "sdk_extensions.classes_left_out[0] has no class"},
-		{name: "a dropped element with no text", old: `"text": "false",`, new: ``, want: "sdk_extensions.dropped_elements[0] has no text"},
+		{name: "a dropped element with no text", old: `"texts": ["false"],`, new: ``, want: "sdk_extensions.dropped_elements[0] has no text"},
 		{name: "an element path with an empty step", old: `"element_path": "constraints",`, new: `"element_path": "constraints//items",`, want: "sdk_extensions.anonymous_type_names[0] has no element_path"},
 		{name: "an unknown schema form", old: `"form": "choice",`, new: `"form": "sequence",`, want: `has the form "sequence"`},
 		{name: "a choice of one shape", old: `"shapes": ["TEXT", "CODE"]`, new: `"shapes": ["TEXT"]`, want: "sdk_extensions.schema_forms[0] has no two or more shapes"},
@@ -275,8 +275,33 @@ func TestSDKExtensions_REQ041_REQ176_DroppedElements(t *testing.T) {
 	checkRefusals(t, []refusal{
 		{name: "an element that names a member", old: `"element": "legacy_flag"`, new: `"element": "rm_attribute_name"`, want: "drops rm_attribute_name, which is one of its members"},
 		{name: "a class the target does not hold", old: `{"class": "ATTRIBUTE", `, new: `{"class": "CODED_ITEM", `, want: "CODED_ITEM, which the target does not hold"},
-		{name: "an element dropped twice", old: `"dropped_elements": [`, new: `"dropped_elements": [{"class": "ATTRIBUTE", "element": "legacy_flag", "text": "true", "reason": "r.", "upstream": "https://example.org/pull/3"}, `, want: "drops ATTRIBUTE.legacy_flag twice"},
+		{name: "an element dropped twice", old: `"dropped_elements": [`, new: `"dropped_elements": [{"class": "ATTRIBUTE", "element": "legacy_flag", "texts": ["true"], "reason": "r.", "upstream": "https://example.org/pull/3"}, `, want: "drops ATTRIBUTE.legacy_flag twice"},
 	}, renderXML)
+}
+
+// TestSDKExtensions_REQ041_REQ176_DroppedElementTexts pins that one
+// dropped_elements entry admits several texts, as REQ-176's `match_negated`
+// admits false written `false` or `0`: the decoder's arm hands every text the
+// entry gives to xmlunmatched.DropElement, which drops the element when its
+// text is any of them. An entry whose texts are none, or hold an empty one, is
+// refused.
+func TestSDKExtensions_REQ041_REQ176_DroppedElementTexts(t *testing.T) {
+	t.Parallel()
+	p, err := editedRootPlan(t, `"texts": ["false"],`, `"texts": ["false", "0"],`)
+	if err != nil {
+		t.Fatalf("generation with two texts = %v; want a plan", err)
+	}
+	unmar := renderedFiles(t, p)["org_test_model_xmlunmar_gen.go"]
+	decoder := unmar[strings.Index(unmar, "func (s *SingleAttribute) UnmarshalXML"):]
+	const want = `xmlunmatched.DropElement(_dec, &_t, "false", "0")`
+	if arm := xmlCaseArm(decoder, "legacy_flag"); !strings.Contains(arm, want) {
+		t.Errorf("SingleAttribute.UnmarshalXML's legacy_flag arm =\n%s\nwant it to call %s", arm, want)
+	}
+
+	checkRefusals(t, []refusal{
+		{name: "no texts", old: `"texts": ["false"],`, new: `"texts": [],`, want: "sdk_extensions.dropped_elements[0] has no text"},
+		{name: "an empty text", old: `"texts": ["false"],`, new: `"texts": ["false", ""],`, want: "sdk_extensions.dropped_elements[0] has no text"},
+	}, nil)
 }
 
 // TestSDKExtensions_REQ041_AnonymousTypeNames pins anonymous_type_names: the
@@ -295,6 +320,111 @@ func TestSDKExtensions_REQ041_AnonymousTypeNames(t *testing.T) {
 		{name: "a path named twice", old: `"anonymous_type_names": [`, new: `"anonymous_type_names": [{"schema_type": "VIEW", "element_path": "constraints", "class": "ITEM", "reason": "r.", "upstream": "https://example.org/pull/4"}, `, want: "VIEW/constraints twice"},
 		{name: "a class named for two paths", old: `"anonymous_type_names": [`, new: `"anonymous_type_names": [{"schema_type": "VIEW", "element_path": "items", "class": "VIEW_CONSTRAINT", "reason": "r.", "upstream": "https://example.org/pull/4"}, `, want: "names VIEW_CONSTRAINT for VIEW/items and for VIEW/constraints"},
 	}, nil)
+}
+
+// TestSDKExtensions_REQ041_REQ176_AnonymousTypeNamesTakeTheSchemaType pins
+// that a class anonymous_type_names names takes the anonymous ITS-XML schema
+// type at its path, as the XML codec reads a class's schema type: VIEW_CONSTRAINT
+// takes the `path` attribute of the type declared inside VIEW's constraints,
+// which no named type gives it. The entry is checked against the schemas: a
+// path that names no anonymous type of the target's schema sets is refused.
+func TestSDKExtensions_REQ041_REQ176_AnonymousTypeNamesTakeTheSchemaType(t *testing.T) {
+	t.Parallel()
+	withOrder := func(t *testing.T, view string) (*Plan, error) {
+		t.Helper()
+		p := extensionPlan(t, extensionRootID)
+		root := writeSchemaTree(t, map[string]string{"s/view.xsd": xsdDoc(view)})
+		set, err := loadXSDSet(root, []string{"s/view.xsd"})
+		if err != nil {
+			t.Fatalf("loadXSDSet: %v", err)
+		}
+		p.xmlOrder = &xmlChildOrder{sets: []*xsdSet{set}}
+		return p, p.xmlOrder.checkAnonymousTypes(p)
+	}
+
+	p, err := withOrder(t, `<xs:complexType name="VIEW"><xs:sequence><xs:element name="constraints" maxOccurs="unbounded">`+
+		`<xs:complexType><xs:sequence/><xs:attribute name="path" type="xs:string" use="required"/></xs:complexType>`+
+		`</xs:element></xs:sequence></xs:complexType>`)
+	if err != nil {
+		t.Fatalf("checkAnonymousTypes over a schema that declares VIEW/constraints = %v; want nil", err)
+	}
+	if got := classXMLAttributes(t, p, "VIEW_CONSTRAINT"); !slices.Equal(got.members, []string{"path"}) {
+		t.Errorf("VIEW_CONSTRAINT's XML attribute members = %q; want [path], from the anonymous type at VIEW/constraints", got.members)
+	}
+
+	if _, err := withOrder(t, `<xs:complexType name="VIEW_CONSTRAINT"><xs:sequence/></xs:complexType>`+
+		`<xs:complexType name="VIEW"><xs:sequence><xs:element name="constraints" type="VIEW_CONSTRAINT"/></xs:sequence></xs:complexType>`); err == nil ||
+		!strings.Contains(err.Error(), "anonymous_type_names names VIEW/constraints, which no ITS-XML schema of the target declares") {
+		t.Errorf("checkAnonymousTypes over a schema whose VIEW/constraints has a named type = %v; want a refusal naming the path", err)
+	}
+}
+
+// TestSDKExtensions_REQ041_REQ176_SchemaFormChoice pins the choice form, the
+// rule behind REQ-176's ORDINAL.symbol: the decoder hands the member's element
+// to xmlunmatched.DecodeChoice with the shapes the entry lists, in its order,
+// each by the child elements of its class and a constructor of it, where the
+// pinned fixture alone decodes the element as its one class; and the encoder
+// writes the value of whichever shape the member holds, by pointer or by
+// value, under the member's element, and refuses a value of any other type. A
+// choice whose member is not typed Any, whose shapes share an element, or one
+// of whose shapes has no decoder of its own is refused.
+func TestSDKExtensions_REQ041_REQ176_SchemaFormChoice(t *testing.T) {
+	t.Parallel()
+	method := func(src, recv string) string {
+		i := strings.Index(src, recv)
+		if i < 0 {
+			return ""
+		}
+		return src[i:]
+	}
+	control := renderedFiles(t, extensionPlan(t, extensionBaseID))["org_test_model_xmlunmar_gen.go"]
+	if arm := xmlCaseArm(method(control, "func (o *Ordinal) UnmarshalXML"), "symbol"); arm == "" || strings.Contains(arm, "DecodeChoice") {
+		t.Fatalf("the pinned fixture alone decodes no ORDINAL.symbol, or decodes it as a choice; the control proves nothing:\n%s", arm)
+	}
+
+	files := renderedFiles(t, extensionPlan(t, extensionRootID))
+	unmar := files["org_test_model_xmlunmar_gen.go"]
+	const wantVar = "var xmlChoiceOrdinalSymbol = []xmlunmatched.Shape{\n" +
+		"\t{Elements: []string{\"value\", \"defining_code\"}, New: func() any { return new(Text) }},\n" +
+		"\t{Elements: []string{\"terminology_id\", \"code_string\"}, New: func() any { return new(Code) }},\n" +
+		"}\n"
+	if !strings.Contains(unmar, wantVar) {
+		t.Errorf("the XML decoders lack the shapes of ORDINAL.symbol:\n%s\nwant\n%s", unmar, wantVar)
+	}
+	arm := xmlCaseArm(method(unmar, "func (o *Ordinal) UnmarshalXML"), "symbol")
+	for _, want := range []string{"xmlunmatched.DecodeChoice(_dec, _t, xmlChoiceOrdinalSymbol)", "o.Symbol = _v"} {
+		if !strings.Contains(arm, want) {
+			t.Errorf("Ordinal.UnmarshalXML's symbol arm =\n%s\nwant it to hold %s", arm, want)
+		}
+	}
+	encoder := method(files["org_test_model_xmlmar_gen.go"], "func (o *Ordinal) MarshalXML")
+	for _, want := range []string{
+		"switch _v := o.Symbol.(type) {",
+		"case *Text, *Code:\n\t\tif err := _e.EncodeElement(_v, xml.StartElement{Name: xml.Name{Local: \"symbol\"}}); err != nil {",
+		"case Text:\n\t\tif err := _e.EncodeElement(&_v, xml.StartElement{Name: xml.Name{Local: \"symbol\"}}); err != nil {",
+		"case Code:\n",
+		"default:\n\t\treturn fmt.Errorf(",
+	} {
+		if !strings.Contains(encoder, want) {
+			t.Errorf("Ordinal.MarshalXML lacks %q:\n%s", want, encoder)
+		}
+	}
+
+	renderXML := func(p *Plan) error {
+		var errs []error
+		for _, f := range p.Files {
+			_, err := RenderUnmarshalXMLFile(p, f)
+			errs = append(errs, err)
+			_, err = RenderMarshalXMLFile(p, f)
+			errs = append(errs, err)
+		}
+		return errors.Join(errs...)
+	}
+	checkRefusals(t, []refusal{
+		{name: "a member not typed Any", old: `"type": "Any", "is_mandatory": true}`, new: `"type": "CODE", "is_mandatory": true}`, want: "ORDINAL.symbol is typed CODE; a choice needs a member typed Any"},
+		{name: "a shape twice", old: `"shapes": ["TEXT", "CODE"]`, new: `"shapes": ["TEXT", "TEXT"]`, want: "the shapes TEXT and TEXT of ORDINAL.symbol share the element value"},
+		{name: "a shape with no decoder of its own", old: `"shapes": ["TEXT", "CODE"]`, new: `"shapes": ["TEXT", "ATTRIBUTE"]`, want: "the shape ATTRIBUTE of ORDINAL.symbol has no XML decoder of its own"},
+	}, renderXML)
 }
 
 // TestSDKExtensions_REQ041_SchemaForms pins schema_forms: the plan carries the

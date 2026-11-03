@@ -96,6 +96,55 @@ func TestXSDSequenceOfVendoredTypes(t *testing.T) {
 	}
 }
 
+// TestXSDAnonymousTypes pins that the reader keeps the anonymous complex type
+// of each element declared inside a named type, under the path of local
+// element names from that type, with its own sequence and attributes: T_VIEW's
+// constraints and their items in the AM Release-1.4 template schema, which the
+// AOM 1.4 root names (REQ-176, REQ-041), and, on a scratch schema, one in an
+// extension's content and one nested inside it under a choice. An element of a
+// named type or of a built-in type has no such path.
+func TestXSDAnonymousTypes(t *testing.T) {
+	_, amSet := loadTestXSDSets(t)
+	root := writeSchemaTree(t, map[string]string{"s/a.xsd": xsdDoc(
+		`<xs:complexType name="B"><xs:sequence><xs:element name="b"/></xs:sequence></xs:complexType>` +
+			`<xs:complexType name="A"><xs:complexContent><xs:extension base="B"><xs:sequence>` +
+			`<xs:element name="named" type="B"/>` +
+			`<xs:element name="inner"><xs:complexType><xs:choice><xs:element name="x" type="xs:string"/>` +
+			`<xs:element name="deep"><xs:complexType><xs:sequence><xs:element name="y"/></xs:sequence><xs:attribute name="k"/></xs:complexType></xs:element>` +
+			`</xs:choice></xs:complexType></xs:element>` +
+			`</xs:sequence></xs:extension></xs:complexContent></xs:complexType>`)})
+	scratch, err := loadXSDSet(root, []string{"s/a.xsd"})
+	if err != nil {
+		t.Fatalf("loadXSDSet: %v", err)
+	}
+	for _, tc := range []struct {
+		set        *xsdSet
+		path       string
+		seq, attrs []string
+	}{
+		{amSet, "T_VIEW/constraints", []string{"items"}, []string{"path"}},
+		{amSet, "T_VIEW/constraints/items", []string{"value"}, []string{"id"}},
+		{scratch, "A/inner", []string{"x", "deep"}, nil},
+		{scratch, "A/inner/deep", []string{"y"}, []string{"k"}},
+	} {
+		t.Run(tc.path, func(t *testing.T) {
+			seq, err := tc.set.sequence(tc.path)
+			if err != nil || !slices.Equal(seq, tc.seq) {
+				t.Errorf("sequence(%s) = %q, %v; want %q", tc.path, seq, err, tc.seq)
+			}
+			attrs, err := tc.set.attributes(tc.path)
+			if err != nil || !slices.Equal(attrs, tc.attrs) {
+				t.Errorf("attributes(%s) = %q, %v; want %q", tc.path, attrs, err, tc.attrs)
+			}
+		})
+	}
+	for _, path := range []string{"A/named", "A/inner/x", "T_VIEW/view"} {
+		if scratch.has(path) || amSet.has(path) {
+			t.Errorf("has(%s) = true; want no anonymous type at that path", path)
+		}
+	}
+}
+
 // writeSchemaTree writes files under a fresh directory and opens it as a
 // root.
 func writeSchemaTree(t *testing.T, files map[string]string) *os.Root {

@@ -83,7 +83,11 @@ type xsdType struct {
 }
 
 // xsdSet is the complex types, the simple type names and the model groups of
-// one closure of schema files, by name.
+// one closure of schema files, by name. An anonymous complex type, the type of
+// an element declared inside a named type, is among the types under its path:
+// the named type's name and the local names of the elements down to it,
+// separated by "/", such as "T_VIEW/constraints/items", which no type name can
+// be.
 type xsdSet struct {
 	types       map[string]*xsdType
 	simpleTypes map[string]bool
@@ -190,12 +194,9 @@ func (s *xsdSet) readFile(root *os.Root, file string) ([]string, error) {
 			if err != nil {
 				return nil, err
 			}
-			name := n.attr("name")
-			if _, dup := s.types[name]; dup {
-				s.dups[name] = append(s.dups[name], t)
-				continue
+			if err := s.declare(t); err != nil {
+				return nil, err
 			}
-			s.types[name] = t
 		case n.is("group"):
 			content := particleOf(n)
 			if content == nil {
@@ -207,6 +208,49 @@ func (s *xsdSet) readFile(root *os.Root, file string) ([]string, error) {
 		}
 	}
 	return refs, nil
+}
+
+// declare adds t, a complex type read from a schema file, to the set under its
+// name, and each anonymous complex type its own particle declares, at any
+// depth, under its path. A name declared before keeps its first declaration;
+// [loadXSDSet] checks that the later ones agree with it.
+func (s *xsdSet) declare(t *xsdType) error {
+	if _, dup := s.types[t.name]; dup {
+		s.dups[t.name] = append(s.dups[t.name], t)
+	} else {
+		s.types[t.name] = t
+	}
+	if t.content == nil {
+		return nil
+	}
+	return s.declareAnonymous(t.file, t.name, t.content)
+}
+
+// declareAnonymous declares the anonymous complex type of each element n, a
+// particle of the type at path, declares, under path and the element's name.
+func (s *xsdSet) declareAnonymous(file, path string, n *xsdNode) error {
+	switch {
+	case n.is("element"):
+		for i := range n.Children {
+			c := &n.Children[i]
+			if !c.is("complexType") {
+				continue
+			}
+			t, err := parseComplexType(file, c)
+			if err != nil {
+				return err
+			}
+			t.name = path + "/" + n.attr("name")
+			return s.declare(t)
+		}
+	case n.is("sequence"), n.is("choice"), n.is("all"):
+		for i := range n.Children {
+			if err := s.declareAnonymous(file, path, &n.Children[i]); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // parseComplexType reads the base, the own particle and the own XML
@@ -520,10 +564,17 @@ func (s *itsXMLSchemas) orderFor(roots [][]string) (*xmlChildOrder, error) {
 
 // typeFor returns the set that declares the schema type class takes and the
 // type's name: the type of the class's own name, or of its nearest ancestor,
-// from the first set that declares one. ok is false when no set declares the
+// from the first set that declares one. A class the target's roots name for an
+// anonymous schema type, in their anonymous_type_names, takes the type at that
+// path in place of a type of its own name. ok is false when no set declares the
 // class or an ancestor.
 func (o *xmlChildOrder) typeFor(plan *Plan, class string) (index int, name string, ok bool) {
 	lineage := nearestLineage(plan, class)
+	for j, c := range lineage {
+		if path, named := plan.extensions.anonymousTypeOf[c]; named {
+			lineage[j] = path
+		}
+	}
 	for i, set := range o.sets {
 		for _, name := range lineage {
 			if set.has(name) {
@@ -532,6 +583,20 @@ func (o *xmlChildOrder) typeFor(plan *Plan, class string) (index int, name strin
 		}
 	}
 	return 0, "", false
+}
+
+// checkAnonymousTypes checks each path the target's roots name in their
+// anonymous_type_names against the schema sets: the path must be that of an
+// anonymous complex type one of them declares, so the class named for it
+// takes that type's elements and attributes.
+func (o *xmlChildOrder) checkAnonymousTypes(plan *Plan) error {
+	var errs []error
+	for _, path := range sortedStringKeys(plan.extensions.anonymousTypeNames) {
+		if !slices.ContainsFunc(o.sets, func(set *xsdSet) bool { return set.has(path) }) {
+			errs = append(errs, fmt.Errorf("bmmgen: %s.anonymous_type_names names %s, which no ITS-XML schema of the target declares as an anonymous type", sdkExtensionsMember, path))
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // sequenceFor returns the element names whose order class's encoder takes

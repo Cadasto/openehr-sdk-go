@@ -18,8 +18,12 @@ import (
 )
 
 // flagged reads as a generated decoder reads a class with one member, `n`, and
-// one dropped element, `legacy`, whose one value is `false`.
-type flagged struct{ n int }
+// one dropped element, `legacy`, whose one value is `false`, or, when wants is
+// set, any of the texts it holds.
+type flagged struct {
+	n     int
+	wants []string
+}
 
 var flaggedClass = &Class{Name: "FLAGGED"}
 
@@ -40,7 +44,11 @@ func (f *flagged) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error {
 					return err
 				}
 			case "legacy":
-				if err := DropElement(dec, &tk, "false"); err != nil {
+				wants := f.wants
+				if wants == nil {
+					wants = []string{"false"}
+				}
+				if err := DropElement(dec, &tk, wants...); err != nil {
 					return err
 				}
 			default:
@@ -113,6 +121,43 @@ func TestDropElement_REQ041_REQ176_RefusesAnyOtherText(t *testing.T) {
 				}
 				if strings.Contains(err.Error(), planted) {
 					t.Errorf("Unmarshal(%q) err = %q; it carries the element's text", in, err)
+				}
+			})
+		}
+	}
+}
+
+// TestDropElement_REQ041_REQ176_DropsAnyOfItsTexts pins that an element whose
+// value may be written in several texts, as REQ-176's `match_negated` holds
+// false written `false` or `0`, is read and dropped in every mode when its text
+// is any of them, and refused in every mode, as a primitive failure wrapping
+// ErrInvalidShape, when it is none of them.
+func TestDropElement_REQ041_REQ176_DropsAnyOfItsTexts(t *testing.T) {
+	wants := []string{"false", "0"}
+	for _, tc := range []struct {
+		text string
+		drop bool
+	}{
+		{"false", true},
+		{"0", true},
+		{" 0\n", true},
+		{"true", false},
+		{"1", false},
+		{"", false},
+		{"false0", false},
+	} {
+		for mode, tracker := range documentModes() {
+			t.Run(mode+"/"+tc.text, func(t *testing.T) {
+				in := flaggedDoc("", tc.text)
+				f := flagged{wants: wants}
+				err := Unmarshal([]byte(in), &f, tracker())
+				switch {
+				case tc.drop && err != nil:
+					t.Errorf("Unmarshal(%q) = %v; want nil, the element read and dropped", in, err)
+				case tc.drop && f.n != 1:
+					t.Errorf("Unmarshal(%q): n = %d; want 1", in, f.n)
+				case !tc.drop && (!errors.Is(err, ErrInvalidShape) || !IsPrimitiveFailure(err)):
+					t.Errorf("Unmarshal(%q) = %v; want a primitive failure wrapping ErrInvalidShape", in, err)
 				}
 			})
 		}

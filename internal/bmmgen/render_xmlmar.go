@@ -39,7 +39,9 @@ import (
 //     built without the schemas, as a test may build one, keeps the
 //     generator's property order. Nil-pointer optionals and empty
 //     containers are omitted. Polymorphic descendants receive
-//     `xsi:type` via [canxml.EncodePoly].
+//     `xsi:type` via [canxml.EncodePoly]. A member whose element the
+//     target's root schemas give a choice of shapes writes the shape it
+//     holds, with no `xsi:type` ([marshalXMLChoice]).
 //
 // An Octet list (DV_MULTIMEDIA's `data` and `integrity_check`, Go []byte) is
 // one element of standard base64 text, the `xs:base64Binary` the ITS-XML
@@ -94,8 +96,11 @@ func RenderMarshalXMLFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	if slices.ContainsFunc(chunks, func(c string) bool { return strings.Contains(c, "base64.") }) {
 		body.WriteString("\t\"encoding/base64\"\n")
 	}
-	body.WriteString("\t\"encoding/xml\"\n\n")
-	body.WriteString("\t\"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml\"\n")
+	body.WriteString("\t\"encoding/xml\"\n")
+	if slices.ContainsFunc(chunks, func(c string) bool { return strings.Contains(c, "fmt.") }) {
+		body.WriteString("\t\"fmt\"\n")
+	}
+	body.WriteString("\n\t\"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml\"\n")
 	if needsExternalImportForJSONMar(plan, chunks) {
 		fmt.Fprintf(&body, "\t%q\n", plan.Target.ExternalImport)
 	}
@@ -195,8 +200,14 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 	b.WriteString("\tif err := _e.EncodeToken(_start); err != nil {\n\t\treturn err\n\t}\n")
 
 	for _, ef := range elemFields {
-		line, err := renderMarshalXMLField(plan, recv, sc, ef)
+		choice, err := xmlChoiceOf(plan, pc, ef)
 		if err != nil {
+			return "", err
+		}
+		var line string
+		if choice != nil {
+			line = marshalXMLChoice(recv, FieldName(ef.Prop.PropertyName()), ef.Prop.PropertyName(), choice, isMandatoryProperty(ef.Prop))
+		} else if line, err = renderMarshalXMLField(plan, recv, sc, ef); err != nil {
 			return "", fmt.Errorf("render XML field %s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
 		}
 		if shaped {
