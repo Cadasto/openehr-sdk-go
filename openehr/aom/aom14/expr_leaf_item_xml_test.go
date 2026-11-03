@@ -210,13 +210,39 @@ func TestREQ176_REQ056_ExprLeafItemPrefix(t *testing.T) {
 
 // TestREQ176_TypedStringRefusesAnUnreadableType pins the encoder's refusal of
 // a TypedString whose Type is no prefixed XML Schema built-in datatype, which
-// would not read back as the value written.
+// would not read back as the value written: among them a prefix that is no
+// XML NCName, which writes malformed XML or a namespace declaration XML
+// forbids, and the prefixes `xml`, `xmlns` and `xsi`, whose declaration would
+// rebind a namespace the document needs; and a prefix outside the characters
+// encoding/xml reads in a name, narrower than XML 1.0 fifth edition's beyond
+// Latin-1. Any other NCName prefix reads back.
 func TestREQ176_TypedStringRefusesAnUnreadableType(t *testing.T) {
-	for _, typ := range []string{"string", ":string", "xs:no_such_datatype", ""} {
+	for _, typ := range []string{
+		"string", ":string", "xs:no_such_datatype", "",
+		"a b:string", "1a:string", "-a:string", ".a:string", "a<b:string", "a\"b:string",
+		"\u2c00:string", "a\u203f:string", "\xff:string",
+		"xml:string", "xmlns:string", "xsi:string",
+	} {
 		leaf := &aom14.ExprLeaf{Type: "String", ReferenceType: "attribute", Item: &aom14.TypedString{Value: "x", Type: typ}}
 		_, err := canxml.Marshal(leaf)
 		if !errors.Is(err, canxml.ErrInvalidShape) {
 			t.Errorf("Marshal(a TypedString of Type %q) = %v; want canxml.ErrInvalidShape", typ, err)
+		}
+	}
+	for _, typ := range []string{"xs:string", "xsd:string", "my-ns.v1_2:string", "\u00e9t\u00e9:string", "a\u00b7b:string", "xmlx:string"} {
+		in := &aom14.ExprLeaf{Type: "String", ReferenceType: "attribute", Item: &aom14.TypedString{Value: "x", Type: typ}}
+		out, err := canxml.Marshal(in)
+		if err != nil {
+			t.Errorf("Marshal(a TypedString of Type %q) = %v; want nil", typ, err)
+			continue
+		}
+		var back aom14.ExprLeaf
+		if err := canxml.Unmarshal(out, &back, canxml.WithStrict()); err != nil {
+			t.Errorf("Unmarshal(%s) = %v; want nil", out, err)
+			continue
+		}
+		if got, ok := back.Item.(*aom14.TypedString); !ok || got.Type != typ || got.Value != "x" {
+			t.Errorf("the item of %s reads back as %#v; want the typed string %q of Type %q", out, back.Item, "x", typ)
 		}
 	}
 }

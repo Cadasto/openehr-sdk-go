@@ -152,8 +152,10 @@ func TestREQ176_REQ052_ExprLeafItemCanonicalJSONRefusals(t *testing.T) {
 // TestREQ176_REQ052_ExprLeafItemCanonicalJSONEncodeRefusals pins what canonical
 // JSON refuses to write for a *aom14.TypedString item, with
 // canjson.ErrInvalidValue and an error that does not quote the text: a Type
-// that is no prefixed XML Schema built-in datatype, and text the built-in's
-// primitive does not read: a Boolean other than true, false, 1 or 0; an
+// that is no prefixed XML Schema built-in datatype, as the XML encoder refuses
+// it, a prefix that is no XML NCName or is `xsi` or `xmlns` among them; and
+// text the built-in's primitive does not read: a Boolean other than true,
+// false, 1 or 0; an
 // Integer or Integer64 that is no whole number in its range; and a Real or
 // Double that is no decimal number in the float64 range, an infinity and a
 // not-a-number among them. Where the text is refused for its spelling or its
@@ -167,6 +169,9 @@ func TestREQ176_REQ052_ExprLeafItemCanonicalJSONEncodeRefusals(t *testing.T) {
 	}{
 		{item: aom14.TypedString{Type: "string", Value: "unprefixed"}},
 		{item: aom14.TypedString{Type: "xs:nothing", Value: "unknown"}},
+		{item: aom14.TypedString{Type: "a b:string", Value: "spaced prefix"}},
+		{item: aom14.TypedString{Type: "xsi:string", Value: "instance prefix"}},
+		{item: aom14.TypedString{Type: "xmlns:string", Value: "reserved prefix"}},
 		{item: aom14.TypedString{Type: "xs:boolean", Value: "yes"}, cause: strconv.ErrSyntax},
 		{item: aom14.TypedString{Type: "xs:boolean", Value: ""}, cause: strconv.ErrSyntax},
 		{item: aom14.TypedString{Type: "xs:int", Value: "abc"}, cause: strconv.ErrSyntax},

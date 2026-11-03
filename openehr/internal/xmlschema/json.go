@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"encoding/json/jsontext"
 	json "encoding/json/v2"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
@@ -30,8 +32,9 @@ import (
 // `1E3`. The JSON keeps neither Type's prefix nor which of the primitive's
 // built-ins Type names.
 //
-// A Type that is no prefixed XML Schema built-in datatype is refused, and so
-// is text the primitive does not read, such as a Boolean written `yes`, an
+// A Type that is no prefixed XML Schema built-in datatype is refused, as the
+// XML encoder refuses it ([TypedString.MarshalXML]), and so is text the
+// primitive does not read, such as a Boolean written `yes`, an
 // Integer out of range or a Double written `INF`, which a JSON number cannot
 // hold. Neither refusal quotes the text.
 func (s TypedString) MarshalJSONTo(enc *jsontext.Encoder) error {
@@ -69,13 +72,52 @@ var errTypedType = errors.New("the xsi:type of a typed item is no prefixed XML S
 
 // typedPrimitive returns the BMM primitive t reads as when t is an XML Schema
 // built-in datatype under a prefix, the `xsi:type` a [TypedString] carries,
-// and false otherwise.
+// and false otherwise. The prefix is one the XML encoder can declare bound to
+// the XML Schema namespace and read back: an XML NCName other than `xml` and
+// `xmlns`, which XML reserves, and `xsi`, which the encoder binds to the XML
+// Schema instance namespace for the `xsi:type` attribute itself.
 func typedPrimitive(t string) (string, bool) {
 	prefix, local, ok := strings.Cut(t, ":")
-	if !ok || prefix == "" {
+	if !ok || !isNCName(prefix) {
+		return "", false
+	}
+	switch prefix {
+	case "xml", "xmlns", "xsi":
 		return "", false
 	}
 	return Builtin(local)
+}
+
+// isNCName reports whether s is an XML NCName (Namespaces in XML 1.0: an XML
+// name with no colon) that encoding/xml reads back as one. In ASCII that is a
+// letter or `_` followed by letters, digits, `_`, `-` and `.`. Beyond ASCII,
+// encoding/xml reads names by the character tables of the first edition of
+// XML 1.0, which admit fewer characters than the NameStartChar and NameChar of
+// the fifth edition, so s is held to what it reads.
+func isNCName(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := range len(s) {
+		c := s[i]
+		switch {
+		case c >= utf8.RuneSelf:
+			return readsAsName(s)
+		case c == '_', 'a' <= c && c <= 'z', 'A' <= c && c <= 'Z':
+		case i > 0 && (c == '-' || c == '.' || '0' <= c && c <= '9'):
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// readsAsName reports whether encoding/xml reads s, which holds no colon, as
+// the whole name of an element.
+func readsAsName(s string) bool {
+	tok, err := xml.NewDecoder(strings.NewReader("<" + s + "/>")).RawToken()
+	start, ok := tok.(xml.StartElement)
+	return err == nil && ok && start.Name.Space == "" && start.Name.Local == s
 }
 
 // xmlSpace is the white space XML Schema removes around the text of a boolean

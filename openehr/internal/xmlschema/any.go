@@ -35,7 +35,11 @@ type TypedString struct {
 // MarshalXML writes s as the element start names: its text, with Type as its
 // `xsi:type` and a declaration that binds Type's prefix to the XML Schema
 // namespace. A Type that is no prefixed XML Schema built-in datatype, which
-// would not read back as one, is refused with xmlunmatched.ErrInvalidShape.
+// would not read back as one, is refused with xmlunmatched.ErrInvalidShape:
+// among them a prefix that is no XML NCName, which would write malformed XML,
+// and the prefixes `xml` and `xmlns`, which XML reserves, and `xsi`, which
+// the `xsi:type` attribute itself needs bound to the XML Schema instance
+// namespace.
 func (s TypedString) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 	if _, ok := typedPrimitive(s.Type); !ok {
 		return fmt.Errorf("%w: the xsi:type of a typed string is no prefixed XML Schema built-in datatype", xmlunmatched.ErrInvalidShape)
