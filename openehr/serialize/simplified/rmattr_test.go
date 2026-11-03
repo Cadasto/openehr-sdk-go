@@ -17,7 +17,6 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
@@ -49,7 +48,7 @@ const (
 // template — the single OPT every corpus fixture instantiates.
 func conformanceWT(t *testing.T) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
 	t.Helper()
-	opt, err := template.ParseFile(fixtures.FlatConformanceOpt())
+	opt, err := readOPTFile(fixtures.FlatConformanceOpt())
 	if err != nil {
 		t.Fatalf("parse corpus OPT: %v", err)
 	}

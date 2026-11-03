@@ -18,7 +18,6 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
@@ -409,7 +408,7 @@ const nestedItemTree = "openEHR-EHR-ITEM_TREE.nested.v1"
 // Template.
 func nestedWT(t *testing.T) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
 	t.Helper()
-	opt, err := template.ParseFile(fixtures.TemplateOpt("nested.en.v1"))
+	opt, err := readOPTFile(fixtures.TemplateOpt("nested.en.v1"))
 	if err != nil {
 		t.Fatalf("parse nested.en.v1 OPT: %v", err)
 	}

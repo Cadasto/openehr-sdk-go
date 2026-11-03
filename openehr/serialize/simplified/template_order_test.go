@@ -9,7 +9,6 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
@@ -210,9 +209,9 @@ func TestREQ053TemplateIndexDisagreementGivesNoType(t *testing.T) {
 // template builds gives its folded protocol the ITEM_LIST the OPT names, at the
 // path the walk rebuilds.
 func TestREQ053TemplateIndexTypesTheBMIProtocol(t *testing.T) {
-	opt, err := template.ParseFile(fixtures.TemplateOpt("BMI"))
+	opt, err := readOPTFile(fixtures.TemplateOpt("BMI"))
 	if err != nil {
-		t.Fatalf("ParseFile(BMI): %v", err)
+		t.Fatalf("readOPTFile(BMI): %v", err)
 	}
 	compiled, err := templatecompile.Compile(opt)
 	if err != nil {

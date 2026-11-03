@@ -17,11 +17,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
@@ -143,9 +143,9 @@ func editValues(t *testing.T, edits ...valuesEdit) editedValues {
 	for _, edit := range edits {
 		opt = edit(t, opt)
 	}
-	parsed, err := template.ParseOPT(strings.NewReader(opt))
+	parsed, err := aom14.ReadOperationalTemplate(strings.NewReader(opt))
 	if err != nil {
-		t.Fatalf("ParseOPT(edited %s): %v", valuesTemplate, err)
+		t.Fatalf("ReadOperationalTemplate(edited %s): %v", valuesTemplate, err)
 	}
 	wt, compiled := compileTemplate(t, valuesTemplate, parsed)
 	composer := "Composer"

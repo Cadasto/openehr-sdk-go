@@ -18,12 +18,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
@@ -34,16 +34,16 @@ import (
 // OPT with the template id id.
 func templateOf(t *testing.T, id string) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
 	t.Helper()
-	opt, err := template.ParseFile(fixtures.TemplateOpt(id))
+	opt, err := readOPTFile(fixtures.TemplateOpt(id))
 	if err != nil {
-		t.Fatalf("ParseFile(%s): %v", id, err)
+		t.Fatalf("readOPTFile(%s): %v", id, err)
 	}
 	return compileTemplate(t, id, opt)
 }
 
 // compileTemplate compiles opt, the template named id, and builds its Web
 // Template.
-func compileTemplate(t *testing.T, id string, opt *template.OperationalTemplate) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
+func compileTemplate(t *testing.T, id string, opt *aom14.OperationalTemplate) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
 	t.Helper()
 	compiled, err := templatecompile.Compile(opt)
 	if err != nil {

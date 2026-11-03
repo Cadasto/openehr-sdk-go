@@ -15,7 +15,6 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
@@ -50,7 +49,7 @@ const benchFlatBody = "ehrbase_conformance_Element_feeder_audit"
 // failure instead of a suspiciously fast measurement.
 func benchFlatTarget(b *testing.B) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
 	b.Helper()
-	opt, err := template.ParseFile(fixtures.FlatConformanceOpt())
+	opt, err := readOPTFile(fixtures.FlatConformanceOpt())
 	if err != nil {
 		b.Fatalf("parse corpus OPT: %v", err)
 	}
