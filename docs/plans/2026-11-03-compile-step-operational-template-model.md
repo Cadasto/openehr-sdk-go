@@ -71,7 +71,7 @@ In `internal/templatecompile`, functions that build `constraints.PrimitiveConstr
 
 ### Task 6: the compile step reads the model
 
-`internal/templatecompile` walks `aom14.OperationalTemplate` (a pointer switch over the 13 `CObject` kinds with a default that refuses), reading node names, terms, bindings and intervals from the model with Task 5's builders, applying the tolerances and refusals of § REQ-111; `openehr/templatecompile.Compile` takes `*aom14.OperationalTemplate`. The golden of Task 2 shows only the slot-predicate change; `pathsnapshot` is updated for the same five paths. `BenchmarkCompile` gains the read step, and the before and after numbers go in the PR body. Files: `internal/templatecompile/`, `openehr/templatecompile/`, their tests and testdata. Callers outside these two packages are moved in Task 10; until then they read with `ReadOperationalTemplate` where a test needs to compile.
+`internal/templatecompile` walks `aom14.OperationalTemplate` (a pointer switch over the 13 `CObject` kinds with a default that refuses), reading node names, terms, bindings and intervals from the model with Task 5's builders, applying the tolerances and refusals of § REQ-111; `openehr/templatecompile.Compile` takes `*aom14.OperationalTemplate`. The golden of Task 2 shows only the slot-predicate change; `pathsnapshot` is updated for the same five paths. `BenchmarkCompile` gains the read step, and the before and after numbers go in the PR body. Every non-test caller of `Compile` moves with it, so `go build ./...` stays green: `cmd/cdrcheck`, the `Compile` calls in `cmd/examples/` (the examples' redesign is Task 11), `testkit/fixtures` (a helper that reads the model), `testkit/conformance/`, and the probes that compile. Files: `internal/templatecompile/`, `openehr/templatecompile/`, their tests and testdata, and those callers. Test files in other packages are moved in Task 10.
 
 ### Task 7: the gains
 
@@ -90,7 +90,7 @@ A lookup on `Compiled` taking a `template.Path`, with REQ-100's resolution rules
 
 ### Task 10: callers moved (wave of three, disjoint files)
 
-Every caller of the parser outside `openehr/template` reads with `ReadOperationalTemplate` and compiles: (a) the unit tests under `openehr/` and `internal/` (54 files); (b) `testkit/fixtures/parse_opt.go` (its root rename goes), `testkit/conformance/`, `testkit/probe/`, `testkit/probes/` apart from PROBE-022 and PROBE-024; (c) `cmd/cdrcheck`. Tests that pin the parser's own behaviour stay in `openehr/template`. Mechanical once Task 6 lands.
+Every test file outside `openehr/template` that parses to compile reads with `ReadOperationalTemplate` (or Task 6's fixtures helper) and compiles: (a) the unit tests under `openehr/` and `internal/` (54 files); (b) the test files under `testkit/` and `cmd/cdrcheck`. Tests that pin the parser's own behaviour stay in `openehr/template`. Mechanical once Task 6 lands.
 
 ### Task 11: examples and documents
 
