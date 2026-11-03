@@ -1745,6 +1745,9 @@ requirements:
       - openehr/client/definition
       - openehr/rm/typereg
       - openehr/serialize/canjson
+      - openehr/serialize/canxml
+      - openehr/aom/aom14
+      - internal/templatecompile
     tests:
       - internal/rmjsonwalk/walk_once_budget_internal_test.go
       - openehr/bmm/load_test.go
