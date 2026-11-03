@@ -64,8 +64,9 @@ import (
 // an RM value, and their callbacks receive JSON Pointers from the root of the
 // body. The audits are checked as AUDIT_DETAILS, the RM class whose attributes
 // the write-side audit shares. A member the write-side shape leaves out by
-// design is never missing: `time_committed` on the batch audit and on each
-// commit_audit, and `uid` and `contribution` on each version. Two things
+// design is never missing: `time_committed` and the optional `system_id` on
+// the batch audit and on each commit_audit, and `uid` and `contribution` on
+// each version. Two things
 // are not checked: the members of the body itself beside `audit` and
 // `versions`, since the body is a REST request shape rather than an RM class,
 // and the payload of an IMPORTED_VERSION's item, which [ImportedVersion] holds
@@ -104,6 +105,7 @@ const (
 	memberUID           = "uid"
 	memberContribution  = "contribution"
 	memberTimeCommitted = "time_committed"
+	memberSystemID      = "system_id"
 
 	typeOriginalVersion = "ORIGINAL_VERSION"
 	typeImportedVersion = "IMPORTED_VERSION"
@@ -118,6 +120,7 @@ const (
 // never does.
 const (
 	standInTimeCommitted = `{"_type":"DV_DATE_TIME","value":""}`
+	standInSystemID      = `""`
 	standInUID           = `{"_type":"OBJECT_VERSION_ID","value":""}`
 	standInContribution  = `{"_type":"OBJECT_REF","id":{"_type":"HIER_OBJECT_ID","value":""},"namespace":"","type":""}`
 )
@@ -282,7 +285,9 @@ func readAudit(raw []byte, at string) (*auditPiece, error) {
 // bytes returns the audit as the decoder reads it, an AUDIT_DETAILS: an
 // UPDATE_AUDIT `_type` is written as AUDIT_DETAILS, the RM class whose
 // attributes the write-side audit shares. For the check pass (forCheck), a
-// time_committed the audit leaves out or holds null is given its stand-in.
+// time_committed or system_id the audit leaves out or holds null is given its
+// stand-in: the server assigns the first, and the write-side audit leaves the
+// second optional.
 func (a *auditPiece) bytes(forCheck bool) []byte {
 	e := objectEdit{obj: a.obj}
 	if a.typ == AuditTypeUpdateAudit {
@@ -290,6 +295,7 @@ func (a *auditPiece) bytes(forCheck bool) []byte {
 	}
 	if forCheck {
 		e.supply(memberTimeCommitted, standInTimeCommitted)
+		e.supply(memberSystemID, standInSystemID)
 	}
 	return e.bytes()
 }

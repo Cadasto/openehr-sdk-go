@@ -647,15 +647,20 @@ func TestUnmarshalSubmissionStrictInPayload(t *testing.T) { // REQ-130, REQ-170
 
 // TestUnmarshalSubmissionMissing passes a payload's missing member to
 // WithMissing by its pointer from the root of the body, and never a member the
-// write-side shape leaves out by design: time_committed on an audit, and a
-// version's uid and contribution, whether absent or null.
+// write-side shape leaves out by design: time_committed and system_id on an
+// audit, and a version's uid and contribution, whether absent or null.
 func TestUnmarshalSubmissionMissing(t *testing.T) { // REQ-130, REQ-175
 	noLanguage := strings.Replace(compositionJSON, `"language":{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"ISO_639-1"},"code_string":"en"},`, "", 1)
 	if noLanguage == compositionJSON {
 		t.Fatal("test setup: the composition fixture no longer carries the language member this test removes")
 	}
+	noSystemID := object(
+		member("_type", `"AUDIT_DETAILS"`),
+		member("committer", committerJSON),
+		member("change_type", codedCreation),
+		member("time_committed", "null"))
 	body := bodyJSON(
-		auditJSON("AUDIT_DETAILS", member("time_committed", "null")),
+		noSystemID,
 		originalJSON(member("data", noLanguage)),
 		importedJSON(compositionJSON),
 		object(
