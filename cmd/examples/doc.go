@@ -13,7 +13,8 @@
 //
 //   - canonical_json: decode a canonical-JSON COMPOSITION into typed RM structs
 //   - canxml_roundtrip: one COMPOSITION through canonical JSON and XML and back
-//   - opt-parse: parse an operational template (OPT) and resolve paths in it
+//   - opt-parse: read and compile an operational template (OPT) and look paths
+//     up in it
 //   - primitive-validate: check single values against one OPT leaf constraint
 //   - validate-composition: validate an in-memory composition with one call,
 //     against an OPT's constraints and the Reference Model (the RM floor)

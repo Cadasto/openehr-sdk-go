@@ -108,7 +108,7 @@ call made through `sandbox.Backend` as the transport, see
 | Example | Program | Network | Demonstrates |
 |---|---|---|---|
 | [JSON and XML round-trip](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/canxml_roundtrip) | `canxml_roundtrip` | None | JSON ↔ XML cross-format invariant |
-| [Parse an operational template](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/opt-parse) | `opt-parse` | None | Parse ADL 1.4 OPT, walk paths |
+| [Read an operational template](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/opt-parse) | `opt-parse` | None | Read and compile an ADL 1.4 OPT, look paths up |
 | [Validate primitive constraints](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/primitive-validate) | `primitive-validate` | None | Primitive constraint validation |
 | [Validate a Composition against the RM and a template](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/validate-composition) | `validate-composition` | None | In-memory Composition against the RM and an OPT |
 | [Synthesise a Composition from a template](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/generate-example) | `generate-example` | None | OPT → synthesised RM instance → JSON |

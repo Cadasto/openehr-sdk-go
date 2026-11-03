@@ -1,9 +1,10 @@
-// Example: parse an ADL 1.4 operational template (OPT) and look around inside
-// it: identity, provenance metadata, the root node with its attributes, and
-// path resolution. It shows both parse modes (ParseFileStrict here, with the
-// lenient ParseFile as the alternative), the ObjectNode interface a tree
-// walker dispatches on, and ParsePath, NodeAt, ValidatePath and
-// WithStrictPaths. Nothing here needs a network or a compiled template.
+// Example: read an ADL 1.4 operational template (OPT), compile it, and look
+// around inside it: identity, provenance metadata, the root node with its
+// attributes, and path lookup. It reads the OPT with
+// aom14.ReadOperationalTemplate, which refuses a node type it does not know,
+// compiles it with templatecompile.Compile, and looks paths up with
+// template.ParsePath, Compiled.ValidatePath and Compiled.Resolve, with and
+// without templatecompile.WithStrictPaths.
 //
 // Runs offline. With no argument it uses the vendored vital_signs.opt fixture:
 //
@@ -12,12 +13,17 @@
 package main
 
 import (
+	"bytes"
+	"cmp"
 	"errors"
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -33,126 +39,150 @@ func run() error {
 		optPath = args[0]
 	}
 
-	// Step 1: parse. Strict mode rejects an unknown node type that has
-	// attributes under it; the lenient ParseFile keeps such a node as a leaf
-	// and silently drops everything beneath it.
-	opt, err := template.ParseFileStrict(optPath)
+	// Step 1: read the OPT into the operational template model.
+	// ReadOperationalTemplate refuses a node type it does not know rather
+	// than drop everything beneath it.
+	raw, err := os.ReadFile(optPath)
 	if err != nil {
-		return fmt.Errorf("parse OPT %s: %w", optPath, err)
+		return fmt.Errorf("read OPT %s: %w", optPath, err)
+	}
+	opt, err := aom14.ReadOperationalTemplate(bytes.NewReader(raw))
+	if err != nil {
+		return fmt.Errorf("read OPT %s: %w", optPath, err)
 	}
 
-	// Step 2: identity and provenance.
+	// Step 2: identity and provenance, read from the model.
 	printIdentity(opt)
 	printProvenance(opt)
 
-	// Step 3: the root node and its attributes.
-	if err := printRoot(opt); err != nil {
-		return err
+	// Step 3: compile it. The compiled template is the tree the SDK walks:
+	// every node with its attributes, and the attributes the Reference
+	// Model adds where the OPT leaves them out.
+	compiled, err := templatecompile.Compile(opt)
+	if err != nil {
+		return fmt.Errorf("compile template: %w", err)
 	}
 
-	// Step 4: resolve a path into the tree.
-	return resolveContent(opt)
+	// Step 4: the root node and its attributes.
+	printRoot(compiled.Root())
+
+	// Step 5: look a path up in the compiled template.
+	return lookUpContent(compiled)
 }
 
 // printIdentity prints the fields that name a template. UID and language are
 // optional in the OPT format, so they appear only when present.
-func printIdentity(opt *template.OperationalTemplate) {
-	fmt.Printf("template_id : %s\n", opt.TemplateID())
-	fmt.Printf("concept     : %s\n", opt.Concept())
-	if uid := opt.UID(); uid != "" {
-		fmt.Printf("uid         : %s\n", uid)
+func printIdentity(opt *aom14.OperationalTemplate) {
+	fmt.Printf("template_id : %s\n", opt.TemplateID.Value)
+	fmt.Printf("concept     : %s\n", opt.Concept)
+	if opt.UID != nil && opt.UID.Value != "" {
+		fmt.Printf("uid         : %s\n", opt.UID.Value)
 	}
-	if lang := opt.Language(); lang != "" {
+	if lang := opt.Language.CodeString; lang != "" {
 		fmt.Printf("language    : %s\n", lang)
 	}
 }
 
 // printProvenance prints what the OPT's <description> and <annotations>
 // blocks carry: the template's lifecycle state, who authored it, and any
-// per-path annotations. Both blocks are optional; Description returns nil and
+// per-path annotations. Both blocks are optional; Description is nil and
 // Annotations has no entries when the template omits them.
-func printProvenance(opt *template.OperationalTemplate) {
-	if desc := opt.Description(); desc != nil {
-		if state := desc.LifecycleState(); state != "" {
-			fmt.Printf("lifecycle   : %s\n", state)
+func printProvenance(opt *aom14.OperationalTemplate) {
+	if desc := opt.Description; desc != nil {
+		if desc.LifecycleState != "" {
+			fmt.Printf("lifecycle   : %s\n", desc.LifecycleState)
 		}
-		if authors := desc.OriginalAuthors(); len(authors) > 0 {
-			fmt.Printf("authors     : %v\n", authors)
+		if len(desc.OriginalAuthor) > 0 {
+			fmt.Printf("authors     : %v\n", desc.OriginalAuthor)
 		}
 	}
-	if annotations := opt.Annotations(); len(annotations) > 0 {
-		fmt.Printf("annotations : %d path(s)\n", len(annotations))
+	if len(opt.Annotations) > 0 {
+		fmt.Printf("annotations : %d path(s)\n", len(opt.Annotations))
 	}
 }
 
 // printRoot prints the root node's RM type, node id and archetype id, then
-// its declared attributes with their cardinality and child count.
-func printRoot(opt *template.OperationalTemplate) error {
-	root := opt.Root()
+// the attributes the template declares on it, with their cardinality and
+// child count. The compile also adds each attribute the Reference Model
+// requires and the OPT leaves out; those are implicit and hold no child, so
+// the program names them on one line.
+func printRoot(root *templatecompile.CompiledNode) {
 	fmt.Printf("root        : %s [%s]\n", root.RMTypeName(), root.NodeID())
-
-	// Root returns the tree's Node interface. ObjectNode is the supertype of
-	// the two node kinds a walker can descend into (*ArchetypeRoot and
-	// *ComplexObject), so asserting it gives access to the attributes without
-	// caring which of the two the root is.
-	object, ok := root.(template.ObjectNode)
-	if !ok {
-		return fmt.Errorf("root node is %T, want a template.ObjectNode", root)
-	}
-
-	// Only an archetype root carries an archetype id, and a template's root
-	// always is one.
-	if archetypeRoot, ok := root.(*template.ArchetypeRoot); ok {
-		fmt.Printf("archetype   : %s\n", archetypeRoot.ArchetypeID())
+	// A template's root is an archetype root, so it carries an archetype id.
+	if id := root.ArchetypeID(); id != "" {
+		fmt.Printf("archetype   : %s\n", id)
 	}
 	fmt.Println("attributes  :")
-	for _, attr := range object.Attributes() {
+	var implicit []string
+	for _, attr := range root.Attributes() {
+		if attr.Implicit() {
+			implicit = append(implicit, attr.Name())
+			continue
+		}
 		fmt.Printf("  %s (%s, children=%d)\n", attr.Name(), attr.Cardinality(), len(attr.Children()))
 	}
-	return nil
+	if len(implicit) > 0 {
+		fmt.Printf("implicit    : %s\n", strings.Join(implicit, ", "))
+	}
 }
 
-// resolveContent resolves the path /content, the attribute that holds a
-// COMPOSITION's clinical entries, and then shows what strict resolution adds.
-func resolveContent(opt *template.OperationalTemplate) error {
+// lookUpContent looks up /content, the attribute that holds a COMPOSITION's
+// clinical entries, then shows what strict lookup adds and the predicate
+// that settles it.
+func lookUpContent(compiled *templatecompile.Compiled) error {
 	const path = "/content"
 
-	// ParsePath checks the syntax once, so a malformed path fails before any
-	// lookup happens.
-	parsed, err := opt.ParsePath(path)
+	// ParsePath checks the syntax once and needs no template, so a malformed
+	// path fails before any lookup happens, and the same Path works on every
+	// compiled template.
+	parsed, err := template.ParsePath(path)
 	if err != nil {
 		return fmt.Errorf("parse path %s: %w", path, err)
 	}
 
 	// ValidatePath answers "does this path exist?" without returning the
 	// node, which is all a precondition check needs.
-	if err := opt.ValidatePath(parsed); err != nil {
+	if err := compiled.ValidatePath(parsed); err != nil {
 		return fmt.Errorf("validate path %s: %w", path, err)
 	}
 
-	// NodeAt returns the node. The path has no predicate and /content has
-	// several children in vital_signs.opt, so the default (lenient) mode
-	// picks the first one.
-	node, err := opt.NodeAt(parsed)
+	// Resolve returns the node. The path has no predicate and /content has
+	// several children in vital_signs.opt, so by default the lookup takes
+	// the first one.
+	node, err := compiled.Resolve(parsed)
 	if err != nil {
 		return fmt.Errorf("resolve %s: %w", path, err)
 	}
-	fmt.Printf("NodeAt(%s): %s [%s]", path, node.RMTypeName(), node.NodeID())
-	if archetypeRoot, ok := node.(*template.ArchetypeRoot); ok {
-		fmt.Printf(" archetype=%s", archetypeRoot.ArchetypeID())
+	fmt.Printf("Resolve(%s): %s [%s]", path, node.RMTypeName(), node.NodeID())
+	if id := node.ArchetypeID(); id != "" {
+		fmt.Printf(" archetype=%s", id)
 	}
 	fmt.Println()
 
-	// Strict mode refuses to guess: the same lookup returns ErrAmbiguousPath,
-	// and the caller adds a predicate such as
-	// /content[openEHR-EHR-OBSERVATION.blood_pressure.v1] to say which child
-	// it means. Validators and code generators should prefer this mode. A
-	// template with a single child under /content prints nothing here.
-	switch _, err := opt.NodeAt(parsed, template.WithStrictPaths()); {
+	// Strict lookup refuses to guess: the same lookup returns
+	// ErrAmbiguousPath. Validators and code generators should prefer it. A
+	// template with a single child under /content prints nothing more.
+	switch _, err := compiled.Resolve(parsed, templatecompile.WithStrictPaths()); {
 	case errors.Is(err, template.ErrAmbiguousPath):
-		fmt.Println("strict       : /content is ambiguous (multiple children) — add an [archetype-id] or [at-code] predicate")
+		fmt.Printf("strict      : %s is ambiguous (multiple children)\n", path)
 	case err != nil:
 		return fmt.Errorf("resolve %s strictly: %w", path, err)
+	default:
+		return nil
 	}
+
+	// A predicate says which child the caller means: the archetype id of an
+	// archetype root, otherwise the node's at-code. With it, strict lookup
+	// finds the node.
+	fixed := path + "[" + cmp.Or(node.ArchetypeID(), node.NodeID()) + "]"
+	parsedFixed, err := template.ParsePath(fixed)
+	if err != nil {
+		return fmt.Errorf("parse path %s: %w", fixed, err)
+	}
+	strictNode, err := compiled.Resolve(parsedFixed, templatecompile.WithStrictPaths())
+	if err != nil {
+		return fmt.Errorf("resolve %s strictly: %w", fixed, err)
+	}
+	fmt.Printf("strict      : Resolve(%s): %s [%s]\n", fixed, strictNode.RMTypeName(), strictNode.NodeID())
 	return nil
 }

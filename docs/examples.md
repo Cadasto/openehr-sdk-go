@@ -12,7 +12,7 @@ Each entry says what the program shows, which packages it uses, how to run it, a
 
 A few openEHR terms recur throughout. A **COMPOSITION** is the top-level clinical document. An **OPT** (operational template) is the deployable form of a template: every archetype it uses, flattened into one XML file with the template's constraints applied; it fixes which archetypes, nodes and value constraints a composition may contain. **Canonical JSON** is the openEHR REST wire format for those documents. **AQL** (Archetype Query Language) is the openEHR query language. A **Web Template** is the JSON form of a compiled OPT that form renderers and the FLAT / STRUCTURED simplified formats work from. The **RM floor** is the check against the Reference Model's own rules. The template-driven validators (`validation.ValidateComposition` and its siblings) include it; `validation.ValidateRM` runs it alone, for a root no template applies to.
 
-The examples that read an OPT file parse it with `template.ParseFileStrict`, so a program that validates, builds, generates, exports or lints stops on a template with an unknown node type that has attributes under it, instead of silently dropping that subtree. `template-explore` is the one exception: it parses leniently with `template.ParseFile` by choice, to show the parts of a template it understands. An unknown node type with no attributes under it is still kept as a leaf, without its constraint, in both modes. [opt-parse](#opt-parse) covers both modes and how they differ.
+The examples that read an OPT read it with `aom14.ReadOperationalTemplate` (package `openehr/aom/aom14`) into the operational template model, then compile it with `templatecompile.Compile`. The reader has one mode: it refuses a node type it does not know, so a program that validates, builds, generates, exports or lints stops on such a template instead of silently dropping what lies beneath that node. [opt-parse](#opt-parse) walks the steps from the file to a path lookup.
 
 ---
 
@@ -24,8 +24,8 @@ The Packages column lists the SDK packages each program imports, by short name (
 |---|---|---|---|
 | [canonical_json](#canonical_json) | No | `rm`, `canjson` | Decode canonical JSON → typed `Composition` |
 | [canxml_roundtrip](#canxml_roundtrip) | No | `rm`, `canjson`, `canxml` | JSON ↔ XML cross-format round-trip |
-| [opt-parse](#opt-parse) | No | `template` | Parse an ADL 1.4 OPT, walk paths |
-| [primitive-validate](#primitive-validate) | No | `template`, `constraints` | Single values against one OPT leaf constraint |
+| [opt-parse](#opt-parse) | No | `aom14`, `templatecompile`, `template` | Read and compile an ADL 1.4 OPT, look paths up |
+| [primitive-validate](#primitive-validate) | No | `aom14`, `templatecompile`, `template`, `constraints` | Single values against one OPT leaf constraint |
 | [validate-composition](#validate-composition) | No | `template`, `templatecompile`, `validation`, `rm`, `terminology` | In-memory composition vs the RM and an OPT |
 | [validate-from-json](#validate-from-json) | No | `template`, `templatecompile`, `validation`, `rm` | Wire bytes → decode and validate in one call |
 | [generate-example](#generate-example) | No | `template`, `templatecompile`, `instance`, `canjson`, `rm` | OPT → generated RM instance → JSON |
@@ -108,21 +108,21 @@ The byte counts differ because the fixture is pretty-printed and the SDK's encod
 
 ### opt-parse
 
-**Purpose:** Parse an ADL 1.4 operational template (OPT) and look around inside it: identity, provenance metadata, the root node with its attributes, and path resolution. Nothing here needs a network or a compiled template.
+**Purpose:** Read an ADL 1.4 operational template (OPT), compile it, and look around inside it: identity, provenance metadata, the root node with its attributes, and path lookup. Nothing here needs a network.
 
 ```bash
 go run ./cmd/examples/opt-parse
 go run ./cmd/examples/opt-parse path/to/template.opt
 ```
 
-**Packages:** `openehr/template`
+**Packages:** `openehr/aom/aom14`, `openehr/templatecompile`, `openehr/template`
 
 **Surfaces shown:**
 
-- `ParseFileStrict`, which rejects an unknown node type that has attributes under it, and the lenient `ParseFile`, which keeps such a node as a leaf and silently drops everything beneath it (an unknown node with no attributes under it is a leaf in both modes)
-- `TemplateID`, `Concept`, `UID`, `Language`, `Description`, `Annotations`
-- `Root`, the `ObjectNode` interface a tree walker dispatches on, and `Attributes`
-- `ParsePath`, `ValidatePath`, `NodeAt`, `WithStrictPaths`, `ErrAmbiguousPath`
+- `aom14.ReadOperationalTemplate`, which reads the OPT into the operational template model and refuses a node type it does not know
+- the model's `TemplateID`, `Concept`, `UID`, `Language`, `Description` and `Annotations`
+- `templatecompile.Compile`, `Compiled.Root`, and the `CompiledNode` and `CompiledAttribute` of the compiled tree, declared and implicit attributes alike
+- `template.ParsePath`, `Compiled.ValidatePath`, `Compiled.Resolve`, `templatecompile.WithStrictPaths`, `template.ErrAmbiguousPath`
 
 **Default fixture:** `testkit/corpus/templates/vital_signs.opt`
 
@@ -140,25 +140,27 @@ archetype   : openEHR-EHR-COMPOSITION.encounter.v1
 attributes  :
   category (single, children=1)
   content (multiple, children=4)
-NodeAt(/content): OBSERVATION [at0000] archetype=openEHR-EHR-OBSERVATION.blood_pressure.v1
-strict       : /content is ambiguous (multiple children) — add an [archetype-id] or [at-code] predicate
+implicit    : name, archetype_node_id, language, territory, composer
+Resolve(/content): OBSERVATION [at0000] archetype=openEHR-EHR-OBSERVATION.blood_pressure.v1
+strict      : /content is ambiguous (multiple children)
+strict      : Resolve(/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]): OBSERVATION [at0000]
 ```
 
-The root is the COMPOSITION archetype the template is built on. `content` is the attribute that holds its clinical entries and has four child nodes here. `NodeAt(/content)` in the default (lenient) mode picks the first child; in strict mode the same lookup returns `ErrAmbiguousPath`, and the caller adds a predicate such as `/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]` to say which child it means.
+The identity and provenance lines come from the model; the rest comes from the compiled template. The root is the COMPOSITION archetype the template is built on. `content` is the attribute that holds its clinical entries and has four child nodes here. The `implicit` line names the attributes the Reference Model requires and the OPT leaves out: the compile adds them with no child, and a composition builder fills them. `Resolve(/content)` takes the first child by default. With `WithStrictPaths` the same lookup returns `ErrAmbiguousPath`, and a predicate such as `/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]` says which child the caller means; the program builds that predicate from the child's archetype id and resolves it strictly.
 
-**What to copy into your app:** `template.ParseFileStrict` in a validator that must fail loudly on an unknown node type that has attributes under it; `ParseFile` when forward compatibility matters more, knowing that it drops the subtree under such a node. Call `opt.ParsePath` once per path, then `ValidatePath` for a precondition check or `NodeAt` for the node itself. Validators and code generators should pass `template.WithStrictPaths()` and handle `template.ErrAmbiguousPath` with `errors.Is`, so a path never silently resolves to the wrong child.
+**What to copy into your app:** `aom14.ReadOperationalTemplate` then `templatecompile.Compile`, once per template; reading fails loudly on a node type the reader does not know. Read identity and provenance from the model and the structure from the compiled tree. Call `template.ParsePath` once per path: it needs no template, so the same `Path` works on every compiled template. Then call `Compiled.ValidatePath` for a precondition check or `Compiled.Resolve` for the node itself. Validators and code generators should pass `templatecompile.WithStrictPaths()` and handle `template.ErrAmbiguousPath` with `errors.Is`, so a path never silently resolves to the wrong child.
 
 ---
 
 ### primitive-validate
 
-**Purpose:** Validate single values (a `DV_QUANTITY` magnitude and units) against one leaf constraint of an OPT, without compiling the template or building a composition. The embedded OPT constrains a DV_QUANTITY to a magnitude of 0..300 in `mm[Hg]`; the program resolves that leaf by path and checks three values against it, two of which fail on purpose.
+**Purpose:** Validate single values (a `DV_QUANTITY` magnitude and units) against one leaf constraint of an OPT, without building a composition. The embedded OPT constrains a DV_QUANTITY to a magnitude of 0..300 in `mm[Hg]`; the program reads it with `aom14.ReadOperationalTemplate`, compiles it with `templatecompile.Compile`, resolves that leaf by path in the compiled template and checks three values against it, two of which fail on purpose.
 
 ```bash
 go run ./cmd/examples/primitive-validate
 ```
 
-**Packages:** `openehr/template`, `openehr/template/constraints`
+**Packages:** `openehr/aom/aom14`, `openehr/templatecompile`, `openehr/template`, `openehr/template/constraints`
 
 **Fixture:** none; the minimal OPT is embedded in the program.
 
@@ -177,7 +179,7 @@ summary     : 2/3 cases failed validation (expected for demo)
 
 Each violation carries a `Code`, the stable identifier a program branches on, and a `Detail`, the explanation for people. `Detail` names the clause that failed and never repeats the submitted value, so it is safe to log or return to a client. The value sits in `Value`, which prints as `[redacted]` whenever it holds one; `Value.Reveal()` returns the value itself, and the demo calls it on its own input to print the `(submitted: …)` part.
 
-**What to copy into your app:** resolve the leaf with `opt.ParsePath` and `opt.NodeAt`, assert `*template.ComplexObject`, and read its `PrimitiveConstraint()` (nil on a structural node). `constraint.Validate(constraints.QuantityValue{Magnitude: m, Units: u})` returns nil when every clause holds, otherwise one `Violation` per failed clause. Use this for field-level checks in a form; use the composition validators when you hold a whole document.
+**What to copy into your app:** read the OPT with `aom14.ReadOperationalTemplate` and compile it with `templatecompile.Compile`, resolve the leaf with `template.ParsePath` and `Compiled.Resolve`, and read the node's `PrimitiveConstraint()` (nil on a structural node). `constraint.Validate(constraints.QuantityValue{Magnitude: m, Units: u})` returns nil when every clause holds, otherwise one `Violation` per failed clause. Use this for field-level checks in a form; use the composition validators when you hold a whole document.
 
 ---
 
