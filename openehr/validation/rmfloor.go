@@ -679,14 +679,16 @@ func (f *findings) checkElementNullFlavour(value any, path issuePath) {
 // of two classes, two DV_QUANTITY in different units, two DV_PROPORTION of
 // different types: [notStrictlyComparable]) breaks the rule whatever its
 // order, and is reported once, with no Value. A strictly comparable pair
-// MUST have lower ≤ upper by the RM's less_than for its type, except that two
-// times or date-times in different time zones are ordered as instants
-// ([orderBounds]). A strictly comparable pair the floor has no order for,
-// such as a time or date-time with a zone against one without, is not
+// MUST have lower ≤ upper in the order [orderBounds] gives: the RM's
+// less_than for its type, except that two dates, or two times or date-times
+// written with one zone designator or none, are compared at the precision
+// they share, and two times or date-times in different time zones are
+// ordered as instants. A strictly comparable pair the floor has no order
+// for, such as a time or date-time with a zone against one without, is not
 // reported.
 //
 // Each Detail names the rule and the type of the bounds, never the bounds;
-// for an out-of-order pair the two compared magnitudes are carried in
+// for an out-of-order pair the two bounds' magnitudes are carried in
 // Issue.Value, lower first, as a [2]float64 (REQ-168), each in UTC for two
 // values ordered as instants. rmType is the node's RM type, which the flag
 // check names. Interval.Limits_comparable, which BASE declares and

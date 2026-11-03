@@ -1087,7 +1087,7 @@ On an `Issue` from the instance validators, `Value` **MUST** hold what this tabl
 | `rm_invariant` on a `DV_PROPORTION` `type` that is not a proportion kind (`Type_validity`) | the type |
 | `rm_invariant` on a `DV_PROPORTION` `denominator` its kind rejects, or of 0 (`Unitary_validity`, `Percent_validity`, `Valid_denominator`) | the denominator |
 | `rm_invariant` on a fraction or integer-fraction `DV_PROPORTION` with a fractional operand (`Fraction_validity`) | the numerator and the denominator, as a `[2]float64` |
-| `rm_invariant` on a `DV_INTERVAL` whose lower bound is above its upper bound | the two compared magnitudes, lower first, as a `[2]float64` |
+| `rm_invariant` on a `DV_INTERVAL` whose lower bound is above its upper bound | the two bounds' magnitudes, lower first, as a `[2]float64` |
 | `rm_invariant` on a temporal `value` (`Value_valid`) | the `value` string |
 | `term_mapping_match` | the `match` |
 | `invalid_shape` from a failed decode | the decode error, which carries the literal through unwrapping where one of its causes records it, as a `*json.SemanticError` or a `*strconv.NumError` does ([wire.md § REQ-052](wire.md#req-052)) |
