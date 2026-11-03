@@ -422,7 +422,11 @@ func probe111SameText(in, out string) bool {
 }
 
 // probe111Diff returns the first difference between in and out, the
-// element at path here; "" when they agree.
+// element at path here; "" when they agree. An `xsi:type` on in that out
+// carries none is set aside: the encoder writes no `xsi:type` where the
+// element's slot holds a single class, so a redundant one the input wrote is
+// no lost content (REQ-176 § Round trip). An `xsi:type` out carries with
+// another value, or one out adds, still differs.
 func probe111Diff(in, out *probe111Element, here string) string {
 	if in.name != out.name {
 		return fmt.Sprintf("%s: the re-encoded document has %s there", here, out.name.Local)
@@ -446,6 +450,8 @@ func probe111Diff(in, out *probe111Element, here string) string {
 		iv, inHas := in.attrs[n]
 		ov, outHas := out.attrs[n]
 		switch {
+		case !outHas && n == probe111XSIType:
+			// Set aside: the element's slot holds a single class.
 		case !outHas:
 			return fmt.Sprintf("%s/@%s: absent from the re-encoded document", here, n.Local)
 		case !inHas:

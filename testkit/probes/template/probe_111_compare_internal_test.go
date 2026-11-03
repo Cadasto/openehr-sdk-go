@@ -134,10 +134,28 @@ func TestProbe111CompareDocuments(t *testing.T) {
 			reEncoded: probe111Doc("", `<concept>at0000</concept>`),
 		},
 		{
-			name:      "an xsi:type below the root still compares",
+			name:      "an xsi:type the encoder does not write is set aside",
 			input:     probe111Doc("", `<definition xsi:type="C_ARCHETYPE_ROOT"/>`),
 			reEncoded: probe111Doc("", `<definition/>`),
-			want:      `/template[1]/definition[1]/@type: absent from the re-encoded document`,
+		},
+		{
+			name:      "an xsi:type below the root re-encoded as another class differs",
+			input:     probe111Doc("", `<definition xsi:type="C_ARCHETYPE_ROOT"/>`),
+			reEncoded: probe111Doc("", `<definition xsi:type="C_COMPLEX_OBJECT"/>`),
+			want: `/template[1]/definition[1]/@type: "{http://schemas.openehr.org/v1}C_ARCHETYPE_ROOT", ` +
+				`re-encoded as "{http://schemas.openehr.org/v1}C_COMPLEX_OBJECT"`,
+		},
+		{
+			name:      "an xsi:type the re-encoded document adds below the root differs",
+			input:     probe111Doc("", `<definition/>`),
+			reEncoded: probe111Doc("", `<definition xsi:type="C_ARCHETYPE_ROOT"/>`),
+			want:      `/template[1]/definition[1]/@type: the re-encoded document adds "{http://schemas.openehr.org/v1}C_ARCHETYPE_ROOT"`,
+		},
+		{
+			name:      "an attribute other than xsi:type absent from the re-encoded document differs",
+			input:     probe111Doc("", `<term_definitions code="at0000" language="en"/>`),
+			reEncoded: probe111Doc("", `<term_definitions code="at0000"/>`),
+			want:      `/template[1]/term_definitions[1]/@language: absent from the re-encoded document`,
 		},
 		{
 			name: "the encoder's rewrites set aside on the input",
