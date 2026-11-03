@@ -243,7 +243,8 @@ func parseComplexType(file string, n *xsdNode) (*xsdType, error) {
 // xs:simpleContent or xs:complexContent, holds: its base, its particle and
 // its attributes. An extension adds them to its base's; a restriction
 // restates the content it keeps, and its base's attributes are not read
-// through it ([xsdSet.attributesOf]).
+// through it ([xsdSet.attributesOf]). An xs:attributeGroup fails in either,
+// and so does an xs:anyAttribute in a restriction.
 func (t *xsdType) parseDerivation(c *xsdNode) error {
 	for j := range c.Children {
 		d := &c.Children[j]
@@ -269,10 +270,17 @@ func (t *xsdType) parseDerivation(c *xsdNode) error {
 			t.restricts = schemaLocalName(d.attr("base"))
 			t.content = particleOf(d)
 			for k := range d.Children {
-				if e := &d.Children[k]; e.is("attribute") {
+				e := &d.Children[k]
+				switch {
+				case e.is("attribute"):
 					if err := t.addAttribute(e); err != nil {
 						return err
 					}
+				case e.is("attributeGroup"), e.is("anyAttribute"):
+					// A restriction of a built-in type inherits nothing for
+					// attributesOf to refuse, so the group the reader does
+					// not expand, or the wildcard, is refused here.
+					return fmt.Errorf("its-xml: %s: type %s: unexpected xs:%s in xs:restriction", t.file, t.name, e.XMLName.Local)
 				}
 			}
 		default:

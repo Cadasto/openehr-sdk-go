@@ -337,10 +337,11 @@ func TestXSDAttributesOfVendoredTypes(t *testing.T) {
 
 // TestXSDAttributesRefuses pins each declaration the attribute reader refuses
 // rather than read into a wrong attribute set: an attribute group, which it
-// does not expand, an attribute with no name, and a type two files declare
-// with different attributes; a simple-content base that is declared nowhere;
-// and a restriction of a declared type, whose inherited attributes it does
-// not work out.
+// does not expand, on a type, in an extension or in a restriction; an
+// attribute wildcard in a restriction; an attribute with no name; and a type
+// two files declare with different attributes; a simple-content base that is
+// declared nowhere; and a restriction of a declared type, whose inherited
+// attributes it does not work out.
 //
 // REQ-056: the attributes the codec writes are the ones the schema declares.
 func TestXSDAttributesRefuses(t *testing.T) {
@@ -364,6 +365,20 @@ func TestXSDAttributesRefuses(t *testing.T) {
 				`<xs:complexType name="B"><xs:sequence/></xs:complexType>` +
 					`<xs:complexType name="A"><xs:complexContent><xs:extension base="B"><xs:attributeGroup ref="G"/></xs:extension></xs:complexContent></xs:complexType>`)},
 			wantErr: "unexpected xs:attributeGroup",
+		},
+		{
+			// A built-in base leaves the type nothing to inherit, so only
+			// the parse can refuse the group.
+			name: "an attribute group in a restriction of a built-in type",
+			files: map[string]string{"s/a.xsd": xsdDoc(
+				`<xs:complexType name="A"><xs:complexContent><xs:restriction base="xs:anyType"><xs:sequence/><xs:attributeGroup ref="G"/></xs:restriction></xs:complexContent></xs:complexType>`)},
+			wantErr: "unexpected xs:attributeGroup in xs:restriction",
+		},
+		{
+			name: "an attribute wildcard in a restriction of a built-in type",
+			files: map[string]string{"s/a.xsd": xsdDoc(
+				`<xs:complexType name="A"><xs:complexContent><xs:restriction base="xs:anyType"><xs:sequence/><xs:anyAttribute/></xs:restriction></xs:complexContent></xs:complexType>`)},
+			wantErr: "unexpected xs:anyAttribute in xs:restriction",
 		},
 		{
 			name: "an attribute with no name",
