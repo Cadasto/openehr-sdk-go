@@ -9,6 +9,7 @@ import (
 	json "encoding/json/v2"
 	"errors"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -186,6 +187,40 @@ func TestREQ176_REQ052_JSONRefusalsKeepTheirText(t *testing.T) {
 				t.Errorf("canjson.Unmarshal(%s) = %q; it carries %q", tc.json, got, tc.absent)
 			}
 		})
+	}
+}
+
+// TestREQ176_REQ052_DecimalItemHasNoExponent pins that a typed item's JSON
+// number follows the XML Schema built-in its Type names, not only the BMM
+// primitive the built-in reads as: an `xs:decimal` item, a Real, is a decimal
+// with no exponent, so `1e3` is refused with strconv.ErrSyntax, while an
+// `xs:float` item, a Real too, and an `xs:double` item keep theirs.
+func TestREQ176_REQ052_DecimalItemHasNoExponent(t *testing.T) {
+	for _, tc := range []struct {
+		typ, value string
+		want       string // the JSON written; "" for a refusal
+	}{
+		{"xs:decimal", "2.50", `{"_type":"Real","value":2.50}`},
+		{"xs:decimal", "-.5", `{"_type":"Real","value":-0.5}`},
+		{"xs:decimal", "1e3", ""},
+		{"xs:decimal", "1E3", ""},
+		{"xs:decimal", " 2.5e-1\n", ""},
+		{"xsd:decimal", "1e3", ""},
+		{"xs:float", "1e3", `{"_type":"Real","value":1e3}`},
+		{"xs:double", "1e3", `{"_type":"Double","value":1e3}`},
+		{"xs:double", "1.E3", `{"_type":"Double","value":1E3}`},
+	} {
+		item := xmlschema.TypedString{Type: tc.typ, Value: tc.value}
+		got, err := json.Marshal(item)
+		if tc.want == "" {
+			if !errors.Is(err, strconv.ErrSyntax) {
+				t.Errorf("json.Marshal(%#v) = %s, %v; want a refusal wrapping strconv.ErrSyntax", item, got, err)
+			}
+			continue
+		}
+		if err != nil || string(got) != tc.want {
+			t.Errorf("json.Marshal(%#v) = %s, %v; want %s, nil", item, got, err, tc.want)
+		}
 	}
 }
 

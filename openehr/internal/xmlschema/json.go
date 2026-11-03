@@ -22,10 +22,12 @@ import (
 // string. A Boolean writes `true` or `1` as true and `false` or `0` as false,
 // XML white space around the text removed as XML Schema reads a boolean. An
 // Integer or an Integer64 writes a JSON integer, a whole number of 32 or 64
-// bits. A Real or a Double writes the text itself as a JSON number, an XML
-// Schema decimal or floating-point literal in the float64 range, so the number
-// written has the text's value exactly, digits a float64 would not keep
-// included: XML white space around the text is removed, and the text is
+// bits. A Real or a Double writes the text itself as a JSON number, a literal
+// of the XML Schema built-in Type names in the float64 range, a decimal with
+// no exponent for `decimal` and a floating-point literal for `float` and
+// `double`, so the number written has the text's value exactly, digits a
+// float64 would not keep included: XML white space around the text is
+// removed, and the text is
 // rewritten only where JSON's number grammar differs from XML Schema's, a
 // leading `+` and leading zeros dropped, `0` written before a leading decimal
 // point and a trailing one dropped, so `+.5` is written `0.5` and `1.E3`
@@ -34,15 +36,17 @@ import (
 //
 // A Type that is no prefixed XML Schema built-in datatype is refused, as the
 // XML encoder refuses it ([TypedString.MarshalXML]), and so is text the
-// primitive does not read, such as a Boolean written `yes`, an
-// Integer out of range or a Double written `INF`, which a JSON number cannot
-// hold. Neither refusal quotes the text.
+// built-in does not read, such as a Boolean written `yes`, an Integer out of
+// range, an `xs:decimal` written with an exponent, such as `1e3`, or a Double
+// written `INF`, which a JSON number cannot hold. Neither refusal quotes the
+// text.
 func (s TypedString) MarshalJSONTo(enc *jsontext.Encoder) error {
 	primitive, ok := typedPrimitive(s.Type)
 	if !ok {
 		return errTypedType
 	}
-	value, number, err := jsonValue(primitive, s.Value)
+	_, builtin, _ := strings.Cut(s.Type, ":")
+	value, number, err := jsonValue(primitive, builtin, s.Value)
 	if err != nil {
 		return err
 	}
@@ -124,11 +128,12 @@ func readsAsName(s string) bool {
 // or a number: space, tab, carriage return and line feed.
 const xmlSpace = " \t\r\n"
 
-// jsonValue returns text, the text of a typed item whose type reads as
-// primitive, as the JSON value [TypedString.MarshalJSONTo] writes for it: the
-// token value, or for a Real or a Double the JSON number in number, or the
-// refusal of text primitive does not read.
-func jsonValue(primitive, text string) (value jsontext.Token, number jsontext.Value, err error) {
+// jsonValue returns text, the text of a typed item whose type, the XML
+// Schema built-in named builtin, reads as primitive, as the JSON value
+// [TypedString.MarshalJSONTo] writes for it: the token value, or for a Real or
+// a Double the JSON number in number, or the refusal of text the built-in does
+// not read.
+func jsonValue(primitive, builtin, text string) (value jsontext.Token, number jsontext.Value, err error) {
 	switch primitive {
 	case "Boolean":
 		switch strings.Trim(text, xmlSpace) {
@@ -149,22 +154,22 @@ func jsonValue(primitive, text string) (value jsontext.Token, number jsontext.Va
 		}
 		return jsontext.Int(n), nil, nil
 	case "Real", "Double":
-		number, err := jsonNumber(primitive, text)
+		number, err := jsonNumber(primitive, builtin, text)
 		return jsontext.Token{}, number, err
 	}
 	return jsontext.String(text), nil, nil
 }
 
-// jsonNumber returns text, the text of a typed item whose type reads as
-// primitive, a Real or a Double, as the JSON number
-// [TypedString.MarshalJSONTo] writes for it, or the refusal of text primitive
-// does not read.
-func jsonNumber(primitive, text string) (jsontext.Value, error) {
+// jsonNumber returns text, the text of a typed item whose type, the XML
+// Schema built-in named builtin, reads as primitive, a Real or a Double, as
+// the JSON number [TypedString.MarshalJSONTo] writes for it, or the refusal of
+// text the built-in does not read.
+func jsonNumber(primitive, builtin, text string) (jsontext.Value, error) {
 	s := strings.Trim(text, xmlSpace)
 	switch {
 	case s == "INF" || s == "+INF" || s == "-INF" || s == "NaN":
 		return nil, fmt.Errorf("the text of a typed item is no finite %s, which canonical JSON cannot write", primitive)
-	case !isDecimal(s):
+	case !isDecimal(builtin, s):
 		return nil, textRefusal(primitive, strconv.ErrSyntax)
 	}
 	// The float64 refuses a literal beyond its range, which canonical JSON
@@ -221,13 +226,17 @@ func numCause(err error) error {
 	return err
 }
 
-// isDecimal reports whether s is a decimal number as XML Schema writes a
-// float or a double, its special values aside: an optional sign, digits with
-// at most one decimal point, and an optional exponent of an optional sign and
-// digits.
-func isDecimal(s string) bool {
+// isDecimal reports whether s is a decimal number as XML Schema writes one
+// of the built-in named builtin, `decimal`, `float` or `double`, the special
+// values of the last two aside: an optional sign, digits with at most one
+// decimal point, and, for a `float` or a `double`, an optional exponent of an
+// optional sign and digits. A `decimal` has no exponent.
+func isDecimal(builtin, s string) bool {
 	mant, exp, hasExp := s, "", false
 	if k := strings.IndexAny(s, "eE"); k >= 0 {
+		if builtin == "decimal" {
+			return false
+		}
 		mant, exp, hasExp = s[:k], s[k+1:], true
 	}
 	intPart, frac, _ := strings.Cut(trimSign(mant), ".")
