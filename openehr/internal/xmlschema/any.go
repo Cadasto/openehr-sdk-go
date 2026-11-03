@@ -10,13 +10,20 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// TypedString is a String a BMM `Any` member holds where its canonical XML
+// TypedString is the value a BMM `Any` member holds where its canonical XML
 // gives it an XML Schema built-in datatype, such as the AOM 1.4
 // `<item xsi:type="xs:string">archetype_id/value</item>` of an EXPR_LEAF:
 // Value is the element's text, and Type the `xsi:type` as written, its prefix
-// included, such as `xs:string` or `xsd:string`, which the encoder writes
+// included, such as `xs:string` or `xsd:string`, which the XML encoder writes
 // back, declaring the prefix it uses bound to the XML Schema namespace. An
 // item with no `xsi:type` holds its text as a plain Go string instead.
+//
+// Canonical JSON writes it as an object whose `_type` is the BMM primitive
+// the built-in reads as and whose `value` is the text as that primitive's
+// JSON value ([TypedString.MarshalJSONTo]). It keeps neither the prefix nor
+// which of the primitive's built-ins Type names, so a TypedString decoded from
+// JSON has Type `xsd:` and one built-in per primitive, `xsd:string` for a
+// String.
 type TypedString struct {
 	// Value is the text of the element.
 	Value string
@@ -30,7 +37,7 @@ type TypedString struct {
 // namespace. A Type that is no prefixed XML Schema built-in datatype, which
 // would not read back as one, is refused with xmlunmatched.ErrInvalidShape.
 func (s TypedString) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
-	if !isTypedStringType(s.Type) {
+	if _, ok := typedPrimitive(s.Type); !ok {
 		return fmt.Errorf("%w: the xsi:type of a typed string is no prefixed XML Schema built-in datatype", xmlunmatched.ErrInvalidShape)
 	}
 	prefix, _, _ := strings.Cut(s.Type, ":")

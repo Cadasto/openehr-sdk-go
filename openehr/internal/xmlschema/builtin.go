@@ -53,3 +53,21 @@ func Builtin(local string) (string, bool) {
 	name, ok := builtins[local]
 	return name, ok
 }
+
+// canonicalBuiltins maps each BMM primitive an XML Schema built-in datatype
+// reads as ([Builtin]) to the one built-in a typed item decoded from canonical
+// JSON is given, since canonical JSON keeps the primitive and not the
+// built-in.
+var canonicalBuiltins = map[string]string{
+	"String":            "string",
+	"Uri":               "anyURI",
+	"Boolean":           "boolean",
+	"Integer":           "int",
+	"Integer64":         "long",
+	"Real":              "float",
+	"Double":            "double",
+	"Iso8601_date":      "date",
+	"Iso8601_time":      "time",
+	"Iso8601_date_time": "dateTime",
+	"Iso8601_duration":  "duration",
+}

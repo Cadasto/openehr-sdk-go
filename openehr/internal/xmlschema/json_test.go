@@ -9,6 +9,7 @@ import (
 	json "encoding/json/v2"
 	"errors"
 	"reflect"
+	"sync"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlschema"
@@ -17,16 +18,21 @@ import (
 )
 
 // TestREQ176_REQ052_AnyJSONDecoders pins what the two decoders store for each
-// JSON value an `Any` member holds: a class value for an object with a
-// `_type`, a *TypedString for an object without one, a Go string for a string,
-// and nothing for null, the optional member's pointer left nil.
+// JSON value an `Any` member holds: a class value for an object whose `_type`
+// names a class, a *TypedString of the `xsd:` built-in canonical for the
+// primitive an object's `_type` names, whether `_type` comes first or not, a
+// Go string for a string, and nothing for null, the optional member's pointer
+// left nil.
 func TestREQ176_REQ052_AnyJSONDecoders(t *testing.T) {
 	for _, tc := range []struct {
 		json string
 		want any
 	}{
 		{`{"_type":"DV_BOOLEAN","value":true}`, &rm.DVBoolean{Value: true}},
-		{`{"value":"a","xsi_type":"xs:string"}`, &xmlschema.TypedString{Value: "a", Type: "xs:string"}},
+		{`{"value":true,"_type":"DV_BOOLEAN"}`, &rm.DVBoolean{Value: true}},
+		{`{"_type":"String","value":"a"}`, &xmlschema.TypedString{Value: "a", Type: "xsd:string"}},
+		{`{"value":"a","_type":"String"}`, &xmlschema.TypedString{Value: "a", Type: "xsd:string"}},
+		{` { "_type" : "Boolean" , "value" : false } `, &xmlschema.TypedString{Value: "false", Type: "xsd:boolean"}},
 		{`"a"`, "a"},
 		{`null`, nil},
 	} {
@@ -105,5 +111,32 @@ func TestREQ176_REQ052_ChoiceJSONDecoders(t *testing.T) {
 	err := json.Unmarshal([]byte(`{"x":{"_type":"DV_TEXT","value":"a"}}`), &w, typereg.Unmarshalers())
 	if !errors.Is(err, typereg.ErrTypeMismatch) {
 		t.Errorf("ChoiceJSON(a class none of the shapes) = %v; want typereg.ErrTypeMismatch", err)
+	}
+}
+
+// registerUriClass registers a class under the name of the BMM primitive Uri,
+// once per test binary, so that a test can tell whether a decoder asks the
+// type registry before it reads a primitive's `_type` as a typed item.
+var registerUriClass = sync.OnceFunc(func() {
+	typereg.Default.Register("Uri", func() any { return new(rm.DVURI) })
+})
+
+// TestREQ176_REQ052_AnyJSONReadsAPrimitiveBeforeTheRegistry pins the order of
+// the `Any` member's decode: an object whose `_type` names a BMM primitive an
+// XML Schema built-in reads as is a typed item even when the type registry
+// holds a class of that name, whether `_type` comes first or not.
+func TestREQ176_REQ052_AnyJSONReadsAPrimitiveBeforeTheRegistry(t *testing.T) {
+	registerUriClass()
+	for _, in := range []string{`{"_type":"Uri","value":"http://example.org/a"}`, `{"value":"http://example.org/a","_type":"Uri"}`} {
+		var v any
+		w := struct {
+			X xmlschema.AnyJSON `json:"x"`
+		}{X: xmlschema.AnyJSON{To: &v}}
+		if err := json.Unmarshal([]byte(`{"x":`+in+`}`), &w, typereg.Unmarshalers()); err != nil {
+			t.Fatalf("AnyJSON(%s) = %v", in, err)
+		}
+		if want := (&xmlschema.TypedString{Value: "http://example.org/a", Type: "xsd:anyURI"}); !reflect.DeepEqual(v, want) {
+			t.Errorf("AnyJSON(%s) stored %#v; want %#v", in, v, want)
+		}
 	}
 }

@@ -22,7 +22,14 @@ type (
 // as a plain Go string, and one whose `xsi:type` names a class, such as
 // `C_STRING`, a pointer to a value of the class, such as a *[CString].
 //
-// In canonical JSON a TypedString is an object holding its Value and Type,
-// `{"value":"archetype_id/value","xsi_type":"xs:string"}`, with no `_type`;
-// a plain string is a JSON string, and a class value carries its `_type`.
+// In canonical JSON a TypedString is an object whose `_type` is the BMM
+// primitive its Type reads as and whose `value` is its text as that
+// primitive's JSON value, `{"_type":"String","value":"archetype_id/value"}`
+// for an `xs:string` item, a JSON boolean for an `xs:boolean` one and a JSON
+// number for an `xs:int` or an `xs:double` one; a plain string is a JSON
+// string, and a class value carries its `_type`. The JSON keeps neither the
+// prefix nor which of the primitive's built-ins Type names: decode gives Type
+// as `xsd:` and one built-in per primitive, so an `xs:string` item comes back
+// as `xsd:string`, the same XML Schema type, and an `xs:decimal` one as
+// `xsd:float`.
 type TypedString = xmlschema.TypedString
