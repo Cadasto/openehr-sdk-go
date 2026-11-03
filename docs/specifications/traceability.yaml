@@ -2637,8 +2637,8 @@ requirements:
     title: ADL 1.4 operational template model
     canonical: docs/specifications/clinical-modeling.md#req-176--adl-14-operational-template-model
     status: draft
-    implementation: planned
-    packages: [openehr/aom/aom14, internal/bmmgen, resources/bmm, openehr/serialize/canxml]
+    implementation: landed
+    packages: [openehr/aom/aom14, internal/bmmgen, resources/bmm, openehr/serialize/canxml, openehr/serialize/canjson, openehr/internal/xmlschema, openehr/internal/xmlunmatched, testkit/probes/template]
     probes: [PROBE-111]
     tests:
       - internal/bmmgen/itsxml_test.go
