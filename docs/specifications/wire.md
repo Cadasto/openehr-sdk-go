@@ -749,7 +749,15 @@ The codes and rubrics are the pinned openEHR terminology's ([§ REQ-034](rm-mode
 - The builder **MUST** accept only the four versionable types the submission shape admits: `COMPOSITION`, `EHR_STATUS`, `FOLDER` and `EHR_ACCESS`.
 - A builder holding no versions **MUST** fail at `Build`: the pin requires a non-empty `versions` array.
 
-**Out of scope for v1:** `IMPORTED_VERSION` authoring beyond the landed pass-through wrapper, multi-EHR batching, and checkpoint/resume — the seeder's responsibility per [use-cases.md](use-cases.md#synthetic-data-seeder).
+**Decoding a submission.** A caller who receives a contribution as one document, authored elsewhere, commits it as the batch it describes. `contribution.UnmarshalSubmission(data, opts...)` **MUST** decode a canonical-JSON `Contribution_create` body into a `*Submission`, the dual of `Submission.MarshalJSON`:
+
+- The batch `audit` and each version's `commit_audit` **MUST** decode as the write-side commit audit from a `_type` of `AUDIT_DETAILS` or `UPDATE_AUDIT`, or from an omitted `_type`, the three forms the pin asks a server to accept, and keep the audit type they were read with, so an omitted one encodes back as the default.
+- Each `versions[]` element **MUST** decode as the `ORIGINAL_VERSION` or `IMPORTED_VERSION` wrapper its `_type` names, its payload type chosen by the `_type` of its `data` (of `item.data` for an `IMPORTED_VERSION`) among the four of § *Builder contract*; an element with no `_type` **MAY** be read as an `ORIGINAL_VERSION`. An element with no `data`, the deletion § *Deletion* builds, decodes with no payload.
+- The decoded submission **MUST** pass `Validate`, or the decode fails with its error, and encoding it **MUST** give what `MarshalJSON` writes for the same submission.
+- A body the decoder cannot place **MUST** fail as a `*canjson.DecodeError` ([§ REQ-052](#req-052)) whose path is the JSON Pointer of the offending member: a body that is not a JSON object, an absent or empty `versions`, a version `_type` other than the two, an audit `_type` other than the three, and a `data` whose `_type` is absent or names a type outside the four.
+- The `canjson` decode options `opts` **SHOULD** govern every value the decoder reads, with pointers from the root of the body ([§ REQ-170](#req-170--unmatched-content-on-decode), [§ REQ-175](#req-175--missing-members-on-decode)). A member the write-side shape leaves out by design, `time_committed` (§ *Audit*) and `uid` and `contribution` (§ *Server-assigned fields*), is not missing.
+
+**Out of scope for v1:** `IMPORTED_VERSION` authoring beyond the landed pass-through wrapper, multi-EHR batching, checkpoint/resume — the seeder's responsibility per [use-cases.md](use-cases.md#synthetic-data-seeder) — and decoding a canonical-XML submission.
 
 ## Transport cross-cutting concerns
 
