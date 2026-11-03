@@ -199,6 +199,47 @@ func TestREQ108_XMLNoMaxDepthWithoutALimit(t *testing.T) {
 	}
 }
 
+// TestREQ108_XMLMaxDepthTheSmallerLimitWins pins that, given more than one
+// canxml.WithMaxDepth, a decode keeps the smallest positive limit, in either
+// order, and that an n <= 0 neither sets a limit nor lifts one already given.
+// A document nested well past every limit is refused at the element one past
+// the limit that holds.
+//
+// Can-fail control: keep the last WithMaxDepth given, as it once did, or let
+// a non-positive n clear the limit, and the cases that give the larger or the
+// non-positive option last fail.
+func TestREQ108_XMLMaxDepthTheSmallerLimitWins(t *testing.T) {
+	in := nestedClusters(8, "")
+	for _, tc := range []struct {
+		name   string
+		limits []int
+		want   int // the limit that holds
+	}{
+		{"the smaller first", []int{3, 5}, 3},
+		{"the smaller last", []int{5, 3}, 3},
+		{"equal limits", []int{4, 4}, 4},
+		{"three, the smallest in the middle", []int{5, 3, 4}, 3},
+		{"a limit, then none", []int{3, 0}, 3},
+		{"none, then a limit", []int{0, 3}, 3},
+		{"a limit, then a negative one", []int{3, -1}, 3},
+		{"a negative one, then a limit", []int{-1, 3}, 3},
+	} {
+		opts := make([]canxml.DecoderOption, len(tc.limits))
+		for i, n := range tc.limits {
+			opts[i] = canxml.WithMaxDepth(n)
+		}
+		decode := map[string]func() error{
+			"Unmarshal": func() error { return canxml.Unmarshal(in, new(rm.ItemTree), opts...) },
+			"Decoder": func() error {
+				return canxml.NewDecoder(streamReaders["whole"](in), opts...).Decode(new(rm.ItemTree))
+			},
+		}
+		for mode, run := range decode {
+			checkDepthRefusal(t, fmt.Sprintf("%s, %s %v", mode, tc.name, tc.limits), run(), clusterPath(tc.want+1), tc.want+1, tc.want)
+		}
+	}
+}
+
 // prefixSlot returns an ARCHETYPE_SLOT whose include's left operand declares
 // the `xs` prefix that its item's `xsi:type` uses, so that a decode given no
 // option stops at the item and decodes the slot a second time, from its

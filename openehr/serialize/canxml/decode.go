@@ -163,11 +163,17 @@ func WithStrict() DecoderOption {
 // A [Decoder] that refuses an element returns the same refusal from every
 // later Decode, since its stream stands inside that element.
 //
-// n <= 0 sets no limit, as leaving the option out does. Following the
-// elements costs a decode some time, as [WithUnmatched] does; a decode
-// without a limit pays nothing for it.
+// n <= 0 sets no limit, as leaving the option out does, and does not lift a
+// limit another WithMaxDepth gave. Given more than one, the smallest positive
+// n holds, in whatever order they come. Following the elements costs a decode
+// some time, as [WithUnmatched] does; a decode without a limit pays nothing
+// for it.
 func WithMaxDepth(n int) DecoderOption {
-	return func(c *decoderConfig) { c.maxDepth = max(n, 0) }
+	return func(c *decoderConfig) {
+		if n > 0 && (c.maxDepth == 0 || n < c.maxDepth) {
+			c.maxDepth = n
+		}
+	}
 }
 
 // WithRelaxedTypeDispatch toggles the polymorphic-dispatch policy
