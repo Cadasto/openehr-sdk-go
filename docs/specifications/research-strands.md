@@ -355,7 +355,7 @@ Three candidates are named and none is built:
 
 **Evidence needed:** the decode cost of the generated model on the corpus against `ParseOPT`'s, on the compile benchmarks; which consumers need what the parser loses; and whether the parser's tolerances can be stated on the model without weakening [REQ-170](wire.md#req-170--unmatched-content-on-decode).
 
-**Resolution form:** an ADR amending REQ-100 and, for the second option, REQ-013.
+**Resolution:** [ADR 0035](../adr/0035-compile-step-reads-operational-template-model.md) amends REQ-176 now, and REQ-100, REQ-108, REQ-111 and REQ-013's `openehr/template` row when the compile step reads the model.
 
 **Affects:** REQ-013, REQ-100, REQ-108, REQ-111, REQ-176.
 
