@@ -187,7 +187,7 @@ func marshalXMLChoice(recv, field, elem string, c *xmlChoice, mandatory bool) st
 	indent := "\t"
 	if !mandatory {
 		fmt.Fprintf(&b, "\tif %s != nil {\n", value)
-		value = "*" + value
+		value = "(*" + value + ")"
 		indent = "\t\t"
 	}
 	encode := func(s xmlChoiceShape, v string) {

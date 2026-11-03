@@ -3,9 +3,11 @@ package bmmgen
 // REQ-176 § Shapes, REQ-056: the encoder of a choice member leaves out, when
 // empty, a mandatory member of a shape that the schema type of the member's
 // element makes optional, such as the `value` of the DV_CODED_TEXT shape of
-// ORDINAL.symbol.
+// ORDINAL.symbol, and is Go source for an optional member as for a mandatory
+// one.
 
 import (
+	"go/format"
 	"slices"
 	"strings"
 	"testing"
@@ -95,6 +97,25 @@ func TestChoice_REQ176_EmptySymbolValueIsLeftOut(t *testing.T) {
 		}
 		if control := encoder(t, planWithoutSchemas(t, TargetAOM14), recv); strings.Contains(control, "EncodeElementOmittingEmpty") {
 			t.Errorf("%s MarshalXML built without the schemas leaves a member out:\n%s", recv, control)
+		}
+	}
+}
+
+// TestREQ176_REQ056_OptionalChoiceMemberXMLEncoderParses pins that the
+// canonical-XML encoder of a choice member is Go source for an optional
+// member, held as a *any, as for a mandatory one: the type switch reads the
+// value the pointer holds, which a type switch guard takes only in
+// parentheses.
+func TestREQ176_REQ056_OptionalChoiceMemberXMLEncoderParses(t *testing.T) {
+	c := &xmlChoice{label: "ORDINAL.symbol", varName: "xmlChoiceOrdinalSymbol", shapes: []xmlChoiceShape{
+		{class: "DV_CODED_TEXT", goType: "rm.DVCodedText", elements: []string{"value", "defining_code"}, omitEmpty: []string{"value"}},
+		{class: "CODE_PHRASE", goType: "rm.CodePhrase", elements: []string{"terminology_id", "code_string"}},
+	}}
+	for _, mandatory := range []bool{true, false} {
+		body := marshalXMLChoice("o", "Symbol", "symbol", c, mandatory)
+		src := "package p\n\nfunc (o *T) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {\n" + body + "\treturn nil\n}\n"
+		if _, err := format.Source([]byte(src)); err != nil {
+			t.Errorf("marshalXMLChoice(mandatory %v) is no Go source: %v\n%s", mandatory, err, src)
 		}
 	}
 }
