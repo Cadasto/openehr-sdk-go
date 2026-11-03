@@ -52,7 +52,9 @@ ARG USER_GID=1000
 
 # gcc + musl-dev give cgo a C compiler and the C library to link against.
 # Only `make test-race` uses them, because the race detector needs cgo.
-RUN apk add --no-cache git make ca-certificates tzdata gcc musl-dev \
+# libxml2-utils gives xmllint, which `make operational-template-schema-check`
+# runs here when the host has none.
+RUN apk add --no-cache git make ca-certificates tzdata gcc musl-dev libxml2-utils \
     && addgroup -g ${USER_GID} dev \
     && adduser -D -u ${USER_UID} -G dev -s /bin/sh dev \
     && mkdir -p /go/pkg/mod /go/bin /home/dev/.cache/go-build /workspace \
