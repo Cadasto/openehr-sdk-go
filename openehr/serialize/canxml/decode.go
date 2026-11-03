@@ -68,9 +68,10 @@ func (c decoderConfig) tracker() *xmlunmatched.Tracker {
 // [ErrNamespace]), the root element aside; text other than XML whitespace
 // directly inside an element whose content is elements, such as an RM
 // object's, a CDATA section included; and an element whose content this
-// codec does not model: a `Hash` member, a BMM `Any` member (the AOM 1.4
-// `assumed_value` and `EXPR_LEAF.item`), and a member whose Go type has no
-// decoder of its own (see the package documentation). A bare `type`
+// codec does not model: a `Hash` whose values are `Hash`es
+// (RESOURCE_ANNOTATIONS `documentation`), a BMM `Any` member (the AOM 1.4
+// `EXPR_LEAF.item`), and a member whose Go type has no decoder of its own
+// (see the package documentation). A bare `type`
 // attribute is unmatched except where dispatch reads it as the
 // discriminator. It applies at any depth: inside a polymorphic slot, an
 // interval bound, a primitive element or an AOM 1.4 value too. The text of

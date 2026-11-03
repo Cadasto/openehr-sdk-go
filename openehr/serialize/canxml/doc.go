@@ -300,9 +300,8 @@
 // # Unsupported: Any content and a Hash of Hashes
 //
 // The codec cannot decode the content of a BMM `Any` attribute, held as a Go
-// empty interface: the AOM 1.4 `assumed_value` and `EXPR_LEAF.item`. Nor does
-// it model a `Hash` whose values are `Hash`es, RESOURCE_ANNOTATIONS'
-// `documentation`. Decode treats such an element as one item of unmatched
+// empty interface: the AOM 1.4 `EXPR_LEAF.item`. Nor does it model a `Hash`
+// whose values are `Hash`es, RESOURCE_ANNOTATIONS' `documentation`. Decode treats such an element as one item of unmatched
 // content, so it skips it by default, [WithUnmatched] reports it and
 // [WithStrict] refuses it, and the field stays at its zero value; [Marshal]
 // of a RESOURCE_ANNOTATIONS fails, since encoding/xml rejects the map. So the

@@ -988,7 +988,7 @@ const checkUnmatchedXMLText = "\t\tcase xml.CharData:\n" +
 const bmmAnyType = "Any"
 
 // unmarshalXMLAnyContent emits the case of a property typed by the BMM root
-// type Any, such as the AOM 1.4 `assumed_value` and `EXPR_LEAF.item`. The
+// type Any, such as the AOM 1.4 `EXPR_LEAF.item`. The
 // codec cannot decode its content, so the element is handed to
 // xmlunmatched.SkipUnmatched as one item: skipped by default, reported or
 // refused on request, and the field is left at its zero value.

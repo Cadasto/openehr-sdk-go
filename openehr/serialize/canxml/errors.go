@@ -37,8 +37,8 @@ var ErrInvalidShape = xmlunmatched.ErrInvalidShape
 // `xsi:nil`, …), an element in a namespace other than the openEHR one
 // (see [ErrNamespace]), and text other than XML whitespace directly inside
 // an element whose content is elements. An element whose content this codec
-// does not model, such as a `Hash` member or a BMM `Any` member, counts as
-// such content too.
+// does not model, a `Hash` whose values are `Hash`es or a BMM `Any` member,
+// counts as such content too.
 //
 // Such content is ignored by default. Only a decode given [WithStrict]
 // refuses it: the refusal wraps this sentinel and names the item's path
