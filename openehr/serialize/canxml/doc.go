@@ -262,9 +262,10 @@
 // # Nesting depth
 //
 // A decode has no depth limit of its own. [WithMaxDepth] sets one, for
-// input from outside the caller's control: the decode refuses an element
-// nested deeper than the limit, the root of the value at depth 1, as it reads
-// the element's start tag, before anything decodes it, in every mode. The
+// input from outside the caller's control; given more than once, the
+// smallest positive limit wins. The decode refuses an element nested deeper
+// than the limit, the root of the value at depth 1, as it reads the
+// element's start tag, before anything decodes it, in every mode. The
 // refusal is a [DecodeError] on its own that wraps [ErrLimitExceeded]; it
 // names the element's depth, the limit and the element's path, cut short in
 // the middle when it is long, and none of the element's content. A [Decoder]
