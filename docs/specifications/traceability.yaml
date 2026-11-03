@@ -1751,6 +1751,7 @@ requirements:
       - internal/templatecompile
     tests:
       - internal/rmjsonwalk/walk_once_budget_internal_test.go
+      - internal/templatecompile/compile_model_test.go
       - openehr/aom/aom14/read_test.go
       - openehr/bmm/load_test.go
       - openehr/rm/typereg/registry_test.go
@@ -1818,6 +1819,7 @@ requirements:
       - openehr/aom/aom14
     probes: []
     tests:
+      - internal/templatecompile/compile_model_test.go
       - internal/templatecompile/compile_nodename_test.go
       - internal/templatecompile/compile_test.go
       - internal/templatecompile/compiled_golden_test.go
