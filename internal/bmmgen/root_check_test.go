@@ -28,6 +28,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -47,9 +48,10 @@ func rootIDsIn(t *testing.T, dir string) []string {
 
 // checkRoot runs the root check on the root schema id names under
 // resourcesDir/sdk, over the pinned schemas in resourcesDir, and returns what
-// the root does wrong, one sentence each. An error is a schema that does not
-// load at all.
-func checkRoot(ctx context.Context, resourcesDir, id string) ([]string, error) {
+// the root does wrong, one sentence each. itsXMLDir is the directory of the
+// vendored ITS-XML schemas, which an upstream reference names as
+// resources/its-xml/<path>. An error is a schema that does not load at all.
+func checkRoot(ctx context.Context, resourcesDir, itsXMLDir, id string) ([]string, error) {
 	resolver := newSchemaResolver(resourcesDir)
 	var problems []string
 
@@ -83,7 +85,7 @@ func checkRoot(ctx context.Context, resourcesDir, id string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	included := chain[1:]
+	refs := upstreamRefs{included: chain[1:], itsXMLDir: itsXMLDir}
 	shadowed, err := bmm.LoadAll(id, withoutDeclarations{Resolver: resolver, id: id, header: own}) //nolint:contextcheck // bmm.LoadAll takes no context
 	if err != nil {
 		return nil, err
@@ -117,13 +119,13 @@ func checkRoot(ctx context.Context, resourcesDir, id string) ([]string, error) {
 				}
 			}
 			// Rule 2: the reason and the upstream reference.
-			if p := noteProblem(section.own[name].Documentation(), included); p != "" {
+			if p := noteProblem(section.own[name].Documentation(), refs); p != "" {
 				problems = append(problems, fmt.Sprintf("root %s: class %s %s", id, name, p))
 			}
 			props, _ := form["properties"].(map[string]any)
 			for _, prop := range slices.Sorted(maps.Keys(props)) {
 				doc, _ := props[prop].(map[string]any)["documentation"].(string)
-				if p := noteProblem(doc, included); p != "" {
+				if p := noteProblem(doc, refs); p != "" {
 					problems = append(problems, fmt.Sprintf("root %s: property %s.%s %s", id, name, prop, p))
 				}
 			}
@@ -268,9 +270,8 @@ func withoutDocumentation(v any) any {
 
 // noteProblem says what a root declaration's documentation lacks, or "" when
 // it carries both parts of its note: a "Reason: " sentence, then an
-// "Upstream: " reference, which is an https URL (a specification pull request
-// or ticket) or the id of a schema the root includes (the schema it follows).
-func noteProblem(doc string, included []string) string {
+// "Upstream: " reference that refs accepts.
+func noteProblem(doc string, refs upstreamRefs) string {
 	_, rest, ok := strings.Cut(doc, "Reason: ")
 	if !ok {
 		return `gives no reason (a "Reason: " sentence in its documentation)`
@@ -282,16 +283,78 @@ func noteProblem(doc string, included []string) string {
 	if !ok {
 		return `gives no upstream reference (an "Upstream: " reference after its reason)`
 	}
+	return refs.problem(ref)
+}
+
+// itsXMLRefPrefix starts an upstream reference to a vendored ITS-XML schema,
+// named by its path in the tree.
+const itsXMLRefPrefix = "resources/its-xml/"
+
+// upstreamRefs is what an upstream reference may name besides an https URL (a
+// specification pull request or ticket): the id of a schema the root includes
+// (the schema it follows), or a vendored ITS-XML schema in itsXMLDir, by its
+// path in the tree with an optional line, such as
+// resources/its-xml/components/AM/Release-1.4/Template.xsd:115.
+type upstreamRefs struct {
+	included  []string
+	itsXMLDir string
+}
+
+// problem says what is wrong with the upstream reference ref, whose first
+// field, less a full stop that ends the sentence, names the reference, or ""
+// when refs accepts it.
+func (refs upstreamRefs) problem(ref string) string {
 	fields := strings.Fields(ref)
 	if len(fields) == 0 {
 		return `gives an empty upstream reference`
 	}
 	name := strings.TrimSuffix(fields[0], ".")
-	if (strings.HasPrefix(name, "https://") && len(name) > len("https://")) || slices.Contains(included, name) {
+	switch {
+	case strings.HasPrefix(name, "https://") && len(name) > len("https://"):
+		return ""
+	case slices.Contains(refs.included, name):
+		return ""
+	case strings.HasPrefix(name, itsXMLRefPrefix):
+		if p := refs.itsXMLProblem(strings.TrimPrefix(name, itsXMLRefPrefix)); p != "" {
+			return fmt.Sprintf("gives the upstream reference %q, %s", name, p)
+		}
 		return ""
 	}
-	return fmt.Sprintf("gives the upstream reference %q, which is neither an https URL nor a schema the root includes", name)
+	return fmt.Sprintf("gives the upstream reference %q, which is neither an https URL, a schema the root includes, nor a vendored ITS-XML schema under %s", name, itsXMLRefPrefix)
 }
+
+// itsXMLProblem says what is wrong with ref, a path under the vendored ITS-XML
+// schemas with an optional ":line", or "" when the file exists there and holds
+// that line. The path is opened through an [os.Root], so it cannot leave the
+// schemas' directory.
+func (refs upstreamRefs) itsXMLProblem(ref string) string {
+	path, line, hasLine := strings.Cut(ref, ":")
+	root, err := os.OpenRoot(refs.itsXMLDir)
+	if err != nil {
+		return fmt.Sprintf("but the ITS-XML schemas cannot be read: %v", err)
+	}
+	defer func() { _ = root.Close() }() // read only
+	body, err := root.ReadFile(path)
+	if err != nil {
+		return "a file the vendored ITS-XML schemas do not hold"
+	}
+	if !hasLine {
+		return ""
+	}
+	n, err := strconv.Atoi(line)
+	lines := bytes.Count(body, []byte("\n"))
+	if len(body) > 0 && body[len(body)-1] != '\n' {
+		lines++
+	}
+	if err != nil || n < 1 || n > lines {
+		return fmt.Sprintf("whose line is not one of the file's %d lines", lines)
+	}
+	return ""
+}
+
+// testITSXMLDir is the directory of the vendored ITS-XML schemas, beside the
+// pinned BMM schemas.
+var testITSXMLDir = filepath.Join(filepath.Dir(testResources), "its-xml")
 
 // TestRootSchemas_REQ041_PassTheRootCheck runs the root check on every root
 // schema the SDK authors, and pins that the RM target loads one of them.
@@ -305,7 +368,7 @@ func TestRootSchemas_REQ041_PassTheRootCheck(t *testing.T) {
 		t.Errorf("TargetRM.RootID = %q, which is not a root schema under %s/%s (%v)", TargetRM.RootID, testResources, rootsDirName, roots)
 	}
 	for _, id := range roots {
-		problems, err := checkRoot(t.Context(), testResources, id)
+		problems, err := checkRoot(t.Context(), testResources, testITSXMLDir, id)
 		if err != nil {
 			t.Errorf("root check on %s: %v", id, err)
 			continue
@@ -346,6 +409,14 @@ const rootCheckItem = `"ITEM": {"name": "ITEM",
 			"documentation": "Its label. Reason: unchanged. Upstream: test_base_1.0.0."},
 		"title": {"_type": "P_BMM_SINGLE_PROPERTY", "name": "title", "type": "String",
 			"documentation": "Its title. Reason: missing upstream. Upstream: https://example.org/pull/1."}}}`
+
+// rootCheckSchemaFile is a vendored ITS-XML schema of the scratch cases, four
+// lines long.
+const rootCheckSchemaFile = `<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+	<xs:complexType name="ITEM"/>
+</xs:schema>
+`
 
 // TestRootCheck_REQ041_RefusesWhatARootMustNotDo gives the root check one
 // scratch root per rule, each breaking that rule alone, and a well-formed root
@@ -399,6 +470,46 @@ func TestRootCheck_REQ041_RefusesWhatARootMustNotDo(t *testing.T) {
 			want: `property ITEM.label gives the upstream reference "somewhere"`,
 		},
 		{
+			name: "rule 2: an upstream reference to a line of a vendored ITS-XML schema",
+			files: map[string]string{
+				"sdk/test_root_1.0.0.bmm.json": rootCheckRoot("root", strings.Replace(rootCheckItem,
+					"Upstream: test_base_1.0.0.", "Upstream: resources/its-xml/components/Item.xsd:3.", 1)),
+				"its-xml/components/Item.xsd": rootCheckSchemaFile,
+			},
+		},
+		{
+			name: "rule 2: an upstream reference to a whole vendored ITS-XML schema",
+			files: map[string]string{
+				"sdk/test_root_1.0.0.bmm.json": rootCheckRoot("root", strings.Replace(rootCheckItem,
+					"Upstream: test_base_1.0.0.", "Upstream: resources/its-xml/components/Item.xsd.", 1)),
+				"its-xml/components/Item.xsd": rootCheckSchemaFile,
+			},
+		},
+		{
+			name: "rule 2: an upstream reference to an ITS-XML schema the tree does not hold",
+			files: map[string]string{"sdk/test_root_1.0.0.bmm.json": rootCheckRoot("root", strings.Replace(rootCheckItem,
+				"Upstream: test_base_1.0.0.", "Upstream: resources/its-xml/components/Item.xsd:3.", 1))},
+			want: `property ITEM.label gives the upstream reference "resources/its-xml/components/Item.xsd:3"`,
+		},
+		{
+			name: "rule 2: an upstream reference past the last line of an ITS-XML schema",
+			files: map[string]string{
+				"sdk/test_root_1.0.0.bmm.json": rootCheckRoot("root", strings.Replace(rootCheckItem,
+					"Upstream: test_base_1.0.0.", "Upstream: resources/its-xml/components/Item.xsd:5.", 1)),
+				"its-xml/components/Item.xsd": rootCheckSchemaFile,
+			},
+			want: `property ITEM.label gives the upstream reference "resources/its-xml/components/Item.xsd:5"`,
+		},
+		{
+			name: "rule 2: an upstream reference that leaves the ITS-XML schemas",
+			files: map[string]string{
+				"sdk/test_root_1.0.0.bmm.json": rootCheckRoot("root", strings.Replace(rootCheckItem,
+					"Upstream: test_base_1.0.0.", "Upstream: resources/its-xml/../test_base_1.0.0.bmm.json.", 1)),
+				"its-xml/components/Item.xsd": rootCheckSchemaFile,
+			},
+			want: `property ITEM.label gives the upstream reference "resources/its-xml/../test_base_1.0.0.bmm.json"`,
+		},
+		{
 			name: "rule 3: a shadow the includes have caught up with",
 			files: map[string]string{"sdk/test_root_1.0.0.bmm.json": rootCheckRoot("root", `"ITEM": {"name": "ITEM",
 				"documentation": "An item. Reason: it lacks a title. Upstream: https://example.org/pull/1.",
@@ -429,7 +540,7 @@ func TestRootCheck_REQ041_RefusesWhatARootMustNotDo(t *testing.T) {
 			if id == "" {
 				id = "test_root_1.0.0"
 			}
-			problems, err := checkRoot(t.Context(), dir, id)
+			problems, err := checkRoot(t.Context(), dir, filepath.Join(dir, "its-xml"), id)
 			if err != nil {
 				t.Fatalf("checkRoot(%s) = %v", id, err)
 			}
