@@ -134,6 +134,38 @@ func TestBuildPlan_REQ041_SourceLabelNamesTheRootAndItsIncludes(t *testing.T) {
 	}
 }
 
+// TestBuildPlan_REQ041_ReadsEachSchemaOnce — the merged schema and the SDK
+// extension keys come from one read of each schema, so a schema that changes
+// between two reads cannot put two versions of itself into one plan.
+func TestBuildPlan_REQ041_ReadsEachSchemaOnce(t *testing.T) {
+	t.Parallel()
+	for _, target := range []Target{TargetRM, TargetAOM14} {
+		r := &countingResolver{Resolver: testResolver(), calls: map[string]int{}}
+		if _, err := BuildPlanForTarget(t.Context(), target, r); err != nil {
+			t.Fatalf("BuildPlanForTarget(%s): %v", target.GoPackage, err)
+		}
+		if r.calls[target.RootID] == 0 {
+			t.Errorf("BuildPlanForTarget(%s) never resolved its root %s", target.GoPackage, target.RootID)
+		}
+		for id, n := range r.calls {
+			if n != 1 {
+				t.Errorf("BuildPlanForTarget(%s) resolved %s %d times, want once", target.GoPackage, id, n)
+			}
+		}
+	}
+}
+
+// countingResolver counts the times each schema id is resolved.
+type countingResolver struct {
+	bmm.Resolver
+	calls map[string]int
+}
+
+func (r *countingResolver) Resolve(ctx context.Context, id string) (io.ReadCloser, error) {
+	r.calls[id]++
+	return r.Resolver.Resolve(ctx, id)
+}
+
 // containsLine reports whether s holds line as one whole line.
 func containsLine(s, line string) bool {
 	for l := range strings.Lines(s) {

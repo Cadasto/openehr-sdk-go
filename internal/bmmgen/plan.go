@@ -144,19 +144,23 @@ func BuildPlan(ctx context.Context, rootID string, resolver bmm.Resolver) (*Plan
 }
 
 // BuildPlanForTarget loads the BMM root schema for the given target
-// (via the supplied resolver) and computes a [Plan].
+// (via the supplied resolver) and computes a [Plan]. It resolves each schema
+// once: the merged schema and the SDK extension keys are read from the same
+// bytes.
 func BuildPlanForTarget(ctx context.Context, t Target, resolver bmm.Resolver) (*Plan, error) {
-	schema, err := bmm.LoadAll(t.RootID, resolver) //nolint:contextcheck // ctx reserved; public bmm.LoadAll does not thread context yet
-	if err != nil {
-		return nil, fmt.Errorf("bmmgen: load %q: %w", t.RootID, err)
-	}
 	chain, err := readSchemaChain(ctx, t.RootID, resolver)
 	if err != nil {
 		return nil, err
 	}
 	ids := make([]string, len(chain))
+	read := make(chainResolver, len(chain))
 	for i, s := range chain {
 		ids[i] = s.id
+		read[s.id] = s.raw
+	}
+	schema, err := bmm.LoadAll(t.RootID, read) //nolint:contextcheck // ctx reserved; public bmm.LoadAll does not thread context yet
+	if err != nil {
+		return nil, fmt.Errorf("bmmgen: load %q: %w", t.RootID, err)
 	}
 	label, err := sourceLabel(ids, resolver)
 	if err != nil {

@@ -144,6 +144,19 @@ type chainSchema struct {
 	schema *bmm.Schema
 }
 
+// chainResolver hands back the bytes of a target's include chain, by schema
+// id, as [readSchemaChain] read them.
+type chainResolver map[string][]byte
+
+// Resolve implements [bmm.Resolver].
+func (r chainResolver) Resolve(_ context.Context, id string) (io.ReadCloser, error) {
+	raw, ok := r[id]
+	if !ok {
+		return nil, fmt.Errorf("bmmgen: %q is not in the include chain: %w", id, bmm.ErrSchemaNotFound)
+	}
+	return io.NopCloser(bytes.NewReader(raw)), nil
+}
+
 // maxSchemaBytes is the size bound the public loader applies to one BMM
 // document: a schema read up to one byte past it is refused by bmm.Load.
 const maxSchemaBytes = 32 << 20
