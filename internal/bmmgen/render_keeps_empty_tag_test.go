@@ -62,11 +62,11 @@ func TestREQ052_ContainerFieldShapeKeepsEmpty(t *testing.T) {
 //
 // REQ-052 § An absent mandatory member, issue 341.
 func TestREQ052_KeepsEmptyListFieldsRendered(t *testing.T) {
-	rmPlan, err := BuildPlanForTarget(t.Context(), TargetRM, bmm.FSResolver{Root: testResources})
+	rmPlan, err := BuildPlanForTarget(t.Context(), TargetRM, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(RM): %v", err)
 	}
-	aomPlan, err := BuildPlanForTarget(t.Context(), TargetAOM14, bmm.FSResolver{Root: testResources})
+	aomPlan, err := BuildPlanForTarget(t.Context(), TargetAOM14, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(AOM14): %v", err)
 	}

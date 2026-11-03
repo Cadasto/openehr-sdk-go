@@ -82,6 +82,7 @@ func (a *ArchetypeTerm) MarshalXML(_e *xml.Encoder, _start xml.StartElement) err
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("ARCHETYPE_TERM")}
 	}
+	_start.Attr = append(_start.Attr, xml.Attr{Name: xml.Name{Local: "code"}, Value: a.Code})
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
@@ -89,9 +90,6 @@ func (a *ArchetypeTerm) MarshalXML(_e *xml.Encoder, _start xml.StartElement) err
 		if err := _e.EncodeElement(a.Items, xml.StartElement{Name: xml.Name{Local: "items"}}); err != nil {
 			return err
 		}
-	}
-	if err := _e.EncodeElement(a.Code, xml.StartElement{Name: xml.Name{Local: "code"}}); err != nil {
-		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err

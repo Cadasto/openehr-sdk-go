@@ -34,11 +34,11 @@ import (
 // REQ-052 § An absent mandatory member: a mandatory member with no value is
 // left out on encode, never written as null.
 func TestREQ052_MandatoryFieldJSONTag(t *testing.T) {
-	rmPlan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+	rmPlan, err := BuildPlanForTarget(context.Background(), TargetRM, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(RM): %v", err)
 	}
-	aomPlan, err := BuildPlanForTarget(context.Background(), TargetAOM14, bmm.FSResolver{Root: testResources})
+	aomPlan, err := BuildPlanForTarget(context.Background(), TargetAOM14, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(AOM14): %v", err)
 	}
@@ -208,7 +208,7 @@ func TestREQ052_IsOwnTypeParameter(t *testing.T) {
 // [TestREQ052_RenderFieldPolymorphicMandatoryTag] holds that [renderField]
 // asks it.
 func TestREQ052_GenericRootIsInterface(t *testing.T) {
-	rmPlan, err := BuildPlanForTarget(t.Context(), TargetRM, bmm.FSResolver{Root: testResources})
+	rmPlan, err := BuildPlanForTarget(t.Context(), TargetRM, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(RM): %v", err)
 	}
@@ -244,7 +244,7 @@ func TestREQ052_GenericRootIsInterface(t *testing.T) {
 // mandatory member: a mandatory member with no value is left out on encode,
 // never written as null.
 func TestREQ052_RenderFieldPolymorphicMandatoryTag(t *testing.T) {
-	rmPlan, err := BuildPlanForTarget(t.Context(), TargetRM, bmm.FSResolver{Root: testResources})
+	rmPlan, err := BuildPlanForTarget(t.Context(), TargetRM, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(RM): %v", err)
 	}

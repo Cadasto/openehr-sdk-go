@@ -17,7 +17,7 @@ import (
 // model rather than a synthetic one.
 func rmInfoTestPlan(t *testing.T) *Plan {
 	t.Helper()
-	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlan(context.Background(), TargetRM.RootID, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlan: %v", err)
 	}
@@ -275,7 +275,7 @@ func TestDriftDetectionCoversHierarchyFields(t *testing.T) {
 	opts := Options{
 		ResourcesDir:  testResources,
 		OutDir:        dir,
-		RootID:        "openehr_rm_1.2.0",
+		RootID:        TargetRM.RootID,
 		SkipInventory: true,
 	}
 	if _, err := Run(opts); err != nil {

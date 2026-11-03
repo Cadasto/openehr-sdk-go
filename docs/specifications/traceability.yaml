@@ -324,8 +324,14 @@ requirements:
       - internal/bmmgen/render_release_test.go
       - internal/bmmgen/render_rminfo_functions_test.go
       - internal/bmmgen/render_rminfo_hierarchy_test.go
+      - internal/bmmgen/render_root_note_test.go
       - internal/bmmgen/render_test.go
+      - internal/bmmgen/resolver_test.go
+      - internal/bmmgen/root_check_test.go
+      - internal/bmmgen/sdk_extensions_test.go
       - internal/bmmgen/sim_bump_test.go
+      - internal/bmmgen/target_test.go
+      - openehr/internal/xmlunmatched/drop_internal_test.go
       - openehr/rm/rminfo/hierarchy_test.go
       - openehr/rm/rminfo/probe_094_test.go
 
@@ -357,6 +363,7 @@ requirements:
       - internal/importguard/importguard_test.go
       - openehr/bmm/imports_test.go
       - openehr/bmm/load_test.go
+      - openehr/bmm/loadall_test.go
 
   - id: REQ-046
     title: Primitive type mapping
@@ -667,8 +674,11 @@ requirements:
       - resources/its-xml
     probes: [PROBE-033, PROBE-034, PROBE-105]
     tests:
+      - internal/bmmgen/itsxml_test.go
       - internal/bmmgen/render_interval_bound_test.go
+      - internal/bmmgen/render_xml_attributes_test.go
       - internal/bmmgen/render_xmlmar_order_test.go
+      - internal/bmmgen/render_xmlunmar_class_test.go
       - internal/bmmgen/render_xmlunmar_unmatched_test.go
       - internal/rmaccess/interval_test.go
       - openehr/aom/aom14/coded_text_code_list_xml_test.go
@@ -2603,3 +2613,6 @@ requirements:
     implementation: planned
     packages: [openehr/aom/aom14, internal/bmmgen, resources/bmm, openehr/serialize/canxml]
     probes: [PROBE-111]
+    tests:
+      - internal/bmmgen/sdk_extensions_test.go
+      - openehr/internal/xmlunmatched/drop_internal_test.go

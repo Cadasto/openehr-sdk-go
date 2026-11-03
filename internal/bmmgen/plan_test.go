@@ -19,7 +19,7 @@ const testResources = "../../" + bmm.DefaultResourcesDir
 // Go file per BMM package, so each class lands in the file of the package
 // that declares it.
 func TestPlanFileAssignments(t *testing.T) {
-	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlan(context.Background(), TargetRM.RootID, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlan: %v", err)
 	}
@@ -49,7 +49,7 @@ func TestPlanFileAssignments(t *testing.T) {
 // TestPlanSkipsEHRExtract asserts that EHR_EXTRACT classes are
 // excluded per REQ-041.
 func TestPlanSkipsEHRExtract(t *testing.T) {
-	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlan(context.Background(), TargetRM.RootID, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlan: %v", err)
 	}
@@ -64,7 +64,7 @@ func TestPlanSkipsEHRExtract(t *testing.T) {
 // non-abstract, non-generic class) appears in the typereg-target
 // list.
 func TestPlanIncludesConcreteRegistrations(t *testing.T) {
-	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlan(context.Background(), TargetRM.RootID, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlan: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestPlanIncludesConcreteRegistrations(t *testing.T) {
 // interface whose marker method every concrete descendant carries; this pins
 // the descendant set the renderer emits those marker methods from.
 func TestPlanAbstractDescendants(t *testing.T) {
-	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlan(context.Background(), TargetRM.RootID, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlan: %v", err)
 	}

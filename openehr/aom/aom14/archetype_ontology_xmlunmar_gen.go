@@ -92,6 +92,7 @@ func (a *ArchetypeOntology) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 // xmlClassArchetypeTerm describes ARCHETYPE_TERM to the canonical-XML decode runtime.
 var xmlClassArchetypeTerm = xmlunmatched.Class{
 	Name:     "ARCHETYPE_TERM",
+	Attrs:    []string{"code"},
 	Required: []string{"code"},
 }
 
@@ -107,6 +108,12 @@ var xmlClassArchetypeTerm = xmlunmatched.Class{
 func (a *ArchetypeTerm) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassArchetypeTerm); _err != nil {
 		return _err
+	}
+	for _, _a := range _start.Attr {
+		if _a.Name.Local == "code" && _a.Name.Space == "" {
+			a.Code = _a.Value
+			break
+		}
 	}
 	for {
 		_tok, _err := _dec.Token()

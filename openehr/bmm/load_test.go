@@ -361,7 +361,7 @@ func TestLoadAll_descendantShadowsAncestor(t *testing.T) {
 
 func TestLoadAll_siblingAncestorsConflict(t *testing.T) {
 	// Two siblings (parent1 and parent2) both define class X with
-	// DIFFERING definitions; the descendant does not. mergeAncestor MUST
+	// DIFFERING definitions; the descendant does not. mergeForms must
 	// surface ErrSchemaConflict (no winner between disagreeing siblings).
 	// Identical sibling definitions, by contrast, merge benignly — see
 	// TestLoadAll_identicalSiblingDefsMerge.

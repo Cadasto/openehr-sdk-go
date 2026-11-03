@@ -10,6 +10,8 @@ import (
 	"path"
 	"slices"
 	"strings"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
 )
 
 // xsdNamespace is the namespace of the XML Schema vocabulary.
@@ -58,23 +60,34 @@ func (n *xsdNode) is(local string) bool {
 	return n.XMLName.Space == xsdNamespace && n.XMLName.Local == local
 }
 
-// xsdType is one named complex type: the type it extends and the particle
-// that holds its own elements.
+// xsdType is one named complex type: the type it extends, the particle that
+// holds its own elements and the XML attributes it declares itself.
 type xsdType struct {
 	file string
+	name string
 	// base is the local name of the xs:extension base, or "" when the type
 	// extends nothing or a built-in type.
 	base string
+	// simple reports a type with simple content: text and attributes, no
+	// child element. Its base may be a simple type, which declares neither.
+	simple bool
+	// restricts is the local name of the type an xs:restriction derives the
+	// type from, or "" when there is none or it is a built-in type.
+	restricts string
 	// content is the type's own particle (xs:sequence, xs:choice, xs:all or
 	// xs:group), or nil when it declares no element of its own.
 	content *xsdNode
+	// attrs names the XML attributes the type declares itself, in document
+	// order, on the type or in its xs:extension or xs:restriction.
+	attrs []string
 }
 
-// xsdSet is the complex types and model groups of one closure of schema
-// files, by name.
+// xsdSet is the complex types, the simple type names and the model groups of
+// one closure of schema files, by name.
 type xsdSet struct {
-	types  map[string]*xsdType
-	groups map[string]*xsdNode
+	types       map[string]*xsdType
+	simpleTypes map[string]bool
+	groups      map[string]*xsdNode
 	// dups holds, per type name, the declarations after the first, which
 	// [loadXSDSet] checks agree with the first.
 	dups map[string][]*xsdType
@@ -83,12 +96,14 @@ type xsdSet struct {
 // loadXSDSet reads the schemas the root patterns match under root, and every
 // file they include, import or redefine, transitively. A pattern is a
 // [path.Match] pattern relative to root that must match at least one file.
-// A type two files declare must give the same element sequence in both.
+// A type two files declare must give the same element sequence and the same
+// XML attributes in both.
 func loadXSDSet(root *os.Root, roots []string) (*xsdSet, error) {
 	s := &xsdSet{
-		types:  make(map[string]*xsdType),
-		groups: make(map[string]*xsdNode),
-		dups:   make(map[string][]*xsdType),
+		types:       make(map[string]*xsdType),
+		simpleTypes: make(map[string]bool),
+		groups:      make(map[string]*xsdNode),
+		dups:        make(map[string][]*xsdType),
 	}
 	var queue []string
 	for _, pattern := range roots {
@@ -119,6 +134,10 @@ func loadXSDSet(root *os.Root, roots []string) (*xsdSet, error) {
 		if err != nil {
 			return nil, err
 		}
+		wantAttrs, err := s.attributesOf(s.types[name], nil)
+		if err != nil {
+			return nil, err
+		}
 		for _, t := range later {
 			got, err := s.sequenceOf(t, nil)
 			if err != nil {
@@ -127,6 +146,14 @@ func loadXSDSet(root *os.Root, roots []string) (*xsdSet, error) {
 			if !slices.Equal(got, want) {
 				return nil, fmt.Errorf("its-xml: type %s has the sequence %v in %s and %v in %s",
 					name, want, s.types[name].file, got, t.file)
+			}
+			gotAttrs, err := s.attributesOf(t, nil)
+			if err != nil {
+				return nil, err
+			}
+			if !slices.Equal(gotAttrs, wantAttrs) {
+				return nil, fmt.Errorf("its-xml: type %s has the attributes %v in %s and %v in %s",
+					name, wantAttrs, s.types[name].file, gotAttrs, t.file)
 			}
 		}
 	}
@@ -175,44 +202,111 @@ func (s *xsdSet) readFile(root *os.Root, file string) ([]string, error) {
 				return nil, fmt.Errorf("its-xml: %s: group %s has no particle", file, n.attr("name"))
 			}
 			s.groups[n.attr("name")] = content
+		case n.is("simpleType"):
+			s.simpleTypes[n.attr("name")] = true
 		}
 	}
 	return refs, nil
 }
 
-// parseComplexType reads the base and the own particle of a named complex
-// type. A construct the reader does not know fails, so a re-pinned schema
-// that uses one cannot be read into a wrong order.
+// parseComplexType reads the base, the own particle and the own XML
+// attributes of a named complex type. A construct the reader does not know
+// fails, so a re-pinned schema that uses one cannot be read into a wrong
+// order or a wrong set of attributes: an xs:attributeGroup among them, which
+// the reader does not expand, and an xs:anyAttribute, which admits attributes
+// no member declares.
 func parseComplexType(file string, n *xsdNode) (*xsdType, error) {
-	t := &xsdType{file: file}
+	t := &xsdType{file: file, name: n.attr("name")}
 	for i := range n.Children {
 		c := &n.Children[i]
 		switch {
-		case c.is("annotation"), c.is("attribute"), c.is("attributeGroup"), c.is("anyAttribute"):
+		case c.is("annotation"):
+		case c.is("attribute"):
+			if err := t.addAttribute(c); err != nil {
+				return nil, err
+			}
 		case c.is("sequence"), c.is("choice"), c.is("all"), c.is("group"):
 			t.content = c
-		case c.is("simpleContent"):
-			// Text content with attributes: no child element.
-		case c.is("complexContent"):
-			for j := range c.Children {
-				d := &c.Children[j]
-				switch {
-				case d.is("annotation"):
-				case d.is("extension"):
-					t.base = schemaLocalName(d.attr("base"))
-					t.content = particleOf(d)
-				case d.is("restriction"):
-					// A restriction restates the content it keeps.
-					t.content = particleOf(d)
-				default:
-					return nil, fmt.Errorf("its-xml: %s: type %s: unexpected xs:%s in xs:complexContent", file, n.attr("name"), d.XMLName.Local)
-				}
+		case c.is("simpleContent"), c.is("complexContent"):
+			// Simple content is text and attributes: no child element.
+			t.simple = c.is("simpleContent")
+			if err := t.parseDerivation(c); err != nil {
+				return nil, err
 			}
 		default:
-			return nil, fmt.Errorf("its-xml: %s: type %s: unexpected xs:%s", file, n.attr("name"), c.XMLName.Local)
+			return nil, fmt.Errorf("its-xml: %s: type %s: unexpected xs:%s", file, t.name, c.XMLName.Local)
 		}
 	}
 	return t, nil
+}
+
+// parseDerivation reads the xs:extension or xs:restriction that c, an
+// xs:simpleContent or xs:complexContent, holds: its base, its particle and
+// its attributes. An extension adds them to its base's; a restriction
+// restates the content it keeps, and its base's attributes are not read
+// through it ([xsdSet.attributesOf]). An xs:attributeGroup or an
+// xs:anyAttribute fails in either.
+func (t *xsdType) parseDerivation(c *xsdNode) error {
+	for j := range c.Children {
+		d := &c.Children[j]
+		switch {
+		case d.is("annotation"):
+		case d.is("extension"):
+			t.base = schemaLocalName(d.attr("base"))
+			for k := range d.Children {
+				e := &d.Children[k]
+				switch {
+				case e.is("annotation"):
+				case e.is("attribute"):
+					if err := t.addAttribute(e); err != nil {
+						return err
+					}
+				case !t.simple && (e.is("sequence") || e.is("choice") || e.is("all") || e.is("group")):
+					t.content = e
+				default:
+					return fmt.Errorf("its-xml: %s: type %s: unexpected xs:%s in xs:extension", t.file, t.name, e.XMLName.Local)
+				}
+			}
+		case d.is("restriction"):
+			t.restricts = schemaLocalName(d.attr("base"))
+			t.content = particleOf(d)
+			for k := range d.Children {
+				e := &d.Children[k]
+				switch {
+				case e.is("attribute"):
+					if err := t.addAttribute(e); err != nil {
+						return err
+					}
+				case e.is("attributeGroup"), e.is("anyAttribute"):
+					// A restriction of a built-in type inherits nothing for
+					// attributesOf to refuse, so the group the reader does
+					// not expand, or the wildcard, is refused here.
+					return fmt.Errorf("its-xml: %s: type %s: unexpected xs:%s in xs:restriction", t.file, t.name, e.XMLName.Local)
+				}
+			}
+		default:
+			return fmt.Errorf("its-xml: %s: type %s: unexpected xs:%s in xs:%s", t.file, t.name, d.XMLName.Local, c.XMLName.Local)
+		}
+	}
+	return nil
+}
+
+// addAttribute records the XML attribute n declares. An attribute by
+// reference names no attribute of the type's own vocabulary and is refused.
+// So is a prohibited one, which declares no attribute and in a restriction
+// takes away an inherited one, which the reader does not do.
+func (t *xsdType) addAttribute(n *xsdNode) error {
+	name := n.attr("name")
+	if name == "" {
+		return fmt.Errorf("its-xml: %s: type %s: an attribute has no name", t.file, t.name)
+	}
+	if n.attr("use") == "prohibited" {
+		return fmt.Errorf("its-xml: %s: type %s: attribute %s is prohibited", t.file, t.name, name)
+	}
+	if !slices.Contains(t.attrs, name) {
+		t.attrs = append(t.attrs, name)
+	}
+	return nil
 }
 
 // particleOf returns the first particle child of n, or nil.
@@ -259,14 +353,11 @@ func (s *xsdSet) sequence(name string) ([]string, error) {
 
 func (s *xsdSet) sequenceOf(t *xsdType, visiting []string) ([]string, error) {
 	var out []string
-	if t.base != "" {
-		if slices.Contains(visiting, t.base) {
-			return nil, fmt.Errorf("its-xml: type %s extends itself", t.base)
-		}
-		base, ok := s.types[t.base]
-		if !ok {
-			return nil, fmt.Errorf("its-xml: %s: base type %s is not declared", t.file, t.base)
-		}
+	base, err := s.complexBase(t, visiting)
+	if err != nil {
+		return nil, err
+	}
+	if base != nil {
 		names, err := s.sequenceOf(base, append(visiting, t.base))
 		if err != nil {
 			return nil, err
@@ -277,6 +368,63 @@ func (s *xsdSet) sequenceOf(t *xsdType, visiting []string) ([]string, error) {
 		return out, nil
 	}
 	return s.appendParticle(out, t.content, nil)
+}
+
+// complexBase returns the complex type t extends, or nil when t extends
+// nothing, a built-in type or, with simple content, a simple type. A base
+// that is declared nowhere, or that visiting already holds, is an error.
+func (s *xsdSet) complexBase(t *xsdType, visiting []string) (*xsdType, error) {
+	if t.base == "" {
+		return nil, nil
+	}
+	if slices.Contains(visiting, t.base) {
+		return nil, fmt.Errorf("its-xml: type %s extends itself", t.base)
+	}
+	if base, ok := s.types[t.base]; ok {
+		return base, nil
+	}
+	if t.simple && s.simpleTypes[t.base] {
+		return nil, nil
+	}
+	return nil, fmt.Errorf("its-xml: %s: base type %s is not declared", t.file, t.base)
+}
+
+// attributes returns the names of the XML attributes of the named type: its
+// extension bases' first, then its own, each in document order.
+func (s *xsdSet) attributes(name string) ([]string, error) {
+	t, ok := s.types[name]
+	if !ok {
+		return nil, fmt.Errorf("its-xml: no complex type %s", name)
+	}
+	return s.attributesOf(t, nil)
+}
+
+// attributesOf returns the XML attribute names of t, its extension bases'
+// first. A type derived by restriction from a declared type inherits the
+// attributes it does not restate, which the reader does not work out: such a
+// type is refused rather than given only the attributes it restates.
+func (s *xsdSet) attributesOf(t *xsdType, visiting []string) ([]string, error) {
+	if t.restricts != "" {
+		return nil, fmt.Errorf("its-xml: %s: type %s restricts %s, and the reader does not derive attributes through a restriction", t.file, t.name, t.restricts)
+	}
+	var out []string
+	base, err := s.complexBase(t, visiting)
+	if err != nil {
+		return nil, err
+	}
+	if base != nil {
+		names, err := s.attributesOf(base, append(visiting, t.base))
+		if err != nil {
+			return nil, err
+		}
+		out = names
+	}
+	for _, name := range t.attrs {
+		if !slices.Contains(out, name) {
+			out = append(out, name)
+		}
+	}
+	return out, nil
 }
 
 // appendParticle appends the element names of particle n to out.
@@ -370,38 +518,61 @@ func (s *itsXMLSchemas) orderFor(roots [][]string) (*xmlChildOrder, error) {
 	return order, nil
 }
 
-// sequenceFor returns the element names whose order class's encoder takes
-// from the schemas. The class takes the type of its own name, or of its
-// nearest ancestor, from the first set that declares one; the type's
-// extension bases come first. When another set declares a type of the same
-// name, each element only that set declares is placed right after the
-// nearest earlier element both declare. A nil result means no set declares
-// the class or an ancestor.
-func (o *xmlChildOrder) sequenceFor(plan *Plan, class string) ([]string, error) {
+// typeFor returns the set that declares the schema type class takes and the
+// type's name: the type of the class's own name, or of its nearest ancestor,
+// from the first set that declares one. ok is false when no set declares the
+// class or an ancestor.
+func (o *xmlChildOrder) typeFor(plan *Plan, class string) (index int, name string, ok bool) {
 	lineage := nearestLineage(plan, class)
 	for i, set := range o.sets {
 		for _, name := range lineage {
-			if !set.has(name) {
-				continue
+			if set.has(name) {
+				return i, name, true
 			}
-			seq, err := set.sequence(name)
-			if err != nil {
-				return nil, err
-			}
-			for j, other := range o.sets {
-				if j == i || !other.has(name) {
-					continue
-				}
-				otherSeq, err := other.sequence(name)
-				if err != nil {
-					return nil, err
-				}
-				seq = placeOtherOnly(seq, otherSeq)
-			}
-			return seq, nil
 		}
 	}
-	return nil, nil
+	return 0, "", false
+}
+
+// sequenceFor returns the element names whose order class's encoder takes
+// from the schemas. The class takes its type as [xmlChildOrder.typeFor]
+// finds it; the type's extension bases come first. When another set
+// declares a type of the same name, each element only that set declares is
+// placed right after the nearest earlier element both declare. A nil result
+// means no set declares the class or an ancestor.
+func (o *xmlChildOrder) sequenceFor(plan *Plan, class string) ([]string, error) {
+	i, name, ok := o.typeFor(plan, class)
+	if !ok {
+		return nil, nil
+	}
+	seq, err := o.sets[i].sequence(name)
+	if err != nil {
+		return nil, err
+	}
+	for j, other := range o.sets {
+		if j == i || !other.has(name) {
+			continue
+		}
+		otherSeq, err := other.sequence(name)
+		if err != nil {
+			return nil, err
+		}
+		seq = placeOtherOnly(seq, otherSeq)
+	}
+	return seq, nil
+}
+
+// attributesFor returns the names of the XML attributes of the schema type
+// class takes, as [xmlChildOrder.typeFor] finds it, its extension bases'
+// first. Only that set is read: another set's type of the same name does not
+// add attributes. A nil result means the type declares none, or no set
+// declares the class or an ancestor.
+func (o *xmlChildOrder) attributesFor(plan *Plan, class string) ([]string, error) {
+	i, name, ok := o.typeFor(plan, class)
+	if !ok {
+		return nil, nil
+	}
+	return o.sets[i].attributes(name)
 }
 
 // nearestLineage returns class and every class it descends from, nearest
@@ -461,4 +632,58 @@ func xmlChildFields(plan *Plan, pc *PlannedClass, fields []emittedField) ([]emit
 	out := slices.Clone(fields)
 	slices.SortStableFunc(out, func(a, b emittedField) int { return cmp.Compare(rank(a), rank(b)) })
 	return out, nil
+}
+
+// errXMLAttributeNotString reports a member the ITS-XML schema type of its
+// class declares as an XML attribute that the generated codec has no rule
+// for: the codec writes and reads an attribute's text as a mandatory String
+// member, held as a Go string.
+var errXMLAttributeNotString = errors.New("bmmgen: a member the ITS-XML schema declares as an XML attribute is not a mandatory String")
+
+// xmlAttributeSet is what the ITS-XML schema type of one class declares as
+// XML attributes.
+type xmlAttributeSet struct {
+	// members are the attributes that name a member of the class, which the
+	// class's codec writes and reads as attributes, in the type's order.
+	members []string
+	// keys are the attributes that name no member of the class: each is the
+	// key the Hash holding the class keeps a value under, which the class's
+	// own codec does not write or read.
+	keys []string
+}
+
+// xmlAttributesOf returns the XML attributes the ITS-XML schema type of pc
+// declares, found as [xmlChildOrder.attributesFor] finds them, split by
+// whether they name one of fields, pc's members. A member it names that is
+// not a mandatory String is refused with [errXMLAttributeNotString]. A plan
+// built without the schemas, as a test may build one, makes no member an
+// attribute.
+func xmlAttributesOf(plan *Plan, pc *PlannedClass, fields []emittedField) (xmlAttributeSet, error) {
+	if plan.xmlOrder == nil {
+		return xmlAttributeSet{}, nil
+	}
+	names, err := plan.xmlOrder.attributesFor(plan, pc.BMMName)
+	if err != nil {
+		return xmlAttributeSet{}, fmt.Errorf("bmmgen: XML attributes of %s: %w", pc.BMMName, err)
+	}
+	var set xmlAttributeSet
+	for _, name := range names {
+		i := slices.IndexFunc(fields, func(ef emittedField) bool { return ef.Prop.PropertyName() == name })
+		if i < 0 {
+			set.keys = append(set.keys, name)
+			continue
+		}
+		if !isMandatoryString(fields[i].Prop) {
+			return xmlAttributeSet{}, fmt.Errorf("%w: %s.%s", errXMLAttributeNotString, pc.BMMName, name)
+		}
+		set.members = append(set.members, name)
+	}
+	return set, nil
+}
+
+// isMandatoryString reports whether prop is a mandatory single property of
+// the BMM primitive String, which the generator holds as a Go string.
+func isMandatoryString(prop bmm.Property) bool {
+	p, ok := prop.(*bmm.SingleProperty)
+	return ok && p.IsMandatory && p.TypeName == "String"
 }

@@ -68,9 +68,13 @@ import (
 //     - Slice of primitive/struct → append per occurrence
 //     - Slice of polymorphic → append result of `canxml.DecodeAs[Iface]`
 //
-//  4. Every other element, a foreign one included, reaches the default
-//     arm, `xmlunmatched.SkipUnmatched`, which skips it, reports it or refuses
-//     it as the decode's options say.
+//  4. An element the class's schema accepts that no member holds, which the
+//     target's root schemas name in their dropped_elements for the class or
+//     a class it inherits from, goes to `xmlunmatched.DropElement`, which
+//     drops it when its text is the one the entry gives and refuses any
+//     other text. Every other element, a foreign one included, reaches the
+//     default arm, `xmlunmatched.SkipUnmatched`, which skips it, reports it or
+//     refuses it as the decode's options say.
 //
 //  5. Text between the child elements goes to
 //     `xmlunmatched.CheckUnmatchedText`: the class's content is elements, so
@@ -174,24 +178,23 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 
 	var b strings.Builder
 
-	// Partition fields: attribute-typed properties are read from
-	// _start.Attr before the token loop; element-typed properties are
-	// handled inside the switch. For attribute-typed properties we
-	// ALSO keep the child-element case so the decoder remains
-	// tolerant of producers that emit the property as a child element
-	// (legacy fixtures, the SDK's own pre-fix output). The attribute
-	// path runs first; the child-element path overwrites only if the
-	// attribute was absent and a child appears.
-	var attrFields []emittedField
+	// The members the class's ITS-XML schema type declares as XML
+	// attributes, which the description names, are read from _start.Attr
+	// before the token loop; every member, those included, has its case in
+	// the switch. The child-element case of an attribute member keeps the
+	// decoder tolerant of producers that write it as a child element (legacy
+	// fixtures, the SDK's own pre-fix output): the attribute is read first,
+	// and a child element that appears overwrites it.
 	elemFields := fields
-	for _, ef := range fields {
-		if isXMLAttributeProperty(ef.Prop) {
-			attrFields = append(attrFields, ef)
-		}
-	}
 
 	// The description of the class the method hands the runtime on entry.
 	desc, err := xmlClassDescriptor(plan, pc, fields)
+	if err != nil {
+		return "", err
+	}
+	// The elements the class's schema accepts that no member holds, which the
+	// target's roots name for the class or a class it inherits from.
+	dropped, err := droppedElementsOf(plan, pc, fields)
 	if err != nil {
 		return "", err
 	}
@@ -228,10 +231,9 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	// The runtime learns the class, and every attribute the class does not
 	// read is unmatched content.
 	b.WriteString(enterXMLClass(pc.GoName))
-	// Read attribute-typed properties from _start.Attr.
-	for _, ef := range attrFields {
-		line := unmarshalXMLAttribute(recv, FieldName(ef.Prop.PropertyName()), ef.Prop.PropertyName())
-		b.WriteString(line)
+	// Read the attribute members from _start.Attr.
+	for _, name := range desc.attrs {
+		b.WriteString(unmarshalXMLAttribute(recv, FieldName(name), name))
 	}
 	if flagged {
 		b.WriteString("\tvar _seen intervalFlagsSeen\n")
@@ -264,6 +266,9 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 			caseBody = withLegacyElementName(caseBody, ef.Prop.PropertyName())
 		}
 		b.WriteString(caseBody)
+	}
+	for _, d := range dropped {
+		b.WriteString(unmarshalXMLDroppedElement(d.element, d.text))
 	}
 
 	b.WriteString("\t\t\tdefault:\n")
@@ -719,12 +724,59 @@ func unmarshalXMLPrimitiveSlice(recv, field, elem, innerType string) string {
 // Mirror of [marshalXMLAttribute]. Tolerates an absent attribute —
 // the openEHR ITS-XML XSDs declare `archetype_node_id` mandatory,
 // but some upstream fixtures (e.g. ehrbase's simple_empty_folder)
-// omit it, so we treat absence as the zero value rather than an
-// error.
+// omit it, so absence leaves the zero value rather than failing; the
+// description's Required list lets a decode that asks report it.
 func unmarshalXMLAttribute(recv, goField, attrName string) string {
 	return fmt.Sprintf(
 		"\tfor _, _a := range _start.Attr {\n\t\tif _a.Name.Local == %q && _a.Name.Space == \"\" {\n\t\t\t%s.%s = _a.Value\n\t\t\tbreak\n\t\t}\n\t}\n",
 		attrName, recv, goField)
+}
+
+// droppedXMLElement is an element a class's decoder reads and drops, with the
+// one text it may hold.
+type droppedXMLElement struct {
+	element, text string
+}
+
+// droppedElementsOf returns, in element order, the elements the decoder of pc
+// reads and drops: those the target's roots name, in their dropped_elements,
+// for pc or for a class pc inherits from. An element that names one of fields,
+// pc's members, is an error, since the member reads it, and so is an element
+// two of those classes drop with different texts.
+func droppedElementsOf(plan *Plan, pc *PlannedClass, fields []emittedField) ([]droppedXMLElement, error) {
+	if len(plan.extensions.droppedElements) == 0 {
+		return nil, nil
+	}
+	texts := map[string]string{}
+	from := map[string]string{}
+	for _, class := range append([]string{pc.BMMName}, AncestorChain(plan, pc.BMMName)...) {
+		for _, elem := range sortedStringKeys(plan.extensions.droppedElements[class]) {
+			text := plan.extensions.droppedElements[class][elem]
+			if prev, ok := texts[elem]; ok && prev != text {
+				return nil, fmt.Errorf("%s inherits the dropped element %s from %s and from %s, with two texts", pc.BMMName, elem, from[elem], class)
+			}
+			texts[elem], from[elem] = text, class
+		}
+	}
+	for _, ef := range fields {
+		if prop := ef.Prop.PropertyName(); texts[prop] != "" {
+			return nil, fmt.Errorf("%s drops %s, which is one of its members: %s.dropped_elements names it for %s", pc.BMMName, prop, sdkExtensionsMember, from[prop])
+		}
+	}
+	out := make([]droppedXMLElement, 0, len(texts))
+	for _, elem := range sortedStringKeys(texts) {
+		out = append(out, droppedXMLElement{element: elem, text: texts[elem]})
+	}
+	return out, nil
+}
+
+// unmarshalXMLDroppedElement emits the case of an element the class's schema
+// accepts that no member holds: xmlunmatched.DropElement reads it, drops it
+// when its text is text, and refuses any other text.
+func unmarshalXMLDroppedElement(elem, text string) string {
+	return fmt.Sprintf(
+		"\t\t\tcase %q:\n\t\t\t\t// The schema accepts the element, which no member holds: it is read, and dropped when its text is %q.\n\t\t\t\tif _err := xmlunmatched.DropElement(_dec, &_t, %q); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
+		elem, text, text)
 }
 
 // enterXMLClass emits the call that hands the start element and the class's
@@ -742,8 +794,10 @@ const maxXMLRequired = 64
 // xmlClassDesc is the description of a class its generated decoder hands
 // xmlunmatched.Enter, rendered by [renderXMLClassVar] as a package-level var
 // named `xmlClass<GoName>`: the class's BMM name, the members the decoder
-// reads as XML attributes, the presence-checked mandatory members in the
-// Reference Model's declaration order, and the multi-valued members.
+// reads as XML attributes, which its ITS-XML schema type declares as
+// attributes, in the type's order ([xmlAttributesOf]), the presence-checked
+// mandatory members in the Reference Model's declaration order, and the
+// multi-valued members.
 type xmlClassDesc struct {
 	goName   string
 	name     string
@@ -760,14 +814,14 @@ type xmlClassDesc struct {
 // used. A class with more presence-checked members than the runtime holds
 // ([maxXMLRequired]) is refused.
 func xmlClassDescriptor(plan *Plan, pc *PlannedClass, fields []emittedField) (xmlClassDesc, error) {
-	d := xmlClassDesc{goName: pc.GoName, name: pc.BMMName}
+	attrs, err := xmlAttributesOf(plan, pc, fields)
+	if err != nil {
+		return xmlClassDesc{}, err
+	}
+	d := xmlClassDesc{goName: pc.GoName, name: pc.BMMName, attrs: attrs.members}
 	for _, ef := range fields {
-		prop := ef.Prop.PropertyName()
-		if isXMLAttributeProperty(ef.Prop) {
-			d.attrs = append(d.attrs, prop)
-		}
 		if xmlMultiValued(ef.Prop) {
-			d.items = append(d.items, prop)
+			d.items = append(d.items, ef.Prop.PropertyName())
 		}
 	}
 	_, order := effectiveProperties(plan, pc.BMMName)

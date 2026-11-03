@@ -26,7 +26,7 @@ import (
 // containers as slices, generic classes as type parameters, and JSON tags
 // that keep the BMM property names.
 func TestGoldenDataTypesQuantity(t *testing.T) {
-	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlan(context.Background(), TargetRM.RootID, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlan: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestIdempotent(t *testing.T) {
 		if _, err := Run(Options{
 			ResourcesDir:  testResources,
 			OutDir:        dir,
-			RootID:        "openehr_rm_1.2.0",
+			RootID:        TargetRM.RootID,
 			SkipInventory: true,
 		}); err != nil {
 			t.Fatalf("Run %s: %v", dir, err)
@@ -87,7 +87,7 @@ func TestDriftDetection(t *testing.T) {
 	if _, err := Run(Options{
 		ResourcesDir:  testResources,
 		OutDir:        dir,
-		RootID:        "openehr_rm_1.2.0",
+		RootID:        TargetRM.RootID,
 		SkipInventory: true,
 	}); err != nil {
 		t.Fatalf("initial Run: %v", err)
@@ -113,7 +113,7 @@ func TestDriftDetection(t *testing.T) {
 	result, err := Run(Options{
 		ResourcesDir:  testResources,
 		OutDir:        dir,
-		RootID:        "openehr_rm_1.2.0",
+		RootID:        TargetRM.RootID,
 		Verify:        true,
 		SkipInventory: true,
 	})
@@ -147,7 +147,7 @@ func TestDriftDetection(t *testing.T) {
 // that carries its pre- and post-conditions as comments and panics with a
 // not-implemented message.
 func TestMethodStubsForDVQuantity(t *testing.T) {
-	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlan(context.Background(), TargetRM.RootID, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlan: %v", err)
 	}
@@ -199,7 +199,7 @@ func TestMethodStubsForDVQuantity(t *testing.T) {
 // REQ-041: § Mapping rules, Functions. A function that has no hand-written
 // body keeps its fail-loud stub.
 func TestManualImplementationSkip(t *testing.T) {
-	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlan(context.Background(), TargetRM.RootID, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlan: %v", err)
 	}
@@ -274,7 +274,7 @@ func TestManualImplementationSkip(t *testing.T) {
 // class with subtypes emitted as a `…Like` interface) stays `T` and carries
 // `omitempty`, and so does a P_BMM_SINGLE_PROPERTY_OPEN.
 func TestOptionalFieldsThatAreNotPointers(t *testing.T) {
-	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlan(context.Background(), TargetRM.RootID, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlan: %v", err)
 	}
@@ -321,7 +321,7 @@ func TestOptionalFieldsThatAreNotPointers(t *testing.T) {
 // carries no omit option. Without these rows a flip in the generator shows
 // only as a `make codegen-check` diff.
 func TestMandatoryFieldsOmitOnlyWhatCanBeAbsent(t *testing.T) {
-	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlan(context.Background(), TargetRM.RootID, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlan: %v", err)
 	}
@@ -366,11 +366,11 @@ func TestMandatoryFieldsOmitOnlyWhatCanBeAbsent(t *testing.T) {
 // whose BMM type is Any is emitted as *any, because Any is a primitive and
 // not a class the interface exception covers. A mandatory one is any.
 func TestAnyPropertyType(t *testing.T) {
-	rmPlan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+	rmPlan, err := BuildPlanForTarget(context.Background(), TargetRM, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(RM): %v", err)
 	}
-	aomPlan, err := BuildPlanForTarget(context.Background(), TargetAOM14, bmm.FSResolver{Root: testResources})
+	aomPlan, err := BuildPlanForTarget(context.Background(), TargetAOM14, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(AOM14): %v", err)
 	}
@@ -506,7 +506,7 @@ func TestVerifyOnFreshTreeIsClean(t *testing.T) {
 	if _, err := Run(Options{
 		ResourcesDir:  testResources,
 		OutDir:        dir,
-		RootID:        "openehr_rm_1.2.0",
+		RootID:        TargetRM.RootID,
 		SkipInventory: true,
 	}); err != nil {
 		t.Fatalf("Run: %v", err)
@@ -514,7 +514,7 @@ func TestVerifyOnFreshTreeIsClean(t *testing.T) {
 	result, err := Run(Options{
 		ResourcesDir:  testResources,
 		OutDir:        dir,
-		RootID:        "openehr_rm_1.2.0",
+		RootID:        TargetRM.RootID,
 		Verify:        true,
 		SkipInventory: true,
 	})

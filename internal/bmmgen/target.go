@@ -11,8 +11,10 @@ import "strings"
 // base classes; it references them as `rm.<GoName>` through a one-way
 // `aom14 → rm` dependency.
 type Target struct {
-	// RootID is the BMM include id to load (no .bmm.json suffix).
-	// Example: "openehr_rm_1.2.0" or "openehr_am_1.4.0".
+	// RootID is the id of the schema to load (no .bmm.json suffix): a root
+	// schema under resources/bmm/sdk/, which includes the pinned openEHR
+	// schemas, or a pinned schema itself. Example:
+	// "openehr_reference_model_1.2.0" or "openehr_am_1.4.0".
 	RootID string
 	// GoPackage is the Go package name written in the file header.
 	// Example: "rm", "aom14".
@@ -20,10 +22,6 @@ type Target struct {
 	// OutSubDir is the sub-directory under OutDir where _gen.go files
 	// land. Example: "openehr/rm", "openehr/aom/aom14".
 	OutSubDir string
-	// SourceLabel is rendered into the generated-file header after
-	// "// Source: ". Example:
-	// "openehr_rm_1.2.0.bmm.json + openehr_base_1.3.0.bmm.json".
-	SourceLabel string
 	// OwnPackagePrefixes is the list of BMM package dotted-name
 	// prefixes whose classes this target *owns* (emits). Classes whose
 	// enclosing BMM package starts with one of these prefixes are
@@ -62,12 +60,12 @@ type Target struct {
 	ITSXMLSchemaSets [][]string
 }
 
-// TargetRM is the RM generation target.
+// TargetRM is the RM generation target. It loads the RM root, which
+// includes openehr_rm_1.2.0 and corrects what that schema gets wrong.
 var TargetRM = Target{
-	RootID:             "openehr_rm_1.2.0",
+	RootID:             "openehr_reference_model_1.2.0",
 	GoPackage:          "rm",
 	OutSubDir:          "openehr/rm",
-	SourceLabel:        "openehr_rm_1.2.0.bmm.json + openehr_base_1.3.0.bmm.json",
 	OwnPackagePrefixes: nil, // RM owns all surviving classes.
 	ExternalQualifier:  "",
 	ExternalImport:     "",
@@ -84,7 +82,6 @@ var TargetAOM14 = Target{
 	RootID:             "openehr_am_1.4.0",
 	GoPackage:          "aom14",
 	OutSubDir:          "openehr/aom/aom14",
-	SourceLabel:        "openehr_am_1.4.0.bmm.json + openehr_base_1.3.0.bmm.json",
 	OwnPackagePrefixes: []string{"org.openehr.am."},
 	ExternalQualifier:  "rm",
 	ExternalImport:     "github.com/cadasto/openehr-sdk-go/openehr/rm",

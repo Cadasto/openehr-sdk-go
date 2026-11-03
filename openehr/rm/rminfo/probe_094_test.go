@@ -1,16 +1,20 @@
 package rminfo_test
 
 // PROBE-094 — the compiled-in RM class graph equals an independent reduction
-// of the pinned BMM (REQ-048).
+// of the pinned BMM (REQ-048), as the RM root schema includes and amends it
+// (REQ-041 § SDK-authored root schemas).
 //
-// The reduction below reads the pinned schemas through the openehr/bmm loader
-// and re-derives every answer from the raw BMM. It deliberately does
+// The reduction below reads the RM root and the pinned schemas it includes
+// through the openehr/bmm loader and re-derives every answer from the raw BMM. It deliberately does
 // NOT call internal/bmmgen: comparing the table against the walk that produced
 // it would pass on a generator whose walk is itself wrong, which is the one
 // failure this probe exists to catch. `make codegen-check` already covers the
 // other direction — that the committed table is what the generator emits.
 
 import (
+	"context"
+	"errors"
+	"io"
 	"maps"
 	"regexp"
 	"slices"
@@ -21,6 +25,23 @@ import (
 )
 
 const probeResourcesDir = "../../../" + bmm.DefaultResourcesDir
+
+// probeRMRootID is the RM root schema under resources/bmm/sdk/, the schema the
+// RM generation target loads. It is written out here, not read from
+// internal/bmmgen, for the reason the reduction does not call the generator.
+const probeRMRootID = "openehr_reference_model_1.2.0"
+
+// probeResolver reads the root schemas under resources/bmm/sdk/ before the
+// pinned schemas under resources/bmm/, as the generator does.
+type probeResolver struct{}
+
+func (probeResolver) Resolve(ctx context.Context, id string) (io.ReadCloser, error) {
+	rc, err := bmm.FSResolver{Root: probeResourcesDir + "/sdk"}.Resolve(ctx, id)
+	if errors.Is(err, bmm.ErrSchemaNotFound) {
+		return bmm.FSResolver{Root: probeResourcesDir}.Resolve(ctx, id)
+	}
+	return rc, err
+}
 
 // probeExcludedClasses mirrors internal/bmmgen's skippedClasses, written out
 // HERE rather than imported. That duplication is the point: it confronts the
@@ -126,9 +147,9 @@ type bmmReduction struct {
 
 func reducePinnedBMM(t *testing.T) *bmmReduction {
 	t.Helper()
-	schema, err := bmm.LoadAll("openehr_rm_1.2.0", bmm.FSResolver{Root: probeResourcesDir})
+	schema, err := bmm.LoadAll(probeRMRootID, probeResolver{})
 	if err != nil {
-		t.Fatalf("LoadAll(openehr_rm_1.2.0): %v", err)
+		t.Fatalf("LoadAll(%s): %v", probeRMRootID, err)
 	}
 
 	r := &bmmReduction{

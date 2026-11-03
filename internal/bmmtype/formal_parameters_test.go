@@ -15,7 +15,7 @@ import (
 func loadPinnedBMM(t *testing.T) *bmm.Schema {
 	t.Helper()
 	id := bmmgen.TargetRM.RootID
-	schema, err := bmm.LoadAll(id, bmm.FSResolver{Root: "../../resources/bmm"})
+	schema, err := bmm.LoadAll(id, bmmgen.NewResolver("../../resources/bmm"))
 	if err != nil {
 		t.Fatalf("LoadAll(%s): %v", id, err)
 	}

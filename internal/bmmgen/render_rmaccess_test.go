@@ -18,15 +18,13 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-
-	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
 )
 
 // rmAccessOutput renders the access file for the pinned RM schemas and
 // parses it.
 func rmAccessOutput(t *testing.T) (*Plan, []byte, *ast.File) {
 	t.Helper()
-	plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlanForTarget(context.Background(), TargetRM, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(RM): %v", err)
 	}
@@ -85,7 +83,7 @@ func caseBodies(t *testing.T, fd *ast.FuncDecl) map[string]string {
 // TestRenderRMAccessFile_REQ171_NotForAOM pins that the access is emitted
 // for the RM target only.
 func TestRenderRMAccessFile_REQ171_NotForAOM(t *testing.T) {
-	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(AOM14): %v", err)
 	}

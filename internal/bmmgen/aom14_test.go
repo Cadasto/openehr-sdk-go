@@ -6,8 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
 )
 
 // TestAOM14PlanFileAssignments asserts that the small load-bearing
@@ -16,7 +14,7 @@ import (
 // REQ-041: § Mapping rules, Schema → Go package set. The AOM 1.4 target also
 // emits one Go file per BMM package.
 func TestAOM14PlanFileAssignments(t *testing.T) {
-	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(AOM14): %v", err)
 	}
@@ -49,7 +47,7 @@ func TestAOM14PlanFileAssignments(t *testing.T) {
 // AUTHORED_RESOURCE, VALIDITY_KIND) are present in the plan but
 // marked External so the renderer qualifies them with `rm.`.
 func TestAOM14ExternalBaseClasses(t *testing.T) {
-	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(AOM14): %v", err)
 	}
@@ -76,7 +74,7 @@ func TestAOM14ExternalBaseClasses(t *testing.T) {
 // contains ARCHETYPE and key C_OBJECT descendants. Abstract classes
 // (C_OBJECT itself, C_PRIMITIVE) must NOT register.
 func TestAOM14ConcreteRegistry(t *testing.T) {
-	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(AOM14): %v", err)
 	}
@@ -121,7 +119,7 @@ func TestAOM14ConcreteRegistry(t *testing.T) {
 // mandatory pointer, its tag carries omitzero, so a nil one is left out of
 // canonical JSON rather than written as null.
 func TestAOM14CyclicSinglePropDetection(t *testing.T) {
-	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(AOM14): %v", err)
 	}
@@ -167,7 +165,7 @@ func TestAOM14CyclicSinglePropDetection(t *testing.T) {
 // REQ-041: § Mapping rules, for the AOM target. The golden holds the class,
 // property and function mapping of the ARCHETYPE file.
 func TestGoldenAOM14Archetype(t *testing.T) {
-	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(AOM14): %v", err)
 	}
@@ -245,7 +243,7 @@ func TestAOM14IdempotentAndVerifyClean(t *testing.T) {
 // pin § Property → Go field: the mandatory archetype_id is a value and the
 // optional uid a pointer.
 func TestAOM14CrossTargetReferences(t *testing.T) {
-	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(AOM14): %v", err)
 	}
@@ -283,7 +281,7 @@ func TestAOM14CrossTargetReferences(t *testing.T) {
 // imports the SAME rm/typereg package as RM. Phase 4 design
 // (Option C) reuses the single Default registry across both models.
 func TestAOM14TypeRegistrySharing(t *testing.T) {
-	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(AOM14): %v", err)
 	}

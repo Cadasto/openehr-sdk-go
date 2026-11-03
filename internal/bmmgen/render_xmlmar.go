@@ -137,15 +137,16 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 	}
 	_ = typeParams // reserved — generic type parameter list lives on the receiver via typeArgs
 
-	// Partition fields: properties emitted as XML attributes
-	// (currently `archetype_node_id` on every LOCATABLE descendant,
-	// per the openEHR ITS-XML XSDs) come before the start token;
-	// element-typed properties come inside.
-	var attrFields, elemFields []emittedField
+	// Partition fields: the members the class's ITS-XML schema type
+	// declares as XML attributes go on the start token, in the type's
+	// order; the others are child elements.
+	attrs, err := xmlAttributesOf(plan, pc, fields)
+	if err != nil {
+		return "", err
+	}
+	var elemFields []emittedField
 	for _, ef := range fields {
-		if isXMLAttributeProperty(ef.Prop) {
-			attrFields = append(attrFields, ef)
-		} else {
+		if !slices.Contains(attrs.members, ef.Prop.PropertyName()) {
 			elemFields = append(elemFields, ef)
 		}
 	}
@@ -187,10 +188,9 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 	b.WriteString("\tif _start.Name.Local == \"\" {\n")
 	fmt.Fprintf(&b, "\t\t_start.Name = xml.Name{Local: canxml.ElementName(%q)}\n", pc.BMMName)
 	b.WriteString("\t}\n")
-	// Append attribute-typed properties.
-	for _, ef := range attrFields {
-		line := marshalXMLAttribute(recv, FieldName(ef.Prop.PropertyName()), ef.Prop.PropertyName())
-		b.WriteString(line)
+	// Append the attribute members.
+	for _, name := range attrs.members {
+		b.WriteString(marshalXMLAttribute(recv, FieldName(name), name))
 	}
 	b.WriteString("\tif err := _e.EncodeToken(_start); err != nil {\n\t\treturn err\n\t}\n")
 
@@ -212,25 +212,10 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 	return b.String(), nil
 }
 
-// isXMLAttributeProperty reports whether a BMM property is emitted
-// as an XML attribute (rather than a child element) in the openEHR
-// ITS-XML profile. The XSDs declare `archetype_node_id` on
-// LOCATABLE as a mandatory `xs:attribute`; the SDK mirrors that on
-// every concrete LOCATABLE descendant (the property is inherited
-// via flattening, so the check is name-based).
-//
-// Other String/primitive properties on LOCATABLE/ARCHETYPED (e.g.
-// `rm_version`) are XSD child elements — the IDCR conformance
-// fixture confirms this. Extend this list as the canonical-XML
-// surface grows.
-func isXMLAttributeProperty(prop bmm.Property) bool {
-	return prop.PropertyName() == "archetype_node_id"
-}
-
 // marshalXMLAttribute emits the source line that appends one XML
-// attribute to _start.Attr before the start token is written. Used
-// for properties that the openEHR ITS-XML profile pins to attribute
-// form. Currently primitive-String only.
+// attribute to _start.Attr before the start token is written, for a member
+// the class's ITS-XML schema type declares as an attribute. The member is a
+// mandatory String, held as a Go string: [xmlAttributesOf] refuses any other.
 func marshalXMLAttribute(recv, goField, attrName string) string {
 	return fmt.Sprintf(
 		"\t_start.Attr = append(_start.Attr, xml.Attr{Name: xml.Name{Local: %q}, Value: %s.%s})\n",

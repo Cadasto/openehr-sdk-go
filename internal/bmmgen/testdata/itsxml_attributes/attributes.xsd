@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A fixture for the ITS-XML schema reader: each type declares its XML
+     attributes in one of the places a schema can put them. -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+	<!-- An attribute of the type itself, after its sequence. -->
+	<xs:complexType name="OWN">
+		<xs:sequence>
+			<xs:element name="items" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attribute name="language" type="xs:string" use="required"/>
+	</xs:complexType>
+	<!-- An attribute in a complexContent extension, after its base's. -->
+	<xs:complexType name="EXTENDED">
+		<xs:complexContent>
+			<xs:extension base="OWN">
+				<xs:sequence>
+					<xs:element name="value" type="xs:string"/>
+				</xs:sequence>
+				<xs:attribute name="code" type="xs:string" use="required"/>
+			</xs:extension>
+		</xs:complexContent>
+	</xs:complexType>
+	<!-- No attribute of its own: both come through the base chain. -->
+	<xs:complexType name="INHERITED">
+		<xs:complexContent>
+			<xs:extension base="EXTENDED">
+				<xs:sequence>
+					<xs:element name="extra" type="xs:string"/>
+				</xs:sequence>
+			</xs:extension>
+		</xs:complexContent>
+	</xs:complexType>
+	<!-- An attribute in a simpleContent extension of a built-in type. -->
+	<xs:complexType name="TEXT_ITEM">
+		<xs:simpleContent>
+			<xs:extension base="xs:string">
+				<xs:attribute name="id" type="xs:string" use="required"/>
+			</xs:extension>
+		</xs:simpleContent>
+	</xs:complexType>
+	<!-- A simpleContent extension of a complex type with simple content. -->
+	<xs:complexType name="TEXT_ITEM_AT_PATH">
+		<xs:simpleContent>
+			<xs:extension base="TEXT_ITEM">
+				<xs:attribute name="path" type="xs:string" use="required"/>
+			</xs:extension>
+		</xs:simpleContent>
+	</xs:complexType>
+	<!-- A simpleContent extension of a named simple type. -->
+	<xs:simpleType name="Token">
+		<xs:restriction base="xs:string">
+			<xs:minLength value="1"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:complexType name="TOKEN_ITEM">
+		<xs:simpleContent>
+			<xs:extension base="Token">
+				<xs:attribute name="terminology" type="xs:string" use="required"/>
+			</xs:extension>
+		</xs:simpleContent>
+	</xs:complexType>
+	<!-- No attribute anywhere. -->
+	<xs:complexType name="PLAIN">
+		<xs:sequence>
+			<xs:element name="value" type="xs:string"/>
+		</xs:sequence>
+	</xs:complexType>
+</xs:schema>

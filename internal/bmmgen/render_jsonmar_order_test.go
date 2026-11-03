@@ -3,8 +3,6 @@ package bmmgen
 import (
 	"context"
 	"testing"
-
-	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
 )
 
 // TestMarshalJSONFieldOrderBMMArder asserts canonical JSON wire structs
@@ -12,7 +10,7 @@ import (
 // HISTORY is used because its own properties are not alphabetical
 // (origin before duration before events).
 func TestMarshalJSONFieldOrderBMMArder(t *testing.T) {
-	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlan(context.Background(), TargetRM.RootID, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlan: %v", err)
 	}

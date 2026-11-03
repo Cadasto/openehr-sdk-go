@@ -19,9 +19,9 @@ import (
 // these invariants fails here until the table follows.
 func TestNonEmptyLists_REQ112_MatchThePinnedBMM(t *testing.T) {
 	t.Parallel()
-	schema, err := bmm.LoadAll("openehr_rm_1.2.0", bmm.FSResolver{Root: probeResourcesDir})
+	schema, err := bmm.LoadAll(probeRMRootID, probeResolver{})
 	if err != nil {
-		t.Fatalf("LoadAll(openehr_rm_1.2.0): %v", err)
+		t.Fatalf("LoadAll(%s): %v", probeRMRootID, err)
 	}
 	lists := rminfo.NonEmptyLists()
 	var keys []string

@@ -27,9 +27,12 @@
 //   - [LoadAll] resolves a schema's transitive `includes` via a
 //     [Resolver] and merges the result. Descendant entries shadow
 //     ancestor entries with the same name, matching observed openEHR
-//     practice (e.g. RM refines TRANSLATION_DETAILS from BASE).
-//     Sibling-ancestor name collisions return [ErrSchemaConflict].
-//     Cycles return [ErrCircularIncludes].
+//     practice (e.g. RM refines TRANSLATION_DETAILS from BASE), also
+//     when the ancestor's entry arrives through a second include path.
+//     Differing entries with the same name from two schemas, neither of
+//     which includes the other, return [ErrSchemaConflict], unless a
+//     third schema that includes both declares the name again. Cycles
+//     return [ErrCircularIncludes].
 //
 // # Type registry
 //

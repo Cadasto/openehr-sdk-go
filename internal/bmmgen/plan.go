@@ -116,6 +116,15 @@ type Plan struct {
 	// referenced a class that was skipped (FUNCTION, ROUTINE, etc.).
 	// Diagnostic only; populated by the renderer.
 	MethodTodoEscapes int
+	// SourceLabel names the files the plan's schemas were read from, the
+	// target's root first and then every schema it includes, as the
+	// generated headers print it after "// Source: ". [BuildPlanForTarget]
+	// sets it; a plan computed from a schema already in memory has none.
+	SourceLabel string
+	// extensions is what the target's schemas say in their SDK extension
+	// keys, checked against the plan ([Plan.applyExtensions]). A plan
+	// computed from a schema already in memory has none.
+	extensions planExtensions
 	// xmlOrder gives the XML encoders their child order from the ITS-XML
 	// schemas. [Run] sets it from [Target.ITSXMLSchemaSets]; when it is nil
 	// the encoders write their children in the generator's property order.
@@ -135,14 +144,38 @@ func BuildPlan(ctx context.Context, rootID string, resolver bmm.Resolver) (*Plan
 }
 
 // BuildPlanForTarget loads the BMM root schema for the given target
-// (via the supplied resolver) and computes a [Plan].
+// (via the supplied resolver) and computes a [Plan]. It resolves each schema
+// once: the merged schema and the SDK extension keys are read from the same
+// bytes.
 func BuildPlanForTarget(ctx context.Context, t Target, resolver bmm.Resolver) (*Plan, error) {
-	_ = ctx                                        // reserved; bmm.LoadAll does not yet thread context.
-	schema, err := bmm.LoadAll(t.RootID, resolver) //nolint:contextcheck // ctx reserved; public bmm.LoadAll does not thread context yet
+	chain, err := readSchemaChain(ctx, t.RootID, resolver)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]string, len(chain))
+	read := make(chainResolver, len(chain))
+	for i, s := range chain {
+		ids[i] = s.id
+		read[s.id] = s.raw
+	}
+	schema, err := bmm.LoadAll(t.RootID, read) //nolint:contextcheck // ctx reserved; public bmm.LoadAll does not thread context yet
 	if err != nil {
 		return nil, fmt.Errorf("bmmgen: load %q: %w", t.RootID, err)
 	}
-	return PlanFromSchemaForTarget(schema, t)
+	label, err := sourceLabel(ids, resolver)
+	if err != nil {
+		return nil, err
+	}
+	ext, err := chainExtensions(chain)
+	if err != nil {
+		return nil, err
+	}
+	p, err := planFromSchema(schema, t, ext)
+	if err != nil {
+		return nil, err
+	}
+	p.SourceLabel = label
+	return p, nil
 }
 
 // PlanFromSchema computes a [Plan] from an already-loaded schema.
@@ -153,10 +186,21 @@ func PlanFromSchema(schema *bmm.Schema) (*Plan, error) {
 }
 
 // PlanFromSchemaForTarget computes a [Plan] from an already-loaded
-// schema, using the supplied target.
+// schema, using the supplied target. The schema carries no SDK extension
+// keys: those [BuildPlanForTarget] reads from the bytes of each schema.
 func PlanFromSchemaForTarget(schema *bmm.Schema, t Target) (*Plan, error) {
+	return planFromSchema(schema, t, sdkExtensions{})
+}
+
+// planFromSchema computes a [Plan] from an already-loaded schema for target
+// t, applying ext, the SDK extension keys of the schemas it was merged from.
+func planFromSchema(schema *bmm.Schema, t Target, ext sdkExtensions) (*Plan, error) {
 	if schema == nil {
 		return nil, errors.New("bmmgen: schema is nil")
+	}
+	leftOut, err := ext.leftOutSet(schema)
+	if err != nil {
+		return nil, err
 	}
 	p := &Plan{
 		Target:              t,
@@ -165,6 +209,7 @@ func PlanFromSchemaForTarget(schema *bmm.Schema, t Target) (*Plan, error) {
 		AbstractDescendants: make(map[string][]string),
 		ConcreteSubtypes:    make(map[string][]string),
 		CyclicSingleProps:   make(map[string]map[string]bool),
+		extensions:          planExtensions{leftOut: leftOut},
 	}
 
 	// Walk the package tree to discover each class's enclosing package.
@@ -224,6 +269,10 @@ func PlanFromSchemaForTarget(schema *bmm.Schema, t Target) (*Plan, error) {
 			p.Notes = append(p.Notes, "skip class (skipped class set): "+name)
 			continue
 		}
+		if leftOut[name] {
+			p.Notes = append(p.Notes, "skip class (left out by the target's root): "+name)
+			continue
+		}
 		pkgPath := classToPkg[name]
 		if isSkippedPackage(pkgPath) {
 			p.Notes = append(p.Notes, fmt.Sprintf("skip class %s (in skipped package %s)", name, pkgPath))
@@ -260,7 +309,7 @@ func PlanFromSchemaForTarget(schema *bmm.Schema, t Target) (*Plan, error) {
 		if isSkippedPrimitive(name) {
 			continue
 		}
-		if isSkippedClass(name) {
+		if isSkippedClass(name) || leftOut[name] {
 			continue
 		}
 		// Primitives without a package path go to a foundation bucket
@@ -314,6 +363,9 @@ func PlanFromSchemaForTarget(schema *bmm.Schema, t Target) (*Plan, error) {
 	computeAbstractDescendants(p)
 	computeConcreteSubtypes(p)
 	computeCyclicSingleProps(p)
+	if err := p.applyExtensions(ext); err != nil {
+		return nil, err
+	}
 	return p, nil
 }
 

@@ -46,12 +46,12 @@ func pinnedClassification(t *testing.T) (raw []byte, classes map[string]invarian
 // its schemas declare.
 func pinnedDeclared(t *testing.T) (*Plan, []string) {
 	t.Helper()
-	resolver := bmm.FSResolver{Root: testResources}
+	resolver := testResolver()
 	plan, err := BuildPlanForTarget(context.Background(), TargetRM, resolver)
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(RM): %v", err)
 	}
-	schemas, err := loadSchemaChain(context.Background(), TargetRM.RootID, resolver)
+	_, schemas, err := loadSchemaChain(context.Background(), TargetRM.RootID, resolver)
 	if err != nil {
 		t.Fatalf("loadSchemaChain(%s): %v", TargetRM.RootID, err)
 	}
@@ -147,7 +147,7 @@ func TestInventory_REQ171_ReadsAnInvariantTheIncludingSchemaRedefines(t *testing
 			"class_definitions": {"X": {"name": "X", "invariants": {"A": "a", "B": "b"}}},
 			"primitive_types": {"P": {"name": "P", "invariants": {"C": "c"}}}}`),
 	}
-	schemas, err := loadSchemaChain(context.Background(), "child_1.0.0", resolver)
+	_, schemas, err := loadSchemaChain(context.Background(), "child_1.0.0", resolver)
 	if err != nil {
 		t.Fatalf("loadSchemaChain: %v", err)
 	}
@@ -463,7 +463,7 @@ func TestRenderInventory_REQ171_ReadsNoExpression(t *testing.T) {
 		t.Helper()
 		resolver := bmm.MapResolver{"s_1.0.0": []byte(`{"schema_name": "s", "rm_release": "1.0.0",
 			"class_definitions": {"X": {"name": "X", "invariants": {"A": ` + strconv.Quote(expr) + `}}}}`)}
-		schemas, err := loadSchemaChain(context.Background(), "s_1.0.0", resolver)
+		_, schemas, err := loadSchemaChain(context.Background(), "s_1.0.0", resolver)
 		if err != nil {
 			t.Fatalf("loadSchemaChain: %v", err)
 		}

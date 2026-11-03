@@ -38,8 +38,9 @@
 //     between the elements they read, [DecodeElement] for an element
 //     decoded as text, [DecodeText] for one whose text they convert
 //     themselves, such as an interval boundary flag, [DecodeBase64] for an
-//     Octet list, and [DecodeParam] for a member typed by an open generic
-//     parameter. The hand-written TERMINOLOGY_CODE decoder calls the same
+//     Octet list, [DecodeParam] for a member typed by an open generic
+//     parameter, and [DropElement] for an element the class's schema accepts
+//     that no member holds. The hand-written TERMINOLOGY_CODE decoder calls the same
 //     helpers, [CheckUnmatchedAttrs] for the attributes of its inner
 //     TERMINOLOGY_ID element, [CheckUnmatchedTextBefore] for text it keeps
 //     until a child shows that the text is not its value, and
@@ -1060,3 +1061,31 @@ func dropXMLSpace(r rune) rune {
 	}
 	return r
 }
+
+// DropElement reads the element start opens and drops it: an element the
+// schema type of the class being decoded accepts but no member of the class
+// holds, which may hold one value only, want, such as the legacy
+// `match_negated` of an ADL 1.4 attribute constraint. start must be the token
+// the decoder read last.
+//
+// With want for text, less the XML whitespace around it, the element is read
+// and dropped in every decode: neither reported nor refused. Any other text,
+// none included, is refused in every decode, as a primitive failure is in
+// [DecodeText]: a *typereg.DecodeError whose cause wraps [ErrInvalidShape] and
+// whose text carries none of the element's. A tracked decode reports an
+// attribute or child element on the element, as for any primitive.
+func DropElement(dec *xml.Decoder, start *xml.StartElement, want string) error {
+	return DecodeText(dec, start, func(text string) error {
+		if strings.Trim(text, xmlSpace) != want {
+			return errDroppedValue
+		}
+		return nil
+	})
+}
+
+// xmlSpace holds the four XML whitespace characters.
+const xmlSpace = " \t\r\n"
+
+// errDroppedValue is the refusal of a dropped element's text other than its
+// one value. It names no text.
+var errDroppedValue = errors.New("the element holds a value other than the one it may hold")

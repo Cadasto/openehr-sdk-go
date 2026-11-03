@@ -24,7 +24,7 @@ func markerOnlyInterface(src, goName string) bool {
 // The BMM declares four functions on CODE_SET_ACCESS and six on
 // TERMINOLOGY_ACCESS; the generator emits none of them today.
 func TestInterfaceClassesMarkerOnlyRM(t *testing.T) {
-	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlan(context.Background(), TargetRM.RootID, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlan: %v", err)
 	}

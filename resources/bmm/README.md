@@ -19,7 +19,7 @@ These files are the SDK's source of truth for the openEHR Reference Model, Arche
 | `openehr_lang_1.1.0.bmm.json` | `openehr_lang_1.1.0` | 2.4 | 86 | base 1.3.0 | **deferred** (reference only) | LANG types: BMM meta-model + `P_BMM` persistence classes. Used as documentation while `openehr/bmm/` is hand-written. |
 | `openehr_term_3.1.0.bmm.json` | `openehr_term_3.1.0` | — | (terminology service interface) | — | **deferred** | Terminology service interface |
 
-**Primary** files drive v1 code generation. **Deferred** files stay here and are not removed. They are kept for future generation phases or as cross-references. See [`../../docs/specifications/scope.md`](../../docs/specifications/scope.md#out-of-scope-v1) and [`../../docs/specifications/bmm-conformance.md § v1 scope summary`](../../docs/specifications/bmm-conformance.md#v1-scope-summary).
+**Primary** files drive v1 code generation, the RM one through the root schema under [`sdk/`](#sdk-authored-root-schemas-sdk). **Deferred** files stay here and are not removed. They are kept for future generation phases or as cross-references. See [`../../docs/specifications/scope.md`](../../docs/specifications/scope.md#out-of-scope-v1) and [`../../docs/specifications/bmm-conformance.md § v1 scope summary`](../../docs/specifications/bmm-conformance.md#v1-scope-summary).
 
 Schema dependencies (transitive `includes`):
 
@@ -30,6 +30,40 @@ base 1.3.0  (foundation)
 └── lang 1.1.0
     └── am 2.4.0
 ```
+
+## SDK-authored root schemas (`sdk/`)
+
+Each root here is the schema a generation target loads in place of a pinned file. A root includes the pinned schema and declares only what the pinned schemas lack or get wrong; a class it declares again replaces the included class of that name, whole. Each class and property a root declares ends its `documentation` with a note: its reason (`Reason: …`), then the upstream reference it rests on (`Upstream: …`). The reference is the specification pull request or ticket that carries the same change, as an `https://` URL; the id of the pinned schema it follows; or a vendored ITS-XML schema by its path in the tree, with or without a line, such as `resources/its-xml/components/AM/Release-1.4/Template.xsd:115`. The generator leaves the note out of the Go doc comment it emits. The contract is [`bmm-conformance.md` § SDK-authored root schemas](../../docs/specifications/bmm-conformance.md#sdk-authored-root-schemas); the decision is [ADR 0034](../../docs/adr/0034-sdk-authored-root-schemas.md).
+
+### SDK extension keys
+
+What P_BMM has no construct for, a root says in the top-level `sdk_extensions` object of its JSON, one key per kind. The public loader (`openehr/bmm`) leaves the object aside; the generator reads it from every schema of the target's include chain, and a member it does not read fails generation, so a misspelt key never goes unnoticed. Every entry carries a `reason` and an `upstream` member, the same two parts as a declaration's note, with the same reference forms.
+
+| Key | Entry members | What the generator does |
+|---|---|---|
+| `classes_left_out` | `class` | Emits no Go type, registry entry or decode hook for the class; rminfo reports it as an excluded class. Generation fails when no schema declares the class, or a class the target emits still names it. |
+| `type_aliases` | `alias`, `class` | Carries the alias, a type name a decoder reads as `class` (an `xsi:type` older tools write), in its plan for the canonical-XML codec; the type registry never holds it. No generated code reads it yet. Generation fails on an alias a schema declares. |
+| `dropped_elements` | `class`, `element`, `text` | The XML decoder of `class`, and of every class that inherits from it, reads the element and drops it when its text, less the white space around it, is `text`, reporting nothing; any other text fails the decode with `canxml.ErrInvalidShape`. The encoder never writes it. Generation fails when the element names a member of the class. |
+| `anonymous_type_names` | `schema_type`, `element_path`, `class` | Carries the class the root declares for the anonymous type of the element at `element_path` (element names separated by `/`) inside the named schema type, in its plan for the ITS-XML schema reading. No generated code reads it yet. |
+| `schema_forms` | `class`, `property`, `form`, `shapes` | Carries the form the schema gives the property's element, in its plan for the canonical-XML codec. The one form is `choice`: the element takes the shape of one of the classes `shapes` lists. No generated code reads it yet. |
+
+Every class an entry of the last four keys names must be one the target holds, so no entry names a class left out. An example entry:
+
+```json
+"sdk_extensions": {
+    "dropped_elements": [
+        {"class": "C_ATTRIBUTE", "element": "match_negated", "text": "false",
+         "reason": "a legacy element no AOM class declares, accepted fixed to false.",
+         "upstream": "resources/its-xml/components/AM/Release-1.4/Archetype.xsd:52"}
+    ]
+}
+```
+
+| File | Schema ID | Includes | Declares | Loaded by |
+|---|---|---|---|---|
+| `sdk/openehr_reference_model_1.2.0.bmm.json` | `openehr_reference_model_1.2.0` | rm 1.2.0 | `TRANSLATION_DETAILS`, with `accreditation` where the RM schema misspells it ([specifications-RM PR 43](https://github.com/openEHR/specifications-RM/pull/43)) | the RM target |
+
+The roots are hand-written sources under review, not pins: the sync script never fetches or removes them, `MANIFEST.txt` does not list them, and `make bmm-check` does not hash them. A root's id is its own (`<rm_publisher>_<schema_name>_<rm_release>`, with the words spelled out); the generator refuses an id that both `sdk/` and this directory hold. The root check, a Go test in `internal/bmmgen` that `make test` runs, holds every root to its rules: each type name it uses resolves after the merge, each declaration and each extension entry carries its reason and upstream reference, each class it declares again still differs from the class it shadows, and no root takes a pinned id.
 
 ## Provenance
 
@@ -46,18 +80,18 @@ Until 2026-10 the pins were audited by hand against [`openEHR/BMM-publisher`](ht
 A BMM version bump is always deliberate and follows [ADR 0001: BMM version-bump runbook](../../docs/adr/0001-bmm-version-bump-runbook.md), the canonical procedure. In outline:
 
 1. Add the new file's upstream path to `SRC_PATHS` in [`scripts/sync-bmm.sh`](../../scripts/sync-bmm.sh), beside the old one, and run `BMM_REF=master make bmm-sync` (e.g. `openehr_rm_1.2.1.bmm.json` lands next to `openehr_rm_1.2.0.bmm.json`). Do **not** overwrite the old file.
-2. Run `make codegen` then `make codegen-check`. Optionally inspect the semantic diff with `go run ./cmd/bmmdiff <old> <new>`.
+2. Move the roots under `sdk/` with the pin: a root that includes the bumped schema names its new id, and a class it declares again that the new schema now carries in the same form goes, which the root check (`go test ./internal/bmmgen -run RootSchemas -count=1`) reports. Then run `make codegen` and `make codegen-check`. Optionally inspect the semantic diff with `go run ./cmd/bmmdiff <old> <new>`.
 3. Update version pins in [`../../docs/specifications/bmm-conformance.md`](../../docs/specifications/bmm-conformance.md) and the schema ID table above.
 4. Propose the one-line CHANGELOG bullet in the PR body; the CHANGELOG follows the rule in [`AGENTS.md § Code style and conventions`](../../AGENTS.md#code-style-and-conventions) (ADR 0001 step 8).
 5. Remove the old path from `SRC_PATHS` and re-run `make bmm-sync`, which deletes the old file, **in the same commit** once the regen and tests pass.
 
 See ADR 0001 for the full procedure, roles, and tooling notes. The weekly drift bot ([`.github/workflows/codegen-drift.yml`](../../.github/workflows/codegen-drift.yml)) catches accidental hand-edits or generator-template changes between bumps.
 
-Mid-version evolution (`openehr_rm_1.2.0` → `openehr_rm_1.2.0.2`, i.e. a `schema_revision` change without a `rm_release` change) is recorded by moving its path in `SRC_PATHS`, re-syncing, and noting it in the CHANGELOG. If no semantic content changed, no code regeneration is required.
+Mid-version evolution (`openehr_rm_1.2.0` → `openehr_rm_1.2.0.2`, i.e. a `schema_revision` change without a `rm_release` change) is recorded by moving its path in `SRC_PATHS`, re-syncing, and noting it in the CHANGELOG. If no semantic content changed, no code regeneration is required. A re-pin of this kind can still land an upstream fix a root carries: run the root check, and remove each shadow it reports in the same commit.
 
 ## Integrity
 
-[`MANIFEST.txt`](MANIFEST.txt) records the upstream commit and each file's `sha256`; the sync script writes it, so never edit it by hand. `make bmm-check`, part of `make ci`, recomputes the hashes offline and fails on a file whose bytes differ, a pinned file with no hash line, or a `*.bmm.json` the manifest does not list. `make bmm-sync` restores the pinned bytes.
+[`MANIFEST.txt`](MANIFEST.txt) records the upstream commit and each file's `sha256`; the sync script writes it, so never edit it by hand. `make bmm-check`, part of `make ci`, recomputes the hashes offline and fails on a file whose bytes differ, a pinned file with no hash line, or a `*.bmm.json` in this directory the manifest does not list. `make bmm-sync` restores the pinned bytes. The roots under `sdk/` are not pins and have no hash line; the root check holds them instead.
 
 ## Why these files and not the upstream URL
 

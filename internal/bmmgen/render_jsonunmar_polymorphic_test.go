@@ -24,7 +24,7 @@ import (
 // with an interface (DVInterval[DVOrdered] used by every
 // ReferenceRange / NormalRange in the RM).
 func TestPolymorphicPropertyEmittingClassNarrowing(t *testing.T) {
-	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlan(context.Background(), TargetRM.RootID, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlan: %v", err)
 	}
@@ -81,7 +81,7 @@ func TestPolymorphicPropertyEmittingClassNarrowing(t *testing.T) {
 // router is gone: v2 walks the interval and the one DVOrdered hook, threaded
 // through the decode options, serves the interface bounds.
 func TestPolymorphicPropertyRendersTyperegDispatch(t *testing.T) {
-	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
+	plan, err := BuildPlan(context.Background(), TargetRM.RootID, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlan: %v", err)
 	}
