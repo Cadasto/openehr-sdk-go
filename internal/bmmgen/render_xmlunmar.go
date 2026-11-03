@@ -68,29 +68,43 @@ import (
 //     - Slice of primitive/struct → append per occurrence
 //     - Slice of polymorphic → append result of `canxml.DecodeAs[Iface]`
 //
-//  4. An element the class's schema accepts that no member holds, which the
+//  4. A member whose element the target's root schemas give a choice of
+//     shapes, in their schema_forms, goes to `xmlunmatched.DecodeChoice`
+//     with the list of its shapes, a package-level `xmlChoice<GoName><Field>`
+//     emitted beside the class's description: the element's first child
+//     chooses the shape ([xmlChoiceOf]).
+//
+//  5. An element the class's schema accepts that no member holds, which the
 //     target's root schemas name in their dropped_elements for the class or
 //     a class it inherits from, goes to `xmlunmatched.DropElement`, which
-//     drops it when its text is the one the entry gives and refuses any
+//     drops it when its text is one of the texts the entry gives and refuses any
 //     other text. Every other element, a foreign one included, reaches the
 //     default arm, `xmlunmatched.SkipUnmatched`, which skips it, reports it or
 //     refuses it as the decode's options say.
 //
-//  5. Text between the child elements goes to
+//  6. Text between the child elements goes to
 //     `xmlunmatched.CheckUnmatchedText`: the class's content is elements, so
 //     text other than XML whitespace is unmatched, one item per element.
 //
-//  6. `xmi:type` is rejected via [canxml.XSITypeOf] (centralised in the
+//  7. `xmi:type` is rejected via [canxml.XSITypeOf] (centralised in the
 //     helper).
 //
-// # Hash/map and Any decoding
+// # Hash and Any decoding
 //
-// Same limitation as the encoder: Hash<K,V> properties are not
-// decoded, and neither is the content of a property typed by the BMM
-// root type Any. Their element goes to `xmlunmatched.SkipUnmatched` as one
-// item of unmatched content, so it is skipped by default, reported or
-// refused on request, and the receiver field is left at its zero value.
-// Documented in canxml/doc.go.
+// A Hash<K,V> member reads each element of its name as one entry, through
+// `xmlunmatched.DecodeEntry`, which takes the key attribute off before the
+// value is read, or `xmlunmatched.DecodeEntryKeyedBy`, which reads the key
+// from the value, its language code ([xmlHashOf]). The method keeps one mark
+// per Hash member, false as the element opens, which it hands the runtime
+// with each entry, so the member's map starts empty at the element's first
+// entry of it in every decode ([xmlHashMarks]). A Hash the codec does not
+// model, a Hash of Hashes, is not decoded: its element goes to
+// `xmlunmatched.SkipUnmatched` as one item of unmatched content, so it is
+// skipped by default, reported or refused on request, and the receiver field
+// is left at its zero value. Documented in canxml/doc.go. A property typed by
+// the BMM root type Any decodes through `xmlschema.DecodeAny`, as the class
+// its `xsi:type` names, as the text of an XML Schema built-in datatype kept
+// with its `xsi:type`, or as its text.
 func RenderUnmarshalXMLFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	emitting, err := codecClassesIn(plan, file)
 	if err != nil {
@@ -124,6 +138,9 @@ func RenderUnmarshalXMLFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	body.WriteString("import (\n")
 	body.WriteString("\t\"encoding/xml\"\n")
 	body.WriteString("\t\"fmt\"\n\n")
+	if slices.ContainsFunc(chunks, func(c string) bool { return strings.Contains(c, "xmlschema.") }) {
+		fmt.Fprintf(&body, "\t%q\n", xmlschemaImportPath)
+	}
 	body.WriteString("\t\"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched\"\n")
 	body.WriteString("\t\"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg\"\n")
 	body.WriteString("\t\"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml\"\n")
@@ -200,14 +217,36 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	}
 	b.WriteString(renderXMLClassVar(desc))
 	b.WriteString("\n")
+	// The members whose element the target's roots give a choice of shapes,
+	// each with the list of its shapes beside the description.
+	choices := map[string]*xmlChoice{}
+	for _, ef := range fields {
+		c, err := xmlChoiceOf(plan, pc, ef)
+		if err != nil {
+			return "", err
+		}
+		if c != nil {
+			choices[ef.Prop.PropertyName()] = c
+			b.WriteString(renderXMLChoiceVar(c))
+			b.WriteString("\n")
+		}
+	}
 
 	fmt.Fprintf(&b, "// UnmarshalXML decodes canonical openEHR XML into %s.\n", pc.GoName)
 	b.WriteString("// Polymorphic fields are routed through canxml.DecodeAs so the\n")
 	b.WriteString("// concrete type is selected by `xsi:type` at each polymorphic site.\n")
 	b.WriteString("// Missing/unknown/type-mismatch dispatch failures wrap typereg\n")
 	b.WriteString("// sentinels inside *canxml.DecodeError for errors.Is / errors.As.\n")
-	b.WriteString("// Properties typed as XML attributes per the openEHR ITS-XML XSDs\n")
-	b.WriteString("// (currently `archetype_node_id`) are read from _start.Attr.\n")
+	b.WriteString("// Members the class's ITS-XML schema type declares as XML attributes\n")
+	b.WriteString("// are read from _start.Attr.\n")
+	marks, err := xmlHashMarks(plan, fields)
+	if err != nil {
+		return "", err
+	}
+	if len(marks) > 0 {
+		b.WriteString("// A Hash member reads each element of its name as one entry, into a\n")
+		b.WriteString("// map that starts empty at the first entry.\n")
+	}
 	b.WriteString("// Content the method does not read is unmatched: it is skipped, or\n")
 	b.WriteString("// reported or refused under canxml.WithUnmatched and canxml.WithStrict.\n")
 	legacy := sc.IsAbstract() && hasIntervalShape(fields)
@@ -230,10 +269,14 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	fmt.Fprintf(&b, "func (%s *%s%s) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {\n", recv, pc.GoName, typeArgs)
 	// The runtime learns the class, and every attribute the class does not
 	// read is unmatched content.
-	b.WriteString(enterXMLClass(pc.GoName))
+	b.WriteString(enterXMLClass(recv, pc.GoName, typeArgs))
 	// Read the attribute members from _start.Attr.
 	for _, name := range desc.attrs {
 		b.WriteString(unmarshalXMLAttribute(recv, FieldName(name), name))
+	}
+	if len(marks) > 0 {
+		b.WriteString("\t// Whether the element has had an entry of each Hash member.\n")
+		fmt.Fprintf(&b, "\tvar %s bool\n", strings.Join(marks, ", "))
 	}
 	if flagged {
 		b.WriteString("\tvar _seen intervalFlagsSeen\n")
@@ -251,6 +294,8 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 		var caseBody string
 		if prop := ef.Prop.PropertyName(); flagged && isIntervalFlag(prop) {
 			caseBody = unmarshalXMLIntervalFlag(recv, prop)
+		} else if c := choices[prop]; c != nil {
+			caseBody = unmarshalXMLChoice(recv, FieldName(prop), prop, c, isMandatoryProperty(ef.Prop))
 		} else {
 			caseBody, err = renderUnmarshalXMLField(plan, recv, sc, ef)
 			if err != nil {
@@ -268,7 +313,7 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 		b.WriteString(caseBody)
 	}
 	for _, d := range dropped {
-		b.WriteString(unmarshalXMLDroppedElement(d.element, d.text))
+		b.WriteString(unmarshalXMLDroppedElement(d.element, d.texts))
 	}
 
 	b.WriteString("\t\t\tdefault:\n")
@@ -301,12 +346,25 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 	goField := FieldName(propName)
 	elemName := propName
 
+	// A Hash member reads one entry per element; one the codec does not model
+	// is unmatched content.
+	hash, isHash, err := xmlHashOf(plan, ef)
+	if err != nil {
+		return "", err
+	}
+	if hash != nil {
+		return unmarshalXMLHash(recv, goField, elemName, hash), nil
+	}
+	if isHash {
+		return unmarshalXMLHashUnmodelled(elemName), nil
+	}
+
 	switch p := ef.Prop.(type) {
 	case *bmm.SingleProperty:
 		if p.TypeName == bmmAnyType {
-			// The codec cannot decode the content of an Any member: the
-			// element goes to xmlunmatched.SkipUnmatched, like a Hash member's.
-			return unmarshalXMLAnyContent(elemName), nil
+			// An Any member decodes as the type its discriminator names, or
+			// as its text: xmlschema.DecodeAny.
+			return unmarshalXMLAny(recv, goField, elemName, p.IsMandatory), nil
 		}
 		ifaceName, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
 		if kind == polySingle {
@@ -394,9 +452,6 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 			// fixture appears that omits the discriminator.
 			return unmarshalXMLPolySlice(recv, goField, elemName, ifaceName), nil
 		}
-		if p.TypeDef != nil && p.TypeDef.ContainerType == "Hash" {
-			return unmarshalXMLHashTODO(elemName), nil
-		}
 		innerIsClass := containerInnerIsClass(plan, p.TypeDef)
 		innerType, err := containerInner(plan, ef.Owner, p.TypeDef)
 		if err != nil {
@@ -428,11 +483,6 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 		return unmarshalXMLPrimitiveSlice(recv, goField, elemName, innerType), nil
 
 	case *bmm.GenericProperty:
-		// Hash<K,V> at the property type level — Go maps it to
-		// map[K]V. v1 defers XML emission/decoding (see canxml/doc.go).
-		if p.TypeDef != nil && p.TypeDef.RootType == "Hash" {
-			return unmarshalXMLHashTODO(elemName), nil
-		}
 		// List<T>, Set<T> or Array<T> at the property type level — Go
 		// holds it as []T, or *[]T when optional: one element per item.
 		if p.TypeDef != nil && containerKinds[p.TypeDef.RootType] {
@@ -531,8 +581,10 @@ const bmmOctetType = "Octet"
 // handWrittenXMLCodecs names the BMM classes whose canonical-XML codec is
 // written by hand in the target package rather than generated, because the
 // generator emits no codec for their class. TERMINOLOGY_CODE is a BASE
-// primitive class, held by value in AOM 1.4 ARCHETYPE.original_language; its
-// methods live in openehr/rm/terminology_code_xml.go.
+// primitive class, which the pinned AOM 1.4 schema holds by value in
+// ARCHETYPE.original_language; its methods live in
+// openehr/rm/terminology_code_xml.go. The AOM 1.4 root gives
+// AUTHORED_RESOURCE its RM form, whose original_language is a CODE_PHRASE.
 var handWrittenXMLCodecs = map[string]bool{
 	"Terminology_code": true,
 }
@@ -541,7 +593,7 @@ var handWrittenXMLCodecs = map[string]bool{
 // canonical-XML decoder of its own, such as a BMM primitive class like
 // TERMINOLOGY_CODE: encoding/xml would read nothing from it and report
 // nothing either. The element is handed to xmlunmatched.SkipUnmatched as one
-// item, like a Hash member's: skipped by default, reported or refused on
+// item, like an Any member's: skipped by default, reported or refused on
 // request, and the field is left at its zero value.
 func unmarshalXMLNoDecoder(elem, bmmType string) string {
 	return fmt.Sprintf(
@@ -733,9 +785,10 @@ func unmarshalXMLAttribute(recv, goField, attrName string) string {
 }
 
 // droppedXMLElement is an element a class's decoder reads and drops, with the
-// one text it may hold.
+// texts it may hold.
 type droppedXMLElement struct {
-	element, text string
+	element string
+	texts   []string
 }
 
 // droppedElementsOf returns, in element order, the elements the decoder of pc
@@ -747,44 +800,50 @@ func droppedElementsOf(plan *Plan, pc *PlannedClass, fields []emittedField) ([]d
 	if len(plan.extensions.droppedElements) == 0 {
 		return nil, nil
 	}
-	texts := map[string]string{}
+	texts := map[string][]string{}
 	from := map[string]string{}
 	for _, class := range append([]string{pc.BMMName}, AncestorChain(plan, pc.BMMName)...) {
 		for _, elem := range sortedStringKeys(plan.extensions.droppedElements[class]) {
-			text := plan.extensions.droppedElements[class][elem]
-			if prev, ok := texts[elem]; ok && prev != text {
-				return nil, fmt.Errorf("%s inherits the dropped element %s from %s and from %s, with two texts", pc.BMMName, elem, from[elem], class)
+			want := plan.extensions.droppedElements[class][elem]
+			if prev, ok := texts[elem]; ok && !slices.Equal(prev, want) {
+				return nil, fmt.Errorf("%s inherits the dropped element %s from %s and from %s, with different texts", pc.BMMName, elem, from[elem], class)
 			}
-			texts[elem], from[elem] = text, class
+			texts[elem], from[elem] = want, class
 		}
 	}
 	for _, ef := range fields {
-		if prop := ef.Prop.PropertyName(); texts[prop] != "" {
+		if prop := ef.Prop.PropertyName(); texts[prop] != nil {
 			return nil, fmt.Errorf("%s drops %s, which is one of its members: %s.dropped_elements names it for %s", pc.BMMName, prop, sdkExtensionsMember, from[prop])
 		}
 	}
 	out := make([]droppedXMLElement, 0, len(texts))
 	for _, elem := range sortedStringKeys(texts) {
-		out = append(out, droppedXMLElement{element: elem, text: texts[elem]})
+		out = append(out, droppedXMLElement{element: elem, texts: texts[elem]})
 	}
 	return out, nil
 }
 
 // unmarshalXMLDroppedElement emits the case of an element the class's schema
 // accepts that no member holds: xmlunmatched.DropElement reads it, drops it
-// when its text is text, and refuses any other text.
-func unmarshalXMLDroppedElement(elem, text string) string {
+// when its text is one of texts, and refuses any other text.
+func unmarshalXMLDroppedElement(elem string, texts []string) string {
+	quoted := make([]string, len(texts))
+	for i, text := range texts {
+		quoted[i] = fmt.Sprintf("%q", text)
+	}
 	return fmt.Sprintf(
-		"\t\t\tcase %q:\n\t\t\t\t// The schema accepts the element, which no member holds: it is read, and dropped when its text is %q.\n\t\t\t\tif _err := xmlunmatched.DropElement(_dec, &_t, %q); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
-		elem, text, text)
+		"\t\t\tcase %q:\n\t\t\t\t// The schema accepts the element, which no member holds: it is read, and dropped when its text is %s.\n\t\t\t\tif _err := xmlunmatched.DropElement(_dec, &_t, %s); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
+		elem, strings.Join(quoted, " or "), strings.Join(quoted, ", "))
 }
 
 // enterXMLClass emits the call that hands the start element and the class's
-// description to xmlunmatched.Enter at the head of UnmarshalXML.
-func enterXMLClass(goName string) string {
+// description to xmlunmatched.Enter at the head of UnmarshalXML, and clears
+// the receiver when Enter says the decode starts the document over: the root
+// of a second decode into a value the first decode filled in part.
+func enterXMLClass(recv, goName, typeArgs string) string {
 	return fmt.Sprintf(
-		"\tif _err := xmlunmatched.Enter(_dec, _start, &xmlClass%s); _err != nil {\n\t\treturn _err\n\t}\n",
-		goName)
+		"\tif _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClass%s); _err != nil {\n\t\treturn _err\n\t} else if _fresh {\n\t\t*%s = %s%s{}\n\t}\n",
+		goName, recv, goName, typeArgs)
 }
 
 // maxXMLRequired is the most presence-checked members a class may have: the
@@ -943,23 +1002,17 @@ const checkUnmatchedXMLText = "\t\tcase xml.CharData:\n" +
 // the Go empty interface.
 const bmmAnyType = "Any"
 
-// unmarshalXMLAnyContent emits the case of a property typed by the BMM root
-// type Any, such as the AOM 1.4 `assumed_value` and `EXPR_LEAF.item`. The
-// codec cannot decode its content, so the element is handed to
-// xmlunmatched.SkipUnmatched as one item, like a Hash member's: skipped by
-// default, reported or refused on request, and the field is left at its
-// zero value.
-func unmarshalXMLAnyContent(elem string) string {
+// unmarshalXMLAny emits the case of a property typed by the BMM root type
+// Any, such as the AOM 1.4 `EXPR_LEAF.item`, held as a Go any, or as *any when
+// optional: xmlschema.DecodeAny decodes the element as the class its
+// discriminator names, as the text of an XML Schema built-in datatype, kept
+// with its `xsi:type`, or, with no discriminator, as its text.
+func unmarshalXMLAny(recv, field, elem string, mandatory bool) string {
+	assign := fmt.Sprintf("\t\t\t\t%s.%s = _v\n", recv, field)
+	if !mandatory {
+		assign = fmt.Sprintf("\t\t\t\t%s.%s = &_v\n", recv, field)
+	}
 	return fmt.Sprintf(
-		"\t\t\tcase %q:\n\t\t\t\t// Canonical XML does not model the content of an Any member — see canxml/doc.go.\n\t\t\t\tif _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
-		elem)
-}
-
-// unmarshalXMLHashTODO emits the case of a Hash<K,V> property. Canonical XML
-// does not model Hash, so the element is handed to xmlunmatched.SkipUnmatched
-// like unmatched content: skipped by default, reported or refused on request.
-func unmarshalXMLHashTODO(elem string) string {
-	return fmt.Sprintf(
-		"\t\t\tcase %q:\n\t\t\t\t// TODO(canxml): Hash<K,V> XML decode deferred — see canxml/doc.go.\n\t\t\t\tif _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
-		elem)
+		"\t\t\tcase %q:\n\t\t\t\t_v, _err := xmlschema.DecodeAny(_dec, _t)\n\t\t\t\tif _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n%s",
+		elem, assign)
 }

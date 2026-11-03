@@ -293,8 +293,13 @@ func xmlIntervalReaders() []xmlIntervalReader {
 			lower: xmlRealLower, upper: xmlRealUpper,
 			decode: func(doc []byte, opts ...canxml.DecoderOption) (intervalFlags, error) {
 				var v aom14.CQuantityItem
-				err := canxml.Unmarshal(doc, &v, opts...)
-				return baseFlags(v.Magnitude), err
+				if err := canxml.Unmarshal(doc, &v, opts...); err != nil {
+					return intervalFlags{}, err
+				}
+				if v.Magnitude == nil {
+					return intervalFlags{}, errors.New("C_QUANTITY_ITEM.magnitude decoded as nil")
+				}
+				return baseFlags(*v.Magnitude), nil
 			},
 		},
 	}

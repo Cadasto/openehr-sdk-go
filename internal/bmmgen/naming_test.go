@@ -21,6 +21,12 @@ func TestPascalCase(t *testing.T) {
 		{"ARCHETYPE_ID", "ArchetypeID"},
 		{"HL7", "HL7"},
 		{"Cardinality", "Cardinality"},
+		// REQ-176: the AM Release-1.4 schemas name some types and elements in
+		// camel case, which the AOM 1.4 root declares under the schema's name;
+		// each hump starts a word.
+		{"CodeDefinitionSet", "CodeDefinitionSet"},
+		{"TermBindingSet", "TermBindingSet"},
+		{"referenceSetUri", "ReferenceSetURI"},
 		{"", ""},
 	}
 	for _, c := range cases {

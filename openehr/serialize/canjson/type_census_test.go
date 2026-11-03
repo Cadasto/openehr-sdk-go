@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	_ "github.com/cadasto/openehr-sdk-go/openehr/aom/aom14" // register the AOM 1.4 types
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14" // also registers the AOM 1.4 types
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
@@ -61,6 +61,15 @@ func TestRegisteredTypeCensus(t *testing.T) {
 			// exercises the codec rather than the value rule.
 			if tm, ok := seed.(*rm.TermMapping); ok {
 				tm.Match = rm.Character("=")
+			}
+			// The zero value of an AOM 1.4 OPERATOR_KIND is no code of the
+			// enumeration, which its codec refuses on encode (a value rule as
+			// well). Seed a code, so the census exercises the codec.
+			switch op := seed.(type) {
+			case *aom14.ExprBinaryOperator:
+				op.Operator = aom14.OperatorKindMatches
+			case *aom14.ExprUnaryOperator:
+				op.Operator = aom14.OperatorKindNot
 			}
 			held := reflect.ValueOf(seed).Elem().Interface() // Concrete value in an interface
 

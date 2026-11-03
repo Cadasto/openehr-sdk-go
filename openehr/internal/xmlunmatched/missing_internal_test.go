@@ -22,7 +22,7 @@ type described struct {
 }
 
 func (d *described) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error {
-	if err := Enter(dec, start, d.class); err != nil {
+	if _, err := Enter(dec, start, d.class); err != nil {
 		return err
 	}
 	return d.readChildren(dec)
@@ -272,7 +272,7 @@ func TestREQ175_MissingMembersReportOnly(t *testing.T) {
 	if err := xml.NewDecoder(strings.NewReader(doc)).Decode(compositionTarget()); err != nil {
 		t.Errorf("untracked Decode = %v; want nil", err)
 	}
-	if err := Enter(xml.NewDecoder(strings.NewReader(doc)), xml.StartElement{}, compClass); err != nil {
+	if _, err := Enter(xml.NewDecoder(strings.NewReader(doc)), xml.StartElement{}, compClass); err != nil {
 		t.Errorf("Enter(untracked decoder) = %v; want nil", err)
 	}
 }
@@ -335,7 +335,7 @@ func TestEnter_REQ175_RefusesMoreThan64Required(t *testing.T) {
 	}
 	start := xml.StartElement{Name: xml.Name{Local: "a"}}
 	dec := xml.NewDecoder(strings.NewReader("<a/>"))
-	if err := Enter(dec, start, &Class{Name: "WIDE", Required: names(maxRequired)}); err != nil {
+	if _, err := Enter(dec, start, &Class{Name: "WIDE", Required: names(maxRequired)}); err != nil {
 		t.Fatalf("Enter(class with %d required members) = %v, want nil", maxRequired, err)
 	}
 	wide := &Class{Name: "TOO_WIDE", Required: names(maxRequired + 1)}
@@ -349,5 +349,5 @@ func TestEnter_REQ175_RefusesMoreThan64Required(t *testing.T) {
 			t.Errorf("Enter panic = %v; want it to name the class and its count", r)
 		}
 	}()
-	_ = Enter(dec, start, wide)
+	_, _ = Enter(dec, start, wide)
 }

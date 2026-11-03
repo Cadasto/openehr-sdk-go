@@ -20,7 +20,7 @@ func TestREQ056_QuantityItemUnitsSystemRoundTrips(t *testing.T) {
 		display = "kg"
 	)
 	in := &aom14.CQuantityItem{
-		Units:            new("kg"),
+		Units:            "kg",
 		UnitsSystem:      new(system),
 		UnitsDisplayName: new(display),
 	}
@@ -40,8 +40,9 @@ func TestREQ056_QuantityItemUnitsSystemRoundTrips(t *testing.T) {
 	for _, c := range doc.Children {
 		got = append(got, c.XMLName.Local)
 	}
-	// magnitude is mandatory in the AOM 1.4 BMM, so it is always written.
-	want := []string{"magnitude", "units", "units_system", "units_display_name"}
+	// magnitude is optional in the AM Release-1.4 schema (REQ-176), so a nil
+	// one is not written.
+	want := []string{"units", "units_system", "units_display_name"}
 	if !slices.Equal(got, want) {
 		t.Errorf("canxml.Marshal wrote child elements %q in %s; want %q", got, b, want)
 	}

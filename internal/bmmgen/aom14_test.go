@@ -108,10 +108,23 @@ func TestAOM14ConcreteRegistry(t *testing.T) {
 	}
 }
 
+// targetPinnedAOM14 is the AOM 1.4 target over the pinned openehr_am_1.4.0
+// schema alone, without the root that gives its classes the AM Release-1.4
+// schemas' forms: a test of a mapping rule that only the pinned schema
+// exercises builds its plan from it.
+var targetPinnedAOM14 = func() Target {
+	t := TargetAOM14
+	t.RootID = "openehr_am_1.4.0"
+	return t
+}()
+
 // TestAOM14CyclicSinglePropDetection asserts that the mutual
 // recursion between ARCHETYPE and ARCHETYPE_ONTOLOGY is broken by a
 // pointer on both sides, in the plan and in the rendered structs.
 // Without the pointer the Go compiler reports "invalid recursive type".
+// The cycle is the pinned schema's: the AOM 1.4 root gives
+// ARCHETYPE_ONTOLOGY the AM Release-1.4 schema's form, which has no
+// parent_archetype, so the plan is built from the pinned schema alone.
 //
 // REQ-041: § Mapping rules, Property → Go field. A mandatory property that
 // closes a cycle of mandatory struct-typed properties becomes a pointer,
@@ -119,7 +132,7 @@ func TestAOM14ConcreteRegistry(t *testing.T) {
 // mandatory pointer, its tag carries omitzero, so a nil one is left out of
 // canonical JSON rather than written as null.
 func TestAOM14CyclicSinglePropDetection(t *testing.T) {
-	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, testResolver())
+	plan, err := BuildPlanForTarget(context.Background(), targetPinnedAOM14, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(AOM14): %v", err)
 	}

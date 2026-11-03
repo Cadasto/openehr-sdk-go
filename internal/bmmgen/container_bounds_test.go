@@ -15,15 +15,16 @@ import (
 // generator keeps only cardinality.lower of a container property (as
 // AttrMeta.Required), because no container in the pinned BMMs has a finite
 // upper bound. No container property of a class, interface, enumeration or
-// primitive type in any pinned schema root may state a finite upper. A BMM
-// bump that brings a finite bound fails here instead of the bound being
-// dropped silently. A container property with no cardinality passes: P_BMM
+// primitive type in any pinned schema root, or in any root schema the SDK
+// authors over them, may state a finite upper. A BMM bump, or a root, that
+// brings a finite bound fails here instead of the bound being dropped
+// silently. A container property with no cardinality passes: P_BMM
 // reads a missing cardinality as |0..*|.
 //
 // REQ-041: § Mapping rules, Cardinality.
 func TestREQ043_PinnedContainersHaveNoFiniteUpper(t *testing.T) {
-	for _, root := range pinnedSchemaRoots {
-		schema, err := bmm.LoadAll(root, bmm.FSResolver{Root: testResources})
+	for _, root := range censusSchemaRoots(t) {
+		schema, err := bmm.LoadAll(root, testResolver())
 		if err != nil {
 			t.Fatalf("LoadAll(%s): %v", root, err)
 		}

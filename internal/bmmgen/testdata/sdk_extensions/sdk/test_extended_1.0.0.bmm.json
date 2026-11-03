@@ -23,6 +23,14 @@
                 "constraints": {"_type": "P_BMM_CONTAINER_PROPERTY", "name": "constraints", "documentation": "The view's constraints.\n\nReason: no pinned schema declares it. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:72.", "type_def": {"container_type": "List", "type": "VIEW_CONSTRAINT"}, "cardinality": {"lower": 0, "upper_unbounded": true}}
             }
         },
+        "ORDINAL": {
+            "name": "ORDINAL",
+            "documentation": "An ordinal value and its symbol.\n\nReason: the schema gives the symbol either of two shapes. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:40.",
+            "properties": {
+                "value": {"_type": "P_BMM_SINGLE_PROPERTY", "name": "value", "documentation": "Its value.\n\nReason: unchanged. Upstream: test_base_1.0.0.", "type": "Integer", "is_mandatory": true},
+                "symbol": {"_type": "P_BMM_SINGLE_PROPERTY", "name": "symbol", "documentation": "Its symbol.\n\nReason: the schema gives it either of two shapes. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:87.", "type": "Any", "is_mandatory": true}
+            }
+        },
         "VIEW_CONSTRAINT": {
             "name": "VIEW_CONSTRAINT",
             "documentation": "One constraint of a view.\n\nReason: the schema gives its type no name. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:72.",
@@ -39,7 +47,7 @@
             {"alias": "LEGACY_ROOT_OBJECT", "class": "ROOT_OBJECT", "reason": "older tools write this name.", "upstream": "https://example.org/pull/2"}
         ],
         "dropped_elements": [
-            {"class": "ATTRIBUTE", "element": "legacy_flag", "text": "false", "reason": "a legacy element no class declares.", "upstream": "resources/its-xml/components/AM/Release-1.4/Archetype.xsd:52"}
+            {"class": "ATTRIBUTE", "element": "legacy_flag", "texts": ["false"], "reason": "a legacy element no class declares.", "upstream": "resources/its-xml/components/AM/Release-1.4/Archetype.xsd:52"}
         ],
         "anonymous_type_names": [
             {"schema_type": "VIEW", "element_path": "constraints", "class": "VIEW_CONSTRAINT", "reason": "the schema gives the type no name.", "upstream": "resources/its-xml/components/AM/Release-1.4/Template.xsd:72"}

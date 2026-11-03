@@ -66,20 +66,32 @@ func marshalXMLChildren(body *ast.BlockStmt) (class string, children []string) {
 		case "EncodePoly":
 			children = append(children, stringLit(call.Args[1]))
 		case "EncodeElement":
-			ast.Inspect(call.Args[1], func(m ast.Node) bool {
-				kv, ok := m.(*ast.KeyValueExpr)
-				if !ok {
-					return true
-				}
-				if key, ok := kv.Key.(*ast.Ident); ok && key.Name == "Local" {
-					children = append(children, stringLit(kv.Value))
-				}
-				return true
-			})
+			// The start element's own name, not the names of the attributes
+			// it carries, such as the `id` of a Hash entry.
+			if name := keyedValue(call.Args[1], "Name"); name != nil {
+				children = append(children, stringLit(keyedValue(name, "Local")))
+			}
 		}
 		return true
 	})
 	return class, children
+}
+
+// keyedValue returns the value of the field key in e, a composite literal, or
+// nil when e is none or does not set it.
+func keyedValue(e ast.Expr, key string) ast.Expr {
+	lit, ok := e.(*ast.CompositeLit)
+	if !ok {
+		return nil
+	}
+	for _, elt := range lit.Elts {
+		if kv, ok := elt.(*ast.KeyValueExpr); ok {
+			if id, ok := kv.Key.(*ast.Ident); ok && id.Name == key {
+				return kv.Value
+			}
+		}
+	}
+	return nil
 }
 
 // stringLit returns the value of a string literal, or "" for anything else.

@@ -83,7 +83,11 @@ type xsdType struct {
 }
 
 // xsdSet is the complex types, the simple type names and the model groups of
-// one closure of schema files, by name.
+// one closure of schema files, by name. An anonymous complex type, the type of
+// an element declared inside a named type, is among the types under its path:
+// the named type's name and the local names of the elements down to it,
+// separated by "/", such as "T_VIEW/constraints/items", which no type name can
+// be.
 type xsdSet struct {
 	types       map[string]*xsdType
 	simpleTypes map[string]bool
@@ -91,6 +95,9 @@ type xsdSet struct {
 	// dups holds, per type name, the declarations after the first, which
 	// [loadXSDSet] checks agree with the first.
 	dups map[string][]*xsdType
+	// globals maps a type name to the global element a schema file declares
+	// with that type: the root element of a document of that type.
+	globals map[string]string
 }
 
 // loadXSDSet reads the schemas the root patterns match under root, and every
@@ -104,6 +111,7 @@ func loadXSDSet(root *os.Root, roots []string) (*xsdSet, error) {
 		simpleTypes: make(map[string]bool),
 		groups:      make(map[string]*xsdNode),
 		dups:        make(map[string][]*xsdType),
+		globals:     make(map[string]string),
 	}
 	var queue []string
 	for _, pattern := range roots {
@@ -160,8 +168,10 @@ func loadXSDSet(root *os.Root, roots []string) (*xsdSet, error) {
 	return s, nil
 }
 
-// readFile declares the top-level complex types and groups of one schema
-// file and returns the files it references, as paths relative to the root.
+// readFile declares the top-level complex types, groups and elements of one
+// schema file and returns the files it references, as paths relative to the
+// root. A global element is read by its name and its type; one with an
+// anonymous type, or a second of another name for a type, is an error.
 func (s *xsdSet) readFile(root *os.Root, file string) ([]string, error) {
 	raw, err := root.ReadFile(file)
 	if err != nil {
@@ -190,12 +200,9 @@ func (s *xsdSet) readFile(root *os.Root, file string) ([]string, error) {
 			if err != nil {
 				return nil, err
 			}
-			name := n.attr("name")
-			if _, dup := s.types[name]; dup {
-				s.dups[name] = append(s.dups[name], t)
-				continue
+			if err := s.declare(t); err != nil {
+				return nil, err
 			}
-			s.types[name] = t
 		case n.is("group"):
 			content := particleOf(n)
 			if content == nil {
@@ -204,9 +211,61 @@ func (s *xsdSet) readFile(root *os.Root, file string) ([]string, error) {
 			s.groups[n.attr("name")] = content
 		case n.is("simpleType"):
 			s.simpleTypes[n.attr("name")] = true
+		case n.is("element"):
+			name, typ := n.attr("name"), schemaLocalName(n.attr("type"))
+			if name == "" || typ == "" {
+				return nil, fmt.Errorf("its-xml: %s: a global element needs a name and a named type", file)
+			}
+			if other, dup := s.globals[typ]; dup && other != name {
+				return nil, fmt.Errorf("its-xml: %s: the global elements %s and %s both have the type %s", file, other, name, typ)
+			}
+			s.globals[typ] = name
 		}
 	}
 	return refs, nil
+}
+
+// declare adds t, a complex type read from a schema file, to the set under its
+// name, and each anonymous complex type its own particle declares, at any
+// depth, under its path. A name declared before keeps its first declaration;
+// [loadXSDSet] checks that the later ones agree with it.
+func (s *xsdSet) declare(t *xsdType) error {
+	if _, dup := s.types[t.name]; dup {
+		s.dups[t.name] = append(s.dups[t.name], t)
+	} else {
+		s.types[t.name] = t
+	}
+	if t.content == nil {
+		return nil
+	}
+	return s.declareAnonymous(t.file, t.name, t.content)
+}
+
+// declareAnonymous declares the anonymous complex type of each element n, a
+// particle of the type at path, declares, under path and the element's name.
+func (s *xsdSet) declareAnonymous(file, path string, n *xsdNode) error {
+	switch {
+	case n.is("element"):
+		for i := range n.Children {
+			c := &n.Children[i]
+			if !c.is("complexType") {
+				continue
+			}
+			t, err := parseComplexType(file, c)
+			if err != nil {
+				return err
+			}
+			t.name = path + "/" + n.attr("name")
+			return s.declare(t)
+		}
+	case n.is("sequence"), n.is("choice"), n.is("all"):
+		for i := range n.Children {
+			if err := s.declareAnonymous(file, path, &n.Children[i]); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // parseComplexType reads the base, the own particle and the own XML
@@ -469,6 +528,90 @@ func (s *xsdSet) appendParticle(out []string, n *xsdNode, groups []string) ([]st
 	}
 }
 
+// elementType returns the local name of the type the named type declares for
+// its child element elem, in its own particle or its extension bases', and
+// false when it declares no such element or gives it no named type.
+func (s *xsdSet) elementType(name, elem string) (string, bool) {
+	visiting := []string{}
+	for t, ok := s.types[name]; ok && !slices.Contains(visiting, t.name); t, ok = s.types[t.base] {
+		visiting = append(visiting, t.name)
+		if t.content == nil {
+			continue
+		}
+		if n := s.findElement(t.content, elem, nil); n != nil {
+			typ := schemaLocalName(n.attr("type"))
+			return typ, typ != ""
+		}
+	}
+	return "", false
+}
+
+// findElement returns the first declaration of the element elem in particle n,
+// at any depth, through the groups it refers to, or nil.
+func (s *xsdSet) findElement(n *xsdNode, elem string, groups []string) *xsdNode {
+	switch {
+	case n.is("element"):
+		if n.attr("name") == elem {
+			return n
+		}
+	case n.is("sequence"), n.is("choice"), n.is("all"):
+		for i := range n.Children {
+			if found := s.findElement(&n.Children[i], elem, groups); found != nil {
+				return found
+			}
+		}
+	case n.is("group"):
+		ref := schemaLocalName(n.attr("ref"))
+		if g, ok := s.groups[ref]; ok && !slices.Contains(groups, ref) {
+			return s.findElement(g, elem, append(groups, ref))
+		}
+	}
+	return nil
+}
+
+// optionalElements returns the names of the elements the named type's own
+// particle declares optional: each declaration of the element has
+// minOccurs="0", on itself or on a particle around it. The branches of an
+// xs:choice count each as a particle of its own, so an element a branch
+// requires is not optional, although the choice may take another branch.
+func (s *xsdSet) optionalElements(name string) []string {
+	t, ok := s.types[name]
+	if !ok || t.content == nil {
+		return nil
+	}
+	optional := map[string]bool{}
+	var walk func(n *xsdNode, around bool, groups []string)
+	walk = func(n *xsdNode, around bool, groups []string) {
+		around = around || n.attr("minOccurs") == "0"
+		switch {
+		case n.is("element"):
+			name := n.attr("name")
+			if seen, ok := optional[name]; ok {
+				optional[name] = seen && around
+			} else {
+				optional[name] = around
+			}
+		case n.is("sequence"), n.is("choice"), n.is("all"):
+			for i := range n.Children {
+				walk(&n.Children[i], around, groups)
+			}
+		case n.is("group"):
+			ref := schemaLocalName(n.attr("ref"))
+			if g, ok := s.groups[ref]; ok && !slices.Contains(groups, ref) {
+				walk(g, around, append(groups, ref))
+			}
+		}
+	}
+	walk(t.content, false, nil)
+	var out []string
+	for _, name := range sortedStringKeys(optional) {
+		if optional[name] {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
 // xmlChildOrder gives one target's XML encoders their child order, from the
 // ITS-XML schema sets in the target's lookup order.
 type xmlChildOrder struct {
@@ -520,10 +663,17 @@ func (s *itsXMLSchemas) orderFor(roots [][]string) (*xmlChildOrder, error) {
 
 // typeFor returns the set that declares the schema type class takes and the
 // type's name: the type of the class's own name, or of its nearest ancestor,
-// from the first set that declares one. ok is false when no set declares the
+// from the first set that declares one. A class the target's roots name for an
+// anonymous schema type, in their anonymous_type_names, takes the type at that
+// path in place of a type of its own name. ok is false when no set declares the
 // class or an ancestor.
 func (o *xmlChildOrder) typeFor(plan *Plan, class string) (index int, name string, ok bool) {
 	lineage := nearestLineage(plan, class)
+	for j, c := range lineage {
+		if path, named := plan.extensions.anonymousTypeOf[c]; named {
+			lineage[j] = path
+		}
+	}
 	for i, set := range o.sets {
 		for _, name := range lineage {
 			if set.has(name) {
@@ -532,6 +682,20 @@ func (o *xmlChildOrder) typeFor(plan *Plan, class string) (index int, name strin
 		}
 	}
 	return 0, "", false
+}
+
+// checkAnonymousTypes checks each path the target's roots name in their
+// anonymous_type_names against the schema sets: the path must be that of an
+// anonymous complex type one of them declares, so the class named for it
+// takes that type's elements and attributes.
+func (o *xmlChildOrder) checkAnonymousTypes(plan *Plan) error {
+	var errs []error
+	for _, path := range sortedStringKeys(plan.extensions.anonymousTypeNames) {
+		if !slices.ContainsFunc(o.sets, func(set *xsdSet) bool { return set.has(path) }) {
+			errs = append(errs, fmt.Errorf("bmmgen: %s.anonymous_type_names names %s, which no ITS-XML schema of the target declares as an anonymous type", sdkExtensionsMember, path))
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // sequenceFor returns the element names whose order class's encoder takes
@@ -564,15 +728,65 @@ func (o *xmlChildOrder) sequenceFor(plan *Plan, class string) ([]string, error) 
 
 // attributesFor returns the names of the XML attributes of the schema type
 // class takes, as [xmlChildOrder.typeFor] finds it, its extension bases'
-// first. Only that set is read: another set's type of the same name does not
-// add attributes. A nil result means the type declares none, or no set
-// declares the class or an ancestor.
+// first, that every other set declaring a type of the same name declares too.
+// Another set's type never adds an attribute, and one it lacks is dropped: a
+// class two sets declare with different attributes takes those both agree on,
+// so every target, whatever order it looks the sets up in, gives a class the
+// same attributes. That gives the resource classes the AM Release-1.4 shape
+// in both targets: BASE Release-1.2.0 declares an `id` on
+// RESOURCE_DESCRIPTION_ITEM and TRANSLATION_DETAILS that AM Release-1.4 does
+// not, so the Hash holding them is keyed by their language. A nil result means
+// the type declares none, or no set declares the class or an ancestor.
 func (o *xmlChildOrder) attributesFor(plan *Plan, class string) ([]string, error) {
 	i, name, ok := o.typeFor(plan, class)
 	if !ok {
 		return nil, nil
 	}
-	return o.sets[i].attributes(name)
+	attrs, err := o.sets[i].attributes(name)
+	if err != nil {
+		return nil, err
+	}
+	for j, other := range o.sets {
+		if j == i || !other.has(name) {
+			continue
+		}
+		agreed, err := other.attributes(name)
+		if err != nil {
+			return nil, err
+		}
+		attrs = slices.DeleteFunc(attrs, func(a string) bool { return !slices.Contains(agreed, a) })
+	}
+	return attrs, nil
+}
+
+// rootElementFor returns the global element the schemas declare with the type
+// of class's own name, from the first set that declares one, or false when
+// none does. A class that takes an ancestor's type takes no root element from
+// it.
+func (o *xmlChildOrder) rootElementFor(class string) (string, bool) {
+	for _, set := range o.sets {
+		if element, ok := set.globals[class]; ok {
+			return element, true
+		}
+	}
+	return "", false
+}
+
+// optionalChildrenOf returns the child elements the schemas make optional in
+// the type of the element elem of class: the type class's schema type, as
+// [xmlChildOrder.typeFor] finds it, declares for elem, read from the set that
+// declares class's type. It returns nil when the schemas declare no such
+// element or give it no named type.
+func (o *xmlChildOrder) optionalChildrenOf(plan *Plan, class, elem string) []string {
+	i, name, ok := o.typeFor(plan, class)
+	if !ok {
+		return nil
+	}
+	typ, ok := o.sets[i].elementType(name, elem)
+	if !ok {
+		return nil
+	}
+	return o.sets[i].optionalElements(typ)
 }
 
 // nearestLineage returns class and every class it descends from, nearest
