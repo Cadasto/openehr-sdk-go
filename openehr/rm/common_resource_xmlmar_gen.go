@@ -5,6 +5,7 @@ package rm
 
 import (
 	"encoding/xml"
+	"fmt"
 	"maps"
 	"slices"
 
@@ -63,6 +64,9 @@ func (r *ResourceDescription) MarshalXML(_e *xml.Encoder, _start xml.StartElemen
 	}
 	for _, _k := range slices.Sorted(maps.Keys(r.Details)) {
 		_v := r.Details[_k]
+		if _k == "" || _v.Language.CodeString != _k {
+			return fmt.Errorf("%w: a details entry is held under a key other than its language code", canxml.ErrInvalidShape)
+		}
 		if err := _e.EncodeElement(&_v, xml.StartElement{Name: xml.Name{Local: "details"}}); err != nil {
 			return err
 		}

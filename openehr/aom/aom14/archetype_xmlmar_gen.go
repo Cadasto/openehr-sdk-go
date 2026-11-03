@@ -5,6 +5,7 @@ package aom14
 
 import (
 	"encoding/xml"
+	"fmt"
 	"maps"
 	"slices"
 
@@ -50,6 +51,9 @@ func (a *Archetype) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if a.Translations != nil {
 		for _, _k := range slices.Sorted(maps.Keys(*a.Translations)) {
 			_v := (*a.Translations)[_k]
+			if _k == "" || _v.Language.CodeString != _k {
+				return fmt.Errorf("%w: a translations entry is held under a key other than its language code", canxml.ErrInvalidShape)
+			}
 			if err := _e.EncodeElement(&_v, xml.StartElement{Name: xml.Name{Local: "translations"}}); err != nil {
 				return err
 			}

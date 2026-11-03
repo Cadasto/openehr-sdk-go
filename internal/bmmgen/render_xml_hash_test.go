@@ -99,6 +99,8 @@ func TestREQ176_XMLHashCodecOfResourceDescription(t *testing.T) {
 		`for _, _k := range slices.Sorted(maps.Keys(*r.OtherDetails)) {`,
 		`for _, _k := range slices.Sorted(maps.Keys(r.Details)) {`,
 		`if err := _e.EncodeElement(&_v, xml.StartElement{Name: xml.Name{Local: "details"}}); err != nil {`,
+		`if _k == "" || _v.Language.CodeString != _k {`,
+		`return fmt.Errorf("%w: a details entry is held under a key other than its language code", canxml.ErrInvalidShape)`,
 	} {
 		if !strings.Contains(enc, want) {
 			t.Errorf("RESOURCE_DESCRIPTION encoder lacks %q:\n%s", want, enc)

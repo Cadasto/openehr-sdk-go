@@ -180,3 +180,44 @@ func TestREQ176_REQ170_RepeatedHashKeyRefused(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ176_REQ056_LanguageKeyedEntryUnderAnotherKeyRefused pins that the
+// encoder of a Hash keyed by its values' language, which writes no key, refuses
+// an entry held under another key than its value's language code, or under the
+// empty key, which would read back under the language or not at all: with
+// canxml.ErrInvalidShape and none of the key.
+func TestREQ176_REQ056_LanguageKeyedEntryUnderAnotherKeyRefused(t *testing.T) {
+	lang := func(code string) rm.CodePhrase {
+		return rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}, CodeString: code}
+	}
+	const key = "secret-key"
+	for name, v := range map[string]any{
+		"RESOURCE_DESCRIPTION.details under another key": &rm.ResourceDescription{
+			OriginalAuthor: map[string]string{"name": "A"},
+			Details: map[string]rm.ResourceDescriptionItem{
+				key:  {Language: lang("de"), Purpose: "p"},
+				"de": {Language: lang("de"), Purpose: "q"},
+			},
+		},
+		"RESOURCE_DESCRIPTION.details under the empty key": &rm.ResourceDescription{
+			OriginalAuthor: map[string]string{"name": "A"},
+			Details:        map[string]rm.ResourceDescriptionItem{"": {Language: lang(""), Purpose: "p"}},
+		},
+		"ARCHETYPE.translations under another key": &aom14.Archetype{
+			ArchetypeID:      rm.ArchetypeID{Value: "openEHR-EHR-OBSERVATION.blood_pressure.v2"},
+			Concept:          "at0000",
+			OriginalLanguage: lang("en"),
+			Translations:     &map[string]rm.TranslationDetails{key: {Language: lang("nl"), Author: map[string]string{"name": "V"}}},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			out, err := canxml.Marshal(v)
+			if !errors.Is(err, canxml.ErrInvalidShape) {
+				t.Fatalf("canxml.Marshal = %s, %v; want canxml.ErrInvalidShape", out, err)
+			}
+			if strings.Contains(err.Error(), key) {
+				t.Errorf("canxml.Marshal error %q quotes the key", err)
+			}
+		})
+	}
+}

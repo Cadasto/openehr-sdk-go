@@ -177,6 +177,12 @@ func fieldNamed(fields []emittedField, name string) (emittedField, bool) {
 // their keys: each with its key in the attribute h names, if any, and its
 // value as text or through the value class's own encoder. A nil or empty Hash
 // writes no element.
+//
+// An entry keyed by its value's language is written without its key, so the
+// decoder reads it back under the language code: an entry held under any
+// other key, the empty one included, which the decoder refuses, is refused
+// with canxml.ErrInvalidShape, as a value the encoder cannot write is, and
+// the error names neither the key nor the code.
 func marshalXMLHash(recv, field, elem string, h *xmlHash) string {
 	keys, m := recv+"."+field, recv+"."+field
 	if h.optional {
@@ -190,9 +196,15 @@ func marshalXMLHash(recv, field, elem string, h *xmlHash) string {
 	if h.valueType == "string" {
 		value = "_v"
 	}
+	check := ""
+	if h.languageKey != "" {
+		check = fmt.Sprintf(
+			"\t\tif _k == \"\" || _v.%s != _k {\n\t\t\treturn fmt.Errorf(\"%%w: a %s entry is held under a key other than its language code\", canxml.ErrInvalidShape)\n\t\t}\n",
+			h.languageKey, elem)
+	}
 	loop := fmt.Sprintf(
-		"\tfor _, _k := range slices.Sorted(maps.Keys(%s)) {\n\t\t_v := %s[_k]\n\t\tif err := _e.EncodeElement(%s, %s); err != nil {\n\t\t\treturn err\n\t\t}\n\t}\n",
-		keys, m, value, start)
+		"\tfor _, _k := range slices.Sorted(maps.Keys(%s)) {\n\t\t_v := %s[_k]\n%s\t\tif err := _e.EncodeElement(%s, %s); err != nil {\n\t\t\treturn err\n\t\t}\n\t}\n",
+		keys, m, check, value, start)
 	if !h.optional {
 		return loop
 	}
