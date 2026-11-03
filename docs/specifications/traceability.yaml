@@ -320,6 +320,7 @@ requirements:
       - internal/bmmgen/itsxml_test.go
       - internal/bmmgen/pin_scripts_test.go
       - internal/bmmgen/plan_test.go
+      - internal/bmmgen/render_integer_enum_test.go
       - internal/bmmgen/render_interface_test.go
       - internal/bmmgen/render_mandatory_tag_test.go
       - internal/bmmgen/render_release_test.go
@@ -332,6 +333,7 @@ requirements:
       - internal/bmmgen/sdk_extensions_test.go
       - internal/bmmgen/sim_bump_test.go
       - internal/bmmgen/target_test.go
+      - openehr/aom/aom14/integer_enumeration_test.go
       - openehr/aom/aom14/operational_template_shapes_xml_test.go
       - openehr/internal/xmlunmatched/choice_internal_test.go
       - openehr/internal/xmlunmatched/drop_internal_test.go
@@ -2619,9 +2621,11 @@ requirements:
     tests:
       - internal/bmmgen/itsxml_test.go
       - internal/bmmgen/naming_test.go
+      - internal/bmmgen/render_integer_enum_test.go
       - internal/bmmgen/render_xml_attributes_test.go
       - internal/bmmgen/sdk_extensions_test.go
       - openehr/aom/aom14/code_phrase_code_list_xml_test.go
+      - openehr/aom/aom14/integer_enumeration_test.go
       - openehr/aom/aom14/operational_template_shapes_xml_test.go
       - openehr/aom/aom14/quantity_item_units_xml_test.go
       - openehr/internal/xmlunmatched/choice_internal_test.go
