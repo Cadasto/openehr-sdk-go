@@ -5,7 +5,7 @@ kind: plan
 # Plan: ADL 1.4 operational template model (REQ-176)
 
 **Date:** 2026-11-02
-**Status:** In delivery (`/sdd-deliver REQ-176`, branch `feat/operational-template-model-req-176`); the first of two pull requests, the second outlined under *The follow-up pull request*
+**Status:** In delivery (`/sdd-deliver REQ-176`), in three pull requests: Tasks 1 to 5 (branch `feat/sdk-authored-root-schemas`), Tasks 6 to 10 stacked on it (branch `feat/operational-template-model-req-176`), and the switch outlined under *The follow-up pull request*
 **Covers:** [REQ-176](../specifications/clinical-modeling.md#req-176--adl-14-operational-template-model); [REQ-041 § SDK-authored root schemas](../specifications/bmm-conformance.md#sdk-authored-root-schemas); [REQ-045](../specifications/bmm-conformance.md#req-045--bmm-loader-is-a-building-block) (the include merge); [REQ-056](../specifications/wire.md#req-056), [REQ-052](../specifications/wire.md#req-052), [REQ-170](../specifications/wire.md#req-170--unmatched-content-on-decode)
 **Probes:** [PROBE-111](../specifications/conformance.md#probe-111--operational-template-corpus-round-trip)
 **Depends on:** PR 360 (Template.xsd pinned, ADR 0034, REQ-176 written), merged as `acf9a9ca`
@@ -34,6 +34,7 @@ A consumer decodes any ADL 1.4 OPT the corpus holds into generated `aom14` types
 
 - **Purpose:** the compile step reads the model, which replaces `template.ParseOPT`'s tree as its source; `templatecompile` itself stays, since it adds what no OPT holds (AQL paths, the attributes the RM requires that the OPT leaves out, parent links, indexes).
 - **Two pull requests:** this one, the model (Tasks 1 to 10, the ADR settling STRAND-17 included); then the switch, whose parity check needs the finished model. D1's "one pull request" now means one for the model.
+- **The model in two pull requests** (maintainer, 2026-11-03, replacing D1): the generator groundwork (Tasks 1 to 5) first, then the model and its probe (Tasks 6 to 10) stacked on it. The prefix rule of `wire.md` § REQ-056 that Task 1 wrote lands with Task 8's code in the second.
 - **`template.ParseOPT` and its node tree** are deprecated in the switch pull request and removed in a later release; `openehr/template` stays the home of `constraints`, `webtemplate` and the small shared types (`Cardinality`, `Multiplicity`, `ErrPathNotFound`).
 - **Path lookup** (`NodeAt`, `ParsePath`, `ValidatePath` and their rules for a path without node ids) is rewritten over the model in the switch pull request.
 - **The parser's tolerances** are kept, by the model's reader or the compile step: `null_flavor` read as `null_flavour`, white space around identifiers, `T_ARCHETYPE_ROOT`, and whatever the corpus parity check shows the rest need.
