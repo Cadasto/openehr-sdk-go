@@ -25,13 +25,15 @@ var xmlClassAccessGroupRef = xmlunmatched.Class{
 // concrete type is selected by `xsi:type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are read from _start.Attr.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are read from _start.Attr.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *AccessGroupRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassAccessGroupRef); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassAccessGroupRef); _err != nil {
 		return _err
+	} else if _fresh {
+		*a = AccessGroupRef{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -81,13 +83,15 @@ var xmlClassArchetypeID = xmlunmatched.Class{
 // concrete type is selected by `xsi:type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are read from _start.Attr.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are read from _start.Attr.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *ArchetypeID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassArchetypeID); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassArchetypeID); _err != nil {
 		return _err
+	} else if _fresh {
+		*a = ArchetypeID{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -127,13 +131,15 @@ var xmlClassGenericID = xmlunmatched.Class{
 // concrete type is selected by `xsi:type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are read from _start.Attr.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are read from _start.Attr.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (g *GenericID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassGenericID); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassGenericID); _err != nil {
 		return _err
+	} else if _fresh {
+		*g = GenericID{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -177,13 +183,15 @@ var xmlClassHierObjectID = xmlunmatched.Class{
 // concrete type is selected by `xsi:type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are read from _start.Attr.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are read from _start.Attr.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (h *HierObjectID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassHierObjectID); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassHierObjectID); _err != nil {
 		return _err
+	} else if _fresh {
+		*h = HierObjectID{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -223,13 +231,15 @@ var xmlClassISOOID = xmlunmatched.Class{
 // concrete type is selected by `xsi:type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are read from _start.Attr.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are read from _start.Attr.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (i *ISOOID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassISOOID); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassISOOID); _err != nil {
 		return _err
+	} else if _fresh {
+		*i = ISOOID{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -269,13 +279,15 @@ var xmlClassInternetID = xmlunmatched.Class{
 // concrete type is selected by `xsi:type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are read from _start.Attr.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are read from _start.Attr.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (i *InternetID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassInternetID); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassInternetID); _err != nil {
 		return _err
+	} else if _fresh {
+		*i = InternetID{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -315,13 +327,15 @@ var xmlClassLocatableRef = xmlunmatched.Class{
 // concrete type is selected by `xsi:type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are read from _start.Attr.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are read from _start.Attr.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (l *LocatableRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassLocatableRef); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassLocatableRef); _err != nil {
 		return _err
+	} else if _fresh {
+		*l = LocatableRef{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -377,13 +391,15 @@ var xmlClassObjectRef = xmlunmatched.Class{
 // concrete type is selected by `xsi:type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are read from _start.Attr.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are read from _start.Attr.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (o *ObjectRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassObjectRef); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassObjectRef); _err != nil {
 		return _err
+	} else if _fresh {
+		*o = ObjectRef{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -433,13 +449,15 @@ var xmlClassObjectVersionID = xmlunmatched.Class{
 // concrete type is selected by `xsi:type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are read from _start.Attr.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are read from _start.Attr.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (o *ObjectVersionID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassObjectVersionID); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassObjectVersionID); _err != nil {
 		return _err
+	} else if _fresh {
+		*o = ObjectVersionID{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -479,13 +497,15 @@ var xmlClassPartyRef = xmlunmatched.Class{
 // concrete type is selected by `xsi:type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are read from _start.Attr.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are read from _start.Attr.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (p *PartyRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassPartyRef); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassPartyRef); _err != nil {
 		return _err
+	} else if _fresh {
+		*p = PartyRef{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -535,13 +555,15 @@ var xmlClassTemplateID = xmlunmatched.Class{
 // concrete type is selected by `xsi:type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are read from _start.Attr.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are read from _start.Attr.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TemplateID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassTemplateID); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassTemplateID); _err != nil {
 		return _err
+	} else if _fresh {
+		*t = TemplateID{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -581,13 +603,15 @@ var xmlClassTerminologyID = xmlunmatched.Class{
 // concrete type is selected by `xsi:type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are read from _start.Attr.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are read from _start.Attr.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TerminologyID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassTerminologyID); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassTerminologyID); _err != nil {
 		return _err
+	} else if _fresh {
+		*t = TerminologyID{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -627,13 +651,15 @@ var xmlClassUuid = xmlunmatched.Class{
 // concrete type is selected by `xsi:type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are read from _start.Attr.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are read from _start.Attr.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (u *Uuid) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassUuid); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassUuid); _err != nil {
 		return _err
+	} else if _fresh {
+		*u = Uuid{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -673,13 +699,15 @@ var xmlClassVersionTreeID = xmlunmatched.Class{
 // concrete type is selected by `xsi:type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are read from _start.Attr.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are read from _start.Attr.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (v *VersionTreeID) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassVersionTreeID); _err != nil {
+	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassVersionTreeID); _err != nil {
 		return _err
+	} else if _fresh {
+		*v = VersionTreeID{}
 	}
 	for {
 		_tok, _err := _dec.Token()

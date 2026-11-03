@@ -117,6 +117,79 @@ func TestPutStoredQueryParsesLocationHeader(t *testing.T) {
 	}
 }
 
+// TestPutStoredQueryLocationDecodedOnce pins REQ-057's Location recovery
+// against a double decode: each `{name}` and `{version}` segment is
+// percent-decoded exactly once, so a name holding a literal `%`, which the
+// server sends as `%25`, comes back as it was stored. Both store calls read
+// the Location through the same parser, and a value url.Parse refuses (the
+// unclosed IPv6 host) still decodes once.
+func TestPutStoredQueryLocationDecodedOnce(t *testing.T) {
+	tests := []struct {
+		name        string
+		location    string
+		wantName    string
+		wantVersion string
+	}{
+		{
+			name:        "encoded percent sign",
+			location:    "/openehr/v1/definition/query/ns::a%2541/1.0.0",
+			wantName:    "ns::a%41",
+			wantVersion: "1.0.0",
+		},
+		{
+			name:        "encoded colons",
+			location:    "/openehr/v1/definition/query/org.openehr%3A%3Avitals/1.0.0",
+			wantName:    "org.openehr::vitals",
+			wantVersion: "1.0.0",
+		},
+		{
+			name:        "encoded percent sign in the version",
+			location:    "/openehr/v1/definition/query/ns::q/1.0.0-rc%2541",
+			wantName:    "ns::q",
+			wantVersion: "1.0.0-rc%41",
+		},
+		{
+			name:        "value url.Parse refuses",
+			location:    "http://[::1/openehr/v1/definition/query/ns::a%2541/1.0.0",
+			wantName:    "ns::a%41",
+			wantVersion: "1.0.0",
+		},
+	}
+	stores := []struct {
+		name  string
+		store func(c *transport.Client) (*definition.StoredQueryMetadata, error)
+	}{
+		{"PutStoredQuery", func(c *transport.Client) (*definition.StoredQueryMetadata, error) {
+			meta, _, err := definition.PutStoredQuery(t.Context(), c, "ns::input", "SELECT 1")
+			return meta, err
+		}},
+		{"PutStoredQueryVersion", func(c *transport.Client) (*definition.StoredQueryMetadata, error) {
+			meta, _, err := definition.PutStoredQueryVersion(t.Context(), c, "ns::input", "9.9.9", "SELECT 1")
+			return meta, err
+		}},
+	}
+	for _, tc := range tests {
+		for _, st := range stores {
+			t.Run(tc.name+"/"+st.name, func(t *testing.T) {
+				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Header().Set("Location", tc.location)
+					w.WriteHeader(http.StatusOK)
+				}))
+				defer srv.Close()
+
+				meta, err := st.store(newClient(t, srv))
+				if err != nil {
+					t.Fatalf("%s with Location %q: %v", st.name, tc.location, err)
+				}
+				if meta.Name != tc.wantName || meta.Version != tc.wantVersion {
+					t.Errorf("%s with Location %q = {Name %q, Version %q}, want {Name %q, Version %q}",
+						st.name, tc.location, meta.Name, meta.Version, tc.wantName, tc.wantVersion)
+				}
+			})
+		}
+	}
+}
+
 // TestPutStoredQueryAbsoluteLocation accepts an absolute Location URL too
 // — some servers return a full https://host/… URL on 201/200.
 func TestPutStoredQueryAbsoluteLocation(t *testing.T) {

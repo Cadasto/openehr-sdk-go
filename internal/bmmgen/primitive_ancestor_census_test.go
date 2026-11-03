@@ -31,6 +31,7 @@ package bmmgen
 import (
 	"maps"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -46,9 +47,18 @@ var pinnedSchemaRoots = []string{
 	"openehr_am_2.4.0", "openehr_lang_1.1.0", "openehr_term_3.1.0",
 }
 
-// primitiveAncestorDrops is the census result as of 2026-09-05:
+// censusSchemaRoots returns the roots the census walks: the pinned schemas,
+// in the order of pinnedSchemaRoots, then the root schemas the SDK authors
+// under resources/bmm/sdk, sorted, which the generator loads in their place.
+func censusSchemaRoots(t *testing.T) []string {
+	t.Helper()
+	return append(slices.Clone(pinnedSchemaRoots), rootIDsIn(t, filepath.Join(testResources, rootsDirName))...)
+}
+
+// primitiveAncestorDrops is the census result as of 2026-09-05, with the
+// SDK-authored roots added on 2026-11-03:
 // "<Class>.<property> via <dropped ancestor>" -> the roots it appears
-// in (same order as pinnedSchemaRoots). Exactly one: Iso8601_timezone declares
+// in (same order as censusSchemaRoots). Exactly one: Iso8601_timezone declares
 // no properties of its own and reaches `value` only through Iso8601_type. It
 // shows up in every root that includes base; openehr_term_3.1.0 includes no
 // base schema and so has no ISO 8601 classes at all. The four DV temporal
@@ -59,6 +69,7 @@ var primitiveAncestorDrops = map[string][]string{
 	"Iso8601_timezone.value via Iso8601_type": {
 		"openehr_base_1.3.0", "openehr_rm_1.2.0", "openehr_am_1.4.0",
 		"openehr_am_2.4.0", "openehr_lang_1.1.0",
+		"openehr_operational_template_1.4.0", "openehr_reference_model_1.2.0",
 	},
 }
 
@@ -74,8 +85,8 @@ var dvTemporalRedeclarers = []string{"DV_DATE", "DV_TIME", "DV_DATE_TIME", "DV_D
 func TestPrimitiveMappedAncestorPropertyCensus(t *testing.T) { // STRAND-13
 	got := map[string][]string{}
 	dvChecked := false
-	for _, root := range pinnedSchemaRoots {
-		schema, err := bmm.LoadAll(root, bmm.FSResolver{Root: testResources})
+	for _, root := range censusSchemaRoots(t) {
+		schema, err := bmm.LoadAll(root, testResolver())
 		if err != nil {
 			t.Fatalf("LoadAll(%s): %v", root, err)
 		}

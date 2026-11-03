@@ -1,6 +1,8 @@
 // Package aom14 holds Go types generated from the openEHR Archetype
-// Object Model 1.4 (BMM source: openehr_am_1.4.0.bmm.json +
-// openehr_base_1.3.0.bmm.json).
+// Object Model 1.4, in the form the AM Release-1.4 XML schemas give an
+// ADL 1.4 operational template (BMM source: the SDK's
+// openehr_operational_template_1.4.0 root over openehr_am_1.4.0.bmm.json,
+// the RM and openehr_base_1.3.0.bmm.json).
 //
 // # Layout
 //
@@ -13,8 +15,8 @@
 //
 // AOM 1.4 includes openehr_base_1.3.0 by reference, the same way RM
 // does. The generator does not duplicate base classes here; instead,
-// references to base classes (e.g. ARCHETYPE_ID, HIER_OBJECT_ID,
-// AUTHORED_RESOURCE, VALIDITY_KIND) are emitted as rm.<GoName> with
+// references to base and RM classes (e.g. ARCHETYPE_ID, HIER_OBJECT_ID,
+// CODE_PHRASE) are emitted as rm.<GoName> with
 // a one-way import on openehr/rm. This avoids binary bloat and keeps
 // the rm.HierObjectID type identical when AOM-side code interoperates
 // with RM-side code.

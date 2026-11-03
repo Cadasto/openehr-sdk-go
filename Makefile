@@ -53,6 +53,12 @@ endif
 HOST_CC_OK = $(if $(HOST_GO_OK),$(shell cc="$$(go env CC 2>/dev/null)"; command -v "$${cc%% *}" >/dev/null 2>&1 && echo yes))
 RACE_GO    = $(if $(HOST_CC_OK),CGO_ENABLED=1 go,$(DOCKER_RUN) -e CGO_ENABLED=1 go go)
 
+# xmllint for `make operational-template-schema-check`: the host's when it has
+# one, else the dev image's (Dockerfile: libxml2-utils). -T keeps the
+# container's stderr apart from its stdout.
+HOST_XMLLINT_OK := $(shell command -v xmllint >/dev/null 2>&1 && echo yes)
+XMLLINT_RUN      = $(if $(HOST_XMLLINT_OK),,$(DOCKER_RUN) -T go)
+
 # golangci-lint shim — host binary (fast path) or the pinned image, which
 # bundles the v2 formatters (gofumpt + goimports), so `fmt` and `lint` share
 # one pinned toolchain. --user keeps rewritten files owned by the host user.
@@ -82,6 +88,7 @@ HELP_FOOTER    = Before a pull request: make ci · docs site: make docs-serve (h
         bmm-sync bmm-drift its-xml-sync its-xml-drift its-rest-sync its-rest-drift flat-sync flat-drift crossformat-sync corpus-pins-drift \
         terminology-sync terminology-drift \
         mod-tidy-check codegen-check termgen-check aqlgen-check bmm-check its-xml-check flat-check crossformat-check corpus-pins-check terminology-check \
+        operational-template-schema-check \
         spec-check sdd-check ci \
         spec-context probe-status probe-record cdr-crosscheck \
         docs-sync docs-sync-offline docs-build docs-check docs-serve docs-clean
@@ -246,6 +253,53 @@ corpus-pins-check: ## Fail if an EHRbase corpus is not at its upstream pin (offl
 
 terminology-check: ## Verify the vendored terminology (offline sha256)
 	@./scripts/sync-terminology.sh verify
+
+# PROBE-111's schema leg. In a fresh folder under the gitignored .tmp/, which
+# the dev container sees too, it writes the pinned ITS-XML schemas with their
+# namespace read as the http://schemas.openehr.org/v1 that OPTs and the SDK
+# write, and the SDK's re-encoding of every corpus OPT the ratchet
+# (testkit/probes/template/probe_111_schema_ratchet.txt) does not list. Then
+# xmllint validates those documents, and every corpus OPT as written, against
+# AM/Release-1.4/Template.xsd. It fails on a re-encoded document the schemas
+# refuse, on an OPT they refuse as written that the ratchet does not list, and
+# on a ratchet entry they now accept.
+operational-template-schema-check: ## Validate the corpus OPTs, as written and re-encoded, against the pinned AM 1.4 schemas (xmllint)
+	@set -e; mkdir -p .tmp; \
+	dir="$$(mktemp -d .tmp/operational-template-schema-check.XXXXXX)"; \
+	trap '[ -n "$$dir" ] && rm -rf "$$dir"' EXIT; \
+	(cd resources/its-xml && find components -name '*.xsd') | while IFS= read -r f; do \
+	  mkdir -p "$$dir/schemas/$$(dirname "$$f")"; \
+	  sed 's|http://schemas.openehr.org/v2|http://schemas.openehr.org/v1|g' "resources/its-xml/$$f" > "$$dir/schemas/$$f"; \
+	done; \
+	out="$$($(GO) test ./testkit/probes/template -run '^TestProbe111WriteSchemaDocuments$$' -count=1 -args -schema-documents "$$dir" 2>&1)" \
+	  || { printf '%s\n' "$$out"; echo "operational-template-schema-check: writing the re-encoded documents failed"; exit 1; }; \
+	files="$$(find testkit/corpus "$$dir/re-encoded" -name '*.opt' | wc -l | tr -d ' ')"; \
+	$(XMLLINT_RUN) find testkit/corpus "$$dir/re-encoded" -name '*.opt' \
+	  -exec xmllint --noout --nonet --schema "$$dir/schemas/components/AM/Release-1.4/Template.xsd" {} + \
+	  > "$$dir/xmllint.log" 2>&1 || true; \
+	judged="$$(grep -cE ' (validates|fails to validate)$$' "$$dir/xmllint.log" || true)"; \
+	if [ "$$judged" != "$$files" ]; then \
+	  cat "$$dir/xmllint.log"; \
+	  echo "operational-template-schema-check: xmllint judged $$judged of $$files documents"; exit 1; \
+	fi; \
+	if grep -F "$$dir/re-encoded/" "$$dir/xmllint.log" | grep -q ' fails to validate$$'; then \
+	  grep -F "$$dir/re-encoded/" "$$dir/xmllint.log" | grep -v ' validates$$'; \
+	  echo "operational-template-schema-check: the pinned schemas refuse the SDK's re-encoding of the OPTs above"; exit 1; \
+	fi; \
+	sed -n 's|^testkit/corpus/\(.*\) fails to validate$$|\1|p' "$$dir/xmllint.log" | LC_ALL=C sort > "$$dir/refused.txt"; \
+	LC_ALL=C sort "$$dir/ratchet.txt" > "$$dir/listed.txt"; \
+	unlisted="$$(LC_ALL=C comm -23 "$$dir/refused.txt" "$$dir/listed.txt")"; \
+	stale="$$(LC_ALL=C comm -13 "$$dir/refused.txt" "$$dir/listed.txt")"; \
+	if [ -n "$$unlisted" ]; then \
+	  printf '%s\n' "$$unlisted" | while IFS= read -r f; do grep -F "testkit/corpus/$$f" "$$dir/xmllint.log"; done; \
+	  echo "operational-template-schema-check: the pinned schemas refuse these OPTs as written; list each in the ratchet with its reason:"; \
+	  printf '%s\n' "$$unlisted" | sed 's/^/  /'; exit 1; \
+	fi; \
+	if [ -n "$$stale" ]; then \
+	  echo "operational-template-schema-check: the pinned schemas now accept these ratchet entries as written; remove them:"; \
+	  printf '%s\n' "$$stale" | sed 's/^/  /'; exit 1; \
+	fi; \
+	echo "operational-template-schema-check: OK ($$(grep -cF "$$dir/re-encoded/" "$$dir/xmllint.log") re-encoded OPTs validate; $$(wc -l < "$$dir/listed.txt" | tr -d ' ') in the ratchet)"
 
 spec-check: ## Check the traceability map and run the SDD gate
 	@bash scripts/spec-check-selftest.sh
@@ -466,4 +520,4 @@ docs-clean: ## Remove the site build, brand layer and caches
 
 ##@ Gates
 
-ci: fmt-check mod-tidy-check vet test lint spec-check bmm-check its-xml-check flat-check corpus-pins-check terminology-check build ## Run the full PR gate (docs/ci.md)
+ci: fmt-check mod-tidy-check vet test lint spec-check bmm-check its-xml-check operational-template-schema-check flat-check corpus-pins-check terminology-check build ## Run the full PR gate (docs/ci.md)

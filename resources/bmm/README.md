@@ -19,7 +19,7 @@ These files are the SDK's source of truth for the openEHR Reference Model, Arche
 | `openehr_lang_1.1.0.bmm.json` | `openehr_lang_1.1.0` | 2.4 | 86 | base 1.3.0 | **deferred** (reference only) | LANG types: BMM meta-model + `P_BMM` persistence classes. Used as documentation while `openehr/bmm/` is hand-written. |
 | `openehr_term_3.1.0.bmm.json` | `openehr_term_3.1.0` | — | (terminology service interface) | — | **deferred** | Terminology service interface |
 
-**Primary** files drive v1 code generation, the RM one through the root schema under [`sdk/`](#sdk-authored-root-schemas-sdk). **Deferred** files stay here and are not removed. They are kept for future generation phases or as cross-references. See [`../../docs/specifications/scope.md`](../../docs/specifications/scope.md#out-of-scope-v1) and [`../../docs/specifications/bmm-conformance.md § v1 scope summary`](../../docs/specifications/bmm-conformance.md#v1-scope-summary).
+**Primary** files drive v1 code generation, each target through its root schema under [`sdk/`](#sdk-authored-root-schemas-sdk). **Deferred** files stay here and are not removed. They are kept for future generation phases or as cross-references. See [`../../docs/specifications/scope.md`](../../docs/specifications/scope.md#out-of-scope-v1) and [`../../docs/specifications/bmm-conformance.md § v1 scope summary`](../../docs/specifications/bmm-conformance.md#v1-scope-summary).
 
 Schema dependencies (transitive `includes`):
 
@@ -43,16 +43,16 @@ What P_BMM has no construct for, a root says in the top-level `sdk_extensions` o
 |---|---|---|
 | `classes_left_out` | `class` | Emits no Go type, registry entry or decode hook for the class; rminfo reports it as an excluded class. Generation fails when no schema declares the class, or a class the target emits still names it. |
 | `type_aliases` | `alias`, `class` | Carries the alias, a type name a decoder reads as `class` (an `xsi:type` older tools write), in its plan for the canonical-XML codec; the type registry never holds it. No generated code reads it yet. Generation fails on an alias a schema declares. |
-| `dropped_elements` | `class`, `element`, `text` | The XML decoder of `class`, and of every class that inherits from it, reads the element and drops it when its text, less the white space around it, is `text`, reporting nothing; any other text fails the decode with `canxml.ErrInvalidShape`. The encoder never writes it. Generation fails when the element names a member of the class. |
-| `anonymous_type_names` | `schema_type`, `element_path`, `class` | Carries the class the root declares for the anonymous type of the element at `element_path` (element names separated by `/`) inside the named schema type, in its plan for the ITS-XML schema reading. No generated code reads it yet. |
-| `schema_forms` | `class`, `property`, `form`, `shapes` | Carries the form the schema gives the property's element, in its plan for the canonical-XML codec. The one form is `choice`: the element takes the shape of one of the classes `shapes` lists. No generated code reads it yet. |
+| `dropped_elements` | `class`, `element`, `texts` | The XML decoder of `class`, and of every class that inherits from it, reads the element and drops it when its text, less the white space around it, is one of `texts`, the one value it may hold in each way the schema writes it (`false` and `0`), reporting nothing; any other text fails the decode with `canxml.ErrInvalidShape`. The encoder never writes it. Generation fails when the element names a member of the class. |
+| `anonymous_type_names` | `schema_type`, `element_path`, `class` | Gives `class` the anonymous type of the element at `element_path` (element names separated by `/`) inside the named schema type, as the schema type the XML codec takes the class's child order and attributes from. Generation fails when no ITS-XML schema of the target declares an anonymous type at that path. |
+| `schema_forms` | `class`, `property`, `form`, `shapes` | Gives the property's element the form the schema gives it. The one form is `choice`: the element takes the shape of one of the classes `shapes` lists, and the property is typed `Any`. The XML decoder reads the element as the first shape whose schema type declares its first child element, or as the first shape when none does; the encoder writes the shape the property holds, with no `xsi:type`. Generation fails when the property is not typed `Any`, a shape has no XML decoder, or two shapes share an element. |
 
 Every class an entry of the last four keys names must be one the target holds, so no entry names a class left out. An example entry:
 
 ```json
 "sdk_extensions": {
     "dropped_elements": [
-        {"class": "C_ATTRIBUTE", "element": "match_negated", "text": "false",
+        {"class": "C_ATTRIBUTE", "element": "match_negated", "texts": ["false", "0"],
          "reason": "a legacy element no AOM class declares, accepted fixed to false.",
          "upstream": "resources/its-xml/components/AM/Release-1.4/Archetype.xsd:52"}
     ]
@@ -62,6 +62,7 @@ Every class an entry of the last four keys names must be one the target holds, s
 | File | Schema ID | Includes | Declares | Loaded by |
 |---|---|---|---|---|
 | `sdk/openehr_reference_model_1.2.0.bmm.json` | `openehr_reference_model_1.2.0` | rm 1.2.0 | `TRANSLATION_DETAILS`, with `accreditation` where the RM schema misspells it ([specifications-RM PR 43](https://github.com/openEHR/specifications-RM/pull/43)) | the RM target |
+| `sdk/openehr_operational_template_1.4.0.bmm.json` | `openehr_operational_template_1.4.0` | am 1.4.0, the RM root | the classes of the AM Release-1.4 `Template.xsd` (`OPERATIONAL_TEMPLATE` and the eight beside it, and the two anonymous types of `T_VIEW`); the ontology in the form of `Archetype.xsd`; `C_CODE_PHRASE`, `C_DV_ORDINAL`, `C_DV_QUANTITY`, `C_QUANTITY_ITEM` and `ORDINAL` in the form of `OpenehrProfile.xsd`, leaving out the BMM's `C_CODED_TEXT`, `C_ORDINAL` and `C_QUANTITY` | the AOM 1.4 target |
 
 The roots are hand-written sources under review, not pins: the sync script never fetches or removes them, `MANIFEST.txt` does not list them, and `make bmm-check` does not hash them. A root's id is its own (`<rm_publisher>_<schema_name>_<rm_release>`, with the words spelled out); the generator refuses an id that both `sdk/` and this directory hold. The root check, a Go test in `internal/bmmgen` that `make test` runs, holds every root to its rules: each type name it uses resolves after the merge, each declaration and each extension entry carries its reason and upstream reference, each class it declares again still differs from the class it shadows, and no root takes a pinned id.
 

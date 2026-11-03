@@ -9,7 +9,7 @@ import (
 
 // The canonical-XML codec of TERMINOLOGY_CODE is written by hand: the BASE
 // schema lists the class among its primitive types, for which the generator
-// emits no codec, yet AOM 1.4 holds one by value in ARCHETYPE.original_language.
+// emits no codec, yet TERMINOLOGY_TERM holds one by value in `concept`.
 // The generator's handWrittenXMLCodecs names it, so the decoders that hold a
 // TerminologyCode hand its element to these methods.
 
@@ -23,9 +23,9 @@ var (
 // for. The RM tables list no mandatory member for it, so none is required.
 var xmlClassTerminologyCode = xmlunmatched.Class{Name: "TERMINOLOGY_CODE"}
 
-// MarshalXML emits canonical openEHR XML for TerminologyCode in the shape the
-// AOM 1.4 ITS-XML schema gives `original_language`, a CODE_PHRASE:
-// `terminology_id` holds its identifier in a `value` child, then
+// MarshalXML emits canonical openEHR XML for TerminologyCode in the shape of a
+// CODE_PHRASE, the form ITS-XML gives a coded term: `terminology_id` holds its
+// identifier in a `value` child, then
 // `code_string`. `terminology_version` and `uri`, which CODE_PHRASE does not
 // have, follow as text elements when set. The default element local name is
 // `terminology_code` when the parent did not set one.
@@ -59,15 +59,17 @@ func (t *TerminologyCode) MarshalXML(e *xml.Encoder, start xml.StartElement) err
 }
 
 // UnmarshalXML decodes canonical openEHR XML into TerminologyCode. It reads
-// `terminology_id` in both spellings: the CODE_PHRASE one of the AOM 1.4
-// ITS-XML schema, with the identifier in a `value` child, and the plain text
+// `terminology_id` in both spellings: the CODE_PHRASE one, with the
+// identifier in a `value` child, and the plain text
 // one that mirrors the canonical-JSON string. `code_string`,
 // `terminology_version` and `uri` are text. Content it does not read, text
 // between its child elements among it, is unmatched: skipped, or reported or
 // refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TerminologyCode) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error {
-	if err := xmlunmatched.Enter(dec, start, &xmlClassTerminologyCode); err != nil {
+	if fresh, err := xmlunmatched.Enter(dec, start, &xmlClassTerminologyCode); err != nil {
 		return err
+	} else if fresh {
+		*t = TerminologyCode{}
 	}
 	for {
 		tok, err := dec.Token()

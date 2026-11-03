@@ -42,6 +42,12 @@ func TestREQ052_MandatoryFieldJSONTag(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(AOM14): %v", err)
 	}
+	// The pinned AOM 1.4 schema holds the cycle the AOM 1.4 root's schema
+	// form of ARCHETYPE_ONTOLOGY has not.
+	pinnedAOMPlan, err := BuildPlanForTarget(context.Background(), targetPinnedAOM14, testResolver())
+	if err != nil {
+		t.Fatalf("BuildPlanForTarget(pinned AOM14): %v", err)
+	}
 
 	for _, tc := range []struct {
 		name     string
@@ -66,7 +72,7 @@ func TestREQ052_MandatoryFieldJSONTag(t *testing.T) {
 			field:    "Details map[string]ResourceDescriptionItem `json:\"details,omitzero\"`",
 		},
 		{
-			name: "pointer that breaks a cycle: ARCHETYPE.ontology", plan: aomPlan, render: RenderFile,
+			name: "pointer that breaks a cycle: ARCHETYPE.ontology", plan: pinnedAOMPlan, render: RenderFile,
 			fileBase: "archetype",
 			field:    "Ontology *ArchetypeOntology `json:\"ontology,omitzero\"`",
 		},

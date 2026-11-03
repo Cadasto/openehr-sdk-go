@@ -9,8 +9,8 @@
 // decodes as, other than namespace declarations and attributes in the XML
 // Schema instance namespace (`xsi:type`, `xsi:schemaLocation`, `xsi:nil`, …);
 // an element in a namespace other than the openEHR one; and an element whose
-// content the codec does not model: a `Hash` member, a BMM `Any` member, and
-// a member whose Go type has no decoder of its own. So is text other than
+// content the codec does not model: a `Hash` of `Hash`es and a member whose Go
+// type has no decoder of its own. So is text other than
 // XML whitespace directly inside an element whose content is elements, one
 // item per element however many runs of text it holds. By default the decode
 // skips it. A caller can instead track it: report each item, in document
@@ -39,8 +39,12 @@
 //     decoded as text, [DecodeText] for one whose text they convert
 //     themselves, such as an interval boundary flag, [DecodeBase64] for an
 //     Octet list, [DecodeParam] for a member typed by an open generic
-//     parameter, and [DropElement] for an element the class's schema accepts
-//     that no member holds. The hand-written TERMINOLOGY_CODE decoder calls the same
+//     parameter, [DropElement] for an element the class's schema accepts
+//     that no member holds, [DecodeChoice] for a member whose element
+//     takes one of several shapes, which its first child chooses, and
+//     [DecodeEntry] and [DecodeEntryKeyedBy] for one entry of a `Hash`
+//     member, which take the key attribute off before the value is read. The
+//     hand-written TERMINOLOGY_CODE decoder calls the same
 //     helpers, [CheckUnmatchedAttrs] for the attributes of its inner
 //     TERMINOLOGY_ID element, [CheckUnmatchedTextBefore] for text it keeps
 //     until a child shows that the text is not its value, and
@@ -48,6 +52,21 @@
 //     that text. canxml calls [DiscriminatorRead] where its dispatch reads a
 //     bare `type`. Each helper looks the decoder up; an untracked decode
 //     finds nothing and behaves as encoding/xml does, but for one thing.
+//
+// # Namespace scope
+//
+// An `xsi:type` written with a prefix, such as `xs:string`, is resolved
+// against the namespace declarations in scope where the attribute stands.
+// encoding/xml resolves element and attribute names but not a prefix inside
+// an attribute value, and hands a decoder none of the declarations of the
+// elements around the one it reads. So the token source of a tracked decode
+// keeps the declarations of the open elements, and so does that of a
+// [Scope]; [LookupPrefix] answers from them. An untracked decode through a
+// plain encoding/xml decoder sees only the declarations an element carries
+// itself. When a prefix needs more ([UnresolvedPrefix]), [Unmarshal] decodes
+// the document again through a tracker that applies no policy, and canxml's
+// stream decoder decodes the value again through a Scope
+// ([Scope.DecodeAgain]).
 //
 // # Missing members
 //
@@ -81,9 +100,12 @@
 // [DecodeText] and [DecodeBase64] return a *typereg.DecodeError whose cause
 // wraps [ErrInvalidShape] and the conversion's own error, never the bare
 // error encoding/xml or a TextUnmarshaler gives, whose text may quote the
-// value. A tracked decode names the element by its path from the root of
-// the value and [Tracker.Decode] returns the failure on its own; an
-// untracked decode names the element alone, and the failure travels out
+// value. [DropElement] returns one for an element whose text is not its one
+// value, and [DecodeEntry] and [DecodeEntryKeyedBy] for a `Hash` entry with
+// no key or with the key of an earlier entry, each with a cause whose fixed
+// text names no value. A tracked decode names the element by its path from
+// the root of the value and [Tracker.Decode] returns the failure on its own;
+// an untracked decode names the element alone, and the failure travels out
 // inside the dispatch envelopes it passes through. [IsPrimitiveFailure] tells
 // such a failure apart, so canxml can decode the input again, tracked, to
 // find the path.
@@ -150,6 +172,13 @@ type Tracker struct {
 	// failure is the primitive failure the value being decoded raised, kept
 	// so that [Tracker.Decode] returns it on its own; nil until one is raised.
 	failure *typereg.DecodeError
+	// reader is the token source of the decoder [Tracker.NewDecoder] returned,
+	// which [DecodeChoice] reads ahead through; nil until then.
+	reader *trackingReader
+	// again marks the second decode [Unmarshal] runs of a document into the
+	// value its first decode filled in part, whose root decoder [Enter] tells
+	// to clear its receiver first.
+	again bool
 }
 
 // frame is one open element: its local name, its 1-based position among its
@@ -158,8 +187,9 @@ type Tracker struct {
 // attribute as the discriminator, and whether its text was found unmatched
 // already. For the missing-member report it also keeps the description of
 // its class, once its decoder has entered, which of the class's mandatory
-// members it has a value for, and what the element carries: `xsi:nil`,
-// text other than whitespace, and whether a decoder read it as a primitive.
+// members it has a value for, what the element carries: `xsi:nil`, text
+// other than whitespace, and whether a decoder read it as a primitive, and,
+// for one entry of a Hash member, how to read its key.
 //
 // The child counts sit in a short slice while the element has opened children
 // of few names, which is the canonical shape and costs no map. Once it opens
@@ -178,6 +208,13 @@ type frame struct {
 	nilled        bool   // the start element, or one around it, carried xsi:nil="true"
 	hasText       bool   // the element holds text other than XML whitespace
 	primitive     bool   // a decoder read the element's text as its value
+	// key reads the key of the element when it is one entry of a Hash member,
+	// so the members inside it are named under the key; nil otherwise.
+	key func() string
+	// optional names the members of the element's class that the shape it
+	// takes as one of a choice of shapes makes optional, which are never
+	// missing; nil otherwise.
+	optional []string
 }
 
 // linearChildNames is the number of distinct child names a frame counts in its
@@ -211,7 +248,8 @@ func NewTracker(report func(path string), strict bool) *Tracker {
 // every element it opens and closes in t. Decode values from it with
 // [Tracker.Decode].
 func (t *Tracker) NewDecoder(r io.Reader) *xml.Decoder {
-	return xml.NewTokenDecoder(&trackingReader{src: xml.NewDecoder(r), t: t})
+	t.reader = &trackingReader{src: xml.NewDecoder(r), t: t}
+	return xml.NewTokenDecoder(t.reader)
 }
 
 // Decode decodes the next value of dec, a decoder from [Tracker.NewDecoder],
@@ -429,8 +467,15 @@ func isXMLSpace(text []byte) bool {
 // decode applies. Text that does not convert is a primitive failure, which
 // names the element by its path from the root of the value.
 func (t *Tracker) decodeText(dec *xml.Decoder, start *xml.StartElement, v any) error {
-	at := t.here()
 	t.open[len(t.open)-1].primitive = true
+	return t.readText(dec, start, v)
+}
+
+// readText decodes the element start opens into v as [Tracker.decodeText]
+// does, but leaves the element unmarked as a primitive: an entry of a Hash
+// member, which is a value of the member whatever its text.
+func (t *Tracker) readText(dec *xml.Decoder, start *xml.StartElement, v any) error {
+	at := t.here()
 	if err := t.attrs(start.Attr, nil); err != nil {
 		return err
 	}
@@ -487,32 +532,59 @@ func trackerOf(dec *xml.Decoder) *Tracker {
 	return nil
 }
 
-// trackingReader is the token source of a tracked decode. It reads src with
-// Token, so the namespaces are resolved and the nesting checked there, and
-// records every element opened and closed in t. It drops the namespace
-// declarations from each start element: the decoder built on it then has no
-// prefix to resolve and passes every name through as src resolved it.
+// trackingReader is the token source of a tracked decode, and of a scoped one
+// ([Scope]). It reads src with Token, so the namespaces are resolved and the
+// nesting checked there, records in t every element opened and closed, when t
+// is not nil, and keeps in scope the namespace prefixes the open elements
+// declare. It drops the namespace declarations from each start element: the
+// decoder built on it then has no prefix to resolve and passes every name
+// through as src resolved it.
 type trackingReader struct {
 	src *xml.Decoder
-	t   *Tracker
+	t   *Tracker // nil for a scoped decode, which records no element
+	// scope holds the prefixes the open elements declare, for [LookupPrefix].
+	scope scope
+	// again marks a scoped decode of a value a second time
+	// ([Scope.DecodeAgain]), whose root decoder [Enter] tells to clear its
+	// receiver first.
+	again bool
+	// pending holds the tokens [trackingReader.peekChild] read ahead of the
+	// decoder, which Token returns, and records, before it reads src again.
+	pending []xml.Token
 }
 
-// Token returns the next token of src, after recording it.
+// Token returns the next token, the first read ahead or else the next of src,
+// after recording it.
 func (r *trackingReader) Token() (xml.Token, error) {
-	tok, err := r.src.Token()
+	var tok xml.Token
+	var err error
+	if len(r.pending) > 0 {
+		tok = r.pending[0]
+		r.pending = r.pending[1:]
+		if len(r.pending) == 0 {
+			r.pending = nil
+		}
+	} else {
+		tok, err = r.src.Token()
+	}
 	switch tk := tok.(type) {
 	case xml.StartElement:
-		r.t.push(tk.Name.Local)
-		if r.t.missing != nil {
-			n := len(r.t.open)
-			r.t.open[n-1].nilled = r.t.open[n-2].nilled || isNilled(tk.Attr)
+		if r.t != nil {
+			r.t.push(tk.Name.Local)
+			if r.t.missing != nil {
+				n := len(r.t.open)
+				r.t.open[n-1].nilled = r.t.open[n-2].nilled || isNilled(tk.Attr)
+			}
 		}
-		tk.Attr = withoutNamespaceDecls(tk.Attr)
+		tk.Attr = r.scope.open(tk.Attr)
 		return tk, err
 	case xml.EndElement:
-		r.t.pop()
+		if r.t != nil {
+			r.t.pop()
+		}
+		r.scope.close()
 	case xml.CharData:
-		if r.t.missing != nil && !isXMLSpace(tk) {
+		if r.t != nil && r.t.missing != nil && !isXMLSpace(tk) {
 			r.t.open[len(r.t.open)-1].hasText = true
 		}
 	}
@@ -741,8 +813,8 @@ func LocalName(name xml.Name) string {
 // SkipUnmatched skips the element start opens, which the generated decoder
 // does not read: its name matches no attribute of the RM type being decoded,
 // it lies in a foreign namespace, or it holds content the codec does not
-// model, such as a `Hash` attribute, a BMM `Any` attribute or a member whose
-// Go type has no decoder of its own. The element is one item, whatever it
+// model, such as a `Hash` of `Hash`es or a member whose Go type has no decoder
+// of its own. The element is one item, whatever it
 // holds. start must be the token the decoder read last.
 //
 // By default it only skips. A tracked decode first reports the element's
@@ -1064,19 +1136,19 @@ func dropXMLSpace(r rune) rune {
 
 // DropElement reads the element start opens and drops it: an element the
 // schema type of the class being decoded accepts but no member of the class
-// holds, which may hold one value only, want, such as the legacy
-// `match_negated` of an ADL 1.4 attribute constraint. start must be the token
-// the decoder read last.
+// holds, which may hold one value only, written as one of wants, such as the
+// legacy `match_negated` of an ADL 1.4 attribute constraint, false written
+// `false` or `0`. start must be the token the decoder read last.
 //
-// With want for text, less the XML whitespace around it, the element is read
-// and dropped in every decode: neither reported nor refused. Any other text,
-// none included, is refused in every decode, as a primitive failure is in
-// [DecodeText]: a *typereg.DecodeError whose cause wraps [ErrInvalidShape] and
-// whose text carries none of the element's. A tracked decode reports an
+// With one of wants for text, less the XML whitespace around it, the element
+// is read and dropped in every decode: neither reported nor refused. Any other
+// text, none included, is refused in every decode, as a primitive failure is
+// in [DecodeText]: a *typereg.DecodeError whose cause wraps [ErrInvalidShape]
+// and whose text carries none of the element's. A tracked decode reports an
 // attribute or child element on the element, as for any primitive.
-func DropElement(dec *xml.Decoder, start *xml.StartElement, want string) error {
+func DropElement(dec *xml.Decoder, start *xml.StartElement, wants ...string) error {
 	return DecodeText(dec, start, func(text string) error {
-		if strings.Trim(text, xmlSpace) != want {
+		if !slices.Contains(wants, strings.Trim(text, xmlSpace)) {
 			return errDroppedValue
 		}
 		return nil

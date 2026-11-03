@@ -18,8 +18,9 @@ package canxml
 // empty struct
 // element such as `<subject/>` or a bare `<subject xsi:type="PARTY_SELF"/>`,
 // `<magnitude>0</magnitude>`, `<units>kg</units>` where `<units></units>` is
-// missing, an `archetype_node_id` written as an XML attribute, and a `Hash`
-// or `Any` element the codec does not model are present. Canonical XML has
+// missing, an `archetype_node_id` written as an XML attribute, a `Hash`
+// with an entry, even one whose value is empty, and a `Hash` of `Hash`es or an
+// `Any` element the codec does not model are present. Canonical XML has
 // no element for an empty list, so a mandatory list the input leaves empty,
 // a CLUSTER's `items`, is missing, where canonical JSON's `[]` is present.
 // Three kinds of attribute are never missing: one no serialization carries
@@ -34,9 +35,11 @@ package canxml
 // its zero value. fn receives each member once, as its JSON Pointer (RFC
 // 6901) in the canonical-JSON form of the instance, from the root of the
 // value, such as "/content/0/data/events/0/data/items/0/value/magnitude":
-// the attribute's name under the pointer of the element that lacks it, and
-// each child element of a multi-valued attribute by its position among its
-// same-named siblings, counted from 0. That is not the element path
+// the attribute's name under the pointer of the element that lacks it, each
+// child element of a multi-valued attribute by its position among its
+// same-named siblings, counted from 0, and each entry of a `Hash` member by
+// its key, as canonical JSON writes the map, such as
+// "/description/details/en/purpose". That is not the element path
 // [WithUnmatched] reports: a missing member is a member of the instance,
 // not an item of the document, so both codecs name it one way and a
 // consumer of either format hands the validators one list. The pointer

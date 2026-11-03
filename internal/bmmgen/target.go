@@ -79,7 +79,7 @@ var TargetRM = Target{
 // ARCHETYPE_ID, HIER_OBJECT_ID, VALIDITY_KIND) are imported from
 // the rm package as `rm.<GoName>`.
 var TargetAOM14 = Target{
-	RootID:             "openehr_am_1.4.0",
+	RootID:             "openehr_operational_template_1.4.0",
 	GoPackage:          "aom14",
 	OutSubDir:          "openehr/aom/aom14",
 	OwnPackagePrefixes: []string{"org.openehr.am."},

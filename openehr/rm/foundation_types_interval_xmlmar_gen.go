@@ -17,9 +17,8 @@ import (
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 //
 // An open side (`lower_unbounded` or `upper_unbounded` set) whose bound
 // is empty emits no `lower` or `upper` element.
@@ -69,9 +68,8 @@ func (p *PointInterval[T]) BMMName() string { return "Point_interval" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 //
 // An open side (`lower_unbounded` or `upper_unbounded` set) whose bound
 // is empty emits no `lower` or `upper` element.
@@ -121,9 +119,8 @@ func (p *ProperInterval[T]) BMMName() string { return "Proper_interval" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 //
 // An open side (`lower_unbounded` or `upper_unbounded` set) whose bound
 // is empty emits no `lower` or `upper` element.

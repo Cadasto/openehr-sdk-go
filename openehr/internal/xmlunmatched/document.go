@@ -32,6 +32,14 @@ import (
 // by decoding data a second time, once the first decode has failed so, which
 // a decode that succeeds never pays for. Other XML syntax errors come back
 // unchanged from encoding/xml.
+//
+// A tracked decode also knows the namespace prefixes declared around each
+// element, which an `xsi:type` written with a prefix needs ([LookupPrefix]).
+// An untracked one sees only those its element declares itself; when an
+// `xsi:type` needs another ([UnresolvedPrefix]), it decodes data a second
+// time, through a decoder that sees them all, into v cleared to its zero
+// value, so that only a document with such a value pays for the second
+// decode.
 func Unmarshal(data []byte, v any, t *Tracker) error {
 	if err := checkProlog(data); err != nil {
 		return err
@@ -39,8 +47,8 @@ func Unmarshal(data []byte, v any, t *Tracker) error {
 	if t == nil {
 		dec := xml.NewDecoder(bytes.NewReader(data))
 		if err := dec.Decode(v); err != nil {
-			if IsPrimitiveFailure(err) {
-				return locate(data, v, err)
+			if IsPrimitiveFailure(err) || IsUnresolvedPrefix(err) {
+				return decodeAgain(data, v, err)
 			}
 			return err
 		}
@@ -53,18 +61,27 @@ func Unmarshal(data []byte, v any, t *Tracker) error {
 	return end(dec)
 }
 
-// locate decodes data into v once more after an untracked decode failed
-// with err, a primitive failure that names the element alone. The second
-// decode reads through a tracker that follows the open elements and applies
-// no policy, so it fails at the same element and names it by its path from
-// the root of the value. locate returns that error, or err should the second
-// decode not fail.
-func locate(data []byte, v any, err error) error {
+// decodeAgain decodes data into v once more after an untracked decode failed
+// with err: a primitive failure that names the element alone, or an `xsi:type`
+// whose prefix the decode could not resolve. The second decode reads through
+// a tracker that follows the open elements and their namespace scope and
+// applies no policy. A primitive failure fails again at the same element,
+// named by its path from the root of the value. A prefix resolves, and the
+// decode reads on to the end: so that it does not add to what the first
+// decode left in v, such as the items of a list, the root's decoder clears v
+// before it reads ([Enter]). It returns what the second decode returns, or
+// err should a primitive failure not fail again.
+func decodeAgain(data []byte, v any, err error) error {
 	t := NewTracker(nil, false)
-	if located := t.Decode(t.NewDecoder(bytes.NewReader(data)), v); located != nil {
-		return located
+	t.again = IsUnresolvedPrefix(err)
+	dec := t.NewDecoder(bytes.NewReader(data))
+	if again := t.Decode(dec, v); again != nil {
+		return again
 	}
-	return err
+	if IsPrimitiveFailure(err) {
+		return err
+	}
+	return end(dec)
 }
 
 // end reads the rest of the document after the root element. Comments,

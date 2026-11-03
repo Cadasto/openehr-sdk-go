@@ -199,9 +199,9 @@ func TestREQ042_RunEmitsReleaseFile(t *testing.T) {
 
 // TestCheckFixedNameCollisions pins which file stems the generator reserves
 // for its own fixed-name files: a BMM package whose file would be written over
-// by typereg_gen.go, jsonhooks_gen.go, interval_bound_gen.go or
-// release_gen.go is refused, the error names both files, and an ordinary plan
-// passes.
+// by typereg_gen.go, jsonhooks_gen.go, interval_bound_gen.go, release_gen.go,
+// integer_enumeration_gen.go or xml_names_gen.go is refused, the error names both files, and an
+// ordinary plan passes.
 func TestCheckFixedNameCollisions(t *testing.T) {
 	for _, tc := range []struct {
 		fileBase string
@@ -211,6 +211,8 @@ func TestCheckFixedNameCollisions(t *testing.T) {
 		{"jsonhooks", "jsonhooks_gen.go"},
 		{"interval_bound", intervalBoundFile},
 		{"release", releaseFileName},
+		{"integer_enumeration", integerEnumFile},
+		{"xml_names", xmlNamesFile},
 	} {
 		t.Run(tc.fixed, func(t *testing.T) {
 			plan := &Plan{Files: []*PlannedFile{{FileBase: "data_types_quantity"}, {FileBase: tc.fileBase}}}
@@ -245,6 +247,8 @@ func TestRunRefusesBMMPackageNamedLikeAFixedFile(t *testing.T) {
 		{"jsonhooks", "jsonhooks_gen.go"},
 		{"interval_bound", intervalBoundFile},
 		{"release", releaseFileName},
+		{"integer_enumeration", integerEnumFile},
+		{"xml_names", xmlNamesFile},
 	} {
 		t.Run(tc.fixed, func(t *testing.T) {
 			resources := stageResources(t, func(name string, body []byte) []byte {
@@ -278,8 +282,9 @@ func TestRunRefusesBMMPackageNamedLikeAFixedFile(t *testing.T) {
 // named like a fixed file is refused, including the two names that target
 // never emits (interval_bound_gen.go and release_gen.go). Guarding the check
 // with the RM target alone would let those two through. The test renames the
-// AOM schema's `openehr_archetype_profile` package and runs the AOM target
-// alone, so the RM target cannot be the one that refuses.
+// `openehr_archetype_profile` package in the AOM schema and in the AOM 1.4
+// root, which declares classes in it too, and runs the AOM target alone, so
+// the RM target cannot be the one that refuses.
 func TestRunRefusesFixedFileNameInAnyTarget(t *testing.T) {
 	for _, tc := range []struct {
 		pkg   string
@@ -289,15 +294,17 @@ func TestRunRefusesFixedFileNameInAnyTarget(t *testing.T) {
 		{"jsonhooks", "jsonhooks_gen.go"},
 		{"interval_bound", intervalBoundFile},
 		{"release", releaseFileName},
+		{"integer_enumeration", integerEnumFile},
+		{"xml_names", xmlNamesFile},
 	} {
 		t.Run(tc.fixed, func(t *testing.T) {
 			resources := stageResources(t, func(name string, body []byte) []byte {
-				if name != "openehr_am_1.4.0.bmm.json" {
+				if name != "openehr_am_1.4.0.bmm.json" && name != rootsDirName+"/"+TargetAOM14.RootID+schemaFileSuffix {
 					return body
 				}
 				renamed := strings.ReplaceAll(string(body), "openehr_archetype_profile", tc.pkg)
 				if renamed == string(body) {
-					t.Fatal("the AOM 1.4 schema no longer declares the package openehr_archetype_profile")
+					t.Fatalf("%s no longer declares the package openehr_archetype_profile", name)
 				}
 				return []byte(renamed)
 			})
