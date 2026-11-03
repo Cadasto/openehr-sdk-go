@@ -53,14 +53,14 @@ func compositionOPTs(t *testing.T) []compositionOPT {
 		if err != nil {
 			t.Fatalf("read %s: %v", ref.Name, err)
 		}
-		opt, err := fixtures.ParseOPTBytes(body)
+		opt, err := fixtures.ReadOperationalTemplate(body)
 		if err != nil {
 			continue
 		}
-		if root := opt.Root(); root == nil || root.RMTypeName() != "COMPOSITION" {
+		if strings.TrimSpace(opt.Definition.RMTypeName) != "COMPOSITION" {
 			continue
 		}
-		id := opt.TemplateID()
+		id := strings.TrimSpace(opt.TemplateID.Value)
 		if seen[id] {
 			continue
 		}
