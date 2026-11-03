@@ -273,6 +273,49 @@ func TestREQ176_REQ052_IntegerItemInItsBuiltinsRange(t *testing.T) {
 	}
 }
 
+// TestREQ176_REQ052_OtherBuiltinItemsAsString pins the canonical JSON of a
+// typed item whose XML Schema built-in no other primitive reads, such as
+// `xs:gYear`: an object whose `_type` is String and whose `value` is the text
+// as written, which decodes back as an `xsd:string` item, since canonical JSON
+// keeps the primitive and not the built-in.
+func TestREQ176_REQ052_OtherBuiltinItemsAsString(t *testing.T) {
+	for _, tc := range []struct{ builtin, text string }{
+		{"gYearMonth", "2020-01"},
+		{"gYear", "2020"},
+		{"gMonthDay", "--01-31"},
+		{"gDay", "---31"},
+		{"gMonth", "--01"},
+		{"hexBinary", "0F"},
+		{"base64Binary", "AQ=="},
+		{"QName", "xs:foo"},
+		{"NOTATION", "xs:png"},
+		{"NMTOKENS", "a b"},
+		{"IDREFS", "a b"},
+		{"ENTITY", "e"},
+		{"ENTITIES", "e f"},
+		{"anySimpleType", "x"},
+		{"anyType", "x"},
+	} {
+		item := xmlschema.TypedString{Type: "xs:" + tc.builtin, Value: tc.text}
+		got, err := json.Marshal(item)
+		if want := `{"_type":"String","value":"` + tc.text + `"}`; err != nil || string(got) != want {
+			t.Errorf("json.Marshal(%#v) = %s, %v; want %s, nil", item, got, err, want)
+			continue
+		}
+		var v any
+		w := struct {
+			X xmlschema.AnyJSON `json:"x"`
+		}{X: xmlschema.AnyJSON{To: &v}}
+		if err := json.Unmarshal([]byte(`{"x":`+string(got)+`}`), &w, typereg.Unmarshalers()); err != nil {
+			t.Errorf("AnyJSON(%s) = %v", got, err)
+			continue
+		}
+		if want := (&xmlschema.TypedString{Value: tc.text, Type: "xsd:string"}); !reflect.DeepEqual(v, want) {
+			t.Errorf("AnyJSON(%s) stored %#v; want %#v", got, v, want)
+		}
+	}
+}
+
 // registerUriClass registers a class under the name of the BMM primitive Uri,
 // once per test binary, so that a test can tell whether a decoder asks the
 // type registry before it reads a primitive's `_type` as a typed item.

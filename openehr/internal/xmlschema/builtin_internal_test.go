@@ -46,6 +46,38 @@ func TestREQ176_REQ052_CanonicalBuiltinsReadBack(t *testing.T) {
 	}
 }
 
+// TestREQ176_REQ056_EveryBuiltinReadsAsAPrimitive pins that every XML Schema
+// 1.0 built-in datatype, the two ur-types included, reads as a BMM
+// primitive, so that an item typed with any of them decodes as a typed
+// string rather than fail as an unknown type; and that the built-ins no
+// other primitive reads, such as `gYear`, `hexBinary` and `QName`, read as a
+// String.
+func TestREQ176_REQ056_EveryBuiltinReadsAsAPrimitive(t *testing.T) {
+	asString := []string{
+		"gYearMonth", "gYear", "gMonthDay", "gDay", "gMonth", "hexBinary", "base64Binary",
+		"QName", "NOTATION", "NMTOKENS", "IDREFS", "ENTITY", "ENTITIES", "anySimpleType", "anyType",
+	}
+	for _, local := range asString {
+		if got, ok := Builtin(local); !ok || got != "String" {
+			t.Errorf("Builtin(%q) = %q, %t; want \"String\"", local, got, ok)
+		}
+	}
+	every := append([]string{
+		"string", "boolean", "decimal", "float", "double", "duration", "dateTime", "time", "date", "anyURI",
+		"normalizedString", "token", "language", "NMTOKEN", "Name", "NCName", "ID", "IDREF",
+		"integer", "nonPositiveInteger", "negativeInteger", "long", "int", "short", "byte",
+		"nonNegativeInteger", "unsignedLong", "unsignedInt", "unsignedShort", "unsignedByte", "positiveInteger",
+	}, asString...)
+	for _, local := range every {
+		if _, ok := Builtin(local); !ok {
+			t.Errorf("Builtin(%q) reads as no primitive; want every XML Schema 1.0 built-in to read as one", local)
+		}
+	}
+	if len(builtins) != len(every) {
+		t.Errorf("the table holds %d built-ins; want the %d of XML Schema 1.0", len(builtins), len(every))
+	}
+}
+
 // TestREQ176_REQ052_IntegerBuiltinsByRange pins the primitive each integer
 // built-in reads as: an Integer where a 32-bit Integer holds the built-in's
 // whole range, and an Integer64 where it does not, so that a value the

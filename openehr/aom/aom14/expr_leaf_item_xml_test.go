@@ -103,9 +103,10 @@ func itemModes(t *testing.T) map[string]func([]byte, any) error {
 // a *aom14.CString; `xs:string` with its prefix declared on the item and
 // `xsd:string` with its prefix declared on the root as a *aom14.TypedString
 // that keeps the `xsi:type` as written; and an item with no `xsi:type` as its
-// text, a Go string. Each encodes back in the form it was read in, the typed
-// string declaring the prefix it uses on the item, and reads back as the same
-// value.
+// text, a Go string. An XML Schema built-in no other primitive reads, such as
+// `xs:gYear`, `xs:hexBinary` or `xs:QName`, decodes as a *aom14.TypedString
+// too. Each encodes back in the form it was read in, the typed string
+// declaring the prefix it uses on the item, and reads back as the same value.
 func TestREQ176_REQ056_ExprLeafItemForms(t *testing.T) {
 	pattern := ".*"
 	forms := []struct {
@@ -137,6 +138,24 @@ func TestREQ176_REQ056_ExprLeafItemForms(t *testing.T) {
 			form:    itemForm{content: "archetype_id/value"},
 			want:    "archetype_id/value",
 			written: `<item>archetype_id/value</item>`,
+		},
+		{
+			name:    "xs:gYear declared on the item",
+			form:    itemForm{item: ` xmlns:xs="` + xmlSchemaNamespace + `" xsi:type="xs:gYear"`, content: "2020"},
+			want:    &aom14.TypedString{Value: "2020", Type: "xs:gYear"},
+			written: `<item xmlns:xs="` + xmlSchemaNamespace + `" xsi:type="xs:gYear">2020</item>`,
+		},
+		{
+			name:    "xs:hexBinary declared on the item",
+			form:    itemForm{item: ` xmlns:xs="` + xmlSchemaNamespace + `" xsi:type="xs:hexBinary"`, content: "0F"},
+			want:    &aom14.TypedString{Value: "0F", Type: "xs:hexBinary"},
+			written: `<item xmlns:xs="` + xmlSchemaNamespace + `" xsi:type="xs:hexBinary">0F</item>`,
+		},
+		{
+			name:    "xs:QName declared on the item",
+			form:    itemForm{item: ` xmlns:xs="` + xmlSchemaNamespace + `" xsi:type="xs:QName"`, content: "xs:foo"},
+			want:    &aom14.TypedString{Value: "xs:foo", Type: "xs:QName"},
+			written: `<item xmlns:xs="` + xmlSchemaNamespace + `" xsi:type="xs:QName">xs:foo</item>`,
 		},
 	}
 	for mode, decode := range itemModes(t) {

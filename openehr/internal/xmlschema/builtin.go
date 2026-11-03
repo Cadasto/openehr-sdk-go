@@ -9,12 +9,14 @@ const NS = "http://www.w3.org/2001/XMLSchema"
 // datatype, as producers write `xsd:string` without declaring `xsd`.
 const LiteralPrefix = "xsd"
 
-// builtins maps the XML Schema built-in datatypes the openEHR ITS-XML schemas
-// and the producers of canonical XML write openEHR primitives as to the BMM
-// primitive each reads as. An integer built-in reads as an Integer where a
-// 32-bit Integer holds its whole range, `int` and the narrower ones, and as an
-// Integer64 otherwise, so a value the built-in admits is not refused for its
-// range where a 64-bit Integer64 holds it.
+// builtins maps every XML Schema 1.0 built-in datatype, the ur-types
+// `anyType` and `anySimpleType` included, to the BMM primitive it reads as.
+// An integer built-in reads as an Integer where a 32-bit Integer holds its
+// whole range, `int` and the narrower ones, and as an Integer64 otherwise, so
+// a value the built-in admits is not refused for its range where a 64-bit
+// Integer64 holds it. A built-in no other primitive reads, such as `gYear`,
+// `hexBinary` or `QName`, reads as a String, so an item typed with it keeps
+// its text and the `xsi:type` it was written with.
 var builtins = map[string]string{
 	"string":             "String",
 	"normalizedString":   "String",
@@ -47,11 +49,26 @@ var builtins = map[string]string{
 	"time":               "Iso8601_time",
 	"dateTime":           "Iso8601_date_time",
 	"duration":           "Iso8601_duration",
+	"gYearMonth":         "String",
+	"gYear":              "String",
+	"gMonthDay":          "String",
+	"gDay":               "String",
+	"gMonth":             "String",
+	"hexBinary":          "String",
+	"base64Binary":       "String",
+	"QName":              "String",
+	"NOTATION":           "String",
+	"NMTOKENS":           "String",
+	"IDREFS":             "String",
+	"ENTITY":             "String",
+	"ENTITIES":           "String",
+	"anySimpleType":      "String",
+	"anyType":            "String",
 }
 
 // Builtin returns the BMM primitive the XML Schema built-in datatype named
 // local reads as, such as `String` for `string`, and false when local names
-// none of the built-in datatypes it reads.
+// no XML Schema 1.0 built-in datatype.
 func Builtin(local string) (string, bool) {
 	name, ok := builtins[local]
 	return name, ok
