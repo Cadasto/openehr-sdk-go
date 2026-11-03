@@ -5,6 +5,8 @@ package aom14
 
 import (
 	"encoding/xml"
+	"maps"
+	"slices"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
@@ -24,6 +26,7 @@ func (a *Archetype) BMMName() string { return "ARCHETYPE" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+// A Hash member writes one element per entry, in ascending key order.
 func (a *Archetype) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("ARCHETYPE")}
@@ -45,8 +48,11 @@ func (a *Archetype) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 		}
 	}
 	if a.Translations != nil {
-		if err := _e.EncodeElement(a.Translations, xml.StartElement{Name: xml.Name{Local: "translations"}}); err != nil {
-			return err
+		for _, _k := range slices.Sorted(maps.Keys(*a.Translations)) {
+			_v := (*a.Translations)[_k]
+			if err := _e.EncodeElement(&_v, xml.StartElement{Name: xml.Name{Local: "translations"}}); err != nil {
+				return err
+			}
 		}
 	}
 	if a.RevisionHistory != nil {

@@ -47,16 +47,17 @@ import (
 // one element of standard base64 text, the `xs:base64Binary` the ITS-XML
 // schema gives it and the string canonical JSON writes.
 //
-// # Hash/map XML emission (current limitation)
+// # Hash members
 //
-// `Hash<K,V>` properties are not emitted to XML: there is no
-// pinned canonical shape for them in the openEHR ITS-XML release
-// the SDK targets. Affected fields are skipped at encode time and
-// rejected at decode time (the decoder leaves them as the zero
-// value). Composition / EHR_STATUS / Directory / Contribution do
-// not use Hash on the critical path; the only RM uses are
-// extensibility hooks (`other_details`, `author`, …) under
-// AUTHORED_RESOURCE descendants. Documented in canxml/doc.go.
+// A `Hash<K,V>` member is written one element per entry, named after the
+// member, in ascending order of the keys, in the shapes the AM Release-1.4
+// schemas give them ([xmlHashOf]): a Hash of Strings as StringDictionaryItems,
+// the key in `id` and the value as text; a Hash of class values through the
+// value class's own encoder, the key in the attribute the class's schema type
+// declares that names no member, or, with none, not written, the value's
+// language code being its key. A Hash the codec does not model, a Hash of
+// Hashes, is handed to encoding/xml, which refuses a map. Documented in
+// canxml/doc.go.
 func RenderMarshalXMLFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	emitting, err := codecClassesIn(plan, file)
 	if err != nil {
@@ -99,6 +100,9 @@ func RenderMarshalXMLFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	body.WriteString("\t\"encoding/xml\"\n")
 	if slices.ContainsFunc(chunks, func(c string) bool { return strings.Contains(c, "fmt.") }) {
 		body.WriteString("\t\"fmt\"\n")
+	}
+	if slices.ContainsFunc(chunks, func(c string) bool { return strings.Contains(c, "slices.Sorted(maps.Keys(") }) {
+		body.WriteString("\t\"maps\"\n\t\"slices\"\n")
 	}
 	body.WriteString("\n\t\"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml\"\n")
 	if needsExternalImportForJSONMar(plan, chunks) {
@@ -182,6 +186,13 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 	}
 	b.WriteString("// Members the class's ITS-XML schema type declares as XML attributes\n")
 	b.WriteString("// are appended to start.Attr before the start token is written.\n")
+	hashes, err := hasXMLHash(plan, fields)
+	if err != nil {
+		return "", err
+	}
+	if hashes {
+		b.WriteString("// A Hash member writes one element per entry, in ascending key order.\n")
+	}
 	shaped := hasIntervalShape(fields)
 	if shaped {
 		b.WriteString("//\n")
@@ -245,6 +256,16 @@ func renderMarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass, e
 	goField := FieldName(propName)
 	elemName := propName
 
+	// A Hash member writes one element per entry; one the codec does not model
+	// goes to encoding/xml below, which refuses a map.
+	hash, _, err := xmlHashOf(plan, ef)
+	if err != nil {
+		return "", err
+	}
+	if hash != nil {
+		return marshalXMLHash(recv, goField, elemName, hash), nil
+	}
+
 	switch p := ef.Prop.(type) {
 	case *bmm.SingleProperty:
 		_, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
@@ -292,7 +313,7 @@ func renderMarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass, e
 			return marshalXMLPolySlice(recv, goField, elemName), nil
 		}
 		if p.TypeDef != nil && p.TypeDef.ContainerType == "Hash" {
-			return marshalXMLHashTODO(goField, elemName), nil
+			return marshalXMLStructMandatory(recv, goField, elemName), nil
 		}
 		innerIsClass := containerInnerIsClass(plan, p.TypeDef)
 		if innerIsClass {
@@ -418,8 +439,4 @@ func marshalXMLGenericOptional(recv, field, elem string) string {
 	// pointer indirection). Take the address so pointer-receiver
 	// MarshalXML on T dispatches; see [marshalXMLGenericMandatory].
 	return fmt.Sprintf("\tif err := _e.EncodeElement(&%s.%s, xml.StartElement{Name: xml.Name{Local: %q}}); err != nil {\n\t\treturn err\n\t}\n", recv, field, elem)
-}
-
-func marshalXMLHashTODO(field, elem string) string {
-	return fmt.Sprintf("\t// TODO(canxml): Hash<K,V> XML emission deferred for %s/%s — see canxml/doc.go.\n\t_ = %q\n", field, elem, elem)
 }

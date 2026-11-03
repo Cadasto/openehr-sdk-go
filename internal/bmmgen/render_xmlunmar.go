@@ -89,14 +89,17 @@ import (
 //  7. `xmi:type` is rejected via [canxml.XSITypeOf] (centralised in the
 //     helper).
 //
-// # Hash/map and Any decoding
+// # Hash and Any decoding
 //
-// Same limitation as the encoder: Hash<K,V> properties are not
-// decoded, and neither is the content of a property typed by the BMM
-// root type Any. Their element goes to `xmlunmatched.SkipUnmatched` as one
-// item of unmatched content, so it is skipped by default, reported or
-// refused on request, and the receiver field is left at its zero value.
-// Documented in canxml/doc.go.
+// A Hash<K,V> member reads each element of its name as one entry, through
+// `xmlunmatched.DecodeEntry`, which takes the key attribute off before the
+// value is read, or `xmlunmatched.DecodeEntryKeyedBy`, which reads the key
+// from the value, its language code ([xmlHashOf]). A Hash the codec does not
+// model, a Hash of Hashes, is not decoded, and neither is the content of a
+// property typed by the BMM root type Any: their element goes to
+// `xmlunmatched.SkipUnmatched` as one item of unmatched content, so it is
+// skipped by default, reported or refused on request, and the receiver field
+// is left at its zero value. Documented in canxml/doc.go.
 func RenderUnmarshalXMLFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	emitting, err := codecClassesIn(plan, file)
 	if err != nil {
@@ -228,6 +231,13 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	b.WriteString("// sentinels inside *canxml.DecodeError for errors.Is / errors.As.\n")
 	b.WriteString("// Members the class's ITS-XML schema type declares as XML attributes\n")
 	b.WriteString("// are read from _start.Attr.\n")
+	hashes, err := hasXMLHash(plan, fields)
+	if err != nil {
+		return "", err
+	}
+	if hashes {
+		b.WriteString("// A Hash member reads each element of its name as one entry.\n")
+	}
 	b.WriteString("// Content the method does not read is unmatched: it is skipped, or\n")
 	b.WriteString("// reported or refused under canxml.WithUnmatched and canxml.WithStrict.\n")
 	legacy := sc.IsAbstract() && hasIntervalShape(fields)
@@ -323,11 +333,24 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 	goField := FieldName(propName)
 	elemName := propName
 
+	// A Hash member reads one entry per element; one the codec does not model
+	// is unmatched content.
+	hash, isHash, err := xmlHashOf(plan, ef)
+	if err != nil {
+		return "", err
+	}
+	if hash != nil {
+		return unmarshalXMLHash(recv, goField, elemName, hash), nil
+	}
+	if isHash {
+		return unmarshalXMLHashUnmodelled(elemName), nil
+	}
+
 	switch p := ef.Prop.(type) {
 	case *bmm.SingleProperty:
 		if p.TypeName == bmmAnyType {
 			// The codec cannot decode the content of an Any member: the
-			// element goes to xmlunmatched.SkipUnmatched, like a Hash member's.
+			// element goes to xmlunmatched.SkipUnmatched as one item.
 			return unmarshalXMLAnyContent(elemName), nil
 		}
 		ifaceName, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
@@ -416,9 +439,6 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 			// fixture appears that omits the discriminator.
 			return unmarshalXMLPolySlice(recv, goField, elemName, ifaceName), nil
 		}
-		if p.TypeDef != nil && p.TypeDef.ContainerType == "Hash" {
-			return unmarshalXMLHashTODO(elemName), nil
-		}
 		innerIsClass := containerInnerIsClass(plan, p.TypeDef)
 		innerType, err := containerInner(plan, ef.Owner, p.TypeDef)
 		if err != nil {
@@ -450,11 +470,6 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 		return unmarshalXMLPrimitiveSlice(recv, goField, elemName, innerType), nil
 
 	case *bmm.GenericProperty:
-		// Hash<K,V> at the property type level — Go maps it to
-		// map[K]V. v1 defers XML emission/decoding (see canxml/doc.go).
-		if p.TypeDef != nil && p.TypeDef.RootType == "Hash" {
-			return unmarshalXMLHashTODO(elemName), nil
-		}
 		// List<T>, Set<T> or Array<T> at the property type level — Go
 		// holds it as []T, or *[]T when optional: one element per item.
 		if p.TypeDef != nil && containerKinds[p.TypeDef.RootType] {
@@ -565,7 +580,7 @@ var handWrittenXMLCodecs = map[string]bool{
 // canonical-XML decoder of its own, such as a BMM primitive class like
 // TERMINOLOGY_CODE: encoding/xml would read nothing from it and report
 // nothing either. The element is handed to xmlunmatched.SkipUnmatched as one
-// item, like a Hash member's: skipped by default, reported or refused on
+// item, like an Any member's: skipped by default, reported or refused on
 // request, and the field is left at its zero value.
 func unmarshalXMLNoDecoder(elem, bmmType string) string {
 	return fmt.Sprintf(
@@ -975,20 +990,10 @@ const bmmAnyType = "Any"
 // unmarshalXMLAnyContent emits the case of a property typed by the BMM root
 // type Any, such as the AOM 1.4 `assumed_value` and `EXPR_LEAF.item`. The
 // codec cannot decode its content, so the element is handed to
-// xmlunmatched.SkipUnmatched as one item, like a Hash member's: skipped by
-// default, reported or refused on request, and the field is left at its
-// zero value.
+// xmlunmatched.SkipUnmatched as one item: skipped by default, reported or
+// refused on request, and the field is left at its zero value.
 func unmarshalXMLAnyContent(elem string) string {
 	return fmt.Sprintf(
 		"\t\t\tcase %q:\n\t\t\t\t// Canonical XML does not model the content of an Any member — see canxml/doc.go.\n\t\t\t\tif _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
-		elem)
-}
-
-// unmarshalXMLHashTODO emits the case of a Hash<K,V> property. Canonical XML
-// does not model Hash, so the element is handed to xmlunmatched.SkipUnmatched
-// like unmatched content: skipped by default, reported or refused on request.
-func unmarshalXMLHashTODO(elem string) string {
-	return fmt.Sprintf(
-		"\t\t\tcase %q:\n\t\t\t\t// TODO(canxml): Hash<K,V> XML decode deferred — see canxml/doc.go.\n\t\t\t\tif _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
 		elem)
 }

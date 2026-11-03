@@ -6,9 +6,9 @@ package canxml_test
 // element decodes as, other than namespace declarations and attributes in the
 // XML Schema instance namespace (a bare `type` counts only where dispatch
 // reads it); an element in a namespace other than the openEHR one; or an
-// element whose content the codec does not model: a `Hash` member, a BMM
-// `Any` member, or a member whose Go type has no decoder of its own, each one
-// item. The default ignores it; WithUnmatched reports every item, in document
+// element whose content the codec does not model: a `Hash` of `Hash`es, a
+// BMM `Any` member, or a member whose Go type has no decoder of its own, each
+// one item. The default ignores it; WithUnmatched reports every item, in document
 // order, by its path; WithStrict refuses the first with
 // canxml.ErrUnknownElement.
 
@@ -648,28 +648,32 @@ func TestREQ170_XMLForeignNamespace(t *testing.T) {
 }
 
 // TestREQ170_XMLHashElements pins the rule for `Hash` members, which the
-// codec does not model: on a resource-metadata type, by default a Hash
-// element is skipped, the report option reports it, and strict refuses it
-// like unmatched content (canxml.ErrUnknownElement, not canxml.ErrNamespace).
+// codec models (REQ-176 § Round trip): on a resource-metadata type each
+// element of a Hash member is one entry, decoded under the key its `id`
+// attribute holds, so neither the entry nor its key is unmatched content.
+// What an entry holds besides its key and its text, here a child element, is
+// unmatched like any other: skipped by default, reported, and refused by
+// strict (canxml.ErrUnknownElement, not canxml.ErrNamespace).
 func TestREQ170_XMLHashElements(t *testing.T) {
 	in := []byte(`<description ` + ucNS + `>` +
 		`<original_author id="name">` + xmlPlanted + `</original_author>` +
 		`<original_author id="email">` + xmlPlanted + `</original_author>` +
 		`<lifecycle_state>published</lifecycle_state>` +
-		`<other_details><item id="k">` + xmlPlanted + `</item></other_details>` +
+		`<other_details id="k"><item>` + xmlPlanted + `</item></other_details>` +
 		`</description>`)
-	wantPaths := []string{
-		"/description[1]/original_author[1]",
-		"/description[1]/original_author[2]",
-		"/description[1]/other_details[1]",
-	}
+	wantPaths := []string{"/description[1]/other_details[1]/item[1]"}
 
 	var got rm.ResourceDescription
 	if err := canxml.Unmarshal(in, &got); err != nil {
-		t.Fatalf("canxml.Unmarshal = %v; want nil: a Hash element is skipped by default", err)
+		t.Fatalf("canxml.Unmarshal = %v; want nil", err)
 	}
-	if want := (rm.ResourceDescription{LifecycleState: "published"}); !reflect.DeepEqual(got, want) {
-		t.Errorf("canxml.Unmarshal decoded %#v; want %#v, the Hash members left out", got, want)
+	want := rm.ResourceDescription{
+		LifecycleState: "published",
+		OriginalAuthor: map[string]string{"name": xmlPlanted, "email": xmlPlanted},
+		OtherDetails:   &map[string]string{"k": ""},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("canxml.Unmarshal decoded %#v; want %#v, each entry under its key", got, want)
 	}
 
 	_, paths, err := unmarshalCollecting(func() any { return new(rm.ResourceDescription) }, in)
@@ -677,7 +681,7 @@ func TestREQ170_XMLHashElements(t *testing.T) {
 		t.Fatalf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
 	}
 	if !slices.Equal(paths, wantPaths) {
-		t.Errorf("WithUnmatched reported %q; want %q", paths, wantPaths)
+		t.Errorf("WithUnmatched reported %q; want %q, no entry and no key attribute", paths, wantPaths)
 	}
 
 	err = canxml.Unmarshal(in, new(rm.ResourceDescription), canxml.WithStrict())
@@ -714,7 +718,7 @@ func TestREQ170_XMLWideElement(t *testing.T) {
 
 // TestREQ170_XMLAnyMemberContent pins the rule for the content of a BMM `Any`
 // member, which the codec cannot decode: the AOM 1.4 `assumed_value` and
-// `EXPR_LEAF.item`. Like a Hash element, the element is skipped by default,
+// `EXPR_LEAF.item`. The element is skipped by default,
 // leaving the field at its zero value; the report option reports it as one
 // item at its own path, whatever it holds, an empty element included; and
 // strict refuses it like unmatched content.

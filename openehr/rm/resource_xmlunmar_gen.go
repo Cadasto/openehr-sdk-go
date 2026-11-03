@@ -42,7 +42,7 @@ func (r *ResourceAnnotations) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEl
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "documentation":
-				// TODO(canxml): Hash<K,V> XML decode deferred — see canxml/doc.go.
+				// Canonical XML does not model a Hash of these values — see canxml/doc.go.
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}

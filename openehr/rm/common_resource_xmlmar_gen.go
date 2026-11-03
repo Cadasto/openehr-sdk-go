@@ -5,6 +5,8 @@ package rm
 
 import (
 	"encoding/xml"
+	"maps"
+	"slices"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
@@ -24,6 +26,7 @@ func (r *ResourceDescription) BMMName() string { return "RESOURCE_DESCRIPTION" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+// A Hash member writes one element per entry, in ascending key order.
 func (r *ResourceDescription) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("RESOURCE_DESCRIPTION")}
@@ -31,8 +34,11 @@ func (r *ResourceDescription) MarshalXML(_e *xml.Encoder, _start xml.StartElemen
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&r.OriginalAuthor, xml.StartElement{Name: xml.Name{Local: "original_author"}}); err != nil {
-		return err
+	for _, _k := range slices.Sorted(maps.Keys(r.OriginalAuthor)) {
+		_v := r.OriginalAuthor[_k]
+		if err := _e.EncodeElement(_v, xml.StartElement{Name: xml.Name{Local: "original_author"}, Attr: []xml.Attr{{Name: xml.Name{Local: "id"}, Value: _k}}}); err != nil {
+			return err
+		}
 	}
 	for _, _item := range r.OtherContributors {
 		if err := _e.EncodeElement(_item, xml.StartElement{Name: xml.Name{Local: "other_contributors"}}); err != nil {
@@ -48,12 +54,18 @@ func (r *ResourceDescription) MarshalXML(_e *xml.Encoder, _start xml.StartElemen
 		}
 	}
 	if r.OtherDetails != nil {
-		if err := _e.EncodeElement(r.OtherDetails, xml.StartElement{Name: xml.Name{Local: "other_details"}}); err != nil {
-			return err
+		for _, _k := range slices.Sorted(maps.Keys(*r.OtherDetails)) {
+			_v := (*r.OtherDetails)[_k]
+			if err := _e.EncodeElement(_v, xml.StartElement{Name: xml.Name{Local: "other_details"}, Attr: []xml.Attr{{Name: xml.Name{Local: "id"}, Value: _k}}}); err != nil {
+				return err
+			}
 		}
 	}
-	if err := _e.EncodeElement(&r.Details, xml.StartElement{Name: xml.Name{Local: "details"}}); err != nil {
-		return err
+	for _, _k := range slices.Sorted(maps.Keys(r.Details)) {
+		_v := r.Details[_k]
+		if err := _e.EncodeElement(&_v, xml.StartElement{Name: xml.Name{Local: "details"}}); err != nil {
+			return err
+		}
 	}
 	if r.ParentResource != nil {
 		if err := canxml.EncodePoly(_e, "parent_resource", r.ParentResource); err != nil {
@@ -79,6 +91,7 @@ func (r *ResourceDescriptionItem) BMMName() string { return "RESOURCE_DESCRIPTIO
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+// A Hash member writes one element per entry, in ascending key order.
 func (r *ResourceDescriptionItem) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("RESOURCE_DESCRIPTION_ITEM")}
@@ -113,13 +126,19 @@ func (r *ResourceDescriptionItem) MarshalXML(_e *xml.Encoder, _start xml.StartEl
 		}
 	}
 	if r.OriginalResourceURI != nil {
-		if err := _e.EncodeElement(r.OriginalResourceURI, xml.StartElement{Name: xml.Name{Local: "original_resource_uri"}}); err != nil {
-			return err
+		for _, _k := range slices.Sorted(maps.Keys(*r.OriginalResourceURI)) {
+			_v := (*r.OriginalResourceURI)[_k]
+			if err := _e.EncodeElement(_v, xml.StartElement{Name: xml.Name{Local: "original_resource_uri"}, Attr: []xml.Attr{{Name: xml.Name{Local: "id"}, Value: _k}}}); err != nil {
+				return err
+			}
 		}
 	}
 	if r.OtherDetails != nil {
-		if err := _e.EncodeElement(r.OtherDetails, xml.StartElement{Name: xml.Name{Local: "other_details"}}); err != nil {
-			return err
+		for _, _k := range slices.Sorted(maps.Keys(*r.OtherDetails)) {
+			_v := (*r.OtherDetails)[_k]
+			if err := _e.EncodeElement(_v, xml.StartElement{Name: xml.Name{Local: "other_details"}, Attr: []xml.Attr{{Name: xml.Name{Local: "id"}, Value: _k}}}); err != nil {
+				return err
+			}
 		}
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
@@ -141,6 +160,7 @@ func (t *TranslationDetails) BMMName() string { return "TRANSLATION_DETAILS" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+// A Hash member writes one element per entry, in ascending key order.
 func (t *TranslationDetails) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("TRANSLATION_DETAILS")}
@@ -151,8 +171,11 @@ func (t *TranslationDetails) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 	if err := _e.EncodeElement(&t.Language, xml.StartElement{Name: xml.Name{Local: "language"}}); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&t.Author, xml.StartElement{Name: xml.Name{Local: "author"}}); err != nil {
-		return err
+	for _, _k := range slices.Sorted(maps.Keys(t.Author)) {
+		_v := t.Author[_k]
+		if err := _e.EncodeElement(_v, xml.StartElement{Name: xml.Name{Local: "author"}, Attr: []xml.Attr{{Name: xml.Name{Local: "id"}, Value: _k}}}); err != nil {
+			return err
+		}
 	}
 	if t.Accreditation != nil {
 		if err := _e.EncodeElement(*t.Accreditation, xml.StartElement{Name: xml.Name{Local: "accreditation"}}); err != nil {
@@ -160,8 +183,11 @@ func (t *TranslationDetails) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 		}
 	}
 	if t.OtherDetails != nil {
-		if err := _e.EncodeElement(t.OtherDetails, xml.StartElement{Name: xml.Name{Local: "other_details"}}); err != nil {
-			return err
+		for _, _k := range slices.Sorted(maps.Keys(*t.OtherDetails)) {
+			_v := (*t.OtherDetails)[_k]
+			if err := _e.EncodeElement(_v, xml.StartElement{Name: xml.Name{Local: "other_details"}, Attr: []xml.Attr{{Name: xml.Name{Local: "id"}, Value: _k}}}); err != nil {
+				return err
+			}
 		}
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {

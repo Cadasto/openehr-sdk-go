@@ -16,10 +16,11 @@ import (
 // apply the decode's policy (REQ-170): the start element's attributes on
 // entry, an element in a foreign namespace through the name it switches on,
 // every other element it does not read through its default arm, the text
-// between its child elements through its character-data arm, a Hash element
-// and the element of an Any member through their own arms, and a primitive
-// element through xmlunmatched.DecodeElement. A member typed by a generic
-// List, Set or Array decodes each element as one item and appends it.
+// between its child elements through its character-data arm, the element of
+// an Any member and of a Hash canonical XML does not model through their own
+// arms, and a primitive element through xmlunmatched.DecodeElement. A member
+// typed by a generic List, Set or Array decodes each element as one item and
+// appends it, and a Hash member each element as one entry (REQ-176).
 //
 // An arm may hand an element to the decoder's own DecodeElement only when the
 // member's class is one of those the two targets render a decoder for, which
@@ -108,8 +109,18 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 						}
 					case isHashProperty(ef.Prop):
 						hashes++
-						if !strings.Contains(arm, "xmlunmatched.SkipUnmatched(_dec, _t)") {
-							t.Errorf("%s.%s is a Hash member; its arm must hand the element to xmlunmatched.SkipUnmatched:\n%s", pc.BMMName, prop, arm)
+						shape, _, err := xmlHashOf(plan, ef)
+						if err != nil {
+							t.Fatalf("xmlHashOf(%s.%s): %v", pc.BMMName, prop, err)
+						}
+						if shape == nil {
+							if !strings.Contains(arm, "xmlunmatched.SkipUnmatched(_dec, _t)") {
+								t.Errorf("%s.%s is a Hash canonical XML does not model; its arm must hand the element to xmlunmatched.SkipUnmatched:\n%s", pc.BMMName, prop, arm)
+							}
+							continue
+						}
+						if !strings.Contains(arm, "xmlunmatched.DecodeEntry(") && !strings.Contains(arm, "xmlunmatched.DecodeEntryKeyedBy(") {
+							t.Errorf("%s.%s is a Hash member; its arm must decode each element as one entry through xmlunmatched.DecodeEntry or DecodeEntryKeyedBy:\n%s", pc.BMMName, prop, arm)
 						}
 					case isAnyProperty(ef.Prop):
 						anys++
@@ -167,8 +178,7 @@ func xmlCaseArm(src, prop string) string {
 	return rest[:end]
 }
 
-// isHashProperty reports whether prop is a BMM Hash member, which canonical
-// XML does not model.
+// isHashProperty reports whether prop is a BMM Hash member.
 func isHashProperty(prop bmm.Property) bool {
 	switch p := prop.(type) {
 	case *bmm.ContainerProperty:

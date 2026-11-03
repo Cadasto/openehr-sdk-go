@@ -29,6 +29,7 @@ var xmlClassArchetype = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A Hash member reads each element of its name as one entry.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *Archetype) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -54,8 +55,10 @@ func (a *Archetype) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 				}
 				a.IsControlled = &_v
 			case "translations":
-				// TODO(canxml): Hash<K,V> XML decode deferred — see canxml/doc.go.
-				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+				if a.Translations == nil {
+					a.Translations = new(map[string]rm.TranslationDetails)
+				}
+				if _err := xmlunmatched.DecodeEntryKeyedBy(_dec, &_t, func(_v *rm.TranslationDetails) string { return _v.Language.CodeString }, a.Translations); _err != nil {
 					return _err
 				}
 			case "description":

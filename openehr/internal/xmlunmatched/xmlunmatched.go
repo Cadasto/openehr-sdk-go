@@ -9,8 +9,8 @@
 // decodes as, other than namespace declarations and attributes in the XML
 // Schema instance namespace (`xsi:type`, `xsi:schemaLocation`, `xsi:nil`, …);
 // an element in a namespace other than the openEHR one; and an element whose
-// content the codec does not model: a `Hash` member, a BMM `Any` member, and
-// a member whose Go type has no decoder of its own. So is text other than
+// content the codec does not model: a BMM `Any` member, a `Hash` of `Hash`es,
+// and a member whose Go type has no decoder of its own. So is text other than
 // XML whitespace directly inside an element whose content is elements, one
 // item per element however many runs of text it holds. By default the decode
 // skips it. A caller can instead track it: report each item, in document
@@ -40,8 +40,10 @@
 //     themselves, such as an interval boundary flag, [DecodeBase64] for an
 //     Octet list, [DecodeParam] for a member typed by an open generic
 //     parameter, [DropElement] for an element the class's schema accepts
-//     that no member holds, and [DecodeChoice] for a member whose element
-//     takes one of several shapes, which its first child chooses. The
+//     that no member holds, [DecodeChoice] for a member whose element
+//     takes one of several shapes, which its first child chooses, and
+//     [DecodeEntry] and [DecodeEntryKeyedBy] for one entry of a `Hash`
+//     member, which take the key attribute off before the value is read. The
 //     hand-written TERMINOLOGY_CODE decoder calls the same
 //     helpers, [CheckUnmatchedAttrs] for the attributes of its inner
 //     TERMINOLOGY_ID element, [CheckUnmatchedTextBefore] for text it keeps
@@ -163,8 +165,9 @@ type Tracker struct {
 // attribute as the discriminator, and whether its text was found unmatched
 // already. For the missing-member report it also keeps the description of
 // its class, once its decoder has entered, which of the class's mandatory
-// members it has a value for, and what the element carries: `xsi:nil`,
-// text other than whitespace, and whether a decoder read it as a primitive.
+// members it has a value for, what the element carries: `xsi:nil`, text
+// other than whitespace, and whether a decoder read it as a primitive, and,
+// for one entry of a Hash member, how to read its key.
 //
 // The child counts sit in a short slice while the element has opened children
 // of few names, which is the canonical shape and costs no map. Once it opens
@@ -183,6 +186,9 @@ type frame struct {
 	nilled        bool   // the start element, or one around it, carried xsi:nil="true"
 	hasText       bool   // the element holds text other than XML whitespace
 	primitive     bool   // a decoder read the element's text as its value
+	// key reads the key of the element when it is one entry of a Hash member,
+	// so the members inside it are named under the key; nil otherwise.
+	key func() string
 }
 
 // linearChildNames is the number of distinct child names a frame counts in its
@@ -435,8 +441,15 @@ func isXMLSpace(text []byte) bool {
 // decode applies. Text that does not convert is a primitive failure, which
 // names the element by its path from the root of the value.
 func (t *Tracker) decodeText(dec *xml.Decoder, start *xml.StartElement, v any) error {
-	at := t.here()
 	t.open[len(t.open)-1].primitive = true
+	return t.readText(dec, start, v)
+}
+
+// readText decodes the element start opens into v as [Tracker.decodeText]
+// does, but leaves the element unmarked as a primitive: an entry of a Hash
+// member, which is a value of the member whatever its text.
+func (t *Tracker) readText(dec *xml.Decoder, start *xml.StartElement, v any) error {
+	at := t.here()
 	if err := t.attrs(start.Attr, nil); err != nil {
 		return err
 	}
@@ -761,8 +774,8 @@ func LocalName(name xml.Name) string {
 // SkipUnmatched skips the element start opens, which the generated decoder
 // does not read: its name matches no attribute of the RM type being decoded,
 // it lies in a foreign namespace, or it holds content the codec does not
-// model, such as a `Hash` attribute, a BMM `Any` attribute or a member whose
-// Go type has no decoder of its own. The element is one item, whatever it
+// model, such as a BMM `Any` attribute, a `Hash` of `Hash`es or a member
+// whose Go type has no decoder of its own. The element is one item, whatever it
 // holds. start must be the token the decoder read last.
 //
 // By default it only skips. A tracked decode first reports the element's

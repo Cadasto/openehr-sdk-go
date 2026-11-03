@@ -18,8 +18,9 @@ type Class struct {
 	// Attrs names the members the decoder reads as XML attributes of the
 	// start element, in no namespace, where the class's ITS-XML schema type
 	// carries them so, such as archetype_node_id or an ARCHETYPE_TERM's code.
-	// Every other attribute, bar the XML Schema instance ones and the
-	// namespace declarations, is unmatched content.
+	// Every other attribute, bar the XML Schema instance ones, the namespace
+	// declarations and the key attribute of a Hash entry, which [DecodeEntry]
+	// takes off first, is unmatched content.
 	Attrs []string
 	// Required names the members the Reference Model makes mandatory on the
 	// class and a document can carry, in the order the model declares them,
@@ -94,9 +95,12 @@ func (t *Tracker) enter(start xml.StartElement, c *Class) error {
 // whose text is empty or XML whitespace only. Nothing inside a nilled
 // element is reported: the member is reported once, by its parent, as a
 // null is in canonical JSON. A struct element with no content is a value,
-// and so is a Hash or Any element the codec does not model. The report is
-// the whole policy: no missing member refuses the decode, strict or not. A
-// nil fn asks for nothing.
+// and so is an entry of a Hash member, whatever its text, and an element the
+// codec does not model, an Any one or a Hash of Hashes. A member inside a
+// Hash entry is named under the entry's key, such as
+// `/description/details/en/purpose`. The report is the whole policy: no
+// missing member refuses the decode, strict or not. A nil fn asks for
+// nothing.
 func (t *Tracker) ReportMissing(fn func(pointer string)) {
 	t.missing = fn
 }
@@ -132,13 +136,19 @@ func (t *Tracker) closing(n int) {
 // writePointer writes the JSON Pointer of the element whose frame is
 // t.open[n-1] in the canonical-JSON form of the value: nothing for the root
 // element, and for each element below it `/` and its local name, followed by
-// `/` and its 0-based position among its same-named siblings when the
-// parent's class lists the name among its multi-valued members.
+// `/` and its key, escaped as RFC 6901 asks, when it is one entry of a Hash
+// member, or by `/` and its 0-based position among its same-named siblings
+// when the parent's class lists the name among its multi-valued members.
 func (t *Tracker) writePointer(b *strings.Builder, n int) {
 	for k := 2; k < n; k++ {
 		f := &t.open[k]
 		b.WriteByte('/')
 		b.WriteString(f.name)
+		if f.key != nil {
+			b.WriteByte('/')
+			_, _ = pointerKey.WriteString(b, f.key()) // a strings.Builder never fails
+			continue
+		}
 		if p := &t.open[k-1]; p.class != nil && slices.Contains(p.class.Items, f.name) {
 			b.WriteByte('/')
 			b.WriteString(strconv.Itoa(f.pos - 1))

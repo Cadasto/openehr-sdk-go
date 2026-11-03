@@ -29,6 +29,7 @@ var xmlClassAnnotation = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A Hash member reads each element of its name as one entry.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *Annotation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -54,8 +55,7 @@ func (a *Annotation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 					return _err
 				}
 			case "items":
-				// TODO(canxml): Hash<K,V> XML decode deferred — see canxml/doc.go.
-				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := xmlunmatched.DecodeEntry(_dec, &_t, "id", &a.Items); _err != nil {
 					return _err
 				}
 			default:
