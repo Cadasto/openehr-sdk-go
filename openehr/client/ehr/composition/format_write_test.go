@@ -528,7 +528,7 @@ func TestWriteFormatKeepsOtherHeaders(t *testing.T) {
 // fails with ErrInvalidConfig and issues no request. A FLAT or STRUCTURED
 // write with a nil Web Template; a WithTemplateID that differs from the Web
 // Template's id; a FLAT write whose two template ids are both empty; a
-// Format outside the four.
+// Format outside the four; an item tag the header rules refuse.
 func TestWriteFormatRefusals(t *testing.T) {
 	wt, comp := loadFormatFixture(t)
 	noID := withoutTemplateID(wt)
@@ -562,6 +562,12 @@ func TestWriteFormatRefusals(t *testing.T) {
 		}},
 		{name: "negative Format", opts: []composition.WriteOption{
 			composition.WithFormat(composition.Format(-1), nil),
+		}},
+		{name: "an item tag with an empty key", opts: []composition.WriteOption{
+			composition.WithObjectItemTags([]openehrclient.ItemTag{{Key: ""}}),
+		}},
+		{name: "a version item tag with a control character", opts: []composition.WriteOption{
+			composition.WithVersionItemTags([]openehrclient.ItemTag{{Key: "k", Value: "a\nb"}}),
 		}},
 	}
 	for _, op := range formatWriteOps {
@@ -844,7 +850,8 @@ func TestWithFormatLastWins(t *testing.T) {
 // *EncodeError that names the format asked for and wraps the codec's own
 // error, never as ErrInvalidConfig. The FLAT and STRUCTURED codecs refuse an
 // EVENT_CONTEXT setting that carries a value but no code; canonical JSON
-// refuses a NaN magnitude, an error no simplified sentinel matches.
+// refuses a NaN magnitude with canjson.ErrInvalidValue, an error no
+// simplified sentinel matches.
 // Canonical XML takes the same path, but no composition the typed RM can
 // build makes its encoder fail, so it has no row.
 func TestWriteSerialiseFailureSendsNothing(t *testing.T) {
@@ -860,7 +867,7 @@ func TestWriteSerialiseFailureSendsNothing(t *testing.T) {
 	}{
 		{format: composition.FormatFlat, comp: badSetting, cause: simplified.ErrUnsupportedDatatype},
 		{format: composition.FormatStructured, comp: badSetting, cause: simplified.ErrUnsupportedDatatype},
-		{format: composition.FormatJSON, comp: nanMagnitude},
+		{format: composition.FormatJSON, comp: nanMagnitude, cause: canjson.ErrInvalidValue},
 	}
 	for _, op := range formatWriteOps {
 		for _, tc := range cases {
