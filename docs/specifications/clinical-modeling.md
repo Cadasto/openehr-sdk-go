@@ -171,13 +171,13 @@ The size limit **MUST** be 32 MiB for an OPT, an uploaded template and a BMM doc
 
 ### Operational template model reader (`openehr/aom/aom14/`)
 
-- `aom14.ReadOperationalTemplate` **MUST** refuse an input larger than the size limit, and an element nested deeper than the element limit below, with an error wrapping `canxml.ErrLimitExceeded`. It reads at most one byte past the size limit, and it refuses a deep element during the decode, through `canxml.WithMaxDepth`. A `canxml.WithMaxDepth` among the caller's options does not raise the element limit.
+- `aom14.ReadOperationalTemplate` **MUST** refuse an input larger than the size limit, and an element nested deeper than the element limit below, with an error wrapping `canxml.ErrLimitExceeded`. It reads at most one byte past the size limit, and it refuses a deep element during the decode, through `canxml.WithMaxDepth`. A `canxml.WithMaxDepth` among the caller's options applies as well; the smaller limit wins. An input with no root element is refused with an error wrapping `io.ErrUnexpectedEOF`, not a bare `io.EOF`.
 - The element limit is the depth limit counted in the model's XML elements, with the root element at depth 1. It is 320 = 2 × 128 + 64: an `<attributes>` and a `<children>` for each of the 128 levels below the definition, and 64 for the root `<template>`, its `<definition>` and the deepest content one constraint object holds, such as an assumed value or an expression tree. The deepest of the 74 corpus OPTs nests 11 levels and 26 elements.
 - A caller that decodes an OPT with `canxml.Unmarshal` or a `canxml.Decoder` itself gets neither limit unless it applies them.
 
 ### Canonical-XML decode depth (`openehr/serialize/canxml/`)
 
-- With `canxml.WithMaxDepth(n)`, `canxml.Unmarshal` and a `canxml.Decoder` **MUST** refuse, during the decode, an element nested deeper than `n`, the root element at depth 1, with a `*canxml.DecodeError` that wraps `canxml.ErrLimitExceeded` and names the depth and the element's path but none of its content. Without the option a decode has no depth limit.
+- With `canxml.WithMaxDepth(n)`, `canxml.Unmarshal` and a `canxml.Decoder` **MUST** refuse, during the decode, an element nested deeper than `n`, the root element at depth 1, with a `*canxml.DecodeError` that wraps `canxml.ErrLimitExceeded` and names the depth and the element's path but none of its content. Without the option a decode has no depth limit. Given more than one, the smallest positive `n` holds, in any order; an `n` of 0 or less sets no limit and does not lift one already given.
 
 ### Path lookup on the compiled template (`openehr/templatecompile/`)
 

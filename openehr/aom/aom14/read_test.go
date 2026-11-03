@@ -312,6 +312,92 @@ func TestREQ108_ReadOperationalTemplateRefusesAnElementPastTheElementLimit(t *te
 	}
 }
 
+// TestREQ108_ReadOperationalTemplateAppliesTheCallersSmallerLimit pins that a
+// caller's own canxml.WithMaxDepth applies as well as the element limit and
+// the smaller holds, whatever the order of the caller's options: a document
+// nested 200 deep, which the reader's limit admits, is refused under a caller's
+// limit of 100 at the first element past it, and one nested 100 deep reads. An
+// n <= 0 among the caller's options lifts neither limit.
+//
+// Can-fail control: let the last canxml.WithMaxDepth given replace the others,
+// and the reader's own limit replaces the caller's, so the 200-deep document
+// reads.
+func TestREQ108_ReadOperationalTemplateAppliesTheCallersSmallerLimit(t *testing.T) {
+	t.Parallel()
+	const limit = 100
+	callers := map[string][]canxml.DecoderOption{
+		"the limit":                      {canxml.WithMaxDepth(limit)},
+		"the limit, then a larger one":   {canxml.WithMaxDepth(limit), canxml.WithMaxDepth(2 * limit)},
+		"a larger limit, then the limit": {canxml.WithMaxDepth(2 * limit), canxml.WithMaxDepth(limit)},
+		"the limit, then no limit":       {canxml.WithMaxDepth(limit), canxml.WithMaxDepth(0)},
+		"no limit, then the limit":       {canxml.WithMaxDepth(0), canxml.WithMaxDepth(limit)},
+		"the limit with WithUnmatched":   {canxml.WithMaxDepth(limit), canxml.WithUnmatched(func(string) {})},
+	}
+	for name, opts := range callers {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if _, err := aom14.ReadOperationalTemplate(strings.NewReader(nested(limit)), opts...); err != nil {
+				t.Errorf("ReadOperationalTemplate(depth %d) = %v, want a read within the caller's limit", limit, err)
+			}
+			_, err := aom14.ReadOperationalTemplate(strings.NewReader(nested(2*limit)), opts...)
+			if !errors.Is(err, canxml.ErrLimitExceeded) {
+				t.Fatalf("ReadOperationalTemplate(depth %d) = %v, want an error wrapping canxml.ErrLimitExceeded", 2*limit, err)
+			}
+			if want := "element depth (101 > 100)"; !strings.Contains(err.Error(), want) {
+				t.Errorf("depth refusal reads %q, want it to name %q", err, want)
+			}
+		})
+	}
+}
+
+// TestREQ108_ReadOperationalTemplateRefusesAnInputWithNoRootElement pins that
+// an input that holds no root element, whether empty or holding only an XML
+// declaration, a byte-order mark, whitespace, a comment or text, is refused
+// with an error wrapping io.ErrUnexpectedEOF, not a bare io.EOF, that says no
+// operational template was in the input and carries none of it. A document cut
+// short after its root begins keeps the decode's own error.
+//
+// Can-fail control: return the decode's error as it comes and the empty input
+// gives a bare io.EOF.
+func TestREQ108_ReadOperationalTemplateRefusesAnInputWithNoRootElement(t *testing.T) {
+	t.Parallel()
+	const planted = "PLANTED"
+	const want = "aom14: no operational template in the input"
+	for name, in := range map[string]string{
+		"nothing":                  "",
+		"whitespace":               " \n\t\r\n",
+		"a byte-order mark":        "\ufeff",
+		"an XML declaration":       `<?xml version="1.0" encoding="UTF-8"?>`,
+		"a comment":                `<!-- ` + planted + ` -->`,
+		"text":                     planted,
+		"a declaration, a comment": `<?xml version="1.0"?>` + "\n" + `<!-- ` + planted + ` -->`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			ot, err := aom14.ReadOperationalTemplate(strings.NewReader(in))
+			if ot != nil {
+				t.Errorf("ReadOperationalTemplate(%s) = %v, want nil", name, ot)
+			}
+			if !errors.Is(err, io.ErrUnexpectedEOF) {
+				t.Fatalf("ReadOperationalTemplate(%s) = %v, want an error wrapping io.ErrUnexpectedEOF", name, err)
+			}
+			if errors.Is(err, io.EOF) {
+				t.Errorf("ReadOperationalTemplate(%s) = %v, want an error that is not io.EOF", name, err)
+			}
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("error %q, want it to say %q", err, want)
+			}
+			if strings.Contains(err.Error(), planted) {
+				t.Errorf("error %q carries the input", err)
+			}
+		})
+	}
+	_, err := aom14.ReadOperationalTemplate(strings.NewReader(`<template xmlns="http://schemas.openehr.org/v1"><template_id>`))
+	if err == nil || strings.Contains(err.Error(), want) {
+		t.Errorf("ReadOperationalTemplate(cut short) = %v, want the decode's own error", err)
+	}
+}
+
 // TestREQ108_ReadOperationalTemplateRefusesADeepElementDuringTheDecode pins
 // that the reader refuses an element past the element limit when it reads
 // the element's start tag, not once it has read the input: it stops reading

@@ -37,17 +37,20 @@ const readMaxDepth = 2*128 + 64
 // describes.
 //
 // opts apply to the decode as they do to a [canxml.Decoder], so
-// [canxml.WithStrict] refuses content the model does not read. The element
-// limit holds whatever opts hold: a [canxml.WithMaxDepth] among them does not
-// raise it.
+// [canxml.WithStrict] refuses content the model does not read. A
+// [canxml.WithMaxDepth] among them applies as well as the element limit, and
+// the smaller limit wins: it can lower the limit and never raise it.
 //
 // The input is one document. It may start with a UTF-8 byte-order mark and
 // the XML declaration, and its root element may have any name, so a document
 // whose root is `<OPERATIONAL_TEMPLATE>` reads as one whose root is
 // `<template>`. After the root it may hold comments, processing instructions
 // and whitespace; anything else there is refused with an error that wraps
-// [canxml.ErrInvalidShape] and carries none of it. Any other decode error
-// comes back as the decode returns it.
+// [canxml.ErrInvalidShape] and carries none of it. An input with no root
+// element, empty or holding only a declaration, a comment or whitespace, is
+// refused with an error that wraps [io.ErrUnexpectedEOF], not [io.EOF], and
+// carries none of the input. Any other decode error comes back as the decode
+// returns it.
 //
 // A caller that decodes an operational template with [canxml.Unmarshal] or a
 // [canxml.Decoder] itself gets neither limit unless it applies them.
@@ -57,7 +60,8 @@ func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*Operat
 	// The decoder takes no byte past the root element from an io.ByteReader,
 	// so what follows the root is left for afterRoot to read.
 	br := bufio.NewReader(lr)
-	// The element limit goes last, so that no option of the caller's replaces it.
+	// WithMaxDepth keeps the smallest limit it is given, so the caller's own
+	// limit applies as well, in whatever order the options come.
 	opts = slices.Concat(opts, []canxml.DecoderOption{canxml.WithMaxDepth(readMaxDepth)})
 	ot := new(OperationalTemplate)
 	err := canxml.NewDecoder(br, opts...).Decode(ot)
@@ -68,6 +72,11 @@ func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*Operat
 	// made of the bytes it read: the limit may have cut it short.
 	if lr.N == 0 {
 		return nil, fmt.Errorf("aom14: input exceeds %d bytes: %w", readMaxBytes, canxml.ErrLimitExceeded)
+	}
+	// The decode gives a bare io.EOF when the input holds no root element,
+	// which a caller reading a stream would take for the end of its own.
+	if errors.Is(err, io.EOF) {
+		return nil, fmt.Errorf("aom14: no operational template in the input: %w", io.ErrUnexpectedEOF)
 	}
 	if err != nil {
 		return nil, err
