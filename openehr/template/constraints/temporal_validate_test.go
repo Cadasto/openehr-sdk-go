@@ -515,11 +515,13 @@ func closedSpan(lower, upper string) constraints.TemporalRange {
 // one CodeOutOfRange that names the range and holds the value in Value only.
 // Durations order by BASE Iso8601_duration.to_seconds, so P1D equals PT24H
 // and 48 months (1460.16 days) fall short of 4 years (1460.96 days). A
-// partial date or time stands for the start of the period it names. A time
-// or a date-time is ordered against a bound by its clock when the two carry
-// one zone designator or none, as instants when both carry a zone, and not
-// at all when one carries a zone and the other does not, so that bound does
-// not refuse it (REQ-112 DV_INTERVAL).
+// date, a time or a date-time is compared with a bound at the precision the
+// two share when they carry one zone designator or none, so a partial value
+// equal to a bound on every shared field is equal to it: 2004-05 and 2004
+// are within a range from 2004-05-20, and 09 within one from 09:30. Where
+// both carry a zone and the designators differ, the two are ordered as
+// instants, and where one carries a zone and the other does not, not at all,
+// so that bound does not refuse it (REQ-112 DV_INTERVAL).
 func TestREQ103TemporalRangeOutcomes(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -568,15 +570,15 @@ func TestREQ103TemporalRangeOutcomes(t *testing.T) {
 			name:     "date",
 			validate: constraints.CDate{Range: closedSpan("2004-05-20", "2004-06-02")}.Validate,
 			detail:   "value outside [2004-05-20..2004-06-02]",
-			admitted: []string{"2004-05-20", "2004-06-02", "20040525", "2004-06"},
-			refused:  []string{"2004-05-19", "2004-06-03", "2004-05", "2004"},
+			admitted: []string{"2004-05-20", "2004-06-02", "20040525", "2004-06", "2004-05", "2004"},
+			refused:  []string{"2004-05-19", "2004-06-03", "2004-04", "2004-07", "2003", "2005"},
 		},
 		{
 			name:     "time, at or after 09:30, no zone on the bound",
 			validate: constraints.CTime{Range: constraints.TemporalRange{Lower: "09:30:00", LowerInclusive: true, UpperUnbounded: true}}.Validate,
 			detail:   "value outside [09:30:00..*)",
-			admitted: []string{"09:30:00", "10", "0930", "09:30:00+05:00", "09:00:00-05:00", "09:29:59.999Z"},
-			refused:  []string{"09:29:59", "09", "09:29:59.999"},
+			admitted: []string{"09:30:00", "10", "0930", "09", "09:30:00.0", "09:30:00+05:00", "09:00:00-05:00", "09:29:59.999Z"},
+			refused:  []string{"09:29:59", "08", "09:29", "0929", "09:29:59.999"},
 		},
 		{
 			name:     "time, after 09:30 at +02:00",
@@ -603,8 +605,11 @@ func TestREQ103TemporalRangeOutcomes(t *testing.T) {
 			name:     "date-time",
 			validate: constraints.CDateTime{Range: closedSpan("2004-05-20T00:00:00", "2005-05-19T23:59:59")}.Validate,
 			detail:   "value outside [2004-05-20T00:00:00..2005-05-19T23:59:59]",
-			admitted: []string{"2004-05-20T00:00:00", "2004-05-20", "2004-06", "2005-05-19T23:59:59Z", "20041231T120000"},
-			refused:  []string{"2004-05-19T23:59:59", "2005-05-20", "2004-05", "2005-05-19T23:59:59.5"},
+			admitted: []string{
+				"2004-05-20T00:00:00", "2004-05-20", "2004-06", "2005-05-19T23:59:59Z", "20041231T120000",
+				"2004-05", "2004", "2005-05-19T23:59:59.0", "2005-05-19T23",
+			},
+			refused: []string{"2004-05-19T23:59:59", "2005-05-20", "2004-04", "2005-05-19T23:59:59.5", "2005-06"},
 		},
 		{
 			name:     "date-time, zone on the bound",
@@ -639,8 +644,9 @@ func TestREQ103TemporalRangeOutcomes(t *testing.T) {
 }
 
 // TestREQ103TemporalPatternAndRangeBothReported pins the Validate contract's
-// one violation per failing clause: a duration that both its pattern and its
-// range refuse gets the CodePatternMismatch, then the CodeOutOfRange.
+// one violation per failing clause: a duration or a date that both its
+// pattern and its range refuse gets the CodePatternMismatch, then the
+// CodeOutOfRange.
 func TestREQ103TemporalPatternAndRangeBothReported(t *testing.T) {
 	t.Parallel()
 	c := constraints.CDuration{Pattern: "PY", Range: constraints.TemporalRange{Lower: "P1Y", LowerInclusive: true, UpperUnbounded: true}}
@@ -653,11 +659,11 @@ func TestREQ103TemporalPatternAndRangeBothReported(t *testing.T) {
 	}
 	date := constraints.CDate{Pattern: "yyyy-mm-dd", Range: closedSpan("2004-05-20", "2004-06-02")}
 	wantDate := []constraints.Violation{
-		{Code: constraints.CodePatternMismatch, Detail: `value does not match pattern "yyyy-mm-dd"`, Value: constraints.Redact("2004-05")},
-		{Code: constraints.CodeOutOfRange, Detail: "value outside [2004-05-20..2004-06-02]", Value: constraints.Redact("2004-05")},
+		{Code: constraints.CodePatternMismatch, Detail: `value does not match pattern "yyyy-mm-dd"`, Value: constraints.Redact("2004-04")},
+		{Code: constraints.CodeOutOfRange, Detail: "value outside [2004-05-20..2004-06-02]", Value: constraints.Redact("2004-04")},
 	}
-	if got := date.Validate("2004-05"); !slices.Equal(got, wantDate) {
-		t.Errorf("Validate(%q) = %+v, want %+v", "2004-05", got, wantDate)
+	if got := date.Validate("2004-04"); !slices.Equal(got, wantDate) {
+		t.Errorf("Validate(%q) = %+v, want %+v", "2004-04", got, wantDate)
 	}
 }
 
