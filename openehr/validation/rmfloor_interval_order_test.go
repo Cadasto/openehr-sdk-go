@@ -230,7 +230,7 @@ func checkSharedEqual[T rm.DVOrdered](t *testing.T, name string, a, b T) {
 
 // REQ-112 — two DV_DATE, two DV_TIME or two DV_DATE_TIME bounds written with
 // one zone designator, or both with none, are ordered at the precision they
-// share, as the REQ-103 range check compares a value with a bound: field by
+// share, as a temporal range check compares a value with a bound: field by
 // field from the largest down, over the fields both carry. So a partial
 // bound covers the whole period it names. A pair equal on every shared field
 // is in order either way round, although reading a partial value as the
