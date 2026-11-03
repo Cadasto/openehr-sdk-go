@@ -6,10 +6,12 @@ package templatecompile_test
 // walks them, the test renders the compiled tree as line-oriented text and
 // holds it equal to testdata/compiled/<corpus path>.txt. Each node is one
 // block in walk order: its path, RM type, node id, archetype id, node name,
-// occurrences, slot marks and rules, primitive constraint, terms and
-// bindings, then one line per attribute. A change to the compile step that
-// moves any of it shows as a diff on the golden, reviewed rather than
-// assumed. Regenerate with:
+// occurrences, slot marks and rules, primitive constraint, default value,
+// terms and bindings, then one line per attribute. A primitive constraint
+// renders as its Go type and exported fields, a default value as its Go
+// type and canonical JSON. A change to the compile step that moves any of
+// it shows as a diff on the golden, reviewed rather than assumed.
+// Regenerate with:
 //
 //	go test ./internal/templatecompile/ -run TestCompiledGolden -update
 
@@ -29,6 +31,8 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile/walk"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
@@ -171,6 +175,9 @@ func writeNode(b *bytes.Buffer, c *templatecompile.Compiled, n *templatecompile.
 	if pc != nil {
 		fmt.Fprintf(b, "  primitive=%s\n", renderConstraint(pc))
 	}
+	if dv := n.DefaultValue(); dv != nil {
+		fmt.Fprintf(b, "  default_value=%T %s\n", dv, renderDefaultValue(dv))
+	}
 
 	if id := n.NodeID(); id != "" {
 		writeTerm(b, n, "term", id, lang)
@@ -208,15 +215,27 @@ func writeBinding(b *bytes.Buffer, label string, tb template.TermBinding) {
 		label, tb.Terminology, tb.NodeOrPath, tb.Target.TerminologyID, tb.Target.CodeString)
 }
 
+// renderDefaultValue renders a default value as its canonical JSON, or as
+// the error that refuses to encode it.
+func renderDefaultValue(dv rm.DataValue) string {
+	j, err := canjson.Marshal(dv)
+	if err != nil {
+		return "!! " + err.Error()
+	}
+	return string(j)
+}
+
 // localCodes returns the local at-codes a coded constraint lists, whose
 // terms the compiled tree resolves on the node's archetype root.
 func localCodes(pc constraints.PrimitiveConstraint) []string {
 	var codes []string
-	switch p := pc.(type) {
-	case constraints.CodePhrase:
+	if p, ok := constraints.CodePhraseOf(pc); ok {
 		if p.Terminology == "local" {
 			codes = append(codes, p.CodeList...)
 		}
+		return codes
+	}
+	switch p := pc.(type) {
 	case constraints.CDvOrdinal:
 		for _, v := range p.Values {
 			if v.Symbol.Terminology == "local" {

@@ -13,6 +13,8 @@
 //     composer). Sourced from openehr/rm/rminfo.
 //   - Typed primitive constraints and slot rules, built from the model's
 //     primitive classes and slot assertions (openehr/template/constraints).
+//   - The default values of the template's <constraints>, each on the node
+//     it addresses ([CompiledNode.DefaultValue]).
 //   - Per-archetype-root term definitions on [CompiledNode]
 //     (scoped at-codes; not flattened to a single global map).
 //     Term bindings flatten to [Compiled.TermBindings].

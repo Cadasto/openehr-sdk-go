@@ -28,6 +28,7 @@ type Compiled = impl.Compiled
 // RM type it constrains (RMTypeName), its at-code / archetype id (NodeID,
 // ArchetypeID), occurrences, slot rules (IsSlot, SlotRules,
 // AllowsArchetypeID), primitive value constraint (PrimitiveConstraint),
+// the default value the template's constraints give it (DefaultValue),
 // human label (Term), template-level pinned node name (NodeName),
 // parent (Parent), and child attributes (Attributes, Attribute).
 // Like [Compiled] it is a type alias of the engine form.
@@ -81,7 +82,9 @@ func WithoutImplicitAttributes() Option {
 // as absent. A slot's includes and excludes are its archetype-id patterns,
 // one per assertion, and a slot with no node id takes the first of its
 // includes, without its regex escapes, as the predicate of its AQL path
-// segment.
+// segment. Each default value of the template's constraints is placed on
+// the node its differential path and attribute name address
+// ([CompiledNode.DefaultValue]).
 //
 // Returns an error wrapping [ErrInvalidInput] when opt is nil, when it has
 // no template_id or no definition (a definition that names no RM type),
@@ -90,8 +93,9 @@ func WithoutImplicitAttributes() Option {
 // not ISO 8601 text of its type, a mandatory timezone validity on a date, a
 // constraint reference with no reference), when a constraint object or an
 // attribute is missing, when constraint objects nest more than 128 levels
-// below the definition, and when two nodes under different attributes have
-// the same AQL path, which is a defect in the template. Nodes under one
+// below the definition, when two nodes under different attributes have
+// the same AQL path, which is a defect in the template, and when a default
+// value of the template's constraints addresses no node. Nodes under one
 // attribute that share a path (alternatives, or siblings with the same node
 // id) and the descendants of such nodes are admitted, and [Compiled.NodeAt]
 // resolves the path to the first one walked. Returns an error that does not

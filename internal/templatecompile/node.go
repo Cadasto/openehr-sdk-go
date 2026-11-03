@@ -4,6 +4,8 @@ import (
 	"maps"
 	"slices"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
@@ -54,6 +56,13 @@ type CompiledNode struct {
 	// non-primitive nodes (composition root, archetype roots, slots, plain
 	// complex objects).
 	primitive constraints.PrimitiveConstraint
+
+	// defaultValue is the canonical JSON of the default value the
+	// template's <constraints> give the node, which Compile has decoded
+	// once; nil when they give none ([placeDefaultValues]). The node keeps
+	// the encoding rather than the value so that each call of
+	// [CompiledNode.DefaultValue] decodes a value of the caller's own.
+	defaultValue []byte
 
 	// terms is populated only on archetype-root nodes. At-codes
 	// are scoped to their enclosing archetype root; the same at-code
@@ -199,11 +208,31 @@ func (n *CompiledNode) ExampleSlotFillArchetypeID() string {
 
 // PrimitiveConstraint returns the typed primitive constraint value for
 // this node, or nil when the node is not a primitive in the closed set: the
-// constraint a C_PRIMITIVE_OBJECT's item, a C_CODE_PHRASE, a C_DV_QUANTITY, a
-// C_DV_ORDINAL or a CONSTRAINT_REF states. A C_PRIMITIVE_OBJECT with no item,
-// which allows any value, has none.
+// constraint a C_PRIMITIVE_OBJECT's item, a C_CODE_PHRASE, a
+// C_CODE_REFERENCE, a C_DV_QUANTITY, a C_DV_ORDINAL or a CONSTRAINT_REF
+// states. A C_PRIMITIVE_OBJECT with no item, which allows any value, has
+// none.
 func (n *CompiledNode) PrimitiveConstraint() constraints.PrimitiveConstraint {
 	return n.primitive
+}
+
+// DefaultValue returns the default value that the template's <constraints>
+// give this node, or nil when they give it none. A default value is the
+// default_value of a T_COMPLEX_OBJECT, and it is placed on the first child,
+// of that object's RM type, of the attribute that its T_ATTRIBUTE names on
+// the node that the T_ATTRIBUTE's differential_path addresses. Each call
+// returns a new value, which the caller may change.
+func (n *CompiledNode) DefaultValue() rm.DataValue {
+	if n.defaultValue == nil {
+		return nil
+	}
+	v, err := typereg.DecodeAs[rm.DataValue](n.defaultValue)
+	if err != nil {
+		// Compile decoded the same bytes before it kept them, so the
+		// decode does not fail here.
+		return nil
+	}
+	return v
 }
 
 // Term returns the term definition for an at-code from the nearest
