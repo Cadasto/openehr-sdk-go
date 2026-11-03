@@ -16,7 +16,8 @@ import (
 // REQ-107 Precedence 3 rules on quantified values: DV_QUANTIFIED
 // Magnitude_status_valid on a magnitude_status, the DV_AMOUNT rules
 // Accuracy_is_percent_validity and Accuracy_validity on a percentage
-// accuracy, and the lower bound -1 of a precision. Where nothing is left of
+// accuracy, and the lower bound -1 of a precision (-1 is no limit,
+// § REQ-112). Where nothing is left of
 // the OPT's constraint, Generate fails with ErrConstraintUnsatisfiable. The
 // 32-bit range of an RM Integer on a DV_ORDINAL's value or a precision is
 // held when the template is read, which refuses a number past it. Neither
