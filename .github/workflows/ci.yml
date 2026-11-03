@@ -77,6 +77,15 @@ jobs:
       - name: Vendored ITS-XML integrity
         run: make its-xml-check
 
+      # PROBE-111's schema leg: every corpus OPT, as written and re-encoded
+      # by the SDK, against the pinned AM Release-1.4 schemas. Needs xmllint
+      # (libxml2-utils), installed when the runner image lacks it.
+      - name: Install xmllint
+        run: command -v xmllint || { sudo apt-get update && sudo apt-get install -y --no-install-recommends libxml2-utils; }
+
+      - name: Operational template schema check
+        run: make operational-template-schema-check
+
       - name: Build
         run: make build
 
