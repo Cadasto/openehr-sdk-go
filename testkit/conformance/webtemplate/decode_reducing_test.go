@@ -265,3 +265,24 @@ func TestNewTargetFromOPT(t *testing.T) {
 		t.Error("NewTargetFromOPT(missing file) error = nil, want an error")
 	}
 }
+
+// TestIrreducibleErrorNilAndZeroAnswer pins REQ-025 § No panics on
+// *IrreducibleError: a nil receiver, the typed nil a failed errors.AsType
+// match leaves behind, gives the zero value's text and unwraps to nil, and
+// the zero value, with no codec error, still gives a text.
+func TestIrreducibleErrorNilAndZeroAnswer(t *testing.T) {
+	var nilErr *IrreducibleError
+	zeroText := (&IrreducibleError{}).Error()
+	if zeroText == "" {
+		t.Fatal(`(&IrreducibleError{}).Error() = "", want a fixed text`)
+	}
+	if got := nilErr.Error(); got != zeroText {
+		t.Errorf("nil IrreducibleError.Error() = %q, want %q (what the zero value says)", got, zeroText)
+	}
+	if got := nilErr.Unwrap(); got != nil {
+		t.Errorf("nil IrreducibleError.Unwrap() = %v, want nil", got)
+	}
+	if errors.Is(nilErr, simplified.ErrUnknownPath) {
+		t.Error("errors.Is(nil IrreducibleError, ErrUnknownPath) = true, want false")
+	}
+}

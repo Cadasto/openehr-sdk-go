@@ -1,10 +1,13 @@
 package canxml
 
 import (
+	"bytes"
 	"encoding/xml"
 	"fmt"
 	"io"
+	"slices"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlschema"
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
@@ -68,8 +71,8 @@ func (c decoderConfig) tracker() *xmlunmatched.Tracker {
 // [ErrNamespace]), the root element aside; text other than XML whitespace
 // directly inside an element whose content is elements, such as an RM
 // object's, a CDATA section included; and an element whose content this
-// codec does not model: a `Hash` member, a BMM `Any` member (the AOM 1.4
-// `assumed_value` and `EXPR_LEAF.item`), and a member whose Go type has no
+// codec does not model: a `Hash` whose values are `Hash`es
+// (RESOURCE_ANNOTATIONS `documentation`) and a member whose Go type has no
 // decoder of its own (see the package documentation). A bare `type`
 // attribute is unmatched except where dispatch reads it as the
 // discriminator. It applies at any depth: inside a polymorphic slot, an
@@ -155,30 +158,239 @@ type Decoder struct {
 	// trk is the decoder's tracker when an option reports or refuses
 	// unmatched content or reports missing members, and nil otherwise.
 	trk *xmlunmatched.Tracker
+	// rec records what dec has read of the stream since the value being
+	// decoded began, for a decoder given none of those options that reads
+	// through a plain encoding/xml decoder from a source it cannot seek; nil
+	// otherwise.
+	rec *recorder
+	// seeker is the source of a decoder given none of those options when it
+	// is an io.ByteReader and an io.Seeker, which dec reads directly and the
+	// decoder seeks back in to decode a value again; nil otherwise.
+	seeker io.ReadSeeker
+	// scope keeps the namespace declarations in scope for a decoder given
+	// none of those options once it has decoded a value a second time to
+	// resolve a prefix: it reads the rest of the stream through scope. nil
+	// until then.
+	scope *xmlunmatched.Scope
 }
 
 // NewDecoder returns a [Decoder] that reads canonical-XML from r. The
 // options apply to every value it decodes; a path that [WithUnmatched] or
 // [WithStrict] reports, and a pointer that [WithMissing] reports, is
 // relative to the value being decoded.
+//
+// When r is an io.ByteReader, such as a *bufio.Reader, the Decoder reads it a
+// byte at a time and takes from it no byte past the end of the value it
+// decodes, whatever its options, so what follows the value stays in r. Any
+// other r it reads ahead, as encoding/xml does. When r is also an io.Seeker,
+// such as a *bytes.Reader, a Decoder given no option seeks r back to decode a
+// value a second time (see [Decoder.Decode]).
 func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 	cfg := newDecoderConfig(opts)
-	t := cfg.tracker()
-	if t == nil {
-		return &Decoder{dec: xml.NewDecoder(r), cfg: cfg}
+	if t := cfg.tracker(); t != nil {
+		return &Decoder{dec: t.NewDecoder(r), cfg: cfg, trk: t}
 	}
-	return &Decoder{dec: t.NewDecoder(r), cfg: cfg, trk: t}
+	if s, ok := r.(byteSeeker); ok {
+		return &Decoder{dec: xml.NewDecoder(s), cfg: cfg, seeker: s}
+	}
+	rec := &recorder{src: r}
+	rec.bsrc, _ = r.(io.ByteReader)
+	return &Decoder{dec: xml.NewDecoder(rec), cfg: cfg, rec: rec}
 }
+
+// byteSeeker is a source a [Decoder] given no option reads directly, as
+// encoding/xml reads an io.ByteReader, and seeks back in to decode a value
+// again, so that it keeps none of the bytes it reads.
+type byteSeeker interface {
+	io.ByteReader
+	io.ReadSeeker
+}
+
+// recorder is the reader a [Decoder] given no option reads its stream
+// through when the stream is no [byteSeeker]. It keeps the bytes read from
+// src since the value being decoded began, so that the value can be read
+// again. encoding/xml reads it a byte at a time, as an io.ByteReader, so it
+// buffers nothing else and the bytes it keeps are the only copy of them. A
+// src that is an io.ByteReader is read a byte at a time too, so the recorder
+// takes from it no byte past the last one encoding/xml asks for; any other
+// src is read ahead, in blocks.
+type recorder struct {
+	src  io.Reader
+	bsrc io.ByteReader // src, when it is an io.ByteReader; nil otherwise
+	buf  []byte        // the bytes read from src from offset base on
+	pos  int           // the index in buf of the next byte to return
+	base int64         // the offset in the stream of buf[0]
+	err  error         // the error src returned, once it has returned one
+}
+
+// minRead is the least room a recorder makes for one read of its source.
+const minRead = 4096
+
+// ReadByte returns the next byte of the stream.
+func (r *recorder) ReadByte() (byte, error) {
+	if r.pos == len(r.buf) {
+		if r.bsrc != nil {
+			c, err := r.takeByte()
+			if err != nil {
+				return 0, err
+			}
+			r.pos++
+			return c, nil
+		}
+		if err := r.fill(); err != nil {
+			return 0, err
+		}
+	}
+	c := r.buf[r.pos]
+	r.pos++
+	return c, nil
+}
+
+// Read reads the next bytes of the stream into p. It makes a recorder the
+// io.Reader encoding/xml takes, which reads it through ReadByte.
+func (r *recorder) Read(p []byte) (int, error) {
+	if r.pos == len(r.buf) {
+		if err := r.fill(); err != nil {
+			return 0, err
+		}
+	}
+	n := copy(p, r.buf[r.pos:])
+	r.pos += n
+	return n, nil
+}
+
+// fill reads src into the room after the bytes buf holds until it reads one
+// or more, making room first when there is none, and returns the error src
+// gave, which every later call returns too. A src that is an io.ByteReader
+// gives one byte.
+func (r *recorder) fill() error {
+	if r.bsrc != nil {
+		_, err := r.takeByte()
+		return err
+	}
+	for range 100 {
+		if r.err != nil {
+			return r.err
+		}
+		if len(r.buf) == cap(r.buf) {
+			r.buf = slices.Grow(r.buf, max(len(r.buf), minRead))
+		}
+		n, err := r.src.Read(r.buf[len(r.buf):cap(r.buf)])
+		r.buf = r.buf[:len(r.buf)+n]
+		r.err = err
+		if n > 0 {
+			return nil
+		}
+	}
+	r.err = io.ErrNoProgress
+	return r.err
+}
+
+// takeByte reads the next byte of bsrc, appends it to buf, making room first
+// as fill does when there is none, and returns it; or it returns the error
+// bsrc gave, which every later call returns too.
+func (r *recorder) takeByte() (byte, error) {
+	if r.err != nil {
+		return 0, r.err
+	}
+	c, err := r.bsrc.ReadByte()
+	if err != nil {
+		r.err = err
+		return 0, err
+	}
+	if len(r.buf) == cap(r.buf) {
+		r.buf = slices.Grow(r.buf, max(len(r.buf), minRead))
+	}
+	r.buf = append(r.buf, c)
+	return c, nil
+}
+
+// from drops the bytes before off, an offset in the stream no later than the
+// next byte to return, which a value decoded from off on does not need.
+func (r *recorder) from(off int64) {
+	n := int(off - r.base)
+	r.buf = r.buf[:copy(r.buf, r.buf[n:])]
+	r.pos -= n
+	r.base = off
+}
+
+// replay returns a reader of the stream from where the record starts: the
+// bytes recorded, then the rest of src, or the error src gave. For a src that
+// is an io.ByteReader it is an io.ByteReader too, so a decoder reading it
+// puts no buffer of its own in front of it and takes from src no byte past
+// the last one it asks for. Such a src has given no error when a value is
+// replayed: the decode stops at the prefix it cannot resolve, in a start
+// element it has read to its end and no further.
+func (r *recorder) replay() io.Reader {
+	if r.bsrc != nil {
+		return &byteReplay{rec: r.buf, src: r.bsrc}
+	}
+	if r.err != nil {
+		return io.MultiReader(bytes.NewReader(r.buf), failedReader{r.err})
+	}
+	return io.MultiReader(bytes.NewReader(r.buf), r.src)
+}
+
+// byteReplay is the replay of a recorder whose source is an io.ByteReader:
+// the bytes recorded, then the rest of the source a byte at a time.
+type byteReplay struct {
+	rec []byte        // the bytes recorded that are still to be read
+	src io.ByteReader // the recorder's source
+}
+
+// ReadByte returns the next byte of the stream.
+func (r *byteReplay) ReadByte() (byte, error) {
+	if len(r.rec) > 0 {
+		c := r.rec[0]
+		r.rec = r.rec[1:]
+		return c, nil
+	}
+	return r.src.ReadByte()
+}
+
+// Read reads the next byte of the stream into p. It makes a byteReplay the
+// io.Reader encoding/xml takes, which reads it through ReadByte.
+func (r *byteReplay) Read(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
+	c, err := r.ReadByte()
+	if err != nil {
+		return 0, err
+	}
+	p[0] = c
+	return 1, nil
+}
+
+// failedReader is a reader that returns err.
+type failedReader struct{ err error }
+
+func (f failedReader) Read([]byte) (int, error) { return 0, f.err }
 
 // Decode reads the next XML element from the stream and stores it
 // in v. Errors follow the same classification as [Unmarshal], with one
 // difference: a Decoder given none of [WithUnmatched], [WithStrict] and
-// [WithMissing] reads the stream once and does not follow the path of the
-// elements it reads, so the [DecodeError] for the text of a primitive
-// element that does not decode as its type names the element alone, such as
-// "/is_queryable", inside the envelope of each polymorphic slot it sits in.
-// A Decoder given any of them returns it on its own, with the element's
-// path from the root of the value, as [Unmarshal] does.
+// [WithMissing] does not follow the path of the elements it reads, so the
+// [DecodeError] for the text of a primitive element that does not decode as
+// its type names the element alone, such as "/is_queryable", inside the
+// envelope of each polymorphic slot it sits in. A Decoder given any of them
+// returns it on its own, with the element's path from the root of the value,
+// as [Unmarshal] does.
+//
+// A prefixed `xsi:type` is resolved against the namespace declarations in
+// scope where the attribute stands (see [XSITypeOf]). A Decoder given any of
+// those options keeps every declaration in scope as it reads. One given none
+// reads an element's own declarations as it goes; when a prefix is declared
+// on an element around the attribute, Decode decodes the value a second time,
+// from where the call began, through a reader that keeps every declaration in
+// scope, into v cleared to its zero value. The Decoder then reads the rest of
+// the stream through that reader. To read the value again, a Decoder whose
+// reader is an io.ByteReader and an io.Seeker, such as a *bytes.Reader, seeks
+// the reader back to where the value began, and a seek that fails is the
+// error Decode returns; a Decoder over any other reader keeps the bytes of
+// the value it is decoding instead. So only a value that needs the second
+// decode pays for it, and over a reader that cannot seek any other pays for
+// keeping its bytes.
 //
 // Decode reads no further than the end of that element, so whatever
 // follows it, another element included, is left for the next call. A
@@ -187,10 +399,44 @@ func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 // whole document, is the call that holds it to one root element and checks
 // what comes before and after it.
 func (d *Decoder) Decode(v any) error {
-	if d.trk == nil {
-		return d.dec.Decode(v)
+	switch {
+	case d.trk != nil:
+		return d.trk.Decode(d.dec, v)
+	case d.scope != nil:
+		return d.scope.Decode(d.dec, v)
 	}
-	return d.trk.Decode(d.dec, v)
+	start := d.dec.InputOffset()
+	if d.rec != nil {
+		d.rec.from(start)
+	}
+	err := d.dec.Decode(v)
+	if !xmlunmatched.IsUnresolvedPrefix(err) {
+		return err
+	}
+	src, err := d.rewind(start)
+	if err != nil {
+		return err
+	}
+	d.scope = new(xmlunmatched.Scope)
+	d.dec = d.scope.NewDecoder(src)
+	d.rec, d.seeker = nil, nil
+	return d.scope.DecodeAgain(d.dec, v)
+}
+
+// rewind returns a reader of the stream from start, the input offset of d.dec
+// where the value being decoded began: the seeker sought back by the bytes
+// d.dec has taken since start, or else the recorder's replay. A decode stops
+// at a prefix it cannot resolve at the end of a start element, where
+// encoding/xml holds back no byte it has read, so the seeker stands that many
+// bytes past where the value began.
+func (d *Decoder) rewind(start int64) (io.Reader, error) {
+	if d.seeker == nil {
+		return d.rec.replay(), nil
+	}
+	if _, err := d.seeker.Seek(start-d.dec.InputOffset(), io.SeekCurrent); err != nil {
+		return nil, fmt.Errorf("canxml: seek back to the value to decode it again: %w", err)
+	}
+	return d.seeker, nil
 }
 
 // RelaxedTypeDispatch reports whether the decoder was configured
@@ -241,6 +487,14 @@ func (d *Decoder) RelaxedTypeDispatch() bool { return d.cfg.relaxedTypeDispatch 
 // data a second time once the first decode has failed so, which a decode
 // that succeeds never does.
 //
+// A prefixed `xsi:type` is resolved against the namespace declarations in
+// scope where the attribute stands (see [XSITypeOf]). Given no option,
+// Unmarshal reads an element's own declarations as it goes; when the prefix
+// is declared on an element around it, Unmarshal decodes data a second time,
+// through a decoder that keeps every declaration in scope, into v cleared to
+// its zero value, so only a document with such a value pays for the second
+// decode.
+//
 // Content the decode does not read is ignored by default. [WithUnmatched]
 // reports each such item and [WithStrict] refuses the first, wrapping
 // [ErrUnknownElement]. A mandatory member the input leaves out is decoded
@@ -265,12 +519,17 @@ func Unmarshal(data []byte, v any, opts ...DecoderOption) error {
 // carries no `xsi:type` in either form above: an `xsi:type` wins
 // wherever it is written.
 //
-// The returned discriminator is normalised: a leading `xsd:` (XML
-// Schema datatype) prefix is stripped so foundation primitives like
-// `xsd:string` decode against the BMM primitive name `String`. A
-// namespace-prefixed RM value (e.g. Better's `ns2:DV_QUANTITY`) is
-// not stripped and so fails registry lookup as an unknown type;
-// namespace-prefixed discriminators are not supported.
+// The returned discriminator is an openEHR class name, matched as written,
+// with no prefix. A value whose prefix is bound to the XML Schema namespace
+// `http://www.w3.org/2001/XMLSchema` names an XML Schema built-in datatype
+// and is returned as the BMM primitive it reads as, whatever the prefix, so
+// `xs:string` and `xsd:string` both return `String`; so is a value with the
+// literal prefix `xsd:` that no declaration binds. Any other prefixed value,
+// such as Better's `ns2:DV_QUANTITY`, is returned as written and so fails
+// registry lookup as an unknown type: namespace-prefixed class names are not
+// supported. XSITypeOf sees only the namespace declarations start carries
+// itself; the decoder resolves a prefix against every declaration in scope
+// where the attribute stands.
 //
 // Returns [ErrInvalidShape] when an `xmi:type` attribute is
 // encountered: ITS-XML specifies `xsi:type` and the SDK rejects XMI
@@ -280,56 +539,8 @@ func Unmarshal(data []byte, v any, opts ...DecoderOption) error {
 // all; the caller decides whether that is an error (strict) or
 // acceptable (relaxed dispatch).
 func XSITypeOf(start xml.StartElement) (string, error) {
-	_, typeName, err := discriminator(start)
-	return typeName, err
-}
-
-// discriminator returns the attribute of start that [XSITypeOf] reads as the
-// `xsi:type` discriminator, by name, with its normalised value. An `xsi:type`
-// in the XSI namespace or written literally wins; a bare `type` is read only
-// when there is none, so a bare `type` beside an `xsi:type` stays unmatched
-// content. The name lets dispatch record which attribute it read.
-func discriminator(start xml.StartElement) (xml.Name, string, error) {
-	bare := -1
-	for i, attr := range start.Attr {
-		// Reject xmi:type (both resolved and literal forms).
-		if attr.Name.Local == "type" && attr.Name.Space == NSXMI {
-			return xml.Name{}, "", fmt.Errorf("canxml: %w: xmi:type on the wire is rejected (use xsi:type)", ErrInvalidShape)
-		}
-		if attr.Name.Local == "xmi:type" {
-			return xml.Name{}, "", fmt.Errorf("canxml: %w: xmi:type on the wire is rejected (use xsi:type)", ErrInvalidShape)
-		}
-		if !xmlunmatched.IsDiscriminator(attr.Name) {
-			continue
-		}
-		// Accept xsi:type (resolved and literal forms) at once; keep a bare
-		// type for when there is none.
-		if attr.Name.Space != "" || attr.Name.Local != "type" {
-			return attr.Name, stripXSDPrefix(attr.Value), nil
-		}
-		if bare < 0 {
-			bare = i
-		}
-	}
-	if bare >= 0 {
-		return start.Attr[bare].Name, stripXSDPrefix(start.Attr[bare].Value), nil
-	}
-	return xml.Name{}, "", nil
-}
-
-// stripXSDPrefix strips a leading `xsd:` namespace prefix from a
-// discriminator. Some ITS-XML producers tag foundation primitives
-// with their XML Schema datatype (`xsd:string`, `xsd:int`, …); the
-// SDK's type registry indexes the BMM primitive name (`String`,
-// `Integer`, …). The stripped name is fed to typereg.Lookup.
-//
-// Idempotent for inputs that already lack the prefix.
-func stripXSDPrefix(s string) string {
-	const prefix = "xsd:"
-	if len(s) > len(prefix) && s[:len(prefix)] == prefix {
-		return s[len(prefix):]
-	}
-	return s
+	d, err := xmlschema.Discriminator(nil, start)
+	return d.Name, err
 }
 
 // DecodeAs reads one polymorphic child element from dec (the
@@ -354,14 +565,15 @@ func stripXSDPrefix(s string) string {
 //     the next child.
 func DecodeAs[T any](dec *xml.Decoder, start xml.StartElement) (T, error) {
 	var zero T
-	attrName, typeName, err := discriminator(start)
+	d, err := xmlschema.Discriminator(dec, start)
 	if err != nil {
 		return zero, &DecodeError{Path: "/" + start.Name.Local, Inner: err}
 	}
+	attrName, typeName := d.Attr, d.Name
 	if typeName == "" {
 		return zero, &DecodeError{Path: "/" + start.Name.Local, Inner: fmt.Errorf("canxml: %w", typereg.ErrMissingType)}
 	}
-	ctor, ok := typereg.Default.Lookup(typeName)
+	ctor, ok := xmlschema.LookupType(typeName)
 	if !ok {
 		return zero, &DecodeError{
 			Path:  "/" + start.Name.Local,
@@ -372,7 +584,7 @@ func DecodeAs[T any](dec *xml.Decoder, start xml.StartElement) (T, error) {
 	xmlunmatched.DiscriminatorRead(dec, attrName)
 	v := ctor()
 	if err := xmlunmatched.DecodeElement(dec, &start, v); err != nil {
-		return zero, enclose("/"+start.Name.Local, typeName, err)
+		return zero, xmlschema.Enclose("/"+start.Name.Local, typeName, err)
 	}
 	if t, ok := v.(T); ok {
 		return t, nil
@@ -402,10 +614,11 @@ func DecodeAs[T any](dec *xml.Decoder, start xml.StartElement) (T, error) {
 // field type fixes the concrete subtype.
 func DecodeAsOrDefault[T any](dec *xml.Decoder, start xml.StartElement, defaultCtor func() any) (T, error) {
 	var zero T
-	attrName, typeName, err := discriminator(start)
+	d, err := xmlschema.Discriminator(dec, start)
 	if err != nil {
 		return zero, &DecodeError{Path: "/" + start.Name.Local, Inner: err}
 	}
+	attrName, typeName := d.Attr, d.Name
 	var v any
 	if typeName == "" {
 		if defaultCtor == nil {
@@ -413,10 +626,10 @@ func DecodeAsOrDefault[T any](dec *xml.Decoder, start xml.StartElement, defaultC
 		}
 		v = defaultCtor()
 		if err := xmlunmatched.DecodeElement(dec, &start, v); err != nil {
-			return zero, enclose("/"+start.Name.Local, "", err)
+			return zero, xmlschema.Enclose("/"+start.Name.Local, "", err)
 		}
 	} else {
-		ctor, ok := typereg.Default.Lookup(typeName)
+		ctor, ok := xmlschema.LookupType(typeName)
 		if !ok {
 			return zero, &DecodeError{
 				Path:  "/" + start.Name.Local,
@@ -427,7 +640,7 @@ func DecodeAsOrDefault[T any](dec *xml.Decoder, start xml.StartElement, defaultC
 		xmlunmatched.DiscriminatorRead(dec, attrName)
 		v = ctor()
 		if err := xmlunmatched.DecodeElement(dec, &start, v); err != nil {
-			return zero, enclose("/"+start.Name.Local, typeName, err)
+			return zero, xmlschema.Enclose("/"+start.Name.Local, typeName, err)
 		}
 	}
 	if t, ok := v.(T); ok {
@@ -441,21 +654,4 @@ func DecodeAsOrDefault[T any](dec *xml.Decoder, start xml.StartElement, defaultC
 		Type:  typeName,
 		Inner: fmt.Errorf("canxml: decoded %T: %w", v, typereg.ErrTypeMismatch),
 	}
-}
-
-// enclose returns the [DecodeError] for err, a failure while the element at
-// path decoded as typeName (empty when no discriminator chose the type).
-//
-// A failure that is itself a DecodeError comes from a polymorphic slot
-// further in. It becomes the Inner of the new one as it is, so a failure deep
-// inside nested slots is a chain of envelopes, one per slot, whose message is
-// written once, when it is asked for. Wrapping it in a formatted error instead
-// would write out the whole message below at every slot on the way out, at a
-// cost that grows with the square of the depth. Any other failure keeps the
-// canxml prefix.
-func enclose(path, typeName string, err error) *DecodeError {
-	if de, ok := err.(*DecodeError); ok && de != nil { //nolint:errorlint // a direct envelope only: a wrapped one keeps its wrapper, prefixed below
-		return &DecodeError{Path: path, Type: typeName, Inner: de}
-	}
-	return &DecodeError{Path: path, Type: typeName, Inner: fmt.Errorf("canxml: %w", err)}
 }

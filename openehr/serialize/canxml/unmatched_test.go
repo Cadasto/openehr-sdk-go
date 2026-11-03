@@ -6,9 +6,9 @@ package canxml_test
 // element decodes as, other than namespace declarations and attributes in the
 // XML Schema instance namespace (a bare `type` counts only where dispatch
 // reads it); an element in a namespace other than the openEHR one; or an
-// element whose content the codec does not model: a `Hash` member, a BMM
-// `Any` member, or a member whose Go type has no decoder of its own, each one
-// item. The default ignores it; WithUnmatched reports every item, in document
+// element whose content the codec does not model: a `Hash` of `Hash`es, a
+// BMM `Any` member, or a member whose Go type has no decoder of its own, each
+// one item. The default ignores it; WithUnmatched reports every item, in document
 // order, by its path; WithStrict refuses the first with
 // canxml.ErrUnknownElement.
 
@@ -252,7 +252,7 @@ func xmlCases() []xmlCase {
 			into: func() any { return new(rm.EHRStatus) },
 		},
 		{
-			// AOM 1.4: the hand-written TERMINOLOGY_CODE decoder, a
+			// AOM 1.4: the CODE_PHRASE of ARCHETYPE.original_language, a
 			// C_COMPLEX_OBJECT and its `occurrences`, the abstract BASE
 			// Interval.
 			name: "text in AOM 1.4 element content",
@@ -648,28 +648,32 @@ func TestREQ170_XMLForeignNamespace(t *testing.T) {
 }
 
 // TestREQ170_XMLHashElements pins the rule for `Hash` members, which the
-// codec does not model: on a resource-metadata type, by default a Hash
-// element is skipped, the report option reports it, and strict refuses it
-// like unmatched content (canxml.ErrUnknownElement, not canxml.ErrNamespace).
+// codec models (REQ-176 § Round trip): on a resource-metadata type each
+// element of a Hash member is one entry, decoded under the key its `id`
+// attribute holds, so neither the entry nor its key is unmatched content.
+// What an entry holds besides its key and its text, here a child element, is
+// unmatched like any other: skipped by default, reported, and refused by
+// strict (canxml.ErrUnknownElement, not canxml.ErrNamespace).
 func TestREQ170_XMLHashElements(t *testing.T) {
 	in := []byte(`<description ` + ucNS + `>` +
 		`<original_author id="name">` + xmlPlanted + `</original_author>` +
 		`<original_author id="email">` + xmlPlanted + `</original_author>` +
 		`<lifecycle_state>published</lifecycle_state>` +
-		`<other_details><item id="k">` + xmlPlanted + `</item></other_details>` +
+		`<other_details id="k"><item>` + xmlPlanted + `</item></other_details>` +
 		`</description>`)
-	wantPaths := []string{
-		"/description[1]/original_author[1]",
-		"/description[1]/original_author[2]",
-		"/description[1]/other_details[1]",
-	}
+	wantPaths := []string{"/description[1]/other_details[1]/item[1]"}
 
 	var got rm.ResourceDescription
 	if err := canxml.Unmarshal(in, &got); err != nil {
-		t.Fatalf("canxml.Unmarshal = %v; want nil: a Hash element is skipped by default", err)
+		t.Fatalf("canxml.Unmarshal = %v; want nil", err)
 	}
-	if want := (rm.ResourceDescription{LifecycleState: "published"}); !reflect.DeepEqual(got, want) {
-		t.Errorf("canxml.Unmarshal decoded %#v; want %#v, the Hash members left out", got, want)
+	want := rm.ResourceDescription{
+		LifecycleState: "published",
+		OriginalAuthor: map[string]string{"name": xmlPlanted, "email": xmlPlanted},
+		OtherDetails:   &map[string]string{"k": ""},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("canxml.Unmarshal decoded %#v; want %#v, each entry under its key", got, want)
 	}
 
 	_, paths, err := unmarshalCollecting(func() any { return new(rm.ResourceDescription) }, in)
@@ -677,7 +681,7 @@ func TestREQ170_XMLHashElements(t *testing.T) {
 		t.Fatalf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
 	}
 	if !slices.Equal(paths, wantPaths) {
-		t.Errorf("WithUnmatched reported %q; want %q", paths, wantPaths)
+		t.Errorf("WithUnmatched reported %q; want %q, no entry and no key attribute", paths, wantPaths)
 	}
 
 	err = canxml.Unmarshal(in, new(rm.ResourceDescription), canxml.WithStrict())
@@ -712,12 +716,14 @@ func TestREQ170_XMLWideElement(t *testing.T) {
 	}
 }
 
-// TestREQ170_XMLAnyMemberContent pins the rule for the content of a BMM `Any`
-// member, which the codec cannot decode: the AOM 1.4 `assumed_value` and
-// `EXPR_LEAF.item`. Like a Hash element, the element is skipped by default,
-// leaving the field at its zero value; the report option reports it as one
-// item at its own path, whatever it holds, an empty element included; and
-// strict refuses it like unmatched content.
+// TestREQ170_XMLAnyMemberContent pins the rule for an `assumed_value` on an
+// AOM 1.4 class whose schema type gives it none, such as C_COMPLEX_OBJECT,
+// which the BMM types `Any` on C_DEFINED_OBJECT: no member reads it. The
+// element is skipped by default, leaving the value as without it; the report
+// option reports it as one item at its own path, whatever it holds, an empty
+// element included; and strict refuses it like unmatched content. The
+// EXPR_LEAF item, the one `Any` member the codec reads, is pinned by
+// TestREQ170_REQ176_XMLExprLeafItemIsRead.
 func TestREQ170_XMLAnyMemberContent(t *testing.T) {
 	const slot = "{{any}}"
 	for _, tc := range []struct {
@@ -740,14 +746,6 @@ func TestREQ170_XMLAnyMemberContent(t *testing.T) {
 			element: `<assumed_value/>`,
 			path:    "/definition[1]/assumed_value[1]",
 			into:    func() any { return new(aom14.CComplexObject) },
-		},
-		{
-			name: "EXPR_LEAF item",
-			tmpl: `<expr_leaf ` + ucNS + `><type>C_STRING</type>` + slot +
-				`<reference_type>constraint</reference_type></expr_leaf>`,
-			element: `<item xsi:type="C_STRING"><pattern>` + xmlPlanted + `</pattern></item>`,
-			path:    "/expr_leaf[1]/item[1]",
-			into:    func() any { return new(aom14.ExprLeaf) },
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -778,6 +776,69 @@ func TestREQ170_XMLAnyMemberContent(t *testing.T) {
 
 			err = canxml.Unmarshal(in, tc.into(), canxml.WithStrict())
 			assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, tc.path, false)
+		})
+	}
+}
+
+// TestREQ170_REQ176_XMLExprLeafItemIsRead pins that the EXPR_LEAF item, a BMM
+// `Any` member, is read, not unmatched (REQ-176 § Shapes): an item whose
+// `xsi:type` names a class or an XML Schema built-in decodes, in every mode,
+// with nothing reported and nothing refused; what the item's own content
+// holds that its type does not read is unmatched at its path inside the item,
+// as for any class or primitive element.
+func TestREQ170_REQ176_XMLExprLeafItemIsRead(t *testing.T) {
+	leaf := func(item string) []byte {
+		return []byte(`<expr_leaf ` + ucNS + `><type>String</type>` + item + `<reference_type>constraint</reference_type></expr_leaf>`)
+	}
+	pattern := xmlPlanted
+	for _, tc := range []struct {
+		name  string
+		item  string
+		want  any
+		paths []string
+	}{
+		{
+			name: "C_STRING",
+			item: `<item xsi:type="C_STRING"><pattern>` + xmlPlanted + `</pattern></item>`,
+			want: &aom14.CString{Pattern: &pattern},
+		},
+		{
+			name: "xs:string",
+			item: `<item xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string">` + xmlPlanted + `</item>`,
+			want: &aom14.TypedString{Value: xmlPlanted, Type: "xs:string"},
+		},
+		{
+			name:  "C_STRING with an attribute it does not read",
+			item:  `<item xsi:type="C_STRING" x-attr="` + xmlPlanted + `"><pattern>` + xmlPlanted + `</pattern></item>`,
+			want:  &aom14.CString{Pattern: &pattern},
+			paths: []string{"/expr_leaf[1]/item[1]/@x-attr"},
+		},
+		{
+			name:  "xs:string holding a child element",
+			item:  `<item xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string">` + xmlPlanted + `<x-note/></item>`,
+			want:  &aom14.TypedString{Value: xmlPlanted, Type: "xs:string"},
+			paths: []string{"/expr_leaf[1]/item[1]/x-note[1]"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, paths, err := unmarshalCollecting(func() any { return new(aom14.ExprLeaf) }, leaf(tc.item))
+			if err != nil {
+				t.Fatalf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
+			}
+			if !slices.Equal(paths, tc.paths) {
+				t.Errorf("WithUnmatched reported %q; want %q", paths, tc.paths)
+			}
+			if item := got.(*aom14.ExprLeaf).Item; !reflect.DeepEqual(item, tc.want) {
+				t.Errorf("item = %#v; want %#v", item, tc.want)
+			}
+			err = canxml.Unmarshal(leaf(tc.item), new(aom14.ExprLeaf), canxml.WithStrict())
+			if len(tc.paths) == 0 {
+				if err != nil {
+					t.Errorf("canxml.Unmarshal(WithStrict) = %v; want nil", err)
+				}
+				return
+			}
+			assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, tc.paths[0], false)
 		})
 	}
 }
@@ -1187,69 +1248,72 @@ func TestREQ056_XMLOriginalVersionData(t *testing.T) {
 	})
 }
 
-// TestREQ056_XMLTerminologyCode pins the canonical-XML codec of the AOM 1.4
-// `ARCHETYPE.original_language`, a TERMINOLOGY_CODE. It reads the CODE_PHRASE
-// shape the AOM 1.4 ITS-XML schema gives the element, with the identifier in a
-// `value` child of `terminology_id`, and the plain text shape that mirrors
-// canonical JSON, both in the default mode; it writes the schema's shape,
-// which decodes back to the same value. The options see inside it like any
-// other content.
+// TestREQ056_XMLTerminologyCode pins the hand-written canonical-XML codec of
+// the BASE TERMINOLOGY_CODE, decoded here as the root of a document named as
+// an `original_language` element: no member of the generated models holds one
+// since the AOM 1.4 root gives AUTHORED_RESOURCE its RM form, whose
+// `original_language` is a CODE_PHRASE (REQ-176). It reads the CODE_PHRASE
+// shape the AOM 1.4 ITS-XML schema gives such an element, with the identifier
+// in a `value` child of `terminology_id`, and the plain text shape that
+// mirrors canonical JSON, both in the default mode; it writes the schema's
+// shape, which decodes back to the same value. The options see inside it like
+// any other content.
 func TestREQ056_XMLTerminologyCode(t *testing.T) {
-	archetype := func(lang string) []byte {
-		return []byte(`<archetype ` + ucNS + `><concept>at0000</concept>` + lang + `</archetype>`)
+	terminologyCode := func(lang string) []byte {
+		return []byte(strings.Replace(lang, `<original_language`, `<original_language `+ucNS, 1))
 	}
 	for name, lang := range map[string]string{
 		"schema shape": `<original_language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></original_language>`,
 		"text shape":   `<original_language><terminology_id>ISO_639-1</terminology_id><code_string>en</code_string></original_language>`,
 	} {
 		t.Run(name, func(t *testing.T) {
-			var a aom14.Archetype
-			if err := canxml.Unmarshal(archetype(lang), &a, canxml.WithStrict()); err != nil {
+			var a rm.TerminologyCode
+			if err := canxml.Unmarshal(terminologyCode(lang), &a, canxml.WithStrict()); err != nil {
 				t.Fatalf("canxml.Unmarshal(WithStrict) = %v; want nil", err)
 			}
-			if a.OriginalLanguage.TerminologyID != "ISO_639-1" || a.OriginalLanguage.CodeString != "en" {
-				t.Errorf("OriginalLanguage = %+v; want ISO_639-1::en", a.OriginalLanguage)
+			if a.TerminologyID != "ISO_639-1" || a.CodeString != "en" {
+				t.Errorf("TerminologyCode = %+v; want ISO_639-1::en", a)
 			}
 		})
 	}
 
 	t.Run("round trip", func(t *testing.T) {
 		version, uri := "2026", "http://example.org/lang/en"
-		in := aom14.Archetype{Concept: "at0000", OriginalLanguage: rm.TerminologyCode{
+		in := rm.TerminologyCode{
 			TerminologyID: "ISO_639-1", CodeString: "en", TerminologyVersion: &version, URI: &uri,
-		}}
+		}
 		b, err := canxml.Marshal(&in)
 		if err != nil {
 			t.Fatalf("canxml.Marshal = %v", err)
 		}
-		if want := `<original_language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string>`; !strings.Contains(string(b), want) {
+		if want := `><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string>`; !strings.Contains(string(b), want) {
 			t.Errorf("canxml.Marshal wrote\n%s\nwant the schema's CODE_PHRASE shape %s", b, want)
 		}
-		var out aom14.Archetype
+		var out rm.TerminologyCode
 		if err := canxml.Unmarshal(b, &out, canxml.WithStrict()); err != nil {
 			t.Fatalf("canxml.Unmarshal(own output, WithStrict) = %v; want nil", err)
 		}
-		if !reflect.DeepEqual(out.OriginalLanguage, in.OriginalLanguage) {
-			t.Errorf("round trip OriginalLanguage = %+v; want %+v", out.OriginalLanguage, in.OriginalLanguage)
+		if !reflect.DeepEqual(out, in) {
+			t.Errorf("round trip TerminologyCode = %+v; want %+v", out, in)
 		}
 	})
 
 	t.Run("report and strict see inside", func(t *testing.T) {
-		in := archetype(`<original_language x-attr="` + xmlPlanted + `"><terminology_id><value>ISO_639-1</value><x-id>` + xmlPlanted + `</x-id></terminology_id>` +
+		in := terminologyCode(`<original_language x-attr="` + xmlPlanted + `"><terminology_id><value>ISO_639-1</value><x-id>` + xmlPlanted + `</x-id></terminology_id>` +
 			`<code_string>en</code_string><x-ext>` + xmlPlanted + `</x-ext></original_language>`)
 		wantPaths := []string{
-			"/archetype[1]/original_language[1]/@x-attr",
-			"/archetype[1]/original_language[1]/terminology_id[1]/x-id[1]",
-			"/archetype[1]/original_language[1]/x-ext[1]",
+			"/original_language[1]/@x-attr",
+			"/original_language[1]/terminology_id[1]/x-id[1]",
+			"/original_language[1]/x-ext[1]",
 		}
-		want := new(aom14.Archetype)
+		want := new(rm.TerminologyCode)
 		if err := canxml.Unmarshal(in, want); err != nil {
 			t.Fatalf("canxml.Unmarshal = %v; want nil", err)
 		}
-		if want.OriginalLanguage.TerminologyID != "ISO_639-1" || want.OriginalLanguage.CodeString != "en" {
-			t.Errorf("OriginalLanguage = %+v; want ISO_639-1::en", want.OriginalLanguage)
+		if want.TerminologyID != "ISO_639-1" || want.CodeString != "en" {
+			t.Errorf("TerminologyCode = %+v; want ISO_639-1::en", *want)
 		}
-		got, paths, err := unmarshalCollecting(func() any { return new(aom14.Archetype) }, in)
+		got, paths, err := unmarshalCollecting(func() any { return new(rm.TerminologyCode) }, in)
 		if err != nil {
 			t.Fatalf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
 		}
@@ -1259,7 +1323,7 @@ func TestREQ056_XMLTerminologyCode(t *testing.T) {
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("canxml.Unmarshal(WithUnmatched) decoded\n%#v\nwant the default's value\n%#v", got, want)
 		}
-		err = canxml.Unmarshal(in, new(aom14.Archetype), canxml.WithStrict())
+		err = canxml.Unmarshal(in, new(rm.TerminologyCode), canxml.WithStrict())
 		assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, wantPaths[0], false)
 	})
 }
@@ -1275,15 +1339,15 @@ func TestREQ056_XMLTerminologyCode(t *testing.T) {
 // `value` child the text is the identifier, and only an unmatched child
 // beside it is reported (TestREQ056_XMLTerminologyCode).
 func TestREQ170_XMLTerminologyIDTextBesideValue(t *testing.T) {
-	archetype := func(id string) []byte {
-		return []byte(`<archetype ` + ucNS + `><concept>at0000</concept><original_language><terminology_id>` + id +
-			`</terminology_id><code_string>en</code_string></original_language></archetype>`)
+	terminologyCode := func(id string) []byte {
+		return []byte(`<original_language ` + ucNS + `><terminology_id>` + id +
+			`</terminology_id><code_string>en</code_string></original_language>`)
 	}
 	const (
 		value    = `<value>ISO_639-1</value>`
-		textPath = "/archetype[1]/original_language[1]/terminology_id[1]/text()"
-		attrPath = "/archetype[1]/original_language[1]/terminology_id[1]/value[1]/@x-attr"
-		fooPath  = "/archetype[1]/original_language[1]/terminology_id[1]/x-foo[1]"
+		textPath = "/original_language[1]/terminology_id[1]/text()"
+		attrPath = "/original_language[1]/terminology_id[1]/value[1]/@x-attr"
+		fooPath  = "/original_language[1]/terminology_id[1]/x-foo[1]"
 	)
 	for _, tc := range []struct {
 		name  string
@@ -1312,15 +1376,15 @@ func TestREQ170_XMLTerminologyIDTextBesideValue(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			in := archetype(tc.id)
-			want := new(aom14.Archetype)
+			in := terminologyCode(tc.id)
+			want := new(rm.TerminologyCode)
 			if err := canxml.Unmarshal(in, want); err != nil {
 				t.Fatalf("canxml.Unmarshal = %v; want nil", err)
 			}
-			if want.OriginalLanguage.TerminologyID != "ISO_639-1" {
-				t.Errorf("TerminologyID = %q; want the value child's ISO_639-1", want.OriginalLanguage.TerminologyID)
+			if want.TerminologyID != "ISO_639-1" {
+				t.Errorf("TerminologyID = %q; want the value child's ISO_639-1", want.TerminologyID)
 			}
-			got, paths, err := unmarshalCollecting(func() any { return new(aom14.Archetype) }, in)
+			got, paths, err := unmarshalCollecting(func() any { return new(rm.TerminologyCode) }, in)
 			if err != nil {
 				t.Fatalf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
 			}
@@ -1330,7 +1394,7 @@ func TestREQ170_XMLTerminologyIDTextBesideValue(t *testing.T) {
 			if !reflect.DeepEqual(got, want) {
 				t.Errorf("canxml.Unmarshal(WithUnmatched) decoded\n%#v\nwant the default's value\n%#v", got, want)
 			}
-			err = canxml.Unmarshal(in, new(aom14.Archetype), canxml.WithStrict())
+			err = canxml.Unmarshal(in, new(rm.TerminologyCode), canxml.WithStrict())
 			if len(tc.paths) == 0 {
 				if err != nil {
 					t.Errorf("canxml.Unmarshal(WithStrict) = %v; want nil: XML whitespace is not unmatched", err)
@@ -1461,22 +1525,22 @@ func TestREQ056_XMLMultimediaBase64(t *testing.T) {
 }
 
 // TestREQ170_XMLEnumerationMembers pins an enumeration member (C_DATE's
-// `day_validity`), which decodes from its text like a primitive: its value is
-// read, and an attribute on it is unmatched like on any primitive.
+// `timezone_validity`), which decodes from its text like a primitive: its value
+// is read, and an attribute on it is unmatched like on any primitive.
 func TestREQ170_XMLEnumerationMembers(t *testing.T) {
 	t.Run("value", func(t *testing.T) {
 		var c aom14.CDate
-		in := []byte(`<c_date ` + ucNS + `><day_validity>optional</day_validity></c_date>`)
+		in := []byte(`<c_date ` + ucNS + `><timezone_validity>1002</timezone_validity></c_date>`)
 		if err := canxml.Unmarshal(in, &c, canxml.WithStrict()); err != nil {
 			t.Fatalf("canxml.Unmarshal(WithStrict) = %v; want nil", err)
 		}
-		if c.DayValidity == nil || string(*c.DayValidity) != "optional" {
-			t.Errorf("DayValidity = %v; want \"optional\" read from the element's text", c.DayValidity)
+		if c.TimezoneValidity == nil || *c.TimezoneValidity != aom14.TimezoneValidityKindOptional {
+			t.Errorf("TimezoneValidity = %v; want 1002 (optional) read from the element's text", c.TimezoneValidity)
 		}
 	})
 	t.Run("attribute", func(t *testing.T) {
-		in := []byte(`<c_date ` + ucNS + `><day_validity x-attr="` + xmlPlanted + `">optional</day_validity></c_date>`)
-		const path = "/c_date[1]/day_validity[1]/@x-attr"
+		in := []byte(`<c_date ` + ucNS + `><timezone_validity x-attr="` + xmlPlanted + `">1002</timezone_validity></c_date>`)
+		const path = "/c_date[1]/timezone_validity[1]/@x-attr"
 		want := new(aom14.CDate)
 		if err := canxml.Unmarshal(in, want); err != nil {
 			t.Fatalf("canxml.Unmarshal = %v; want nil", err)

@@ -173,6 +173,7 @@ requirements:
       - openehr/aql/verify_test.go
       - openehr/aql/version_internal_test.go
       - openehr/aql/version_test.go
+      - openehr/client/ehr/composition/format_write_test.go
       - openehr/client/ehr/contribution/builder_test.go
       - openehr/client/ehr/contribution/submission_test.go
       - openehr/client/ehr/contribution/update_audit_test.go
@@ -203,6 +204,7 @@ requirements:
       - smart/discovery/plaintext_document_test.go
       - smart/log_value_test.go
       - smart/print_test.go
+      - testkit/conformance/webtemplate/decode_reducing_test.go
       - testkit/probe/run_test.go
       - testkit/probes/aql/probe_097_semantic_lint.go
       - testkit/probes/aql/probes_test.go
@@ -317,8 +319,10 @@ requirements:
     tests:
       - internal/bmmgen/aom14_test.go
       - internal/bmmgen/container_bounds_test.go
+      - internal/bmmgen/itsxml_test.go
       - internal/bmmgen/pin_scripts_test.go
       - internal/bmmgen/plan_test.go
+      - internal/bmmgen/render_integer_enum_test.go
       - internal/bmmgen/render_interface_test.go
       - internal/bmmgen/render_mandatory_tag_test.go
       - internal/bmmgen/render_release_test.go
@@ -331,6 +335,10 @@ requirements:
       - internal/bmmgen/sdk_extensions_test.go
       - internal/bmmgen/sim_bump_test.go
       - internal/bmmgen/target_test.go
+      - openehr/aom/aom14/integer_enumeration_test.go
+      - openehr/aom/aom14/operational_template_shapes_xml_test.go
+      - openehr/aom/aom14/primitive_profile_shapes_xml_test.go
+      - openehr/internal/xmlunmatched/choice_internal_test.go
       - openehr/internal/xmlunmatched/drop_internal_test.go
       - openehr/rm/rminfo/hierarchy_test.go
       - openehr/rm/rminfo/probe_094_test.go
@@ -443,6 +451,7 @@ requirements:
     probes: [PROBE-030, PROBE-031, PROBE-038, PROBE-105]
     tests:
       - internal/bmmgen/render_interval_bound_test.go
+      - internal/bmmgen/render_jsonmar_any_test.go
       - internal/bmmgen/render_jsonunmar_polymorphic_test.go
       - internal/bmmgen/render_keeps_empty_tag_test.go
       - internal/bmmgen/render_mandatory_tag_test.go
@@ -453,13 +462,18 @@ requirements:
       - internal/rmjsonwalk/walk_once_internal_test.go
       - internal/rmlists/rmlists_test.go
       - internal/v1_rm_decode_guard_test.go
+      - openehr/aom/aom14/expr_leaf_item_json_test.go
       - openehr/aom/aom14/interval_open_side_test.go
+      - openehr/aom/aom14/operational_template_json_test.go
+      - openehr/aom/aom14/symbol_json_test.go
       - openehr/client/demographic/versioned_test.go
       - openehr/client/ehr/contribution/submission_decode_test.go
       - openehr/client/ehr/contribution/submission_test.go
       - openehr/instance/instance_test.go
       - openehr/instance/polymorphic_roundtrip_test.go
       - openehr/internal/refused/refused_test.go
+      - openehr/internal/xmlschema/builtin_internal_test.go
+      - openehr/internal/xmlschema/json_test.go
       - openehr/internal/xmlunmatched/document_internal_test.go
       - openehr/rm/character_test.go
       - openehr/rm/character_text_test.go
@@ -677,32 +691,48 @@ requirements:
     tests:
       - internal/bmmgen/itsxml_test.go
       - internal/bmmgen/render_interval_bound_test.go
+      - internal/bmmgen/render_jsonmar_any_test.go
       - internal/bmmgen/render_xml_attributes_test.go
+      - internal/bmmgen/render_xml_hash_test.go
+      - internal/bmmgen/render_xmlchoice_optional_test.go
       - internal/bmmgen/render_xmlmar_order_test.go
+      - internal/bmmgen/render_xmlnames_test.go
       - internal/bmmgen/render_xmlunmar_class_test.go
       - internal/bmmgen/render_xmlunmar_unmatched_test.go
       - internal/rmaccess/interval_test.go
-      - openehr/aom/aom14/coded_text_code_list_xml_test.go
+      - openehr/aom/aom14/code_phrase_code_list_xml_test.go
+      - openehr/aom/aom14/expr_leaf_item_xml_test.go
+      - openehr/aom/aom14/hash_xml_test.go
       - openehr/aom/aom14/interval_open_side_test.go
       - openehr/aom/aom14/quantity_item_units_xml_test.go
+      - openehr/aom/aom14/schema_names_xml_test.go
+      - openehr/aom/aom14/symbol_value_xml_test.go
+      - openehr/internal/xmlschema/names_test.go
+      - openehr/internal/xmlschema/omit_test.go
       - openehr/internal/xmlunmatched/document_internal_test.go
+      - openehr/internal/xmlunmatched/scope_internal_test.go
       - openehr/rm/character_text_test.go
       - openehr/rm/interval_bound_test.go
       - openehr/rm/real_test.go
       - openehr/rm/real_xsd_text_test.go
+      - openehr/rm/resource_hash_xml_test.go
       - openehr/serialize/canjson/item_structure_list_test.go
       - openehr/serialize/canxml/child_order_test.go
       - openehr/serialize/canxml/crossformat_test.go
       - openehr/serialize/canxml/decode_test.go
+      - openehr/serialize/canxml/edgecases_test.go
       - openehr/serialize/canxml/interval_flag_defaults_test.go
       - openehr/serialize/canxml/interval_open_side_test.go
       - openehr/serialize/canxml/missing_test.go
+      - openehr/serialize/canxml/names_test.go
       - openehr/serialize/canxml/oneroot_test.go
       - openehr/serialize/canxml/primitive_error_test.go
       - openehr/serialize/canxml/real_precision_test.go
       - openehr/serialize/canxml/real_xsd_text_test.go
       - openehr/serialize/canxml/roundtrip_test.go
+      - openehr/serialize/canxml/stream_decoder_test.go
       - openehr/serialize/canxml/unmatched_test.go
+      - openehr/serialize/canxml/xsd_prefix_test.go
       - testkit/conformance/crossformat/census_test.go
       - testkit/conformance/crossformat/recorded_test.go
       - testkit/fixtures/crossformat_test.go
@@ -2451,8 +2481,10 @@ requirements:
       - internal/rmjsonwalk/root_internal_test.go
       - internal/rmjsonwalk/root_test.go
       - internal/rmjsonwalk/walk_test.go
+      - openehr/aom/aom14/hash_xml_test.go
       - openehr/client/ehr/contribution/submission_decode_test.go
       - openehr/internal/xmlunmatched/document_internal_test.go
+      - openehr/internal/xmlunmatched/entry_internal_test.go
       - openehr/serialize/canjson/unmatched_test.go
       - openehr/serialize/canxml/primitive_error_test.go
       - openehr/serialize/canxml/unmatched_test.go
@@ -2602,6 +2634,7 @@ requirements:
     tests:
       - internal/bmmgen/render_xmlunmar_class_test.go
       - internal/rmjsonwalk/walk_once_internal_test.go
+      - openehr/aom/aom14/symbol_value_xml_test.go
       - openehr/client/ehr/contribution/submission_decode_test.go
       - openehr/internal/xmlunmatched/document_internal_test.go
       - openehr/internal/xmlunmatched/missing_internal_test.go
@@ -2614,9 +2647,44 @@ requirements:
     title: ADL 1.4 operational template model
     canonical: docs/specifications/clinical-modeling.md#req-176--adl-14-operational-template-model
     status: draft
-    implementation: planned
-    packages: [openehr/aom/aom14, internal/bmmgen, resources/bmm, openehr/serialize/canxml]
+    implementation: landed
+    packages: [openehr/aom/aom14, internal/bmmgen, resources/bmm, openehr/serialize/canxml, openehr/serialize/canjson, openehr/internal/xmlschema, openehr/internal/xmlunmatched, testkit/probes/template]
     probes: [PROBE-111]
     tests:
+      - internal/bmmgen/itsxml_test.go
+      - internal/bmmgen/naming_test.go
+      - internal/bmmgen/render_integer_enum_test.go
+      - internal/bmmgen/render_jsonmar_any_test.go
+      - internal/bmmgen/render_xml_attributes_test.go
+      - internal/bmmgen/render_xml_hash_test.go
+      - internal/bmmgen/render_xmlchoice_optional_test.go
+      - internal/bmmgen/render_xmlnames_test.go
+      - internal/bmmgen/render_xmlunmar_unmatched_test.go
       - internal/bmmgen/sdk_extensions_test.go
+      - openehr/aom/aom14/code_phrase_code_list_xml_test.go
+      - openehr/aom/aom14/expr_leaf_item_json_test.go
+      - openehr/aom/aom14/expr_leaf_item_xml_test.go
+      - openehr/aom/aom14/hash_xml_test.go
+      - openehr/aom/aom14/integer_enumeration_test.go
+      - openehr/aom/aom14/operational_template_json_test.go
+      - openehr/aom/aom14/operational_template_shapes_xml_test.go
+      - openehr/aom/aom14/primitive_profile_shapes_xml_test.go
+      - openehr/aom/aom14/quantity_item_units_xml_test.go
+      - openehr/aom/aom14/schema_names_xml_test.go
+      - openehr/aom/aom14/symbol_json_test.go
+      - openehr/aom/aom14/symbol_value_xml_test.go
+      - openehr/internal/xmlschema/builtin_internal_test.go
+      - openehr/internal/xmlschema/json_test.go
+      - openehr/internal/xmlschema/names_test.go
+      - openehr/internal/xmlschema/omit_test.go
+      - openehr/internal/xmlunmatched/choice_internal_test.go
       - openehr/internal/xmlunmatched/drop_internal_test.go
+      - openehr/internal/xmlunmatched/entry_internal_test.go
+      - openehr/rm/resource_hash_xml_test.go
+      - openehr/serialize/canxml/names_test.go
+      - openehr/serialize/canxml/unmatched_test.go
+      - testkit/probes/template/probe_111_compare_internal_test.go
+      - testkit/probes/template/probe_111_guard_internal_test.go
+      - testkit/probes/template/probe_111_operational_template_compare.go
+      - testkit/probes/template/probe_111_operational_template_round_trip.go
+      - testkit/probes/template/probe_111_operational_template_round_trip_test.go

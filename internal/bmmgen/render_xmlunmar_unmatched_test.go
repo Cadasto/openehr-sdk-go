@@ -16,10 +16,12 @@ import (
 // apply the decode's policy (REQ-170): the start element's attributes on
 // entry, an element in a foreign namespace through the name it switches on,
 // every other element it does not read through its default arm, the text
-// between its child elements through its character-data arm, a Hash element
-// and the element of an Any member through their own arms, and a primitive
+// between its child elements through its character-data arm, the element of
+// a Hash canonical XML does not model through its own arm, and a primitive
 // element through xmlunmatched.DecodeElement. A member typed by a generic
-// List, Set or Array decodes each element as one item and appends it.
+// List, Set or Array decodes each element as one item and appends it, a Hash
+// member each element as one entry, and an Any member its element through
+// xmlschema.DecodeAny, as the type its discriminator names (REQ-176).
 //
 // An arm may hand an element to the decoder's own DecodeElement only when the
 // member's class is one of those the two targets render a decoder for, which
@@ -33,7 +35,7 @@ import (
 // content unreported.
 func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 	const (
-		attrs        = "\tif _err := xmlunmatched.Enter(_dec, _start, &xmlClass"
+		attrs        = "\tif _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClass"
 		switchOnName = "\t\t\tswitch xmlunmatched.LocalName(_t.Name) {\n"
 		defaultArm   = "\t\t\tdefault:\n\t\t\t\tif _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {\n"
 		textArm      = "\t\tcase xml.CharData:\n\t\t\tif _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {\n"
@@ -62,7 +64,7 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 
 	for _, target := range []Target{TargetRM, TargetAOM14} {
 		plan := plans[target.GoPackage]
-		hashes, anys, params, octets, lists := 0, 0, 0, 0, 0
+		hashes, anys, params, octets, lists, choices := 0, 0, 0, 0, 0, 0
 		for _, f := range plan.Files {
 			classes, err := codecClassesIn(plan, f)
 			if err != nil {
@@ -96,16 +98,35 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 							t.Errorf("%s.%s is typed by a generic list; its arm must decode each element as one item and append it:\n%s", pc.BMMName, prop, arm)
 						}
 					}
+					choice, err := xmlChoiceOf(plan, pc, ef)
+					if err != nil {
+						t.Fatalf("xmlChoiceOf(%s.%s): %v", pc.BMMName, prop, err)
+					}
 					switch {
+					case choice != nil:
+						choices++
+						if !strings.Contains(arm, "xmlunmatched.DecodeChoice(_dec, _t, "+choice.varName+")") {
+							t.Errorf("%s.%s takes a choice of shapes; its arm must decode through xmlunmatched.DecodeChoice with its shapes:\n%s", pc.BMMName, prop, arm)
+						}
 					case isHashProperty(ef.Prop):
 						hashes++
-						if !strings.Contains(arm, "xmlunmatched.SkipUnmatched(_dec, _t)") {
-							t.Errorf("%s.%s is a Hash member; its arm must hand the element to xmlunmatched.SkipUnmatched:\n%s", pc.BMMName, prop, arm)
+						shape, _, err := xmlHashOf(plan, ef)
+						if err != nil {
+							t.Fatalf("xmlHashOf(%s.%s): %v", pc.BMMName, prop, err)
+						}
+						if shape == nil {
+							if !strings.Contains(arm, "xmlunmatched.SkipUnmatched(_dec, _t)") {
+								t.Errorf("%s.%s is a Hash canonical XML does not model; its arm must hand the element to xmlunmatched.SkipUnmatched:\n%s", pc.BMMName, prop, arm)
+							}
+							continue
+						}
+						if !strings.Contains(arm, "xmlunmatched.DecodeEntry(") && !strings.Contains(arm, "xmlunmatched.DecodeEntryKeyedBy(") {
+							t.Errorf("%s.%s is a Hash member; its arm must decode each element as one entry through xmlunmatched.DecodeEntry or DecodeEntryKeyedBy:\n%s", pc.BMMName, prop, arm)
 						}
 					case isAnyProperty(ef.Prop):
 						anys++
-						if !strings.Contains(arm, "xmlunmatched.SkipUnmatched(_dec, _t)") || strings.Contains(arm, "DecodeElement(") {
-							t.Errorf("%s.%s is an Any member; its arm must hand the element to xmlunmatched.SkipUnmatched as one item and decode nothing:\n%s", pc.BMMName, prop, arm)
+						if !strings.Contains(arm, "xmlschema.DecodeAny(_dec, _t)") || strings.Contains(arm, "SkipUnmatched(") {
+							t.Errorf("%s.%s is an Any member; its arm must decode the element through xmlschema.DecodeAny, as the type its discriminator names:\n%s", pc.BMMName, prop, arm)
 						}
 					case isOpenParamProperty(ef):
 						if strings.Contains(arm, "_err := canxml.DecodeAs[") {
@@ -135,8 +156,8 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 		if target.GoPackage == TargetRM.GoPackage && (hashes == 0 || params == 0 || octets == 0) {
 			t.Errorf("the RM target rendered %d Hash arms, %d generic-parameter arms and %d Octet arms; want the resource-metadata Hash members, VERSION<T>.data and DV_MULTIMEDIA.data covered", hashes, params, octets)
 		}
-		if target.GoPackage == TargetAOM14.GoPackage && (anys == 0 || lists == 0) {
-			t.Errorf("the AOM 1.4 target rendered %d Any arms and %d generic-list arms; want `assumed_value`, `EXPR_LEAF.item` and C_CODED_TEXT's `code_list` covered", anys, lists)
+		if target.GoPackage == TargetAOM14.GoPackage && (anys == 0 || lists == 0 || choices == 0) {
+			t.Errorf("the AOM 1.4 target rendered %d Any arms, %d generic-list arms and %d choice arms; want `EXPR_LEAF.item`, C_CODE_PHRASE's `code_list` and ORDINAL's `symbol` covered", anys, lists, choices)
 		}
 	}
 }
@@ -158,8 +179,7 @@ func xmlCaseArm(src, prop string) string {
 	return rest[:end]
 }
 
-// isHashProperty reports whether prop is a BMM Hash member, which canonical
-// XML does not model.
+// isHashProperty reports whether prop is a BMM Hash member.
 func isHashProperty(prop bmm.Property) bool {
 	switch p := prop.(type) {
 	case *bmm.ContainerProperty:
@@ -178,7 +198,7 @@ func isGenericListProperty(prop bmm.Property) bool {
 }
 
 // isAnyProperty reports whether prop is a single property typed by the BMM
-// root type Any, whose content canonical XML does not model.
+// root type Any, which canonical XML decodes as its discriminator says.
 func isAnyProperty(prop bmm.Property) bool {
 	p, ok := prop.(*bmm.SingleProperty)
 	return ok && p.TypeName == bmmAnyType
@@ -292,9 +312,9 @@ func TestREQ056_GenericListDecode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(aom14): %v", err)
 	}
-	owner, ok := plan.Classes["C_CODED_TEXT"].Class.(*bmm.SimpleClass)
+	owner, ok := plan.Classes["C_CODE_PHRASE"].Class.(*bmm.SimpleClass)
 	if !ok {
-		t.Fatalf("plan has no simple class C_CODED_TEXT")
+		t.Fatalf("plan has no simple class C_CODE_PHRASE")
 	}
 	field := func(mandatory bool, root string, items ...string) emittedField {
 		p := &bmm.GenericProperty{TypeDef: &bmm.GenericType{RootType: root}}
@@ -303,7 +323,7 @@ func TestREQ056_GenericListDecode(t *testing.T) {
 		}
 		p.Name = "probe"
 		p.IsMandatory = mandatory
-		return emittedField{Prop: p, Owner: owner, OwnerName: "C_CODED_TEXT"}
+		return emittedField{Prop: p, Owner: owner, OwnerName: "C_CODE_PHRASE"}
 	}
 	for _, tc := range []struct {
 		name string

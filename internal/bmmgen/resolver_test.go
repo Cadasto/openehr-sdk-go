@@ -111,7 +111,8 @@ func TestSchemaResolver_REQ041_ReadsAResourcesDirectoryWithoutRoots(t *testing.T
 // TestBuildPlan_REQ041_SourceLabelNamesTheRootAndItsIncludes — the generated
 // header names the file each schema of the plan came from, the root first:
 // the RM target's root under sdk/ and the pinned schemas it includes, and the
-// AOM 1.4 target's pinned schema and its include.
+// AOM 1.4 target's root, the schemas it includes, the RM root among them, and
+// theirs, in the order the include chain reaches them.
 func TestBuildPlan_REQ041_SourceLabelNamesTheRootAndItsIncludes(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -119,7 +120,7 @@ func TestBuildPlan_REQ041_SourceLabelNamesTheRootAndItsIncludes(t *testing.T) {
 		want   string
 	}{
 		{TargetRM, "sdk/openehr_reference_model_1.2.0.bmm.json + openehr_rm_1.2.0.bmm.json + openehr_base_1.3.0.bmm.json"},
-		{TargetAOM14, "openehr_am_1.4.0.bmm.json + openehr_base_1.3.0.bmm.json"},
+		{TargetAOM14, "sdk/openehr_operational_template_1.4.0.bmm.json + openehr_am_1.4.0.bmm.json + sdk/openehr_reference_model_1.2.0.bmm.json + openehr_base_1.3.0.bmm.json + openehr_rm_1.2.0.bmm.json"},
 	} {
 		plan, err := BuildPlanForTarget(context.Background(), tc.target, testResolver())
 		if err != nil {

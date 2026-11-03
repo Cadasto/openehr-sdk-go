@@ -210,7 +210,7 @@ func TestREQ052_GoBuiltAbsentMandatoryMember(t *testing.T) {
 // is empty. A concrete RM value encodes with its `_type`, so a zero one is
 // still written; a struct or primitive held by value, and a type-parameter
 // field instantiated by value, have no absent form; and an `any` holding an
-// empty string or object holds a value.
+// empty string or a zero class value holds a value.
 //
 // REQ-052 § An absent mandatory member: a mandatory member held by value
 // has no absent form and is written.
@@ -261,10 +261,10 @@ func TestREQ052_MandatoryMemberWithAValueIsWritten(t *testing.T) {
 			want:   `""`,
 		},
 		{
-			name:   "an empty object in an AOM 1.4 EXPR_LEAF.item",
-			value:  &aom14.ExprLeaf{Type: "Object", ReferenceType: "constant", Item: map[string]any{}},
-			member: "item",
-			want:   `{}`,
+			name:     "a zero class value in an AOM 1.4 EXPR_LEAF.item",
+			value:    &aom14.ExprLeaf{Type: "C_STRING", ReferenceType: "constant", Item: &aom14.CString{}},
+			member:   "item",
+			wantType: "C_STRING",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

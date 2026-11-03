@@ -1,0 +1,9 @@
+# PROBE-111 schema ratchet: the corpus operational templates the pinned
+# AM Release-1.4 schemas (resources/its-xml, targetNamespace read as
+# http://schemas.openehr.org/v1) refuse as written. Such a template goes
+# through the round-trip leg only, until a re-pin admits it.
+#
+# One template per line: its path relative to testkit/corpus, a tab, and
+# the reason the schemas refuse it. `make operational-template-schema-check`
+# fails when a template the schemas refuse is missing here, and when one
+# listed here validates (a stale entry). Never edit the template itself.

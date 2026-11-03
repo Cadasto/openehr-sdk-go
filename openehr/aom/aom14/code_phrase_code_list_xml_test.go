@@ -6,21 +6,23 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
 
-// TestREQ056_CodedTextCodeListRoundTrips pins that canonical XML writes
-// C_CODED_TEXT.code_list as one `code_list` element per code, the repeated
+// TestREQ056_CodePhraseCodeListRoundTrips pins that canonical XML writes
+// C_CODE_PHRASE.code_list as one `code_list` element per code, the repeated
 // xs:string the AM 1.4 schema type C_CODE_PHRASE declares, and reads every
-// one of them back, in every decode mode (REQ-056).
-func TestREQ056_CodedTextCodeListRoundTrips(t *testing.T) {
+// one of them back, in every decode mode (REQ-056). C_CODE_PHRASE is the
+// schema's name for the BMM's C_CODED_TEXT (REQ-176).
+func TestREQ056_CodePhraseCodeListRoundTrips(t *testing.T) {
 	want := []string{"at0001", "at0002"}
 	in := &aom14.CSingleAttribute{
 		RMAttributeName: "defining_code",
-		Children: []aom14.CObject{&aom14.CCodedText{
-			RMTypeName:  "CODE_PHRASE",
-			Terminology: "local",
-			CodeList:    new(slices.Clone(want)),
+		Children: []aom14.CObject{&aom14.CCodePhrase{
+			RMTypeName:    "CODE_PHRASE",
+			TerminologyID: &rm.TerminologyID{Value: "local"},
+			CodeList:      new(slices.Clone(want)),
 		}},
 	}
 	b, err := canxml.Marshal(in)
@@ -50,9 +52,9 @@ func TestREQ056_CodedTextCodeListRoundTrips(t *testing.T) {
 		if len(back.Children) != 1 {
 			t.Fatalf("canxml.Unmarshal(%s): Children = %#v; want one", b, back.Children)
 		}
-		c, ok := back.Children[0].(*aom14.CCodedText)
+		c, ok := back.Children[0].(*aom14.CCodePhrase)
 		if !ok {
-			t.Fatalf("canxml.Unmarshal(%s): child is %T; want *aom14.CCodedText", b, back.Children[0])
+			t.Fatalf("canxml.Unmarshal(%s): child is %T; want *aom14.CCodePhrase", b, back.Children[0])
 		}
 		if c.CodeList == nil {
 			t.Errorf("canxml.Unmarshal(%s) (strict %v): CodeList = nil; want %q", b, strict, want)

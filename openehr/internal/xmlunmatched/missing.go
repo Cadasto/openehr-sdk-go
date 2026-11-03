@@ -16,9 +16,11 @@ type Class struct {
 	// Name is the class's name in the Reference Model, such as DV_QUANTITY.
 	Name string
 	// Attrs names the members the decoder reads as XML attributes of the
-	// start element, in no namespace, where the ITS-XML schema carries them
-	// so: archetype_node_id today. Every other attribute, bar the XML Schema
-	// instance ones and the namespace declarations, is unmatched content.
+	// start element, in no namespace, where the class's ITS-XML schema type
+	// carries them so, such as archetype_node_id or an ARCHETYPE_TERM's code.
+	// Every other attribute, bar the XML Schema instance ones, the namespace
+	// declarations and the key attribute of a Hash entry, which [DecodeEntry]
+	// takes off first, is unmatched content.
 	Attrs []string
 	// Required names the members the Reference Model makes mandatory on the
 	// class and a document can carry, in the order the model declares them,
@@ -46,20 +48,26 @@ const maxRequired = 64
 // as the element closes. start must be the token the decoder read last, and
 // no child token may have been read since.
 //
+// fresh reports that the decoder is to clear its receiver before it reads
+// the element: start opens the root of a value decoded a second time into the
+// value the first decode filled in part, which the second decode is to fill
+// again from nothing: a document [Unmarshal] decodes again, or a value of a
+// stream a [Scope] decodes again ([Scope.DecodeAgain]).
+//
 // By default it does nothing. A description with more than [maxRequired]
 // names in its Required is a programming error, and Enter panics on it
 // before any decode, tracked or not: a frame records the members it has
 // seen in one word of that many bits, and a name past it would be reported
 // missing whatever the document carries.
-func Enter(dec *xml.Decoder, start xml.StartElement, c *Class) error {
+func Enter(dec *xml.Decoder, start xml.StartElement, c *Class) (fresh bool, err error) {
 	if len(c.Required) > maxRequired {
 		panic(fmt.Sprintf("xmlunmatched.Enter: class %s lists %d required members, more than the %d a description holds", c.Name, len(c.Required), maxRequired))
 	}
 	t := trackerOf(dec)
 	if t == nil {
-		return nil
+		return againAtRoot(dec), nil
 	}
-	return t.enter(start, c)
+	return t.again && len(t.open) == 2, t.enter(start, c)
 }
 
 // enter records c on the innermost open element, the one start opened, marks
@@ -93,9 +101,12 @@ func (t *Tracker) enter(start xml.StartElement, c *Class) error {
 // whose text is empty or XML whitespace only. Nothing inside a nilled
 // element is reported: the member is reported once, by its parent, as a
 // null is in canonical JSON. A struct element with no content is a value,
-// and so is a Hash or Any element the codec does not model. The report is
-// the whole policy: no missing member refuses the decode, strict or not. A
-// nil fn asks for nothing.
+// and so is an entry of a Hash member, whatever its text, and an element the
+// codec does not model, a Hash of Hashes. A member inside a
+// Hash entry is named under the entry's key, such as
+// `/description/details/en/purpose`. The report is the whole policy: no
+// missing member refuses the decode, strict or not. A nil fn asks for
+// nothing.
 func (t *Tracker) ReportMissing(fn func(pointer string)) {
 	t.missing = fn
 }
@@ -109,7 +120,7 @@ func (t *Tracker) closing(n int) {
 	if f.class != nil && !f.nilled {
 		var b strings.Builder
 		for i, name := range f.class.Required {
-			if f.seen&(1<<i) != 0 {
+			if f.seen&(1<<i) != 0 || slices.Contains(f.optional, name) {
 				continue
 			}
 			b.Reset()
@@ -131,13 +142,19 @@ func (t *Tracker) closing(n int) {
 // writePointer writes the JSON Pointer of the element whose frame is
 // t.open[n-1] in the canonical-JSON form of the value: nothing for the root
 // element, and for each element below it `/` and its local name, followed by
-// `/` and its 0-based position among its same-named siblings when the
-// parent's class lists the name among its multi-valued members.
+// `/` and its key, escaped as RFC 6901 asks, when it is one entry of a Hash
+// member, or by `/` and its 0-based position among its same-named siblings
+// when the parent's class lists the name among its multi-valued members.
 func (t *Tracker) writePointer(b *strings.Builder, n int) {
 	for k := 2; k < n; k++ {
 		f := &t.open[k]
 		b.WriteByte('/')
 		b.WriteString(f.name)
+		if f.key != nil {
+			b.WriteByte('/')
+			_, _ = pointerKey.WriteString(b, f.key()) // a strings.Builder never fails
+			continue
+		}
 		if p := &t.open[k-1]; p.class != nil && slices.Contains(p.class.Items, f.name) {
 			b.WriteByte('/')
 			b.WriteString(strconv.Itoa(f.pos - 1))

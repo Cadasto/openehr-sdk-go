@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -527,7 +528,7 @@ func TestWriteFormatKeepsOtherHeaders(t *testing.T) {
 // fails with ErrInvalidConfig and issues no request. A FLAT or STRUCTURED
 // write with a nil Web Template; a WithTemplateID that differs from the Web
 // Template's id; a FLAT write whose two template ids are both empty; a
-// Format outside the four.
+// Format outside the four; an item tag the header rules refuse.
 func TestWriteFormatRefusals(t *testing.T) {
 	wt, comp := loadFormatFixture(t)
 	noID := withoutTemplateID(wt)
@@ -562,6 +563,12 @@ func TestWriteFormatRefusals(t *testing.T) {
 		{name: "negative Format", opts: []composition.WriteOption{
 			composition.WithFormat(composition.Format(-1), nil),
 		}},
+		{name: "an item tag with an empty key", opts: []composition.WriteOption{
+			composition.WithObjectItemTags([]openehrclient.ItemTag{{Key: ""}}),
+		}},
+		{name: "a version item tag with a control character", opts: []composition.WriteOption{
+			composition.WithVersionItemTags([]openehrclient.ItemTag{{Key: "k", Value: "a\nb"}}),
+		}},
 	}
 	for _, op := range formatWriteOps {
 		for _, tc := range cases {
@@ -570,6 +577,9 @@ func TestWriteFormatRefusals(t *testing.T) {
 				out, meta, err := op.do(t.Context(), newClient(t, fs.srv), comp, tc.opts...)
 				if !errors.Is(err, transport.ErrInvalidConfig) {
 					t.Errorf("%s error = %v, want ErrInvalidConfig", op.name, err)
+				}
+				if _, ok := errors.AsType[*composition.EncodeError](err); ok {
+					t.Errorf("%s error = %v, want a refused option, not an *EncodeError", op.name, err)
 				}
 				if out != nil || meta != nil {
 					t.Errorf("%s returned (%+v, %+v), want nil, nil", op.name, out, meta)
@@ -836,22 +846,48 @@ func TestWithFormatLastWins(t *testing.T) {
 }
 
 // TestWriteSerialiseFailureSendsNothing pins REQ-173: a composition the
-// codec cannot serialise fails the write before any request. The FLAT and
-// STRUCTURED codecs refuse an EVENT_CONTEXT setting that carries a value but
-// no code.
+// codec cannot serialise fails the write before any request, as an
+// *EncodeError that names the format asked for and wraps the codec's own
+// error, never as ErrInvalidConfig. The FLAT and STRUCTURED codecs refuse an
+// EVENT_CONTEXT setting that carries a value but no code; canonical JSON
+// refuses a NaN magnitude with canjson.ErrInvalidValue, an error no
+// simplified sentinel matches.
+// Canonical XML takes the same path, but no composition the typed RM can
+// build makes its encoder fail, so it has no row.
 func TestWriteSerialiseFailureSendsNothing(t *testing.T) {
 	wt, _ := loadFormatFixture(t)
-	bad := &rm.Composition{Context: &rm.EventContext{Setting: rm.DVCodedText{Value: "home"}}}
+	badSetting := &rm.Composition{Context: &rm.EventContext{Setting: rm.DVCodedText{Value: "home"}}}
+	nanMagnitude := &rm.Composition{Context: &rm.EventContext{OtherContext: &rm.ItemTree{Items: []rm.Item{
+		&rm.Element{Value: &rm.DVQuantity{Magnitude: rm.Real(math.NaN()), Units: "mm[Hg]"}},
+	}}}}
+	cases := []struct {
+		format composition.Format
+		comp   *rm.Composition
+		cause  error // the codec sentinel the error still matches, or nil
+	}{
+		{format: composition.FormatFlat, comp: badSetting, cause: simplified.ErrUnsupportedDatatype},
+		{format: composition.FormatStructured, comp: badSetting, cause: simplified.ErrUnsupportedDatatype},
+		{format: composition.FormatJSON, comp: nanMagnitude, cause: canjson.ErrInvalidValue},
+	}
 	for _, op := range formatWriteOps {
-		for _, f := range []composition.Format{composition.FormatFlat, composition.FormatStructured} {
-			t.Run(op.name+"/"+f.String(), func(t *testing.T) {
+		for _, tc := range cases {
+			t.Run(op.name+"/"+tc.format.String(), func(t *testing.T) {
 				fs := newFormatServer(t, http.StatusCreated, "", nil)
-				out, meta, err := op.do(t.Context(), newClient(t, fs.srv), bad, composition.WithFormat(f, wt))
-				if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
-					t.Errorf("%s(%v) error = %v, want the codec's ErrUnsupportedDatatype", op.name, f, err)
+				out, meta, err := op.do(t.Context(), newClient(t, fs.srv), tc.comp, composition.WithFormat(tc.format, wt))
+				encErr, ok := errors.AsType[*composition.EncodeError](err)
+				switch {
+				case !ok || encErr == nil:
+					t.Errorf("%s(%v) error = %v, want an *EncodeError", op.name, tc.format, err)
+				case encErr.Format != tc.format:
+					t.Errorf("%s(%v) EncodeError.Format = %v, want %v", op.name, tc.format, encErr.Format, tc.format)
+				case encErr.Err == nil:
+					t.Errorf("%s(%v) EncodeError.Err = nil, want the codec's error", op.name, tc.format)
 				}
-				if err != nil && !strings.Contains(err.Error(), "marshal body") {
-					t.Errorf("%s(%v) error = %q, want it to name the body marshal", op.name, f, err)
+				if tc.cause != nil && !errors.Is(err, tc.cause) {
+					t.Errorf("%s(%v) error = %v, want it to wrap the codec's %v", op.name, tc.format, err, tc.cause)
+				}
+				if errors.Is(err, transport.ErrInvalidConfig) {
+					t.Errorf("%s(%v) error = %v, want a codec failure, not ErrInvalidConfig", op.name, tc.format, err)
 				}
 				if out != nil || meta != nil {
 					t.Errorf("%s returned (%+v, %+v), want nil, nil", op.name, out, meta)
@@ -1022,5 +1058,25 @@ func TestWithFormatCopiesDecodeOptions(t *testing.T) {
 	}
 	if got := firstEntryName(t, out); got != fixtureEntryName {
 		t.Errorf("first content entry name = %q, want %q from the compiled template", got, fixtureEntryName)
+	}
+}
+
+// TestNilEncodeErrorAnswersInsteadOfPanicking pins REQ-025 § No panics on the
+// typed nil a failed errors.AsType[*composition.EncodeError] match leaves
+// behind: Error gives the zero value's text, Unwrap gives nil, and errors.Is
+// through it answers false instead of panicking.
+func TestNilEncodeErrorAnswersInsteadOfPanicking(t *testing.T) {
+	e, ok := errors.AsType[*composition.EncodeError](transport.ErrInvalidConfig)
+	if ok {
+		t.Fatal("errors.AsType[*EncodeError](ErrInvalidConfig) matched, want no match")
+	}
+	if got, want := e.Error(), (&composition.EncodeError{}).Error(); got != want {
+		t.Errorf("nil EncodeError.Error() = %q, want %q (what the zero EncodeError says)", got, want)
+	}
+	if got := e.Unwrap(); got != nil {
+		t.Errorf("nil EncodeError.Unwrap() = %v, want nil", got)
+	}
+	if errors.Is(e, canjson.ErrInvalidValue) {
+		t.Error("errors.Is(nil EncodeError, ErrInvalidValue) = true, want false")
 	}
 }

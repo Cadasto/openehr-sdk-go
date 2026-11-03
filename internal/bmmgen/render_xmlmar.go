@@ -39,22 +39,25 @@ import (
 //     built without the schemas, as a test may build one, keeps the
 //     generator's property order. Nil-pointer optionals and empty
 //     containers are omitted. Polymorphic descendants receive
-//     `xsi:type` via [canxml.EncodePoly].
+//     `xsi:type` via [canxml.EncodePoly]. A member whose element the
+//     target's root schemas give a choice of shapes writes the shape it
+//     holds, with no `xsi:type` ([marshalXMLChoice]).
 //
 // An Octet list (DV_MULTIMEDIA's `data` and `integrity_check`, Go []byte) is
 // one element of standard base64 text, the `xs:base64Binary` the ITS-XML
 // schema gives it and the string canonical JSON writes.
 //
-// # Hash/map XML emission (current limitation)
+// # Hash members
 //
-// `Hash<K,V>` properties are not emitted to XML: there is no
-// pinned canonical shape for them in the openEHR ITS-XML release
-// the SDK targets. Affected fields are skipped at encode time and
-// rejected at decode time (the decoder leaves them as the zero
-// value). Composition / EHR_STATUS / Directory / Contribution do
-// not use Hash on the critical path; the only RM uses are
-// extensibility hooks (`other_details`, `author`, …) under
-// AUTHORED_RESOURCE descendants. Documented in canxml/doc.go.
+// A `Hash<K,V>` member is written one element per entry, named after the
+// member, in ascending order of the keys, in the shapes the AM Release-1.4
+// schemas give them ([xmlHashOf]): a Hash of Strings as StringDictionaryItems,
+// the key in `id` and the value as text; a Hash of class values through the
+// value class's own encoder, the key in the attribute the class's schema type
+// declares that names no member, or, with none, not written, the value's
+// language code being its key. A Hash the codec does not model, a Hash of
+// Hashes, is handed to encoding/xml, which refuses a map. Documented in
+// canxml/doc.go.
 func RenderMarshalXMLFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	emitting, err := codecClassesIn(plan, file)
 	if err != nil {
@@ -94,7 +97,17 @@ func RenderMarshalXMLFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	if slices.ContainsFunc(chunks, func(c string) bool { return strings.Contains(c, "base64.") }) {
 		body.WriteString("\t\"encoding/base64\"\n")
 	}
-	body.WriteString("\t\"encoding/xml\"\n\n")
+	body.WriteString("\t\"encoding/xml\"\n")
+	if slices.ContainsFunc(chunks, func(c string) bool { return strings.Contains(c, "fmt.") }) {
+		body.WriteString("\t\"fmt\"\n")
+	}
+	if slices.ContainsFunc(chunks, func(c string) bool { return strings.Contains(c, "slices.Sorted(maps.Keys(") }) {
+		body.WriteString("\t\"maps\"\n\t\"slices\"\n")
+	}
+	body.WriteString("\n")
+	if slices.ContainsFunc(chunks, func(c string) bool { return strings.Contains(c, "xmlschema.") }) {
+		fmt.Fprintf(&body, "\t%q\n", xmlschemaImportPath)
+	}
 	body.WriteString("\t\"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml\"\n")
 	if needsExternalImportForJSONMar(plan, chunks) {
 		fmt.Fprintf(&body, "\t%q\n", plan.Target.ExternalImport)
@@ -175,9 +188,15 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 		b.WriteString("// declaration order; nil-pointer optionals and empty containers are\n")
 		b.WriteString("// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.\n")
 	}
-	b.WriteString("// Properties typed as XML attributes per the openEHR ITS-XML XSDs\n")
-	b.WriteString("// (currently `archetype_node_id`) are appended to start.Attr before\n")
-	b.WriteString("// the start token is written.\n")
+	b.WriteString("// Members the class's ITS-XML schema type declares as XML attributes\n")
+	b.WriteString("// are appended to start.Attr before the start token is written.\n")
+	hashes, err := hasXMLHash(plan, fields)
+	if err != nil {
+		return "", err
+	}
+	if hashes {
+		b.WriteString("// A Hash member writes one element per entry, in ascending key order.\n")
+	}
 	shaped := hasIntervalShape(fields)
 	if shaped {
 		b.WriteString("//\n")
@@ -195,8 +214,14 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 	b.WriteString("\tif err := _e.EncodeToken(_start); err != nil {\n\t\treturn err\n\t}\n")
 
 	for _, ef := range elemFields {
-		line, err := renderMarshalXMLField(plan, recv, sc, ef)
+		choice, err := xmlChoiceOf(plan, pc, ef)
 		if err != nil {
+			return "", err
+		}
+		var line string
+		if choice != nil {
+			line = marshalXMLChoice(recv, FieldName(ef.Prop.PropertyName()), ef.Prop.PropertyName(), choice, isMandatoryProperty(ef.Prop))
+		} else if line, err = renderMarshalXMLField(plan, recv, sc, ef); err != nil {
 			return "", fmt.Errorf("render XML field %s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
 		}
 		if shaped {
@@ -235,8 +260,21 @@ func renderMarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass, e
 	goField := FieldName(propName)
 	elemName := propName
 
+	// A Hash member writes one element per entry; one the codec does not model
+	// goes to encoding/xml below, which refuses a map.
+	hash, _, err := xmlHashOf(plan, ef)
+	if err != nil {
+		return "", err
+	}
+	if hash != nil {
+		return marshalXMLHash(recv, goField, elemName, hash), nil
+	}
+
 	switch p := ef.Prop.(type) {
 	case *bmm.SingleProperty:
+		if p.TypeName == bmmAnyType {
+			return marshalXMLAny(recv, goField, elemName, emitting.ClassName()+"."+propName, p.IsMandatory), nil
+		}
 		_, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
 		if kind == polySingle || kind == polySingleNarrow {
 			return marshalXMLPolySingle(recv, goField, elemName), nil
@@ -282,7 +320,7 @@ func renderMarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass, e
 			return marshalXMLPolySlice(recv, goField, elemName), nil
 		}
 		if p.TypeDef != nil && p.TypeDef.ContainerType == "Hash" {
-			return marshalXMLHashTODO(goField, elemName), nil
+			return marshalXMLStructMandatory(recv, goField, elemName), nil
 		}
 		innerIsClass := containerInnerIsClass(plan, p.TypeDef)
 		if innerIsClass {
@@ -333,6 +371,44 @@ func containerInnerIsClass(plan *Plan, td *bmm.ContainerType) bool {
 }
 
 // --- Per-shape emission helpers ----------------------------------------
+
+// marshalXMLAny emits the encoding of a property typed by the BMM root type
+// Any, held as a Go any, or as *any when optional, label naming it as its
+// class and property: a string, the text of an item with no `xsi:type`, and
+// an xmlschema.TypedString, which writes its own `xsi:type`, go to
+// encoding/xml; a nil member writes nothing; and any other value
+// [anyMemberFunc] accepts is a class value, which it returns as a pointer
+// where the member holds it by value, written through canxml.EncodePoly with
+// its `xsi:type`. A value it does not accept, one whose type names itself
+// after a registered class included, is refused with canxml.ErrInvalidShape,
+// naming the member and the Go type it holds, never the value, as the
+// canonical-JSON encoder refuses it ([jsonAnyChecks]).
+func marshalXMLAny(recv, field, elem, label string, mandatory bool) string {
+	start := fmt.Sprintf("xml.StartElement{Name: xml.Name{Local: %q}}", elem)
+	value := recv + "." + field
+	indent := "\t"
+	var b strings.Builder
+	if !mandatory {
+		fmt.Fprintf(&b, "\tif %s != nil {\n", value)
+		value = "(*" + value + ")"
+		indent = "\t\t"
+	}
+	fmt.Fprintf(&b, "%sswitch _v := %s.(type) {\n", indent, value)
+	fmt.Fprintf(&b, "%scase nil:\n", indent)
+	fmt.Fprintf(&b, "%scase string, xmlschema.TypedString, *xmlschema.TypedString:\n", indent)
+	fmt.Fprintf(&b, "%s\tif err := _e.EncodeElement(_v, %s); err != nil {\n%s\t\treturn err\n%s\t}\n", indent, start, indent, indent)
+	fmt.Fprintf(&b, "%sdefault:\n", indent)
+	fmt.Fprintf(&b, "%s\t_c, _ok := %s(_v)\n", indent, anyMemberFunc)
+	fmt.Fprintf(&b, "%s\tif !_ok {\n", indent)
+	fmt.Fprintf(&b, "%s\t\treturn fmt.Errorf(\"%%w: %s holds %%T, %s\", canxml.ErrInvalidShape, _v)\n", indent, label, anyMemberRefusal)
+	fmt.Fprintf(&b, "%s\t}\n", indent)
+	fmt.Fprintf(&b, "%s\tif err := canxml.EncodePoly(_e, %q, _c); err != nil {\n%s\t\treturn err\n%s\t}\n", indent, elem, indent, indent)
+	fmt.Fprintf(&b, "%s}\n", indent)
+	if !mandatory {
+		b.WriteString("\t}\n")
+	}
+	return b.String()
+}
 
 func marshalXMLPrimitiveMandatory(recv, field, elem string) string {
 	return fmt.Sprintf("\tif err := _e.EncodeElement(%s.%s, xml.StartElement{Name: xml.Name{Local: %q}}); err != nil {\n\t\treturn err\n\t}\n", recv, field, elem)
@@ -408,8 +484,4 @@ func marshalXMLGenericOptional(recv, field, elem string) string {
 	// pointer indirection). Take the address so pointer-receiver
 	// MarshalXML on T dispatches; see [marshalXMLGenericMandatory].
 	return fmt.Sprintf("\tif err := _e.EncodeElement(&%s.%s, xml.StartElement{Name: xml.Name{Local: %q}}); err != nil {\n\t\treturn err\n\t}\n", recv, field, elem)
-}
-
-func marshalXMLHashTODO(field, elem string) string {
-	return fmt.Sprintf("\t// TODO(canxml): Hash<K,V> XML emission deferred for %s/%s — see canxml/doc.go.\n\t_ = %q\n", field, elem, elem)
 }

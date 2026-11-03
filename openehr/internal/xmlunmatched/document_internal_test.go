@@ -26,7 +26,7 @@ type counted struct{ n int }
 var countedClass = &Class{Name: "COUNTED", Required: []string{"n"}}
 
 func (c *counted) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error {
-	if err := Enter(dec, start, countedClass); err != nil {
+	if _, err := Enter(dec, start, countedClass); err != nil {
 		return err
 	}
 	for {

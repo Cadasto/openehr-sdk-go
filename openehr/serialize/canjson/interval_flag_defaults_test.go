@@ -291,8 +291,10 @@ func jsonIntervalReaders() []jsonIntervalReader {
 			member: "magnitude", lower: "0", upper: "250",
 			decode: func(doc []byte, opts ...canjson.DecoderOption) (*intervalFlags, error) {
 				var v aom14.CQuantityItem
-				err := canjson.Unmarshal(doc, &v, opts...)
-				return new(baseFlags(v.Magnitude)), err
+				if err := canjson.Unmarshal(doc, &v, opts...); err != nil || v.Magnitude == nil {
+					return nil, err
+				}
+				return new(baseFlags(*v.Magnitude)), nil
 			},
 		},
 	}
