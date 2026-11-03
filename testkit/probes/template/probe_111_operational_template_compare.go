@@ -392,17 +392,26 @@ func probe111SortHashEntries(el *probe111Element) {
 // with no special value: the text the comparison reads as a number.
 var probe111Decimal = regexp.MustCompile(`^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$`)
 
-// probe111SameText reports whether two texts are equal, or both numbers of
-// the same value, or the same boolean literal. A number or a boolean is read
-// as XML Schema reads it, its white space collapsed, so `true` followed by a
-// line break and indentation is `true`.
-func probe111SameText(a, b string) bool {
-	if a == b {
+// probe111Booleans maps each literal of an XML Schema boolean to its value.
+var probe111Booleans = map[string]bool{"true": true, "1": true, "false": false, "0": false}
+
+// probe111SameText reports whether in, the input's text, and out, the
+// re-encoded text, are equal, or both numbers of the same value, or both
+// booleans of the same value. A number or a boolean is read as XML Schema
+// reads it, its white space collapsed, so `true` followed by a line break and
+// indentation is `true`. out is a boolean when it is `true` or `false`, the
+// only form the encoder writes a boolean in and never the form of a number;
+// in is then read as a boolean in any of its literals, so `1` is `true` and
+// `0` is `false`.
+func probe111SameText(in, out string) bool {
+	if in == out {
 		return true
 	}
-	ta, tb := strings.Trim(a, probe111XMLWhiteSpace), strings.Trim(b, probe111XMLWhiteSpace)
-	if ta == tb && slices.Contains([]string{"true", "false", "1", "0"}, ta) {
-		return true
+	ta, tb := strings.Trim(in, probe111XMLWhiteSpace), strings.Trim(out, probe111XMLWhiteSpace)
+	if tb == "true" || tb == "false" {
+		if v, ok := probe111Booleans[ta]; ok {
+			return v == (tb == "true")
+		}
 	}
 	if !probe111Decimal.MatchString(ta) || !probe111Decimal.MatchString(tb) {
 		return false

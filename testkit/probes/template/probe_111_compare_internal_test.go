@@ -85,10 +85,21 @@ func TestProbe111CompareDocuments(t *testing.T) {
 			reEncoded: probe111Doc("", `<existence><lower_included>true</lower_included><upper_included>true</upper_included><lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>0</lower><upper>1</upper></existence>`),
 		},
 		{
-			name:      "a boolean of another literal differs",
-			input:     probe111Doc("", `<existence><lower_included>1</lower_included><upper_included>true</upper_included><lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>0</lower><upper>1</upper></existence>`),
+			name:      "a boolean compares by its value, so 1 is true and 0 is false",
+			input:     probe111Doc("", "<existence><lower_included>1</lower_included><upper_included> 1\n</upper_included><lower_unbounded>0</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>0</lower><upper>1</upper></existence>"),
 			reEncoded: probe111Doc("", `<existence><lower_included>true</lower_included><upper_included>true</upper_included><lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>0</lower><upper>1</upper></existence>`),
-			want:      `/template[1]/existence[1]/lower_included[1]: text "1", re-encoded as "true"`,
+		},
+		{
+			name:      "a boolean of another value differs",
+			input:     probe111Doc("", `<existence><lower_included>1</lower_included><upper_included>true</upper_included><lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>0</lower><upper>1</upper></existence>`),
+			reEncoded: probe111Doc("", `<existence><lower_included>false</lower_included><upper_included>true</upper_included><lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>0</lower><upper>1</upper></existence>`),
+			want:      `/template[1]/existence[1]/lower_included[1]: text "1", re-encoded as "false"`,
+		},
+		{
+			name:      "a number that is no boolean literal differs from true",
+			input:     probe111Doc("", `<magnitude>1.0</magnitude>`),
+			reEncoded: probe111Doc("", `<magnitude>true</magnitude>`),
+			want:      `/template[1]/magnitude[1]: text "1.0", re-encoded as "true"`,
 		},
 		{
 			name:      "an absent included flag compares as its default: closed on a bounded side, open on an unbounded one",
