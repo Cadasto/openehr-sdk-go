@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -804,42 +803,7 @@ func intervalToMultiplicity(i *xmlInterval) (*Multiplicity, error) {
 	}
 	lowerIncluded := includedFlag(i.LowerIncluded.ptr(), lowerUnbounded)
 	upperIncluded := includedFlag(i.UpperIncluded.ptr(), upperUnbounded)
-	lower, upper := intOrZero(i.Lower), intOrZero(i.Upper)
-	m := &Multiplicity{
-		lower:          lower,
-		upper:          upper,
-		lowerUnbounded: lowerUnbounded,
-		upperUnbounded: upperUnbounded,
-	}
-	// A Multiplicity counts whole items, so an excluded end on a bounded
-	// side becomes the closed end it stands for: ">0" is 1 and "<3" is 2.
-	// An unbounded side has no bound to move, whatever its included flag
-	// says. An int cannot hold the closed end of "> the largest int" or
-	// "< the smallest int", so such an end is refused instead of being
-	// left to wrap around to the other end of the int range.
-	if !lowerUnbounded && !lowerIncluded {
-		if m.lower == math.MaxInt {
-			return nil, fmt.Errorf("closed lower bound overflows int: excluded lower=%d", lower)
-		}
-		m.lower++
-	}
-	if !upperUnbounded && !upperIncluded {
-		if m.upper == math.MinInt {
-			return nil, fmt.Errorf("closed upper bound overflows int: excluded upper=%d", upper)
-		}
-		m.upper--
-	}
-	// Reject inverted intervals at parse time so downstream walkers
-	// can assume `Lower <= Upper` whenever both bounds are present.
-	// The check runs on the closed ends, so an interval that closing
-	// leaves empty, such as ">2..<3", is refused here too; the message
-	// adds the interval as written so the reader recognises it.
-	// Unbounded sides are skipped: they have no concrete value to compare.
-	if !m.lowerUnbounded && !m.upperUnbounded && m.lower > m.upper {
-		return nil, fmt.Errorf("inverted interval lower=%d > upper=%d (written %s)",
-			m.lower, m.upper, writtenBounds(lower, upper, lowerIncluded, upperIncluded))
-	}
-	return m, nil
+	return NewMultiplicity(intOrZero(i.Lower), intOrZero(i.Upper), lowerIncluded, upperIncluded, lowerUnbounded, upperUnbounded)
 }
 
 // intOrZero returns the bound p points to, or 0 for a bound the OPT omits.

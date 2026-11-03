@@ -1,7 +1,9 @@
 package template
 
 import (
+	"fmt"
 	"maps"
+	"math"
 	"slices"
 	"strconv"
 
@@ -167,8 +169,8 @@ type ObjectNode interface {
 
 // Multiplicity is the min/max interval that OPT uses for both
 // existence and occurrences blocks. Fields are unexported to keep
-// parsed intervals immutable from outside the package; only the
-// parser constructs values (there is no public constructor).
+// parsed intervals immutable from outside the package; the parser and
+// [NewMultiplicity] construct values.
 //
 // A Multiplicity counts whole items, so every bounded side of a parsed
 // Multiplicity is closed: the parser turns an end the OPT excludes into
@@ -180,6 +182,52 @@ type Multiplicity struct {
 	upper          int
 	lowerUnbounded bool
 	upperUnbounded bool
+}
+
+// NewMultiplicity returns the Multiplicity of an AOM 1.4 integer interval,
+// given by its two bounds and its four flags, closed on each bounded side as
+// the parser closes an OPT interval: an end the interval excludes becomes the
+// closed end it stands for, so the bounds 0 and 3 with both ends excluded give
+// Lower 1 and Upper 2. An unbounded side keeps the bound it is given, which
+// its included flag does not move. NewMultiplicity returns an error for an
+// interval whose closed ends are inverted, one that closing leaves empty,
+// such as ">2..<3", and an excluded end whose closed end an int cannot hold.
+func NewMultiplicity(lower, upper int, lowerIncluded, upperIncluded, lowerUnbounded, upperUnbounded bool) (*Multiplicity, error) {
+	m := &Multiplicity{
+		lower:          lower,
+		upper:          upper,
+		lowerUnbounded: lowerUnbounded,
+		upperUnbounded: upperUnbounded,
+	}
+	// A Multiplicity counts whole items, so an excluded end on a bounded
+	// side becomes the closed end it stands for: ">0" is 1 and "<3" is 2.
+	// An unbounded side has no bound to move, whatever its included flag
+	// says. An int cannot hold the closed end of "> the largest int" or
+	// "< the smallest int", so such an end is refused instead of being
+	// left to wrap around to the other end of the int range.
+	if !lowerUnbounded && !lowerIncluded {
+		if m.lower == math.MaxInt {
+			return nil, fmt.Errorf("closed lower bound overflows int: excluded lower=%d", lower)
+		}
+		m.lower++
+	}
+	if !upperUnbounded && !upperIncluded {
+		if m.upper == math.MinInt {
+			return nil, fmt.Errorf("closed upper bound overflows int: excluded upper=%d", upper)
+		}
+		m.upper--
+	}
+	// Reject inverted intervals so downstream walkers can assume
+	// `Lower <= Upper` whenever both bounds are present. The check runs
+	// on the closed ends, so an interval that closing leaves empty, such
+	// as ">2..<3", is refused here too; the message adds the interval as
+	// written so the reader recognises it. Unbounded sides are skipped:
+	// they have no concrete value to compare.
+	if !m.lowerUnbounded && !m.upperUnbounded && m.lower > m.upper {
+		return nil, fmt.Errorf("inverted interval lower=%d > upper=%d (written %s)",
+			m.lower, m.upper, writtenBounds(lower, upper, lowerIncluded, upperIncluded))
+	}
+	return m, nil
 }
 
 // Lower returns the lower bound of the interval.
