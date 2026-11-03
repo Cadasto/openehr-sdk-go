@@ -47,7 +47,8 @@ import (
 // not a JSON object (Path ""); an absent, null or empty `versions`
 // ("/versions"); a version `_type` other than the two ("/versions/0/_type");
 // an audit `_type` other than the three ("/audit/_type",
-// "/versions/0/commit_audit/_type"); a `data` without a `_type`
+// "/versions/0/commit_audit/_type"); an IMPORTED_VERSION with no `item`, or
+// a null one ("/versions/0/item"); a `data` without a `_type`
 // ("/versions/0/data") or with one outside the four
 // ("/versions/0/data/_type"); and a failure inside a payload or an audit, such
 // as an unknown `_type` within a composition, which canjson reports at its
