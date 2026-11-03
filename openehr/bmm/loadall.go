@@ -220,7 +220,9 @@ func (st *loadAllState) mergeAncestor(dst, ancestor *mergedSchema, descendantCla
 //     schemaConflictError naming two sources neither of which includes
 //     the other.
 func (st *loadAllState) mergeForms(dst map[string]Class, dstSources map[string][]string, src map[string]Class, srcSources map[string][]string, own map[string]struct{}) error {
-	for name, form := range src {
+	// Sorted, so that of several conflicts the same one is reported.
+	for _, name := range sortedKeys(src) {
+		form := src[name]
 		if _, inDescendant := own[name]; inDescendant {
 			continue // descendant shadow — allowed
 		}

@@ -287,3 +287,35 @@ func loadPinned(t *testing.T, r bmm.FSResolver, id string) *bmm.Schema {
 	}
 	return s
 }
+
+// TestLoadAll_conflictErrorIsReproducible pins REQ-045: when two includes
+// disagree on several classes, LoadAll reports the same one on every run.
+func TestLoadAll_conflictErrorIsReproducible(t *testing.T) {
+	t.Parallel()
+	classes := func(form string) string {
+		defs := make([]string, 0, 5)
+		for _, name := range []string{"A", "B", "C", "D", "E"} {
+			defs = append(defs, fmt.Sprintf(`%q:{"name":%q,"documentation":%q}`, name, name, form))
+		}
+		return strings.Join(defs, ",")
+	}
+	r := bmm.MapResolver{
+		"root_1.0.0": []byte(`{"schema_name":"root","rm_release":"1.0.0","includes":{"p1_1.0.0":{"id":"p1_1.0.0"},"p2_1.0.0":{"id":"p2_1.0.0"}}}`),
+		"p1_1.0.0":   []byte(`{"schema_name":"p1","rm_release":"1.0.0","class_definitions":{` + classes("from p1") + `}}`),
+		"p2_1.0.0":   []byte(`{"schema_name":"p2","rm_release":"1.0.0","class_definitions":{` + classes("from p2") + `}}`),
+	}
+	var first string
+	for run := range 20 {
+		_, err := bmm.LoadAll("root_1.0.0", r)
+		if !errors.Is(err, bmm.ErrSchemaConflict) {
+			t.Fatalf("run %d: LoadAll error = %v, want errors.Is(err, bmm.ErrSchemaConflict)", run, err)
+		}
+		if run == 0 {
+			first = err.Error()
+			continue
+		}
+		if got := err.Error(); got != first {
+			t.Fatalf("run %d: LoadAll error = %q, want the first run's %q", run, got, first)
+		}
+	}
+}
