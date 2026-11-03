@@ -92,10 +92,10 @@
 //     element of standard base64 text, the `xs:base64Binary` the ITS-XML
 //     schema gives it and the string canonical JSON writes; XML
 //     whitespace inside the text is ignored on decode.
-//   - The AOM 1.4 `original_language`, a TERMINOLOGY_CODE, is written in
-//     the CODE_PHRASE shape the AOM 1.4 ITS-XML schema gives it, with the
-//     terminology identifier in a `value` child of `terminology_id`;
-//     decode also reads a plain text `terminology_id`.
+//   - A TERMINOLOGY_CODE, such as the `concept` of a TERMINOLOGY_TERM, is
+//     written in the CODE_PHRASE shape, with the terminology identifier in a
+//     `value` child of `terminology_id`; decode also reads a plain text
+//     `terminology_id`.
 //   - A member typed by a generic parameter that is instantiated with an
 //     interface, such as the `data` of ORIGINAL_VERSION<any>, is a
 //     polymorphic site and needs `xsi:type`, even when its element is
