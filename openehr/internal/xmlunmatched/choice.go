@@ -6,11 +6,17 @@ import (
 )
 
 // Shape is one of the shapes the element of a choice member takes: the child
-// elements the shape's schema type declares, and how to allocate a value of
-// it. The generator emits one list of shapes per choice member.
+// elements the shape's schema type declares, which of the members the class
+// that reads it requires the shape makes optional, and how to allocate a value
+// of it. The generator emits one list of shapes per choice member.
 type Shape struct {
 	// Elements names the child elements of the shape, by local name.
 	Elements []string
+	// Optional names the members the class of the shape requires that the
+	// shape's schema type makes optional, such as the `value` of the
+	// DV_CODED_TEXT shape of an AOM 1.4 ORDINAL symbol: the missing-member
+	// report ([Tracker.ReportMissing]) does not report them.
+	Optional []string
 	// New returns a pointer to a new value of the shape, whose UnmarshalXML
 	// reads the element.
 	New func() any
@@ -26,7 +32,8 @@ type Shape struct {
 //
 // The shape's decoder reads the element as if called on it directly: in a
 // tracked decode its unmatched content and its missing members are reported
-// at the element's path, and its failures are its own.
+// at the element's path, and its failures are its own. A member the shape
+// makes optional ([Shape.Optional]) is not reported missing.
 func DecodeChoice(dec *xml.Decoder, start xml.StartElement, shapes []Shape) (any, error) {
 	if len(shapes) == 0 {
 		return nil, SkipUnmatched(dec, start)
@@ -39,7 +46,9 @@ func DecodeChoice(dec *xml.Decoder, start xml.StartElement, shapes []Shape) (any
 		if err != nil {
 			return nil, err
 		}
-		v := chooseShape(shapes, first).New()
+		shape := chooseShape(shapes, first)
+		t.open[len(t.open)-1].optional = shape.Optional
+		v := shape.New()
 		return v, dec.DecodeElement(v, &start)
 	}
 	// An untracked decoder cannot read ahead: the tokens up to the first

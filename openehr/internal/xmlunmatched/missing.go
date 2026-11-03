@@ -119,7 +119,7 @@ func (t *Tracker) closing(n int) {
 	if f.class != nil && !f.nilled {
 		var b strings.Builder
 		for i, name := range f.class.Required {
-			if f.seen&(1<<i) != 0 {
+			if f.seen&(1<<i) != 0 || slices.Contains(f.optional, name) {
 				continue
 			}
 			b.Reset()

@@ -508,7 +508,7 @@ var xmlClassOrdinal = xmlunmatched.Class{
 
 // xmlChoiceOrdinalSymbol lists the shapes the element of ORDINAL.symbol takes, which its first child chooses.
 var xmlChoiceOrdinalSymbol = []xmlunmatched.Shape{
-	{Elements: []string{"value", "hyperlink", "formatting", "mappings", "language", "encoding", "defining_code"}, New: func() any { return new(rm.DVCodedText) }},
+	{Elements: []string{"value", "hyperlink", "formatting", "mappings", "language", "encoding", "defining_code"}, Optional: []string{"value"}, New: func() any { return new(rm.DVCodedText) }},
 	{Elements: []string{"terminology_id", "code_string", "preferred_term"}, New: func() any { return new(rm.CodePhrase) }},
 }
 
@@ -587,7 +587,7 @@ var xmlClassScale = xmlunmatched.Class{
 
 // xmlChoiceScaleSymbol lists the shapes the element of SCALE.symbol takes, which its first child chooses.
 var xmlChoiceScaleSymbol = []xmlunmatched.Shape{
-	{Elements: []string{"value", "hyperlink", "formatting", "mappings", "language", "encoding", "defining_code"}, New: func() any { return new(rm.DVCodedText) }},
+	{Elements: []string{"value", "hyperlink", "formatting", "mappings", "language", "encoding", "defining_code"}, Optional: []string{"value"}, New: func() any { return new(rm.DVCodedText) }},
 	{Elements: []string{"terminology_id", "code_string", "preferred_term"}, New: func() any { return new(rm.CodePhrase) }},
 }
 

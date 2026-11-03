@@ -143,13 +143,19 @@ func propertyTypeName(prop bmm.Property) string {
 }
 
 // renderXMLChoiceVar renders the package-level list of c's shapes the decoder
-// hands xmlunmatched.DecodeChoice, one shape per line.
+// hands xmlunmatched.DecodeChoice, one shape per line, each with the members
+// the shape makes optional that its class requires, which the missing-member
+// report leaves out.
 func renderXMLChoiceVar(c *xmlChoice) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "// %s lists the shapes the element of %s takes, which its first child chooses.\n", c.varName, c.label)
 	fmt.Fprintf(&b, "var %s = []xmlunmatched.Shape{\n", c.varName)
 	for _, s := range c.shapes {
-		fmt.Fprintf(&b, "\t{Elements: %s, New: func() any { return new(%s) }},\n", stringSliceLiteral(s.elements), s.goType)
+		optional := ""
+		if len(s.omitEmpty) > 0 {
+			optional = ", Optional: " + stringSliceLiteral(s.omitEmpty)
+		}
+		fmt.Fprintf(&b, "\t{Elements: %s%s, New: func() any { return new(%s) }},\n", stringSliceLiteral(s.elements), optional, s.goType)
 	}
 	b.WriteString("}\n")
 	return b.String()

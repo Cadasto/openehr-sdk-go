@@ -207,6 +207,10 @@ type frame struct {
 	// key reads the key of the element when it is one entry of a Hash member,
 	// so the members inside it are named under the key; nil otherwise.
 	key func() string
+	// optional names the members of the element's class that the shape it
+	// takes as one of a choice of shapes makes optional, which are never
+	// missing; nil otherwise.
+	optional []string
 }
 
 // linearChildNames is the number of distinct child names a frame counts in its

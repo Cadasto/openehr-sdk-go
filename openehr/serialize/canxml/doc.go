@@ -221,7 +221,11 @@
 // which is every function the model computes, such as EVENT `offset`, and
 // RESOURCE_DESCRIPTION `parent_resource`; the four interval boundary flags,
 // which take their defaults when absent; and `xsi:type`, which names no
-// attribute.
+// attribute. An element that takes one of several shapes, the AOM 1.4
+// ORDINAL and SCALE `symbol`, is held to the members its shape's schema type
+// requires, not to those of the class that reads it: the `value` of its
+// DV_CODED_TEXT shape is optional there, so a symbol without one reports
+// nothing.
 //
 // The check runs in the same pass over the input that serves
 // [WithUnmatched], through the description of its class each generated

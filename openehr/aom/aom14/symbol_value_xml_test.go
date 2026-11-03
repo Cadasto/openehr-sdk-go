@@ -86,3 +86,36 @@ func TestREQ176_SymbolValueIsWrittenOnlyWhenNonEmpty(t *testing.T) {
 		})
 	}
 }
+
+// TestREQ176_REQ175_SymbolValueIsNotMissing pins that WithMissing holds a
+// choice shape to the members its schema shape requires, not to those of the
+// RM class that reads it: the DV_CODED_TEXT shape of ORDINAL_SYMBOL makes
+// `value` optional, so a symbol with no `value`, or an empty one, reports
+// nothing, while one that leaves out its `defining_code`, which the shape
+// requires, reports it, as ORDINAL and as SCALE.
+func TestREQ176_REQ175_SymbolValueIsNotMissing(t *testing.T) {
+	const code = `<defining_code><terminology_id><value>local</value></terminology_id><code_string>at1</code_string></defining_code>`
+	for _, class := range []string{"ordinal", "scale"} {
+		for _, tc := range []struct {
+			name, symbol string
+			want         []string
+		}{
+			{"no value", `<symbol>` + code + `</symbol>`, nil},
+			{"an empty value", `<symbol><value></value>` + code + `</symbol>`, nil},
+			{"a value", `<symbol><value>Mild</value>` + code + `</symbol>`, nil},
+			{"no defining_code", `<symbol><value>Mild</value></symbol>`, []string{"/symbol/defining_code"}},
+		} {
+			doc := `<` + class + ` xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><value>1</value>` +
+				tc.symbol + `</` + class + `>`
+			var missing []string
+			report := canxml.WithMissing(func(p string) { missing = append(missing, p) })
+			into := map[string]any{"ordinal": new(aom14.Ordinal), "scale": new(aom14.Scale)}[class]
+			if err := canxml.Unmarshal([]byte(doc), into, report); err != nil {
+				t.Fatalf("%s, %s: canxml.Unmarshal = %v", class, tc.name, err)
+			}
+			if !reflect.DeepEqual(missing, tc.want) {
+				t.Errorf("%s, %s: WithMissing reported %q; want %q", class, tc.name, missing, tc.want)
+			}
+		}
+	}
+}
