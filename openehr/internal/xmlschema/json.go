@@ -4,6 +4,8 @@ import (
 	"encoding/json/jsontext"
 	json "encoding/json/v2"
 	"errors"
+	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -116,5 +118,75 @@ func (a OptionalAnyJSON) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		return nil
 	}
 	*a.To = &v
+	return nil
+}
+
+// errChoiceJSON is the refusal of a JSON value a member whose canonical XML
+// takes a choice of shapes does not hold.
+var errChoiceJSON = errors.New("a member of a choice of shapes holds a JSON object or null")
+
+// DecodeChoiceJSON decodes the next JSON value of dec into *out, the value of a
+// BMM `Any` member whose canonical XML takes one of several shapes, such as the
+// AOM 1.4 `ORDINAL.symbol`: an object whose `_type` names one of types, the BMM
+// names of the shapes, as that class, through the type registry, as at a
+// polymorphic slot; and null as nil. A `_type` the registry holds that names
+// none of the shapes is refused with typereg.ErrTypeMismatch, and any other
+// JSON value as a shape failure.
+func DecodeChoiceJSON(dec *jsontext.Decoder, out *any, types []string) error {
+	switch dec.PeekKind() {
+	case jsontext.KindNull:
+		*out = nil
+		_, err := dec.ReadToken()
+		return err
+	case jsontext.KindBeginObject:
+		var v any
+		if err := typereg.DecodePolymorphic(dec, &v, nil); err != nil {
+			return err
+		}
+		if n, ok := v.(interface{ BMMName() string }); !ok || !slices.Contains(types, n.BMMName()) {
+			return &typereg.DecodeError{Inner: fmt.Errorf("canjson: decoded %T, none of the member's shapes: %w", v, typereg.ErrTypeMismatch)}
+		}
+		*out = v
+		return nil
+	case jsontext.KindString, jsontext.KindFalse, jsontext.KindTrue, jsontext.KindNumber, jsontext.KindBeginArray,
+		jsontext.KindEndObject, jsontext.KindEndArray, jsontext.KindInvalid:
+	}
+	return errChoiceJSON
+}
+
+// ChoiceJSON decodes a mandatory member whose canonical XML takes a choice of
+// shapes, held as a Go any at To, from canonical JSON ([DecodeChoiceJSON]):
+// Types names the BMM classes of its shapes. A generated decoder sets it in the
+// place of the member, so that the member's JSON value decodes through it.
+type ChoiceJSON struct {
+	To    *any
+	Types []string
+}
+
+// UnmarshalJSONFrom decodes the member's value into *c.To.
+func (c ChoiceJSON) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	return DecodeChoiceJSON(dec, c.To, c.Types)
+}
+
+// OptionalChoiceJSON decodes an optional member whose canonical XML takes a
+// choice of shapes, held as a Go *any at To, from canonical JSON
+// ([DecodeChoiceJSON]): null leaves the member nil.
+type OptionalChoiceJSON struct {
+	To    **any
+	Types []string
+}
+
+// UnmarshalJSONFrom decodes the member's value into a new any *c.To points to,
+// or sets *c.To to nil for null.
+func (c OptionalChoiceJSON) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	var v any
+	if err := DecodeChoiceJSON(dec, &v, c.Types); err != nil {
+		return err
+	}
+	if v == nil {
+		*c.To = nil
+		return nil
+	}
+	*c.To = &v
 	return nil
 }

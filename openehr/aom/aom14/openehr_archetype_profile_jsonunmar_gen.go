@@ -7,6 +7,7 @@ import (
 	"encoding/json/jsontext"
 	"fmt"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlschema"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
@@ -138,6 +139,9 @@ func (n *NonTerminalState) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	return typereg.DecodeInto(dec, "NON_TERMINAL_STATE", &w, &w.Type)
 }
 
+// jsonChoiceOrdinalSymbol lists the classes the canonical JSON of ORDINAL.symbol may name in its `_type`: the shapes its canonical XML takes.
+var jsonChoiceOrdinalSymbol = []string{"DV_CODED_TEXT", "CODE_PHRASE"}
+
 // UnmarshalJSONFrom decodes canonical openEHR JSON into Ordinal.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
 // dereferenced. The shared helper checks the `_type`
@@ -152,9 +156,13 @@ func (o *Ordinal) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	w := struct {
 		Type string `json:"_type"`
 		*rawOrdinal
-	}{rawOrdinal: (*rawOrdinal)(o)}
+		Symbol xmlschema.ChoiceJSON `json:"symbol"`
+	}{rawOrdinal: (*rawOrdinal)(o), Symbol: xmlschema.ChoiceJSON{To: &o.Symbol, Types: jsonChoiceOrdinalSymbol}}
 	return typereg.DecodeInto(dec, "ORDINAL", &w, &w.Type)
 }
+
+// jsonChoiceScaleSymbol lists the classes the canonical JSON of SCALE.symbol may name in its `_type`: the shapes its canonical XML takes.
+var jsonChoiceScaleSymbol = []string{"DV_CODED_TEXT", "CODE_PHRASE"}
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into Scale.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
@@ -170,7 +178,8 @@ func (s *Scale) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	w := struct {
 		Type string `json:"_type"`
 		*rawScale
-	}{rawScale: (*rawScale)(s)}
+		Symbol xmlschema.ChoiceJSON `json:"symbol"`
+	}{rawScale: (*rawScale)(s), Symbol: xmlschema.ChoiceJSON{To: &s.Symbol, Types: jsonChoiceScaleSymbol}}
 	return typereg.DecodeInto(dec, "SCALE", &w, &w.Type)
 }
 

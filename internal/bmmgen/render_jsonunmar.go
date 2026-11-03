@@ -128,6 +128,13 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 	}
 
 	var b strings.Builder
+	for _, m := range anyMembers {
+		if m.typesVar == "" {
+			continue
+		}
+		fmt.Fprintf(&b, "// %s lists the classes the canonical JSON of %s.%s may name in its `_type`: the shapes its canonical XML takes.\n", m.typesVar, pc.BMMName, m.name)
+		fmt.Fprintf(&b, "var %s = %s\n\n", m.typesVar, stringSliceLiteral(m.types))
+	}
 	fmt.Fprintf(&b, "// UnmarshalJSONFrom decodes canonical openEHR JSON into %s.\n", pc.GoName)
 	b.WriteString("// A nil receiver is refused with typereg.ErrNilReceiver rather than\n")
 	b.WriteString("// dereferenced. The shared helper checks the `_type`\n")
@@ -189,7 +196,11 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 		inits := []string{fmt.Sprintf("%s: (*%s%s)(%s)", alias, alias, typeArgs, recv)}
 		for _, m := range anyMembers {
 			fmt.Fprintf(&b, "\t\t%s %s `json:%q`\n", m.field, m.decoder, m.name)
-			inits = append(inits, fmt.Sprintf("%s: %s{To: &%s.%s}", m.field, m.decoder, recv, m.field))
+			init := fmt.Sprintf("%s: %s{To: &%s.%s}", m.field, m.decoder, recv, m.field)
+			if m.typesVar != "" {
+				init = fmt.Sprintf("%s: %s{To: &%s.%s, Types: %s}", m.field, m.decoder, recv, m.field, m.typesVar)
+			}
+			inits = append(inits, init)
 		}
 		fmt.Fprintf(&b, "\t}{%s}\n", strings.Join(inits, ", "))
 		fmt.Fprintf(&b, "\treturn typereg.DecodeInto(dec, %q, &w, &w.Type)\n", pc.BMMName)
@@ -202,17 +213,24 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 
 // jsonAnyMember is a member typed by the BMM root type Any, which canonical
 // JSON decodes through a decoder of its own: field is its Go field, name its
-// JSON member name and decoder the xmlschema type that decodes it.
+// JSON member name and decoder the xmlschema type that decodes it. A member
+// whose canonical XML takes a choice of shapes also names typesVar, the
+// package-level list of the BMM names of its shapes, types, which its decoder
+// holds the `_type` to.
 type jsonAnyMember struct {
 	field, name, decoder string
+	typesVar             string
+	types                []string
 }
 
-// jsonAnyMembers returns the members of pc typed by the BMM root type Any,
-// such as the AOM 1.4 `EXPR_LEAF.item`, in the order of fields, each with the
-// decoder that reads its canonical JSON: xmlschema.AnyJSON for a mandatory
-// member, held as a Go any, and xmlschema.OptionalAnyJSON for an optional one,
-// held as a *any. A member whose element takes a choice of shapes in canonical
-// XML ([xmlChoiceOf]) is not one of them.
+// jsonAnyMembers returns the members of pc typed by the BMM root type Any, in
+// the order of fields, each with the decoder that reads its canonical JSON. A
+// member whose element takes a choice of shapes in canonical XML
+// ([xmlChoiceOf]), such as the AOM 1.4 `ORDINAL.symbol`, decodes through
+// xmlschema.ChoiceJSON, which reads the class its `_type` names when that is
+// one of the shapes; any other, such as `EXPR_LEAF.item`, through
+// xmlschema.AnyJSON. A mandatory member is held as a Go any, an optional one,
+// decoded through the Optional form of either, as a *any.
 func jsonAnyMembers(plan *Plan, pc *PlannedClass, fields []emittedField) ([]jsonAnyMember, error) {
 	var out []jsonAnyMember
 	for _, ef := range fields {
@@ -224,12 +242,16 @@ func jsonAnyMembers(plan *Plan, pc *PlannedClass, fields []emittedField) ([]json
 		if err != nil {
 			return nil, err
 		}
-		if choice != nil {
-			continue
-		}
 		m := jsonAnyMember{field: FieldName(p.PropertyName()), name: p.PropertyName(), decoder: "xmlschema.AnyJSON"}
+		if choice != nil {
+			m.decoder = "xmlschema.ChoiceJSON"
+			m.typesVar = "jsonChoice" + pc.GoName + m.field
+			for _, shape := range choice.shapes {
+				m.types = append(m.types, shape.class)
+			}
+		}
 		if !p.IsMandatory {
-			m.decoder = "xmlschema.OptionalAnyJSON"
+			m.decoder = strings.Replace(m.decoder, "xmlschema.", "xmlschema.Optional", 1)
 		}
 		out = append(out, m)
 	}
