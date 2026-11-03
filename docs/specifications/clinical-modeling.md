@@ -815,8 +815,10 @@ var ErrInvalidInput error  // re-export; errors.Is works across the boundary
 var ErrPathNotFound error
 
 // Path lookup (§ Path lookup), methods of Compiled:
-//   Resolve(p template.Path, opts ...<resolve option>) (*CompiledNode, error)
-//   ValidatePath(p template.Path, opts ...<resolve option>) error
+//   Resolve(p template.Path, opts ...ResolveOption) (*CompiledNode, error)
+//   ValidatePath(p template.Path, opts ...ResolveOption) error
+type ResolveOption = <internal resolve option>
+func WithStrictPaths() ResolveOption           // a predicate-less segment with several children is ambiguous
 
 // Introspection tree — also public, for form generation, path discovery,
 // and custom mapping/validation. Aliases of the engine node types.
