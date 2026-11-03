@@ -4,6 +4,8 @@ package validation_test
 // two bounds of an interval when neither side is unbounded and the two are
 // strictly comparable as the RM defines is_strictly_comparable_to for their
 // type, by the RM's less_than for that type, and it orders no other pair. Two
+// DV_DATE, DV_TIME or DV_DATE_TIME values written with one zone designator,
+// or both with none, are ordered at the precision they share instead; two
 // DV_TIME or DV_DATE_TIME values in different time zones are ordered as
 // instants, partial values and leap seconds included, and one with a zone is
 // not ordered against one without. A pair that is not strictly comparable
@@ -117,13 +119,19 @@ func checkInOrder[T rm.DVOrdered](t *testing.T, name string, lower, upper T) {
 // Limits_consistent, for each bound type, in each interval form; the same
 // bounds in order do not. The order is the RM's less_than for the type:
 // magnitude for DV_COUNT, DV_QUANTITY and DV_PROPORTION (numerator over
-// denominator), value for DV_ORDINAL and DV_SCALE, and for the temporal
-// types the magnitude the REQ-123 parse gives (days since 0001-01-01 for a
-// date, seconds for the others). A DV_TIME's magnitude reads the clock, so
+// denominator), value for DV_ORDINAL and DV_SCALE, and for a duration the
+// magnitude the REQ-123 parse gives. Two dates, and two times or date-times
+// written with one zone designator or both with none, are ordered at the
+// precision they share, which
+// orders the full values here as their magnitudes do
+// ([TestValidateRM_REQ112_IntervalOrderAtSharedPrecision] pins partial
+// values); Value holds their magnitudes (days since 0001-01-01 for a date,
+// seconds for the others). A DV_TIME's magnitude reads the clock, so
 // two DV_TIME values in different time zones are ordered as instants
 // instead, each by its magnitude less its zone's offset from UTC; a
 // DV_DATE_TIME's magnitude reads a zoned value in UTC already, so it orders
-// two zoned date-times as instants. Partial values and leap seconds are
+// two date-times in different zones as instants. Partial values and leap
+// seconds are
 // included, and Value holds the magnitudes read in UTC. The floor does not
 // compare units_system, so a same-units pair is ordered whatever its
 // units_system.
