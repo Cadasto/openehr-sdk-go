@@ -14,7 +14,8 @@ import (
 // The targets below read a Hash member as the generated decoders do
 // (REQ-176 § Round trip): one element per entry, the key of a String value
 // in the entry's `id` attribute, the key of a class value in its `id`
-// attribute or else read from the decoded value.
+// attribute or else read from the decoded value, and one mark per member,
+// false as the element opens.
 
 // entryItem is a class value of a Hash, a cut-down RESOURCE_DESCRIPTION_ITEM:
 // its language and its purpose are mandatory.
@@ -75,6 +76,7 @@ func (h *entryHolder) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) err
 	if _, err := Enter(dec, start, entryHolderClass); err != nil {
 		return err
 	}
+	var author, details, parts bool
 	for {
 		tok, err := dec.Token()
 		if err != nil {
@@ -84,15 +86,15 @@ func (h *entryHolder) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) err
 		case xml.StartElement:
 			switch LocalName(tk.Name) {
 			case "author":
-				if err := DecodeEntry(dec, &tk, "id", &h.Author); err != nil {
+				if err := DecodeEntry(dec, &tk, "id", &h.Author, &author); err != nil {
 					return err
 				}
 			case "details":
-				if err := DecodeEntryKeyedBy(dec, &tk, func(v *entryItem) string { return v.Language }, &h.Details); err != nil {
+				if err := DecodeEntryKeyedBy(dec, &tk, func(v *entryItem) string { return v.Language }, &h.Details, &details); err != nil {
 					return err
 				}
 			case "parts":
-				if err := DecodeEntry(dec, &tk, "id", &h.Parts); err != nil {
+				if err := DecodeEntry(dec, &tk, "id", &h.Parts, &parts); err != nil {
 					return err
 				}
 			default:
@@ -336,6 +338,7 @@ func (h *countHolder) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) err
 	if _, err := Enter(dec, start, countHolderClass); err != nil {
 		return err
 	}
+	var author bool
 	for {
 		tok, err := dec.Token()
 		if err != nil {
@@ -345,7 +348,7 @@ func (h *countHolder) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) err
 		case xml.StartElement:
 			switch LocalName(tk.Name) {
 			case "author":
-				if err := DecodeEntry(dec, &tk, "id", &h.Author); err != nil {
+				if err := DecodeEntry(dec, &tk, "id", &h.Author, &author); err != nil {
 					return err
 				}
 			case "count":
@@ -373,6 +376,37 @@ func TestREQ176_EntryKeysOfASecondDecode(t *testing.T) {
 	err := Unmarshal([]byte(doc), new(countHolder), nil)
 	if de, ok := errors.AsType[*typereg.DecodeError](err); !ok || de == nil || de.Path != "/counted[1]/count[1]" || !IsPrimitiveFailure(err) {
 		t.Errorf("Unmarshal = %v; want the primitive failure of /counted[1]/count[1]", err)
+	}
+}
+
+// TestREQ176_REQ170_EntriesStartEmptyAtTheFirstEntry pins that a Hash
+// member's map starts empty at the element's first entry of the member, in
+// every mode: a value whose members already hold entries, decoded into from a
+// document that holds one of their keys once, decodes, and each member holds
+// the document's entries alone, as a value decoded into twice holds the
+// second document's.
+func TestREQ176_REQ170_EntriesStartEmptyAtTheFirstEntry(t *testing.T) {
+	doc := `<holder ` + xmlnsDecl + `><author id="a">A2</author>` +
+		`<details><language>en</language><purpose>p2</purpose></details>` +
+		`<parts id="x"><language>fr</language><purpose>r2</purpose></parts></holder>`
+	want := entryHolder{
+		Author:  map[string]string{"a": "A2"},
+		Details: map[string]entryItem{"en": {Language: "en", Purpose: "p2"}},
+		Parts:   map[string]entryItem{"x": {Language: "fr", Purpose: "r2"}},
+	}
+	for mode, decode := range entryModes {
+		got := entryHolder{
+			Author:  map[string]string{"a": "A1", "b": "B1"},
+			Details: map[string]entryItem{"en": {Language: "en", Purpose: "p1"}, "de": {Language: "de", Purpose: "q1"}},
+			Parts:   map[string]entryItem{"x": {Language: "fr", Purpose: "r1"}, "y": {Language: "it", Purpose: "s1"}},
+		}
+		if err := decode(doc, &got); err != nil {
+			t.Errorf("%s decode into a value holding entries = %v; want nil", mode, err)
+			continue
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("%s decode into a value holding entries = %#v; want %#v", mode, got, want)
+		}
 	}
 }
 

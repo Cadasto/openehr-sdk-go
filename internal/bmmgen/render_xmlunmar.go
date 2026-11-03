@@ -94,7 +94,10 @@ import (
 // A Hash<K,V> member reads each element of its name as one entry, through
 // `xmlunmatched.DecodeEntry`, which takes the key attribute off before the
 // value is read, or `xmlunmatched.DecodeEntryKeyedBy`, which reads the key
-// from the value, its language code ([xmlHashOf]). A Hash the codec does not
+// from the value, its language code ([xmlHashOf]). The method keeps one mark
+// per Hash member, false as the element opens, which it hands the runtime
+// with each entry, so the member's map starts empty at the element's first
+// entry of it in every decode ([xmlHashMarks]). A Hash the codec does not
 // model, a Hash of Hashes, is not decoded: its element goes to
 // `xmlunmatched.SkipUnmatched` as one item of unmatched content, so it is
 // skipped by default, reported or refused on request, and the receiver field
@@ -236,12 +239,13 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	b.WriteString("// sentinels inside *canxml.DecodeError for errors.Is / errors.As.\n")
 	b.WriteString("// Members the class's ITS-XML schema type declares as XML attributes\n")
 	b.WriteString("// are read from _start.Attr.\n")
-	hashes, err := hasXMLHash(plan, fields)
+	marks, err := xmlHashMarks(plan, fields)
 	if err != nil {
 		return "", err
 	}
-	if hashes {
-		b.WriteString("// A Hash member reads each element of its name as one entry.\n")
+	if len(marks) > 0 {
+		b.WriteString("// A Hash member reads each element of its name as one entry, into a\n")
+		b.WriteString("// map that starts empty at the first entry.\n")
 	}
 	b.WriteString("// Content the method does not read is unmatched: it is skipped, or\n")
 	b.WriteString("// reported or refused under canxml.WithUnmatched and canxml.WithStrict.\n")
@@ -269,6 +273,10 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	// Read the attribute members from _start.Attr.
 	for _, name := range desc.attrs {
 		b.WriteString(unmarshalXMLAttribute(recv, FieldName(name), name))
+	}
+	if len(marks) > 0 {
+		b.WriteString("\t// Whether the element has had an entry of each Hash member.\n")
+		fmt.Fprintf(&b, "\tvar %s bool\n", strings.Join(marks, ", "))
 	}
 	if flagged {
 		b.WriteString("\tvar _seen intervalFlagsSeen\n")

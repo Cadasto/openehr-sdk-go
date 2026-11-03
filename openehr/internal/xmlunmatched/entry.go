@@ -21,13 +21,17 @@ import (
 // attribute, or whose key an earlier entry of the member holds, is refused
 // ([putEntry]).
 //
+// begun is the decoder's mark of the member in the element being decoded:
+// false until the element's first entry of the member, which starts m empty
+// and sets it ([beginEntry]).
+//
 // For the missing-member report ([Tracker.ReportMissing]), an entry is a value
 // of the member whatever its text, and the members inside a class value are
 // named under the entry's key.
-func DecodeEntry[V any](dec *xml.Decoder, start *xml.StartElement, attr string, m *map[string]V) error {
+func DecodeEntry[V any](dec *xml.Decoder, start *xml.StartElement, attr string, m *map[string]V, begun *bool) error {
 	key, entry, keyed := withoutKey(start, attr)
 	setEntryKey(dec, func() string { return key })
-	t, at := beginEntry(dec, m)
+	t, at := beginEntry(dec, m, begun)
 	var v V
 	if err := decodeEntryValue(dec, &entry, &v); err != nil {
 		return err
@@ -41,15 +45,16 @@ func DecodeEntry[V any](dec *xml.Decoder, start *xml.StartElement, attr string, 
 // value. It allocates m when m is nil. start must be the token the decoder
 // read last. An entry whose value has an empty key, as a language with no
 // code has, or whose key an earlier entry of the member holds, is refused
-// ([putEntry]).
+// ([putEntry]). begun is the decoder's mark of the member, as for
+// [DecodeEntry].
 //
 // For the missing-member report ([Tracker.ReportMissing]), the members inside
 // the value are named under the key keyOf reads from the value as decoded so
 // far, which holds the key once the element that carries it has been read.
-func DecodeEntryKeyedBy[V any](dec *xml.Decoder, start *xml.StartElement, keyOf func(*V) string, m *map[string]V) error {
+func DecodeEntryKeyedBy[V any](dec *xml.Decoder, start *xml.StartElement, keyOf func(*V) string, m *map[string]V, begun *bool) error {
 	var v V
 	setEntryKey(dec, func() string { return keyOf(&v) })
-	t, at := beginEntry(dec, m)
+	t, at := beginEntry(dec, m, begun)
 	if err := decodeEntryValue(dec, start, &v); err != nil {
 		return err
 	}
@@ -69,23 +74,24 @@ func withoutKey(start *xml.StartElement, attr string) (string, xml.StartElement,
 	return start.Attr[i].Value, entry, true
 }
 
-// beginEntry returns the tracker of dec, nil for an untracked decode, and the
-// place of the entry the decoder read last in a tracked one, before the
-// entry's value is read. The first entry of the member in the element that
-// holds it starts m afresh in a tracked decode, so that a value decoded a
-// second time, as [Unmarshal] decodes a document again to name a failure's
-// path, holds no entry of the first decode for a key to repeat. An untracked
-// decode, which knows no place, keeps m as it is.
-func beginEntry[V any](dec *xml.Decoder, m *map[string]V) (*Tracker, place) {
+// beginEntry starts m empty at the element's first entry of the member, the
+// one begun does not mark yet, and marks it, in every decode: the member then
+// holds the entries of this element alone, so a key repeats only within the
+// element, whatever the value held before. That covers a value a caller
+// decodes into twice and the second decode [Unmarshal] runs of a document to
+// name a failure's path. beginEntry returns the tracker of dec, nil for an
+// untracked decode, and the place of the entry the decoder read last in a
+// tracked one, before the entry's value is read.
+func beginEntry[V any](dec *xml.Decoder, m *map[string]V, begun *bool) (*Tracker, place) {
+	if !*begun {
+		*begun = true
+		*m = nil
+	}
 	t := trackerOf(dec)
 	if t == nil {
 		return nil, place{}
 	}
-	at := t.here()
-	if at.pos == 1 && len(*m) > 0 {
-		*m = nil
-	}
-	return t, at
+	return t, t.here()
 }
 
 // setEntryKey records key as the way to read the key of the entry the decoder

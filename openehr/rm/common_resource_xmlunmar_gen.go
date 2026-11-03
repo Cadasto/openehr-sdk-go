@@ -28,7 +28,8 @@ var xmlClassResourceDescription = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
-// A Hash member reads each element of its name as one entry.
+// A Hash member reads each element of its name as one entry, into a
+// map that starts empty at the first entry.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (r *ResourceDescription) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -37,6 +38,8 @@ func (r *ResourceDescription) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEl
 	} else if _fresh {
 		*r = ResourceDescription{}
 	}
+	// Whether the element has had an entry of each Hash member.
+	var _begunOriginalAuthor, _begunOtherDetails, _begunDetails bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -46,7 +49,7 @@ func (r *ResourceDescription) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEl
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "original_author":
-				if _err := xmlunmatched.DecodeEntry(_dec, &_t, "id", &r.OriginalAuthor); _err != nil {
+				if _err := xmlunmatched.DecodeEntry(_dec, &_t, "id", &r.OriginalAuthor, &_begunOriginalAuthor); _err != nil {
 					return _err
 				}
 			case "other_contributors":
@@ -69,7 +72,7 @@ func (r *ResourceDescription) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEl
 				if r.OtherDetails == nil {
 					r.OtherDetails = new(map[string]string)
 				}
-				if _err := xmlunmatched.DecodeEntry(_dec, &_t, "id", r.OtherDetails); _err != nil {
+				if _err := xmlunmatched.DecodeEntry(_dec, &_t, "id", r.OtherDetails, &_begunOtherDetails); _err != nil {
 					return _err
 				}
 			case "parent_resource":
@@ -79,7 +82,7 @@ func (r *ResourceDescription) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEl
 				}
 				r.ParentResource = _v
 			case "details":
-				if _err := xmlunmatched.DecodeEntryKeyedBy(_dec, &_t, func(_v *ResourceDescriptionItem) string { return _v.Language.CodeString }, &r.Details); _err != nil {
+				if _err := xmlunmatched.DecodeEntryKeyedBy(_dec, &_t, func(_v *ResourceDescriptionItem) string { return _v.Language.CodeString }, &r.Details, &_begunDetails); _err != nil {
 					return _err
 				}
 			default:
@@ -111,7 +114,8 @@ var xmlClassResourceDescriptionItem = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
-// A Hash member reads each element of its name as one entry.
+// A Hash member reads each element of its name as one entry, into a
+// map that starts empty at the first entry.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (r *ResourceDescriptionItem) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -120,6 +124,8 @@ func (r *ResourceDescriptionItem) UnmarshalXML(_dec *xml.Decoder, _start xml.Sta
 	} else if _fresh {
 		*r = ResourceDescriptionItem{}
 	}
+	// Whether the element has had an entry of each Hash member.
+	var _begunOriginalResourceURI, _begunOtherDetails bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -164,14 +170,14 @@ func (r *ResourceDescriptionItem) UnmarshalXML(_dec *xml.Decoder, _start xml.Sta
 				if r.OriginalResourceURI == nil {
 					r.OriginalResourceURI = new(map[string]string)
 				}
-				if _err := xmlunmatched.DecodeEntry(_dec, &_t, "id", r.OriginalResourceURI); _err != nil {
+				if _err := xmlunmatched.DecodeEntry(_dec, &_t, "id", r.OriginalResourceURI, &_begunOriginalResourceURI); _err != nil {
 					return _err
 				}
 			case "other_details":
 				if r.OtherDetails == nil {
 					r.OtherDetails = new(map[string]string)
 				}
-				if _err := xmlunmatched.DecodeEntry(_dec, &_t, "id", r.OtherDetails); _err != nil {
+				if _err := xmlunmatched.DecodeEntry(_dec, &_t, "id", r.OtherDetails, &_begunOtherDetails); _err != nil {
 					return _err
 				}
 			default:
@@ -202,7 +208,8 @@ var xmlClassTranslationDetails = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
-// A Hash member reads each element of its name as one entry.
+// A Hash member reads each element of its name as one entry, into a
+// map that starts empty at the first entry.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TranslationDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -211,6 +218,8 @@ func (t *TranslationDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 	} else if _fresh {
 		*t = TranslationDetails{}
 	}
+	// Whether the element has had an entry of each Hash member.
+	var _begunAuthor, _begunOtherDetails bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -224,7 +233,7 @@ func (t *TranslationDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 					return _err
 				}
 			case "author":
-				if _err := xmlunmatched.DecodeEntry(_dec, &_t, "id", &t.Author); _err != nil {
+				if _err := xmlunmatched.DecodeEntry(_dec, &_t, "id", &t.Author, &_begunAuthor); _err != nil {
 					return _err
 				}
 			case "accreditation":
@@ -237,7 +246,7 @@ func (t *TranslationDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 				if t.OtherDetails == nil {
 					t.OtherDetails = new(map[string]string)
 				}
-				if _err := xmlunmatched.DecodeEntry(_dec, &_t, "id", t.OtherDetails); _err != nil {
+				if _err := xmlunmatched.DecodeEntry(_dec, &_t, "id", t.OtherDetails, &_begunOtherDetails); _err != nil {
 					return _err
 				}
 			default:

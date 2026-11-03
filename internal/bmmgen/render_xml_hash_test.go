@@ -89,7 +89,8 @@ func TestREQ176_XMLHashShapes(t *testing.T) {
 // RESOURCE_DESCRIPTION's Hash members: entries written in ascending key order,
 // a String value under an `id` attribute and the details with none; and each
 // entry decoded through the runtime's entry helper, under its `id` or under
-// the value's language code.
+// the value's language code, with the member's mark, declared once before the
+// token loop so it is false as the element opens.
 func TestREQ176_XMLHashCodecOfResourceDescription(t *testing.T) {
 	plan := buildPlanWithITSXML(t, TargetRM)
 	enc, dec := renderedXMLCodec(t, plan, "RESOURCE_DESCRIPTION")
@@ -107,9 +108,9 @@ func TestREQ176_XMLHashCodecOfResourceDescription(t *testing.T) {
 		}
 	}
 	for prop, want := range map[string]string{
-		"original_author": `xmlunmatched.DecodeEntry(_dec, &_t, "id", &r.OriginalAuthor)`,
-		"other_details":   `xmlunmatched.DecodeEntry(_dec, &_t, "id", r.OtherDetails)`,
-		"details":         `xmlunmatched.DecodeEntryKeyedBy(_dec, &_t, func(_v *ResourceDescriptionItem) string { return _v.Language.CodeString }, &r.Details)`,
+		"original_author": `xmlunmatched.DecodeEntry(_dec, &_t, "id", &r.OriginalAuthor, &_begunOriginalAuthor)`,
+		"other_details":   `xmlunmatched.DecodeEntry(_dec, &_t, "id", r.OtherDetails, &_begunOtherDetails)`,
+		"details":         `xmlunmatched.DecodeEntryKeyedBy(_dec, &_t, func(_v *ResourceDescriptionItem) string { return _v.Language.CodeString }, &r.Details, &_begunDetails)`,
 	} {
 		if arm := xmlCaseArm(dec, prop); !strings.Contains(arm, want) {
 			t.Errorf("RESOURCE_DESCRIPTION decoder arm for %s lacks %q:\n%s", prop, want, arm)
@@ -117,6 +118,10 @@ func TestREQ176_XMLHashCodecOfResourceDescription(t *testing.T) {
 	}
 	if arm := xmlCaseArm(dec, "other_details"); !strings.Contains(arm, "r.OtherDetails = new(map[string]string)") {
 		t.Errorf("RESOURCE_DESCRIPTION decoder arm for the optional other_details allocates no map:\n%s", arm)
+	}
+	const marks = "var _begunOriginalAuthor, _begunOtherDetails, _begunDetails bool\n\tfor {"
+	if !strings.Contains(dec, marks) {
+		t.Errorf("RESOURCE_DESCRIPTION decoder lacks %q, the marks declared before the token loop:\n%s", marks, dec)
 	}
 }
 
@@ -157,7 +162,7 @@ func TestREQ176_XMLHashKeyedByAttribute(t *testing.T) {
 	if want := `_e.EncodeElement(&_v, xml.StartElement{Name: xml.Name{Local: "details"}, Attr: []xml.Attr{{Name: xml.Name{Local: "id"}, Value: _k}}})`; !strings.Contains(enc, want) {
 		t.Errorf("RESOURCE_DESCRIPTION encoder lacks %q:\n%s", want, enc)
 	}
-	if want := `xmlunmatched.DecodeEntry(_dec, &_t, "id", &r.Details)`; !strings.Contains(xmlCaseArm(dec, "details"), want) {
+	if want := `xmlunmatched.DecodeEntry(_dec, &_t, "id", &r.Details, &_begunDetails)`; !strings.Contains(xmlCaseArm(dec, "details"), want) {
 		t.Errorf("RESOURCE_DESCRIPTION decoder arm for details lacks %q:\n%s", want, xmlCaseArm(dec, "details"))
 	}
 }

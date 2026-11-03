@@ -29,7 +29,8 @@ var xmlClassArchetype = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
-// A Hash member reads each element of its name as one entry.
+// A Hash member reads each element of its name as one entry, into a
+// map that starts empty at the first entry.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *Archetype) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -38,6 +39,8 @@ func (a *Archetype) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 	} else if _fresh {
 		*a = Archetype{}
 	}
+	// Whether the element has had an entry of each Hash member.
+	var _begunTranslations bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -60,7 +63,7 @@ func (a *Archetype) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 				if a.Translations == nil {
 					a.Translations = new(map[string]rm.TranslationDetails)
 				}
-				if _err := xmlunmatched.DecodeEntryKeyedBy(_dec, &_t, func(_v *rm.TranslationDetails) string { return _v.Language.CodeString }, a.Translations); _err != nil {
+				if _err := xmlunmatched.DecodeEntryKeyedBy(_dec, &_t, func(_v *rm.TranslationDetails) string { return _v.Language.CodeString }, a.Translations, &_begunTranslations); _err != nil {
 					return _err
 				}
 			case "description":

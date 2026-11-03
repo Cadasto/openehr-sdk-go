@@ -304,7 +304,17 @@
 // key is never unmatched content; any other attribute of the entry, and a
 // child element inside a String value, is. An empty or nil `Hash` writes no
 // element, as an empty list does, and a mandatory one with no element is
-// missing ([WithMissing]). Two entries with the same key keep the later one.
+// missing ([WithMissing]).
+//
+// A member's map starts empty at the element's first entry of it, in every
+// mode, so a key repeats only within the element, and a value decoded into
+// twice holds the second document's entries. Decode refuses an entry whose
+// key an earlier entry of the member holds, and an entry with no key, no key
+// attribute or no language code, with [ErrInvalidShape]: the error names the
+// entry's path and not its key. The encoder refuses, with [ErrInvalidShape],
+// an entry keyed by language held under a key other than its value's
+// language code, the empty key included: decode would not read it back under
+// that key.
 //
 // # Any members
 //

@@ -222,3 +222,72 @@ func TestREQ176_REQ056_LanguageKeyedEntryUnderAnotherKeyRefused(t *testing.T) {
 		})
 	}
 }
+
+// descriptionDoc returns a RESOURCE_DESCRIPTION, an OPT's description, whose
+// three Hash members, original_author, the optional other_details and details,
+// keyed by language, each hold one entry: the author named author, the detail
+// x holding detail and the English item whose purpose is purpose.
+func descriptionDoc(author, detail, purpose string) string {
+	return `<description` + nsOpenEHR + `>` +
+		`<original_author id="name">` + author + `</original_author>` +
+		`<lifecycle_state>published</lifecycle_state>` +
+		`<other_details id="x">` + detail + `</other_details>` +
+		`<details><language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>` +
+		`<purpose>` + purpose + `</purpose></details>` +
+		`</description>`
+}
+
+// TestREQ176_REQ170_HashDecodedIntoTwice pins that a Hash member's map starts
+// empty at the element's first entry of the member, in every mode of
+// canxml.Unmarshal and of a canxml.Decoder: a RESOURCE_DESCRIPTION whose Hash
+// members already hold entries, decoded into from a document that holds one
+// of their keys once, decodes, and each member holds the document's entries
+// alone; a Decoder that decodes two values of a stream into one value leaves
+// it holding the second's entries.
+func TestREQ176_REQ170_HashDecodedIntoTwice(t *testing.T) {
+	doc := descriptionDoc("B", "d2", "p2")
+	var want rm.ResourceDescription
+	if err := canxml.Unmarshal([]byte(doc), &want, canxml.WithStrict()); err != nil {
+		t.Fatalf("canxml.Unmarshal(%s, strict) = %v; want nil", doc, err)
+	}
+	filled := func() rm.ResourceDescription {
+		item := func(code, purpose string) rm.ResourceDescriptionItem {
+			return rm.ResourceDescriptionItem{
+				Language: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}, CodeString: code},
+				Purpose:  purpose,
+			}
+		}
+		return rm.ResourceDescription{
+			OriginalAuthor: map[string]string{"name": "A", "email": "a@example.org"},
+			OtherDetails:   &map[string]string{"x": "d1", "y": "e1"},
+			Details:        map[string]rm.ResourceDescriptionItem{"en": item("en", "p1"), "de": item("de", "q1")},
+		}
+	}
+	var reported []string
+	for mode, opts := range decodeModes(&reported) {
+		got := filled()
+		if err := canxml.Unmarshal([]byte(doc), &got, opts...); err != nil {
+			t.Errorf("canxml.Unmarshal(%s) into a value holding entries = %v; want nil", mode, err)
+		} else if !reflect.DeepEqual(got, want) {
+			t.Errorf("canxml.Unmarshal(%s) into a value holding entries = %#v; want %#v", mode, got, want)
+		}
+		got = filled()
+		if err := canxml.NewDecoder(strings.NewReader(doc), opts...).Decode(&got); err != nil {
+			t.Errorf("Decoder.Decode(%s) into a value holding entries = %v; want nil", mode, err)
+		} else if !reflect.DeepEqual(got, want) {
+			t.Errorf("Decoder.Decode(%s) into a value holding entries = %#v; want %#v", mode, got, want)
+		}
+		var twice rm.ResourceDescription
+		dec := canxml.NewDecoder(strings.NewReader(descriptionDoc("A", "d1", "p1")+doc), opts...)
+		if err := dec.Decode(&twice); err != nil {
+			t.Errorf("Decoder.Decode(%s) of the first value of the stream = %v; want nil", mode, err)
+		} else if err := dec.Decode(&twice); err != nil {
+			t.Errorf("Decoder.Decode(%s) of the second value of the stream into the first = %v; want nil", mode, err)
+		} else if !reflect.DeepEqual(twice, want) {
+			t.Errorf("Decoder.Decode(%s) of two values into one = %#v; want the second, %#v", mode, twice, want)
+		}
+	}
+	if len(reported) > 0 {
+		t.Errorf("the report option reported %q; want nothing", reported)
+	}
+}

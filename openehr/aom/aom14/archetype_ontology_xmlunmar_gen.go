@@ -97,7 +97,8 @@ var xmlClassArchetypeTerm = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
-// A Hash member reads each element of its name as one entry.
+// A Hash member reads each element of its name as one entry, into a
+// map that starts empty at the first entry.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *ArchetypeTerm) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -112,6 +113,8 @@ func (a *ArchetypeTerm) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 			break
 		}
 	}
+	// Whether the element has had an entry of each Hash member.
+	var _begunItems bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -125,7 +128,7 @@ func (a *ArchetypeTerm) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 					return _err
 				}
 			case "items":
-				if _err := xmlunmatched.DecodeEntry(_dec, &_t, "id", &a.Items); _err != nil {
+				if _err := xmlunmatched.DecodeEntry(_dec, &_t, "id", &a.Items, &_begunItems); _err != nil {
 					return _err
 				}
 			default:

@@ -120,6 +120,31 @@ func xmlHashOf(plan *Plan, ef emittedField) (shape *xmlHash, isHash bool, err er
 	return shape, true, nil
 }
 
+// xmlHashMarks returns the names of the local variables a generated decoder
+// keeps for the Hash members of fields the canonical-XML codec reads one
+// element per entry, one per member in the order of fields: each marks that
+// the element has had an entry of the member, so the runtime starts the
+// member's map empty at the first.
+func xmlHashMarks(plan *Plan, fields []emittedField) ([]string, error) {
+	var marks []string
+	for _, ef := range fields {
+		shape, _, err := xmlHashOf(plan, ef)
+		if err != nil {
+			return nil, err
+		}
+		if shape != nil {
+			marks = append(marks, xmlHashMark(FieldName(ef.Prop.PropertyName())))
+		}
+	}
+	return marks, nil
+}
+
+// xmlHashMark returns the name of the local variable that marks the Hash
+// member held in the Go field field ([xmlHashMarks]).
+func xmlHashMark(field string) string {
+	return "_begun" + field
+}
+
 // hasXMLHash reports whether one of fields is a Hash member the
 // canonical-XML codec writes one element per entry.
 func hasXMLHash(plan *Plan, fields []emittedField) (bool, error) {
@@ -215,8 +240,9 @@ func marshalXMLHash(recv, field, elem string, h *xmlHash) string {
 // unmarshalXMLHash emits the decode case of the Hash member field, held as h
 // says: each element named elem is one entry, which the runtime decodes and
 // adds to the map under its key, taking the key attribute off first or
-// reading the key from the value. An optional member's map is allocated on the
-// first entry.
+// reading the key from the value. The member's mark ([xmlHashMarks]) goes with
+// each entry, so the runtime starts the map empty at the element's first. An
+// optional member's map is allocated on the first entry.
 func unmarshalXMLHash(recv, field, elem string, h *xmlHash) string {
 	m := "&" + recv + "." + field
 	alloc := ""
@@ -224,9 +250,10 @@ func unmarshalXMLHash(recv, field, elem string, h *xmlHash) string {
 		m = recv + "." + field
 		alloc = fmt.Sprintf("\t\t\t\tif %s == nil {\n\t\t\t\t\t%s = new(map[string]%s)\n\t\t\t\t}\n", m, m, h.valueType)
 	}
-	call := fmt.Sprintf("xmlunmatched.DecodeEntry(_dec, &_t, %q, %s)", h.keyAttr, m)
+	mark := "&" + xmlHashMark(field)
+	call := fmt.Sprintf("xmlunmatched.DecodeEntry(_dec, &_t, %q, %s, %s)", h.keyAttr, m, mark)
 	if h.keyAttr == "" {
-		call = fmt.Sprintf("xmlunmatched.DecodeEntryKeyedBy(_dec, &_t, func(_v *%s) string { return _v.%s }, %s)", h.valueType, h.languageKey, m)
+		call = fmt.Sprintf("xmlunmatched.DecodeEntryKeyedBy(_dec, &_t, func(_v *%s) string { return _v.%s }, %s, %s)", h.valueType, h.languageKey, m, mark)
 	}
 	return fmt.Sprintf("\t\t\tcase %q:\n%s\t\t\t\tif _err := %s; _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n", elem, alloc, call)
 }
