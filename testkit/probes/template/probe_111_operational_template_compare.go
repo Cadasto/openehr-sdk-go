@@ -234,7 +234,8 @@ func probe111Rewrite(el *probe111Element) {
 // probe111Normalise applies the comparison's normalisation to both sides
 // (REQ-176 § Round trip): the root's `xsi:type` set aside, white space
 // between elements set aside, absent interval flags written with their
-// defaults, and each Hash member's entries in the order of their keys.
+// defaults, each Hash member's entries in the order of their keys, and a
+// SCALE's value before its symbol.
 func probe111Normalise(el *probe111Element, root bool) {
 	if root {
 		delete(el.attrs, probe111XSIType)
@@ -244,8 +245,29 @@ func probe111Normalise(el *probe111Element, root bool) {
 	}
 	probe111DefaultIntervalFlags(el)
 	probe111SortHashEntries(el)
+	probe111ScaleValueFirst(el)
 	for _, c := range el.children {
 		probe111Normalise(c, false)
+	}
+}
+
+// probe111ScaleValueFirst puts the `value` of each SCALE that el, a
+// C_DV_SCALE, holds in `assumed_value` or `list` before its `symbol`.
+// OpenehrProfile.xsd admits the two in either order, Archetype Designer
+// writing the symbol first, and the encoder writes the value first, the
+// order of an ORDINAL and of the RM's DV_SCALE.
+func probe111ScaleValueFirst(el *probe111Element) {
+	if el.attrs[probe111XSIType] != "{"+probe111OpenEHRNamespace+"}C_DV_SCALE" {
+		return
+	}
+	for _, c := range el.children {
+		if c.name != probe111OpenEHR("assumed_value") && c.name != probe111OpenEHR("list") {
+			continue
+		}
+		n := len(c.children)
+		if n >= 2 && c.children[n-2].name == probe111OpenEHR("symbol") && c.children[n-1].name == probe111OpenEHR("value") {
+			c.children[n-2], c.children[n-1] = c.children[n-1], c.children[n-2]
+		}
 	}
 }
 

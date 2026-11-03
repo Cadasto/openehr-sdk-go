@@ -179,6 +179,27 @@ func TestProbe111CompareDocuments(t *testing.T) {
 			want:      `/template[1]/symbol[1]/value[1]: the re-encoded document has defining_code there`,
 		},
 		{
+			name: "a SCALE's value and symbol compare in either order",
+			input: probe111Doc("", `<children xsi:type="C_DV_SCALE">`+
+				`<assumed_value><symbol><defining_code/></symbol><value>2</value></assumed_value>`+
+				`<list><normal_status/><symbol><defining_code/></symbol><value>1.5</value></list></children>`),
+			reEncoded: probe111Doc("", `<children xsi:type="C_DV_SCALE">`+
+				`<assumed_value><value>2</value><symbol><defining_code/></symbol></assumed_value>`+
+				`<list><normal_status/><value>1.5</value><symbol><defining_code/></symbol></list></children>`),
+		},
+		{
+			name:      "a SCALE's value still compares in either order",
+			input:     probe111Doc("", `<children xsi:type="C_DV_SCALE"><list><symbol><defining_code/></symbol><value>1.5</value></list></children>`),
+			reEncoded: probe111Doc("", `<children xsi:type="C_DV_SCALE"><list><value>2.5</value><symbol><defining_code/></symbol></list></children>`),
+			want:      `/template[1]/children[1]/list[1]/value[1]: text "1.5", re-encoded as "2.5"`,
+		},
+		{
+			name:      "an ORDINAL's value and symbol keep their order",
+			input:     probe111Doc("", `<children xsi:type="C_DV_ORDINAL"><list><symbol><defining_code/></symbol><value>1</value></list></children>`),
+			reEncoded: probe111Doc("", `<children xsi:type="C_DV_ORDINAL"><list><value>1</value><symbol><defining_code/></symbol></list></children>`),
+			want:      `/template[1]/children[1]/list[1]/symbol[1]: the re-encoded document has value there`,
+		},
+		{
 			name:      "an attribute the re-encoded document adds differs",
 			input:     probe111Doc("", `<term_definitions code="at0000"/>`),
 			reEncoded: probe111Doc("", `<term_definitions code="at0000" language="en"/>`),

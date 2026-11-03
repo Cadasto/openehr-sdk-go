@@ -118,9 +118,9 @@ func probe111ParseRatchet(text string) ([]Probe111SchemaRatchetEntry, error) {
 // interval that leaves out a boundary flag compares as one that writes the
 // flag's default (an absent `*_unbounded` is true where its side carries no
 // bound, an absent `*_included` true where its side is bounded); an
-// `xsi:type` compares as the qualified name it denotes; and an `xsi:type`
-// the re-encoded element does not carry is set aside, the root element's
-// among them. On body alone it first applies the
+// `xsi:type` compares as the qualified name it denotes; a SCALE's `value`
+// and `symbol` compare in either order; and an `xsi:type` the re-encoded
+// element does not carry is set aside, the root element's among them. On body alone it first applies the
 // rewrites the encoder makes: `match_negated` removed, a `timezone_validity`
 // or `operator` word written as its integer code, `T_ARCHETYPE_ROOT` written
 // as `C_ARCHETYPE_ROOT`, and the empty `value` of an ORDINAL or SCALE
