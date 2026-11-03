@@ -223,9 +223,10 @@ type intervalOrder struct {
 	// magnitudes are the two values the order compares, lower first, and
 	// for two dates, times or date-times ordered at the precision they
 	// share, which compares no single value, their magnitudes, a zoned
-	// date-time's read in UTC. A strict order at that precision gives the
-	// same strict order of the magnitudes, so they show the inversion the
-	// order reports.
+	// date-time's read in UTC. They are reported as read and need not show
+	// the inversion: two values closer than a float64 magnitude can tell
+	// apart read equal, and a leap second, which the magnitude counts into
+	// the next minute, can put 2021-12-31T23:59:60.5 above 2022-01-01.
 	magnitudes [2]float64
 }
 

@@ -689,8 +689,9 @@ func (f *findings) checkElementNullFlavour(value any, path issuePath) {
 //
 // Each Detail names the rule and the type of the bounds, never the bounds;
 // for an out-of-order pair the two bounds' magnitudes are carried in
-// Issue.Value, lower first, as a [2]float64 (REQ-168), each in UTC for two
-// values ordered as instants. rmType is the node's RM type, which the flag
+// Issue.Value, lower first, as a [2]float64 (REQ-168): each the REQ-123
+// magnitude, which reads a zoned date-time in UTC whatever its designator,
+// and each read in UTC for two times ordered as instants. rmType is the node's RM type, which the flag
 // check names. Interval.Limits_comparable, which BASE declares and
 // DV_INTERVAL.Limits_consistent restates, is not evaluated on the BASE
 // intervals ([intervalBounds] reads no Proper_interval or Point_interval),
