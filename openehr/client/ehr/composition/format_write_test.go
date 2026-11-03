@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -571,6 +572,9 @@ func TestWriteFormatRefusals(t *testing.T) {
 				if !errors.Is(err, transport.ErrInvalidConfig) {
 					t.Errorf("%s error = %v, want ErrInvalidConfig", op.name, err)
 				}
+				if _, ok := errors.AsType[*composition.EncodeError](err); ok {
+					t.Errorf("%s error = %v, want a refused option, not an *EncodeError", op.name, err)
+				}
 				if out != nil || meta != nil {
 					t.Errorf("%s returned (%+v, %+v), want nil, nil", op.name, out, meta)
 				}
@@ -836,22 +840,47 @@ func TestWithFormatLastWins(t *testing.T) {
 }
 
 // TestWriteSerialiseFailureSendsNothing pins REQ-173: a composition the
-// codec cannot serialise fails the write before any request. The FLAT and
-// STRUCTURED codecs refuse an EVENT_CONTEXT setting that carries a value but
-// no code.
+// codec cannot serialise fails the write before any request, as an
+// *EncodeError that names the format asked for and wraps the codec's own
+// error, never as ErrInvalidConfig. The FLAT and STRUCTURED codecs refuse an
+// EVENT_CONTEXT setting that carries a value but no code; canonical JSON
+// refuses a NaN magnitude, an error no simplified sentinel matches.
+// Canonical XML takes the same path, but no composition the typed RM can
+// build makes its encoder fail, so it has no row.
 func TestWriteSerialiseFailureSendsNothing(t *testing.T) {
 	wt, _ := loadFormatFixture(t)
-	bad := &rm.Composition{Context: &rm.EventContext{Setting: rm.DVCodedText{Value: "home"}}}
+	badSetting := &rm.Composition{Context: &rm.EventContext{Setting: rm.DVCodedText{Value: "home"}}}
+	nanMagnitude := &rm.Composition{Context: &rm.EventContext{OtherContext: &rm.ItemTree{Items: []rm.Item{
+		&rm.Element{Value: &rm.DVQuantity{Magnitude: rm.Real(math.NaN()), Units: "mm[Hg]"}},
+	}}}}
+	cases := []struct {
+		format composition.Format
+		comp   *rm.Composition
+		cause  error // the codec sentinel the error still matches, or nil
+	}{
+		{format: composition.FormatFlat, comp: badSetting, cause: simplified.ErrUnsupportedDatatype},
+		{format: composition.FormatStructured, comp: badSetting, cause: simplified.ErrUnsupportedDatatype},
+		{format: composition.FormatJSON, comp: nanMagnitude},
+	}
 	for _, op := range formatWriteOps {
-		for _, f := range []composition.Format{composition.FormatFlat, composition.FormatStructured} {
-			t.Run(op.name+"/"+f.String(), func(t *testing.T) {
+		for _, tc := range cases {
+			t.Run(op.name+"/"+tc.format.String(), func(t *testing.T) {
 				fs := newFormatServer(t, http.StatusCreated, "", nil)
-				out, meta, err := op.do(t.Context(), newClient(t, fs.srv), bad, composition.WithFormat(f, wt))
-				if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
-					t.Errorf("%s(%v) error = %v, want the codec's ErrUnsupportedDatatype", op.name, f, err)
+				out, meta, err := op.do(t.Context(), newClient(t, fs.srv), tc.comp, composition.WithFormat(tc.format, wt))
+				encErr, ok := errors.AsType[*composition.EncodeError](err)
+				switch {
+				case !ok || encErr == nil:
+					t.Errorf("%s(%v) error = %v, want an *EncodeError", op.name, tc.format, err)
+				case encErr.Format != tc.format:
+					t.Errorf("%s(%v) EncodeError.Format = %v, want %v", op.name, tc.format, encErr.Format, tc.format)
+				case encErr.Err == nil:
+					t.Errorf("%s(%v) EncodeError.Err = nil, want the codec's error", op.name, tc.format)
 				}
-				if err != nil && !strings.Contains(err.Error(), "marshal body") {
-					t.Errorf("%s(%v) error = %q, want it to name the body marshal", op.name, f, err)
+				if tc.cause != nil && !errors.Is(err, tc.cause) {
+					t.Errorf("%s(%v) error = %v, want it to wrap the codec's %v", op.name, tc.format, err, tc.cause)
+				}
+				if errors.Is(err, transport.ErrInvalidConfig) {
+					t.Errorf("%s(%v) error = %v, want a codec failure, not ErrInvalidConfig", op.name, tc.format, err)
 				}
 				if out != nil || meta != nil {
 					t.Errorf("%s returned (%+v, %+v), want nil, nil", op.name, out, meta)
