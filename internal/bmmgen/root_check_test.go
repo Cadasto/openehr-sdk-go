@@ -2,7 +2,7 @@ package bmmgen
 
 // REQ-041 § SDK-authored root schemas, Gate — the root check. Every root
 // schema under resources/bmm/sdk/ is held, with the pinned schemas it
-// includes, to four rules:
+// includes, to five rules:
 //
 //  1. every type name a root's declarations use resolves after the merge;
 //  2. every class and property a root declares carries, in its
@@ -15,7 +15,11 @@ package bmmgen
 //     shadows, so a re-pin that lands the upstream fix fails here until the
 //     shadow goes;
 //  4. no root's id is a pinned schema's, and a root's header composes the id
-//     its file name carries.
+//     its file name carries;
+//  5. every top-level member of a root is a P_BMM schema member or
+//     sdk_extensions: the loader and the generator both leave any other
+//     member aside, so a misspelt extension key would drop its entries
+//     unread.
 //
 // The rules run on the vendored roots in TestRootSchemas_REQ041_PassTheRootCheck
 // and on scratch schemas in TestRootCheck_REQ041_RefusesWhatARootMustNotDo,
@@ -105,6 +109,19 @@ func checkRoot(ctx context.Context, resourcesDir, itsXMLDir, id string) ([]strin
 	if err != nil {
 		return nil, fmt.Errorf("root %s: %w", id, err)
 	}
+
+	// Rule 5: every top-level member is a P_BMM schema member or the SDK
+	// extension keys' member.
+	var members map[string]any
+	if err := json.Unmarshal(raw, &members); err != nil {
+		return nil, fmt.Errorf("root %s: %w", id, err)
+	}
+	schemaMembers := pbmmSchemaMembers()
+	for _, m := range slices.Sorted(maps.Keys(members)) {
+		if !schemaMembers[m] && m != sdkExtensionsMember {
+			problems = append(problems, fmt.Sprintf("root %s: top-level member %q is neither a P_BMM schema member nor %s, so no reader sees what it holds", id, m, sdkExtensionsMember))
+		}
+	}
 	for _, e := range extensions.entries() {
 		if p := entryNoteProblem(e, refs); p != "" {
 			problems = append(problems, fmt.Sprintf("root %s: %s entry %s %s", id, e.key, e.subject, p))
@@ -164,6 +181,18 @@ func checkRoot(ctx context.Context, resourcesDir, itsXMLDir, id string) ([]strin
 		}
 	}
 	return problems, nil
+}
+
+// pbmmSchemaMembers returns the top-level members of a P_BMM schema: the JSON
+// names of [bmm.Schema]'s fields.
+func pbmmSchemaMembers() map[string]bool {
+	members := map[string]bool{}
+	for field := range reflect.TypeFor[bmm.Schema]().Fields() {
+		if name, _, _ := strings.Cut(field.Tag.Get("json"), ","); name != "" && name != "-" {
+			members[name] = true
+		}
+	}
+	return members
 }
 
 // loadSchemaFile reads one P_BMM schema from path, unmerged.
@@ -540,6 +569,14 @@ func TestRootCheck_REQ041_RefusesWhatARootMustNotDo(t *testing.T) {
 			name:  "rule 4: a header that composes another id",
 			files: map[string]string{"sdk/test_root_1.0.0.bmm.json": rootCheckRoot("other", rootCheckItem)},
 			want:  `composes the id "test_other_1.0.0"`,
+		},
+		{
+			// The loader and the generator both leave the misspelt member
+			// aside, so nothing else sees the entries it holds.
+			name: "rule 5: a misspelt extension key member",
+			files: map[string]string{"sdk/test_root_1.0.0.bmm.json": strings.Replace(rootCheckRootWith("root", rootCheckItem, rootCheckAlias),
+				`"sdk_extensions":`, `"sdk_extension":`, 1)},
+			want: `top-level member "sdk_extension"`,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
