@@ -674,8 +674,11 @@ requirements:
       - resources/its-xml
     probes: [PROBE-033, PROBE-034, PROBE-105]
     tests:
+      - internal/bmmgen/itsxml_test.go
       - internal/bmmgen/render_interval_bound_test.go
+      - internal/bmmgen/render_xml_attributes_test.go
       - internal/bmmgen/render_xmlmar_order_test.go
+      - internal/bmmgen/render_xmlunmar_class_test.go
       - internal/bmmgen/render_xmlunmar_unmatched_test.go
       - internal/rmaccess/interval_test.go
       - openehr/aom/aom14/coded_text_code_list_xml_test.go
