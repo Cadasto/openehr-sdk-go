@@ -9,6 +9,8 @@ package validation
 // covers every DV_INTERVAL instantiation the registry knows.
 
 import (
+	"strings"
+
 	"github.com/cadasto/openehr-sdk-go/internal/iso8601"
 	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -215,10 +217,15 @@ func asArchetyped(value any) (rm.Archetyped, bool) {
 type intervalOrder struct {
 	// class is the RM type of the two bounds.
 	class string
-	// inverted reports that lower is above upper by the RM's less_than for
-	// class.
+	// inverted reports that lower is above upper by the order
+	// [orderBounds] gives class.
 	inverted bool
-	// magnitudes are the two values the order compares, lower first.
+	// magnitudes are the two values the order compares, lower first, and
+	// for two dates, times or date-times ordered at the precision they
+	// share, which compares no single value, their magnitudes, a zoned
+	// date-time's read in UTC. A strict order at that precision gives the
+	// same strict order of the magnitudes, so they show the inversion the
+	// order reports.
 	magnitudes [2]float64
 }
 
@@ -292,12 +299,14 @@ func intervalBounds(value any) (lower, upper rm.DVOrdered, bounded bool) {
 }
 
 // orderBounds reads the order of two bounds that the RM makes strictly
-// comparable, by the RM's less_than for their type, and returns ok=false for
-// any other pair, and for a pair it has no order for. The RM's less_than,
-// which DV_INTERVAL.Limits_consistent reads as `<=`, has the precondition
-// Pre_comparable, is_strictly_comparable_to(other), so the floor orders two
-// bounds only when the RM makes them strictly comparable; a pair it reads as
-// not strictly comparable is reported as that ([notStrictlyComparable]).
+// comparable, by the RM's less_than for their type, except where the list
+// below orders two dates, times or date-times otherwise, and returns
+// ok=false for any other pair, and for a pair it has no order for. The
+// RM's less_than, which DV_INTERVAL.Limits_consistent reads as `<=`, has
+// the precondition Pre_comparable, is_strictly_comparable_to(other), so the
+// floor orders two bounds only when the RM makes them strictly comparable;
+// a pair it reads as not strictly comparable is reported as that
+// ([notStrictlyComparable]).
 // Two bounds of different types are never ordered, a DV_COUNT beside a
 // unitless DV_QUANTITY included: no less_than takes both. A nil bound names
 // no type, so it is not ordered either. For two bounds of one type:
@@ -313,19 +322,29 @@ func intervalBounds(value any) (lower, upper rm.DVOrdered, bounded bool) {
 //     magnitude, numerator / denominator. A zero denominator gives no
 //     magnitude (the RM's Valid_denominator forbids it), so a pair holding
 //     one is not ordered and reports nothing here.
-//   - DV_DATE and DV_DURATION: always comparable; ordered by their Compare,
-//     which reads the magnitude of each parsed value ([temporalOrder]).
+//   - DV_DATE: always comparable; ordered at the precision the two share
+//     ([iso8601.Fields.Compare], [temporalOrder]): field by field from the
+//     year down, over the fields both carry, so a partial value covers the
+//     whole period it names and 2021-05 is equal to 2021. This departs from
+//     the RM's less_than, whose magnitude reads a partial value as the
+//     start of its period; the REQ-103 temporal range check compares a
+//     value with a bound the same way, so the two agree.
 //   - DV_TIME: always comparable. Two values written with one time zone
-//     designator, or both with none, are ordered by their Compare
-//     ([temporalOrder]). Two values whose designators differ are ordered as
-//     instants, each by its magnitude less its zone's offset from UTC,
-//     partial values and leap seconds included ([instantOrder]). A value with
-//     a zone is not ordered against one without.
-//   - DV_DATE_TIME: always comparable; ordered by its Compare
-//     ([temporalOrder]), whose magnitude reads a value with a zone in UTC,
-//     so two zoned values are ordered as instants, partial values and leap
-//     seconds included. A value with a zone is not ordered against one
+//     designator, or both with none, are ordered at the precision they
+//     share, as two dates are, on their clocks as written. Two values whose
+//     designators differ are ordered as instants, each by its magnitude less
+//     its zone's offset from UTC, partial values and leap seconds included
+//     ([instantOrder]). A value with a zone is not ordered against one
 //     without.
+//   - DV_DATE_TIME: always comparable. Two values written with one zone
+//     designator, or both with none, are ordered at the precision they
+//     share, as two dates are, a date with no time carrying no time fields.
+//     Two zoned values whose designators differ are ordered by their
+//     Compare, whose magnitude reads each in UTC, so as instants, partial
+//     values and leap seconds included. A value with a zone is not ordered
+//     against one without.
+//   - DV_DURATION: always comparable; ordered by its Compare, which reads
+//     the magnitude of each parsed value ([temporalOrder]).
 //
 // The generated IsStrictlyComparableTo and LessThan of the non-temporal types
 // are not called: they are stubs that panic.
@@ -365,19 +384,28 @@ func orderBounds(lower, upper rm.DVOrdered) (intervalOrder, bool) {
 		return numberOrder(class, lo.Numerator/lo.Denominator, hi.Numerator/hi.Denominator), true
 	case "DV_DATE":
 		lo, hi := boundAs[rm.DVDate](lower), boundAs[rm.DVDate](upper)
-		return temporalOrder(class, lo.Compare(hi), float64(lo.Magnitude()), float64(hi.Magnitude()), lo.ValidISO8601(), hi.ValidISO8601())
+		sign := dateFields(lo.Value).Compare(dateFields(hi.Value))
+		return temporalOrder(class, sign, float64(lo.Magnitude()), float64(hi.Magnitude()), lo.ValidISO8601(), hi.ValidISO8601())
 	case "DV_TIME":
 		lo, hi := boundAs[rm.DVTime](lower), boundAs[rm.DVTime](upper)
 		if loZone, hiZone := lo.Timezone(), hi.Timezone(); loZone != hiZone {
 			return instantOrder(class, loZone, hiZone, float64(lo.Magnitude()), float64(hi.Magnitude()))
 		}
-		return temporalOrder(class, lo.Compare(hi), float64(lo.Magnitude()), float64(hi.Magnitude()), lo.ValidISO8601(), hi.ValidISO8601())
+		sign := timeFields(lo.Value).Compare(timeFields(hi.Value))
+		return temporalOrder(class, sign, float64(lo.Magnitude()), float64(hi.Magnitude()), lo.ValidISO8601(), hi.ValidISO8601())
 	case "DV_DATE_TIME":
 		lo, hi := boundAs[rm.DVDateTime](lower), boundAs[rm.DVDateTime](upper)
-		if (lo.Timezone() == "") != (hi.Timezone() == "") {
+		loZone, hiZone := lo.Timezone(), hi.Timezone()
+		var sign int
+		switch {
+		case loZone == hiZone:
+			sign = dateTimeFields(lo.Value).Compare(dateTimeFields(hi.Value))
+		case loZone == "" || hiZone == "":
 			return intervalOrder{}, false
+		default:
+			sign = lo.Compare(hi)
 		}
-		return temporalOrder(class, lo.Compare(hi), lo.Magnitude(), hi.Magnitude(), lo.ValidISO8601(), hi.ValidISO8601())
+		return temporalOrder(class, sign, lo.Magnitude(), hi.Magnitude(), lo.ValidISO8601(), hi.ValidISO8601())
 	case "DV_DURATION":
 		lo, hi := boundAs[rm.DVDuration](lower), boundAs[rm.DVDuration](upper)
 		return temporalOrder(class, lo.Compare(hi), lo.Magnitude(), hi.Magnitude(), lo.ValidISO8601(), hi.ValidISO8601())
@@ -411,18 +439,22 @@ func numberOrder[N ~int32 | ~int64 | ~float64](class string, lower, upper N) int
 	return intervalOrder{class: class, inverted: lower > upper, magnitudes: [2]float64{float64(lower), float64(upper)}}
 }
 
-// temporalOrder orders two temporal bounds of class. sign is the Compare of
-// lower with upper ([rm.DVDate.Compare] and its kin), which reads the
-// magnitude of each parsed value, and lowerMag and upperMag are those
-// magnitudes. A value the parse refuses has no magnitude (Compare would read
-// it as zero), so a pair that holds one is not ordered. An empty value is
+// temporalOrder orders two temporal bounds of class. sign is the order of
+// lower against upper that [orderBounds] reads: for two dates, and for two
+// times or date-times written with one zone designator or both with none,
+// the order at the precision the two share ([iso8601.Fields.Compare]); for
+// two zoned date-times whose designators differ, and for two durations,
+// their Compare ([rm.DVDateTime.Compare], [rm.DVDuration.Compare]), which
+// reads the magnitude of each parsed value. lowerMag and upperMag are the
+// magnitudes of the two values, which the finding's Value carries. A value
+// the parse refuses has no fields and no magnitude (each would read as
+// zero), so a pair that holds one is not ordered. An empty value is
 // reported by the mandatory-presence rule, as `required` at the bound's
-// …/value; any other value the parse refuses, by the bound's own Value_valid.
-// The magnitude of a DV_TIME reads the clock in the value's own time zone,
-// so [orderBounds] sends two of them here only when they are written with
-// one zone designator, or both with none, and sends the others to
-// [instantOrder]. The magnitude of a DV_DATE_TIME reads a value with a zone
-// in UTC, so two zoned date-times come here whatever their designators.
+// …/value; any other value the parse refuses, by the bound's own
+// Value_valid. The magnitude of a DV_TIME reads the clock in the value's own
+// time zone, so [orderBounds] sends two times whose designators differ to
+// [instantOrder] instead. The magnitude of a DV_DATE_TIME reads a value with
+// a zone in UTC, so its Compare orders two zoned date-times as instants.
 func temporalOrder(class string, sign int, lowerMag, upperMag float64, lowerValid, upperValid bool) (intervalOrder, bool) {
 	if !lowerValid || !upperValid {
 		return intervalOrder{}, false
@@ -454,6 +486,29 @@ func instantOrder(class, lowerZone, upperZone string, lowerMag, upperMag float64
 		return intervalOrder{}, false
 	}
 	return intervalOrder{class: class, inverted: lowerUTC > upperUTC, magnitudes: [2]float64{lowerUTC, upperUTC}}, true
+}
+
+// dateFields, timeFields and dateTimeFields read the value of a DV_DATE,
+// DV_TIME or DV_DATE_TIME field by field as written, its zone not applied
+// ([iso8601.Fields]), for the order at the precision two bounds share. A
+// value the parse refuses reads as zero fields, which [temporalOrder] does
+// not order.
+func dateFields(s string) iso8601.Fields {
+	d, _ := iso8601.ParseDate(s)
+	return iso8601.DateFields(d)
+}
+
+func timeFields(s string) iso8601.Fields {
+	t, _ := iso8601.ParseTime(s)
+	return iso8601.TimeFields(t)
+}
+
+// dateTimeFields reads a date-time's time only where its text holds a "T":
+// a date carries none, so a date-time the parse accepts has a time exactly
+// when it holds one.
+func dateTimeFields(s string) iso8601.Fields {
+	d, t, _ := iso8601.ParseDateTime(s)
+	return iso8601.DateTimeFields(d, t, strings.Contains(s, "T"))
 }
 
 // codedInOneTerminology reports whether the symbols of two DV_ORDINAL or
