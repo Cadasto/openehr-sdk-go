@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"slices"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlschema"
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
@@ -183,33 +184,89 @@ func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 
 // recorder is the reader a [Decoder] given no option reads its stream
 // through. It keeps the bytes read from src since the value being decoded
-// began, so that the value can be read again.
+// began, so that the value can be read again. encoding/xml reads it a byte at
+// a time, as an io.ByteReader, so it buffers nothing else and the bytes it
+// keeps are the only copy of them.
 type recorder struct {
 	src  io.Reader
 	buf  []byte // the bytes read from src from offset base on
+	pos  int    // the index in buf of the next byte to return
 	base int64  // the offset in the stream of buf[0]
+	err  error  // the error src returned, once it has returned one
 }
 
-// Read reads from src into p and records what it read.
+// minRead is the least room a recorder makes for one read of its source.
+const minRead = 4096
+
+// ReadByte returns the next byte of the stream.
+func (r *recorder) ReadByte() (byte, error) {
+	if r.pos == len(r.buf) {
+		if err := r.fill(); err != nil {
+			return 0, err
+		}
+	}
+	c := r.buf[r.pos]
+	r.pos++
+	return c, nil
+}
+
+// Read reads the next bytes of the stream into p. It makes a recorder the
+// io.Reader encoding/xml takes, which reads it through ReadByte.
 func (r *recorder) Read(p []byte) (int, error) {
-	n, err := r.src.Read(p)
-	r.buf = append(r.buf, p[:n]...)
-	return n, err
+	if r.pos == len(r.buf) {
+		if err := r.fill(); err != nil {
+			return 0, err
+		}
+	}
+	n := copy(p, r.buf[r.pos:])
+	r.pos += n
+	return n, nil
 }
 
-// from drops the bytes before off, an offset in the stream, which a value
-// decoded from off on does not need.
+// fill reads src into the room after the bytes buf holds until it reads one
+// or more, making room first when there is none, and returns the error src
+// gave, which every later call returns too.
+func (r *recorder) fill() error {
+	for range 100 {
+		if r.err != nil {
+			return r.err
+		}
+		if len(r.buf) == cap(r.buf) {
+			r.buf = slices.Grow(r.buf, max(len(r.buf), minRead))
+		}
+		n, err := r.src.Read(r.buf[len(r.buf):cap(r.buf)])
+		r.buf = r.buf[:len(r.buf)+n]
+		r.err = err
+		if n > 0 {
+			return nil
+		}
+	}
+	r.err = io.ErrNoProgress
+	return r.err
+}
+
+// from drops the bytes before off, an offset in the stream no later than the
+// next byte to return, which a value decoded from off on does not need.
 func (r *recorder) from(off int64) {
 	n := int(off - r.base)
 	r.buf = r.buf[:copy(r.buf, r.buf[n:])]
+	r.pos -= n
 	r.base = off
 }
 
 // replay returns a reader of the stream from where the record starts: the
-// bytes recorded, then the rest of src.
+// bytes recorded, then the rest of src, or the error src gave.
 func (r *recorder) replay() io.Reader {
+	if r.err != nil {
+		return io.MultiReader(bytes.NewReader(r.buf), failedReader{r.err})
+	}
 	return io.MultiReader(bytes.NewReader(r.buf), r.src)
 }
+
+// failedReader is a reader that returns err.
+type failedReader struct{ err error }
+
+func (f failedReader) Read([]byte) (int, error) { return 0, f.err }
 
 // Decode reads the next XML element from the stream and stores it
 // in v. Errors follow the same classification as [Unmarshal], with one

@@ -168,3 +168,56 @@ func TestREQ056_DecoderDecodesTheFirstValueAgainFromTheStreamStart(t *testing.T)
 		}
 	}
 }
+
+// errStream is the failure of a stream test's reader.
+var errStream = errors.New("the stream failed")
+
+// failingReader returns its data and err from its first Read, and io.EOF from
+// every later one, as a reader whose failure arrives with its last bytes may.
+type failingReader struct {
+	data []byte
+	err  error
+	read bool
+}
+
+func (r *failingReader) Read(p []byte) (int, error) {
+	if r.read {
+		return 0, io.EOF
+	}
+	r.read = true
+	return copy(p, r.data), r.err
+}
+
+// TestREQ056_DecoderKeepsTheReadersFailureForTheSecondDecode pins a stream
+// whose reader fails with the last bytes of a value that needs the second
+// decode: the value decodes from the bytes the Decoder kept, and the next
+// Decode returns the reader's failure, which a second read of the reader
+// would not give again.
+func TestREQ056_DecoderKeepsTheReadersFailureForTheSecondDecode(t *testing.T) {
+	v := streamValue{root: ` xmlns:xs="` + xsdNamespace + `"`, item: ` xsi:type="xs:string"`, content: "archetype_id/value"}
+	dec := canxml.NewDecoder(&failingReader{data: []byte(v.slot()), err: errStream})
+	var slot aom14.ArchetypeSlot
+	if err := dec.Decode(&slot); err != nil {
+		t.Fatalf("Decode of the value = %v; want nil", err)
+	}
+	if got, want := secondItem(t, &slot), (&aom14.TypedString{Value: "archetype_id/value", Type: "xs:string"}); !reflect.DeepEqual(got, want) {
+		t.Errorf("the value's second item = %#v; want %#v", got, want)
+	}
+	if err := dec.Decode(new(aom14.ArchetypeSlot)); !errors.Is(err, errStream) {
+		t.Errorf("Decode after the value = %v; want the reader's failure", err)
+	}
+}
+
+// stalledReader returns nothing and no error from every Read.
+type stalledReader struct{}
+
+func (stalledReader) Read([]byte) (int, error) { return 0, nil }
+
+// TestREQ056_DecoderRefusesAReaderThatMakesNoProgress pins a Decoder given no
+// option over a reader that returns no bytes and no error, read after read:
+// Decode fails with io.ErrNoProgress rather than read on for ever.
+func TestREQ056_DecoderRefusesAReaderThatMakesNoProgress(t *testing.T) {
+	if err := canxml.NewDecoder(stalledReader{}).Decode(new(aom14.ArchetypeSlot)); !errors.Is(err, io.ErrNoProgress) {
+		t.Errorf("Decode = %v; want io.ErrNoProgress", err)
+	}
+}
