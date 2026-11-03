@@ -84,9 +84,9 @@ type mergedSchema struct {
 	ancestors map[string]struct{}
 	// classSources and primSources map each class and primitive type name
 	// to the schemas whose own declaration supplied the merged form: one
-	// schema, or several that neither include each other and declare the
-	// same form. A schema that redeclares a name it also reaches through
-	// an include is that name's only source.
+	// schema, or several that declare the same form. A schema that
+	// redeclares a name it also reaches through an include is that name's
+	// only source.
 	classSources map[string][]string
 	primSources  map[string][]string
 }
