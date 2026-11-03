@@ -6,7 +6,11 @@ package bmmgen
 //
 //  1. every type name a root's declarations use resolves after the merge;
 //  2. every class and property a root declares carries, in its
-//     documentation, the reason and the upstream reference it rests on;
+//     documentation, the reason and the upstream reference it rests on, and
+//     so does every entry of its SDK extension keys, in its reason and
+//     upstream members; the reference is an https URL, a schema the root
+//     includes, or a vendored ITS-XML schema by its path, with or without a
+//     line;
 //  3. each class a root declares again still differs from the class it
 //     shadows, so a re-pin that lands the upstream fix fails here until the
 //     shadow goes;
@@ -89,6 +93,22 @@ func checkRoot(ctx context.Context, resourcesDir, itsXMLDir, id string) ([]strin
 	shadowed, err := bmm.LoadAll(id, withoutDeclarations{Resolver: resolver, id: id, header: own}) //nolint:contextcheck // bmm.LoadAll takes no context
 	if err != nil {
 		return nil, err
+	}
+
+	// Rule 2 for the SDK extension keys: each entry's reason and upstream
+	// reference, read from the root's own bytes, as the generator reads them.
+	raw, err := os.ReadFile(filepath.Join(resolver.roots, id+schemaFileSuffix))
+	if err != nil {
+		return nil, err
+	}
+	extensions, err := parseSDKExtensions(raw)
+	if err != nil {
+		return nil, fmt.Errorf("root %s: %w", id, err)
+	}
+	for _, e := range extensions.entries() {
+		if p := entryNoteProblem(e, refs); p != "" {
+			problems = append(problems, fmt.Sprintf("root %s: %s entry %s %s", id, e.key, e.subject, p))
+		}
 	}
 
 	for _, section := range []struct {
@@ -191,60 +211,6 @@ func (w withoutDeclarations) Resolve(ctx context.Context, id string) (io.ReadClo
 	return io.NopCloser(bytes.NewReader(b)), nil
 }
 
-// classForm returns c in its P_BMM JSON form, decoded into maps and lists.
-func classForm(c bmm.Class) (map[string]any, error) {
-	b, err := json.Marshal(c)
-	if err != nil {
-		return nil, err
-	}
-	var form map[string]any
-	if err := json.Unmarshal(b, &form); err != nil {
-		return nil, err
-	}
-	return form, nil
-}
-
-// typeNamesIn lists every type name a class form uses: its ancestors, the
-// bounds of its generic parameters, and the types of its properties and of
-// its functions' parameters and results.
-func typeNamesIn(form map[string]any) []string {
-	var names []string
-	var walk func(v any)
-	walk = func(v any) {
-		switch x := v.(type) {
-		case map[string]any:
-			for _, k := range slices.Sorted(maps.Keys(x)) {
-				switch k {
-				case "documentation", "invariants", "pre_conditions", "post_conditions", "item_names", "item_documentations", "item_values", "aliases":
-					continue
-				case "type", "root_type", "container_type", "conforms_to_type":
-					if s, ok := x[k].(string); ok {
-						names = append(names, s)
-						continue
-					}
-				case "ancestors", "generic_parameters":
-					items, _ := x[k].([]any)
-					for _, item := range items {
-						if s, ok := item.(string); ok {
-							names = append(names, s)
-						} else {
-							walk(item)
-						}
-					}
-					continue
-				}
-				walk(x[k])
-			}
-		case []any:
-			for _, item := range x {
-				walk(item)
-			}
-		}
-	}
-	walk(form)
-	return names
-}
-
 // withoutDocumentation returns form with every documentation member left out,
 // at any depth.
 func withoutDocumentation(v any) any {
@@ -284,6 +250,19 @@ func noteProblem(doc string, refs upstreamRefs) string {
 		return `gives no upstream reference (an "Upstream: " reference after its reason)`
 	}
 	return refs.problem(ref)
+}
+
+// entryNoteProblem says what the note of e, an entry of an SDK extension key,
+// lacks, or "" when it carries a reason and an upstream reference that refs
+// accepts.
+func entryNoteProblem(e extensionEntry, refs upstreamRefs) string {
+	switch {
+	case strings.TrimSpace(e.reason) == "":
+		return `gives no reason (a "reason" member)`
+	case strings.TrimSpace(e.upstream) == "":
+		return `gives no upstream reference (an "upstream" member)`
+	}
+	return refs.problem(e.upstream)
 }
 
 // itsXMLRefPrefix starts an upstream reference to a vendored ITS-XML schema,
@@ -400,6 +379,17 @@ func rootCheckRoot(name, classes string) string {
 }`
 }
 
+// rootCheckRootWith returns rootCheckRoot(name, classes) with extensions, the
+// members of its sdk_extensions object.
+func rootCheckRootWith(name, classes, extensions string) string {
+	return strings.Replace(rootCheckRoot(name, classes), `"class_definitions": {`,
+		`"sdk_extensions": {`+extensions+`},
+	"class_definitions": {`, 1)
+}
+
+// rootCheckAlias is a well-formed type_aliases entry.
+const rootCheckAlias = `"type_aliases": [{"alias": "OLD_ITEM", "class": "ITEM", "reason": "older tools write it.", "upstream": "https://example.org/pull/9"}]`
+
 // rootCheckItem is a well-formed shadow of ITEM: it adds a property and notes
 // both declarations.
 const rootCheckItem = `"ITEM": {"name": "ITEM",
@@ -508,6 +498,28 @@ func TestRootCheck_REQ041_RefusesWhatARootMustNotDo(t *testing.T) {
 				"its-xml/components/Item.xsd": rootCheckSchemaFile,
 			},
 			want: `property ITEM.label gives the upstream reference "resources/its-xml/../test_base_1.0.0.bmm.json"`,
+		},
+		{
+			name:  "a well-formed root with an extension entry",
+			files: map[string]string{"sdk/test_root_1.0.0.bmm.json": rootCheckRootWith("root", rootCheckItem, rootCheckAlias)},
+		},
+		{
+			name: "rule 2: an extension entry with no reason",
+			files: map[string]string{"sdk/test_root_1.0.0.bmm.json": rootCheckRootWith("root", rootCheckItem,
+				strings.Replace(rootCheckAlias, `"reason": "older tools write it.", `, "", 1))},
+			want: "type_aliases entry OLD_ITEM gives no reason",
+		},
+		{
+			name: "rule 2: an extension entry with no upstream reference",
+			files: map[string]string{"sdk/test_root_1.0.0.bmm.json": rootCheckRootWith("root", rootCheckItem,
+				strings.Replace(rootCheckAlias, `, "upstream": "https://example.org/pull/9"`, "", 1))},
+			want: "type_aliases entry OLD_ITEM gives no upstream reference",
+		},
+		{
+			name: "rule 2: an extension entry whose upstream reference names nothing",
+			files: map[string]string{"sdk/test_root_1.0.0.bmm.json": rootCheckRootWith("root", rootCheckItem,
+				strings.Replace(rootCheckAlias, "https://example.org/pull/9", "somewhere", 1))},
+			want: `type_aliases entry OLD_ITEM gives the upstream reference "somewhere"`,
 		},
 		{
 			name: "rule 3: a shadow the includes have caught up with",

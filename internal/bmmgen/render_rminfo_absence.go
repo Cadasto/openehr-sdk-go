@@ -144,7 +144,8 @@ func rmInfoAbsence(plan *Plan) ([]absenceEntry, error) {
 // groups the functional / builtins foundation CLASSES (TUPLE, FUNCTION, Env, …)
 // in beside the real primitives for the generator's own skip convenience, and
 // those names are not primitives — they are excluded classes, and the
-// exclusion set is what must account for them.
+// exclusion set is what must account for them. A class the target's root
+// schemas leave out (classes_left_out) is an excluded class too.
 func absenceReasonFor(plan *Plan, name string) (absenceReason, bool) {
 	if _, isPrimitiveDecl := plan.Schema.PrimitiveTypes[name]; isPrimitiveDecl || isPrimitive(name) {
 		return absencePrimitive, true
@@ -154,7 +155,7 @@ func absenceReasonFor(plan *Plan, name string) (absenceReason, bool) {
 			return absenceEnumeration, true
 		}
 	}
-	if isSkippedClass(name) {
+	if isSkippedClass(name) || plan.extensions.leftOut[name] {
 		return absenceExcludedClass, true
 	}
 	if isSkippedPackage(plan.ClassPackages[name]) {

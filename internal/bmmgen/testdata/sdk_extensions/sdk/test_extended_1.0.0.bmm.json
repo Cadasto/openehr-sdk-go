@@ -1,0 +1,51 @@
+{
+    "bmm_version": "2.4",
+    "rm_publisher": "test",
+    "schema_name": "extended",
+    "rm_release": "1.0.0",
+    "schema_revision": "1.0.0.1",
+    "schema_lifecycle_state": "stable",
+    "schema_description": "A root over test_base_1.0.0 that carries one entry of each SDK extension key.",
+    "includes": {
+        "test_base_1.0.0": {"id": "test_base_1.0.0"}
+    },
+    "packages": {
+        "org.test.views": {
+            "name": "org.test.views",
+            "classes": ["VIEW", "VIEW_CONSTRAINT"]
+        }
+    },
+    "class_definitions": {
+        "VIEW": {
+            "name": "VIEW",
+            "documentation": "A view of a template.\n\nReason: no pinned schema declares it. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:70.",
+            "properties": {
+                "constraints": {"_type": "P_BMM_CONTAINER_PROPERTY", "name": "constraints", "documentation": "The view's constraints.\n\nReason: no pinned schema declares it. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:72.", "type_def": {"container_type": "List", "type": "VIEW_CONSTRAINT"}, "cardinality": {"lower": 0, "upper_unbounded": true}}
+            }
+        },
+        "VIEW_CONSTRAINT": {
+            "name": "VIEW_CONSTRAINT",
+            "documentation": "One constraint of a view.\n\nReason: the schema gives its type no name. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:72.",
+            "properties": {
+                "path": {"_type": "P_BMM_SINGLE_PROPERTY", "name": "path", "documentation": "The path constrained.\n\nReason: no pinned schema declares it. Upstream: resources/its-xml/components/AM/Release-1.4/Template.xsd:84.", "type": "String", "is_mandatory": true}
+            }
+        }
+    },
+    "sdk_extensions": {
+        "classes_left_out": [
+            {"class": "CODED_ITEM", "reason": "the schemas name the class otherwise.", "upstream": "https://example.org/pull/1"}
+        ],
+        "type_aliases": [
+            {"alias": "LEGACY_ROOT_OBJECT", "class": "ROOT_OBJECT", "reason": "older tools write this name.", "upstream": "https://example.org/pull/2"}
+        ],
+        "dropped_elements": [
+            {"class": "ATTRIBUTE", "element": "legacy_flag", "text": "false", "reason": "a legacy element no class declares.", "upstream": "resources/its-xml/components/AM/Release-1.4/Archetype.xsd:52"}
+        ],
+        "anonymous_type_names": [
+            {"schema_type": "VIEW", "element_path": "constraints", "class": "VIEW_CONSTRAINT", "reason": "the schema gives the type no name.", "upstream": "resources/its-xml/components/AM/Release-1.4/Template.xsd:72"}
+        ],
+        "schema_forms": [
+            {"class": "ORDINAL", "property": "symbol", "form": "choice", "shapes": ["TEXT", "CODE"], "reason": "the schema accepts either shape.", "upstream": "resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:87"}
+        ]
+    }
+}

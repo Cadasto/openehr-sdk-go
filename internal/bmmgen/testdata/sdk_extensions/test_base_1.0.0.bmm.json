@@ -1,0 +1,90 @@
+{
+    "bmm_version": "2.4",
+    "rm_publisher": "test",
+    "schema_name": "base",
+    "rm_release": "1.0.0",
+    "schema_revision": "1.0.0.1",
+    "schema_lifecycle_state": "stable",
+    "schema_description": "The pinned schema of the SDK extension key fixtures: the root beside it in sdk/ includes it.",
+    "primitive_types": {
+        "Any": {"name": "Any", "is_abstract": true},
+        "Boolean": {"name": "Boolean"},
+        "Integer": {"name": "Integer"},
+        "List": {"name": "List", "generic_parameter_defs": {"T": {"name": "T", "conforms_to_type": "Any"}}},
+        "String": {"name": "String"}
+    },
+    "packages": {
+        "org.test.model": {
+            "name": "org.test.model",
+            "classes": ["ATTRIBUTE", "CODE", "CODED_ITEM", "ITEM", "ITEM_LIST", "ORDINAL", "ROOT_OBJECT", "SINGLE_ATTRIBUTE", "TEXT"]
+        }
+    },
+    "class_definitions": {
+        "ATTRIBUTE": {
+            "name": "ATTRIBUTE",
+            "documentation": "An abstract attribute constraint.",
+            "is_abstract": true,
+            "properties": {
+                "rm_attribute_name": {"_type": "P_BMM_SINGLE_PROPERTY", "name": "rm_attribute_name", "type": "String", "is_mandatory": true}
+            }
+        },
+        "CODE": {
+            "name": "CODE",
+            "documentation": "A terminology code.",
+            "properties": {
+                "terminology_id": {"_type": "P_BMM_SINGLE_PROPERTY", "name": "terminology_id", "type": "String", "is_mandatory": true},
+                "code_string": {"_type": "P_BMM_SINGLE_PROPERTY", "name": "code_string", "type": "String", "is_mandatory": true}
+            }
+        },
+        "CODED_ITEM": {
+            "name": "CODED_ITEM",
+            "documentation": "An item with a code.",
+            "ancestors": ["ITEM"],
+            "properties": {
+                "code": {"_type": "P_BMM_SINGLE_PROPERTY", "name": "code", "type": "CODE"}
+            }
+        },
+        "ITEM": {
+            "name": "ITEM",
+            "documentation": "An item.",
+            "properties": {
+                "label": {"_type": "P_BMM_SINGLE_PROPERTY", "name": "label", "type": "String", "is_mandatory": true}
+            }
+        },
+        "ITEM_LIST": {
+            "name": "ITEM_LIST",
+            "documentation": "A list of items.",
+            "properties": {
+                "items": {"_type": "P_BMM_CONTAINER_PROPERTY", "name": "items", "type_def": {"container_type": "List", "type": "ITEM"}, "cardinality": {"lower": 0, "upper_unbounded": true}}
+            }
+        },
+        "ORDINAL": {
+            "name": "ORDINAL",
+            "documentation": "An ordinal value and its symbol.",
+            "properties": {
+                "value": {"_type": "P_BMM_SINGLE_PROPERTY", "name": "value", "type": "Integer", "is_mandatory": true},
+                "symbol": {"_type": "P_BMM_SINGLE_PROPERTY", "name": "symbol", "type": "CODE", "is_mandatory": true}
+            }
+        },
+        "ROOT_OBJECT": {
+            "name": "ROOT_OBJECT",
+            "documentation": "The root object of a constraint tree.",
+            "properties": {
+                "node_id": {"_type": "P_BMM_SINGLE_PROPERTY", "name": "node_id", "type": "String", "is_mandatory": true}
+            }
+        },
+        "SINGLE_ATTRIBUTE": {
+            "name": "SINGLE_ATTRIBUTE",
+            "documentation": "A single-valued attribute constraint.",
+            "ancestors": ["ATTRIBUTE"]
+        },
+        "TEXT": {
+            "name": "TEXT",
+            "documentation": "A text with a defining code.",
+            "properties": {
+                "value": {"_type": "P_BMM_SINGLE_PROPERTY", "name": "value", "type": "String"},
+                "defining_code": {"_type": "P_BMM_SINGLE_PROPERTY", "name": "defining_code", "type": "CODE", "is_mandatory": true}
+            }
+        }
+    }
+}

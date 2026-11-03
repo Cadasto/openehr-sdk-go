@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"go/format"
 	"go/token"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -122,23 +123,55 @@ func parseClassification(data []byte) (map[string]invariantClassification, error
 // schema whose class the including one redefines is still seen. The schemas
 // and their ids come back in the order they were reached, rootID first.
 func loadSchemaChain(ctx context.Context, rootID string, resolver bmm.Resolver) ([]string, []*bmm.Schema, error) {
+	chain, err := readSchemaChain(ctx, rootID, resolver)
+	if err != nil {
+		return nil, nil, err
+	}
+	ids := make([]string, len(chain))
+	out := make([]*bmm.Schema, len(chain))
+	for i, s := range chain {
+		ids[i], out[i] = s.id, s.schema
+	}
+	return ids, out, nil
+}
+
+// chainSchema is one schema of a target's include chain: its id, its bytes as
+// the resolver handed them back, and the schema the public loader reads from
+// them, on its own and unmerged.
+type chainSchema struct {
+	id     string
+	raw    []byte
+	schema *bmm.Schema
+}
+
+// maxSchemaBytes is the size bound the public loader applies to one BMM
+// document: a schema read up to one byte past it is refused by bmm.Load.
+const maxSchemaBytes = 32 << 20
+
+// readSchemaChain reads the schema rootID names and every schema it includes,
+// transitively, in the order they were reached, rootID first, each once.
+func readSchemaChain(ctx context.Context, rootID string, resolver bmm.Resolver) ([]chainSchema, error) {
 	seen := map[string]bool{rootID: true}
 	ids := []string{rootID}
-	var out []*bmm.Schema
+	var out []chainSchema
 	for i := 0; i < len(ids); i++ {
 		id := ids[i]
 		rc, err := resolver.Resolve(ctx, id)
 		if err != nil {
-			return nil, nil, fmt.Errorf("bmmgen: resolve %q: %w", id, err)
+			return nil, fmt.Errorf("bmmgen: resolve %q: %w", id, err)
 		}
-		s, err := bmm.Load(rc)
+		raw, err := io.ReadAll(io.LimitReader(rc, maxSchemaBytes+1))
 		if closeErr := rc.Close(); closeErr != nil && err == nil {
 			err = closeErr
 		}
 		if err != nil {
-			return nil, nil, fmt.Errorf("bmmgen: load %q: %w", id, err)
+			return nil, fmt.Errorf("bmmgen: read %q: %w", id, err)
 		}
-		out = append(out, s)
+		s, err := bmm.Load(bytes.NewReader(raw))
+		if err != nil {
+			return nil, fmt.Errorf("bmmgen: load %q: %w", id, err)
+		}
+		out = append(out, chainSchema{id: id, raw: raw, schema: s})
 		for _, incl := range sortedStringKeys(s.Includes) {
 			if !seen[incl] {
 				seen[incl] = true
@@ -146,7 +179,7 @@ func loadSchemaChain(ctx context.Context, rootID string, resolver bmm.Resolver) 
 			}
 		}
 	}
-	return ids, out, nil
+	return out, nil
 }
 
 // classInvariantNames returns the names of the invariants c declares, sorted.
