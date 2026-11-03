@@ -171,8 +171,8 @@ The size limit **MUST** be 32 MiB for an OPT, an uploaded template and a BMM doc
 
 ### Operational template model reader (`openehr/aom/aom14/`)
 
-- `aom14.ReadOperationalTemplate` **MUST** refuse an input larger than the size limit, and an element nested deeper than the element limit below, with an error wrapping `canxml.ErrLimitExceeded`. It reads at most one byte past the size limit, and it refuses a deep element during the decode, through `canxml.WithMaxDepth`.
-- The element limit is the depth limit counted in the model's XML elements, with the root element at depth 1. It is 263 = 2 + 2 × 128 + 5: the root `<template>` and its `<definition>`, an `<attributes>` and a `<children>` for each of the 128 levels below the definition, and five for the content of the deepest constraint object, as deep as an `ARCHETYPE_SLOT`'s `includes/expression/right_operand/item/pattern`, a `C_DV_ORDINAL`'s `list/symbol/defining_code/terminology_id/value` or a `C_ARCHETYPE_ROOT`'s `term_bindings/items/value/terminology_id/value`. The deepest of the 74 corpus OPTs nests 11 levels and 26 elements.
+- `aom14.ReadOperationalTemplate` **MUST** refuse an input larger than the size limit, and an element nested deeper than the element limit below, with an error wrapping `canxml.ErrLimitExceeded`. It reads at most one byte past the size limit, and it refuses a deep element during the decode, through `canxml.WithMaxDepth`. A `canxml.WithMaxDepth` among the caller's options does not raise the element limit.
+- The element limit is the depth limit counted in the model's XML elements, with the root element at depth 1. It is 320 = 2 × 128 + 64: an `<attributes>` and a `<children>` for each of the 128 levels below the definition, and 64 for the root `<template>`, its `<definition>` and the deepest content one constraint object holds, such as an assumed value or an expression tree. The deepest of the 74 corpus OPTs nests 11 levels and 26 elements.
 - A caller that decodes an OPT with `canxml.Unmarshal` or a `canxml.Decoder` itself gets neither limit unless it applies them.
 
 ### Canonical-XML decode depth (`openehr/serialize/canxml/`)
