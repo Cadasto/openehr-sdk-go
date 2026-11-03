@@ -335,6 +335,7 @@ requirements:
       - internal/bmmgen/target_test.go
       - openehr/aom/aom14/integer_enumeration_test.go
       - openehr/aom/aom14/operational_template_shapes_xml_test.go
+      - openehr/aom/aom14/primitive_profile_shapes_xml_test.go
       - openehr/internal/xmlunmatched/choice_internal_test.go
       - openehr/internal/xmlunmatched/drop_internal_test.go
       - openehr/rm/rminfo/hierarchy_test.go
@@ -2627,6 +2628,7 @@ requirements:
       - openehr/aom/aom14/code_phrase_code_list_xml_test.go
       - openehr/aom/aom14/integer_enumeration_test.go
       - openehr/aom/aom14/operational_template_shapes_xml_test.go
+      - openehr/aom/aom14/primitive_profile_shapes_xml_test.go
       - openehr/aom/aom14/quantity_item_units_xml_test.go
       - openehr/internal/xmlunmatched/choice_internal_test.go
       - openehr/internal/xmlunmatched/drop_internal_test.go
