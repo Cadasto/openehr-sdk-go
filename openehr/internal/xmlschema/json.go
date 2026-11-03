@@ -35,11 +35,11 @@ import (
 // built-ins Type names.
 //
 // A Type that is no prefixed XML Schema built-in datatype is refused, as the
-// XML encoder refuses it ([TypedString.MarshalXML]), and so is text the
-// built-in does not read, such as a Boolean written `yes`, an Integer out of
-// range, an `xs:decimal` written with an exponent, such as `1e3`, or a Double
-// written `INF`, which a JSON number cannot hold. Neither refusal quotes the
-// text.
+// XML encoder refuses it ([TypedString.MarshalXML]), and so is text that is
+// no literal of the primitive, such as a Boolean written `yes`, an Integer
+// out of its 32-bit range or a Double written `INF`, which a JSON number
+// cannot hold, and an `xs:decimal` written with an exponent, such as `1e3`,
+// which XML Schema's decimal does not have. Neither refusal quotes the text.
 func (s TypedString) MarshalJSONTo(enc *jsontext.Encoder) error {
 	primitive, ok := typedPrimitive(s.Type)
 	if !ok {
