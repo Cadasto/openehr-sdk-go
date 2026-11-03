@@ -487,6 +487,35 @@ func runTarget(opts Options, t Target, resolver schemaResolver, schemas *itsXMLS
 		}
 	}
 
+	// The canonical-XML names the target's classes take beyond their own,
+	// one file per target that registers any.
+	namesBody, err := RenderXMLNamesFile(plan)
+	if err != nil {
+		return tr, err
+	}
+	namesPath := filepath.Join(outDir, xmlNamesFile)
+	if namesBody == nil {
+		if opts.Verify {
+			if _, statErr := os.Stat(namesPath); statErr == nil {
+				result.Drifts = append(result.Drifts, DriftRecord{Path: namesPath, Existing: true})
+			}
+		}
+	} else {
+		tr.Files = append(tr.Files, namesPath)
+		result.Files = append(result.Files, namesPath)
+		if opts.Verify {
+			drift, err := compareFile(namesPath, namesBody)
+			if err != nil {
+				return tr, err
+			}
+			if drift != nil {
+				result.Drifts = append(result.Drifts, *drift)
+			}
+		} else if err := writeAtomic(namesPath, namesBody); err != nil {
+			return tr, err
+		}
+	}
+
 	// rminfo data tables — emitted alongside the RM target (one
 	// sub-package down). Both renderers return nil for non-RM targets,
 	// so AOM 1.4 doesn't get them. The package lives in its own
@@ -577,7 +606,7 @@ func runTarget(opts Options, t Target, resolver schemaResolver, schemas *itsXMLS
 // the ones not derived from a BMM package: a package whose file stem produced
 // one of them would be silently overwritten by it.
 //
-// The reservation is uniform: all five names, in every target. A BMM package
+// The reservation is uniform: all six names, in every target. A BMM package
 // named like a fixed file is refused even in a target that would not emit that
 // file (the AOM 1.4 target emits neither interval_bound_gen.go nor
 // release_gen.go), so the set of reserved names never depends on the target and
@@ -588,6 +617,7 @@ var fixedGeneratedFiles = []string{
 	intervalBoundFile,
 	releaseFileName,
 	integerEnumFile,
+	xmlNamesFile,
 }
 
 // checkFixedNameCollisions refuses a plan in which a BMM package file would

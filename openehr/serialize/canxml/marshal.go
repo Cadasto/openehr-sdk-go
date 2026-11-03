@@ -68,6 +68,11 @@ func BMMNameOf(v any) (string, bool) {
 // tests are stable. Use [MarshalIndent] for human inspection only;
 // indented output is not a round-trip-stable form.
 //
+// The root element takes the lower-cased name of v's BMM class, such as
+// `composition`, except where the class's ITS-XML schema declares a global
+// element of another name for its type: an AOM 1.4 OPERATIONAL_TEMPLATE is
+// written as `template`, as `Template.xsd` names it.
+//
 // At the root, the encoder does not emit `xsi:type`, because the caller
 // already knows the concrete type. Polymorphic descendants carry
 // `xsi:type` at every concrete value boundary inside the document.
@@ -116,9 +121,11 @@ func MarshalIndent(v any, prefix, indent string) ([]byte, error) {
 }
 
 // rootStartElement builds the canonical root xml.StartElement for v.
-// The element local name is the snake-cased BMM class name (e.g.
-// `dv_quantity`) so the root element matches the canjson key
-// convention. The default namespace `http://schemas.openehr.org/v1`
+// The element local name is the global element the class's ITS-XML
+// schema declares for its type, where its package registered one
+// ([RegisterRootElement]), such as `template`, and otherwise the
+// snake-cased BMM class name (e.g. `dv_quantity`), which matches the
+// canjson key convention. The default namespace `http://schemas.openehr.org/v1`
 // is declared on the root via an explicit `xmlns` attribute (rather
 // than the Name.Space slot, which auto-decorates child elements with
 // the openEHR namespace prefix), plus `xmlns:xsi` so descendants can
@@ -130,7 +137,7 @@ func MarshalIndent(v any, prefix, indent string) ([]byte, error) {
 func rootStartElement(v any) xml.StartElement {
 	local := ""
 	if n, ok := v.(BMMNamer); ok {
-		local = ElementName(n.BMMName())
+		local = rootElementName(n.BMMName())
 	}
 	return xml.StartElement{
 		Name: xml.Name{Local: local},

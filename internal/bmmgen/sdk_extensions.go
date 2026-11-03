@@ -261,7 +261,9 @@ func chainExtensions(chain []chainSchema) (sdkExtensions, error) {
 type planExtensions struct {
 	// leftOut is the set of classes the target leaves out.
 	leftOut map[string]bool
-	// typeAliases maps each alias to the class it reads as.
+	// typeAliases maps each alias of a class the target owns to the class it
+	// reads as; the generated package registers each with the canonical-XML
+	// decoder. An alias of a class another target owns is that target's.
 	typeAliases map[string]string
 	// droppedElements maps a class to the elements it accepts and drops, each
 	// to the texts it may hold.
@@ -303,7 +305,8 @@ func (x sdkExtensions) leftOutSet(schema *bmm.Schema) (map[string]bool, error) {
 // in p.extensions by subject. Every class an entry names but a type alias must
 // be one the plan holds, so a class left out is named by no other entry, and a
 // class the target emits must not name a class left out, which has no Go type.
-// A subject given twice is an error.
+// A subject given twice is an error. A type alias is kept only when the target
+// owns the class it names.
 func (p *Plan) applyExtensions(x sdkExtensions) error {
 	var errs []error
 	fail := func(format string, args ...any) {
@@ -347,6 +350,12 @@ func (p *Plan) applyExtensions(x sdkExtensions) error {
 			continue
 		}
 		if held("type_aliases", e.Class) {
+			if p.Classes[e.Class].External {
+				// The keys merge across the include chain, so a target
+				// sees the aliases of the schemas it includes; the target
+				// that owns the class registers its alias.
+				continue
+			}
 			if p.extensions.typeAliases == nil {
 				p.extensions.typeAliases = map[string]string{}
 			}

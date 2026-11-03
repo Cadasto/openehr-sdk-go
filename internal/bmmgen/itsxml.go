@@ -95,6 +95,9 @@ type xsdSet struct {
 	// dups holds, per type name, the declarations after the first, which
 	// [loadXSDSet] checks agree with the first.
 	dups map[string][]*xsdType
+	// globals maps a type name to the global element a schema file declares
+	// with that type: the root element of a document of that type.
+	globals map[string]string
 }
 
 // loadXSDSet reads the schemas the root patterns match under root, and every
@@ -108,6 +111,7 @@ func loadXSDSet(root *os.Root, roots []string) (*xsdSet, error) {
 		simpleTypes: make(map[string]bool),
 		groups:      make(map[string]*xsdNode),
 		dups:        make(map[string][]*xsdType),
+		globals:     make(map[string]string),
 	}
 	var queue []string
 	for _, pattern := range roots {
@@ -164,8 +168,10 @@ func loadXSDSet(root *os.Root, roots []string) (*xsdSet, error) {
 	return s, nil
 }
 
-// readFile declares the top-level complex types and groups of one schema
-// file and returns the files it references, as paths relative to the root.
+// readFile declares the top-level complex types, groups and elements of one
+// schema file and returns the files it references, as paths relative to the
+// root. A global element is read by its name and its type; one with an
+// anonymous type, or a second of another name for a type, is an error.
 func (s *xsdSet) readFile(root *os.Root, file string) ([]string, error) {
 	raw, err := root.ReadFile(file)
 	if err != nil {
@@ -205,6 +211,15 @@ func (s *xsdSet) readFile(root *os.Root, file string) ([]string, error) {
 			s.groups[n.attr("name")] = content
 		case n.is("simpleType"):
 			s.simpleTypes[n.attr("name")] = true
+		case n.is("element"):
+			name, typ := n.attr("name"), schemaLocalName(n.attr("type"))
+			if name == "" || typ == "" {
+				return nil, fmt.Errorf("its-xml: %s: a global element needs a name and a named type", file)
+			}
+			if other, dup := s.globals[typ]; dup && other != name {
+				return nil, fmt.Errorf("its-xml: %s: the global elements %s and %s both have the type %s", file, other, name, typ)
+			}
+			s.globals[typ] = name
 		}
 	}
 	return refs, nil
@@ -658,6 +673,19 @@ func (o *xmlChildOrder) attributesFor(plan *Plan, class string) ([]string, error
 		attrs = slices.DeleteFunc(attrs, func(a string) bool { return !slices.Contains(agreed, a) })
 	}
 	return attrs, nil
+}
+
+// rootElementFor returns the global element the schemas declare with the type
+// of class's own name, from the first set that declares one, or false when
+// none does. A class that takes an ancestor's type takes no root element from
+// it.
+func (o *xmlChildOrder) rootElementFor(class string) (string, bool) {
+	for _, set := range o.sets {
+		if element, ok := set.globals[class]; ok {
+			return element, true
+		}
+	}
+	return "", false
 }
 
 // nearestLineage returns class and every class it descends from, nearest

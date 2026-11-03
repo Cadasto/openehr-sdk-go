@@ -361,7 +361,7 @@ func DecodeAs[T any](dec *xml.Decoder, start xml.StartElement) (T, error) {
 	if typeName == "" {
 		return zero, &DecodeError{Path: "/" + start.Name.Local, Inner: fmt.Errorf("canxml: %w", typereg.ErrMissingType)}
 	}
-	ctor, ok := typereg.Default.Lookup(typeName)
+	ctor, ok := lookupType(typeName)
 	if !ok {
 		return zero, &DecodeError{
 			Path:  "/" + start.Name.Local,
@@ -416,7 +416,7 @@ func DecodeAsOrDefault[T any](dec *xml.Decoder, start xml.StartElement, defaultC
 			return zero, enclose("/"+start.Name.Local, "", err)
 		}
 	} else {
-		ctor, ok := typereg.Default.Lookup(typeName)
+		ctor, ok := lookupType(typeName)
 		if !ok {
 			return zero, &DecodeError{
 				Path:  "/" + start.Name.Local,
