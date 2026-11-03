@@ -6,6 +6,7 @@ package aom14
 import (
 	"encoding/xml"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlschema"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
 
@@ -157,8 +158,16 @@ func (e *ExprLeaf) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeElement(e.Type, xml.StartElement{Name: xml.Name{Local: "type"}}); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(e.Item, xml.StartElement{Name: xml.Name{Local: "item"}}); err != nil {
-		return err
+	switch _v := e.Item.(type) {
+	case nil:
+	case string, xmlschema.TypedString, *xmlschema.TypedString:
+		if err := _e.EncodeElement(_v, xml.StartElement{Name: xml.Name{Local: "item"}}); err != nil {
+			return err
+		}
+	default:
+		if err := canxml.EncodePoly(_e, "item", _v); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeElement(e.ReferenceType, xml.StartElement{Name: xml.Name{Local: "reference_type"}}); err != nil {
 		return err

@@ -7,6 +7,7 @@ import (
 	"encoding/json/jsontext"
 	"fmt"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlschema"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
@@ -80,7 +81,8 @@ func (e *ExprLeaf) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	w := struct {
 		Type string `json:"_type"`
 		*rawExprLeaf
-	}{rawExprLeaf: (*rawExprLeaf)(e)}
+		Item xmlschema.AnyJSON `json:"item"`
+	}{rawExprLeaf: (*rawExprLeaf)(e), Item: xmlschema.AnyJSON{To: &e.Item}}
 	return typereg.DecodeInto(dec, "EXPR_LEAF", &w, &w.Type)
 }
 

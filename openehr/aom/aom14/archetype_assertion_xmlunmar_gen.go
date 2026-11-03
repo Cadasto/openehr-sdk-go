@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"fmt"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlschema"
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
@@ -241,10 +242,11 @@ func (e *ExprLeaf) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 					return _err
 				}
 			case "item":
-				// Canonical XML does not model the content of an Any member — see canxml/doc.go.
-				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+				_v, _err := xmlschema.DecodeAny(_dec, _t)
+				if _err != nil {
 					return _err
 				}
+				e.Item = _v
 			default:
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err

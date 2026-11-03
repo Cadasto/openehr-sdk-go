@@ -2,8 +2,12 @@
 // canonical XML of the generated classes beyond their BMM names and shapes,
 // for the generated packages and openehr/serialize/canxml, which import it:
 // the type aliases the decoder reads, the root elements the encoder writes,
-// and the children the encoder leaves out where a schema makes them optional.
-// It is internal so that this wiring is not part of the SDK's public API.
+// the children the encoder leaves out where a schema makes them optional, the
+// reading of an `xsi:type` discriminator, an XML Schema built-in datatype
+// under a prefix among it, and the values of a BMM `Any` member, in canonical
+// XML and in the canonical JSON that carries the same values. It is internal
+// so that this wiring is not part of the SDK's public API; aom14.TypedString
+// names its one value type.
 package xmlschema
 
 import "sync"

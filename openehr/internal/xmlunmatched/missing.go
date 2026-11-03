@@ -101,7 +101,7 @@ func (t *Tracker) enter(start xml.StartElement, c *Class) error {
 // element is reported: the member is reported once, by its parent, as a
 // null is in canonical JSON. A struct element with no content is a value,
 // and so is an entry of a Hash member, whatever its text, and an element the
-// codec does not model, an Any one or a Hash of Hashes. A member inside a
+// codec does not model, a Hash of Hashes. A member inside a
 // Hash entry is named under the entry's key, such as
 // `/description/details/en/purpose`. The report is the whole policy: no
 // missing member refuses the decode, strict or not. A nil fn asks for

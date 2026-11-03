@@ -95,11 +95,13 @@ import (
 // `xmlunmatched.DecodeEntry`, which takes the key attribute off before the
 // value is read, or `xmlunmatched.DecodeEntryKeyedBy`, which reads the key
 // from the value, its language code ([xmlHashOf]). A Hash the codec does not
-// model, a Hash of Hashes, is not decoded, and neither is the content of a
-// property typed by the BMM root type Any: their element goes to
+// model, a Hash of Hashes, is not decoded: its element goes to
 // `xmlunmatched.SkipUnmatched` as one item of unmatched content, so it is
 // skipped by default, reported or refused on request, and the receiver field
-// is left at its zero value. Documented in canxml/doc.go.
+// is left at its zero value. Documented in canxml/doc.go. A property typed by
+// the BMM root type Any decodes through `xmlschema.DecodeAny`, as the class
+// its `xsi:type` names, as the text of an XML Schema built-in datatype kept
+// with its `xsi:type`, or as its text.
 func RenderUnmarshalXMLFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	emitting, err := codecClassesIn(plan, file)
 	if err != nil {
@@ -133,6 +135,9 @@ func RenderUnmarshalXMLFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	body.WriteString("import (\n")
 	body.WriteString("\t\"encoding/xml\"\n")
 	body.WriteString("\t\"fmt\"\n\n")
+	if slices.ContainsFunc(chunks, func(c string) bool { return strings.Contains(c, "xmlschema.") }) {
+		fmt.Fprintf(&body, "\t%q\n", xmlschemaImportPath)
+	}
 	body.WriteString("\t\"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched\"\n")
 	body.WriteString("\t\"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg\"\n")
 	body.WriteString("\t\"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml\"\n")
@@ -349,9 +354,9 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 	switch p := ef.Prop.(type) {
 	case *bmm.SingleProperty:
 		if p.TypeName == bmmAnyType {
-			// The codec cannot decode the content of an Any member: the
-			// element goes to xmlunmatched.SkipUnmatched as one item.
-			return unmarshalXMLAnyContent(elemName), nil
+			// An Any member decodes as the type its discriminator names, or
+			// as its text: xmlschema.DecodeAny.
+			return unmarshalXMLAny(recv, goField, elemName, p.IsMandatory), nil
 		}
 		ifaceName, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
 		if kind == polySingle {
@@ -989,13 +994,17 @@ const checkUnmatchedXMLText = "\t\tcase xml.CharData:\n" +
 // the Go empty interface.
 const bmmAnyType = "Any"
 
-// unmarshalXMLAnyContent emits the case of a property typed by the BMM root
-// type Any, such as the AOM 1.4 `EXPR_LEAF.item`. The
-// codec cannot decode its content, so the element is handed to
-// xmlunmatched.SkipUnmatched as one item: skipped by default, reported or
-// refused on request, and the field is left at its zero value.
-func unmarshalXMLAnyContent(elem string) string {
+// unmarshalXMLAny emits the case of a property typed by the BMM root type
+// Any, such as the AOM 1.4 `EXPR_LEAF.item`, held as a Go any, or as *any when
+// optional: xmlschema.DecodeAny decodes the element as the class its
+// discriminator names, as the text of an XML Schema built-in datatype, kept
+// with its `xsi:type`, or, with no discriminator, as its text.
+func unmarshalXMLAny(recv, field, elem string, mandatory bool) string {
+	assign := fmt.Sprintf("\t\t\t\t%s.%s = _v\n", recv, field)
+	if !mandatory {
+		assign = fmt.Sprintf("\t\t\t\t%s.%s = &_v\n", recv, field)
+	}
 	return fmt.Sprintf(
-		"\t\t\tcase %q:\n\t\t\t\t// Canonical XML does not model the content of an Any member — see canxml/doc.go.\n\t\t\t\tif _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
-		elem)
+		"\t\t\tcase %q:\n\t\t\t\t_v, _err := xmlschema.DecodeAny(_dec, _t)\n\t\t\t\tif _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n%s",
+		elem, assign)
 }

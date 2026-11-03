@@ -4,7 +4,6 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlschema"
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
@@ -71,9 +70,8 @@ func (c decoderConfig) tracker() *xmlunmatched.Tracker {
 // directly inside an element whose content is elements, such as an RM
 // object's, a CDATA section included; and an element whose content this
 // codec does not model: a `Hash` whose values are `Hash`es
-// (RESOURCE_ANNOTATIONS `documentation`), a BMM `Any` member (the AOM 1.4
-// `EXPR_LEAF.item`), and a member whose Go type has no decoder of its own
-// (see the package documentation). A bare `type`
+// (RESOURCE_ANNOTATIONS `documentation`) and a member whose Go type has no
+// decoder of its own (see the package documentation). A bare `type`
 // attribute is unmatched except where dispatch reads it as the
 // discriminator. It applies at any depth: inside a polymorphic slot, an
 // interval bound, a primitive element or an AOM 1.4 value too. The text of
@@ -303,91 +301,8 @@ func Unmarshal(data []byte, v any, opts ...DecoderOption) error {
 // all; the caller decides whether that is an error (strict) or
 // acceptable (relaxed dispatch).
 func XSITypeOf(start xml.StartElement) (string, error) {
-	d, err := discriminator(nil, start)
-	return d.name, err
-}
-
-// discriminated is what the discriminator of an element says about the type
-// the element decodes as.
-type discriminated struct {
-	// attr names the attribute read as the discriminator, so that dispatch
-	// can record which attribute it read; the zero name when there is none.
-	attr xml.Name
-	// name is the type the element decodes as: an openEHR class name, or the
-	// BMM primitive an XML Schema built-in datatype reads as; empty when the
-	// element carries no discriminator.
-	name string
-	// written is the discriminator as written, its prefix included.
-	written string
-	// builtin reports that name is the BMM primitive of the XML Schema
-	// built-in datatype written names.
-	builtin bool
-}
-
-// discriminator returns what the attribute of start that [XSITypeOf] reads as
-// the `xsi:type` discriminator says. An `xsi:type` in the XSI namespace or
-// written literally wins; a bare `type` is read only when there is none, so a
-// bare `type` beside an `xsi:type` stays unmatched content. A prefixed value
-// resolves against the namespace declarations in scope where the attribute
-// stands, which dec knows, or, when dec is nil, against those start carries.
-func discriminator(dec *xml.Decoder, start xml.StartElement) (discriminated, error) {
-	bare := -1
-	for i, attr := range start.Attr {
-		// Reject xmi:type (both resolved and literal forms).
-		if attr.Name.Local == "type" && attr.Name.Space == NSXMI {
-			return discriminated{}, fmt.Errorf("canxml: %w: xmi:type on the wire is rejected (use xsi:type)", ErrInvalidShape)
-		}
-		if attr.Name.Local == "xmi:type" {
-			return discriminated{}, fmt.Errorf("canxml: %w: xmi:type on the wire is rejected (use xsi:type)", ErrInvalidShape)
-		}
-		if !xmlunmatched.IsDiscriminator(attr.Name) {
-			continue
-		}
-		// Accept xsi:type (resolved and literal forms) at once; keep a bare
-		// type for when there is none.
-		if attr.Name.Space != "" || attr.Name.Local != "type" {
-			return resolveType(dec, start, attr)
-		}
-		if bare < 0 {
-			bare = i
-		}
-	}
-	if bare >= 0 {
-		return resolveType(dec, start, start.Attr[bare])
-	}
-	return discriminated{}, nil
-}
-
-// resolveType returns what attr, the discriminator of start, says. A value
-// with no prefix names an openEHR class. A prefixed value names an XML Schema
-// built-in datatype, and reads as its BMM primitive, when its prefix is bound
-// to the XML Schema namespace where attr stands, or is the literal `xsd`
-// bound by no declaration in scope; any other prefixed value is kept as
-// written, which names no type. A value whose local name is no built-in
-// datatype is kept as written whatever its prefix, so only a built-in's
-// prefix is resolved. When dec cannot tell the declarations around start,
-// which a plain encoding/xml decoder does not keep, and start does not
-// declare the prefix itself, resolveType refuses the value with
-// [xmlunmatched.UnresolvedPrefix], for [Unmarshal] to decode the document
-// again through a decoder that does.
-func resolveType(dec *xml.Decoder, start xml.StartElement, attr xml.Attr) (discriminated, error) {
-	d := discriminated{attr: attr.Name, name: attr.Value, written: attr.Value}
-	prefix, local, prefixed := strings.Cut(attr.Value, ":")
-	if !prefixed {
-		return d, nil
-	}
-	primitive, ok := xmlschema.Builtin(local)
-	if !ok {
-		return d, nil
-	}
-	uri, bound, known := xmlunmatched.LookupPrefix(dec, start, prefix)
-	if !known && dec != nil {
-		return discriminated{}, xmlunmatched.UnresolvedPrefix()
-	}
-	if (bound && uri == xmlschema.NS) || (!bound && prefix == xmlschema.LiteralPrefix) {
-		d.name, d.builtin = primitive, true
-	}
-	return d, nil
+	d, err := xmlschema.Discriminator(nil, start)
+	return d.Name, err
 }
 
 // DecodeAs reads one polymorphic child element from dec (the
@@ -412,15 +327,15 @@ func resolveType(dec *xml.Decoder, start xml.StartElement, attr xml.Attr) (discr
 //     the next child.
 func DecodeAs[T any](dec *xml.Decoder, start xml.StartElement) (T, error) {
 	var zero T
-	d, err := discriminator(dec, start)
+	d, err := xmlschema.Discriminator(dec, start)
 	if err != nil {
 		return zero, &DecodeError{Path: "/" + start.Name.Local, Inner: err}
 	}
-	attrName, typeName := d.attr, d.name
+	attrName, typeName := d.Attr, d.Name
 	if typeName == "" {
 		return zero, &DecodeError{Path: "/" + start.Name.Local, Inner: fmt.Errorf("canxml: %w", typereg.ErrMissingType)}
 	}
-	ctor, ok := lookupType(typeName)
+	ctor, ok := xmlschema.LookupType(typeName)
 	if !ok {
 		return zero, &DecodeError{
 			Path:  "/" + start.Name.Local,
@@ -431,7 +346,7 @@ func DecodeAs[T any](dec *xml.Decoder, start xml.StartElement) (T, error) {
 	xmlunmatched.DiscriminatorRead(dec, attrName)
 	v := ctor()
 	if err := xmlunmatched.DecodeElement(dec, &start, v); err != nil {
-		return zero, enclose("/"+start.Name.Local, typeName, err)
+		return zero, xmlschema.Enclose("/"+start.Name.Local, typeName, err)
 	}
 	if t, ok := v.(T); ok {
 		return t, nil
@@ -461,11 +376,11 @@ func DecodeAs[T any](dec *xml.Decoder, start xml.StartElement) (T, error) {
 // field type fixes the concrete subtype.
 func DecodeAsOrDefault[T any](dec *xml.Decoder, start xml.StartElement, defaultCtor func() any) (T, error) {
 	var zero T
-	d, err := discriminator(dec, start)
+	d, err := xmlschema.Discriminator(dec, start)
 	if err != nil {
 		return zero, &DecodeError{Path: "/" + start.Name.Local, Inner: err}
 	}
-	attrName, typeName := d.attr, d.name
+	attrName, typeName := d.Attr, d.Name
 	var v any
 	if typeName == "" {
 		if defaultCtor == nil {
@@ -473,10 +388,10 @@ func DecodeAsOrDefault[T any](dec *xml.Decoder, start xml.StartElement, defaultC
 		}
 		v = defaultCtor()
 		if err := xmlunmatched.DecodeElement(dec, &start, v); err != nil {
-			return zero, enclose("/"+start.Name.Local, "", err)
+			return zero, xmlschema.Enclose("/"+start.Name.Local, "", err)
 		}
 	} else {
-		ctor, ok := lookupType(typeName)
+		ctor, ok := xmlschema.LookupType(typeName)
 		if !ok {
 			return zero, &DecodeError{
 				Path:  "/" + start.Name.Local,
@@ -487,7 +402,7 @@ func DecodeAsOrDefault[T any](dec *xml.Decoder, start xml.StartElement, defaultC
 		xmlunmatched.DiscriminatorRead(dec, attrName)
 		v = ctor()
 		if err := xmlunmatched.DecodeElement(dec, &start, v); err != nil {
-			return zero, enclose("/"+start.Name.Local, typeName, err)
+			return zero, xmlschema.Enclose("/"+start.Name.Local, typeName, err)
 		}
 	}
 	if t, ok := v.(T); ok {
@@ -501,21 +416,4 @@ func DecodeAsOrDefault[T any](dec *xml.Decoder, start xml.StartElement, defaultC
 		Type:  typeName,
 		Inner: fmt.Errorf("canxml: decoded %T: %w", v, typereg.ErrTypeMismatch),
 	}
-}
-
-// enclose returns the [DecodeError] for err, a failure while the element at
-// path decoded as typeName (empty when no discriminator chose the type).
-//
-// A failure that is itself a DecodeError comes from a polymorphic slot
-// further in. It becomes the Inner of the new one as it is, so a failure deep
-// inside nested slots is a chain of envelopes, one per slot, whose message is
-// written once, when it is asked for. Wrapping it in a formatted error instead
-// would write out the whole message below at every slot on the way out, at a
-// cost that grows with the square of the depth. Any other failure keeps the
-// canxml prefix.
-func enclose(path, typeName string, err error) *DecodeError {
-	if de, ok := err.(*DecodeError); ok && de != nil { //nolint:errorlint // a direct envelope only: a wrapped one keeps its wrapper, prefixed below
-		return &DecodeError{Path: path, Type: typeName, Inner: de}
-	}
-	return &DecodeError{Path: path, Type: typeName, Inner: fmt.Errorf("canxml: %w", err)}
 }

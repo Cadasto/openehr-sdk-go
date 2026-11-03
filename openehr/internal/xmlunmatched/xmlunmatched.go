@@ -9,8 +9,8 @@
 // decodes as, other than namespace declarations and attributes in the XML
 // Schema instance namespace (`xsi:type`, `xsi:schemaLocation`, `xsi:nil`, …);
 // an element in a namespace other than the openEHR one; and an element whose
-// content the codec does not model: a BMM `Any` member, a `Hash` of `Hash`es,
-// and a member whose Go type has no decoder of its own. So is text other than
+// content the codec does not model: a `Hash` of `Hash`es and a member whose Go
+// type has no decoder of its own. So is text other than
 // XML whitespace directly inside an element whose content is elements, one
 // item per element however many runs of text it holds. By default the decode
 // skips it. A caller can instead track it: report each item, in document
@@ -801,8 +801,8 @@ func LocalName(name xml.Name) string {
 // SkipUnmatched skips the element start opens, which the generated decoder
 // does not read: its name matches no attribute of the RM type being decoded,
 // it lies in a foreign namespace, or it holds content the codec does not
-// model, such as a BMM `Any` attribute, a `Hash` of `Hash`es or a member
-// whose Go type has no decoder of its own. The element is one item, whatever it
+// model, such as a `Hash` of `Hash`es or a member whose Go type has no decoder
+// of its own. The element is one item, whatever it
 // holds. start must be the token the decoder read last.
 //
 // By default it only skips. A tracked decode first reports the element's

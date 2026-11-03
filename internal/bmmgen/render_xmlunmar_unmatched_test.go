@@ -17,10 +17,11 @@ import (
 // entry, an element in a foreign namespace through the name it switches on,
 // every other element it does not read through its default arm, the text
 // between its child elements through its character-data arm, the element of
-// an Any member and of a Hash canonical XML does not model through their own
-// arms, and a primitive element through xmlunmatched.DecodeElement. A member
-// typed by a generic List, Set or Array decodes each element as one item and
-// appends it, and a Hash member each element as one entry (REQ-176).
+// a Hash canonical XML does not model through its own arm, and a primitive
+// element through xmlunmatched.DecodeElement. A member typed by a generic
+// List, Set or Array decodes each element as one item and appends it, a Hash
+// member each element as one entry, and an Any member its element through
+// xmlschema.DecodeAny, as the type its discriminator names (REQ-176).
 //
 // An arm may hand an element to the decoder's own DecodeElement only when the
 // member's class is one of those the two targets render a decoder for, which
@@ -124,8 +125,8 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 						}
 					case isAnyProperty(ef.Prop):
 						anys++
-						if !strings.Contains(arm, "xmlunmatched.SkipUnmatched(_dec, _t)") || strings.Contains(arm, "DecodeElement(") {
-							t.Errorf("%s.%s is an Any member; its arm must hand the element to xmlunmatched.SkipUnmatched as one item and decode nothing:\n%s", pc.BMMName, prop, arm)
+						if !strings.Contains(arm, "xmlschema.DecodeAny(_dec, _t)") || strings.Contains(arm, "SkipUnmatched(") {
+							t.Errorf("%s.%s is an Any member; its arm must decode the element through xmlschema.DecodeAny, as the type its discriminator names:\n%s", pc.BMMName, prop, arm)
 						}
 					case isOpenParamProperty(ef):
 						if strings.Contains(arm, "_err := canxml.DecodeAs[") {
@@ -156,7 +157,7 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 			t.Errorf("the RM target rendered %d Hash arms, %d generic-parameter arms and %d Octet arms; want the resource-metadata Hash members, VERSION<T>.data and DV_MULTIMEDIA.data covered", hashes, params, octets)
 		}
 		if target.GoPackage == TargetAOM14.GoPackage && (anys == 0 || lists == 0 || choices == 0) {
-			t.Errorf("the AOM 1.4 target rendered %d Any arms, %d generic-list arms and %d choice arms; want `assumed_value`, `EXPR_LEAF.item`, C_CODE_PHRASE's `code_list` and ORDINAL's `symbol` covered", anys, lists, choices)
+			t.Errorf("the AOM 1.4 target rendered %d Any arms, %d generic-list arms and %d choice arms; want `EXPR_LEAF.item`, C_CODE_PHRASE's `code_list` and ORDINAL's `symbol` covered", anys, lists, choices)
 		}
 	}
 }
@@ -197,7 +198,7 @@ func isGenericListProperty(prop bmm.Property) bool {
 }
 
 // isAnyProperty reports whether prop is a single property typed by the BMM
-// root type Any, whose content canonical XML does not model.
+// root type Any, which canonical XML decodes as its discriminator says.
 func isAnyProperty(prop bmm.Property) bool {
 	p, ok := prop.(*bmm.SingleProperty)
 	return ok && p.TypeName == bmmAnyType

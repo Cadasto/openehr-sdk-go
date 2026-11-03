@@ -272,6 +272,9 @@ func renderMarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass, e
 
 	switch p := ef.Prop.(type) {
 	case *bmm.SingleProperty:
+		if p.TypeName == bmmAnyType {
+			return marshalXMLAny(recv, goField, elemName, p.IsMandatory), nil
+		}
 		_, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
 		if kind == polySingle || kind == polySingleNarrow {
 			return marshalXMLPolySingle(recv, goField, elemName), nil
@@ -368,6 +371,34 @@ func containerInnerIsClass(plan *Plan, td *bmm.ContainerType) bool {
 }
 
 // --- Per-shape emission helpers ----------------------------------------
+
+// marshalXMLAny emits the encoding of a property typed by the BMM root type
+// Any, held as a Go any, or as *any when optional: a string, the text of an
+// item with no `xsi:type`, and an xmlschema.TypedString, which writes its own
+// `xsi:type`, go to encoding/xml; any other value is a class value, written
+// through canxml.EncodePoly with its `xsi:type`; a nil member writes nothing.
+func marshalXMLAny(recv, field, elem string, mandatory bool) string {
+	start := fmt.Sprintf("xml.StartElement{Name: xml.Name{Local: %q}}", elem)
+	value := recv + "." + field
+	indent := "\t"
+	var b strings.Builder
+	if !mandatory {
+		fmt.Fprintf(&b, "\tif %s != nil {\n", value)
+		value = "*" + value
+		indent = "\t\t"
+	}
+	fmt.Fprintf(&b, "%sswitch _v := %s.(type) {\n", indent, value)
+	fmt.Fprintf(&b, "%scase nil:\n", indent)
+	fmt.Fprintf(&b, "%scase string, xmlschema.TypedString, *xmlschema.TypedString:\n", indent)
+	fmt.Fprintf(&b, "%s\tif err := _e.EncodeElement(_v, %s); err != nil {\n%s\t\treturn err\n%s\t}\n", indent, start, indent, indent)
+	fmt.Fprintf(&b, "%sdefault:\n", indent)
+	fmt.Fprintf(&b, "%s\tif err := canxml.EncodePoly(_e, %q, _v); err != nil {\n%s\t\treturn err\n%s\t}\n", indent, elem, indent, indent)
+	fmt.Fprintf(&b, "%s}\n", indent)
+	if !mandatory {
+		b.WriteString("\t}\n")
+	}
+	return b.String()
+}
 
 func marshalXMLPrimitiveMandatory(recv, field, elem string) string {
 	return fmt.Sprintf("\tif err := _e.EncodeElement(%s.%s, xml.StartElement{Name: xml.Name{Local: %q}}); err != nil {\n\t\treturn err\n\t}\n", recv, field, elem)

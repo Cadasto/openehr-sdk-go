@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"go/format"
+	"slices"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
@@ -57,6 +58,9 @@ func RenderUnmarshalJSONFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	body.WriteString("import (\n")
 	body.WriteString("\t\"encoding/json/jsontext\"\n")
 	body.WriteString("\t\"fmt\"\n\n")
+	if slices.ContainsFunc(chunks, func(c string) bool { return strings.Contains(c, "xmlschema.") }) {
+		fmt.Fprintf(&body, "\t%q\n", xmlschemaImportPath)
+	}
 	fmt.Fprintf(&body, "\t%q\n", typeregImportPath)
 	if needsExternalImportForJSONMar(plan, chunks) {
 		fmt.Fprintf(&body, "\t%q\n", plan.Target.ExternalImport)
@@ -114,6 +118,13 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 	}
 	if shape == shapeIntervalBase {
 		return renderUnmarshalIntervalBase(pc, recv, typeArgs), nil
+	}
+	anyMembers, err := jsonAnyMembers(plan, pc, fields)
+	if err != nil {
+		return "", err
+	}
+	if len(anyMembers) > 0 && shape != shapeAlias && shape != shapeIntervalAlias {
+		return "", fmt.Errorf("%s has an Any member and takes JSON wire shape %d, which has no decode for one", pc.BMMName, shape)
 	}
 
 	var b strings.Builder
@@ -173,13 +184,56 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 		b.WriteString("\tw := struct {\n")
 		b.WriteString("\t\tType string `json:\"_type\"`\n")
 		fmt.Fprintf(&b, "\t\t*%s%s\n", alias, typeArgs)
-		fmt.Fprintf(&b, "\t}{%s: (*%s%s)(%s)}\n", alias, alias, typeArgs, recv)
+		// An Any member decodes through a field of its own, which shadows the
+		// alias's field of that JSON name and decodes into the receiver's.
+		inits := []string{fmt.Sprintf("%s: (*%s%s)(%s)", alias, alias, typeArgs, recv)}
+		for _, m := range anyMembers {
+			fmt.Fprintf(&b, "\t\t%s %s `json:%q`\n", m.field, m.decoder, m.name)
+			inits = append(inits, fmt.Sprintf("%s: %s{To: &%s.%s}", m.field, m.decoder, recv, m.field))
+		}
+		fmt.Fprintf(&b, "\t}{%s}\n", strings.Join(inits, ", "))
 		fmt.Fprintf(&b, "\treturn typereg.DecodeInto(dec, %q, &w, &w.Type)\n", pc.BMMName)
 	default:
 		return "", fmt.Errorf("%s: unhandled JSON wire shape %d", pc.BMMName, shape)
 	}
 	b.WriteString("}\n")
 	return b.String(), nil
+}
+
+// jsonAnyMember is a member typed by the BMM root type Any, which canonical
+// JSON decodes through a decoder of its own: field is its Go field, name its
+// JSON member name and decoder the xmlschema type that decodes it.
+type jsonAnyMember struct {
+	field, name, decoder string
+}
+
+// jsonAnyMembers returns the members of pc typed by the BMM root type Any,
+// such as the AOM 1.4 `EXPR_LEAF.item`, in the order of fields, each with the
+// decoder that reads its canonical JSON: xmlschema.AnyJSON for a mandatory
+// member, held as a Go any, and xmlschema.OptionalAnyJSON for an optional one,
+// held as a *any. A member whose element takes a choice of shapes in canonical
+// XML ([xmlChoiceOf]) is not one of them.
+func jsonAnyMembers(plan *Plan, pc *PlannedClass, fields []emittedField) ([]jsonAnyMember, error) {
+	var out []jsonAnyMember
+	for _, ef := range fields {
+		p, ok := ef.Prop.(*bmm.SingleProperty)
+		if !ok || p.TypeName != bmmAnyType {
+			continue
+		}
+		choice, err := xmlChoiceOf(plan, pc, ef)
+		if err != nil {
+			return nil, err
+		}
+		if choice != nil {
+			continue
+		}
+		m := jsonAnyMember{field: FieldName(p.PropertyName()), name: p.PropertyName(), decoder: "xmlschema.AnyJSON"}
+		if !p.IsMandatory {
+			m.decoder = "xmlschema.OptionalAnyJSON"
+		}
+		out = append(out, m)
+	}
+	return out, nil
 }
 
 // polyKind enumerates the polymorphism shapes the classifier recognises: a

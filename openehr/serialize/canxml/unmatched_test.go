@@ -716,12 +716,14 @@ func TestREQ170_XMLWideElement(t *testing.T) {
 	}
 }
 
-// TestREQ170_XMLAnyMemberContent pins the rule for the content of a BMM `Any`
-// member, which the codec cannot decode: the AOM 1.4 `assumed_value` and
-// `EXPR_LEAF.item`. The element is skipped by default,
-// leaving the field at its zero value; the report option reports it as one
-// item at its own path, whatever it holds, an empty element included; and
-// strict refuses it like unmatched content.
+// TestREQ170_XMLAnyMemberContent pins the rule for an `assumed_value` on an
+// AOM 1.4 class whose schema type gives it none, such as C_COMPLEX_OBJECT,
+// which the BMM types `Any` on C_DEFINED_OBJECT: no member reads it. The
+// element is skipped by default, leaving the value as without it; the report
+// option reports it as one item at its own path, whatever it holds, an empty
+// element included; and strict refuses it like unmatched content. The
+// EXPR_LEAF item, the one `Any` member the codec reads, is pinned by
+// TestREQ170_REQ176_XMLExprLeafItemIsRead.
 func TestREQ170_XMLAnyMemberContent(t *testing.T) {
 	const slot = "{{any}}"
 	for _, tc := range []struct {
@@ -744,14 +746,6 @@ func TestREQ170_XMLAnyMemberContent(t *testing.T) {
 			element: `<assumed_value/>`,
 			path:    "/definition[1]/assumed_value[1]",
 			into:    func() any { return new(aom14.CComplexObject) },
-		},
-		{
-			name: "EXPR_LEAF item",
-			tmpl: `<expr_leaf ` + ucNS + `><type>C_STRING</type>` + slot +
-				`<reference_type>constraint</reference_type></expr_leaf>`,
-			element: `<item xsi:type="C_STRING"><pattern>` + xmlPlanted + `</pattern></item>`,
-			path:    "/expr_leaf[1]/item[1]",
-			into:    func() any { return new(aom14.ExprLeaf) },
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -782,6 +776,69 @@ func TestREQ170_XMLAnyMemberContent(t *testing.T) {
 
 			err = canxml.Unmarshal(in, tc.into(), canxml.WithStrict())
 			assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, tc.path, false)
+		})
+	}
+}
+
+// TestREQ170_REQ176_XMLExprLeafItemIsRead pins that the EXPR_LEAF item, a BMM
+// `Any` member, is read, not unmatched (REQ-176 § Shapes): an item whose
+// `xsi:type` names a class or an XML Schema built-in decodes, in every mode,
+// with nothing reported and nothing refused; what the item's own content
+// holds that its type does not read is unmatched at its path inside the item,
+// as for any class or primitive element.
+func TestREQ170_REQ176_XMLExprLeafItemIsRead(t *testing.T) {
+	leaf := func(item string) []byte {
+		return []byte(`<expr_leaf ` + ucNS + `><type>String</type>` + item + `<reference_type>constraint</reference_type></expr_leaf>`)
+	}
+	pattern := xmlPlanted
+	for _, tc := range []struct {
+		name  string
+		item  string
+		want  any
+		paths []string
+	}{
+		{
+			name: "C_STRING",
+			item: `<item xsi:type="C_STRING"><pattern>` + xmlPlanted + `</pattern></item>`,
+			want: &aom14.CString{Pattern: &pattern},
+		},
+		{
+			name: "xs:string",
+			item: `<item xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string">` + xmlPlanted + `</item>`,
+			want: &aom14.TypedString{Value: xmlPlanted, Type: "xs:string"},
+		},
+		{
+			name:  "C_STRING with an attribute it does not read",
+			item:  `<item xsi:type="C_STRING" x-attr="` + xmlPlanted + `"><pattern>` + xmlPlanted + `</pattern></item>`,
+			want:  &aom14.CString{Pattern: &pattern},
+			paths: []string{"/expr_leaf[1]/item[1]/@x-attr"},
+		},
+		{
+			name:  "xs:string holding a child element",
+			item:  `<item xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string">` + xmlPlanted + `<x-note/></item>`,
+			want:  &aom14.TypedString{Value: xmlPlanted, Type: "xs:string"},
+			paths: []string{"/expr_leaf[1]/item[1]/x-note[1]"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, paths, err := unmarshalCollecting(func() any { return new(aom14.ExprLeaf) }, leaf(tc.item))
+			if err != nil {
+				t.Fatalf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
+			}
+			if !slices.Equal(paths, tc.paths) {
+				t.Errorf("WithUnmatched reported %q; want %q", paths, tc.paths)
+			}
+			if item := got.(*aom14.ExprLeaf).Item; !reflect.DeepEqual(item, tc.want) {
+				t.Errorf("item = %#v; want %#v", item, tc.want)
+			}
+			err = canxml.Unmarshal(leaf(tc.item), new(aom14.ExprLeaf), canxml.WithStrict())
+			if len(tc.paths) == 0 {
+				if err != nil {
+					t.Errorf("canxml.Unmarshal(WithStrict) = %v; want nil", err)
+				}
+				return
+			}
+			assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, tc.paths[0], false)
 		})
 	}
 }

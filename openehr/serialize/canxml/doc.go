@@ -121,7 +121,7 @@
 // element in a namespace other than the openEHR one ([ErrNamespace]); text
 // other than XML whitespace directly inside an element whose content is
 // elements, such as an RM object's, a CDATA section included; and the
-// element of a BMM `Any` member or of a `Hash` of `Hash`es (see below). The
+// element of a `Hash` of `Hash`es (see below). The
 // key attribute of a `Hash` entry is read, not unmatched. The text of a
 // primitive element is its value, and whitespace between elements is never
 // unmatched, so an indented document decodes as a compact one does.
@@ -211,8 +211,8 @@
 // element such as `<subject/>` or a bare `<subject xsi:type="PARTY_SELF"/>`,
 // `<magnitude>0</magnitude>`, an `archetype_node_id` written as an XML
 // attribute, a `Hash` with an entry, even one whose value is empty, and an
-// `Any` element the codec does not model are present, and whether such a
-// value is valid is for the validators to say.
+// element the codec does not model, a `Hash` of `Hash`es, are present, and
+// whether such a value is valid is for the validators to say.
 // Canonical XML has no element for an empty list, so a mandatory list the
 // input leaves empty, a CLUSTER's `items`, is missing, where canonical
 // JSON's `[]` is present. Nothing inside a nilled element is reported: the
@@ -302,16 +302,31 @@
 // element, as an empty list does, and a mandatory one with no element is
 // missing ([WithMissing]). Two entries with the same key keep the later one.
 //
-// # Unsupported: Any content and a Hash of Hashes
+// # Any members
 //
-// The codec cannot decode the content of a BMM `Any` attribute, held as a Go
-// empty interface: the AOM 1.4 `EXPR_LEAF.item`. Nor does it model a `Hash`
-// whose values are `Hash`es, RESOURCE_ANNOTATIONS' `documentation`. Decode treats such an element as one item of unmatched
-// content, so it skips it by default, [WithUnmatched] reports it and
-// [WithStrict] refuses it, and the field stays at its zero value; [Marshal]
-// of a RESOURCE_ANNOTATIONS fails, since encoding/xml rejects the map. So the
-// decode would treat a member whose Go type has no canonical-XML decoder of
-// its own; every member of the RM and AOM 1.4 types has one.
+// A BMM `Any` member, held as a Go empty interface, the AOM 1.4
+// `EXPR_LEAF.item`, decodes as the type its `xsi:type` names, read as a
+// discriminator is read (see "Wire profile" above): a class such as
+// `C_STRING`, as a pointer to a value of the class; an XML Schema built-in
+// datatype, such as `xs:string` under a prefix bound to the XML Schema
+// namespace where the attribute stands, as an aom14.TypedString that holds
+// the text and keeps the `xsi:type` as written; and, with no `xsi:type`, as
+// its text, a Go string. The encoder writes each in the form it was read in: a
+// class value with its `xsi:type`, a typed string with its own and a
+// declaration of the prefix it uses, and a Go string with none. The item is
+// read, not unmatched content; what its own type does not read is, as in any
+// class or primitive element.
+//
+// # Unsupported: a Hash of Hashes
+//
+// The codec does not model a `Hash` whose values are `Hash`es,
+// RESOURCE_ANNOTATIONS' `documentation`. Decode treats such an element as one
+// item of unmatched content, so it skips it by default, [WithUnmatched]
+// reports it and [WithStrict] refuses it, and the field stays at its zero
+// value; [Marshal] of a RESOURCE_ANNOTATIONS fails, since encoding/xml rejects
+// the map. So the decode would treat a member whose Go type has no
+// canonical-XML decoder of its own; every member of the RM and AOM 1.4 types
+// has one.
 //
 // The canjson codec is unaffected (encoding/json handles maps).
 //
