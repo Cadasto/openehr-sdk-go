@@ -8,16 +8,15 @@ import (
 
 // TestTemplatecompileForbiddenImports guards REQ-013
 // (docs/specifications/module-layout.md § REQ-013) for openehr/templatecompile,
-// a clinical building block that takes a parsed OPT and returns a compiled
-// template, as doc.go documents. Two rules hold:
+// a clinical building block that takes an operational template read into the
+// model and returns a compiled template, as doc.go documents. Two rules hold:
 //
 //   - Neither the package nor any package of this module it pulls in imports
 //     transport, auth or openehr/client.
 //   - The package's own non-test files do not import openehr/serialize, the
-//     rule every template-side building block keeps. Today nothing they pull
-//     in imports it either: the closure reaches openehr/rm/rminfo but not
-//     openehr/rm, whose generated marshal files are what bring
-//     openehr/serialize/canxml into other blocks' closures.
+//     rule every template-side building block keeps. What they pull in does:
+//     the model in openehr/aom/aom14, which Compile takes, and openehr/rm,
+//     which the model is built on, decode through openehr/serialize/canxml.
 func TestTemplatecompileForbiddenImports(t *testing.T) {
 	t.Parallel()
 	violations, err := importguard.Scan(".", importguard.WireLayers())

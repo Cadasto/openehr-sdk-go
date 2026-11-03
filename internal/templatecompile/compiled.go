@@ -62,9 +62,9 @@ func (c *Compiled) Root() *CompiledNode { return c.root }
 // not predicate-less prefixes like "/content".
 //
 // This differs from [template.OperationalTemplate.NodeAt], which
-// walks the wire tree and applies lenient first-child rules for
-// predicate-less segments on multi-cardinality attributes. Use
-// [CompiledNode.AQLPath] or wire NodeAt when you need tree-walk
+// walks the deprecated parser's tree and applies lenient first-child rules
+// for predicate-less segments on multi-cardinality attributes. Use
+// [CompiledNode.AQLPath] or that NodeAt when you need tree-walk
 // semantics; use NodeAt here when you already hold a canonical path.
 //
 // Returns [ErrPathNotFound] when the path string is not indexed.
