@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
 // ItemTag is a parsed ITEM_TAG from an openehr-item-tag or
@@ -15,7 +17,8 @@ type ItemTag struct {
 }
 
 // FormatItemTagHeader encodes tags into the semicolon-separated ITS-REST
-// header shape.
+// header shape. A tag with an empty key, or with a control character in its
+// key, value or target path, fails with [transport.ErrInvalidConfig].
 func FormatItemTagHeader(tags []ItemTag) (string, error) {
 	if len(tags) == 0 {
 		return "", nil
@@ -23,16 +26,16 @@ func FormatItemTagHeader(tags []ItemTag) (string, error) {
 	parts := make([]string, 0, len(tags))
 	for i, t := range tags {
 		if strings.TrimSpace(t.Key) == "" {
-			return "", fmt.Errorf("ehr: item tag[%d]: empty key", i)
+			return "", fmt.Errorf("ehr: %w: item tag[%d]: empty key", transport.ErrInvalidConfig, i)
 		}
 		if hasCtrlChars(t.Key) {
-			return "", fmt.Errorf("ehr: item tag[%d]: key contains control characters", i)
+			return "", fmt.Errorf("ehr: %w: item tag[%d]: key contains control characters", transport.ErrInvalidConfig, i)
 		}
 		if t.Value != "" && hasCtrlChars(t.Value) {
-			return "", fmt.Errorf("ehr: item tag[%d]: value contains control characters", i)
+			return "", fmt.Errorf("ehr: %w: item tag[%d]: value contains control characters", transport.ErrInvalidConfig, i)
 		}
 		if t.TargetPath != "" && hasCtrlChars(t.TargetPath) {
-			return "", fmt.Errorf("ehr: item tag[%d]: target_path contains control characters", i)
+			return "", fmt.Errorf("ehr: %w: item tag[%d]: target_path contains control characters", transport.ErrInvalidConfig, i)
 		}
 		var b strings.Builder
 		b.WriteString(`key="`)

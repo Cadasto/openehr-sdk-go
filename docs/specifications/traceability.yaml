@@ -173,6 +173,7 @@ requirements:
       - openehr/aql/verify_test.go
       - openehr/aql/version_internal_test.go
       - openehr/aql/version_test.go
+      - openehr/client/ehr/composition/format_write_test.go
       - openehr/client/ehr/contribution/builder_test.go
       - openehr/client/ehr/contribution/submission_test.go
       - openehr/client/ehr/contribution/update_audit_test.go
@@ -203,6 +204,7 @@ requirements:
       - smart/discovery/plaintext_document_test.go
       - smart/log_value_test.go
       - smart/print_test.go
+      - testkit/conformance/webtemplate/decode_reducing_test.go
       - testkit/probe/run_test.go
       - testkit/probes/aql/probe_097_semantic_lint.go
       - testkit/probes/aql/probes_test.go

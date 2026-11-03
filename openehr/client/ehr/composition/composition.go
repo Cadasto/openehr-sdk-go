@@ -313,7 +313,8 @@ func WithTemplateID(id string) WriteOption {
 // when f is not one of the four formats, when FLAT or STRUCTURED gets a nil
 // wt, and when the [WithTemplateID] id and wt's template id are both empty
 // or name different templates. A composition the codec cannot serialise
-// also fails before any request.
+// also fails before any request, with an [*EncodeError] that names f and
+// wraps the codec's error.
 func WithFormat(f Format, wt *webtemplate.WebTemplate, opts ...simplified.Option) WriteOption {
 	opts = slices.Clone(opts)
 	return func(c *writeConfig) {
@@ -417,6 +418,11 @@ func WithDeleteAudit(a *rm.AuditDetails) DeleteOption {
 // Audit details and the template id flow via the `openehr-*` header
 // family. A FLAT or STRUCTURED write always sends the template id, taken
 // from [WithTemplateID] or from the Web Template given to [WithFormat].
+//
+// A composition the format's codec cannot serialise fails before any
+// request with an [*EncodeError], which wraps the codec's error; an option
+// the write refuses fails with [transport.ErrInvalidConfig], also before
+// any request.
 func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("composition.Save: %w: empty EHRID", transport.ErrInvalidConfig)
@@ -482,7 +488,8 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, c
 //
 // Response shape matches [Save]: bare `*rm.Composition` per the
 // ITS-REST OpenAPI `200_COMPOSITION_updated` response. The format
-// options apply as they do for [Save].
+// options apply as they do for [Save], and a composition the format's
+// codec cannot serialise fails before any request with an [*EncodeError].
 func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, ifMatch string, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("composition.Update: %w: empty EHRID", transport.ErrInvalidConfig)
@@ -603,8 +610,9 @@ type formatWrite struct {
 // comp. Every refusal comes before any request (REQ-173): a format outside
 // the four, FLAT or STRUCTURED with a nil Web Template, a template id the
 // rule in simplifiedTemplateID cannot resolve, and a composition the codec
-// cannot serialise. Canonical JSON with no format option yields the request
-// every write sent before the formats existed.
+// cannot serialise, returned as an *EncodeError. Canonical JSON with no
+// format option yields the request every write sent before the formats
+// existed.
 func (c *writeConfig) resolveFormat(op string, comp *rm.Composition) (formatWrite, error) {
 	f := c.format
 	if !f.valid() {
@@ -623,7 +631,7 @@ func (c *writeConfig) resolveFormat(op string, comp *rm.Composition) (formatWrit
 	}
 	body, err := f.marshal(comp, c.webTemplate)
 	if err != nil {
-		return formatWrite{}, fmt.Errorf("%s: marshal body: %w", op, err)
+		return formatWrite{}, fmt.Errorf("%s: %w", op, &EncodeError{Format: f, Err: err})
 	}
 	fw := formatWrite{
 		body:        body,

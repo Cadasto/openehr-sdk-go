@@ -264,10 +264,28 @@ type IrreducibleError struct {
 }
 
 // Error gives the harness's account of the failure, then the codec's error.
-func (e *IrreducibleError) Error() string { return e.why + ": " + e.Err.Error() }
+// A nil receiver gives the text of the zero value.
+func (e *IrreducibleError) Error() string {
+	if e == nil {
+		e = &IrreducibleError{}
+	}
+	msg := e.why
+	if msg == "" {
+		msg = "decode failure the harness cannot reduce"
+	}
+	if e.Err == nil {
+		return msg
+	}
+	return msg + ": " + e.Err.Error()
+}
 
-// Unwrap returns the codec's error.
-func (e *IrreducibleError) Unwrap() error { return e.Err }
+// Unwrap returns the codec's error, or nil for a nil receiver.
+func (e *IrreducibleError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Err
+}
 
 // DecodeReducing decodes candidate with the target's template, excluding what
 // the codec does not decode: the keys it reports as unmatched content (see

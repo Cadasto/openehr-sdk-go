@@ -74,6 +74,44 @@ func (f Format) String() string {
 	}
 }
 
+// EncodeError reports a composition that the codec of Format cannot
+// serialise. [Save] and [Update] return it before sending any request, so a
+// caller can tell "this composition cannot go in this format" apart from a
+// request that went out and failed, and from an option refused with
+// [transport.ErrInvalidConfig]; such a caller may, for example, send the
+// composition again in canonical JSON.
+//
+// Err is the codec's own error, which [errors.Is] and [errors.AsType] reach
+// through Unwrap, such as [simplified.ErrUnknownPath] or
+// [simplified.ErrUnsupportedDatatype].
+type EncodeError struct {
+	// Format is the format the write asked for.
+	Format Format
+	// Err is the error the codec returned.
+	Err error
+}
+
+// Error names the format and, after a colon, the codec's error. A nil
+// receiver gives the text of the zero value.
+func (e *EncodeError) Error() string {
+	if e == nil {
+		e = &EncodeError{}
+	}
+	msg := "encode the composition as " + e.Format.String()
+	if e.Err == nil {
+		return msg
+	}
+	return msg + ": " + e.Err.Error()
+}
+
+// Unwrap returns the codec's error, or nil for a nil receiver.
+func (e *EncodeError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Err
+}
+
 // valid reports whether f is one of the four formats.
 func (f Format) valid() bool {
 	switch f {
