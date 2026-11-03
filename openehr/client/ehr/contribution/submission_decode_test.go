@@ -69,14 +69,22 @@ func originalJSON(extra ...string) string {
 	}, extra...)...)
 }
 
+// importedItemUID is the uid of the item importedJSON writes.
+const importedItemUID = "8849182c-82ad-4088-a07f-48ead4180515::other.example::1"
+
 // importedJSON is an IMPORTED_VERSION element whose item carries data, left
 // out when data is empty.
 func importedJSON(data string) string {
+	return importedJSONAudit(auditJSON("AUDIT_DETAILS"), data)
+}
+
+// importedJSONAudit is importedJSON with the commit_audit given.
+func importedJSONAudit(audit, data string) string {
 	item := []string{
 		member("_type", `"ORIGINAL_VERSION"`),
 		member("contribution", `{"_type":"OBJECT_REF","id":{"_type":"HIER_OBJECT_ID","value":"b7c3a0f2-2f6c-4f0b-9d55-0c1f3d6e8a11"},"namespace":"other.example","type":"CONTRIBUTION"}`),
 		member("commit_audit", itemAuditJSON),
-		member("uid", `{"_type":"OBJECT_VERSION_ID","value":"8849182c-82ad-4088-a07f-48ead4180515::other.example::1"}`),
+		member("uid", `{"_type":"OBJECT_VERSION_ID","value":"`+importedItemUID+`"}`),
 		member("lifecycle_state", codedComplete),
 	}
 	if data != "" {
@@ -84,7 +92,7 @@ func importedJSON(data string) string {
 	}
 	return object(
 		member("_type", `"IMPORTED_VERSION"`),
-		member("commit_audit", auditJSON("AUDIT_DETAILS")),
+		member("commit_audit", audit),
 		member("item", object(item...)),
 	)
 }
@@ -241,15 +249,18 @@ func TestUnmarshalSubmissionInstantiations(t *testing.T) { // REQ-130
 		is      func(contribution.CommitVersion) bool
 		// noData asserts the decoded ORIGINAL_VERSION carries no payload.
 		noData bool
+		// imported names the payload `_type` an IMPORTED_VERSION's item must
+		// carry back, with the item's uid.
+		imported string
 	}{
 		{name: "ORIGINAL_VERSION<COMPOSITION>", version: originalJSON(member("data", compositionJSON)), is: isWrapper[*contribution.OriginalVersion[rm.Composition]]},
 		{name: "ORIGINAL_VERSION<EHR_STATUS>", version: originalJSON(member("data", payload("EHR_STATUS"))), is: isWrapper[*contribution.OriginalVersion[rm.EHRStatus]]},
 		{name: "ORIGINAL_VERSION<FOLDER>", version: originalJSON(member("data", payload("FOLDER"))), is: isWrapper[*contribution.OriginalVersion[rm.Folder]]},
 		{name: "ORIGINAL_VERSION<EHR_ACCESS>", version: originalJSON(member("data", payload("EHR_ACCESS"))), is: isWrapper[*contribution.OriginalVersion[rm.EHRAccess]]},
-		{name: "IMPORTED_VERSION<COMPOSITION>", version: importedJSON(compositionJSON), is: isWrapper[*contribution.ImportedVersion[rm.Composition]]},
-		{name: "IMPORTED_VERSION<EHR_STATUS>", version: importedJSON(payload("EHR_STATUS")), is: isWrapper[*contribution.ImportedVersion[rm.EHRStatus]]},
-		{name: "IMPORTED_VERSION<FOLDER>", version: importedJSON(payload("FOLDER")), is: isWrapper[*contribution.ImportedVersion[rm.Folder]]},
-		{name: "IMPORTED_VERSION<EHR_ACCESS>", version: importedJSON(payload("EHR_ACCESS")), is: isWrapper[*contribution.ImportedVersion[rm.EHRAccess]]},
+		{name: "IMPORTED_VERSION<COMPOSITION>", version: importedJSON(compositionJSON), is: isWrapper[*contribution.ImportedVersion[rm.Composition]], imported: "COMPOSITION"},
+		{name: "IMPORTED_VERSION<EHR_STATUS>", version: importedJSON(payload("EHR_STATUS")), is: isWrapper[*contribution.ImportedVersion[rm.EHRStatus]], imported: "EHR_STATUS"},
+		{name: "IMPORTED_VERSION<FOLDER>", version: importedJSON(payload("FOLDER")), is: isWrapper[*contribution.ImportedVersion[rm.Folder]], imported: "FOLDER"},
+		{name: "IMPORTED_VERSION<EHR_ACCESS>", version: importedJSON(payload("EHR_ACCESS")), is: isWrapper[*contribution.ImportedVersion[rm.EHRAccess]], imported: "EHR_ACCESS"},
 		{
 			name: "no _type reads as ORIGINAL_VERSION",
 			version: object(
@@ -257,6 +268,15 @@ func TestUnmarshalSubmissionInstantiations(t *testing.T) { // REQ-130
 				member("lifecycle_state", codedComplete),
 				member("data", payload("FOLDER"))),
 			is: isWrapper[*contribution.OriginalVersion[rm.Folder]],
+		},
+		{
+			name: "empty _type reads as ORIGINAL_VERSION",
+			version: object(
+				member("_type", `""`),
+				member("commit_audit", auditJSON("AUDIT_DETAILS")),
+				member("lifecycle_state", codedComplete),
+				member("data", payload("EHR_ACCESS"))),
+			is: isWrapper[*contribution.OriginalVersion[rm.EHRAccess]],
 		},
 		{name: "no data member", version: originalJSON(), is: isWrapper[*contribution.OriginalVersion[rm.Composition]], noData: true},
 		{name: "null data", version: originalJSON(member("data", "null")), is: isWrapper[*contribution.OriginalVersion[rm.Composition]], noData: true},
@@ -295,6 +315,23 @@ func TestUnmarshalSubmissionInstantiations(t *testing.T) { // REQ-130
 			if tc.noData && hasData {
 				t.Errorf("encoding writes data %s for an element read with none", data)
 			}
+			if tc.imported != "" {
+				var item struct {
+					UID struct {
+						Value string `json:"value"`
+					} `json:"uid"`
+					Data struct {
+						Type string `json:"_type"`
+					} `json:"data"`
+				}
+				if err := json.Unmarshal(encoded.Versions[0]["item"], &item); err != nil {
+					t.Fatalf("encoded item: %v\n%s", err, got)
+				}
+				if item.UID.Value != importedItemUID || item.Data.Type != tc.imported {
+					t.Errorf("encoded item has uid %q and data _type %q, want %q and %q, the item read",
+						item.UID.Value, item.Data.Type, importedItemUID, tc.imported)
+				}
+			}
 		})
 	}
 }
@@ -305,22 +342,26 @@ func TestUnmarshalSubmissionInstantiations(t *testing.T) { // REQ-130
 // the default AUDIT_DETAILS.
 func TestUnmarshalSubmissionAuditType(t *testing.T) { // REQ-130
 	cases := []struct {
+		name     string
 		read     string
+		extra    []string // members after the others, such as an explicit empty `_type`
 		wantType contribution.AuditType
 		wantWire string
 	}{
-		{read: "AUDIT_DETAILS", wantType: contribution.AuditTypeAuditDetails, wantWire: "AUDIT_DETAILS"},
-		{read: "UPDATE_AUDIT", wantType: contribution.AuditTypeUpdateAudit, wantWire: "UPDATE_AUDIT"},
-		{read: "", wantType: "", wantWire: "AUDIT_DETAILS"},
+		{name: "AUDIT_DETAILS", read: "AUDIT_DETAILS", wantType: contribution.AuditTypeAuditDetails, wantWire: "AUDIT_DETAILS"},
+		{name: "UPDATE_AUDIT", read: "UPDATE_AUDIT", wantType: contribution.AuditTypeUpdateAudit, wantWire: "UPDATE_AUDIT"},
+		{name: "omitted", read: "", wantType: "", wantWire: "AUDIT_DETAILS"},
+		{name: "empty", read: "", extra: []string{member("_type", `""`)}, wantType: "", wantWire: "AUDIT_DETAILS"},
 	}
 	for _, tc := range cases {
-		t.Run("_type="+strconv.Quote(tc.read), func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
+			audit := func(extra ...string) string { return auditJSON(tc.read, append(extra, tc.extra...)...) }
 			version := object(
 				member("_type", `"ORIGINAL_VERSION"`),
-				member("commit_audit", auditJSON(tc.read, member("description", `{"_type":"DV_TEXT","value":"why"}`))),
+				member("commit_audit", audit(member("description", `{"_type":"DV_TEXT","value":"why"}`))),
 				member("lifecycle_state", codedComplete),
 				member("data", compositionJSON))
-			sub, err := contribution.UnmarshalSubmission(bodyJSON(auditJSON(tc.read), version))
+			sub, err := contribution.UnmarshalSubmission(bodyJSON(audit(), version, importedJSONAudit(audit(), compositionJSON)))
 			if err != nil {
 				t.Fatalf("UnmarshalSubmission: %v", err)
 			}
@@ -336,6 +377,10 @@ func TestUnmarshalSubmissionAuditType(t *testing.T) { // REQ-130
 			}
 			if c, ok := ov.CommitAudit.Committer.(*rm.PartyIdentified); !ok || c.Name == nil || *c.Name != "alice" {
 				t.Errorf("commit_audit Committer = %#v, want the PARTY_IDENTIFIED read", ov.CommitAudit.Committer)
+			}
+			iv := sub.Versions[1].(*contribution.ImportedVersion[rm.Composition])
+			if iv.CommitAudit.Type != tc.wantType {
+				t.Errorf("IMPORTED_VERSION commit_audit Type = %q, want %q", iv.CommitAudit.Type, tc.wantType)
 			}
 			got, err := sub.MarshalJSON()
 			if err != nil {
@@ -353,8 +398,10 @@ func TestUnmarshalSubmissionAuditType(t *testing.T) { // REQ-130
 			if encoded.Audit["_type"] != tc.wantWire {
 				t.Errorf("audit._type = %v, want %q", encoded.Audit["_type"], tc.wantWire)
 			}
-			if encoded.Versions[0].CommitAudit["_type"] != tc.wantWire {
-				t.Errorf("commit_audit._type = %v, want %q", encoded.Versions[0].CommitAudit["_type"], tc.wantWire)
+			for i, v := range encoded.Versions {
+				if v.CommitAudit["_type"] != tc.wantWire {
+					t.Errorf("versions[%d].commit_audit._type = %v, want %q", i, v.CommitAudit["_type"], tc.wantWire)
+				}
 			}
 		})
 	}
@@ -407,6 +454,16 @@ func TestUnmarshalSubmissionRefusals(t *testing.T) { // REQ-130, REQ-052
 		{name: "versions empty", body: bodyJSON(seededAudit), wantPath: "/versions", want: canjson.ErrInvalidShape},
 		{name: "versions an object", body: []byte(object(member("audit", seededAudit), member("versions", "{}"))), wantPath: "/versions", want: canjson.ErrInvalidShape},
 		{name: "version not an object", body: bodyJSON(seededAudit, withData(compositionJSON), strconv.Quote(decodeSeed)), wantPath: "/versions/1", want: canjson.ErrInvalidShape},
+		{
+			name:     "IMPORTED_VERSION with no item",
+			body:     bodyJSON(seededAudit, object(member("_type", `"IMPORTED_VERSION"`), member("commit_audit", seededAudit))),
+			wantPath: "/versions/0/item", want: canjson.ErrInvalidShape,
+		},
+		{
+			name:     "IMPORTED_VERSION with a null item",
+			body:     bodyJSON(seededAudit, object(member("_type", `"IMPORTED_VERSION"`), member("commit_audit", seededAudit), member("item", "null"))),
+			wantPath: "/versions/0/item", want: canjson.ErrInvalidShape,
+		},
 		{
 			name:     "version _type names another RM class",
 			body:     bodyJSON(seededAudit, strings.Replace(withData(compositionJSON), `"ORIGINAL_VERSION"`, `"OBJECT_REF"`, 1)),

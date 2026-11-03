@@ -365,7 +365,9 @@ func (v *versionPiece) payloadType(at string) (string, string, error) {
 		at += "/" + memberItem
 		i := holder.index(memberItem)
 		if i < 0 || isNull(holder.value(i)) {
-			return at + "/" + memberData, "", nil
+			// The RM makes IMPORTED_VERSION.item mandatory, and the encoder
+			// would write one the body never held.
+			return "", "", refusal(at, "", "an IMPORTED_VERSION has no item", canjson.ErrInvalidShape)
 		}
 		item, isObject, err := readObject(holder.value(i))
 		switch {
@@ -565,7 +567,8 @@ func (o jsonObject) value(i int) []byte {
 // readObject reads raw, which holds one JSON value and nothing after it, as an
 // object. It reports false, and no error, when the value is not an object.
 func readObject(raw []byte) (jsonObject, bool, error) {
-	dec := jsontext.NewDecoder(bytes.NewReader(raw))
+	// A bytes.Buffer is read in place; any other io.Reader is copied.
+	dec := jsontext.NewDecoder(bytes.NewBuffer(raw))
 	tok, err := dec.ReadToken()
 	if err != nil {
 		return jsonObject{}, false, err
@@ -597,7 +600,7 @@ func readObject(raw []byte) (jsonObject, bool, error) {
 // array, returning its elements' bytes. It reports false, and no error, when
 // the value is not an array.
 func readArray(raw []byte) ([][]byte, bool, error) {
-	dec := jsontext.NewDecoder(bytes.NewReader(raw))
+	dec := jsontext.NewDecoder(bytes.NewBuffer(raw))
 	tok, err := dec.ReadToken()
 	if err != nil {
 		return nil, false, err
