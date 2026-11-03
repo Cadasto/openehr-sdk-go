@@ -63,7 +63,9 @@ var mergedForms = []struct {
 // includes of a schema meet again with differing forms of a class or
 // primitive type, and the schema that declared one form transitively
 // includes the schema that declared the other, LoadAll keeps the
-// descendant's form instead of failing. Identical forms merge once.
+// descendant's form instead of failing. A schema that includes the schemas
+// of two unrelated forms and declares the name again wins over both,
+// whatever the order of the includes. Identical forms merge once.
 func TestLoadAll_includeDiamondKeepsDescendantForm(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -112,6 +114,50 @@ func TestLoadAll_includeDiamondKeepsDescendantForm(t *testing.T) {
 				"base": {form: "from base"},
 			},
 			want: "from rm",
+		},
+		// A third schema that includes two unrelated schemas and declares
+		// their class again refines both forms, whichever place its id
+		// takes among the root's includes.
+		{
+			name: "refiner of two unrelated forms merged first",
+			graph: map[string]fixture{
+				"root": {includes: []string{"a", "m", "z"}},
+				"a":    {form: "from a", includes: []string{"m", "z"}},
+				"m":    {form: "from m"},
+				"z":    {form: "from z"},
+			},
+			want: "from a",
+		},
+		{
+			name: "refiner of two unrelated forms merged between them",
+			graph: map[string]fixture{
+				"root": {includes: []string{"a", "m", "z"}},
+				"a":    {form: "from a"},
+				"m":    {form: "from m", includes: []string{"a", "z"}},
+				"z":    {form: "from z"},
+			},
+			want: "from m",
+		},
+		{
+			name: "refiner of two unrelated forms merged last",
+			graph: map[string]fixture{
+				"root": {includes: []string{"a", "m", "z"}},
+				"a":    {form: "from a"},
+				"m":    {form: "from m"},
+				"z":    {form: "from z", includes: []string{"a", "m"}},
+			},
+			want: "from z",
+		},
+		{
+			name: "refiner of two unrelated forms reached through a further include",
+			graph: map[string]fixture{
+				"root": {includes: []string{"a", "m", "z"}},
+				"a":    {form: "from a"},
+				"m":    {form: "from m"},
+				"z":    {includes: []string{"zz"}},
+				"zz":   {form: "from zz", includes: []string{"a", "m"}},
+			},
+			want: "from zz",
 		},
 		{
 			name: "identical form reached through a shared include",
@@ -200,6 +246,17 @@ func TestLoadAll_unrelatedIncludesConflict(t *testing.T) {
 				"a":    {form: "same"},
 				"b":    {form: "same"},
 				"c":    {form: "from c", includes: []string{"a"}},
+			},
+		},
+		{
+			// a refines m's form but not z's, and neither a nor z
+			// includes the other.
+			name: "refiner of only one of two unrelated forms",
+			graph: map[string]fixture{
+				"root": {includes: []string{"a", "m", "z"}},
+				"a":    {form: "from a", includes: []string{"m"}},
+				"m":    {form: "from m"},
+				"z":    {form: "from z"},
 			},
 		},
 	}

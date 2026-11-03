@@ -24,18 +24,22 @@ import (
 //     openEHR BMM corpus, e.g. TRANSLATION_DETAILS appears in both
 //     openehr_base_1.3.0 and openehr_rm_1.2.0, with the RM definition
 //     being the authoritative refinement.) The same precedence holds
-//     when two includes of one schema bring *differing* definitions of
-//     a name: the definition declared by a schema that includes,
-//     directly or transitively, the schema declaring the other one
-//     wins. A schema that reaches openehr_base_1.3.0 both through
-//     openehr_am_1.4.0 and through openehr_rm_1.2.0 therefore takes
-//     RM's TRANSLATION_DETAILS. A definition is declared by the schema
-//     whose own class_definitions or primitive_types carry it, not by a
-//     schema that passes it on from an include. When neither declaring
-//     schema includes the other, that's an ErrSchemaConflict; there is
-//     no winner. An *identical* definition reached via two include
-//     paths (a diamond, e.g. am24 includes both base and lang, and lang
-//     also includes base) is benign and merged once.
+//     when the includes of one schema bring *differing* definitions of
+//     a name: the definition whose declaring schemas include, directly
+//     or transitively, every schema that declares another one wins,
+//     whatever the order of the includes. A schema that reaches
+//     openehr_base_1.3.0 both through openehr_am_1.4.0 and through
+//     openehr_rm_1.2.0 therefore takes RM's TRANSLATION_DETAILS; two
+//     definitions from schemas neither of which includes the other give
+//     way to that of a third schema that includes both and declares the
+//     name again. A definition is declared by the schema whose own
+//     class_definitions or primitive_types carry it, not by a schema
+//     that passes it on from an include. When no definition's declaring
+//     schemas include every schema that declares another one, that's an
+//     ErrSchemaConflict; there is no winner. An *identical* definition
+//     reached via two include paths (a diamond, e.g. am24 includes both
+//     base and lang, and lang also includes base) is benign and merged
+//     once.
 //   - Packages are merged by fully-qualified package name (the map key
 //     plus the recursive Name field). When two schemas both define the
 //     same package node, their class-name lists are concatenated
@@ -117,18 +121,6 @@ func (st *loadAllState) load(ctx context.Context, id string) (*mergedSchema, err
 	st.stack = append(st.stack, id)
 	defer func() { st.stack = st.stack[:len(st.stack)-1] }()
 
-	// Snapshot the descendant's own class names before any ancestor
-	// merge — needed by mergeAncestor to distinguish "descendant
-	// shadows ancestor" (allowed) from "ancestor vs ancestor"
-	// (settled by mergeForms).
-	descendantClasses := make(map[string]struct{}, len(root.ClassDefinitions))
-	for k := range root.ClassDefinitions {
-		descendantClasses[k] = struct{}{}
-	}
-	descendantPrims := make(map[string]struct{}, len(root.PrimitiveTypes))
-	for k := range root.PrimitiveTypes {
-		descendantPrims[k] = struct{}{}
-	}
 	merged := &mergedSchema{
 		schema:       root,
 		ancestors:    map[string]struct{}{},
@@ -138,6 +130,7 @@ func (st *loadAllState) load(ctx context.Context, id string) (*mergedSchema, err
 
 	// Merge ancestors first (depth-first), in deterministic key order
 	// so error messages are reproducible.
+	includes := make([]*mergedSchema, 0, len(root.Includes))
 	for _, inclID := range sortedKeys(root.Includes) {
 		ancestor, err := st.load(ctx, inclID)
 		if err != nil {
@@ -145,9 +138,20 @@ func (st *loadAllState) load(ctx context.Context, id string) (*mergedSchema, err
 		}
 		merged.ancestors[inclID] = struct{}{}
 		maps.Copy(merged.ancestors, ancestor.ancestors)
-		if err := st.mergeAncestor(merged, ancestor, descendantClasses, descendantPrims); err != nil {
-			return nil, err
-		}
+		includes = append(includes, ancestor)
+	}
+	// Each name is settled over every form the includes bring at once, so
+	// the include order cannot change which form wins.
+	root.PrimitiveTypes, err = st.mergeForms(root.PrimitiveTypes, merged.primSources, includes, primitiveForms)
+	if err != nil {
+		return nil, err
+	}
+	root.ClassDefinitions, err = st.mergeForms(root.ClassDefinitions, merged.classSources, includes, classForms)
+	if err != nil {
+		return nil, err
+	}
+	for _, ancestor := range includes {
+		mergePackages(root, ancestor.schema)
 	}
 	st.visited[id] = merged
 	return merged, nil
@@ -165,96 +169,106 @@ func ownSources(own map[string]Class, id string) map[string][]string {
 	return sources
 }
 
-// mergeAncestor folds the ancestor schema's primitive types, class
-// definitions, and packages into dst (the descendant). Mutates dst.
-// Names the descendant declares itself (descendantClasses,
-// descendantPrims) shadow any ancestor contribution — that's the
-// documented merge precedence, not a conflict. A name two includes both
-// contribute is settled by mergeForms.
-func (st *loadAllState) mergeAncestor(dst, ancestor *mergedSchema, descendantClasses, descendantPrims map[string]struct{}) error {
-	d, a := dst.schema, ancestor.schema
-	if len(a.PrimitiveTypes) > 0 {
-		if d.PrimitiveTypes == nil {
-			d.PrimitiveTypes = make(map[string]Class, len(a.PrimitiveTypes))
-		}
-		if err := st.mergeForms(d.PrimitiveTypes, dst.primSources, a.PrimitiveTypes, ancestor.primSources, descendantPrims); err != nil {
-			return err
-		}
-	}
-	if len(a.ClassDefinitions) > 0 {
-		if d.ClassDefinitions == nil {
-			d.ClassDefinitions = make(map[string]Class, len(a.ClassDefinitions))
-		}
-		if err := st.mergeForms(d.ClassDefinitions, dst.classSources, a.ClassDefinitions, ancestor.classSources, descendantClasses); err != nil {
-			return err
-		}
-	}
-	// Packages: merge by name, recursively.
-	if len(a.Packages) > 0 {
-		if d.Packages == nil {
-			d.Packages = make(map[string]*Package, len(a.Packages))
-		}
-		for k, v := range a.Packages {
-			existing, ok := d.Packages[k]
-			if !ok {
-				d.Packages[k] = clonePackage(v)
-				continue
-			}
-			mergePackage(existing, v)
-		}
-	}
-	return nil
+// formsOf picks one kind of named entry (classes or primitive types) of a
+// merged schema, with the sources of each.
+type formsOf func(*mergedSchema) (map[string]Class, map[string][]string)
+
+func primitiveForms(m *mergedSchema) (map[string]Class, map[string][]string) {
+	return m.schema.PrimitiveTypes, m.primSources
 }
 
-// mergeForms folds one kind of named entry (classes or primitive types)
-// from an ancestor into dst, keeping dstSources in step. A name in own
-// is the descendant's and is kept. A name dst does not hold yet is
-// copied. A name dst already holds through an earlier include keeps one
-// form:
+func classForms(m *mergedSchema) (map[string]Class, map[string][]string) {
+	return m.schema.ClassDefinitions, m.classSources
+}
+
+// candidate is one form of a name the includes bring, with every schema
+// whose own declaration supplied it.
+type candidate struct {
+	form    Class
+	sources []string
+}
+
+// mergeForms folds one kind of named entry from the includes into dst,
+// which holds the descendant's own entries, keeping dstSources in step,
+// and returns dst, made when it was nil and gains an entry. A name in dst
+// is the descendant's and is kept. Every other name is settled over all
+// the forms the includes bring for it:
 //
-//   - an identical form is merged once and gains the ancestor's sources;
-//   - a differing form loses to the other when every one of its sources
-//     is included, directly or transitively, by one of the other form's
-//     sources: that schema refines the class it reached;
-//   - otherwise there is no winner, and the result is a
-//     schemaConflictError naming two sources neither of which includes
-//     the other.
-func (st *loadAllState) mergeForms(dst map[string]Class, dstSources map[string][]string, src map[string]Class, srcSources map[string][]string, own map[string]struct{}) error {
-	// Sorted, so that of several conflicts the same one is reported.
-	for _, name := range sortedKeys(src) {
-		form := src[name]
-		if _, inDescendant := own[name]; inDescendant {
-			continue // descendant shadow — allowed
-		}
-		existing, exists := dst[name]
-		if !exists {
-			dst[name] = form
-			dstSources[name] = srcSources[name]
-			continue
-		}
-		have, incoming := dstSources[name], srcSources[name]
-		if reflect.DeepEqual(existing, form) {
-			// Identical definition reached via two include paths (diamond) — benign.
-			dstSources[name] = addSources(have, incoming)
-			continue
-		}
-		incomingOnly, incomingStands := st.unshadowed(have, incoming)
-		if !incomingStands {
-			continue // the form already merged refines the incoming one
-		}
-		haveOnly, haveStands := st.unshadowed(incoming, have)
-		if !haveStands {
-			dst[name] = form // the incoming form refines the one already merged
-			dstSources[name] = incoming
-			continue
-		}
-		return &schemaConflictError{
-			ClassName: name,
-			SchemaA:   haveOnly,
-			SchemaB:   incomingOnly,
+//   - identical forms are one candidate, whose sources are those of each;
+//   - a candidate refines another when every one of the other's sources is
+//     included, directly or transitively, by one of its own;
+//   - the one candidate no other refines refines every other and wins;
+//   - when two or more stand, there is no winner, and the result is a
+//     schemaConflictError naming a source of each of the first two
+//     neither of which includes the other.
+func (st *loadAllState) mergeForms(dst map[string]Class, dstSources map[string][]string, includes []*mergedSchema, kind formsOf) (map[string]Class, error) {
+	names := map[string]struct{}{}
+	for _, inc := range includes {
+		forms, _ := kind(inc)
+		for name := range forms {
+			if _, own := dst[name]; own {
+				continue // descendant shadow — allowed
+			}
+			names[name] = struct{}{}
 		}
 	}
-	return nil
+	// Sorted, so that of several conflicts the same one is reported.
+	for _, name := range sortedKeys(names) {
+		var candidates []candidate
+		for _, inc := range includes {
+			forms, sources := kind(inc)
+			form, ok := forms[name]
+			if !ok {
+				continue
+			}
+			i := slices.IndexFunc(candidates, func(c candidate) bool { return reflect.DeepEqual(c.form, form) })
+			if i < 0 {
+				candidates = append(candidates, candidate{form: form, sources: sources[name]})
+				continue
+			}
+			// Identical definition reached via two include paths (diamond) — benign.
+			candidates[i].sources = addSources(candidates[i].sources, sources[name])
+		}
+		standing := st.standing(candidates)
+		if len(standing) > 1 {
+			a, b := candidates[standing[0]], candidates[standing[1]]
+			onlyA, _ := st.unshadowed(b.sources, a.sources)
+			onlyB, _ := st.unshadowed(a.sources, b.sources)
+			return nil, &schemaConflictError{ClassName: name, SchemaA: onlyA, SchemaB: onlyB}
+		}
+		if dst == nil {
+			dst = make(map[string]Class, len(names))
+		}
+		winner := candidates[standing[0]]
+		dst[name] = winner.form
+		dstSources[name] = winner.sources
+	}
+	return dst, nil
+}
+
+// standing returns the indexes of the candidates no other candidate
+// refines, in order. Since a schema never includes itself, directly or
+// transitively, refining is a strict order between candidates, so of a
+// non-empty list at least one stands, and when only one does it refines
+// every other.
+func (st *loadAllState) standing(candidates []candidate) []int {
+	var out []int
+	for i, c := range candidates {
+		refined := false
+		for j, other := range candidates {
+			if j == i {
+				continue
+			}
+			if _, stands := st.unshadowed(other.sources, c.sources); !stands {
+				refined = true
+				break
+			}
+		}
+		if !refined {
+			out = append(out, i)
+		}
+	}
+	return out
 }
 
 // unshadowed returns the first schema in sources that no schema in by
@@ -286,6 +300,25 @@ func addSources(have, incoming []string) []string {
 		}
 	}
 	return have
+}
+
+// mergePackages folds the ancestor schema's packages into dst (the
+// descendant) by name, recursively. Mutates dst.
+func mergePackages(dst, ancestor *Schema) {
+	if len(ancestor.Packages) == 0 {
+		return
+	}
+	if dst.Packages == nil {
+		dst.Packages = make(map[string]*Package, len(ancestor.Packages))
+	}
+	for k, v := range ancestor.Packages {
+		existing, ok := dst.Packages[k]
+		if !ok {
+			dst.Packages[k] = clonePackage(v)
+			continue
+		}
+		mergePackage(existing, v)
+	}
 }
 
 func mergePackage(dst, src *Package) {

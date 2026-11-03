@@ -30,7 +30,8 @@
 //     practice (e.g. RM refines TRANSLATION_DETAILS from BASE), also
 //     when the ancestor's entry arrives through a second include path.
 //     Differing entries with the same name from two schemas, neither of
-//     which includes the other, return [ErrSchemaConflict]. Cycles
+//     which includes the other, return [ErrSchemaConflict], unless a
+//     third schema that includes both declares the name again. Cycles
 //     return [ErrCircularIncludes].
 //
 // # Type registry
