@@ -22,9 +22,8 @@ func (a *Address) BMMName() string { return "ADDRESS" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 func (a *Address) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("ADDRESS")}
@@ -80,9 +79,8 @@ func (a *Agent) BMMName() string { return "AGENT" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 func (a *Agent) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("AGENT")}
@@ -166,9 +164,8 @@ func (c *Capability) BMMName() string { return "CAPABILITY" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 func (c *Capability) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("CAPABILITY")}
@@ -229,9 +226,8 @@ func (c *Contact) BMMName() string { return "CONTACT" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 func (c *Contact) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("CONTACT")}
@@ -292,9 +288,8 @@ func (g *Group) BMMName() string { return "GROUP" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 func (g *Group) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("GROUP")}
@@ -378,9 +373,8 @@ func (o *Organisation) BMMName() string { return "ORGANISATION" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 func (o *Organisation) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("ORGANISATION")}
@@ -464,9 +458,8 @@ func (p *PartyIdentity) BMMName() string { return "PARTY_IDENTITY" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 func (p *PartyIdentity) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("PARTY_IDENTITY")}
@@ -522,9 +515,8 @@ func (p *PartyRelationship) BMMName() string { return "PARTY_RELATIONSHIP" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 func (p *PartyRelationship) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("PARTY_RELATIONSHIP")}
@@ -591,9 +583,8 @@ func (p *Person) BMMName() string { return "PERSON" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 func (p *Person) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("PERSON")}
@@ -677,9 +668,8 @@ func (r *Role) BMMName() string { return "ROLE" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 func (r *Role) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("ROLE")}
@@ -763,9 +753,8 @@ func (v *VersionedParty) BMMName() string { return "VERSIONED_PARTY" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 func (v *VersionedParty) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("VERSIONED_PARTY")}

@@ -22,9 +22,8 @@ func (a *Action) BMMName() string { return "ACTION" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 func (a *Action) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("ACTION")}
@@ -127,9 +126,8 @@ func (a *Activity) BMMName() string { return "ACTIVITY" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 func (a *Activity) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("ACTIVITY")}
@@ -193,9 +191,8 @@ func (a *AdminEntry) BMMName() string { return "ADMIN_ENTRY" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 func (a *AdminEntry) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("ADMIN_ENTRY")}
@@ -277,9 +274,8 @@ func (e *Evaluation) BMMName() string { return "EVALUATION" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 func (e *Evaluation) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("EVALUATION")}
@@ -371,9 +367,8 @@ func (i *Instruction) BMMName() string { return "INSTRUCTION" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 func (i *Instruction) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("INSTRUCTION")}
@@ -480,9 +475,8 @@ func (i *InstructionDetails) BMMName() string { return "INSTRUCTION_DETAILS" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 func (i *InstructionDetails) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("INSTRUCTION_DETAILS")}
@@ -518,9 +512,8 @@ func (i *IsmTransition) BMMName() string { return "ISM_TRANSITION" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 func (i *IsmTransition) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("ISM_TRANSITION")}
@@ -566,9 +559,8 @@ func (o *Observation) BMMName() string { return "OBSERVATION" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 func (o *Observation) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("OBSERVATION")}

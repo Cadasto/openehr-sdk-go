@@ -22,9 +22,8 @@ func (c *CBoolean) BMMName() string { return "C_BOOLEAN" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 func (c *CBoolean) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("C_BOOLEAN")}
@@ -60,9 +59,8 @@ func (c *CDate) BMMName() string { return "C_DATE" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 func (c *CDate) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("C_DATE")}
@@ -107,9 +105,8 @@ func (c *CDateTime) BMMName() string { return "C_DATE_TIME" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 func (c *CDateTime) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("C_DATE_TIME")}
@@ -154,9 +151,8 @@ func (c *CDuration) BMMName() string { return "C_DURATION" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 func (c *CDuration) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("C_DURATION")}
@@ -196,9 +192,8 @@ func (c *CInteger) BMMName() string { return "C_INTEGER" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 func (c *CInteger) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("C_INTEGER")}
@@ -238,9 +233,8 @@ func (c *CReal) BMMName() string { return "C_REAL" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 func (c *CReal) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("C_REAL")}
@@ -280,9 +274,8 @@ func (c *CString) BMMName() string { return "C_STRING" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 func (c *CString) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("C_STRING")}
@@ -327,9 +320,8 @@ func (c *CTime) BMMName() string { return "C_TIME" }
 // sequence of the class, then any property the schema does not
 // declare; nil-pointer optionals and empty containers are omitted.
 // Polymorphic descendants are emitted via canxml.EncodePoly.
-// Properties typed as XML attributes per the openEHR ITS-XML XSDs
-// (currently `archetype_node_id`) are appended to start.Attr before
-// the start token is written.
+// Members the class's ITS-XML schema type declares as XML attributes
+// are appended to start.Attr before the start token is written.
 func (c *CTime) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("C_TIME")}

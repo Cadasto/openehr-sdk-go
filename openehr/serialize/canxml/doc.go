@@ -159,15 +159,16 @@
 // else the type the RM declares where it sits, as "Unmatched content" above
 // reads it, and the element carries no value for it: it has no child element
 // of that name, and no XML attribute of it where the ITS-XML schema carries
-// the attribute as one (`archetype_node_id`); the child it has carries
-// `xsi:nil="true"` (or `1`), whatever it holds; or the child is a primitive
-// element whose text is empty or XML whitespace only, which carries no
-// value, as an empty interval flag element does. The decoder cannot always
-// show that in the value it returns: a member the SDK holds by value, a
-// number, a boolean, a string or a value struct such as PARTY_SELF or
-// ARCHETYPE_ID, decodes to its zero value whether the input carried it or
-// not, so a DV_QUANTITY without its `magnitude` reads as one of 0 and an
-// EHR_STATUS without its `subject` reads as one with a bare PARTY_SELF.
+// the attribute as one (`archetype_node_id`, an ARCHETYPE_TERM's `code`);
+// the child it has carries `xsi:nil="true"` (or `1`), whatever it holds; or
+// the child is a primitive element whose text is empty or XML whitespace
+// only, which carries no value, as an empty interval flag element does. The
+// decoder cannot always show that in the value it returns: a member the SDK
+// holds by value, a number, a boolean, a string or a value struct such as
+// PARTY_SELF or ARCHETYPE_ID, decodes to its zero value whether the input
+// carried it or not, so a DV_QUANTITY without its `magnitude` reads as one
+// of 0 and an EHR_STATUS without its `subject` reads as one with a bare
+// PARTY_SELF.
 //
 // By default the decoder decodes an input with missing members as it decodes
 // one without: no error, each such member at its zero value. A missing

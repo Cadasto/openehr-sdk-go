@@ -16,9 +16,10 @@ type Class struct {
 	// Name is the class's name in the Reference Model, such as DV_QUANTITY.
 	Name string
 	// Attrs names the members the decoder reads as XML attributes of the
-	// start element, in no namespace, where the ITS-XML schema carries them
-	// so: archetype_node_id today. Every other attribute, bar the XML Schema
-	// instance ones and the namespace declarations, is unmatched content.
+	// start element, in no namespace, where the class's ITS-XML schema type
+	// carries them so, such as archetype_node_id or an ARCHETYPE_TERM's code.
+	// Every other attribute, bar the XML Schema instance ones and the
+	// namespace declarations, is unmatched content.
 	Attrs []string
 	// Required names the members the Reference Model makes mandatory on the
 	// class and a document can carry, in the order the model declares them,

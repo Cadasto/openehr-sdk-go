@@ -180,9 +180,8 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 		b.WriteString("// declaration order; nil-pointer optionals and empty containers are\n")
 		b.WriteString("// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.\n")
 	}
-	b.WriteString("// Properties typed as XML attributes per the openEHR ITS-XML XSDs\n")
-	b.WriteString("// (currently `archetype_node_id`) are appended to start.Attr before\n")
-	b.WriteString("// the start token is written.\n")
+	b.WriteString("// Members the class's ITS-XML schema type declares as XML attributes\n")
+	b.WriteString("// are appended to start.Attr before the start token is written.\n")
 	shaped := hasIntervalShape(fields)
 	if shaped {
 		b.WriteString("//\n")
