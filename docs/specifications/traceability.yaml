@@ -1751,6 +1751,7 @@ requirements:
       - internal/templatecompile
     tests:
       - internal/rmjsonwalk/walk_once_budget_internal_test.go
+      - openehr/aom/aom14/read_test.go
       - openehr/bmm/load_test.go
       - openehr/rm/typereg/registry_test.go
       - openehr/rm/typereg/streaming_hotpath_test.go
@@ -2571,6 +2572,7 @@ requirements:
       - openehr/validation/primitive_empty_part_test.go
       - openehr/validation/prohibited_test.go
       - openehr/validation/registry_roots_test.go
+      - openehr/validation/rm_class_names_internal_test.go
       - openehr/validation/rmfloor_chained_corpus_test.go
       - openehr/validation/rmfloor_chained_internal_test.go
       - openehr/validation/rmfloor_coded_test.go
@@ -2679,6 +2681,7 @@ requirements:
       - openehr/aom/aom14/operational_template_shapes_xml_test.go
       - openehr/aom/aom14/primitive_profile_shapes_xml_test.go
       - openehr/aom/aom14/quantity_item_units_xml_test.go
+      - openehr/aom/aom14/read_test.go
       - openehr/aom/aom14/schema_names_xml_test.go
       - openehr/aom/aom14/symbol_json_test.go
       - openehr/aom/aom14/symbol_value_xml_test.go
