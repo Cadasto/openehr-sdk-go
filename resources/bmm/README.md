@@ -33,13 +33,37 @@ base 1.3.0  (foundation)
 
 ## SDK-authored root schemas (`sdk/`)
 
-Each root here is the schema a generation target loads in place of a pinned file. A root includes the pinned schema and declares only what the pinned schemas lack or get wrong; a class it declares again replaces the included class of that name, whole. Each class and property a root declares names, in its `documentation`, its reason (`Reason: …`) and the upstream reference it rests on (`Upstream: …`: the specification pull request or ticket that carries the same change, or the pinned schema it follows). The contract is [`bmm-conformance.md` § SDK-authored root schemas](../../docs/specifications/bmm-conformance.md#sdk-authored-root-schemas); the decision is [ADR 0034](../../docs/adr/0034-sdk-authored-root-schemas.md).
+Each root here is the schema a generation target loads in place of a pinned file. A root includes the pinned schema and declares only what the pinned schemas lack or get wrong; a class it declares again replaces the included class of that name, whole. Each class and property a root declares ends its `documentation` with a note: its reason (`Reason: …`), then the upstream reference it rests on (`Upstream: …`). The reference is the specification pull request or ticket that carries the same change, as an `https://` URL; the id of the pinned schema it follows; or a vendored ITS-XML schema by its path in the tree, with or without a line, such as `resources/its-xml/components/AM/Release-1.4/Template.xsd:115`. The generator leaves the note out of the Go doc comment it emits. The contract is [`bmm-conformance.md` § SDK-authored root schemas](../../docs/specifications/bmm-conformance.md#sdk-authored-root-schemas); the decision is [ADR 0034](../../docs/adr/0034-sdk-authored-root-schemas.md).
+
+### SDK extension keys
+
+What P_BMM has no construct for, a root says in the top-level `sdk_extensions` object of its JSON, one key per kind. The public loader (`openehr/bmm`) leaves the object aside; the generator reads it from every schema of the target's include chain, and a member it does not read fails generation, so a misspelt key never goes unnoticed. Every entry carries a `reason` and an `upstream` member, the same two parts as a declaration's note, with the same reference forms.
+
+| Key | Entry members | What the generator does |
+|---|---|---|
+| `classes_left_out` | `class` | Emits no Go type, registry entry or decode hook for the class; rminfo reports it as an excluded class. Generation fails when no schema declares the class, or a class the target emits still names it. |
+| `type_aliases` | `alias`, `class` | Carries the alias, a type name a decoder reads as `class` (an `xsi:type` older tools write), in its plan for the canonical-XML codec; the type registry never holds it. No generated code reads it yet. Generation fails on an alias a schema declares. |
+| `dropped_elements` | `class`, `element`, `text` | The XML decoder of `class`, and of every class that inherits from it, reads the element and drops it when its text, less the white space around it, is `text`, reporting nothing; any other text fails the decode with `canxml.ErrInvalidShape`. The encoder never writes it. Generation fails when the element names a member of the class. |
+| `anonymous_type_names` | `schema_type`, `element_path`, `class` | Carries the class the root declares for the anonymous type of the element at `element_path` (element names separated by `/`) inside the named schema type, in its plan for the ITS-XML schema reading. No generated code reads it yet. |
+| `schema_forms` | `class`, `property`, `form`, `shapes` | Carries the form the schema gives the property's element, in its plan for the canonical-XML codec. The one form is `choice`: the element takes the shape of one of the classes `shapes` lists. No generated code reads it yet. |
+
+Every class an entry of the last four keys names must be one the target holds, so no entry names a class left out. An example entry:
+
+```json
+"sdk_extensions": {
+    "dropped_elements": [
+        {"class": "C_ATTRIBUTE", "element": "match_negated", "text": "false",
+         "reason": "a legacy element no AOM class declares, accepted fixed to false.",
+         "upstream": "resources/its-xml/components/AM/Release-1.4/Archetype.xsd:52"}
+    ]
+}
+```
 
 | File | Schema ID | Includes | Declares | Loaded by |
 |---|---|---|---|---|
 | `sdk/openehr_reference_model_1.2.0.bmm.json` | `openehr_reference_model_1.2.0` | rm 1.2.0 | `TRANSLATION_DETAILS`, with `accreditation` where the RM schema misspells it ([specifications-RM PR 43](https://github.com/openEHR/specifications-RM/pull/43)) | the RM target |
 
-The roots are hand-written sources under review, not pins: the sync script never fetches or removes them, `MANIFEST.txt` does not list them, and `make bmm-check` does not hash them. A root's id is its own (`<rm_publisher>_<schema_name>_<rm_release>`, with the words spelled out); the generator refuses an id that both `sdk/` and this directory hold. The root check, a Go test in `internal/bmmgen` that `make test` runs, holds every root to its rules: each type name it uses resolves after the merge, each declaration carries its reason and upstream reference, each class it declares again still differs from the class it shadows, and no root takes a pinned id.
+The roots are hand-written sources under review, not pins: the sync script never fetches or removes them, `MANIFEST.txt` does not list them, and `make bmm-check` does not hash them. A root's id is its own (`<rm_publisher>_<schema_name>_<rm_release>`, with the words spelled out); the generator refuses an id that both `sdk/` and this directory hold. The root check, a Go test in `internal/bmmgen` that `make test` runs, holds every root to its rules: each type name it uses resolves after the merge, each declaration and each extension entry carries its reason and upstream reference, each class it declares again still differs from the class it shadows, and no root takes a pinned id.
 
 ## Provenance
 
