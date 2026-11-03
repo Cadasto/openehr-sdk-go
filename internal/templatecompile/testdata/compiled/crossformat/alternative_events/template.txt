@@ -1,0 +1,268 @@
+# compiled tree of crossformat/alternative_events/template.opt
+template_id="AlternativeEvents" concept="AlternativeEvents" language="de" uid="e96e42e0-7480-4303-bbe5-0ea9d686c7f0" num_nodes=39
+
+node /
+  rm_type="COMPOSITION" node_id="at0000" archetype_id="openEHR-EHR-COMPOSITION.report.v1" node_name="" occurrences=1..1 slot=false
+  term[de] "at0000" code="at0000" description="Ein Dokument zur Übermittlung von Informationen an andere, meist als Antwort auf\n                eine Anfrage." text="Bericht"
+  attr "category" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "context" rm_type="EVENT_CONTEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "content" rm_type="CONTENT_ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "territory" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "composer" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /category
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /category/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["433"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context
+  rm_type="EVENT_CONTEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "other_context" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "start_time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "setting" rm_type="DV_CODED_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context/other_context
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[de] "at0001" code="at0001" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=3
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context/other_context/items[at0002]
+  rm_type="ELEMENT" node_id="at0002" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[de] "at0002" code="at0002" description="Identifizierungsmerkmal des Berichts." text="Bericht ID"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context/other_context/items[at0002]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context/other_context/items[at0005]
+  rm_type="ELEMENT" node_id="at0005" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[de] "at0005" code="at0005" description="Der Status des gesamten Berichts. Hinweis: Dies ist nicht der Status einer\n                Berichtskomponente." text="Status"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context/other_context/items[at0005]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context/other_context/items[at0006]
+  rm_type="CLUSTER" node_id="at0006" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                                        <type>Boolean</type>\n                                        <operator>2007</operator>\n                                        <precedence_overridden>false</precedence_overridden>\n                                        <left_operand xsi:type=\"EXPR_LEAF\">\n                                            <type>String</type>\n                                            <item xsi:type=\"xsd:string\">archetype_id/value</item>\n                                            <reference_type>attribute</reference_type>\n                                        </left_operand>\n                                        <right_operand xsi:type=\"EXPR_LEAF\">\n                                            <type>C_STRING</type>\n                                            <item xsi:type=\"C_STRING\">\n                                                <pattern>.*</pattern>\n                                            </item>\n                                            <reference_type>constraint</reference_type>\n                                        </right_operand>\n                                    </expression>"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[de] "at0006" code="at0006" comment="Zum Beispiel: lokaler Informationsbedarf oder zusätzliche Metadaten zur Anpassung an\n                FHIR-Ressourcen oder CIMI-Modelle." description="Zusätzliche Informationen zur Erfassung lokaler Inhalte oder Anpassung an andere\n                Referenzmodelle/Formalismen." text="Erweiterung"
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]
+  rm_type="OBSERVATION" node_id="at0000" archetype_id="openEHR-EHR-OBSERVATION.body_weight.v2" node_name="" occurrences=0..* slot=false
+  term[de] "at0000" code="at0000" description="Messung des Körpergewichts eines Individuums." text="Körpergewicht"
+  attr "data" rm_type="HISTORY" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "protocol" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "encoding" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "subject" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]/data
+  rm_type="HISTORY" node_id="at0002" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[de] "at0002" code="at0002" description="@ internal @" text="History"
+  attr "events" rm_type="EVENT" cardinality=multiple existence=0..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "origin" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]/data/events[at0003]
+  rm_type="EVENT" node_id="at0003" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[de] "at0003" code="at0003" description="*Default, unspecified point in time or interval event which may be\n                        explicitly defined in a template or at run-time.(en)" text="*Any event(en)"
+  attr "data" rm_type="T" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "state" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]/data/events[at0003]/data
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[de] "at0001" code="at0001" description="@ internal @" text="Simple"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]/data/events[at0003]/data/items[at0004]
+  rm_type="ELEMENT" node_id="at0004" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[de] "at0004" code="at0004" description="Das Gewicht eines Individuums." text="Gewicht"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]/data/events[at0003]/data/items[at0004]/value
+  rm_type="DV_QUANTITY" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.DvQuantity{Units:[constraints.QuantityUnit{Units:"kg" Magnitude:constraints.NumericRange{Lower:0 Upper:1000 LowerInclusive:true UpperInclusive:true LowerUnbounded:false UpperUnbounded:false} Precision:constraints.NumericRange{Lower:0 Upper:0 LowerInclusive:false UpperInclusive:false LowerUnbounded:true UpperUnbounded:true}} constraints.QuantityUnit{Units:"[lb_av]" Magnitude:constraints.NumericRange{Lower:0 Upper:2000 LowerInclusive:true UpperInclusive:true LowerUnbounded:false UpperUnbounded:false} Precision:constraints.NumericRange{Lower:0 Upper:0 LowerInclusive:false UpperInclusive:false LowerUnbounded:true UpperUnbounded:true}} constraints.QuantityUnit{Units:"g" Magnitude:constraints.NumericRange{Lower:0 Upper:1e+06 LowerInclusive:true UpperInclusive:true LowerUnbounded:false UpperUnbounded:false} Precision:constraints.NumericRange{Lower:0 Upper:0 LowerInclusive:false UpperInclusive:false LowerUnbounded:true UpperUnbounded:true}}] Property:constraints.CodedTermRef{Terminology:"openehr" CodeString:"124"} PropertyUnits:["kg" "AU" "cg" "dg" "[dr_av]" "fg" "g" "[gr]" "[lb_av]" "mg" "[m_p]" "[m_e]" "ng" "[oz_av]" "[oz_tr]" "pg" "t" "[ston_av]" "AMU" "ug"]}
+  attr "magnitude" rm_type="Real" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "units" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]/data/events[at0003]/data/items[at0024]
+  rm_type="ELEMENT" node_id="at0024" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[de] "at0024" code="at0024" description="*Additional narrative about the measurement of Body weight, not captured in\n                        other fields.(en)" text="*Comment(en)"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]/data/events[at0003]/data/items[at0024]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]/data/events[at0003]/state
+  rm_type="ITEM_TREE" node_id="at0008" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[de] "at0008" code="at0008" description="@ internal @" text="State structure"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]/data/events[at0003]/state/items[at0009]
+  rm_type="ELEMENT" node_id="at0009" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[de] "at0009" code="at0009" description="*Description of the state of dress of the person at the time of\n                        weighing.(en)" text="*State of dress(en)"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]/data/events[at0003]/state/items[at0009]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]/data/events[at0003]/state/items[at0009]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0013" "at0017" "at0011" "at0028" "at0010"]}
+  code_term[de] "at0013" code="at0013" description="Ohne Kleidung." text="Unbekleidet"
+  code_term[de] "at0017" code="at0017" description="Trägt Windel; kann signifikant zum Gewicht beitragen." text="Windel"
+  code_term[de] "at0011" code="at0011" description="Bekleidung, die nicht signifikant zum Gewicht beiträgt." text="Leicht bekleidet / Unterwäsche"
+  code_term[de] "at0028" code="at0028" description="*Clothing which may add significantly to weight. (en)" text="*Fully clothed, without shoes (en)"
+  code_term[de] "at0010" code="at0010" description="Bekleidung, die signifikant zum Gewicht beiträgt, mit Schuhen." text="Voll bekleidet, mit Schuhen"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]/data/events[at0003]/state/items[at0025]
+  rm_type="ELEMENT" node_id="at0025" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[de] "at0025" code="at0025" description="*Record any issues or factors that may impact on the measurement of body\n                        weight eg timing in menstrual cycle, timing of recent bowel motion or noting of amputation.(en)" text="*Confounding factors(en)"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]/data/events[at0003]/state/items[at0025]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]/data/events[at0026]
+  rm_type="POINT_EVENT" node_id="at0026" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[de] "at0026" code="at0026" description="*Usually the first weight, measured soon after birth. This event will only\n                        be used once per health record\n                        .(en)" text="*Birth(en)"
+  attr "data" rm_type="T" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "state" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]/data/events[at0026]/data
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[de] "at0001" code="at0001" description="@ internal @" text="Simple"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]/data/events[at0026]/data/items[at0004]
+  rm_type="ELEMENT" node_id="at0004" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[de] "at0004" code="at0004" description="Das Gewicht eines Individuums." text="Gewicht"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]/data/events[at0026]/data/items[at0004]/value
+  rm_type="DV_QUANTITY" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.DvQuantity{Units:[constraints.QuantityUnit{Units:"kg" Magnitude:constraints.NumericRange{Lower:0 Upper:1000 LowerInclusive:true UpperInclusive:true LowerUnbounded:false UpperUnbounded:false} Precision:constraints.NumericRange{Lower:0 Upper:0 LowerInclusive:false UpperInclusive:false LowerUnbounded:true UpperUnbounded:true}} constraints.QuantityUnit{Units:"[lb_av]" Magnitude:constraints.NumericRange{Lower:0 Upper:2000 LowerInclusive:true UpperInclusive:true LowerUnbounded:false UpperUnbounded:false} Precision:constraints.NumericRange{Lower:0 Upper:0 LowerInclusive:false UpperInclusive:false LowerUnbounded:true UpperUnbounded:true}} constraints.QuantityUnit{Units:"g" Magnitude:constraints.NumericRange{Lower:0 Upper:1e+06 LowerInclusive:true UpperInclusive:true LowerUnbounded:false UpperUnbounded:false} Precision:constraints.NumericRange{Lower:0 Upper:0 LowerInclusive:false UpperInclusive:false LowerUnbounded:true UpperUnbounded:true}}] Property:constraints.CodedTermRef{Terminology:"openehr" CodeString:"124"} PropertyUnits:["kg" "AU" "cg" "dg" "[dr_av]" "fg" "g" "[gr]" "[lb_av]" "mg" "[m_p]" "[m_e]" "ng" "[oz_av]" "[oz_tr]" "pg" "t" "[ston_av]" "AMU" "ug"]}
+  attr "magnitude" rm_type="Real" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "units" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]/data/events[at0026]/data/items[at0024]
+  rm_type="ELEMENT" node_id="at0024" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[de] "at0024" code="at0024" description="*Additional narrative about the measurement of Body weight, not captured in\n                        other fields.(en)" text="*Comment(en)"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]/data/events[at0026]/data/items[at0024]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]/data/events[at0026]/state
+  rm_type="ITEM_TREE" node_id="at0008" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[de] "at0008" code="at0008" description="@ internal @" text="State structure"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]/data/events[at0026]/state/items[at0009]
+  rm_type="ELEMENT" node_id="at0009" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[de] "at0009" code="at0009" description="*Description of the state of dress of the person at the time of\n                        weighing.(en)" text="*State of dress(en)"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]/data/events[at0026]/state/items[at0009]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]/data/events[at0026]/state/items[at0009]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0013" "at0017" "at0011" "at0028" "at0010"]}
+  code_term[de] "at0013" code="at0013" description="Ohne Kleidung." text="Unbekleidet"
+  code_term[de] "at0017" code="at0017" description="Trägt Windel; kann signifikant zum Gewicht beitragen." text="Windel"
+  code_term[de] "at0011" code="at0011" description="Bekleidung, die nicht signifikant zum Gewicht beiträgt." text="Leicht bekleidet / Unterwäsche"
+  code_term[de] "at0028" code="at0028" description="*Clothing which may add significantly to weight. (en)" text="*Fully clothed, without shoes (en)"
+  code_term[de] "at0010" code="at0010" description="Bekleidung, die signifikant zum Gewicht beiträgt, mit Schuhen." text="Voll bekleidet, mit Schuhen"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]/data/events[at0026]/state/items[at0025]
+  rm_type="ELEMENT" node_id="at0025" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[de] "at0025" code="at0025" description="*Record any issues or factors that may impact on the measurement of body\n                        weight eg timing in menstrual cycle, timing of recent bowel motion or noting of amputation.(en)" text="*Confounding factors(en)"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]/data/events[at0026]/state/items[at0025]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]/protocol
+  rm_type="ITEM_TREE" node_id="at0015" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[de] "at0015" code="at0015" description="@ internal @" text="Protocol structure"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]/protocol/items[at0020]
+  rm_type="CLUSTER" node_id="at0020" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                                        <type>Boolean</type>\n                                        <operator>2007</operator>\n                                        <precedence_overridden>false</precedence_overridden>\n                                        <left_operand xsi:type=\"EXPR_LEAF\">\n                                            <type>String</type>\n                                            <item xsi:type=\"xsd:string\">archetype_id/value</item>\n                                            <reference_type>attribute</reference_type>\n                                        </left_operand>\n                                        <right_operand xsi:type=\"EXPR_LEAF\">\n                                            <type>C_STRING</type>\n                                            <item xsi:type=\"C_STRING\">\n                                                <pattern>openEHR-EHR-CLUSTER\\.device(-[a-zA-Z0-9_]+)*\\.v1</pattern>\n                                            </item>\n                                            <reference_type>constraint</reference_type>\n                                        </right_operand>\n                                    </expression>"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.device(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[] raw_include_count=1
+  term[de] "at0020" code="at0020" description="Details über die benutzte Waage." text="Gerät"
+
+node /content[openEHR-EHR-OBSERVATION.body_weight.v2]/protocol/items[at0027]
+  rm_type="CLUSTER" node_id="at0027" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                                        <type>Boolean</type>\n                                        <operator>2007</operator>\n                                        <precedence_overridden>false</precedence_overridden>\n                                        <left_operand xsi:type=\"EXPR_LEAF\">\n                                            <type>String</type>\n                                            <item xsi:type=\"xsd:string\">archetype_id/value</item>\n                                            <reference_type>attribute</reference_type>\n                                        </left_operand>\n                                        <right_operand xsi:type=\"EXPR_LEAF\">\n                                            <type>C_STRING</type>\n                                            <item xsi:type=\"C_STRING\">\n                                                <pattern>.*</pattern>\n                                            </item>\n                                            <reference_type>constraint</reference_type>\n                                        </right_operand>\n                                    </expression>"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[de] "at0027" code="at0027" comment="*For example: local information requirements or additional metadata to align\n                        with FHIR or CIMI equivalents.(en)" description="*Additional information required to capture local content or to align with\n                        other reference models/formalisms.(en)" text="*Extension(en)"
+
+# walked nodes=39

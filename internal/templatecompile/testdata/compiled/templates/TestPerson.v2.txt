@@ -1,0 +1,1051 @@
+# compiled tree of templates/TestPerson.v2.opt
+template_id="TestPerson.v2" concept="Test Person" language="nl" uid="91f7b350-edb3-11e4-90dd-6f1310194e3c" num_nodes=174
+
+node /
+  rm_type="PERSON" node_id="at0000" archetype_id="openEHR-DEMOGRAPHIC-PERSON.person.v2" node_name="" occurrences=1..1 slot=false
+  term[nl] "at0000" code="at0000" description="Persoonlijke demografische gegevens." text="Persoon"
+  attr "details" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "identities" rm_type="PARTY_IDENTITY" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=1
+  attr "contacts" rm_type="CONTACT" cardinality=multiple existence=0..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=1
+  attr "relationships" rm_type="PARTY_RELATIONSHIP" cardinality=multiple existence=0..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=0
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details
+  rm_type="ITEM_TREE" node_id="at0000" archetype_id="openEHR-DEMOGRAPHIC-ITEM_TREE.person_details.v2" node_name="" occurrences=1..1 slot=false
+  term[nl] "at0000" code="at0000" description="Demographic data about a person such as birth data, death data, sex, marital status, ethnic group and biometric identifier" text="Persoon data"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=14
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0001]
+  rm_type="CLUSTER" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[nl] "at0001" code="at0001" description="Birth demographic data" text="Geboortegegevens"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=5
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0001]/items[at0010]
+  rm_type="ELEMENT" node_id="at0010" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[nl] "at0010" code="at0010" description="The date of birth of a person" text="Geboortedatum"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0001]/items[at0010]/value
+  rm_type="DV_DATE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0001]/items[at0012]
+  rm_type="ELEMENT" node_id="at0012" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at0012" code="at0012" description="The country where a person was born" text="Geboorteland"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0001]/items[at0012]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0001]/items[at0012]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.ConstraintRef{Reference:"ac0001"}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0001]/items[at0014]
+  rm_type="ELEMENT" node_id="at0014" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at0014" code="at0014" description="The city/town/locality where the person was born" text="Geboorteplaats"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0001]/items[at0014]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0001]/items[at2401]
+  rm_type="ELEMENT" node_id="at2401" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at2401" code="at2401" description="*" text="Meerling"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0001]/items[at2401]/value
+  rm_type="DV_BOOLEAN" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="Boolean" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0001]/items[at0006]
+  rm_type="CLUSTER" node_id="at0006" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                    <type>Boolean</type>\n                    <operator>2007</operator>\n                    <precedence_overridden>false</precedence_overridden>\n                    <left_operand xsi:type=\"EXPR_LEAF\">\n                      <type>String</type>\n                      <item>archetype_id/value</item>\n                      <reference_type>attribute</reference_type>\n                    </left_operand>\n                    <right_operand xsi:type=\"EXPR_LEAF\">\n                      <type>C_STRING</type>\n                      <item xsi:type=\"C_STRING\">\n                        <pattern>openEHR-EHR-CLUSTER\\.(birth_data_additional_detail)[a-zA-Z0-9_-]*\\.v1</pattern>\n                      </item>\n                      <reference_type>constraint</reference_type>\n                    </right_operand>\n                  </expression>"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.(birth_data_additional_detail)[a-zA-Z0-9_-]*\\.v1"] excludes=[] raw_include_count=1
+  term[nl] "at0006" code="at0006" description="Additional birth data that are country specific" text="Aanvullend land geboden geboortedatum"
+
+node /details/items[at0002]
+  rm_type="CLUSTER" node_id="at0002" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[nl] "at0002" code="at0002" description="Death demographic data" text="Overlijdensgegevens"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0002]/items[at0021]
+  rm_type="ELEMENT" node_id="at0021" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[nl] "at0021" code="at0021" description="Overlijdensdatum van deze persoon." text="Overlijdensdatum"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0002]/items[at0021]/value
+  rm_type="DV_DATE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0031]
+  rm_type="ELEMENT" node_id="at0031" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[nl] "at0031" code="at0031" description="The gender of the subject" text="Geslacht"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0031]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0031]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0310" "at0311" "at0312" "at0313"]}
+  code_term[nl] "at0310" code="at0310" description="Het geslacht is man." text="Man"
+  code_term[nl] "at0311" code="at0311" description="Het geslacht is vrouw." text="Vrouw"
+  code_term[nl] "at0312" code="at0312" description="Het geslacht van een persoon kan niet uniek worden gedefinieerd als man of vrouw, zoals een hermafrodiet." text="Ongedifferentieerd"
+  code_term[nl] "at0313" code="at0313" description="Het geslacht is onbekend." text="Onbekend"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0033]
+  rm_type="ELEMENT" node_id="at0033" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[nl] "at0033" code="at0033" description="De burgerlijke staat van een mens in de zin en betekenis van het burgerlijk wetboek." text="Burgerlijke staat"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0033]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0033]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0034]
+  rm_type="ELEMENT" node_id="at0034" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[nl] "at0034" code="at0034" description="The person's ethnic background" text="Etnische achtergrond"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0034]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0034]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0034]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.ConstraintRef{Reference:"ac0007"}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at2402]
+  rm_type="ELEMENT" node_id="at2402" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[nl] "at2402" code="at2402" description="*" text="Nationaliteit"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at2402]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at2402]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at2403]
+  rm_type="ELEMENT" node_id="at2403" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at2403" code="at2403" description="*" text="Levensovertuiging"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at2403]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at2403]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0035]
+  rm_type="ELEMENT" node_id="at0035" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[nl] "at0035" code="at0035" description="Comments recorded for a person registration to distinguish between two or more persons with the same or similar demographic information" text="Opmerkingen"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0035]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at2400]
+  rm_type="ELEMENT" node_id="at2400" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[nl] "at2400" code="at2400" description="*" text="Overige gegevens"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at2400]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier.v2]
+  rm_type="CLUSTER" node_id="at0000" archetype_id="openEHR-DEMOGRAPHIC-CLUSTER.person_identifier.v2" node_name="" occurrences=0..* slot=false
+  term[nl] "at0000" code="at0000" description="Identifier for a person." text="Persoon ID"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=2..* implicit=false not_in_rm=false required=true children=3
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier.v2]/items[at0001]
+  rm_type="ELEMENT" node_id="at0001" archetype_id="" node_name="" occurrences=1..* slot=false
+  term[nl] "at0001" code="at0001" description="Identifier number or code, issuer, assigner and type of identifier." text="Gegevens"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier.v2]/items[at0001]/value
+  rm_type="DV_IDENTIFIER" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier.v2]/items[at0006]
+  rm_type="ELEMENT" node_id="at0006" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at0006" code="at0006" description="Period in which this identifier is valid." text="Time validity"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier.v2]/items[at0006]/value
+  rm_type="DV_INTERVAL<DV_DATE>" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "upper" rm_type="DV_DATE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "lower" rm_type="DV_DATE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "lower_unbounded" rm_type="Boolean" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "upper_unbounded" rm_type="Boolean" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "lower_included" rm_type="Boolean" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "upper_included" rm_type="Boolean" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier.v2]/items[at0006]/value/upper
+  rm_type="DV_DATE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier.v2]/items[at0006]/value/lower
+  rm_type="DV_DATE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier.v2]/items[at0007]
+  rm_type="ELEMENT" node_id="at0007" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at0007" code="at0007" description="Last verification date." text="Controle datum"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier.v2]/items[at0007]/value
+  rm_type="DV_DATE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]
+  rm_type="CLUSTER" node_id="at0000" archetype_id="openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2" node_name="" occurrences=0..* slot=false
+  term[nl] "at0000" code="at0000" description="Afbeelding van persoon" text="Afbeelding"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]
+  rm_type="ELEMENT" node_id="at0001" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at0001" code="at0001" description="Afbeelding van persoon" text="Afbeelding gegevens"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value
+  rm_type="DV_MULTIMEDIA" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "media_type" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "size" rm_type="Integer" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openEHR" CodeList:["425" "426" "427" "428" "429"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]
+  rm_type="CLUSTER" node_id="at0000" archetype_id="openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2" node_name="" occurrences=0..* slot=false
+  term[nl] "at0000" code="at0000" description="unknown" text="Wettelijk identiteitsdocument (WID)"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=9
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0001]
+  rm_type="ELEMENT" node_id="at0001" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at0001" code="at0001" description="Het nummer van het document" text="Document nummer"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0001]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0002]
+  rm_type="ELEMENT" node_id="at0002" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at0002" code="at0002" description="Type document, kan zijn reisdocument, rijbewijs of vreemdelingendocument" text="Type document"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0002]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0002]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0003]
+  rm_type="ELEMENT" node_id="at0003" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at0003" code="at0003" description="*" text="Geldig tot"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0003]/value
+  rm_type="DV_DATE_TIME" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0004]
+  rm_type="ELEMENT" node_id="at0004" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at0004" code="at0004" description="*" text="Gecontroleerd op"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0004]/value
+  rm_type="DV_DATE_TIME" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0005]
+  rm_type="ELEMENT" node_id="at0005" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at0005" code="at0005" description="*" text="Document in omloop"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0005]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0005]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]
+  rm_type="ELEMENT" node_id="at0006" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at0006" code="at0006" description="*" text="Bijlage"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value
+  rm_type="DV_MULTIMEDIA" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "media_type" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "size" rm_type="Integer" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openEHR" CodeList:[]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0007]
+  rm_type="ELEMENT" node_id="at0007" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at0007" code="at0007" description="*" text="Opmerkingen"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0007]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0008]
+  rm_type="ELEMENT" node_id="at0008" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at0008" code="at0008" description="*" text="Identiteit vastgesteld door"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0008]/value
+  rm_type="DV_IDENTIFIER" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0009]
+  rm_type="ELEMENT" node_id="at0009" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at0009" code="at0009" description="*" text="Identiteit vastgesteld op datum"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0009]/value
+  rm_type="DV_DATE_TIME" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_insurance.v2]
+  rm_type="CLUSTER" node_id="at0000" archetype_id="openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_insurance.v2" node_name="" occurrences=0..* slot=false
+  term[nl] "at0000" code="at0000" description="De zorgverzekering" text="Zorgverzekering"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=5..* implicit=false not_in_rm=false required=true children=7
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_insurance.v2]/items[at0001]
+  rm_type="ELEMENT" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[nl] "at0001" code="at0001" description="Wordt voornamelijk gebruikt in externe systemen." text="Alternatief UID"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_insurance.v2]/items[at0001]/value
+  rm_type="DV_IDENTIFIER" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_insurance.v2]/items[at0002]
+  rm_type="ELEMENT" node_id="at0002" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[nl] "at0002" code="at0002" description="Polisnummer." text="Polisnummer"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_insurance.v2]/items[at0002]/value
+  rm_type="DV_IDENTIFIER" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_insurance.v2]/items[at0003]
+  rm_type="ELEMENT" node_id="at0003" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[nl] "at0003" code="at0003" description="Het type van de zorgverzekering, extern gedefiniëerd." text="Type"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_insurance.v2]/items[at0003]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_insurance.v2]/items[at0004]
+  rm_type="ELEMENT" node_id="at0004" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at0004" code="at0004" description="De datum waarop de zorgverzekering als laatste is geïmporteerd." text="Datum van import"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_insurance.v2]/items[at0004]/value
+  rm_type="DV_DATE_TIME" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_insurance.v2]/items[at0005]
+  rm_type="ELEMENT" node_id="at0005" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at0005" code="at0005" description="De pakketcode en pakketlabel van de zorgverzekering. Wordt gebruikt met andere velden om uniekheid te bepalen." text="Pakket"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_insurance.v2]/items[at0005]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_insurance.v2]/items[at0006]
+  rm_type="ELEMENT" node_id="at0006" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[nl] "at0006" code="at0006" description="De start en einddatum van de zorgverzekering." text="Geldigheid"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_insurance.v2]/items[at0006]/value
+  rm_type="DV_INTERVAL<DV_DATE>" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "upper" rm_type="DV_DATE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "lower" rm_type="DV_DATE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "lower_unbounded" rm_type="Boolean" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "upper_unbounded" rm_type="Boolean" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "lower_included" rm_type="Boolean" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "upper_included" rm_type="Boolean" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_insurance.v2]/items[at0006]/value/upper
+  rm_type="DV_DATE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_insurance.v2]/items[at0006]/value/upper/value
+  rm_type="DATE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CDate{Pattern:"yyyy-mm-dd" Range:constraints.TemporalRange{Lower:"" Upper:"" LowerInclusive:false UpperInclusive:false LowerUnbounded:false UpperUnbounded:false} TimezoneValidity:0}
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_insurance.v2]/items[at0006]/value/lower
+  rm_type="DV_DATE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_insurance.v2]/items[at0006]/value/lower/value
+  rm_type="DATE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CDate{Pattern:"yyyy-mm-dd" Range:constraints.TemporalRange{Lower:"" Upper:"" LowerInclusive:false UpperInclusive:false LowerUnbounded:false UpperUnbounded:false} TimezoneValidity:0}
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_insurance.v2]/items[at0007]
+  rm_type="ELEMENT" node_id="at0007" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[nl] "at0007" code="at0007" description="Een referentie naar de zorgverzekeraar van de zorgverzekering." text="Zorgverzekeraar"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_insurance.v2]/items[at0007]/value
+  rm_type="DV_IDENTIFIER" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.annotations.v1]
+  rm_type="CLUSTER" node_id="at0000" archetype_id="openEHR-DEMOGRAPHIC-CLUSTER.annotations.v1" node_name="" occurrences=1..1 slot=false
+  term[nl] "at0000" code="at0000" description="Annotaties" text="Annotaties"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.annotations.v1]/items[at0001]
+  rm_type="ELEMENT" node_id="at0001" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[nl] "at0001" code="at0001" description="Annotatie" text="Annotatie"
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.annotations.v1]/items[at0001]/name
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.annotations.v1]/items[at0001]/name/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[openEHR-DEMOGRAPHIC-CLUSTER.annotations.v1]/items[at0001]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2]
+  rm_type="PARTY_IDENTITY" node_id="at0000" archetype_id="openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2" node_name="" occurrences=1..* slot=false
+  term[nl] "at0000" code="at0000" description="Naamgegevens" text="Naamgegevens"
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "details" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2]/name
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2]/name/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0025" "at0027" "at0028"]}
+  code_term[nl] "at0025" code="at0025" description="The name used by the subject for business or professional purposes." text="Professionele of zakelijke naam"
+  code_term[nl] "at0027" code="at0027" description="Registered name (Legal name)." text="Officiële naam"
+  code_term[nl] "at0028" code="at0028" description="Any other name by which the subject is known, or has been known by in the past." text="Andere naam"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2]/details
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[nl] "at0001" code="at0001" description="Rootconcept van de naamgegevens. De naamgegevens van een persoon bevatten voornamen, roepnaam, achternaam en eventueel de achternaam van de partner." text="Naam"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=10
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2]/details/items[at0004]
+  rm_type="ELEMENT" node_id="at0004" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[nl] "at0004" code="at0004" description="Een eervolle adresvorm die begint met een naam, die wordt gebruikt bij het aanspreken van een persoon op naam, per post, telefoon of afhankelijk van de culturele situatie in persoon." text="Titel"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2]/details/items[at0004]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2]/details/items[at0002]
+  rm_type="ELEMENT" node_id="at0002" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[nl] "at0002" code="at0002" description="Officiële voornamen van de persoon." text="Voornaam"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2]/details/items[at0002]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2]/details/items[at2401]
+  rm_type="ELEMENT" node_id="at2401" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[nl] "at2401" code="at2401" description="Initialen van de persoon." text="Initialen"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2]/details/items[at2401]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2]/details/items[at2402]
+  rm_type="ELEMENT" node_id="at2402" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[nl] "at2402" code="at2402" description="De naam waarmee de persoon gebruikelijk aangesproken wordt." text="Roepnaam"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2]/details/items[at2402]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2]/details/items[at2405]
+  rm_type="ELEMENT" node_id="at2405" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[nl] "at2405" code="at2405" description="Bij de eigen achternaam behorende voorvoegsels." text="Voorvoegsel"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2]/details/items[at2405]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2]/details/items[at0003]
+  rm_type="ELEMENT" node_id="at0003" archetype_id="" node_name="" occurrences=1..* slot=false
+  term[nl] "at0003" code="at0003" description="Officiële achternaam van de persoon." text="Achternaam"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2]/details/items[at0003]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2]/details/items[at2403]
+  rm_type="ELEMENT" node_id="at2403" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[nl] "at2403" code="at2403" description="Bij de achternaam van de partner behorende voorvoegsels." text="Partnernaam voorvoegsel"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2]/details/items[at2403]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2]/details/items[at2404]
+  rm_type="ELEMENT" node_id="at2404" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[nl] "at2404" code="at2404" description="Officiële achternaam van de partner." text="Partnernaam"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2]/details/items[at2404]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2]/details/items[at0010]
+  rm_type="ELEMENT" node_id="at0010" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at0010" code="at0010" description="De volledige naam van de persoon als aaneenschakeling van de naamgegevens." text="Volledige naam"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2]/details/items[at0010]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2]/details/items[at2410]
+  rm_type="ELEMENT" node_id="at2410" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at2410" code="at2410" description="Dit geeft de volgorde van naamdelen aan waarmee de persoon aangesproken of aangeschreven wil worden." text="Voorkeursvolgorde van de naamdelen"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2]/details/items[at2410]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2]/details/items[at2410]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]
+  rm_type="CONTACT" node_id="at0003" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[nl] "at0003" code="at0003" description="Contacten van een persoon." text="Contacten"
+  attr "addresses" rm_type="ADDRESS" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=3
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]
+  rm_type="ADDRESS" node_id="at0000" archetype_id="openEHR-DEMOGRAPHIC-ADDRESS.address.v2" node_name="" occurrences=0..* slot=false
+  term[nl] "at0000" code="at0000" description="Adres gebaseerd op de ISO22220 standaard." text="Adres"
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "details" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/name
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/name/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0461" "at0462" "at0463" "at0464" "at0465" "at2467" "at2468" "at0466"]}
+  code_term[nl] "at0461" code="at0461" description="Used to indicate an address that is the physical location of a business or office at which an entity can be contacted." text="Zakelijk adres"
+  code_term[nl] "at0462" code="at0462" description="Used to indicate an address that is only for correspondence and/or billing purposes." text="Postadres"
+  code_term[nl] "at0463" code="at0463" description="Temporary accommodation address (such as for a person who usually resides overseas or where the provider of the address is in temporary accommodation due to renovation or treatment)." text="Tijdelijk adres"
+  code_term[nl] "at0464" code="at0464" description="Used to indicate where a person is living. Note that this code is not valid for organisations." text="Hoofdadres"
+  code_term[nl] "at0465" code="at0465" description="Used where a person has no fixed address." text="Geen vast adres"
+  code_term[nl] "at2467" code="at2467" description="Woon-/Verblijfadres." text="Verblijfadres"
+  code_term[nl] "at2468" code="at2468" description="Vakantie adres." text="Vakantie adres"
+  code_term[nl] "at0466" code="at0466" description="Unknown/not stated/inadequately described may also be used where the person has no fixed address or does not wish to have their residential or correspondence address recorded." text="Onbekend/niet vermeld/onvoldoende beschreven"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/details
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at0001" code="at0001" description="Bevat alle gegevenselementen van een adres." text="Gegevens"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=6
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/details/items[at0002]
+  rm_type="CLUSTER" node_id="at0002" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[nl] "at0002" code="at0002" description="A composite of one or more standard address components that describe a low level of geographical/physical description of a location that, used in conjunction with the other high-level address components i.e. ‘suburb / town / locality name’, ‘postal code’, ‘state / territory / province’, and ‘country’, forms a complete geographical/physical address." text="Adres regel"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=5
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/details/items[at0002]/items[at0028]
+  rm_type="ELEMENT" node_id="at0028" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at0028" code="at0028" description="The name that identifies a public thoroughfare and differentiates it from others in the same suburb/town/locality." text="Straat"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/details/items[at0002]/items[at0028]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/details/items[at0002]/items[at0029]
+  rm_type="ELEMENT" node_id="at0029" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at0029" code="at0029" description="The numeric or string reference number of a house or property that is unique within a street name, suburb." text="Huisnummer"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/details/items[at0002]/items[at0029]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/details/items[at0002]/items[at2401]
+  rm_type="ELEMENT" node_id="at2401" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at2401" code="at2401" description="Een alfabetisch teken achter het huisnummer zoals dit door het gemeentebestuur is toegekend." text="Huisnummerletter"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/details/items[at0002]/items[at2401]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/details/items[at0002]/items[at2402]
+  rm_type="ELEMENT" node_id="at2402" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at2402" code="at2402" description="Die letters of tekens die noodzakelijk zijn om, naast het huisnummer en de letter, de brievenbus te vinden." text="Huisnummertoevoeging"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/details/items[at0002]/items[at2402]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/details/items[at0002]/items[at2403]
+  rm_type="ELEMENT" node_id="at2403" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at2403" code="at2403" description="De aanduiding die wordt gebruikt voor adressen die niet zijn voorzien van de gebruikelijke straatnaam en huisnummeraanduidingen, b.v. bij, tegenover." text="Aanduiding bij nummer"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/details/items[at0002]/items[at2403]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/details/items[at0002]/items[at2403]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/details/items[at0006]
+  rm_type="ELEMENT" node_id="at0006" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at0006" code="at0006" description="Postcode van het adres." text="Postcode"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/details/items[at0006]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/details/items[at0007]
+  rm_type="ELEMENT" node_id="at0007" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at0007" code="at0007" description="Een geografisch bepaald gebied dat een deel is van het gemeentelijke grondgebied." text="Woonplaats"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/details/items[at0007]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/details/items[at2404]
+  rm_type="ELEMENT" node_id="at2404" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at2404" code="at2404" description="Gemeente van inschrijving." text="Gemeente"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/details/items[at2404]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/details/items[at0009]
+  rm_type="ELEMENT" node_id="at0009" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at0009" code="at0009" description="Land waar het adres zich bevindt." text="Land"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/details/items[at0009]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/details/items[at0009]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.ConstraintRef{Reference:"ac0004"}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/details/items[at2499]
+  rm_type="ELEMENT" node_id="at2499" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at2499" code="at2499" description="Other details or remarks." text="Opmerkingen"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/details/items[at2499]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.electronic_communication.v2]
+  rm_type="ADDRESS" node_id="at0000" archetype_id="openEHR-DEMOGRAPHIC-ADDRESS.electronic_communication.v2" node_name="" occurrences=0..* slot=false
+  term[nl] "at0000" code="at0000" description="The address of an electronic communication medium." text="Elektronisch adres"
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "details" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.electronic_communication.v2]/name
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.electronic_communication.v2]/name/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0020" "at0021" "at0022" "at0023" "at0024" "at0025"]}
+  code_term[nl] "at0020" code="at0020" description="The medium is a telephone (not a mobile phone)." text="Telefoon"
+  code_term[nl] "at0021" code="at0021" description="The medium is a mobile phone (not a landline)." text="Mobiel"
+  code_term[nl] "at0022" code="at0022" description="The medium is a faxsimile machine." text="Fax"
+  code_term[nl] "at0023" code="at0023" description="The medium is a pager." text="Pieper"
+  code_term[nl] "at0024" code="at0024" description="The medium is e-mail." text="E-mail"
+  code_term[nl] "at0025" code="at0025" description="The medium is an internet address." text="URL"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.electronic_communication.v2]/details
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[nl] "at0001" code="at0001" description="Electronic communication medium components." text="Gegevens"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=4
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.electronic_communication.v2]/details/items[at0003]
+  rm_type="ELEMENT" node_id="at0003" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at0003" code="at0003" description="A code representing the manner of use that a person/organization applies to an electronic medium." text="Gebruik"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.electronic_communication.v2]/details/items[at0003]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.electronic_communication.v2]/details/items[at0003]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0030" "at0031" "at0032" "at2434" "at0033"]}
+  code_term[nl] "at0030" code="at0030" description="The medium is for personal use." text="Persoonlijk"
+  code_term[nl] "at0031" code="at0031" description="The medium is for business use." text="Zakelijk"
+  code_term[nl] "at0032" code="at0032" description="The medium is for both business and personal use." text="Persoonlijk/Zakelijk"
+  code_term[nl] "at2434" code="at2434" description="The medium is for temporary use, i.e. availability is uncertain, may be or may be not good for visit or mailing." text="Tijdelijk"
+  code_term[nl] "at0033" code="at0033" description="The medium is for another use, e.g., a telephone for contact, a relative's phone." text="Anders"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.electronic_communication.v2]/details/items[at0007]
+  rm_type="ELEMENT" node_id="at0007" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[nl] "at0007" code="at0007" description="A unique combination of characters used as input to electronic telecommunication equipment for the purpose of establishing contact." text="Gegeven"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.electronic_communication.v2]/details/items[at0007]/value
+  rm_type="DV_TEXT" node_id="at0012" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[nl] "at0012" code="at0012" description="Identification of telephone, fax, pager, e-mail, etc." text="Identificatie van alle elektronische communicatiemiddelen"
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.electronic_communication.v2]/details/items[at0007]/value
+  rm_type="DV_URI" node_id="at0009" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[nl] "at0009" code="at0009" description="Internet address." text="Internet adres"
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.electronic_communication.v2]/details/items[at2499]
+  rm_type="ELEMENT" node_id="at2499" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at2499" code="at2499" description="Other details or remarks." text="Opmerkingen"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.electronic_communication.v2]/details/items[at2499]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.electronic_communication.v2]/details/items[at2498]
+  rm_type="ELEMENT" node_id="at2498" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at2498" code="at2498" description="This field indicates whether this mobile phone number is allowed to be sent notifications via sms texts" text="Sms notificaties"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.electronic_communication.v2]/details/items[at2498]/value
+  rm_type="DV_BOOLEAN" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="Boolean" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.residence_principle.v2]
+  rm_type="ADDRESS" node_id="at0000" archetype_id="openEHR-DEMOGRAPHIC-ADDRESS.residence_principle.v2" node_name="" occurrences=0..* slot=false
+  term[nl] "at0000" code="at0000" description="Adres gebaseerd op de ISO22220 standaard." text="residence_principle"
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "details" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.residence_principle.v2]/name
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.residence_principle.v2]/name/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0461" "at0462" "at0463" "at0464" "at0465" "at2467" "at2468" "at0466"]}
+  code_term[nl] "at0461" code="at0461" description="Used to indicate an address that is the physical location of a business or office at which an entity can be contacted." text="Zakelijk adres"
+  code_term[nl] "at0462" code="at0462" description="Used to indicate an address that is only for correspondence and/or billing purposes." text="Postadres"
+  code_term[nl] "at0463" code="at0463" description="Temporary accommodation address (such as for a person who usually resides overseas or where the provider of the address is in temporary accommodation due to renovation or treatment)." text="Tijdelijk adres"
+  code_term[nl] "at0464" code="at0464" description="Used to indicate where a person is living. Note that this code is not valid for organisations." text="Hoofdadres"
+  code_term[nl] "at0465" code="at0465" description="Used where a person has no fixed address." text="Geen vast adres"
+  code_term[nl] "at2467" code="at2467" description="Woon-/Verblijfadres." text="Verblijfadres"
+  code_term[nl] "at2468" code="at2468" description="Vakantie adres." text="Vakantie adres"
+  code_term[nl] "at0466" code="at0466" description="Unknown/not stated/inadequately described may also be used where the person has no fixed address or does not wish to have their residential or correspondence address recorded." text="Onbekend/niet vermeld/onvoldoende beschreven"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.residence_principle.v2]/details
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at0001" code="at0001" description="Bevat alle gegevenselementen van een adres." text="Gegevens"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=3
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.residence_principle.v2]/details/items[at2404]
+  rm_type="ELEMENT" node_id="at2404" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[nl] "at2404" code="at2404" description="Gemeente van inschrijving." text="Gemeente"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.residence_principle.v2]/details/items[at2404]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.residence_principle.v2]/details/items[at2499]
+  rm_type="ELEMENT" node_id="at2499" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[nl] "at2499" code="at2499" description="Other details or remarks." text="Opmerkingen"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.residence_principle.v2]/details/items[at2499]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.residence_principle.v2]/details/items[at2502]
+  rm_type="ELEMENT" node_id="at2502" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[nl] "at2502" code="at2502" description="De periode waarvoor dit woonplaatsbeginsel geldig is" text="time_validity"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.residence_principle.v2]/details/items[at2502]/value
+  rm_type="DV_INTERVAL<DV_DATE>" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "lower" rm_type="DV_DATE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "upper" rm_type="DV_DATE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "lower_unbounded" rm_type="Boolean" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "upper_unbounded" rm_type="Boolean" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "lower_included" rm_type="Boolean" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "upper_included" rm_type="Boolean" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.residence_principle.v2]/details/items[at2502]/value/lower
+  rm_type="DV_DATE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.residence_principle.v2]/details/items[at2502]/value/lower/value
+  rm_type="DATE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CDate{Pattern:"yyyy-mm-dd" Range:constraints.TemporalRange{Lower:"" Upper:"" LowerInclusive:false UpperInclusive:false LowerUnbounded:false UpperUnbounded:false} TimezoneValidity:0}
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.residence_principle.v2]/details/items[at2502]/value/upper
+  rm_type="DV_DATE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.residence_principle.v2]/details/items[at2502]/value/upper/value
+  rm_type="DATE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CDate{Pattern:"yyyy-mm-dd" Range:constraints.TemporalRange{Lower:"" Upper:"" LowerInclusive:false UpperInclusive:false LowerUnbounded:false UpperUnbounded:false} TimezoneValidity:0}
+
+# walked nodes=176

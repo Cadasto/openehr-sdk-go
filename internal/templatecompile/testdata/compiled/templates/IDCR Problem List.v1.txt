@@ -1,0 +1,204 @@
+# compiled tree of templates/IDCR Problem List.v1.opt
+template_id="IDCR Problem List.v1" concept="IDCR Problem List.v1" language="en" uid="93c39e9e-86b0-45c7-a1ed-9752d8270011" num_nodes=32
+
+node /
+  rm_type="COMPOSITION" node_id="at0000" archetype_id="openEHR-EHR-COMPOSITION.problem_list.v1" node_name="" occurrences=1..1 slot=false
+  term[en] "at0000" code="at0000" description="A persistent and managed list of any combination of diagnoses, problems and/or procedures that may influence clinical decision-making and care provision for the subject of care." text="Problem list"
+  attr "category" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "context" rm_type="EVENT_CONTEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "content" rm_type="CONTENT_ITEM" cardinality=multiple existence=0..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=5
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "territory" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "composer" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /category
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /category/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["433"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context
+  rm_type="EVENT_CONTEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "other_context" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "start_time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "setting" rm_type="DV_CODED_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context/other_context
+  rm_type="ITEM_TREE" node_id="at0006" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0006" code="at0006" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context/other_context/items[at0008]
+  rm_type="CLUSTER" node_id="at0008" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                    <type>Boolean</type>\n                    <operator>2007</operator>\n                    <precedence_overridden>false</precedence_overridden>\n                    <left_operand xsi:type=\"EXPR_LEAF\">\n                      <type>String</type>\n                      <item xsi:type=\"xsd:string\">archetype_id/value</item>\n                      <reference_type>attribute</reference_type>\n                    </left_operand>\n                    <right_operand xsi:type=\"EXPR_LEAF\">\n                      <type>C_STRING</type>\n                      <item xsi:type=\"C_STRING\">\n                        <pattern>.*</pattern>\n                      </item>\n                      <reference_type>constraint</reference_type>\n                    </right_operand>\n                  </expression>"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0008" code="at0008" comment="For example: Local hospital departmental infomation or additional metadata to align with FHIR or CIMI equivalents." description="Additional information required to capture local context or to align with other reference models/formalisms." text="Extension"
+
+node /content[at0002]
+  rm_type="EVALUATION" node_id="at0002" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n            <type>Boolean</type>\n            <operator>2007</operator>\n            <precedence_overridden>false</precedence_overridden>\n            <left_operand xsi:type=\"EXPR_LEAF\">\n              <type>String</type>\n              <item xsi:type=\"xsd:string\">archetype_id/value</item>\n              <reference_type>attribute</reference_type>\n            </left_operand>\n            <right_operand xsi:type=\"EXPR_LEAF\">\n              <type>C_STRING</type>\n              <item xsi:type=\"C_STRING\">\n                <pattern>openEHR-EHR-EVALUATION\\.problem_diagnosis(-[a-zA-Z0-9_]+)*\\.v1</pattern>\n              </item>\n              <reference_type>constraint</reference_type>\n            </right_operand>\n          </expression>"] slot_excludes=[]
+  slot_rules rm_type="EVALUATION" includes=["openEHR-EHR-EVALUATION\\.problem_diagnosis(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[] raw_include_count=1
+  term[en] "at0002" code="at0002" description="Detail about identified problems, diagnoses, concerns or health issue threads." text="Problems, diagnoses, concerns or Health issue threads"
+
+node /content[at0003]
+  rm_type="ACTION" node_id="at0003" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n            <type>Boolean</type>\n            <operator>2007</operator>\n            <precedence_overridden>false</precedence_overridden>\n            <left_operand xsi:type=\"EXPR_LEAF\">\n              <type>String</type>\n              <item xsi:type=\"xsd:string\">archetype_id/value</item>\n              <reference_type>attribute</reference_type>\n            </left_operand>\n            <right_operand xsi:type=\"EXPR_LEAF\">\n              <type>C_STRING</type>\n              <item xsi:type=\"C_STRING\">\n                <pattern>openEHR-EHR-ACTION\\.procedure(-[a-zA-Z0-9_]+)*\\.v1</pattern>\n              </item>\n              <reference_type>constraint</reference_type>\n            </right_operand>\n          </expression>"] slot_excludes=[]
+  slot_rules rm_type="ACTION" includes=["openEHR-EHR-ACTION\\.procedure(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[] raw_include_count=1
+  term[en] "at0003" code="at0003" description="Detail about identified procedures that have been performed." text="Procedures"
+
+node /content[at0004]
+  rm_type="EVALUATION" node_id="at0004" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n            <type>Boolean</type>\n            <operator>2007</operator>\n            <precedence_overridden>false</precedence_overridden>\n            <left_operand xsi:type=\"EXPR_LEAF\">\n              <type>String</type>\n              <item xsi:type=\"xsd:string\">archetype_id/value</item>\n              <reference_type>attribute</reference_type>\n            </left_operand>\n            <right_operand xsi:type=\"EXPR_LEAF\">\n              <type>C_STRING</type>\n              <item xsi:type=\"C_STRING\">\n                <pattern>openEHR-EHR-EVALUATION\\.exclusion-problem_diagnosis(-[a-zA-Z0-9_]+)*\\.v1|openEHR-EHR-EVALUATION\\.exclusion-procedure(-[a-zA-Z0-9_]+)*\\.v1</pattern>\n              </item>\n              <reference_type>constraint</reference_type>\n            </right_operand>\n          </expression>"] slot_excludes=[]
+  slot_rules rm_type="EVALUATION" includes=["openEHR-EHR-EVALUATION\\.exclusion-problem_diagnosis(-[a-zA-Z0-9_]+)*\\.v1|openEHR-EHR-EVALUATION\\.exclusion-procedure(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[] raw_include_count=1
+  term[en] "at0004" code="at0004" comment="For example: \"No significant problems or diagnoses\" or \"No history of significant operations or procedures\"." description="Positive statement about the exclusion of known problems or diagnoses and procedures performed." text="Exclusion statements"
+
+node /content[at0005]
+  rm_type="EVALUATION" node_id="at0005" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n            <type>Boolean</type>\n            <operator>2007</operator>\n            <precedence_overridden>false</precedence_overridden>\n            <left_operand xsi:type=\"EXPR_LEAF\">\n              <type>String</type>\n              <item xsi:type=\"xsd:string\">archetype_id/value</item>\n              <reference_type>attribute</reference_type>\n            </left_operand>\n            <right_operand xsi:type=\"EXPR_LEAF\">\n              <type>C_STRING</type>\n              <item xsi:type=\"C_STRING\">\n                <pattern>openEHR-EHR-EVALUATION\\.absence(-[a-zA-Z0-9_]+)*\\.v1</pattern>\n              </item>\n              <reference_type>constraint</reference_type>\n            </right_operand>\n          </expression>"] slot_excludes=[]
+  slot_rules rm_type="EVALUATION" includes=["openEHR-EHR-EVALUATION\\.absence(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[] raw_include_count=1
+  term[en] "at0005" code="at0005" description="Positive statement that no information is available about identification of problems or diagnoses, nor procedures performed." text="Absent information"
+
+node /content[openEHR-EHR-SECTION.problems_issues_rcp.v1]
+  rm_type="SECTION" node_id="at0000" archetype_id="openEHR-EHR-SECTION.problems_issues_rcp.v1" node_name="" occurrences=0..* slot=false
+  term[en] "at0000" code="at0000" description="Problems and issues heading (AoMRC)." text="Problems and issues"
+  attr "items" rm_type="CONTENT_ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.problems_issues_rcp.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]
+  rm_type="EVALUATION" node_id="at0000" archetype_id="openEHR-EHR-EVALUATION.problem_diagnosis.v1" node_name="" occurrences=0..* slot=false
+  term[en] "at0000" code="at0000" comment="Clear delineation between the scope of a problem versus a diagnosis is not easy to achieve in practice. For the purposes of clinical documentation with this archetype, problem and diagnosis are regarded as a continuum, with increasing levels of detail and supportive evidence usually providing weight towards the label of 'diagnosis'." description="Details about a single identified health condition, injury, disability or any other issue which impacts on the physical, mental and/or social well-being of an individual." text="Problem/Diagnosis"
+  attr "data" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "protocol" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "encoding" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "subject" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.problems_issues_rcp.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="@ internal @" text="structure"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=9
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.problems_issues_rcp.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0002]
+  rm_type="ELEMENT" node_id="at0002" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0002" code="at0002" comment="Coding of the name of the problem or diagnosis with a terminology is preferred, where possible." description="Identification of the problem or diagnosis, by name." text="Problem/Diagnosis name"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.problems_issues_rcp.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0002]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.problems_issues_rcp.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0009]
+  rm_type="ELEMENT" node_id="at0009" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0009" code="at0009" comment="Use to provide background and context, including evolution, episodes or exacerbations, progress and any other relevant details, about the problem or diagnosis." description="Narrative description about the problem or diagnosis." text="Clinical description"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.problems_issues_rcp.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0009]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.problems_issues_rcp.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0012]
+  rm_type="ELEMENT" node_id="at0012" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[en] "at0012" code="at0012" comment="Coding of the name of the anatomical location with a terminology is preferred, where possible.\nUse this data element to record precoordinated anatomical locations. If the requirements for recording the anatomical location are determined at run-time by the application or require more complex modelling such as relative locations then use the CLUSTER.anatomical_location or CLUSTER.relative_location within the 'Structured anatomical location' SLOT in this archetype. Occurrences for this data element are unbounded to allow for clinical scenarios such as describing a rash in multiple locations but where all of the other attributes are identical. If the anatomical location is included in the Problem/diagnosis name via precoordinated codes, this data element becomes redundant." description="Identification of a simple body site for the location of the problem or diagnosis." text="Body site"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.problems_issues_rcp.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0012]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.problems_issues_rcp.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0039]
+  rm_type="CLUSTER" node_id="at0039" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                        <type>Boolean</type>\n                        <operator>2007</operator>\n                        <precedence_overridden>false</precedence_overridden>\n                        <left_operand xsi:type=\"EXPR_LEAF\">\n                          <type>String</type>\n                          <item xsi:type=\"xsd:string\">archetype_id/value</item>\n                          <reference_type>attribute</reference_type>\n                        </left_operand>\n                        <right_operand xsi:type=\"EXPR_LEAF\">\n                          <type>C_STRING</type>\n                          <item xsi:type=\"C_STRING\">\n                            <pattern>openEHR-EHR-CLUSTER\\.anatomical_location(-[a-zA-Z0-9_]+)*\\.v1|openEHR-EHR-CLUSTER\\.anatomical_location_clock(-[a-zA-Z0-9_]+)*\\.v0|openEHR-EHR-CLUSTER\\.anatomical_location_relative(-[a-zA-Z0-9_]+)*\\.v1</pattern>\n                          </item>\n                          <reference_type>constraint</reference_type>\n                        </right_operand>\n                      </expression>"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.anatomical_location(-[a-zA-Z0-9_]+)*\\.v1|openEHR-EHR-CLUSTER\\.anatomical_location_clock(-[a-zA-Z0-9_]+)*\\.v0|openEHR-EHR-CLUSTER\\.anatomical_location_relative(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[] raw_include_count=1
+  term[en] "at0039" code="at0039" comment="Use this SLOT to insert the CLUSTER.anatomical_location or CLUSTER.relative_location archetypes if the requirements for recording the anatomical location are determined at run-time by the application or require more complex modelling such as relative locations.\n\nIf the anatomical location is included in the Problem/diagnosis name via precoordinated codes, use of this SLOT becomes redundant." description="A structured anatomical location for the problem or diagnosis." text="Structured body site"
+
+node /content[openEHR-EHR-SECTION.problems_issues_rcp.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0077]
+  rm_type="ELEMENT" node_id="at0077" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0077" code="at0077" comment="Data captured/imported as \"Age at onset\" should be converted to a date using the subject's date of birth." description="Estimated or actual date/time that signs or symptoms of the problem/diagnosis were first observed." text="Date/time of onset"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.problems_issues_rcp.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0077]/value
+  rm_type="DV_DATE_TIME" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.problems_issues_rcp.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0003]
+  rm_type="ELEMENT" node_id="at0003" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0003" code="at0003" comment="Partial dates are acceptable. If the subject of care is under the age of one year, then the complete date or a minimum of the month and year is necessary to enable accurate age calculations - for example, if used to drive decision support. Data captured/imported as \"Age at time of clinical recognition\" should be converted to a date using the subject's date of birth." description="Estimated or actual date/time the diagnosis or problem was recognised by a healthcare professional." text="Date/time clinically recognised"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.problems_issues_rcp.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0003]/value
+  rm_type="DV_DATE_TIME" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.problems_issues_rcp.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0043]
+  rm_type="CLUSTER" node_id="at0043" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                        <type>Boolean</type>\n                        <operator>2007</operator>\n                        <precedence_overridden>false</precedence_overridden>\n                        <left_operand xsi:type=\"EXPR_LEAF\">\n                          <type>String</type>\n                          <item xsi:type=\"xsd:string\">archetype_id/value</item>\n                          <reference_type>attribute</reference_type>\n                        </left_operand>\n                        <right_operand xsi:type=\"EXPR_LEAF\">\n                          <type>C_STRING</type>\n                          <item xsi:type=\"C_STRING\">\n                            <pattern>.*</pattern>\n                          </item>\n                          <reference_type>constraint</reference_type>\n                        </right_operand>\n                      </expression>"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0043" code="at0043" comment="May include structured detail about the grading or staging of the diagnosis; diagnostic criteria, classification criteria or formal severity assessments such as Common Terminology Criteria for Adverse Events." description="Details that are additionally required to record as unique attributes of this problem or diagnosis." text="Specific details"
+
+node /content[openEHR-EHR-SECTION.problems_issues_rcp.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0046]
+  rm_type="CLUSTER" node_id="at0046" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                        <type>Boolean</type>\n                        <operator>2007</operator>\n                        <precedence_overridden>false</precedence_overridden>\n                        <left_operand xsi:type=\"EXPR_LEAF\">\n                          <type>String</type>\n                          <item xsi:type=\"xsd:string\">archetype_id/value</item>\n                          <reference_type>attribute</reference_type>\n                        </left_operand>\n                        <right_operand xsi:type=\"EXPR_LEAF\">\n                          <type>C_STRING</type>\n                          <item xsi:type=\"C_STRING\">\n                            <pattern>openEHR-EHR-CLUSTER\\.problem_status(-[a-zA-Z0-9_]+)*\\.v0</pattern>\n                          </item>\n                          <reference_type>constraint</reference_type>\n                        </right_operand>\n                      </expression>"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.problem_status(-[a-zA-Z0-9_]+)*\\.v0"] excludes=[] raw_include_count=1
+  term[en] "at0046" code="at0046" comment="Use status or context qualifiers with care, as they are variably used in practice and interoperability cannot be assured unless usage is clearly defined with the community of use. For example: active status - active, inactive, resolved, in remission; evolution status - initial, interim/working, final; temporal status - current, past; episodicity status - first, new, ongoing; admission status - admission, discharge; or priority status - primary, secondary." description="Structured details for location-, domain-, episode- or workflow-specific aspects of the diagnostic process." text="Status"
+
+node /content[openEHR-EHR-SECTION.problems_issues_rcp.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0073]
+  rm_type="ELEMENT" node_id="at0073" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0073" code="at0073" description="The level of confidence in the identification of the diagnosis." text="Diagnostic certainty"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.problems_issues_rcp.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0073]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.problems_issues_rcp.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/protocol
+  rm_type="ITEM_TREE" node_id="at0032" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0032" code="at0032" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.problems_issues_rcp.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/protocol/items[at0070]
+  rm_type="ELEMENT" node_id="at0070" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0070" code="at0070" description="The date this problem or diagnosis was last updated." text="Last updated"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.problems_issues_rcp.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/protocol/items[at0070]/value
+  rm_type="DV_DATE_TIME" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.problems_issues_rcp.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/protocol/items[at0071]
+  rm_type="CLUSTER" node_id="at0071" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["<expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                        <type>Boolean</type>\n                        <operator>2007</operator>\n                        <precedence_overridden>false</precedence_overridden>\n                        <left_operand xsi:type=\"EXPR_LEAF\">\n                          <type>String</type>\n                          <item xsi:type=\"xsd:string\">archetype_id/value</item>\n                          <reference_type>attribute</reference_type>\n                        </left_operand>\n                        <right_operand xsi:type=\"EXPR_LEAF\">\n                          <type>C_STRING</type>\n                          <item xsi:type=\"C_STRING\">\n                            <pattern>.*</pattern>\n                          </item>\n                          <reference_type>constraint</reference_type>\n                        </right_operand>\n                      </expression>"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0071" code="at0071" comment="For example: local information requirements or additional metadata to align with FHIR or CIMI equivalents." description="Additional information required to capture local content or to align with other reference models/formalisms." text="Extension"
+
+# walked nodes=32

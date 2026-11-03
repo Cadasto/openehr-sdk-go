@@ -1,0 +1,260 @@
+# compiled tree of templates/family_history.v.1.2.3.opt
+template_id="family_history.v.1.2.3" concept="family_history.v.1.2.3" language="en" uid="2d8616b8-8b67-4d07-b308-3dc462ca35e0" num_nodes=40
+template_binding terminology="SNOMED-CT" node_or_path="at0000" target_terminology="SNOMED-CT" target_code="[SNOMED-CT(20160131)::57177007]"
+
+node /
+  rm_type="COMPOSITION" node_id="at0000" archetype_id="openEHR-EHR-COMPOSITION.family_history.v0" node_name="" occurrences=1..1 slot=false
+  term[en] "at0000" code="at0000" description="A persistent and managed list about relevant family history of the subject that may influence clinical decision-making and care provision." text="Family history"
+  binding terminology="SNOMED-CT" node_or_path="at0000" target_terminology="SNOMED-CT" target_code="[SNOMED-CT(20160131)::57177007]"
+  attr "category" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "context" rm_type="EVENT_CONTEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "content" rm_type="CONTENT_ITEM" cardinality=multiple existence=0..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "territory" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "composer" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /category
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /category/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["433"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context
+  rm_type="EVENT_CONTEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "other_context" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "start_time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "setting" rm_type="DV_CODED_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context/other_context
+  rm_type="ITEM_TREE" node_id="at0003" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0003" code="at0003" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context/other_context/items[at0005]
+  rm_type="CLUSTER" node_id="at0005" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["<string_expression>archetype_id/value matches {/.*/}</string_expression>\n    <expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n        <type>Boolean</type>\n        <operator>2007</operator>\n        <precedence_overridden>false</precedence_overridden>\n        <left_operand xsi:type=\"EXPR_LEAF\">\n            <type>String</type>\n            <item xmlns:xs=\"http://www.w3.org/2001/XMLSchema\" xsi:type=\"xs:string\">archetype_id/value</item>\n            <reference_type>attribute</reference_type>\n        </left_operand>\n        <right_operand xsi:type=\"EXPR_LEAF\">\n            <type>String</type>\n            <item xsi:type=\"C_STRING\">\n                <pattern>.*</pattern>\n            </item>\n            <reference_type>constraint</reference_type>\n        </right_operand>\n    </expression>"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0005" code="at0005" comment="For example: local information requirements or additional metadata to align with FHIR or CIMI equivalents." description="Additional information required to capture local context or to align with other reference models/formalisms." text="Extension"
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]
+  rm_type="EVALUATION" node_id="at0000" archetype_id="openEHR-EHR-EVALUATION.family_history.v2" node_name="" occurrences=0..1 slot=false
+  term[en] "at0000" code="at0000" description="Summary information about the significant health-related problems found in family members." text="Family history"
+  binding terminology="SNOMED-CT" node_or_path="at0000" target_terminology="SNOMED-CT" target_code="[SNOMED-CT(20160131)::57177007]"
+  attr "data" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "protocol" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "encoding" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "subject" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]
+  rm_type="CLUSTER" node_id="at0003" archetype_id="" node_name="" occurrences=1..* slot=false
+  term[en] "at0003" code="at0003" comment="The data elements in this cluster will relate to the individual identified either by name or by alias. Repeat the use of the cluster for other family members." description="Details about a specific family member." text="Per family member"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=9
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0004]
+  rm_type="ELEMENT" node_id="at0004" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0004" code="at0004" comment="For example: 'Aunt Susan' or 'Susan Smith'. However, for privacy reasons this may not be appropriate for recording, sharing or public display and in this situation the 'Alias' should be used." description="Name of family member." text="Family member name"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0004]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0048]
+  rm_type="CLUSTER" node_id="at0048" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["<string_expression>archetype_id/value matches {/openEHR-EHR-CLUSTER\\.person_name(-[a-zA-Z0-9_]+)*\\.v1/}</string_expression>\n            <expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                <type>Boolean</type>\n                <operator>2007</operator>\n                <precedence_overridden>false</precedence_overridden>\n                <left_operand xsi:type=\"EXPR_LEAF\">\n                    <type>String</type>\n                    <item xmlns:xs=\"http://www.w3.org/2001/XMLSchema\" xsi:type=\"xs:string\">archetype_id/value</item>\n                    <reference_type>attribute</reference_type>\n                </left_operand>\n                <right_operand xsi:type=\"EXPR_LEAF\">\n                    <type>String</type>\n                    <item xsi:type=\"C_STRING\">\n                        <pattern>openEHR-EHR-CLUSTER\\.person_name(-[a-zA-Z0-9_]+)*\\.v1</pattern>\n                    </item>\n                    <reference_type>constraint</reference_type>\n                </right_operand>\n            </expression>"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.person_name(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[] raw_include_count=1
+  term[en] "at0048" code="at0048" comment="May include structured detail that identifies the family member more specifically or other details relevant to the family history of the family member." description="Structured detail about the identified family member." text="Family member details"
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0060]
+  rm_type="ELEMENT" node_id="at0060" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0060" code="at0060" comment="Coding of the sex with a terminology is preferred, where possible." description="The family member's biological sex." text="Biological sex"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0060]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0060]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=0..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"SNOMED-CT" CodeList:["248152002" "248153007" "32570681000036106" "32570691000036108" "407377005" "407376001"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0016]
+  rm_type="ELEMENT" node_id="at0016" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0016" code="at0016" comment="For example: mother, step-father, maternal grandmother, or paternal uncle. Coding of the relationship with a terminology is preferred, where possible and including specification of maternal and paternal as required." description="The relationship of the family member to the subject of care." text="Relationship"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0016]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0016]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=0..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"SNOMED-CT" CodeList:["444301002" "444295003" "444304005" "444303004" "444191003" "444055008" "444244000" "444243006" "444293005" "444292000" "699111006"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0005]
+  rm_type="ELEMENT" node_id="at0005" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0005" code="at0005" description="Full or partial date of birth of the family member." text="Date of birth"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0005]/value
+  rm_type="DV_DATE_TIME" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0023]
+  rm_type="ELEMENT" node_id="at0023" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0023" code="at0023" comment="Record as 'True' if family member is deceased." description="Is the family member deceased?" text="Deceased?"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0023]/value
+  rm_type="DV_BOOLEAN" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="Boolean" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0023]/value/value
+  rm_type="BOOLEAN" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CBoolean{TrueValid:true FalseValid:false Default:nil}
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0058]
+  rm_type="ELEMENT" node_id="at0058" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0058" code="at0058" comment="Date of death may be useful in some situations in which the month of death may trigger decision support or identify groupings of disease. For example: environmental allergens triggering respiratory exaccerbations; or events such as Christmas." description="Full or partial date of death of the family member." text="Date of death"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0058]/value
+  rm_type="DV_DATE_TIME" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0008]
+  rm_type="CLUSTER" node_id="at0008" archetype_id="" node_name="" occurrences=1..* slot=false
+  term[en] "at0008" code="at0008" comment="If more detail is required, suggest using EVALUATION.problem_diagnosis or the ACTION.procedure archetype and specifying the 'Subject of Care' as the family member, rather than the subject of the health record." description="Detail about problems or diagnoses for the family member." text="Clinical history"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=3
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0008]/items[at0009]
+  rm_type="ELEMENT" node_id="at0009" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0009" code="at0009" comment="Coding of the family member's problem or diagnosis with a terminology is preferred, where possible. May link from this data element to a detailed record of a Problem/Diagnosis using the EVALUATION.problem_diagnosis archetype with the Subject of Care set to the family member, not to the patient." description="Identification of the significant problem or diagnosis in the identified family member." text="Problem/diagnosis name"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0008]/items[at0009]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0008]/items[at0009]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=0..1 slot=false
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0008]/items[at0010]
+  rm_type="ELEMENT" node_id="at0010" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0010" code="at0010" comment="For health problems with multiple occurrences, this describes the first nown occurrence." description="Estimated or actual age of the family member when the problem/diagnosis was clinically recognised." text="Age at onset"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0008]/items[at0010]/value
+  rm_type="DV_DURATION" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0008]/items[at0010]/value/value
+  rm_type="DURATION" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CDuration{Pattern:"PY" Range:constraints.TemporalRange{Lower:"P0Y" Upper:"P150Y" LowerInclusive:true UpperInclusive:true LowerUnbounded:false UpperUnbounded:false}}
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0008]/items[at0014]
+  rm_type="ELEMENT" node_id="at0014" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0014" code="at0014" description="Relationship of the problem/diagnosis to the death of this family member." text="Cause of death?"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0008]/items[at0014]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0008]/items[at0014]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0061" "at0062" "at0063"]}
+  code_term[en] "at0061" code="at0061" description="The problem or diagnosis was a direct cause or closely related to the direct cause of death." text="Direct cause or closely related"
+  code_term[en] "at0062" code="at0062" description="The problem or diagnosis was unrelated to the cause of death." text="Unrelated"
+  code_term[en] "at0063" code="at0063" description="It is impossible to determine whether the problem or diagnosis was closely related to the direct cause of death." text="Indeterminate"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0008]/items[at0014]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0024]
+  rm_type="CLUSTER" node_id="at0024" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0024" code="at0024" comment="For example: detailed information on BRCA mutations in family members. \r\nNote: More data elements will be needed in future to record detailed genetic marker information." description="Detailed information about measurable indicators of a biological state or condition of the family member." text="Biomarkers"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0024]/items[at0027]
+  rm_type="CLUSTER" node_id="at0027" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["<string_expression>archetype_id/value matches {/.*/}</string_expression>\n                    <expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n                        <type>Boolean</type>\n                        <operator>2007</operator>\n                        <precedence_overridden>false</precedence_overridden>\n                        <left_operand xsi:type=\"EXPR_LEAF\">\n                            <type>String</type>\n                            <item xmlns:xs=\"http://www.w3.org/2001/XMLSchema\" xsi:type=\"xs:string\">archetype_id/value</item>\n                            <reference_type>attribute</reference_type>\n                        </left_operand>\n                        <right_operand xsi:type=\"EXPR_LEAF\">\n                            <type>String</type>\n                            <item xsi:type=\"C_STRING\">\n<pattern>.*</pattern>\n                            </item>\n                            <reference_type>constraint</reference_type>\n                        </right_operand>\n                    </expression>"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0027" code="at0027" description="Structured details about biological markers." text="Biomarker details"
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0053]
+  rm_type="CLUSTER" node_id="at0053" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["<string_expression>archetype_id/value matches {/openEHR-EHR-CLUSTER\\.multimedia(-[a-zA-Z0-9_]+)*\\.v1/}</string_expression>\n    <expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n        <type>Boolean</type>\n        <operator>2007</operator>\n        <precedence_overridden>false</precedence_overridden>\n        <left_operand xsi:type=\"EXPR_LEAF\">\n            <type>String</type>\n            <item xmlns:xs=\"http://www.w3.org/2001/XMLSchema\" xsi:type=\"xs:string\">archetype_id/value</item>\n            <reference_type>attribute</reference_type>\n        </left_operand>\n        <right_operand xsi:type=\"EXPR_LEAF\">\n            <type>String</type>\n            <item xsi:type=\"C_STRING\">\n                <pattern>openEHR-EHR-CLUSTER\\.multimedia(-[a-zA-Z0-9_]+)*\\.v1</pattern>\n            </item>\n            <reference_type>constraint</reference_type>\n        </right_operand>\n    </expression>"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.multimedia(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[] raw_include_count=1
+  term[en] "at0053" code="at0053" comment="For example: a pedigree chart." description="Multimedia representation of the family history." text="Multimedia"
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/protocol
+  rm_type="ITEM_TREE" node_id="at0025" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0025" code="at0025" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-EVALUATION.family_history.v2]/protocol/items[at0045]
+  rm_type="CLUSTER" node_id="at0045" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["<string_expression>archetype_id/value matches {/.*/}</string_expression>\n    <expression xsi:type=\"EXPR_BINARY_OPERATOR\">\n        <type>Boolean</type>\n        <operator>2007</operator>\n        <precedence_overridden>false</precedence_overridden>\n        <left_operand xsi:type=\"EXPR_LEAF\">\n            <type>String</type>\n            <item xmlns:xs=\"http://www.w3.org/2001/XMLSchema\" xsi:type=\"xs:string\">archetype_id/value</item>\n            <reference_type>attribute</reference_type>\n        </left_operand>\n        <right_operand xsi:type=\"EXPR_LEAF\">\n            <type>String</type>\n            <item xsi:type=\"C_STRING\">\n                <pattern>.*</pattern>\n            </item>\n            <reference_type>constraint</reference_type>\n        </right_operand>\n    </expression>"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0045" code="at0045" comment="For example: local information requirements or additional metadata to align with FHIR or CIMI equivalents." description="Additional information required to capture local content or to align with other reference models/formalisms." text="Extension"
+
+# walked nodes=41
