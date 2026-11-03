@@ -21,7 +21,7 @@ func TestREQ111_PublicResolve(t *testing.T) {
 	}
 	parse := func(s string) template.Path {
 		t.Helper()
-		p, err := (*template.OperationalTemplate)(nil).ParsePath(s)
+		p, err := template.ParsePath(s)
 		if err != nil {
 			t.Fatalf("ParsePath(%q): %v", s, err)
 		}

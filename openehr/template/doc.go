@@ -4,8 +4,7 @@
 //
 // The package keeps:
 //
-//   - [Path] and the path grammar, read by [OperationalTemplate.ParsePath],
-//     which needs no template and accepts a nil receiver;
+//   - [Path] and the path grammar, read by [ParsePath];
 //   - [Cardinality] with [Single] and [Multiple], and [Multiplicity]
 //     with [NewMultiplicity];
 //   - [ArchetypeTerm], [TermBinding] and [CodedTermRef], the term records
@@ -20,18 +19,18 @@
 // model, then compile it with templatecompile.Compile (package
 // openehr/templatecompile). Look a path up in the compiled template with
 // Compiled.Resolve or Compiled.ValidatePath, passing the [Path] that
-// ParsePath returns and, to refuse an ambiguous segment,
+// [ParsePath] returns and, to refuse an ambiguous segment,
 // templatecompile.WithStrictPaths.
 //
 // The OPT parser ([ParseOPT], [ParseOPTStrict], [ParseFile] and
 // [ParseFileStrict]), the node tree it builds ([OperationalTemplate],
 // [Node], [ObjectNode], [ComplexObject], [ArchetypeRoot], [Attribute],
 // [Slot], [Annotation] and [Description]), [OperationalTemplate.NodeAt],
-// [OperationalTemplate.ValidatePath], [ResolveOption] and
-// [WithStrictPaths] are deprecated. They keep working, with the
-// behaviour documented on each, until a later release removes them. So
-// do the parser's errors, [ErrInvalidOPT], [ErrNotOPTFile] and
-// [ErrUnsupportedNode].
+// [OperationalTemplate.ValidatePath], [OperationalTemplate.ParsePath],
+// [ResolveOption] and [WithStrictPaths] are deprecated. They keep
+// working, with the behaviour documented on each, until a later release
+// removes them. So do the parser's errors, [ErrInvalidOPT],
+// [ErrNotOPTFile] and [ErrUnsupportedNode].
 //
 // An OPT is an XML artifact with root element <template> in namespace
 // http://schemas.openehr.org/v1 (the Ocean Template Designer XSD form),

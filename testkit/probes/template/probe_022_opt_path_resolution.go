@@ -19,7 +19,7 @@ import (
 // ExpectNotFound).
 type PathAssertion struct {
 	// Path is the openEHR path string, in the path-syntax subset that
-	// [template.OperationalTemplate.ParsePath] reads and
+	// [template.ParsePath] reads and
 	// [templatecompile.Compiled.Resolve] resolves.
 	Path string
 
@@ -99,11 +99,9 @@ func compileOPT(opt []byte) (*templatecompile.Compiled, string) {
 	return c, ""
 }
 
-// parsePath parses s with the openEHR path grammar of
-// [template.OperationalTemplate.ParsePath], which reads the grammar alone
-// and needs no template.
+// parsePath parses s with [template.ParsePath].
 func parsePath(s string) (template.Path, error) {
-	return (*template.OperationalTemplate)(nil).ParsePath(s)
+	return template.ParsePath(s)
 }
 
 func checkAssertion(c *templatecompile.Compiled, a PathAssertion) string {

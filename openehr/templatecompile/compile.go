@@ -18,8 +18,8 @@ import (
 // [Compiled.AllByRMType] / [Compiled.AllByNodeID] /
 // [Compiled.AllByArchetypeID] index it. [Compiled.Resolve] and
 // [Compiled.ValidatePath] walk the tree along a path that
-// [github.com/cadasto/openehr-sdk-go/openehr/template.OperationalTemplate.ParsePath]
-// reads; [Compiled.NodeAt] looks up the exact AQL path the compile wrote.
+// [github.com/cadasto/openehr-sdk-go/openehr/template.ParsePath] reads;
+// [Compiled.NodeAt] looks up the exact AQL path the compile wrote.
 type Compiled = impl.Compiled
 
 // CompiledNode is one node in the compiled OPT tree, the unit of

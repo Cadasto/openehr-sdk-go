@@ -9,8 +9,7 @@ import (
 // resolves to the template root when passed to Compiled.Resolve in
 // package templatecompile. A Path is not bound to any particular
 // template; the same Path can be applied to multiple compiled
-// templates. Construct non-root paths via
-// [OperationalTemplate.ParsePath].
+// templates. Construct non-root paths with [ParsePath].
 type Path struct {
 	segments []pathSegment
 }
@@ -51,18 +50,16 @@ func (p Path) IsRoot() bool { return len(p.segments) == 0 }
 //   - Optional predicate per segment ("/content[at0001]" or
 //     "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]")
 //
-// Rejects (with ErrPathSyntax): relative paths, trailing slashes,
+// Rejects (with [ErrPathSyntax]): relative paths, trailing slashes,
 // empty segments, multi-predicate constructs, AQL projection syntax
 // (predicates with name= / @ / quoted values).
 //
-// ParsePath validates grammar only; it does not check that segment
-// names or predicates resolve against any OPT. The receiver is not
-// read, so a nil *OperationalTemplate works; the grammar itself is
-// template-independent. To check a path against a template, compile
-// the template with templatecompile.Compile and pass the Path to
-// Compiled.ValidatePath, or to Compiled.Resolve when the resolved
-// node is needed.
-func (t *OperationalTemplate) ParsePath(s string) (Path, error) {
+// ParsePath checks the grammar only; it does not check that segment
+// names or predicates resolve against any template. To check a path
+// against a template, compile the template with templatecompile.Compile
+// and pass the Path to Compiled.ValidatePath, or to Compiled.Resolve
+// when the resolved node is needed.
+func ParsePath(s string) (Path, error) {
 	if s == "" {
 		return Path{}, fmt.Errorf("%w: empty path", ErrPathSyntax)
 	}
@@ -134,6 +131,16 @@ func (t *OperationalTemplate) ParsePath(s string) (Path, error) {
 		return Path{}, err
 	}
 	return Path{segments: segs}, nil
+}
+
+// ParsePath parses an openEHR path string with the grammar of the
+// package-level [ParsePath]. The receiver is not read, so a nil
+// *OperationalTemplate works.
+//
+// Deprecated: Use [ParsePath], which needs no template. A later release
+// removes this method.
+func (t *OperationalTemplate) ParsePath(s string) (Path, error) {
+	return ParsePath(s)
 }
 
 // ResolveOption tunes path-resolution behaviour. Construct via the

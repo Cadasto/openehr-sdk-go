@@ -80,9 +80,7 @@ func constrainedAttribute(c *Compiled, ta *aom14.TAttribute) (*CompiledAttribute
 	var p template.Path // the root path
 	if rest != "" {
 		var err error
-		// ParsePath stays in openehr/template and does not read its
-		// receiver; only the receiver's type is deprecated.
-		if p, err = (*template.OperationalTemplate)(nil).ParsePath(rest); err != nil { //nolint:staticcheck // SA1019: see above
+		if p, err = template.ParsePath(rest); err != nil {
 			return nil, fmt.Errorf("%w: default value at %q: %w", ErrInvalidInput, where, err)
 		}
 	}

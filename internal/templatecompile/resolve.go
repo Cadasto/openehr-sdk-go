@@ -25,8 +25,9 @@ func WithStrictPaths() ResolveOption {
 	return func(o *resolveOptions) { o.strictPaths = true }
 }
 
-// Resolve walks the compiled tree from the root along p and returns the node
-// p reaches. The root path returns the root.
+// Resolve walks the compiled tree from the root along p, a path that
+// [template.ParsePath] reads, and returns the node p reaches. The root path
+// returns the root.
 //
 // Each segment of p names an attribute of the node reached so far: a declared
 // attribute, or an implicit one, which holds no child. A segment's predicate

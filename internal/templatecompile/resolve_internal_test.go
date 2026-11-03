@@ -21,7 +21,7 @@ func TestREQ108_ResolveRefusesAWalkPastTheDepthLimit(t *testing.T) {
 	c := &Compiled{root: n}
 	parse := func(levels int) template.Path {
 		t.Helper()
-		p, err := (*template.OperationalTemplate)(nil).ParsePath(strings.Repeat("/items[at0001]", levels))
+		p, err := template.ParsePath(strings.Repeat("/items[at0001]", levels))
 		if err != nil {
 			t.Fatalf("ParsePath: %v", err)
 		}
@@ -55,7 +55,7 @@ func TestResolveSegmentsReadThePathText(t *testing.T) {
 		{path: "/a[x/y]/b[z]", want: []pathSegment{{name: "a", predicate: "x/y"}, {name: "b", predicate: "z"}}},
 	}
 	for _, tc := range cases {
-		p, err := (*template.OperationalTemplate)(nil).ParsePath(tc.path)
+		p, err := template.ParsePath(tc.path)
 		if err != nil {
 			t.Fatalf("ParsePath(%q): %v", tc.path, err)
 		}

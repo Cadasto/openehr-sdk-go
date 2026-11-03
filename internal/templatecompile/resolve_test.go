@@ -21,12 +21,11 @@ import (
 	templateprobes "github.com/cadasto/openehr-sdk-go/testkit/probes/template"
 )
 
-// mustParsePath parses s with the path grammar of openehr/template, stopping
-// the test when it does not parse. The grammar does not depend on a
-// template, so no template is given.
+// mustParsePath parses s with [template.ParsePath], stopping the test when
+// it does not parse.
 func mustParsePath(t testing.TB, s string) template.Path {
 	t.Helper()
-	p, err := (*template.OperationalTemplate)(nil).ParsePath(s)
+	p, err := template.ParsePath(s)
 	if err != nil {
 		t.Fatalf("ParsePath(%q): %v", s, err)
 	}
