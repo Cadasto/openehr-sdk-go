@@ -35,4 +35,10 @@
 // server-assigned `contribution` and `uid` fields, which the ITS-REST
 // `UpdateVersion` request DTO does not declare, are omitted from every
 // write-side body rather than sent empty.
+//
+// [UnmarshalSubmission] reads that body back: it decodes a canonical-JSON
+// `Contribution_create` document authored elsewhere into a [Submission], each
+// version as the wrapper and payload type its `_type` members name and each
+// audit keeping the `_type` it was read with, so a batch received as one
+// document is committed as the batch it describes.
 package contribution

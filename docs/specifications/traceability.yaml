@@ -467,6 +467,7 @@ requirements:
       - openehr/aom/aom14/operational_template_json_test.go
       - openehr/aom/aom14/symbol_json_test.go
       - openehr/client/demographic/versioned_test.go
+      - openehr/client/ehr/contribution/submission_decode_test.go
       - openehr/client/ehr/contribution/submission_test.go
       - openehr/instance/instance_test.go
       - openehr/instance/polymorphic_roundtrip_test.go
@@ -2116,6 +2117,7 @@ requirements:
     probes: [PROBE-084]
     tests:
       - openehr/client/ehr/contribution/builder_test.go
+      - openehr/client/ehr/contribution/submission_decode_test.go
       - openehr/client/ehr/contribution/submission_test.go
       - openehr/client/ehr/contribution/version_shadow_internal_test.go
       - openehr/client/ehr/contribution/version_test.go
@@ -2480,6 +2482,7 @@ requirements:
       - internal/rmjsonwalk/root_test.go
       - internal/rmjsonwalk/walk_test.go
       - openehr/aom/aom14/hash_xml_test.go
+      - openehr/client/ehr/contribution/submission_decode_test.go
       - openehr/internal/xmlunmatched/document_internal_test.go
       - openehr/internal/xmlunmatched/entry_internal_test.go
       - openehr/serialize/canjson/unmatched_test.go
@@ -2632,6 +2635,7 @@ requirements:
       - internal/bmmgen/render_xmlunmar_class_test.go
       - internal/rmjsonwalk/walk_once_internal_test.go
       - openehr/aom/aom14/symbol_value_xml_test.go
+      - openehr/client/ehr/contribution/submission_decode_test.go
       - openehr/internal/xmlunmatched/document_internal_test.go
       - openehr/internal/xmlunmatched/missing_internal_test.go
       - openehr/rm/missing_members_test.go
