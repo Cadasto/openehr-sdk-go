@@ -390,7 +390,7 @@ func marshalXMLAny(recv, field, elem, label string, mandatory bool) string {
 	var b strings.Builder
 	if !mandatory {
 		fmt.Fprintf(&b, "\tif %s != nil {\n", value)
-		value = "*" + value
+		value = "(*" + value + ")"
 		indent = "\t\t"
 	}
 	fmt.Fprintf(&b, "%sswitch _v := %s.(type) {\n", indent, value)

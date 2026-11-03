@@ -8,6 +8,7 @@ package bmmgen
 // generated function holds for both encoders.
 
 import (
+	"go/format"
 	"slices"
 	"strings"
 	"testing"
@@ -152,6 +153,21 @@ func TestREQ176_REQ056_AnyMemberXMLEncoder(t *testing.T) {
 		}
 		if strings.Contains(got, `canxml.EncodePoly(_e, "item", _v)`) {
 			t.Errorf("marshalXMLAny(mandatory %v) writes the value it holds, not the one anyMemberValue returns:\n%s", mandatory, got)
+		}
+	}
+}
+
+// TestREQ176_REQ056_OptionalAnyMemberXMLEncoderParses pins that the
+// canonical-XML encoder of a member typed Any is Go source for an optional
+// member, held as a *any, as for a mandatory one: the type switch reads the
+// value the pointer holds, which a type switch guard takes only in
+// parentheses.
+func TestREQ176_REQ056_OptionalAnyMemberXMLEncoderParses(t *testing.T) {
+	for _, mandatory := range []bool{true, false} {
+		body := marshalXMLAny("e", "Item", "item", "EXPR_LEAF.item", mandatory)
+		src := "package p\n\nfunc (e *T) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {\n" + body + "\treturn nil\n}\n"
+		if _, err := format.Source([]byte(src)); err != nil {
+			t.Errorf("marshalXMLAny(mandatory %v) is no Go source: %v\n%s", mandatory, err, src)
 		}
 	}
 }
