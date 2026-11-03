@@ -169,10 +169,12 @@ func (CDateTime) isPrimitive() {}
 // ExampleValue returns a date-time written to Pattern and inside Range,
 // chosen as [CDate.ExampleValue] chooses a date, with the zone written and a
 // bound moved as [CTime.ExampleValue] says; a literal field after the year
-// can move a bound out of the range. Its sentinel is "2020-01-01T12:00:00Z". No
-// candidate carries a fraction of a second, so a range only such a
-// date-time meets, one whose excluded bounds are a second apart, gives the
-// sentinel, which Validate refuses.
+// can move a bound out of the range. Its sentinel is "2020-01-01T12:00:00Z".
+// No candidate carries a fraction of a second, so a range whose excluded
+// bounds are a second apart gives the sentinel. Where the bounds carry a
+// zone, Validate refuses it as out of range; where they carry none, the
+// sentinel, which carries one, is not ordered against them, so Validate
+// does not refuse it for the range.
 func (c CDateTime) ExampleValue() any {
 	return clockExample(clockDateTime, c.Pattern, c.Range, c.TimezoneValidity, "2020-01-01T12:00:00Z")
 }
