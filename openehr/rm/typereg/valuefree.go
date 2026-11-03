@@ -481,10 +481,14 @@ var (
 		` \([0-9]+ > [0-9]+\)`,
 		`: `+formIdent+` for (?:`+formGoType+`)?`,
 		`: xmi:type on the wire is rejected \(use xsi:type\)`,
+		// canonical XML's refusal of an element nested past the depth limit.
+		`: element depth \([0-9]+ > [0-9]+\)`,
 	)
 	wholeForms = anchoredForms(
-		// canxml's own shape sentinel, a value this package cannot name.
+		// canxml's own shape and limit sentinels, values this package cannot
+		// name.
 		`canxml: invalid XML shape`,
+		`canxml: decode limit exceeded`,
 		`(?:lower|upper)_unbounded is false but the interval gives no (?:lower|upper) bound, which a bound held by value cannot leave out`,
 		`rm\.(?:Integer|Integer64|Real|Character): empty input`,
 		`rm\.Real: literal cannot be held in a float64 at its own precision`,

@@ -83,6 +83,17 @@
 // list. The report is the whole policy: a missing member is never a decode
 // error, and a decode that does not ask pays nothing for it.
 //
+// # Depth limit
+//
+// A decode given a depth limit ([Tracker.LimitDepth], [Scope.LimitDepth])
+// refuses an element nested deeper than the limit below the root of the
+// value, in its token source, as the start tag is read: no decoder sees the
+// element, and every later read returns the refusal. The refusal wraps
+// [ErrLimitExceeded], names the element by its path, with the middle of a
+// long one left out, and comes back on its own. The token source follows the
+// open elements for it; a scoped decode does so in a tracker no decoder is
+// registered with, so the decode applies no other policy.
+//
 // # Whole documents
 //
 // [Unmarshal] decodes one whole document, through a tracker or none: it
@@ -117,6 +128,7 @@ import (
 	"encoding/base64"
 	"encoding/xml"
 	"errors"
+	"fmt"
 	"io"
 	"slices"
 	"strconv"
@@ -149,6 +161,11 @@ var ErrNamespace = errors.New("canxml: foreign XML namespace")
 // canxml.ErrInvalidShape, where it is documented.
 var ErrInvalidShape = errors.New("canxml: invalid XML shape")
 
+// ErrLimitExceeded classifies input past a limit the decode was given, among
+// it an element nested deeper than [Tracker.LimitDepth] allows. canxml
+// re-exports it as canxml.ErrLimitExceeded, where it is documented.
+var ErrLimitExceeded = errors.New("canxml: decode limit exceeded")
+
 // Tracker is the policy and position of one tracked decode: the caller's
 // report function, whether the first unmatched item refuses the decode, and
 // the elements open at the decoder's current token. A Tracker serves one
@@ -179,6 +196,14 @@ type Tracker struct {
 	// value its first decode filled in part, whose root decoder [Enter] tells
 	// to clear its receiver first.
 	again bool
+	// maxDepth is the deepest an element may nest below the root of the value,
+	// the root at depth 1, set by [Tracker.LimitDepth]; 0 sets no limit.
+	maxDepth int
+	// refusal is the refusal of the first element nested deeper than
+	// maxDepth, kept so that the decode returns it on its own and every later
+	// read of the decoder returns it again, the input standing inside that
+	// element; nil until an element is refused.
+	refusal *typereg.DecodeError
 }
 
 // frame is one open element: its local name, its 1-based position among its
@@ -280,11 +305,15 @@ func (t *Tracker) reset() {
 }
 
 // alone returns the failure in err's chain that names its item from the root
-// of the value, a strict refusal or the primitive failure t raised, on its
-// own, and err unchanged when the chain holds neither (a nil err included).
+// of the value, a depth refusal, a strict refusal or the primitive failure t
+// raised, on its own, and err unchanged when the chain holds none (a nil err
+// included).
 func (t *Tracker) alone(err error) error {
 	if err == nil {
 		return nil
+	}
+	if t.refusal != nil && errors.Is(err, t.refusal) {
+		return t.refusal
 	}
 	if ue, ok := errors.AsType[*unknownElementError](err); ok && ue != nil {
 		return ue
@@ -362,6 +391,50 @@ func (t *Tracker) writePath(b *strings.Builder, n int) {
 	for _, f := range t.open[1:n] {
 		writeSegment(b, f.name, f.pos)
 	}
+}
+
+// LimitDepth makes the decodes through t's decoder refuse an element nested
+// deeper than n below the root of the value being decoded, the root at depth
+// 1, as soon as the decoder reads its start tag, before anything decodes it.
+// n <= 0 sets no limit, the default. The refusal is a *typereg.DecodeError
+// that wraps [ErrLimitExceeded], names the element's depth and n, and names
+// the element by its path, kept to [pathEnds] segments at each end; the
+// decoder returns it again from every later read.
+func (t *Tracker) LimitDepth(n int) { t.maxDepth = max(n, 0) }
+
+// refuseDepth refuses the element the decoder opened last, nested one past the
+// depth limit, and keeps the refusal, which it returns.
+func (t *Tracker) refuseDepth() error {
+	t.refusal = &typereg.DecodeError{
+		Path:  t.endsPath(),
+		Inner: fmt.Errorf("%w: element depth (%d > %d)", ErrLimitExceeded, len(t.open)-1, t.maxDepth),
+	}
+	return t.refusal
+}
+
+// pathEnds is how many segments the path of a depth refusal keeps at each end
+// of a longer path, so that the error stays short however deep the limit lets
+// a document nest.
+const pathEnds = 8
+
+// endsPath returns the path of the innermost open element as [Tracker.path]
+// does, but with at most pathEnds segments at each end: a longer path has a
+// `/...` segment in place of those between, which no element's segment can
+// be, since each carries its position.
+func (t *Tracker) endsPath() string {
+	frames := t.open[1:]
+	if len(frames) <= 2*pathEnds {
+		return t.path()
+	}
+	var b strings.Builder
+	for _, f := range frames[:pathEnds] {
+		writeSegment(&b, f.name, f.pos)
+	}
+	b.WriteString("/...")
+	for _, f := range frames[len(frames)-pathEnds:] {
+		writeSegment(&b, f.name, f.pos)
+	}
+	return b.String()
 }
 
 // writeSegment writes the path segment of the element named name at position
@@ -535,13 +608,18 @@ func trackerOf(dec *xml.Decoder) *Tracker {
 // trackingReader is the token source of a tracked decode, and of a scoped one
 // ([Scope]). It reads src with Token, so the namespaces are resolved and the
 // nesting checked there, records in t every element opened and closed, when t
-// is not nil, and keeps in scope the namespace prefixes the open elements
-// declare. It drops the namespace declarations from each start element: the
-// decoder built on it then has no prefix to resolve and passes every name
-// through as src resolved it.
+// is not nil, refusing an element nested deeper than t's depth limit, and
+// keeps in scope the namespace prefixes the open elements declare. It drops
+// the namespace declarations from each start element: the decoder built on it
+// then has no prefix to resolve and passes every name through as src resolved
+// it.
 type trackingReader struct {
 	src *xml.Decoder
-	t   *Tracker // nil for a scoped decode, which records no element
+	// t is the tracker of a tracked decode. For a scoped decode it is nil, and
+	// no element is recorded, unless the decode has a depth limit
+	// ([Scope.LimitDepth]): t is then a tracker no decoder is registered with,
+	// which follows the open elements for the limit and applies no policy.
+	t *Tracker
 	// scope holds the prefixes the open elements declare, for [LookupPrefix].
 	scope scope
 	// again marks a scoped decode of a value a second time
@@ -554,8 +632,12 @@ type trackingReader struct {
 }
 
 // Token returns the next token, the first read ahead or else the next of src,
-// after recording it.
+// after recording it. A start element nested deeper than the depth limit is
+// refused, and so is every token after it.
 func (r *trackingReader) Token() (xml.Token, error) {
+	if r.t != nil && r.t.refusal != nil {
+		return nil, r.t.refusal
+	}
 	var tok xml.Token
 	var err error
 	if len(r.pending) > 0 {
@@ -571,6 +653,9 @@ func (r *trackingReader) Token() (xml.Token, error) {
 	case xml.StartElement:
 		if r.t != nil {
 			r.t.push(tk.Name.Local)
+			if r.t.maxDepth > 0 && len(r.t.open)-1 > r.t.maxDepth {
+				return nil, r.t.refuseDepth()
+			}
 			if r.t.missing != nil {
 				n := len(r.t.open)
 				r.t.open[n-1].nilled = r.t.open[n-2].nilled || isNilled(tk.Attr)
