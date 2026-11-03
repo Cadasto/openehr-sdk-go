@@ -66,6 +66,42 @@ func (c *CDVQuantity) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	return typereg.DecodeInto(dec, "C_DV_QUANTITY", &w, &w.Type)
 }
 
+// UnmarshalJSONFrom decodes canonical openEHR JSON into CDVScale.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced. The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape.
+func (c *CDVScale) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if c == nil {
+		return fmt.Errorf("canjson: C_DV_SCALE: %w", typereg.ErrNilReceiver)
+	}
+	w := struct {
+		Type string `json:"_type"`
+		*rawCDVScale
+	}{rawCDVScale: (*rawCDVScale)(c)}
+	return typereg.DecodeInto(dec, "C_DV_SCALE", &w, &w.Type)
+}
+
+// UnmarshalJSONFrom decodes canonical openEHR JSON into CDVState.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced. The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape.
+func (c *CDVState) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if c == nil {
+		return fmt.Errorf("canjson: C_DV_STATE: %w", typereg.ErrNilReceiver)
+	}
+	w := struct {
+		Type string `json:"_type"`
+		*rawCDVState
+	}{rawCDVState: (*rawCDVState)(c)}
+	return typereg.DecodeInto(dec, "C_DV_STATE", &w, &w.Type)
+}
+
 // UnmarshalJSONFrom decodes canonical openEHR JSON into CQuantityItem.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
 // dereferenced. The shared helper checks the `_type`
@@ -84,6 +120,24 @@ func (c *CQuantityItem) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	return typereg.DecodeInto(dec, "C_QUANTITY_ITEM", &w, &w.Type)
 }
 
+// UnmarshalJSONFrom decodes canonical openEHR JSON into NonTerminalState.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced. The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape.
+func (n *NonTerminalState) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if n == nil {
+		return fmt.Errorf("canjson: NON_TERMINAL_STATE: %w", typereg.ErrNilReceiver)
+	}
+	w := struct {
+		Type string `json:"_type"`
+		*rawNonTerminalState
+	}{rawNonTerminalState: (*rawNonTerminalState)(n)}
+	return typereg.DecodeInto(dec, "NON_TERMINAL_STATE", &w, &w.Type)
+}
+
 // UnmarshalJSONFrom decodes canonical openEHR JSON into Ordinal.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
 // dereferenced. The shared helper checks the `_type`
@@ -100,4 +154,76 @@ func (o *Ordinal) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		*rawOrdinal
 	}{rawOrdinal: (*rawOrdinal)(o)}
 	return typereg.DecodeInto(dec, "ORDINAL", &w, &w.Type)
+}
+
+// UnmarshalJSONFrom decodes canonical openEHR JSON into Scale.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced. The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape.
+func (s *Scale) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if s == nil {
+		return fmt.Errorf("canjson: SCALE: %w", typereg.ErrNilReceiver)
+	}
+	w := struct {
+		Type string `json:"_type"`
+		*rawScale
+	}{rawScale: (*rawScale)(s)}
+	return typereg.DecodeInto(dec, "SCALE", &w, &w.Type)
+}
+
+// UnmarshalJSONFrom decodes canonical openEHR JSON into StateMachine.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced. The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape.
+func (s *StateMachine) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if s == nil {
+		return fmt.Errorf("canjson: STATE_MACHINE: %w", typereg.ErrNilReceiver)
+	}
+	w := struct {
+		Type string `json:"_type"`
+		*rawStateMachine
+	}{rawStateMachine: (*rawStateMachine)(s)}
+	return typereg.DecodeInto(dec, "STATE_MACHINE", &w, &w.Type)
+}
+
+// UnmarshalJSONFrom decodes canonical openEHR JSON into TerminalState.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced. The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape.
+func (t *TerminalState) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if t == nil {
+		return fmt.Errorf("canjson: TERMINAL_STATE: %w", typereg.ErrNilReceiver)
+	}
+	w := struct {
+		Type string `json:"_type"`
+		*rawTerminalState
+	}{rawTerminalState: (*rawTerminalState)(t)}
+	return typereg.DecodeInto(dec, "TERMINAL_STATE", &w, &w.Type)
+}
+
+// UnmarshalJSONFrom decodes canonical openEHR JSON into Transition.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced. The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape.
+func (t *Transition) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if t == nil {
+		return fmt.Errorf("canjson: TRANSITION: %w", typereg.ErrNilReceiver)
+	}
+	w := struct {
+		Type string `json:"_type"`
+		*rawTransition
+	}{rawTransition: (*rawTransition)(t)}
+	return typereg.DecodeInto(dec, "TRANSITION", &w, &w.Type)
 }

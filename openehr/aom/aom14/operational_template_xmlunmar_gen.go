@@ -101,11 +101,6 @@ func (c *CArchetypeRoot) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement
 		switch _t := _tok.(type) {
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
-			case "assumed_value":
-				// Canonical XML does not model the content of an Any member — see canxml/doc.go.
-				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
-					return _err
-				}
 			case "rm_type_name":
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.RMTypeName); _err != nil {
 					return _err
@@ -517,11 +512,6 @@ func (t *TComplexObject) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement
 		switch _t := _tok.(type) {
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
-			case "assumed_value":
-				// Canonical XML does not model the content of an Any member — see canxml/doc.go.
-				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
-					return _err
-				}
 			case "rm_type_name":
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &t.RMTypeName); _err != nil {
 					return _err

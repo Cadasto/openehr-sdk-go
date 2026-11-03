@@ -359,8 +359,10 @@ func TestMandatoryFieldsOmitOnlyWhatCanBeAbsent(t *testing.T) {
 }
 
 // TestAnyPropertyType pins the Go type of a single property whose BMM type
-// is the primitive Any, on a property built for the test and on the real
-// AOM 1.4 fields of each kind.
+// is the primitive Any, on a property built for the test and on real AOM 1.4
+// fields of each kind: the optional one of the pinned openehr_am_1.4.0, since
+// the AOM 1.4 root restates C_DEFINED_OBJECT without it, and the mandatory one
+// of the AOM 1.4 target.
 //
 // REQ-041: § Mapping rules, Property → Go field. A non-mandatory property
 // whose BMM type is Any is emitted as *any, because Any is a primitive and
@@ -373,6 +375,12 @@ func TestAnyPropertyType(t *testing.T) {
 	aomPlan, err := BuildPlanForTarget(context.Background(), TargetAOM14, testResolver())
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(AOM14): %v", err)
+	}
+	pinnedAOM := TargetAOM14
+	pinnedAOM.RootID = "openehr_am_1.4.0"
+	pinnedAOMPlan, err := BuildPlanForTarget(context.Background(), pinnedAOM, testResolver())
+	if err != nil {
+		t.Fatalf("BuildPlanForTarget(%s): %v", pinnedAOM.RootID, err)
 	}
 	// built is a property of type Any on a real owner, so the owner's
 	// generic parameters and cycles are those the generator meets.
@@ -398,7 +406,7 @@ func TestAnyPropertyType(t *testing.T) {
 			prop: func(*testing.T, *bmm.SimpleClass) *bmm.SingleProperty { return built(true) },
 		},
 		{
-			name: "optional: C_DEFINED_OBJECT.assumed_value", plan: aomPlan, owner: "C_DEFINED_OBJECT", want: "*any",
+			name: "optional: C_DEFINED_OBJECT.assumed_value", plan: pinnedAOMPlan, owner: "C_DEFINED_OBJECT", want: "*any",
 			prop: func(t *testing.T, owner *bmm.SimpleClass) *bmm.SingleProperty {
 				return anyProperty(t, owner, "assumed_value", false)
 			},

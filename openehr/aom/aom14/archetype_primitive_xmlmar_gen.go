@@ -70,6 +70,16 @@ func (c *CDate) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
+	if c.Pattern != nil {
+		if err := _e.EncodeElement(*c.Pattern, xml.StartElement{Name: xml.Name{Local: "pattern"}}); err != nil {
+			return err
+		}
+	}
+	if c.TimezoneValidity != nil {
+		if err := _e.EncodeElement(c.TimezoneValidity, xml.StartElement{Name: xml.Name{Local: "timezone_validity"}}); err != nil {
+			return err
+		}
+	}
 	if c.Range != nil {
 		if err := _e.EncodeElement(c.Range, xml.StartElement{Name: xml.Name{Local: "range"}}); err != nil {
 			return err
@@ -77,16 +87,6 @@ func (c *CDate) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	}
 	if c.AssumedValue != nil {
 		if err := _e.EncodeElement(*c.AssumedValue, xml.StartElement{Name: xml.Name{Local: "assumed_value"}}); err != nil {
-			return err
-		}
-	}
-	if c.DayValidity != nil {
-		if err := _e.EncodeElement(c.DayValidity, xml.StartElement{Name: xml.Name{Local: "day_validity"}}); err != nil {
-			return err
-		}
-	}
-	if c.MonthValidity != nil {
-		if err := _e.EncodeElement(c.MonthValidity, xml.StartElement{Name: xml.Name{Local: "month_validity"}}); err != nil {
 			return err
 		}
 	}
@@ -117,6 +117,11 @@ func (c *CDateTime) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
+	if c.Pattern != nil {
+		if err := _e.EncodeElement(*c.Pattern, xml.StartElement{Name: xml.Name{Local: "pattern"}}); err != nil {
+			return err
+		}
+	}
 	if c.TimezoneValidity != nil {
 		if err := _e.EncodeElement(c.TimezoneValidity, xml.StartElement{Name: xml.Name{Local: "timezone_validity"}}); err != nil {
 			return err
@@ -129,36 +134,6 @@ func (c *CDateTime) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	}
 	if c.AssumedValue != nil {
 		if err := _e.EncodeElement(*c.AssumedValue, xml.StartElement{Name: xml.Name{Local: "assumed_value"}}); err != nil {
-			return err
-		}
-	}
-	if c.MonthValidity != nil {
-		if err := _e.EncodeElement(c.MonthValidity, xml.StartElement{Name: xml.Name{Local: "month_validity"}}); err != nil {
-			return err
-		}
-	}
-	if c.DayValidity != nil {
-		if err := _e.EncodeElement(c.DayValidity, xml.StartElement{Name: xml.Name{Local: "day_validity"}}); err != nil {
-			return err
-		}
-	}
-	if c.HourValidity != nil {
-		if err := _e.EncodeElement(c.HourValidity, xml.StartElement{Name: xml.Name{Local: "hour_validity"}}); err != nil {
-			return err
-		}
-	}
-	if c.MinuteValidity != nil {
-		if err := _e.EncodeElement(c.MinuteValidity, xml.StartElement{Name: xml.Name{Local: "minute_validity"}}); err != nil {
-			return err
-		}
-	}
-	if c.SecondValidity != nil {
-		if err := _e.EncodeElement(c.SecondValidity, xml.StartElement{Name: xml.Name{Local: "second_validity"}}); err != nil {
-			return err
-		}
-	}
-	if c.MillisecondValidity != nil {
-		if err := _e.EncodeElement(c.MillisecondValidity, xml.StartElement{Name: xml.Name{Local: "millisecond_validity"}}); err != nil {
 			return err
 		}
 	}
@@ -189,6 +164,11 @@ func (c *CDuration) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
+	if c.Pattern != nil {
+		if err := _e.EncodeElement(*c.Pattern, xml.StartElement{Name: xml.Name{Local: "pattern"}}); err != nil {
+			return err
+		}
+	}
 	if c.Range != nil {
 		if err := _e.EncodeElement(c.Range, xml.StartElement{Name: xml.Name{Local: "range"}}); err != nil {
 			return err
@@ -196,46 +176,6 @@ func (c *CDuration) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	}
 	if c.AssumedValue != nil {
 		if err := _e.EncodeElement(*c.AssumedValue, xml.StartElement{Name: xml.Name{Local: "assumed_value"}}); err != nil {
-			return err
-		}
-	}
-	if c.YearsAllowed != nil {
-		if err := _e.EncodeElement(*c.YearsAllowed, xml.StartElement{Name: xml.Name{Local: "years_allowed"}}); err != nil {
-			return err
-		}
-	}
-	if c.MonthsAllowed != nil {
-		if err := _e.EncodeElement(*c.MonthsAllowed, xml.StartElement{Name: xml.Name{Local: "months_allowed"}}); err != nil {
-			return err
-		}
-	}
-	if c.WeeksAllowed != nil {
-		if err := _e.EncodeElement(*c.WeeksAllowed, xml.StartElement{Name: xml.Name{Local: "weeks_allowed"}}); err != nil {
-			return err
-		}
-	}
-	if c.DaysAllowed != nil {
-		if err := _e.EncodeElement(*c.DaysAllowed, xml.StartElement{Name: xml.Name{Local: "days_allowed"}}); err != nil {
-			return err
-		}
-	}
-	if c.HoursAllowed != nil {
-		if err := _e.EncodeElement(*c.HoursAllowed, xml.StartElement{Name: xml.Name{Local: "hours_allowed"}}); err != nil {
-			return err
-		}
-	}
-	if c.MinutesAllowed != nil {
-		if err := _e.EncodeElement(*c.MinutesAllowed, xml.StartElement{Name: xml.Name{Local: "minutes_allowed"}}); err != nil {
-			return err
-		}
-	}
-	if c.SecondsAllowed != nil {
-		if err := _e.EncodeElement(*c.SecondsAllowed, xml.StartElement{Name: xml.Name{Local: "seconds_allowed"}}); err != nil {
-			return err
-		}
-	}
-	if c.FractionalSecondsAllowed != nil {
-		if err := _e.EncodeElement(*c.FractionalSecondsAllowed, xml.StartElement{Name: xml.Name{Local: "fractional_seconds_allowed"}}); err != nil {
 			return err
 		}
 	}
@@ -360,8 +300,10 @@ func (c *CString) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(c.ListOpen, xml.StartElement{Name: xml.Name{Local: "list_open"}}); err != nil {
-		return err
+	if c.ListOpen != nil {
+		if err := _e.EncodeElement(*c.ListOpen, xml.StartElement{Name: xml.Name{Local: "list_open"}}); err != nil {
+			return err
+		}
 	}
 	if c.AssumedValue != nil {
 		if err := _e.EncodeElement(*c.AssumedValue, xml.StartElement{Name: xml.Name{Local: "assumed_value"}}); err != nil {
@@ -395,6 +337,11 @@ func (c *CTime) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
+	if c.Pattern != nil {
+		if err := _e.EncodeElement(*c.Pattern, xml.StartElement{Name: xml.Name{Local: "pattern"}}); err != nil {
+			return err
+		}
+	}
 	if c.TimezoneValidity != nil {
 		if err := _e.EncodeElement(c.TimezoneValidity, xml.StartElement{Name: xml.Name{Local: "timezone_validity"}}); err != nil {
 			return err
@@ -407,21 +354,6 @@ func (c *CTime) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	}
 	if c.AssumedValue != nil {
 		if err := _e.EncodeElement(*c.AssumedValue, xml.StartElement{Name: xml.Name{Local: "assumed_value"}}); err != nil {
-			return err
-		}
-	}
-	if c.MinuteValidity != nil {
-		if err := _e.EncodeElement(c.MinuteValidity, xml.StartElement{Name: xml.Name{Local: "minute_validity"}}); err != nil {
-			return err
-		}
-	}
-	if c.SecondValidity != nil {
-		if err := _e.EncodeElement(c.SecondValidity, xml.StartElement{Name: xml.Name{Local: "second_validity"}}); err != nil {
-			return err
-		}
-	}
-	if c.MillisecondValidity != nil {
-		if err := _e.EncodeElement(c.MillisecondValidity, xml.StartElement{Name: xml.Name{Local: "millisecond_validity"}}); err != nil {
 			return err
 		}
 	}

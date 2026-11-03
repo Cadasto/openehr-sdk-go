@@ -98,11 +98,6 @@ func (c *CArchetypeRoot) MarshalXML(_e *xml.Encoder, _start xml.StartElement) er
 			return err
 		}
 	}
-	if c.AssumedValue != nil {
-		if err := _e.EncodeElement(*c.AssumedValue, xml.StartElement{Name: xml.Name{Local: "assumed_value"}}); err != nil {
-			return err
-		}
-	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err
 	}
@@ -373,11 +368,6 @@ func (t *TComplexObject) MarshalXML(_e *xml.Encoder, _start xml.StartElement) er
 	}
 	if t.DefaultValue != nil {
 		if err := canxml.EncodePoly(_e, "default_value", t.DefaultValue); err != nil {
-			return err
-		}
-	}
-	if t.AssumedValue != nil {
-		if err := _e.EncodeElement(*t.AssumedValue, xml.StartElement{Name: xml.Name{Local: "assumed_value"}}); err != nil {
 			return err
 		}
 	}

@@ -45,7 +45,6 @@ func (c *CArchetypeRoot) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if err := typereg.DecodeInto(dec, "C_ARCHETYPE_ROOT", &wire, &wire.Class); err != nil {
 		return err
 	}
-	c.AssumedValue = wire.AssumedValue
 	c.RMTypeName = wire.RMTypeName
 	c.Occurrences = wire.Occurrences
 	c.NodeID = wire.NodeID
@@ -156,7 +155,6 @@ func (t *TComplexObject) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if err := typereg.DecodeInto(dec, "T_COMPLEX_OBJECT", &wire, &wire.Class); err != nil {
 		return err
 	}
-	t.AssumedValue = wire.AssumedValue
 	t.RMTypeName = wire.RMTypeName
 	t.Occurrences = wire.Occurrences
 	t.NodeID = wire.NodeID

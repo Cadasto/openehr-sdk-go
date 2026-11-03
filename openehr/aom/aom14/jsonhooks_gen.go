@@ -34,4 +34,7 @@ func init() {
 	typereg.RegisterUnmarshaler(json.UnmarshalFromFunc(func(dec *jsontext.Decoder, out *ExprItem) error {
 		return typereg.DecodePolymorphic(dec, out, nil)
 	}))
+	typereg.RegisterUnmarshaler(json.UnmarshalFromFunc(func(dec *jsontext.Decoder, out *State) error {
+		return typereg.DecodePolymorphic(dec, out, nil)
+	}))
 }

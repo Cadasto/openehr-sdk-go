@@ -17,38 +17,28 @@ type CBoolean struct {
 	TrueValid bool `json:"true_valid"`
 }
 
-// CDate ISO 8601-compatible constraint on instances of Date in the form either of a set of validity values, or an actual date range. There is no validity flag for ‘year’, since it must always be by definition mandatory in order to have a sensible date at all. Syntax expressions of instances of this class include “YYYY-??-??” (date with optional month and day).
+// CDate ISO 8601-compatible constraint on instances of Date, in the form of a pattern, a date range or both.
 type CDate struct {
 	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
 	AssumedValue *string `json:"assumed_value,omitzero"`
-	// DayValidity Validity of day in constrained date.
-	DayValidity *rm.ValidityKind `json:"day_validity,omitzero"`
-	// MonthValidity Validity of month in constrained date.
-	MonthValidity *rm.ValidityKind `json:"month_validity,omitzero"`
+	// Pattern Pattern of the dates allowed, in the ADL 1.4 date constraint syntax, such as `yyyy-mm-??`.
+	Pattern *string `json:"pattern,omitzero"`
 	// Range Interval of Dates specifying constraint.
 	Range *rm.Interval[string] `json:"range,omitzero"`
+	// TimezoneValidity Validity of the timezone in the constrained dates.
+	TimezoneValidity *TimezoneValidityKind `json:"timezone_validity,omitzero"`
 }
 
-// CDateTime ISO 8601-compatible constraint on instances of Date_Time. There is no validity flag for ‘year’, since it must always be by definition mandatory in order to have a sensible date/time at all. Syntax expressions of instances of this class include “YYYY-MM-DDT??:??:??” (date/time with optional time) and “YYYY-MMDDTHH:MM:xx” (date/time, seconds not allowed).
+// CDateTime ISO 8601-compatible constraint on instances of Date_Time, in the form of a pattern, a date/time range or both.
 type CDateTime struct {
 	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
 	AssumedValue *string `json:"assumed_value,omitzero"`
-	// DayValidity Validity of day in constrained date.
-	DayValidity *rm.ValidityKind `json:"day_validity,omitzero"`
-	// HourValidity Validity of hour in constrained time.
-	HourValidity *rm.ValidityKind `json:"hour_validity,omitzero"`
-	// MillisecondValidity Validity of millisecond in constrained time.
-	MillisecondValidity *rm.ValidityKind `json:"millisecond_validity,omitzero"`
-	// MinuteValidity Validity of minute in constrained time.
-	MinuteValidity *rm.ValidityKind `json:"minute_validity,omitzero"`
-	// MonthValidity Validity of month in constrained date.
-	MonthValidity *rm.ValidityKind `json:"month_validity,omitzero"`
+	// Pattern Pattern of the date/times allowed, in the ADL 1.4 date/time constraint syntax, such as `yyyy-mm-ddTHH:??:??`.
+	Pattern *string `json:"pattern,omitzero"`
 	// Range Range of Date_times specifying constraint.
 	Range *rm.Interval[string] `json:"range,omitzero"`
-	// SecondValidity Validity of second in constrained time.
-	SecondValidity *rm.ValidityKind `json:"second_validity,omitzero"`
-	// TimezoneValidity Validity of timezone in constrained date.
-	TimezoneValidity *rm.ValidityKind `json:"timezone_validity,omitzero"`
+	// TimezoneValidity Validity of the timezone in the constrained date/times.
+	TimezoneValidity *TimezoneValidityKind `json:"timezone_validity,omitzero"`
 }
 
 // ValidityIsRange True if validity is in the form of a range; useful for developers to check which kind of constraint has been set.
@@ -67,21 +57,10 @@ func (c *CDateTime) ValidityIsRange() bool {
 type CDuration struct {
 	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
 	AssumedValue *string `json:"assumed_value,omitzero"`
-	// DaysAllowed True if days are allowed in the constrained Duration.
-	DaysAllowed *bool `json:"days_allowed,omitzero"`
-	// FractionalSecondsAllowed True if fractional seconds are allowed in the constrained Duration.
-	FractionalSecondsAllowed *bool `json:"fractional_seconds_allowed,omitzero"`
-	// HoursAllowed True if hours are allowed in the constrained Duration.
-	HoursAllowed *bool `json:"hours_allowed,omitzero"`
-	// MinutesAllowed True if minutes are allowed in the constrained Duration.
-	MinutesAllowed *bool `json:"minutes_allowed,omitzero"`
-	// MonthsAllowed True if months are allowed in the constrained Duration.
-	MonthsAllowed *bool `json:"months_allowed,omitzero"`
+	// Pattern Pattern of the durations allowed, the designators they may carry, in the ADL 1.4 duration constraint syntax, such as `PYMWD` or `PTHMS`.
+	Pattern *string `json:"pattern,omitzero"`
 	// Range Range of Durations specifying constraint.
-	Range          *rm.Interval[string] `json:"range,omitzero"`
-	SecondsAllowed *bool                `json:"seconds_allowed,omitzero"`
-	WeeksAllowed   *bool                `json:"weeks_allowed,omitzero"`
-	YearsAllowed   *bool                `json:"years_allowed,omitzero"`
+	Range *rm.Interval[string] `json:"range,omitzero"`
 }
 
 // CInteger Constraint on instances of Integer.
@@ -247,7 +226,7 @@ type CString struct {
 	// List Set of Strings specifying constraint.
 	List []string `json:"list,omitempty"`
 	// ListOpen True if the list is being used to specify the constraint but is not considered exhaustive.
-	ListOpen bool `json:"list_open"`
+	ListOpen *bool `json:"list_open,omitzero"`
 	// Pattern Regular expression pattern for proposed instances of String to match.
 	Pattern *string `json:"pattern,omitzero"`
 }
@@ -257,23 +236,33 @@ func (c *CString) ValidValue(aValue string) bool {
 	panic("not implemented: C_STRING.valid_value — implement in a non-generated file")
 }
 
-// CTime ISO 8601-compatible constraint on instances of Time. There is no validity flag for ‘hour’, since it must always be by definition mandatory in order to have a sensible time at all. Syntax expressions of instances of this class include “HH:??:xx” (time with optional minutes and seconds not allowed).
+// CTime ISO 8601-compatible constraint on instances of Time, in the form of a pattern, a time range or both.
 type CTime struct {
 	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
 	AssumedValue *string `json:"assumed_value,omitzero"`
-	// MillisecondValidity Validity of millisecond in constrained time.
-	MillisecondValidity *rm.ValidityKind `json:"millisecond_validity,omitzero"`
-	// MinuteValidity Validity of minute in constrained time.
-	MinuteValidity *rm.ValidityKind `json:"minute_validity,omitzero"`
+	// Pattern Pattern of the times allowed, in the ADL 1.4 time constraint syntax, such as `HH:??:XX`.
+	Pattern *string `json:"pattern,omitzero"`
 	// Range Interval of Times specifying constraint.
 	Range *rm.Interval[string] `json:"range,omitzero"`
-	// SecondValidity Validity of second in constrained time.
-	SecondValidity *rm.ValidityKind `json:"second_validity,omitzero"`
-	// TimezoneValidity Validity of timezone in constrained date.
-	TimezoneValidity *rm.ValidityKind `json:"timezone_validity,omitzero"`
+	// TimezoneValidity Validity of the timezone in the constrained times.
+	TimezoneValidity *TimezoneValidityKind `json:"timezone_validity,omitzero"`
 }
 
 // ValidityIsRange True if validity is in the form of a range; useful for developers to check which kind of constraint has been set.
 func (c *CTime) ValidityIsRange() bool {
 	panic("not implemented: C_TIME.validity_is_range — implement in a non-generated file")
 }
+
+// TimezoneValidityKind Validity of the timezone in a date, time or date/time constraint: the integer codes of the openEHR Release-1.0.2 schemas, each named by the VALIDITY_KIND word it stands for, and disallowed, the word AOM 1.4 uses for prohibited.
+type TimezoneValidityKind int32
+
+const (
+	// TimezoneValidityKindMandatory Constant to indicate mandatory presence of something.
+	TimezoneValidityKindMandatory TimezoneValidityKind = 1001
+	// TimezoneValidityKindOptional Constant to indicate optional presence of something.
+	TimezoneValidityKindOptional TimezoneValidityKind = 1002
+	// TimezoneValidityKindProhibited Constant to indicate disallowed presence of something.
+	TimezoneValidityKindProhibited TimezoneValidityKind = 1003
+	// TimezoneValidityKindDisallowed Constant to indicate disallowed presence of something: the word AOM 1.4 uses for prohibited, with the same code.
+	TimezoneValidityKindDisallowed TimezoneValidityKind = 1003
+)

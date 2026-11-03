@@ -231,6 +231,137 @@ func (c *CDVQuantity) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 	}
 }
 
+// xmlClassCDVScale describes C_DV_SCALE to the canonical-XML decode runtime.
+var xmlClassCDVScale = xmlunmatched.Class{
+	Name:     "C_DV_SCALE",
+	Required: []string{"rm_type_name", "occurrences", "node_id"},
+	Items:    []string{"list"},
+}
+
+// UnmarshalXML decodes canonical openEHR XML into CDVScale.
+// Polymorphic fields are routed through canxml.DecodeAs so the
+// concrete type is selected by `xsi:type` at each polymorphic site.
+// Missing/unknown/type-mismatch dispatch failures wrap typereg
+// sentinels inside *canxml.DecodeError for errors.Is / errors.As.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
+func (c *CDVScale) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCDVScale); _err != nil {
+		return _err
+	}
+	for {
+		_tok, _err := _dec.Token()
+		if _err != nil {
+			return _err
+		}
+		switch _t := _tok.(type) {
+		case xml.StartElement:
+			switch xmlunmatched.LocalName(_t.Name) {
+			case "rm_type_name":
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.RMTypeName); _err != nil {
+					return _err
+				}
+			case "occurrences":
+				if _err := _dec.DecodeElement(&c.Occurrences, &_t); _err != nil {
+					return _err
+				}
+			case "node_id":
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.NodeID); _err != nil {
+					return _err
+				}
+			case "assumed_value":
+				_v := new(Scale)
+				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
+					return _err
+				}
+				c.AssumedValue = _v
+			case "list":
+				var _v Scale
+				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+					return _err
+				}
+				c.List = append(c.List, _v)
+			default:
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+					return _err
+				}
+			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
+			}
+		case xml.EndElement:
+			return nil
+		}
+	}
+}
+
+// xmlClassCDVState describes C_DV_STATE to the canonical-XML decode runtime.
+var xmlClassCDVState = xmlunmatched.Class{
+	Name:     "C_DV_STATE",
+	Required: []string{"rm_type_name", "occurrences", "node_id", "value"},
+}
+
+// UnmarshalXML decodes canonical openEHR XML into CDVState.
+// Polymorphic fields are routed through canxml.DecodeAs so the
+// concrete type is selected by `xsi:type` at each polymorphic site.
+// Missing/unknown/type-mismatch dispatch failures wrap typereg
+// sentinels inside *canxml.DecodeError for errors.Is / errors.As.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
+func (c *CDVState) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCDVState); _err != nil {
+		return _err
+	}
+	for {
+		_tok, _err := _dec.Token()
+		if _err != nil {
+			return _err
+		}
+		switch _t := _tok.(type) {
+		case xml.StartElement:
+			switch xmlunmatched.LocalName(_t.Name) {
+			case "rm_type_name":
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.RMTypeName); _err != nil {
+					return _err
+				}
+			case "occurrences":
+				if _err := _dec.DecodeElement(&c.Occurrences, &_t); _err != nil {
+					return _err
+				}
+			case "node_id":
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.NodeID); _err != nil {
+					return _err
+				}
+			case "assumed_value":
+				_v := new(rm.DVState)
+				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
+					return _err
+				}
+				c.AssumedValue = _v
+			case "value":
+				if _err := _dec.DecodeElement(&c.Value, &_t); _err != nil {
+					return _err
+				}
+			default:
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+					return _err
+				}
+			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
+			}
+		case xml.EndElement:
+			return nil
+		}
+	}
+}
+
 // xmlClassCQuantityItem describes C_QUANTITY_ITEM to the canonical-XML decode runtime.
 var xmlClassCQuantityItem = xmlunmatched.Class{
 	Name:     "C_QUANTITY_ITEM",
@@ -286,6 +417,59 @@ func (c *CQuantityItem) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 					return _err
 				}
 				c.UnitsDisplayName = &_v
+			default:
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+					return _err
+				}
+			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
+			}
+		case xml.EndElement:
+			return nil
+		}
+	}
+}
+
+// xmlClassNonTerminalState describes NON_TERMINAL_STATE to the canonical-XML decode runtime.
+var xmlClassNonTerminalState = xmlunmatched.Class{
+	Name:     "NON_TERMINAL_STATE",
+	Required: []string{"name", "transitions"},
+	Items:    []string{"transitions"},
+}
+
+// UnmarshalXML decodes canonical openEHR XML into NonTerminalState.
+// Polymorphic fields are routed through canxml.DecodeAs so the
+// concrete type is selected by `xsi:type` at each polymorphic site.
+// Missing/unknown/type-mismatch dispatch failures wrap typereg
+// sentinels inside *canxml.DecodeError for errors.Is / errors.As.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
+func (n *NonTerminalState) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassNonTerminalState); _err != nil {
+		return _err
+	}
+	for {
+		_tok, _err := _dec.Token()
+		if _err != nil {
+			return _err
+		}
+		switch _t := _tok.(type) {
+		case xml.StartElement:
+			switch xmlunmatched.LocalName(_t.Name) {
+			case "name":
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &n.Name); _err != nil {
+					return _err
+				}
+			case "transitions":
+				var _v Transition
+				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+					return _err
+				}
+				n.Transitions = append(n.Transitions, _v)
 			default:
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
@@ -363,6 +547,242 @@ func (o *Ordinal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 					return _err
 				}
 				o.Symbol = _v
+			default:
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+					return _err
+				}
+			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
+			}
+		case xml.EndElement:
+			return nil
+		}
+	}
+}
+
+// xmlClassScale describes SCALE to the canonical-XML decode runtime.
+var xmlClassScale = xmlunmatched.Class{
+	Name:     "SCALE",
+	Required: []string{"value", "symbol"},
+	Items:    []string{"other_reference_ranges"},
+}
+
+// xmlChoiceScaleSymbol lists the shapes the element of SCALE.symbol takes, which its first child chooses.
+var xmlChoiceScaleSymbol = []xmlunmatched.Shape{
+	{Elements: []string{"value", "hyperlink", "formatting", "mappings", "language", "encoding", "defining_code"}, New: func() any { return new(rm.DVCodedText) }},
+	{Elements: []string{"terminology_id", "code_string", "preferred_term"}, New: func() any { return new(rm.CodePhrase) }},
+}
+
+// UnmarshalXML decodes canonical openEHR XML into Scale.
+// Polymorphic fields are routed through canxml.DecodeAs so the
+// concrete type is selected by `xsi:type` at each polymorphic site.
+// Missing/unknown/type-mismatch dispatch failures wrap typereg
+// sentinels inside *canxml.DecodeError for errors.Is / errors.As.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
+func (s *Scale) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassScale); _err != nil {
+		return _err
+	}
+	for {
+		_tok, _err := _dec.Token()
+		if _err != nil {
+			return _err
+		}
+		switch _t := _tok.(type) {
+		case xml.StartElement:
+			switch xmlunmatched.LocalName(_t.Name) {
+			case "normal_range":
+				_v := new(rm.DVInterval[rm.DVOrdered])
+				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
+					return _err
+				}
+				s.NormalRange = _v
+			case "other_reference_ranges":
+				var _v rm.ReferenceRange[rm.DVOrdered]
+				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+					return _err
+				}
+				s.OtherReferenceRanges = append(s.OtherReferenceRanges, _v)
+			case "normal_status":
+				_v := new(rm.CodePhrase)
+				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
+					return _err
+				}
+				s.NormalStatus = _v
+			case "value":
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &s.Value); _err != nil {
+					return _err
+				}
+			case "symbol":
+				_v, _err := xmlunmatched.DecodeChoice(_dec, _t, xmlChoiceScaleSymbol)
+				if _err != nil {
+					return _err
+				}
+				s.Symbol = _v
+			default:
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+					return _err
+				}
+			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
+			}
+		case xml.EndElement:
+			return nil
+		}
+	}
+}
+
+// xmlClassStateMachine describes STATE_MACHINE to the canonical-XML decode runtime.
+var xmlClassStateMachine = xmlunmatched.Class{
+	Name:     "STATE_MACHINE",
+	Required: []string{"states"},
+	Items:    []string{"states"},
+}
+
+// UnmarshalXML decodes canonical openEHR XML into StateMachine.
+// Polymorphic fields are routed through canxml.DecodeAs so the
+// concrete type is selected by `xsi:type` at each polymorphic site.
+// Missing/unknown/type-mismatch dispatch failures wrap typereg
+// sentinels inside *canxml.DecodeError for errors.Is / errors.As.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
+func (s *StateMachine) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassStateMachine); _err != nil {
+		return _err
+	}
+	for {
+		_tok, _err := _dec.Token()
+		if _err != nil {
+			return _err
+		}
+		switch _t := _tok.(type) {
+		case xml.StartElement:
+			switch xmlunmatched.LocalName(_t.Name) {
+			case "states":
+				_v, _err := canxml.DecodeAs[State](_dec, _t)
+				if _err != nil {
+					return _err
+				}
+				s.States = append(s.States, _v)
+			default:
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+					return _err
+				}
+			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
+			}
+		case xml.EndElement:
+			return nil
+		}
+	}
+}
+
+// xmlClassTerminalState describes TERMINAL_STATE to the canonical-XML decode runtime.
+var xmlClassTerminalState = xmlunmatched.Class{
+	Name:     "TERMINAL_STATE",
+	Required: []string{"name"},
+}
+
+// UnmarshalXML decodes canonical openEHR XML into TerminalState.
+// Polymorphic fields are routed through canxml.DecodeAs so the
+// concrete type is selected by `xsi:type` at each polymorphic site.
+// Missing/unknown/type-mismatch dispatch failures wrap typereg
+// sentinels inside *canxml.DecodeError for errors.Is / errors.As.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
+func (t *TerminalState) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassTerminalState); _err != nil {
+		return _err
+	}
+	for {
+		_tok, _err := _dec.Token()
+		if _err != nil {
+			return _err
+		}
+		switch _t := _tok.(type) {
+		case xml.StartElement:
+			switch xmlunmatched.LocalName(_t.Name) {
+			case "name":
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &t.Name); _err != nil {
+					return _err
+				}
+			default:
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+					return _err
+				}
+			}
+		case xml.CharData:
+			if _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {
+				return _err
+			}
+		case xml.EndElement:
+			return nil
+		}
+	}
+}
+
+// xmlClassTransition describes TRANSITION to the canonical-XML decode runtime.
+var xmlClassTransition = xmlunmatched.Class{
+	Name:     "TRANSITION",
+	Required: []string{"event"},
+}
+
+// UnmarshalXML decodes canonical openEHR XML into Transition.
+// Polymorphic fields are routed through canxml.DecodeAs so the
+// concrete type is selected by `xsi:type` at each polymorphic site.
+// Missing/unknown/type-mismatch dispatch failures wrap typereg
+// sentinels inside *canxml.DecodeError for errors.Is / errors.As.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
+func (t *Transition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassTransition); _err != nil {
+		return _err
+	}
+	for {
+		_tok, _err := _dec.Token()
+		if _err != nil {
+			return _err
+		}
+		switch _t := _tok.(type) {
+		case xml.StartElement:
+			switch xmlunmatched.LocalName(_t.Name) {
+			case "event":
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &t.Event); _err != nil {
+					return _err
+				}
+			case "action":
+				var _v string
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+					return _err
+				}
+				t.Action = &_v
+			case "guard":
+				var _v string
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+					return _err
+				}
+				t.Guard = &_v
+			case "next_state":
+				_v, _err := canxml.DecodeAs[State](_dec, _t)
+				if _err != nil {
+					return _err
+				}
+				t.NextState = _v
 			default:
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err

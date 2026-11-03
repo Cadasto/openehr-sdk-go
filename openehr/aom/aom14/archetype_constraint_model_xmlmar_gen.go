@@ -134,11 +134,6 @@ func (c *CComplexObject) MarshalXML(_e *xml.Encoder, _start xml.StartElement) er
 			return err
 		}
 	}
-	if c.AssumedValue != nil {
-		if err := _e.EncodeElement(*c.AssumedValue, xml.StartElement{Name: xml.Name{Local: "assumed_value"}}); err != nil {
-			return err
-		}
-	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err
 	}
@@ -221,11 +216,6 @@ func (c *CPrimitiveObject) MarshalXML(_e *xml.Encoder, _start xml.StartElement) 
 	}
 	if c.Item != nil {
 		if err := canxml.EncodePoly(_e, "item", c.Item); err != nil {
-			return err
-		}
-	}
-	if c.AssumedValue != nil {
-		if err := _e.EncodeElement(*c.AssumedValue, xml.StartElement{Name: xml.Name{Local: "assumed_value"}}); err != nil {
 			return err
 		}
 	}

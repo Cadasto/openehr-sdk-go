@@ -30,6 +30,10 @@ func (CDVOrdinal) isArchetypeConstraint() {}
 
 func (CDVQuantity) isArchetypeConstraint() {}
 
+func (CDVScale) isArchetypeConstraint() {}
+
+func (CDVState) isArchetypeConstraint() {}
+
 func (CMultipleAttribute) isArchetypeConstraint() {}
 
 func (CPrimitiveObject) isArchetypeConstraint() {}
@@ -80,6 +84,16 @@ func (c *CDVOrdinal) HasPath(aPath string) bool {
 
 // HasPath True if the relative path a_path exists at this node.
 func (c *CDVQuantity) HasPath(aPath string) bool {
+	panic("not implemented: ARCHETYPE_CONSTRAINT.has_path — implement in a non-generated file")
+}
+
+// HasPath True if the relative path a_path exists at this node.
+func (c *CDVScale) HasPath(aPath string) bool {
+	panic("not implemented: ARCHETYPE_CONSTRAINT.has_path — implement in a non-generated file")
+}
+
+// HasPath True if the relative path a_path exists at this node.
+func (c *CDVState) HasPath(aPath string) bool {
 	panic("not implemented: ARCHETYPE_CONSTRAINT.has_path — implement in a non-generated file")
 }
 
@@ -159,6 +173,18 @@ func (c *CDVQuantity) IsSubsetOf(other ArchetypeConstraint) bool {
 
 // IsSubsetOf True if constraints represented by this node, ignoring any sub-parts, are narrower or the same as other.
 // Typically used during validation of special-ised archetype nodes.
+func (c *CDVScale) IsSubsetOf(other ArchetypeConstraint) bool {
+	panic("not implemented: ARCHETYPE_CONSTRAINT.is_subset_of — implement in a non-generated file")
+}
+
+// IsSubsetOf True if constraints represented by this node, ignoring any sub-parts, are narrower or the same as other.
+// Typically used during validation of special-ised archetype nodes.
+func (c *CDVState) IsSubsetOf(other ArchetypeConstraint) bool {
+	panic("not implemented: ARCHETYPE_CONSTRAINT.is_subset_of — implement in a non-generated file")
+}
+
+// IsSubsetOf True if constraints represented by this node, ignoring any sub-parts, are narrower or the same as other.
+// Typically used during validation of special-ised archetype nodes.
 func (c *CMultipleAttribute) IsSubsetOf(other ArchetypeConstraint) bool {
 	panic("not implemented: ARCHETYPE_CONSTRAINT.is_subset_of — implement in a non-generated file")
 }
@@ -227,6 +253,16 @@ func (c *CDVQuantity) IsValid() bool {
 }
 
 // IsValid (no BMM documentation).
+func (c *CDVScale) IsValid() bool {
+	panic("not implemented: ARCHETYPE_CONSTRAINT.is_valid — implement in a non-generated file")
+}
+
+// IsValid (no BMM documentation).
+func (c *CDVState) IsValid() bool {
+	panic("not implemented: ARCHETYPE_CONSTRAINT.is_valid — implement in a non-generated file")
+}
+
+// IsValid (no BMM documentation).
 func (c *CMultipleAttribute) IsValid() bool {
 	panic("not implemented: ARCHETYPE_CONSTRAINT.is_valid — implement in a non-generated file")
 }
@@ -288,6 +324,16 @@ func (c *CDVOrdinal) Path() string {
 
 // Path Path of this node relative to root of archetype.
 func (c *CDVQuantity) Path() string {
+	panic("not implemented: ARCHETYPE_CONSTRAINT.path — implement in a non-generated file")
+}
+
+// Path Path of this node relative to root of archetype.
+func (c *CDVScale) Path() string {
+	panic("not implemented: ARCHETYPE_CONSTRAINT.path — implement in a non-generated file")
+}
+
+// Path Path of this node relative to root of archetype.
+func (c *CDVState) Path() string {
 	panic("not implemented: ARCHETYPE_CONSTRAINT.path — implement in a non-generated file")
 }
 
@@ -367,8 +413,6 @@ func (c *CSingleAttribute) AnyAllowed() bool {
 
 // CComplexObject Constraint on complex objects, i.e. any object that consists of other object constraints.
 type CComplexObject struct {
-	// AssumedValue Value to be assumed if none sent in data.
-	AssumedValue *any `json:"assumed_value,omitzero"`
 	// Attributes List of constraints on attributes of the reference model type represented by this object.
 	Attributes []CAttribute `json:"attributes,omitempty"`
 	// NodeID Semantic identifier of this node, used to distinguish sibling nodes. All nodes must have a node_id; for nodes under a container C_ATTRIBUTE, the id must be an id-code must be defined in the archetype terminology. For valid structures, all node ids are at-codes.
@@ -404,6 +448,10 @@ func (CDVOrdinal) isCDefinedObject() {}
 
 func (CDVQuantity) isCDefinedObject() {}
 
+func (CDVScale) isCDefinedObject() {}
+
+func (CDVState) isCDefinedObject() {}
+
 func (CPrimitiveObject) isCDefinedObject() {}
 
 func (TComplexObject) isCDefinedObject() {}
@@ -436,6 +484,20 @@ func (c *CDVQuantity) AnyAllowed() bool {
 	panic("not implemented: C_DEFINED_OBJECT.any_allowed — implement in a non-generated file")
 }
 
+// AnyAllowed True if any value of the reference model type being constrained is allowed. Redefine in descendants.
+//
+// Post: Result = attributes.is_empty
+func (c *CDVScale) AnyAllowed() bool {
+	panic("not implemented: C_DEFINED_OBJECT.any_allowed — implement in a non-generated file")
+}
+
+// AnyAllowed True if any value of the reference model type being constrained is allowed. Redefine in descendants.
+//
+// Post: Result = attributes.is_empty
+func (c *CDVState) AnyAllowed() bool {
+	panic("not implemented: C_DEFINED_OBJECT.any_allowed — implement in a non-generated file")
+}
+
 // DefaultValue Generate a default value from this constraint object.
 func (c *CArchetypeRoot) DefaultValue() any {
 	panic("not implemented: C_DEFINED_OBJECT.default_value — implement in a non-generated file")
@@ -463,6 +525,16 @@ func (c *CDVOrdinal) DefaultValue() any {
 
 // DefaultValue Generate a default value from this constraint object.
 func (c *CDVQuantity) DefaultValue() any {
+	panic("not implemented: C_DEFINED_OBJECT.default_value — implement in a non-generated file")
+}
+
+// DefaultValue Generate a default value from this constraint object.
+func (c *CDVScale) DefaultValue() any {
+	panic("not implemented: C_DEFINED_OBJECT.default_value — implement in a non-generated file")
+}
+
+// DefaultValue Generate a default value from this constraint object.
+func (c *CDVState) DefaultValue() any {
 	panic("not implemented: C_DEFINED_OBJECT.default_value — implement in a non-generated file")
 }
 
@@ -498,6 +570,16 @@ func (c *CDVOrdinal) HasAssumedValue() bool {
 
 // HasAssumedValue True if there is an assumed value.
 func (c *CDVQuantity) HasAssumedValue() bool {
+	panic("not implemented: C_DEFINED_OBJECT.has_assumed_value — implement in a non-generated file")
+}
+
+// HasAssumedValue True if there is an assumed value.
+func (c *CDVScale) HasAssumedValue() bool {
+	panic("not implemented: C_DEFINED_OBJECT.has_assumed_value — implement in a non-generated file")
+}
+
+// HasAssumedValue True if there is an assumed value.
+func (c *CDVState) HasAssumedValue() bool {
 	panic("not implemented: C_DEFINED_OBJECT.has_assumed_value — implement in a non-generated file")
 }
 
@@ -542,6 +624,16 @@ func (c *CDVQuantity) PrototypeValue() any {
 }
 
 // PrototypeValue Generate a prototype value from this constraint object.
+func (c *CDVScale) PrototypeValue() any {
+	panic("not implemented: C_DEFINED_OBJECT.prototype_value — implement in a non-generated file")
+}
+
+// PrototypeValue Generate a prototype value from this constraint object.
+func (c *CDVState) PrototypeValue() any {
+	panic("not implemented: C_DEFINED_OBJECT.prototype_value — implement in a non-generated file")
+}
+
+// PrototypeValue Generate a prototype value from this constraint object.
 func (c *CPrimitiveObject) PrototypeValue() any {
 	panic("not implemented: C_DEFINED_OBJECT.prototype_value — implement in a non-generated file")
 }
@@ -582,6 +674,16 @@ func (c *CDVQuantity) ValidValue(aValue any) bool {
 }
 
 // ValidValue True if a_value is valid with respect to constraint expressed in concrete instance of this type.
+func (c *CDVScale) ValidValue(aValue any) bool {
+	panic("not implemented: C_DEFINED_OBJECT.valid_value — implement in a non-generated file")
+}
+
+// ValidValue True if a_value is valid with respect to constraint expressed in concrete instance of this type.
+func (c *CDVState) ValidValue(aValue any) bool {
+	panic("not implemented: C_DEFINED_OBJECT.valid_value — implement in a non-generated file")
+}
+
+// ValidValue True if a_value is valid with respect to constraint expressed in concrete instance of this type.
 func (c *CPrimitiveObject) ValidValue(aValue any) bool {
 	panic("not implemented: C_DEFINED_OBJECT.valid_value — implement in a non-generated file")
 }
@@ -604,6 +706,10 @@ func (CDVOrdinal) isCDomainType() {}
 
 func (CDVQuantity) isCDomainType() {}
 
+func (CDVScale) isCDomainType() {}
+
+func (CDVState) isCDomainType() {}
+
 // StandardEquivalent Standard (i.e. C_OBJECT) form of constraint.
 func (c *CCodePhrase) StandardEquivalent() CComplexObjectLike {
 	panic("not implemented: C_DOMAIN_TYPE.standard_equivalent — implement in a non-generated file")
@@ -621,6 +727,16 @@ func (c *CDVOrdinal) StandardEquivalent() CComplexObjectLike {
 
 // StandardEquivalent Standard (i.e. C_OBJECT) form of constraint.
 func (c *CDVQuantity) StandardEquivalent() CComplexObjectLike {
+	panic("not implemented: C_DOMAIN_TYPE.standard_equivalent — implement in a non-generated file")
+}
+
+// StandardEquivalent Standard (i.e. C_OBJECT) form of constraint.
+func (c *CDVScale) StandardEquivalent() CComplexObjectLike {
+	panic("not implemented: C_DOMAIN_TYPE.standard_equivalent — implement in a non-generated file")
+}
+
+// StandardEquivalent Standard (i.e. C_OBJECT) form of constraint.
+func (c *CDVState) StandardEquivalent() CComplexObjectLike {
 	panic("not implemented: C_DOMAIN_TYPE.standard_equivalent — implement in a non-generated file")
 }
 
@@ -664,14 +780,16 @@ func (CDVOrdinal) isCObject() {}
 
 func (CDVQuantity) isCObject() {}
 
+func (CDVScale) isCObject() {}
+
+func (CDVState) isCObject() {}
+
 func (CPrimitiveObject) isCObject() {}
 
 func (TComplexObject) isCObject() {}
 
 // CPrimitiveObject Constraint on a primitive type.
 type CPrimitiveObject struct {
-	// AssumedValue Value to be assumed if none sent in data.
-	AssumedValue *any `json:"assumed_value,omitzero"`
 	// Item Object actually defining the constraint.
 	Item CPrimitive `json:"item,omitempty"`
 	// NodeID Semantic identifier of this node, used to distinguish sibling nodes. All nodes must have a node_id; for nodes under a container C_ATTRIBUTE, the id must be an id-code must be defined in the archetype terminology. For valid structures, all node ids are at-codes.

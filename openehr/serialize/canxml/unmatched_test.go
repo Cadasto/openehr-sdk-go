@@ -1464,22 +1464,22 @@ func TestREQ056_XMLMultimediaBase64(t *testing.T) {
 }
 
 // TestREQ170_XMLEnumerationMembers pins an enumeration member (C_DATE's
-// `day_validity`), which decodes from its text like a primitive: its value is
-// read, and an attribute on it is unmatched like on any primitive.
+// `timezone_validity`), which decodes from its text like a primitive: its value
+// is read, and an attribute on it is unmatched like on any primitive.
 func TestREQ170_XMLEnumerationMembers(t *testing.T) {
 	t.Run("value", func(t *testing.T) {
 		var c aom14.CDate
-		in := []byte(`<c_date ` + ucNS + `><day_validity>optional</day_validity></c_date>`)
+		in := []byte(`<c_date ` + ucNS + `><timezone_validity>1002</timezone_validity></c_date>`)
 		if err := canxml.Unmarshal(in, &c, canxml.WithStrict()); err != nil {
 			t.Fatalf("canxml.Unmarshal(WithStrict) = %v; want nil", err)
 		}
-		if c.DayValidity == nil || string(*c.DayValidity) != "optional" {
-			t.Errorf("DayValidity = %v; want \"optional\" read from the element's text", c.DayValidity)
+		if c.TimezoneValidity == nil || *c.TimezoneValidity != aom14.TimezoneValidityKindOptional {
+			t.Errorf("TimezoneValidity = %v; want 1002 (optional) read from the element's text", c.TimezoneValidity)
 		}
 	})
 	t.Run("attribute", func(t *testing.T) {
-		in := []byte(`<c_date ` + ucNS + `><day_validity x-attr="` + xmlPlanted + `">optional</day_validity></c_date>`)
-		const path = "/c_date[1]/day_validity[1]/@x-attr"
+		in := []byte(`<c_date ` + ucNS + `><timezone_validity x-attr="` + xmlPlanted + `">1002</timezone_validity></c_date>`)
+		const path = "/c_date[1]/timezone_validity[1]/@x-attr"
 		want := new(aom14.CDate)
 		if err := canxml.Unmarshal(in, want); err != nil {
 			t.Fatalf("canxml.Unmarshal = %v; want nil", err)

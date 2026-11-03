@@ -80,6 +80,17 @@
                 ],
                 "reason": "the schema type ORDINAL_SYMBOL is a choice between the elements of a DV_CODED_TEXT and those of a CODE_PHRASE, which P_BMM cannot express.",
                 "upstream": "resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:87"
+            },
+            {
+                "class": "SCALE",
+                "property": "symbol",
+                "form": "choice",
+                "shapes": [
+                    "DV_CODED_TEXT",
+                    "CODE_PHRASE"
+                ],
+                "reason": "the schema types the symbol of a SCALE as ORDINAL_SYMBOL, the choice ORDINAL.symbol takes.",
+                "upstream": "resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:64"
             }
         ]
     },
@@ -106,6 +117,31 @@
                 "archetype": {
                     "name": "archetype",
                     "packages": {
+                        "assertion": {
+                            "name": "assertion",
+                            "classes": [
+                                "EXPR_OPERATOR",
+                                "OPERATOR_KIND"
+                            ]
+                        },
+                        "constraint_model": {
+                            "name": "constraint_model",
+                            "classes": [
+                                "C_DEFINED_OBJECT"
+                            ]
+                        },
+                        "primitive": {
+                            "name": "primitive",
+                            "classes": [
+                                "C_PRIMITIVE",
+                                "C_STRING",
+                                "C_DATE",
+                                "C_DATE_TIME",
+                                "C_TIME",
+                                "C_DURATION",
+                                "TIMEZONE_VALIDITY_KIND"
+                            ]
+                        },
                         "ontology": {
                             "name": "ontology",
                             "classes": [
@@ -127,7 +163,15 @@
                         "C_DV_ORDINAL",
                         "C_DV_QUANTITY",
                         "C_QUANTITY_ITEM",
-                        "ORDINAL"
+                        "ORDINAL",
+                        "C_DV_SCALE",
+                        "SCALE",
+                        "C_DV_STATE",
+                        "STATE_MACHINE",
+                        "STATE",
+                        "NON_TERMINAL_STATE",
+                        "TERMINAL_STATE",
+                        "TRANSITION"
                     ]
                 }
             }
@@ -1037,6 +1081,664 @@
                     "type": "Any"
                 }
             }
+        },
+        "C_DV_SCALE": {
+            "name": "C_DV_SCALE",
+            "documentation": "Constrainer class for scale data: the scale values allowed.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema declares it as an extension of the ITS, which neither AOM 1.4 nor its Archetype Profile defines. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:47.",
+            "ancestors": [
+                "C_DOMAIN_TYPE"
+            ],
+            "properties": {
+                "assumed_value": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "assumed_value",
+                    "documentation": "Value to be assumed if none sent in data.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema types it SCALE. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:51.",
+                    "type": "SCALE"
+                },
+                "list": {
+                    "_type": "P_BMM_CONTAINER_PROPERTY",
+                    "name": "list",
+                    "documentation": "Value set of allowed scale values in the constraint. No list means any value is allowed.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:52.",
+                    "type_def": {
+                        "container_type": "List",
+                        "type": "SCALE"
+                    },
+                    "cardinality": {
+                        "lower": 0,
+                        "upper_unbounded": true
+                    }
+                }
+            }
+        },
+        "SCALE": {
+            "name": "SCALE",
+            "documentation": "Constrainer object representing a single scale value: its value, its symbol and, optionally, the elements of a DV_ORDERED.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published; it accepts the value and the symbol in either order. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:58.",
+            "properties": {
+                "normal_range": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "normal_range",
+                    "documentation": "Optional normal range, as for `DV_ORDERED._normal_range_`.\n\nReason: no pinned schema declares it; the schema accepts the DvOrderedElements group. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:76.",
+                    "type": "DV_INTERVAL"
+                },
+                "other_reference_ranges": {
+                    "_type": "P_BMM_CONTAINER_PROPERTY",
+                    "name": "other_reference_ranges",
+                    "documentation": "Optional tagged other reference ranges, as for `DV_ORDERED._other_reference_ranges_`.\n\nReason: no pinned schema declares it; the schema accepts the DvOrderedElements group. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:77.",
+                    "type_def": {
+                        "container_type": "List",
+                        "type_def": {
+                            "_type": "P_BMM_GENERIC_TYPE",
+                            "root_type": "REFERENCE_RANGE",
+                            "generic_parameters": [
+                                "DV_ORDERED"
+                            ]
+                        }
+                    },
+                    "cardinality": {
+                        "lower": 0,
+                        "upper_unbounded": true
+                    }
+                },
+                "normal_status": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "normal_status",
+                    "documentation": "Optional normal status, as for `DV_ORDERED._normal_status_`.\n\nReason: no pinned schema declares it; the schema accepts the DvOrderedElements group. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:78.",
+                    "type": "CODE_PHRASE"
+                },
+                "value": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "value",
+                    "documentation": "Scale value.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition openEHR has published. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:63.",
+                    "is_mandatory": true,
+                    "type": "Real"
+                },
+                "symbol": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "symbol",
+                    "documentation": "Terminology code providing the scale value's symbol, written as a DV_CODED_TEXT or as a CODE_PHRASE.\n\nReason: no pinned schema declares it; the schema gives the symbol the shape of a DV_CODED_TEXT or of a CODE_PHRASE, which the schema_forms entry for it names. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:64.",
+                    "is_mandatory": true,
+                    "type": "Any"
+                }
+            }
+        },
+        "C_DV_STATE": {
+            "name": "C_DV_STATE",
+            "documentation": "Constrainer class for DV_STATE data: the state machine whose states and transitions the value takes.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition the pins hold. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:126.",
+            "ancestors": [
+                "C_DOMAIN_TYPE"
+            ],
+            "properties": {
+                "assumed_value": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "assumed_value",
+                    "documentation": "Value to be assumed if none sent in data.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema types it DV_STATE. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:130.",
+                    "type": "DV_STATE"
+                },
+                "value": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "value",
+                    "documentation": "The state machine the constrained values follow.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition the pins hold. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:131.",
+                    "is_mandatory": true,
+                    "type": "STATE_MACHINE"
+                }
+            }
+        },
+        "STATE_MACHINE": {
+            "name": "STATE_MACHINE",
+            "documentation": "Definition of a state machine as its states, each with the transitions out of it.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition the pins hold. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:137.",
+            "properties": {
+                "states": {
+                    "_type": "P_BMM_CONTAINER_PROPERTY",
+                    "name": "states",
+                    "documentation": "The states of the machine.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition the pins hold. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:139.",
+                    "is_mandatory": true,
+                    "type_def": {
+                        "container_type": "List",
+                        "type": "STATE"
+                    },
+                    "cardinality": {
+                        "lower": 1,
+                        "upper_unbounded": true
+                    }
+                }
+            }
+        },
+        "STATE": {
+            "name": "STATE",
+            "documentation": "Abstract definition of one state of a state machine.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition the pins hold. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:143.",
+            "is_abstract": true,
+            "properties": {
+                "name": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "name",
+                    "documentation": "Name of the state.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition the pins hold. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:145.",
+                    "is_mandatory": true,
+                    "type": "String"
+                }
+            }
+        },
+        "NON_TERMINAL_STATE": {
+            "name": "NON_TERMINAL_STATE",
+            "documentation": "A state of a state machine that has transitions out of it.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition the pins hold. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:148.",
+            "ancestors": [
+                "STATE"
+            ],
+            "properties": {
+                "transitions": {
+                    "_type": "P_BMM_CONTAINER_PROPERTY",
+                    "name": "transitions",
+                    "documentation": "The transitions out of the state.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition the pins hold. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:152.",
+                    "is_mandatory": true,
+                    "type_def": {
+                        "container_type": "List",
+                        "type": "TRANSITION"
+                    },
+                    "cardinality": {
+                        "lower": 1,
+                        "upper_unbounded": true
+                    }
+                }
+            }
+        },
+        "TERMINAL_STATE": {
+            "name": "TERMINAL_STATE",
+            "documentation": "A state of a state machine that has no transition out of it.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition the pins hold. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:157.",
+            "ancestors": [
+                "STATE"
+            ]
+        },
+        "TRANSITION": {
+            "name": "TRANSITION",
+            "documentation": "A transition of a state machine: the event that fires it and, optionally, its guard, its action and the state it leads to.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition the pins hold. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:162.",
+            "properties": {
+                "event": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "event",
+                    "documentation": "Event that fires the transition.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition the pins hold. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:164.",
+                    "is_mandatory": true,
+                    "type": "String"
+                },
+                "action": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "action",
+                    "documentation": "Action carried out when the transition fires.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition the pins hold. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:165.",
+                    "type": "String"
+                },
+                "guard": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "guard",
+                    "documentation": "Condition that must hold for the transition to fire.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition the pins hold. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:166.",
+                    "type": "String"
+                },
+                "next_state": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "next_state",
+                    "documentation": "State the transition leads to.\n\nReason: no pinned schema declares it; the AM Release-1.4 schema is the only formal definition the pins hold. Upstream: resources/its-xml/components/AM/Release-1.4/OpenehrProfile.xsd:167.",
+                    "type": "STATE"
+                }
+            }
+        },
+        "C_DEFINED_OBJECT": {
+            "name": "C_DEFINED_OBJECT",
+            "documentation": "Abstract parent type of C_OBJECT subtypes that are defined by value, i.e. whose definitions are actually in the archetype rather than being by reference.\n\nReason: the AM Release-1.4 schema declares no assumed_value on it, where the BMM gives one typed Any; each subclass that has an assumed value declares it with the type the schema gives it. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:115.",
+            "is_abstract": true,
+            "ancestors": [
+                "C_OBJECT"
+            ],
+            "functions": {
+                "valid_value": {
+                    "name": "valid_value",
+                    "documentation": "True if a_value is valid with respect to constraint expressed in concrete instance of this type.",
+                    "is_abstract": true,
+                    "parameters": {
+                        "a_value": {
+                            "_type": "P_BMM_SINGLE_FUNCTION_PARAMETER",
+                            "name": "a_value",
+                            "type": "Any"
+                        }
+                    },
+                    "result": {
+                        "_type": "P_BMM_SIMPLE_TYPE",
+                        "type": "Boolean"
+                    }
+                },
+                "prototype_value": {
+                    "name": "prototype_value",
+                    "documentation": "Generate a prototype value from this constraint object.",
+                    "is_abstract": true,
+                    "result": {
+                        "_type": "P_BMM_SIMPLE_TYPE",
+                        "type": "Any"
+                    }
+                },
+                "has_assumed_value": {
+                    "name": "has_assumed_value",
+                    "documentation": "True if there is an assumed value.\n",
+                    "result": {
+                        "_type": "P_BMM_SIMPLE_TYPE",
+                        "type": "Boolean"
+                    }
+                },
+                "default_value": {
+                    "name": "default_value",
+                    "documentation": "Generate a default value from this constraint object.",
+                    "is_abstract": true,
+                    "result": {
+                        "_type": "P_BMM_SIMPLE_TYPE",
+                        "type": "Any"
+                    },
+                    "is_nullable": true
+                },
+                "any_allowed": {
+                    "name": "any_allowed",
+                    "documentation": "True if any value of the reference model type being constrained is allowed. Redefine in descendants.",
+                    "is_abstract": true,
+                    "post_conditions": {
+                        "Post": "Result = attributes.is_empty"
+                    },
+                    "result": {
+                        "_type": "P_BMM_SIMPLE_TYPE",
+                        "type": "Boolean"
+                    }
+                }
+            }
+        },
+        "C_PRIMITIVE": {
+            "name": "C_PRIMITIVE",
+            "documentation": "Parent of types representing constraints on primitive types.\n\nReason: the AM Release-1.4 schema declares no assumed_value on it, where the BMM gives one typed Any; each subclass declares its own, with the type the schema gives it. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:250.",
+            "is_abstract": true,
+            "functions": {
+                "default_value": {
+                    "name": "default_value",
+                    "documentation": "Generate a default value from this constraint object.",
+                    "is_abstract": true,
+                    "result": {
+                        "_type": "P_BMM_SIMPLE_TYPE",
+                        "type": "Any"
+                    }
+                },
+                "has_assumed_value": {
+                    "name": "has_assumed_value",
+                    "documentation": "True if there is an assumed value.",
+                    "is_abstract": true,
+                    "result": {
+                        "_type": "P_BMM_SIMPLE_TYPE",
+                        "type": "Boolean"
+                    }
+                },
+                "valid_value": {
+                    "name": "valid_value",
+                    "documentation": "True if a_value is valid with respect to constraint expressed in concrete instance of this type.",
+                    "is_abstract": true,
+                    "parameters": {
+                        "a_value": {
+                            "_type": "P_BMM_SINGLE_FUNCTION_PARAMETER",
+                            "name": "a_value",
+                            "type": "Any"
+                        }
+                    },
+                    "result": {
+                        "_type": "P_BMM_SIMPLE_TYPE",
+                        "type": "Boolean"
+                    }
+                }
+            }
+        },
+        "C_STRING": {
+            "name": "C_STRING",
+            "documentation": "Constraint on instances of STRING.\n\nReason: the AM Release-1.4 schema makes list_open optional, where the BMM makes it mandatory. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:264.",
+            "ancestors": [
+                "C_PRIMITIVE"
+            ],
+            "properties": {
+                "pattern": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "pattern",
+                    "documentation": "Regular expression pattern for proposed instances of String to match.\n\nReason: unchanged; declared again with its class. Upstream: openehr_am_1.4.0.",
+                    "type": "String"
+                },
+                "list": {
+                    "_type": "P_BMM_CONTAINER_PROPERTY",
+                    "name": "list",
+                    "documentation": "Set of Strings specifying constraint.\n\nReason: unchanged; declared again with its class. Upstream: openehr_am_1.4.0.",
+                    "type_def": {
+                        "container_type": "List",
+                        "type": "String"
+                    },
+                    "cardinality": {
+                        "lower": 0,
+                        "upper_unbounded": true
+                    }
+                },
+                "list_open": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "list_open",
+                    "documentation": "True if the list is being used to specify the constraint but is not considered exhaustive.\n\nReason: the schema makes it optional, where the BMM makes it mandatory. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:270.",
+                    "type": "Boolean"
+                },
+                "assumed_value": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "assumed_value",
+                    "documentation": "The value to assume if this item is not included in data, due to being part of an optional structure.\n\nReason: unchanged; declared again with its class. Upstream: openehr_am_1.4.0.",
+                    "type": "String"
+                }
+            },
+            "functions": {
+                "valid_value": {
+                    "name": "valid_value",
+                    "documentation": "True if a_value is valid with respect to constraint expressed in concrete instance of this type. ",
+                    "parameters": {
+                        "a_value": {
+                            "_type": "P_BMM_SINGLE_FUNCTION_PARAMETER",
+                            "name": "a_value",
+                            "type": "String"
+                        }
+                    },
+                    "result": {
+                        "_type": "P_BMM_SIMPLE_TYPE",
+                        "type": "Boolean"
+                    }
+                }
+            }
+        },
+        "C_DATE": {
+            "name": "C_DATE",
+            "documentation": "ISO 8601-compatible constraint on instances of Date, in the form of a pattern, a date range or both.\n\nReason: the AM Release-1.4 schema constrains a date by a pattern and a timezone validity, where the BMM gives validity flags for its month and day. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:298.",
+            "ancestors": [
+                "C_PRIMITIVE"
+            ],
+            "properties": {
+                "pattern": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "pattern",
+                    "documentation": "Pattern of the dates allowed, in the ADL 1.4 date constraint syntax, such as `yyyy-mm-??`.\n\nReason: the schema declares it, where the BMM gives validity flags instead. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:302.",
+                    "type": "String"
+                },
+                "timezone_validity": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "timezone_validity",
+                    "documentation": "Validity of the timezone in the constrained dates.\n\nReason: the schema declares it, typed by the union VALIDITY_KIND_AOM14 the root declares as TIMEZONE_VALIDITY_KIND, where the BMM has no member for it. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:303.",
+                    "type": "TIMEZONE_VALIDITY_KIND"
+                },
+                "range": {
+                    "_type": "P_BMM_GENERIC_PROPERTY",
+                    "name": "range",
+                    "documentation": "Interval of Dates specifying constraint.\n\nReason: unchanged; declared again with its class. Upstream: openehr_am_1.4.0.",
+                    "type_def": {
+                        "root_type": "Interval",
+                        "generic_parameters": [
+                            "Iso8601_date"
+                        ]
+                    }
+                },
+                "assumed_value": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "assumed_value",
+                    "documentation": "The value to assume if this item is not included in data, due to being part of an optional structure.\n\nReason: unchanged; declared again with its class. Upstream: openehr_am_1.4.0.",
+                    "type": "Iso8601_date"
+                }
+            },
+            "invariants": {
+                "Pattern_validity": "pattern /= Void implies valid_iso8601_date_constraint_pattern(pattern)",
+                "Validity_is_range": "validity_is_range = (range /= Void)"
+            }
+        },
+        "C_DATE_TIME": {
+            "name": "C_DATE_TIME",
+            "documentation": "ISO 8601-compatible constraint on instances of Date_Time, in the form of a pattern, a date/time range or both.\n\nReason: the AM Release-1.4 schema constrains a date/time by a pattern and a timezone validity, where the BMM gives validity flags for each of its parts. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:316.",
+            "ancestors": [
+                "C_PRIMITIVE"
+            ],
+            "properties": {
+                "pattern": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "pattern",
+                    "documentation": "Pattern of the date/times allowed, in the ADL 1.4 date/time constraint syntax, such as `yyyy-mm-ddTHH:??:??`.\n\nReason: the schema declares it, where the BMM gives validity flags instead. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:320.",
+                    "type": "String"
+                },
+                "timezone_validity": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "timezone_validity",
+                    "documentation": "Validity of the timezone in the constrained date/times.\n\nReason: the schema types it by the union VALIDITY_KIND_AOM14, which the root declares as TIMEZONE_VALIDITY_KIND, where the BMM gives a VALIDITY_KIND. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:321.",
+                    "type": "TIMEZONE_VALIDITY_KIND"
+                },
+                "range": {
+                    "_type": "P_BMM_GENERIC_PROPERTY",
+                    "name": "range",
+                    "documentation": "Range of Date_times specifying constraint.\n\nReason: unchanged; declared again with its class. Upstream: openehr_am_1.4.0.",
+                    "type_def": {
+                        "root_type": "Interval",
+                        "generic_parameters": [
+                            "Iso8601_date_time"
+                        ]
+                    }
+                },
+                "assumed_value": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "assumed_value",
+                    "documentation": "The value to assume if this item is not included in data, due to being part of an optional structure.\n\nReason: unchanged; declared again with its class. Upstream: openehr_am_1.4.0.",
+                    "type": "Iso8601_date_time"
+                }
+            },
+            "functions": {
+                "validity_is_range": {
+                    "name": "validity_is_range",
+                    "documentation": "True if validity is in the form of a range; useful for developers to check which kind of constraint has been set.",
+                    "result": {
+                        "_type": "P_BMM_SIMPLE_TYPE",
+                        "type": "Boolean"
+                    }
+                }
+            },
+            "invariants": {
+                "Pattern_validity": "pattern /= Void implies valid_iso8601_date_time_constraint_pattern(pattern)",
+                "Validity_is_range": "validity_is_range = (range /= Void)"
+            }
+        },
+        "C_TIME": {
+            "name": "C_TIME",
+            "documentation": "ISO 8601-compatible constraint on instances of Time, in the form of a pattern, a time range or both.\n\nReason: the AM Release-1.4 schema constrains a time by a pattern and a timezone validity, where the BMM gives validity flags for each of its parts. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:336.",
+            "ancestors": [
+                "C_PRIMITIVE"
+            ],
+            "properties": {
+                "pattern": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "pattern",
+                    "documentation": "Pattern of the times allowed, in the ADL 1.4 time constraint syntax, such as `HH:??:XX`.\n\nReason: the schema declares it, where the BMM gives validity flags instead. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:340.",
+                    "type": "String"
+                },
+                "timezone_validity": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "timezone_validity",
+                    "documentation": "Validity of the timezone in the constrained times.\n\nReason: the schema types it by the union VALIDITY_KIND_AOM14, which the root declares as TIMEZONE_VALIDITY_KIND, where the BMM gives a VALIDITY_KIND. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:341.",
+                    "type": "TIMEZONE_VALIDITY_KIND"
+                },
+                "range": {
+                    "_type": "P_BMM_GENERIC_PROPERTY",
+                    "name": "range",
+                    "documentation": "Interval of Times specifying constraint.\n\nReason: unchanged; declared again with its class. Upstream: openehr_am_1.4.0.",
+                    "type_def": {
+                        "root_type": "Interval",
+                        "generic_parameters": [
+                            "Iso8601_time"
+                        ]
+                    }
+                },
+                "assumed_value": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "assumed_value",
+                    "documentation": "The value to assume if this item is not included in data, due to being part of an optional structure.\n\nReason: unchanged; declared again with its class. Upstream: openehr_am_1.4.0.",
+                    "type": "Iso8601_time"
+                }
+            },
+            "functions": {
+                "validity_is_range": {
+                    "name": "validity_is_range",
+                    "documentation": "True if validity is in the form of a range; useful for developers to check which kind of constraint has been set.",
+                    "result": {
+                        "_type": "P_BMM_SIMPLE_TYPE",
+                        "type": "Boolean"
+                    }
+                }
+            },
+            "invariants": {
+                "Pattern_validity": "pattern /= Void implies valid_iso8601_time_constraint_pattern (pattern)",
+                "Validity_is_range": "validity_is_range = (range /= Void)"
+            }
+        },
+        "C_DURATION": {
+            "name": "C_DURATION",
+            "documentation": "ISO 8601-compatible constraint on instances of Duration. In ISO 8601 terms, constraints might are of the form “PWD” (weeks and/or days), “PDTHMS” (days, hours, minutes, seconds) and so on.\n\nBoth range and the constraint pattern can be set at the same time, corresponding to the ADL constraint `\"PWD/|P0W..P50W|\"`.\n\nAs for all of openEHR, two ISO 8601 exceptions are allowed: \n\n* the ‘W’ (week) designator can be mixed in - the allowed patterns are: `P[Y|y][M|m][D|d][T[H|h][M|m][S|s]]` and `P[W|w]`;\n* the values used in an interval constraint may be negated, i.e. a leading minus (`'-'`) sign may be used.\n\nReason: the AM Release-1.4 schema constrains a duration by a pattern, where the BMM gives a flag for each of its designators. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:353.",
+            "ancestors": [
+                "C_PRIMITIVE"
+            ],
+            "properties": {
+                "pattern": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "pattern",
+                    "documentation": "Pattern of the durations allowed, the designators they may carry, in the ADL 1.4 duration constraint syntax, such as `PYMWD` or `PTHMS`.\n\nReason: the schema declares it, where the BMM gives a flag for each designator instead. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:357.",
+                    "type": "String"
+                },
+                "range": {
+                    "_type": "P_BMM_GENERIC_PROPERTY",
+                    "name": "range",
+                    "documentation": "Range of Durations specifying constraint.\n\nReason: unchanged; declared again with its class. Upstream: openehr_am_1.4.0.",
+                    "type_def": {
+                        "root_type": "Interval",
+                        "generic_parameters": [
+                            "Iso8601_duration"
+                        ]
+                    }
+                },
+                "assumed_value": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "assumed_value",
+                    "documentation": "The value to assume if this item is not included in data, due to being part of an optional structure.\n\nReason: unchanged; declared again with its class. Upstream: openehr_am_1.4.0.",
+                    "type": "Iso8601_duration"
+                }
+            }
+        },
+        "TIMEZONE_VALIDITY_KIND": {
+            "_type": "P_BMM_ENUMERATION_INTEGER",
+            "name": "TIMEZONE_VALIDITY_KIND",
+            "documentation": "Validity of the timezone in a date, time or date/time constraint: the integer codes of the openEHR Release-1.0.2 schemas, each named by the VALIDITY_KIND word it stands for, and disallowed, the word AOM 1.4 uses for prohibited.\n\nReason: the AM Release-1.4 schema types timezone_validity by VALIDITY_KIND_AOM14, a union of the VALIDITY_KIND words, the word disallowed and the codes 1001 to 1003, which P_BMM cannot express; the root declares it as an integer enumeration whose item names are the words, so a decode reads either spelling and an encode writes the code, the spelling every reader of the schema accepts. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:233.",
+            "ancestors": [
+                "Integer"
+            ],
+            "item_names": [
+                "mandatory",
+                "optional",
+                "prohibited",
+                "disallowed"
+            ],
+            "item_values": [
+                1001,
+                1002,
+                1003,
+                1003
+            ],
+            "item_documentations": [
+                "Constant to indicate mandatory presence of something.",
+                "Constant to indicate optional presence of something.",
+                "Constant to indicate disallowed presence of something.",
+                "Constant to indicate disallowed presence of something: the word AOM 1.4 uses for prohibited, with the same code."
+            ]
+        },
+        "EXPR_OPERATOR": {
+            "name": "EXPR_OPERATOR",
+            "documentation": "Abstract parent of operator types.\n\nReason: the AM Release-1.4 schema makes precedence_overridden mandatory, where the BMM makes it optional. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:177.",
+            "is_abstract": true,
+            "ancestors": [
+                "EXPR_ITEM"
+            ],
+            "properties": {
+                "operator": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "operator",
+                    "documentation": "Code of operator.\n\nReason: the schema types it OPERATOR_KIND, which the root declares in the schema's form, as an integer enumeration. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:181.",
+                    "is_mandatory": true,
+                    "type": "OPERATOR_KIND"
+                },
+                "precedence_overridden": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "precedence_overridden",
+                    "documentation": "True if the natural precedence of operators is overridden in the expression represented by this node of the expression tree. If True, parentheses should be introduced around the totality of the syntax expression corresponding to this operator node and its operands.\n\nReason: the schema makes it mandatory, where the BMM makes it optional. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:182.",
+                    "is_mandatory": true,
+                    "type": "Boolean"
+                }
+            }
+        },
+        "OPERATOR_KIND": {
+            "_type": "P_BMM_ENUMERATION_INTEGER",
+            "name": "OPERATOR_KIND",
+            "documentation": "Enumeration type for operator types in assertion expressions.\n\nReason: the AM Release-1.4 schema writes it as an integer restricted to the codes 2001 to 2024, each with the name its id gives it, where the BMM gives a String enumeration of the names op_eq to op_exponent, with no codes. Upstream: resources/its-xml/components/AM/Release-1.4/Archetype.xsd:206.",
+            "ancestors": [
+                "Integer"
+            ],
+            "item_names": [
+                "equal",
+                "not_equal",
+                "less_than_or_equal",
+                "less_than",
+                "greater_than_or_equal",
+                "greater_than",
+                "matches",
+                "not",
+                "and",
+                "or",
+                "xor",
+                "implies",
+                "for_all",
+                "exists",
+                "plus",
+                "minus",
+                "multiply",
+                "divide",
+                "exponent"
+            ],
+            "item_values": [
+                2001,
+                2002,
+                2003,
+                2004,
+                2005,
+                2006,
+                2007,
+                2010,
+                2011,
+                2012,
+                2013,
+                2014,
+                2015,
+                2016,
+                2020,
+                2021,
+                2022,
+                2023,
+                2024
+            ],
+            "item_documentations": [
+                "Equals operator (= or ==)",
+                "Not equals operator (!= or /=)",
+                "Less-than or equals operator (<=)",
+                "Less-than operator (<)",
+                "Greater-than or equals operator (>=)",
+                "Greater-than operator (>)",
+                "Matches operator (matches or is_in)",
+                "Not logical operator",
+                "And logical operator",
+                "Or logical operator.",
+                "Xor logical operator",
+                "Implies logical operator",
+                "For-all (universal) quantifier",
+                "Exists quantifier",
+                "Arithmetic plus operator (+)",
+                "Arithmetic minus operator (-)",
+                "Arithmetic multiplication operator (*)",
+                "Arithmetic division operator (/)",
+                "Arithmetic exponentiation operator (^)"
+            ]
         }
     }
 }

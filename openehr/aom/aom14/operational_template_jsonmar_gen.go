@@ -41,8 +41,6 @@ func (a Annotation) MarshalJSONTo(enc *jsontext.Encoder) error {
 // struct embeds nothing and so cannot promote.
 type jsonWireCArchetypeRoot struct {
 	Class string `json:"_type"`
-	// AssumedValue Value to be assumed if none sent in data.
-	AssumedValue *any `json:"assumed_value,omitzero"`
 	// RMTypeName Reference model type that this node corresponds to.
 	RMTypeName string `json:"rm_type_name"`
 	// Occurrences Occurrences of this object node in the data, under the owning attribute. Upper limit can only be greater than 1 if owning attribute has a cardinality of more than 1).
@@ -68,7 +66,6 @@ type jsonWireCArchetypeRoot struct {
 func (c CArchetypeRoot) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &jsonWireCArchetypeRoot{
 		Class:           "C_ARCHETYPE_ROOT",
-		AssumedValue:    c.AssumedValue,
 		RMTypeName:      c.RMTypeName,
 		Occurrences:     c.Occurrences,
 		NodeID:          c.NodeID,
@@ -201,8 +198,6 @@ func (t TAttribute) MarshalJSONTo(enc *jsontext.Encoder) error {
 // struct embeds nothing and so cannot promote.
 type jsonWireTComplexObject struct {
 	Class string `json:"_type"`
-	// AssumedValue Value to be assumed if none sent in data.
-	AssumedValue *any `json:"assumed_value,omitzero"`
 	// RMTypeName Reference model type that this node corresponds to.
 	RMTypeName string `json:"rm_type_name"`
 	// Occurrences Occurrences of this object node in the data, under the owning attribute. Upper limit can only be greater than 1 if owning attribute has a cardinality of more than 1).
@@ -222,7 +217,6 @@ type jsonWireTComplexObject struct {
 func (t TComplexObject) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &jsonWireTComplexObject{
 		Class:        "T_COMPLEX_OBJECT",
-		AssumedValue: t.AssumedValue,
 		RMTypeName:   t.RMTypeName,
 		Occurrences:  t.Occurrences,
 		NodeID:       t.NodeID,

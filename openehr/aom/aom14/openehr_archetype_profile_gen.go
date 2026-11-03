@@ -56,6 +56,36 @@ type CDVQuantity struct {
 	RMTypeName string `json:"rm_type_name"`
 }
 
+// CDVScale Constrainer class for scale data: the scale values allowed.
+type CDVScale struct {
+	// AssumedValue Value to be assumed if none sent in data.
+	AssumedValue *Scale `json:"assumed_value,omitzero"`
+	// List Value set of allowed scale values in the constraint. No list means any value is allowed.
+	List []Scale `json:"list,omitempty"`
+	// NodeID Semantic identifier of this node, used to distinguish sibling nodes. All nodes must have a node_id; for nodes under a container C_ATTRIBUTE, the id must be an id-code must be defined in the archetype terminology. For valid structures, all node ids are at-codes.
+	// For C_PRIMITIVE_OBJECTs, it will have the special value Primitive_node_id.
+	NodeID string `json:"node_id"`
+	// Occurrences Occurrences of this object node in the data, under the owning attribute. Upper limit can only be greater than 1 if owning attribute has a cardinality of more than 1).
+	Occurrences rm.Interval[Integer] `json:"occurrences"`
+	// RMTypeName Reference model type that this node corresponds to.
+	RMTypeName string `json:"rm_type_name"`
+}
+
+// CDVState Constrainer class for DV_STATE data: the state machine whose states and transitions the value takes.
+type CDVState struct {
+	// AssumedValue Value to be assumed if none sent in data.
+	AssumedValue *rm.DVState `json:"assumed_value,omitzero"`
+	// NodeID Semantic identifier of this node, used to distinguish sibling nodes. All nodes must have a node_id; for nodes under a container C_ATTRIBUTE, the id must be an id-code must be defined in the archetype terminology. For valid structures, all node ids are at-codes.
+	// For C_PRIMITIVE_OBJECTs, it will have the special value Primitive_node_id.
+	NodeID string `json:"node_id"`
+	// Occurrences Occurrences of this object node in the data, under the owning attribute. Upper limit can only be greater than 1 if owning attribute has a cardinality of more than 1).
+	Occurrences rm.Interval[Integer] `json:"occurrences"`
+	// RMTypeName Reference model type that this node corresponds to.
+	RMTypeName string `json:"rm_type_name"`
+	// Value The state machine the constrained values follow.
+	Value StateMachine `json:"value"`
+}
+
 // CQuantityItem Constrainer class for a single quantity: its units and, optionally, ranges of its magnitude and precision.
 type CQuantityItem struct {
 	// Magnitude Quantity magnitude constraint.
@@ -74,6 +104,14 @@ type CQuantityItem struct {
 	UnitsSystem *string `json:"units_system,omitzero"`
 }
 
+// NonTerminalState A state of a state machine that has transitions out of it.
+type NonTerminalState struct {
+	// Name Name of the state.
+	Name string `json:"name"`
+	// Transitions The transitions out of the state.
+	Transitions []Transition `json:"transitions,omitzero"`
+}
+
 // Ordinal Constrainer object representing a single ordinal value: its value, its symbol and, optionally, the elements of a DV_ORDERED.
 type Ordinal struct {
 	// NormalRange Optional normal range, as for `DV_ORDERED._normal_range_`.
@@ -86,4 +124,51 @@ type Ordinal struct {
 	Symbol any `json:"symbol,omitzero"`
 	// Value Ordinal value.
 	Value Integer `json:"value"`
+}
+
+// Scale Constrainer object representing a single scale value: its value, its symbol and, optionally, the elements of a DV_ORDERED.
+type Scale struct {
+	// NormalRange Optional normal range, as for `DV_ORDERED._normal_range_`.
+	NormalRange *rm.DVInterval[rm.DVOrdered] `json:"normal_range,omitzero"`
+	// NormalStatus Optional normal status, as for `DV_ORDERED._normal_status_`.
+	NormalStatus *rm.CodePhrase `json:"normal_status,omitzero"`
+	// OtherReferenceRanges Optional tagged other reference ranges, as for `DV_ORDERED._other_reference_ranges_`.
+	OtherReferenceRanges []rm.ReferenceRange[rm.DVOrdered] `json:"other_reference_ranges,omitempty"`
+	// Symbol Terminology code providing the scale value's symbol, written as a DV_CODED_TEXT or as a CODE_PHRASE.
+	Symbol any `json:"symbol,omitzero"`
+	// Value Scale value.
+	Value Real `json:"value"`
+}
+
+// State Abstract definition of one state of a state machine.
+type State interface {
+	isState()
+}
+
+func (NonTerminalState) isState() {}
+
+func (TerminalState) isState() {}
+
+// StateMachine Definition of a state machine as its states, each with the transitions out of it.
+type StateMachine struct {
+	// States The states of the machine.
+	States []State `json:"states,omitzero"`
+}
+
+// TerminalState A state of a state machine that has no transition out of it.
+type TerminalState struct {
+	// Name Name of the state.
+	Name string `json:"name"`
+}
+
+// Transition A transition of a state machine: the event that fires it and, optionally, its guard, its action and the state it leads to.
+type Transition struct {
+	// Action Action carried out when the transition fires.
+	Action *string `json:"action,omitzero"`
+	// Event Event that fires the transition.
+	Event string `json:"event"`
+	// Guard Condition that must hold for the transition to fire.
+	Guard *string `json:"guard,omitzero"`
+	// NextState State the transition leads to.
+	NextState State `json:"next_state,omitempty"`
 }

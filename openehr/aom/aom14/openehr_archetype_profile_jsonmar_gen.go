@@ -78,6 +78,50 @@ func (c CDVQuantity) MarshalJSONTo(enc *jsontext.Encoder) error {
 	}{"C_DV_QUANTITY", rawCDVQuantity(c)}, typereg.MarshalOptions(enc))
 }
 
+// rawCDVScale is the method-free canonical-JSON alias for CDVScale. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted.
+type rawCDVScale CDVScale
+
+// MarshalJSONTo emits canonical openEHR JSON for CDVScale with `_type`
+// (value "C_DV_SCALE") as the leading member. Field order otherwise follows the
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
+// The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type`.
+func (c CDVScale) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		rawCDVScale
+	}{"C_DV_SCALE", rawCDVScale(c)}, typereg.MarshalOptions(enc))
+}
+
+// rawCDVState is the method-free canonical-JSON alias for CDVState. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted.
+type rawCDVState CDVState
+
+// MarshalJSONTo emits canonical openEHR JSON for CDVState with `_type`
+// (value "C_DV_STATE") as the leading member. Field order otherwise follows the
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
+// The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type`.
+func (c CDVState) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		rawCDVState
+	}{"C_DV_STATE", rawCDVState(c)}, typereg.MarshalOptions(enc))
+}
+
 // rawCQuantityItem is the method-free canonical-JSON alias for CQuantityItem. The alias
 // drops the codec methods so marshalling the anonymous wrapper below
 // does not recurse; the class embeds no marshaler-bearing concrete
@@ -100,6 +144,28 @@ func (c CQuantityItem) MarshalJSONTo(enc *jsontext.Encoder) error {
 	}{"C_QUANTITY_ITEM", rawCQuantityItem(c)}, typereg.MarshalOptions(enc))
 }
 
+// rawNonTerminalState is the method-free canonical-JSON alias for NonTerminalState. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted.
+type rawNonTerminalState NonTerminalState
+
+// MarshalJSONTo emits canonical openEHR JSON for NonTerminalState with `_type`
+// (value "NON_TERMINAL_STATE") as the leading member. Field order otherwise follows the
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
+// The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type`.
+func (n NonTerminalState) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		rawNonTerminalState
+	}{"NON_TERMINAL_STATE", rawNonTerminalState(n)}, typereg.MarshalOptions(enc))
+}
+
 // rawOrdinal is the method-free canonical-JSON alias for Ordinal. The alias
 // drops the codec methods so marshalling the anonymous wrapper below
 // does not recurse; the class embeds no marshaler-bearing concrete
@@ -120,4 +186,92 @@ func (o Ordinal) MarshalJSONTo(enc *jsontext.Encoder) error {
 		Type string `json:"_type"`
 		rawOrdinal
 	}{"ORDINAL", rawOrdinal(o)}, typereg.MarshalOptions(enc))
+}
+
+// rawScale is the method-free canonical-JSON alias for Scale. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted.
+type rawScale Scale
+
+// MarshalJSONTo emits canonical openEHR JSON for Scale with `_type`
+// (value "SCALE") as the leading member. Field order otherwise follows the
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
+// The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type`.
+func (s Scale) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		rawScale
+	}{"SCALE", rawScale(s)}, typereg.MarshalOptions(enc))
+}
+
+// rawStateMachine is the method-free canonical-JSON alias for StateMachine. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted.
+type rawStateMachine StateMachine
+
+// MarshalJSONTo emits canonical openEHR JSON for StateMachine with `_type`
+// (value "STATE_MACHINE") as the leading member. Field order otherwise follows the
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
+// The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type`.
+func (s StateMachine) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		rawStateMachine
+	}{"STATE_MACHINE", rawStateMachine(s)}, typereg.MarshalOptions(enc))
+}
+
+// rawTerminalState is the method-free canonical-JSON alias for TerminalState. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted.
+type rawTerminalState TerminalState
+
+// MarshalJSONTo emits canonical openEHR JSON for TerminalState with `_type`
+// (value "TERMINAL_STATE") as the leading member. Field order otherwise follows the
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
+// The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type`.
+func (t TerminalState) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		rawTerminalState
+	}{"TERMINAL_STATE", rawTerminalState(t)}, typereg.MarshalOptions(enc))
+}
+
+// rawTransition is the method-free canonical-JSON alias for Transition. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted.
+type rawTransition Transition
+
+// MarshalJSONTo emits canonical openEHR JSON for Transition with `_type`
+// (value "TRANSITION") as the leading member. Field order otherwise follows the
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
+// The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type`.
+func (t Transition) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		rawTransition
+	}{"TRANSITION", rawTransition(t)}, typereg.MarshalOptions(enc))
 }

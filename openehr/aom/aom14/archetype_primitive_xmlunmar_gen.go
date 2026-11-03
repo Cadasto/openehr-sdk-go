@@ -97,18 +97,18 @@ func (c *CDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 		switch _t := _tok.(type) {
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
-			case "day_validity":
-				var _v rm.ValidityKind
+			case "pattern":
+				var _v string
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
-				c.DayValidity = &_v
-			case "month_validity":
-				var _v rm.ValidityKind
+				c.Pattern = &_v
+			case "timezone_validity":
+				var _v TimezoneValidityKind
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
-				c.MonthValidity = &_v
+				c.TimezoneValidity = &_v
 			case "range":
 				_v := new(rm.Interval[string])
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
@@ -162,44 +162,14 @@ func (c *CDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 		switch _t := _tok.(type) {
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
-			case "month_validity":
-				var _v rm.ValidityKind
+			case "pattern":
+				var _v string
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
-				c.MonthValidity = &_v
-			case "day_validity":
-				var _v rm.ValidityKind
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
-					return _err
-				}
-				c.DayValidity = &_v
-			case "hour_validity":
-				var _v rm.ValidityKind
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
-					return _err
-				}
-				c.HourValidity = &_v
-			case "minute_validity":
-				var _v rm.ValidityKind
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
-					return _err
-				}
-				c.MinuteValidity = &_v
-			case "second_validity":
-				var _v rm.ValidityKind
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
-					return _err
-				}
-				c.SecondValidity = &_v
-			case "millisecond_validity":
-				var _v rm.ValidityKind
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
-					return _err
-				}
-				c.MillisecondValidity = &_v
+				c.Pattern = &_v
 			case "timezone_validity":
-				var _v rm.ValidityKind
+				var _v TimezoneValidityKind
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
@@ -257,54 +227,12 @@ func (c *CDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 		switch _t := _tok.(type) {
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
-			case "years_allowed":
-				var _v bool
+			case "pattern":
+				var _v string
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
-				c.YearsAllowed = &_v
-			case "months_allowed":
-				var _v bool
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
-					return _err
-				}
-				c.MonthsAllowed = &_v
-			case "weeks_allowed":
-				var _v bool
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
-					return _err
-				}
-				c.WeeksAllowed = &_v
-			case "days_allowed":
-				var _v bool
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
-					return _err
-				}
-				c.DaysAllowed = &_v
-			case "hours_allowed":
-				var _v bool
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
-					return _err
-				}
-				c.HoursAllowed = &_v
-			case "minutes_allowed":
-				var _v bool
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
-					return _err
-				}
-				c.MinutesAllowed = &_v
-			case "seconds_allowed":
-				var _v bool
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
-					return _err
-				}
-				c.SecondsAllowed = &_v
-			case "fractional_seconds_allowed":
-				var _v bool
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
-					return _err
-				}
-				c.FractionalSecondsAllowed = &_v
+				c.Pattern = &_v
 			case "range":
 				_v := new(rm.Interval[string])
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
@@ -454,9 +382,8 @@ func (c *CReal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 
 // xmlClassCString describes C_STRING to the canonical-XML decode runtime.
 var xmlClassCString = xmlunmatched.Class{
-	Name:     "C_STRING",
-	Required: []string{"list_open"},
-	Items:    []string{"list"},
+	Name:  "C_STRING",
+	Items: []string{"list"},
 }
 
 // UnmarshalXML decodes canonical openEHR XML into CString.
@@ -493,9 +420,11 @@ func (c *CString) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 				}
 				c.List = append(c.List, _v)
 			case "list_open":
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.ListOpen); _err != nil {
+				var _v bool
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
+				c.ListOpen = &_v
 			case "assumed_value":
 				var _v string
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
@@ -543,26 +472,14 @@ func (c *CTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 		switch _t := _tok.(type) {
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
-			case "minute_validity":
-				var _v rm.ValidityKind
+			case "pattern":
+				var _v string
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
-				c.MinuteValidity = &_v
-			case "second_validity":
-				var _v rm.ValidityKind
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
-					return _err
-				}
-				c.SecondValidity = &_v
-			case "millisecond_validity":
-				var _v rm.ValidityKind
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
-					return _err
-				}
-				c.MillisecondValidity = &_v
+				c.Pattern = &_v
 			case "timezone_validity":
-				var _v rm.ValidityKind
+				var _v TimezoneValidityKind
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}

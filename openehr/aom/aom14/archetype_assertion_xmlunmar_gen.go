@@ -134,7 +134,7 @@ func (a *AssertionVariable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 // xmlClassExprBinaryOperator describes EXPR_BINARY_OPERATOR to the canonical-XML decode runtime.
 var xmlClassExprBinaryOperator = xmlunmatched.Class{
 	Name:     "EXPR_BINARY_OPERATOR",
-	Required: []string{"type", "operator", "left_operand", "right_operand"},
+	Required: []string{"type", "operator", "precedence_overridden", "left_operand", "right_operand"},
 }
 
 // UnmarshalXML decodes canonical openEHR XML into ExprBinaryOperator.
@@ -158,14 +158,12 @@ func (e *ExprBinaryOperator) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 		switch _t := _tok.(type) {
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
-			case "precedence_overridden":
-				var _v bool
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
-					return _err
-				}
-				e.PrecedenceOverridden = &_v
 			case "operator":
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &e.Operator); _err != nil {
+					return _err
+				}
+			case "precedence_overridden":
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &e.PrecedenceOverridden); _err != nil {
 					return _err
 				}
 			case "type":
@@ -257,7 +255,7 @@ func (e *ExprLeaf) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 // xmlClassExprUnaryOperator describes EXPR_UNARY_OPERATOR to the canonical-XML decode runtime.
 var xmlClassExprUnaryOperator = xmlunmatched.Class{
 	Name:     "EXPR_UNARY_OPERATOR",
-	Required: []string{"type", "operator", "operand"},
+	Required: []string{"type", "operator", "precedence_overridden", "operand"},
 }
 
 // UnmarshalXML decodes canonical openEHR XML into ExprUnaryOperator.
@@ -281,14 +279,12 @@ func (e *ExprUnaryOperator) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 		switch _t := _tok.(type) {
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
-			case "precedence_overridden":
-				var _v bool
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
-					return _err
-				}
-				e.PrecedenceOverridden = &_v
 			case "operator":
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &e.Operator); _err != nil {
+					return _err
+				}
+			case "precedence_overridden":
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &e.PrecedenceOverridden); _err != nil {
 					return _err
 				}
 			case "type":

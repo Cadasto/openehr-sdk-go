@@ -161,6 +161,96 @@ func (c *CDVQuantity) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 	return nil
 }
 
+// BMMName returns "C_DV_SCALE" — the BMM class identifier used as the
+// `xsi:type` polymorphic discriminator in canonical XML and the
+// `_type` discriminator in canonical JSON.
+func (c *CDVScale) BMMName() string { return "C_DV_SCALE" }
+
+// MarshalXML emits canonical openEHR XML for CDVScale. The default
+// element local name is the snake-cased BMM class name when the
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are appended to start.Attr before
+// the start token is written.
+func (c *CDVScale) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
+	if _start.Name.Local == "" {
+		_start.Name = xml.Name{Local: canxml.ElementName("C_DV_SCALE")}
+	}
+	if err := _e.EncodeToken(_start); err != nil {
+		return err
+	}
+	if err := _e.EncodeElement(c.RMTypeName, xml.StartElement{Name: xml.Name{Local: "rm_type_name"}}); err != nil {
+		return err
+	}
+	if err := _e.EncodeElement(&c.Occurrences, xml.StartElement{Name: xml.Name{Local: "occurrences"}}); err != nil {
+		return err
+	}
+	if err := _e.EncodeElement(c.NodeID, xml.StartElement{Name: xml.Name{Local: "node_id"}}); err != nil {
+		return err
+	}
+	if c.AssumedValue != nil {
+		if err := _e.EncodeElement(c.AssumedValue, xml.StartElement{Name: xml.Name{Local: "assumed_value"}}); err != nil {
+			return err
+		}
+	}
+	for _idx := range c.List {
+		if err := _e.EncodeElement(&c.List[_idx], xml.StartElement{Name: xml.Name{Local: "list"}}); err != nil {
+			return err
+		}
+	}
+	if err := _e.EncodeToken(_start.End()); err != nil {
+		return err
+	}
+	return nil
+}
+
+// BMMName returns "C_DV_STATE" — the BMM class identifier used as the
+// `xsi:type` polymorphic discriminator in canonical XML and the
+// `_type` discriminator in canonical JSON.
+func (c *CDVState) BMMName() string { return "C_DV_STATE" }
+
+// MarshalXML emits canonical openEHR XML for CDVState. The default
+// element local name is the snake-cased BMM class name when the
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are appended to start.Attr before
+// the start token is written.
+func (c *CDVState) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
+	if _start.Name.Local == "" {
+		_start.Name = xml.Name{Local: canxml.ElementName("C_DV_STATE")}
+	}
+	if err := _e.EncodeToken(_start); err != nil {
+		return err
+	}
+	if err := _e.EncodeElement(c.RMTypeName, xml.StartElement{Name: xml.Name{Local: "rm_type_name"}}); err != nil {
+		return err
+	}
+	if err := _e.EncodeElement(&c.Occurrences, xml.StartElement{Name: xml.Name{Local: "occurrences"}}); err != nil {
+		return err
+	}
+	if err := _e.EncodeElement(c.NodeID, xml.StartElement{Name: xml.Name{Local: "node_id"}}); err != nil {
+		return err
+	}
+	if c.AssumedValue != nil {
+		if err := _e.EncodeElement(c.AssumedValue, xml.StartElement{Name: xml.Name{Local: "assumed_value"}}); err != nil {
+			return err
+		}
+	}
+	if err := _e.EncodeElement(&c.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
+		return err
+	}
+	if err := _e.EncodeToken(_start.End()); err != nil {
+		return err
+	}
+	return nil
+}
+
 // BMMName returns "C_QUANTITY_ITEM" — the BMM class identifier used as the
 // `xsi:type` polymorphic discriminator in canonical XML and the
 // `_type` discriminator in canonical JSON.
@@ -202,6 +292,41 @@ func (c *CQuantityItem) MarshalXML(_e *xml.Encoder, _start xml.StartElement) err
 	}
 	if c.UnitsDisplayName != nil {
 		if err := _e.EncodeElement(*c.UnitsDisplayName, xml.StartElement{Name: xml.Name{Local: "units_display_name"}}); err != nil {
+			return err
+		}
+	}
+	if err := _e.EncodeToken(_start.End()); err != nil {
+		return err
+	}
+	return nil
+}
+
+// BMMName returns "NON_TERMINAL_STATE" — the BMM class identifier used as the
+// `xsi:type` polymorphic discriminator in canonical XML and the
+// `_type` discriminator in canonical JSON.
+func (n *NonTerminalState) BMMName() string { return "NON_TERMINAL_STATE" }
+
+// MarshalXML emits canonical openEHR XML for NonTerminalState. The default
+// element local name is the snake-cased BMM class name when the
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are appended to start.Attr before
+// the start token is written.
+func (n *NonTerminalState) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
+	if _start.Name.Local == "" {
+		_start.Name = xml.Name{Local: canxml.ElementName("NON_TERMINAL_STATE")}
+	}
+	if err := _e.EncodeToken(_start); err != nil {
+		return err
+	}
+	if err := _e.EncodeElement(n.Name, xml.StartElement{Name: xml.Name{Local: "name"}}); err != nil {
+		return err
+	}
+	for _idx := range n.Transitions {
+		if err := _e.EncodeElement(&n.Transitions[_idx], xml.StartElement{Name: xml.Name{Local: "transitions"}}); err != nil {
 			return err
 		}
 	}
@@ -266,6 +391,178 @@ func (o *Ordinal) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 		}
 	default:
 		return fmt.Errorf("canxml: ORDINAL.symbol holds %T, which is none of the shapes its element takes", _v)
+	}
+	if err := _e.EncodeToken(_start.End()); err != nil {
+		return err
+	}
+	return nil
+}
+
+// BMMName returns "SCALE" — the BMM class identifier used as the
+// `xsi:type` polymorphic discriminator in canonical XML and the
+// `_type` discriminator in canonical JSON.
+func (s *Scale) BMMName() string { return "SCALE" }
+
+// MarshalXML emits canonical openEHR XML for Scale. The default
+// element local name is the snake-cased BMM class name when the
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are appended to start.Attr before
+// the start token is written.
+func (s *Scale) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
+	if _start.Name.Local == "" {
+		_start.Name = xml.Name{Local: canxml.ElementName("SCALE")}
+	}
+	if err := _e.EncodeToken(_start); err != nil {
+		return err
+	}
+	if s.NormalRange != nil {
+		if err := _e.EncodeElement(s.NormalRange, xml.StartElement{Name: xml.Name{Local: "normal_range"}}); err != nil {
+			return err
+		}
+	}
+	for _idx := range s.OtherReferenceRanges {
+		if err := _e.EncodeElement(&s.OtherReferenceRanges[_idx], xml.StartElement{Name: xml.Name{Local: "other_reference_ranges"}}); err != nil {
+			return err
+		}
+	}
+	if s.NormalStatus != nil {
+		if err := _e.EncodeElement(s.NormalStatus, xml.StartElement{Name: xml.Name{Local: "normal_status"}}); err != nil {
+			return err
+		}
+	}
+	if err := _e.EncodeElement(s.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
+		return err
+	}
+	switch _v := s.Symbol.(type) {
+	case nil:
+	case *rm.DVCodedText, *rm.CodePhrase:
+		if err := _e.EncodeElement(_v, xml.StartElement{Name: xml.Name{Local: "symbol"}}); err != nil {
+			return err
+		}
+	case rm.DVCodedText:
+		if err := _e.EncodeElement(&_v, xml.StartElement{Name: xml.Name{Local: "symbol"}}); err != nil {
+			return err
+		}
+	case rm.CodePhrase:
+		if err := _e.EncodeElement(&_v, xml.StartElement{Name: xml.Name{Local: "symbol"}}); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("canxml: SCALE.symbol holds %T, which is none of the shapes its element takes", _v)
+	}
+	if err := _e.EncodeToken(_start.End()); err != nil {
+		return err
+	}
+	return nil
+}
+
+// BMMName returns "STATE_MACHINE" — the BMM class identifier used as the
+// `xsi:type` polymorphic discriminator in canonical XML and the
+// `_type` discriminator in canonical JSON.
+func (s *StateMachine) BMMName() string { return "STATE_MACHINE" }
+
+// MarshalXML emits canonical openEHR XML for StateMachine. The default
+// element local name is the snake-cased BMM class name when the
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are appended to start.Attr before
+// the start token is written.
+func (s *StateMachine) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
+	if _start.Name.Local == "" {
+		_start.Name = xml.Name{Local: canxml.ElementName("STATE_MACHINE")}
+	}
+	if err := _e.EncodeToken(_start); err != nil {
+		return err
+	}
+	for _, _item := range s.States {
+		if _item == nil {
+			continue
+		}
+		if err := canxml.EncodePoly(_e, "states", _item); err != nil {
+			return err
+		}
+	}
+	if err := _e.EncodeToken(_start.End()); err != nil {
+		return err
+	}
+	return nil
+}
+
+// BMMName returns "TERMINAL_STATE" — the BMM class identifier used as the
+// `xsi:type` polymorphic discriminator in canonical XML and the
+// `_type` discriminator in canonical JSON.
+func (t *TerminalState) BMMName() string { return "TERMINAL_STATE" }
+
+// MarshalXML emits canonical openEHR XML for TerminalState. The default
+// element local name is the snake-cased BMM class name when the
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are appended to start.Attr before
+// the start token is written.
+func (t *TerminalState) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
+	if _start.Name.Local == "" {
+		_start.Name = xml.Name{Local: canxml.ElementName("TERMINAL_STATE")}
+	}
+	if err := _e.EncodeToken(_start); err != nil {
+		return err
+	}
+	if err := _e.EncodeElement(t.Name, xml.StartElement{Name: xml.Name{Local: "name"}}); err != nil {
+		return err
+	}
+	if err := _e.EncodeToken(_start.End()); err != nil {
+		return err
+	}
+	return nil
+}
+
+// BMMName returns "TRANSITION" — the BMM class identifier used as the
+// `xsi:type` polymorphic discriminator in canonical XML and the
+// `_type` discriminator in canonical JSON.
+func (t *Transition) BMMName() string { return "TRANSITION" }
+
+// MarshalXML emits canonical openEHR XML for Transition. The default
+// element local name is the snake-cased BMM class name when the
+// parent did not set one. Child elements follow the ITS-XML schema
+// sequence of the class, then any property the schema does not
+// declare; nil-pointer optionals and empty containers are omitted.
+// Polymorphic descendants are emitted via canxml.EncodePoly.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are appended to start.Attr before
+// the start token is written.
+func (t *Transition) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
+	if _start.Name.Local == "" {
+		_start.Name = xml.Name{Local: canxml.ElementName("TRANSITION")}
+	}
+	if err := _e.EncodeToken(_start); err != nil {
+		return err
+	}
+	if err := _e.EncodeElement(t.Event, xml.StartElement{Name: xml.Name{Local: "event"}}); err != nil {
+		return err
+	}
+	if t.Action != nil {
+		if err := _e.EncodeElement(*t.Action, xml.StartElement{Name: xml.Name{Local: "action"}}); err != nil {
+			return err
+		}
+	}
+	if t.Guard != nil {
+		if err := _e.EncodeElement(*t.Guard, xml.StartElement{Name: xml.Name{Local: "guard"}}); err != nil {
+			return err
+		}
+	}
+	if t.NextState != nil {
+		if err := canxml.EncodePoly(_e, "next_state", t.NextState); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err

@@ -118,10 +118,8 @@ func (e *ExprBinaryOperator) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 	if err := _e.EncodeElement(&e.Operator, xml.StartElement{Name: xml.Name{Local: "operator"}}); err != nil {
 		return err
 	}
-	if e.PrecedenceOverridden != nil {
-		if err := _e.EncodeElement(*e.PrecedenceOverridden, xml.StartElement{Name: xml.Name{Local: "precedence_overridden"}}); err != nil {
-			return err
-		}
+	if err := _e.EncodeElement(e.PrecedenceOverridden, xml.StartElement{Name: xml.Name{Local: "precedence_overridden"}}); err != nil {
+		return err
 	}
 	if e.LeftOperand != nil {
 		if err := canxml.EncodePoly(_e, "left_operand", e.LeftOperand); err != nil {
@@ -202,10 +200,8 @@ func (e *ExprUnaryOperator) MarshalXML(_e *xml.Encoder, _start xml.StartElement)
 	if err := _e.EncodeElement(&e.Operator, xml.StartElement{Name: xml.Name{Local: "operator"}}); err != nil {
 		return err
 	}
-	if e.PrecedenceOverridden != nil {
-		if err := _e.EncodeElement(*e.PrecedenceOverridden, xml.StartElement{Name: xml.Name{Local: "precedence_overridden"}}); err != nil {
-			return err
-		}
+	if err := _e.EncodeElement(e.PrecedenceOverridden, xml.StartElement{Name: xml.Name{Local: "precedence_overridden"}}); err != nil {
+		return err
 	}
 	if e.Operand != nil {
 		if err := canxml.EncodePoly(_e, "operand", e.Operand); err != nil {
