@@ -16,6 +16,13 @@
 # `BMM_REF=master make bmm-sync`, regenerate, and drop the old path and file
 # in the same commit.
 #
+# The root schemas the SDK authors over these files live in resources/bmm/sdk/
+# and are never fetched, removed or hashed here (ADR 0034). A re-pin moves them
+# by hand: a root that includes a bumped schema names its new id, and a class a
+# root declares again that the new pin now carries in the same form goes. The
+# root check, `go test ./internal/bmmgen -run RootSchemas`, reports both; sync
+# prints that step after it moves the pin.
+#
 # Subcommands:
 #   sync     Fetch every file in SRC_PATHS at one commit, write them
 #            byte-identical, remove any *.bmm.json in resources/bmm/ that
@@ -59,6 +66,8 @@ readonly SRC_PATHS=(
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 readonly DEST="$ROOT/resources/bmm"
 readonly MANIFEST="$DEST/MANIFEST.txt"
+# The SDK-authored root schemas, which include the pinned ones by id.
+readonly ROOTS="$DEST/sdk"
 
 # --- helpers ---------------------------------------------------------------
 
@@ -210,6 +219,20 @@ cmd_sync() {
   } >"$MANIFEST"
 
   echo "Synced ${#SRC_PATHS[@]} files → resources/bmm/ ($ref, commit ${commit:0:12})"
+
+  # The roots include the pinned schemas by id. Name each include the pin no
+  # longer holds, and the step that finds a correction the new pin closed.
+  if compgen -G "$ROOTS/*.bmm.json" >/dev/null; then
+    local root incl
+    for root in "$ROOTS"/*.bmm.json; do
+      while IFS= read -r incl; do
+        [[ -f "$DEST/$incl.bmm.json" || -f "$ROOTS/$incl.bmm.json" ]] \
+          || echo "  root $(basename "$root") includes $incl, which the pin no longer holds: name the new id (ADR 0001 step 1)"
+      done < <(jq -r '.includes // {} | keys[]' "$root")
+    done
+    echo "Roots under resources/bmm/sdk/ include the pinned schemas: run the root check and remove each correction it reports as closed:"
+    echo "  go test ./internal/bmmgen -run RootSchemas -count=1"
+  fi
 
   # Keep the generated code in step with the pin (REQ-042).
   if [[ "${BMM_SKIP_GEN:-}" == "1" ]]; then

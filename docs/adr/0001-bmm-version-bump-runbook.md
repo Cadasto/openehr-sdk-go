@@ -11,7 +11,7 @@ date: 2026-05-16
 - **Status:** Accepted, 2026-05-16.
 - **Supersedes:** —
 - **Superseded by:** —
-- **Amended:** steps 1 and 9, 2026-10-26 (the schemas are fetched and removed by `make bmm-sync`, pinned in `resources/bmm/MANIFEST.txt`).
+- **Amended:** steps 1 and 9, 2026-10-26 (the schemas are fetched and removed by `make bmm-sync`, pinned in `resources/bmm/MANIFEST.txt`); step 1, 2026-11-03 (the SDK-authored root schemas under `resources/bmm/sdk/` move with the pin, [ADR 0034](0034-sdk-authored-root-schemas.md)).
 - **Tracks:** part of the BMM code generator delivery (drift bot and version-bump runbook).
 - **Requirements:** [REQ-041](../specifications/bmm-conformance.md#req-041--pinned-bmm-sources) (the pinned BMM sources a version bump moves).
 
@@ -33,6 +33,14 @@ A BMM version bump follows the numbered procedure below. CI enforces the determi
 ### Procedure
 
 1. **Stage the new BMM file alongside the old.** Add its upstream path to `SRC_PATHS` in [`scripts/sync-bmm.sh`](../../scripts/sync-bmm.sh), beside the old one, and run `BMM_REF=master make bmm-sync`: it fetches `openehr_rm_1.2.1.bmm.json` next to `openehr_rm_1.2.0.bmm.json` from `openEHR/specifications-ITS-BMM` and records both in `resources/bmm/MANIFEST.txt`. **Do not overwrite** the old file in the same commit — the diff must show the rename as a paired add/remove.
+
+   **Then move the roots.** Each SDK-authored root under [`resources/bmm/sdk/`](../../resources/bmm/README.md#sdk-authored-root-schemas-sdk) includes a pinned schema by id, and the sync never touches it. A root that includes the bumped schema names its new id in `includes`; the RM root also takes the new `rm_release`, which changes its id and file name (`openehr_reference_model_1.2.1`) and `TargetRM.RootID` in `internal/bmmgen/target.go` with them. Then run the root check:
+
+   ```sh
+   go test ./internal/bmmgen -run RootSchemas -count=1
+   ```
+
+   A class a root declares again that the new schema now carries in the same form fails it, as a correction the upstream fix has closed: remove that declaration from the root in this PR. A re-pin within one release (a new `schema_revision` under the same file name) can land such a fix too, so the root check runs after every sync.
 
 2. **Regenerate.** Run:
 
