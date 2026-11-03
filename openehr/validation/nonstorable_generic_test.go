@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
@@ -41,9 +41,9 @@ func TestValidate_genericEventOffsetIsNotRequired(t *testing.T) {
     </attributes>
   </definition>
 </template>`
-	opt, err := template.ParseOPT(strings.NewReader(body))
+	opt, err := aom14.ReadOperationalTemplate(strings.NewReader(body))
 	if err != nil {
-		t.Fatalf("ParseOPT: %v", err)
+		t.Fatalf("ReadOperationalTemplate: %v", err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {

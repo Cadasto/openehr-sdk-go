@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
@@ -42,9 +42,9 @@ const forbiddenChildInternalOPT = `<?xml version="1.0"?>
 // binds to no child.
 func TestEngine_REQ171_RecordsAnItemBoundToAForbiddenChildAsRefused(t *testing.T) {
 	t.Parallel()
-	opt, err := template.ParseOPT(strings.NewReader(forbiddenChildInternalOPT))
+	opt, err := aom14.ReadOperationalTemplate(strings.NewReader(forbiddenChildInternalOPT))
 	if err != nil {
-		t.Fatalf("ParseOPT: %v", err)
+		t.Fatalf("ReadOperationalTemplate: %v", err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {

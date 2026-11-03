@@ -6,18 +6,19 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
-// compileStrictOPT parses body in strict mode and compiles it.
+// compileStrictOPT reads body in strict mode and compiles it.
 func compileStrictOPT(t *testing.T, body string) *templatecompile.Compiled {
 	t.Helper()
-	opt, err := template.ParseOPTStrict(strings.NewReader(body))
+	opt, err := aom14.ReadOperationalTemplate(strings.NewReader(body), canxml.WithStrict())
 	if err != nil {
-		t.Fatalf("ParseOPTStrict: %v", err)
+		t.Fatalf("ReadOperationalTemplate(strict): %v", err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {

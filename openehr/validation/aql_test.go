@@ -9,16 +9,15 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/contain"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 func compileVitalSigns(t *testing.T) *templatecompile.Compiled {
 	t.Helper()
-	opt, err := template.ParseFile(fixtures.TemplateOptForName("vital_signs"))
+	opt, err := readOPTFile(fixtures.TemplateOptForName("vital_signs"))
 	if err != nil {
-		t.Fatalf("ParseFile: %v", err)
+		t.Fatalf("readOPTFile: %v", err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {

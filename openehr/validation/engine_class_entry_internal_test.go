@@ -16,8 +16,8 @@ import (
 	"testing"
 
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
@@ -156,12 +156,12 @@ const (
 	existence01 = `<lower_included>true</lower_included><upper_included>true</upper_included><lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>0</lower><upper>1</upper>`
 )
 
-// compileOPTText parses and compiles the operational template xml.
+// compileOPTText reads and compiles the operational template xml.
 func compileOPTText(t *testing.T, xml string) *templatecompile.Compiled {
 	t.Helper()
-	opt, err := template.ParseOPT(strings.NewReader(xml))
+	opt, err := aom14.ReadOperationalTemplate(strings.NewReader(xml))
 	if err != nil {
-		t.Fatalf("ParseOPT: %v", err)
+		t.Fatalf("ReadOperationalTemplate: %v", err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
@@ -258,7 +258,7 @@ func TestREQ171_CompileInjectsNoAttributeTheTemplateDeclares(t *testing.T) {
 	}
 	compiled := []*templatecompile.Compiled{compileOPTText(t, declaredTwiceOPT)}
 	for _, ref := range refs {
-		opt, err := template.ParseFile(ref.Path)
+		opt, err := readOPTFile(ref.Path)
 		if err != nil {
 			continue
 		}
