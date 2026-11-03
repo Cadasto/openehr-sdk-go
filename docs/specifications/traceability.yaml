@@ -707,6 +707,11 @@ requirements:
       - openehr/aom/aom14/quantity_item_units_xml_test.go
       - openehr/aom/aom14/schema_names_xml_test.go
       - openehr/aom/aom14/symbol_value_xml_test.go
+      - openehr/instance/integer_draw_window_test.go
+      - openehr/instance/interval_expanded_internal_test.go
+      - openehr/instance/ordinal_integer_test.go
+      - openehr/instance/quantified_rules_test.go
+      - openehr/instance/valuefill_leaves_test.go
       - openehr/internal/xmlschema/names_test.go
       - openehr/internal/xmlschema/omit_test.go
       - openehr/internal/xmlunmatched/document_internal_test.go
@@ -1328,6 +1333,7 @@ requirements:
       - internal/templatecompile/compile_generic_test.go
       - internal/templatecompile/flat_conformance_compile_test.go
       - internal/templatecompile/registerpath_test.go
+      - internal/templatecompile/resolve_test.go
       - internal/templatecompile/untyped_test.go
       - internal/templatecompile/webtemplate_oracle_compile_test.go
       - openehr/rm/rminfo/lookup_test.go
@@ -1752,6 +1758,8 @@ requirements:
     tests:
       - internal/rmjsonwalk/walk_once_budget_internal_test.go
       - internal/templatecompile/compile_model_test.go
+      - internal/templatecompile/resolve_internal_test.go
+      - internal/templatecompile/resolve_test.go
       - openehr/aom/aom14/read_test.go
       - openehr/bmm/load_test.go
       - openehr/rm/typereg/registry_test.go
@@ -1823,12 +1831,15 @@ requirements:
       - internal/templatecompile/compile_nodename_test.go
       - internal/templatecompile/compile_test.go
       - internal/templatecompile/compiled_golden_test.go
+      - internal/templatecompile/resolve_test.go
       - openehr/instance/local_term_text_test.go
       - openehr/template/path_test.go
       - openehr/template/slot_assertion_test.go
       - openehr/templatecompile/compile_test.go
       - openehr/templatecompile/external_test.go
       - openehr/templatecompile/introspect_test.go
+      - openehr/templatecompile/resolve_test.go
+      - testkit/probes/template/probes_test.go
 
   - id: REQ-112
     title: Template-less Reference Model validation floor

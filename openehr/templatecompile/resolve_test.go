@@ -12,7 +12,8 @@ import (
 // TestREQ111_PublicResolve drives the path lookup through the public names
 // alone: Resolve and ValidatePath on a compiled template, WithStrictPaths,
 // and an error for a path that reaches no node that this package's
-// ErrPathNotFound and template.ErrPathNotFound both match.
+// ErrPathNotFound and template.ErrPathNotFound both match (REQ-111 § Path
+// lookup).
 func TestREQ111_PublicResolve(t *testing.T) {
 	c, err := templatecompile.Compile(mustReadModelFile(t, fixtures.TemplateOptForName("vital_signs")))
 	if err != nil {
