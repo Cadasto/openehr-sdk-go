@@ -127,6 +127,24 @@ func TestREQ111_SlotPatternsFromModel(t *testing.T) {
 			want:      []string{`a\.v1`, `b\.v1`},
 		},
 		{
+			name: "an expression tree whose right operand names its type String gives its C_STRING's pattern",
+			assertion: aom14.Assertion{Expression: &aom14.ExprBinaryOperator{
+				Operator:     aom14.OperatorKindMatches,
+				LeftOperand:  &aom14.ExprLeaf{Type: "String", ReferenceType: "attribute", Item: "archetype_id/value"},
+				RightOperand: &aom14.ExprLeaf{Type: "String", ReferenceType: "constraint", Item: &aom14.CString{Pattern: new(`openEHR-EHR-CLUSTER\.device\.v1`)}},
+			}},
+			want: []string{`openEHR-EHR-CLUSTER\.device\.v1`},
+		},
+		{
+			name: "an expression tree whose right operand is no C_STRING gives none",
+			assertion: aom14.Assertion{Expression: &aom14.ExprBinaryOperator{
+				Operator:     aom14.OperatorKindMatches,
+				LeftOperand:  &aom14.ExprLeaf{Type: "String", ReferenceType: "attribute", Item: "archetype_id/value"},
+				RightOperand: &aom14.ExprLeaf{Type: "C_STRING", ReferenceType: "constraint", Item: "openEHR-EHR-CLUSTER.device.v1"},
+			}},
+			want: nil,
+		},
+		{
 			name: "an expression tree on another attribute gives none",
 			assertion: aom14.Assertion{Expression: &aom14.ExprBinaryOperator{
 				Operator:     aom14.OperatorKindMatches,

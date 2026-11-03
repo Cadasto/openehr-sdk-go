@@ -145,8 +145,10 @@ func archetypeIDMatchesPattern(text string) string {
 // expressionSlotPattern returns the pattern of the expression tree e where it
 // is the match the slot rules read, `archetype_id/value matches {pattern}`:
 // a binary matches operator whose left operand is the String attribute
-// archetype_id/value and whose right operand is a C_STRING constraint; or ""
-// for any other tree.
+// archetype_id/value and whose right operand is a constraint whose item is a
+// C_STRING; or "" for any other tree. The right operand's type text is not
+// read: some templates write it as String, others as C_STRING, and the item's
+// own class says what it is.
 func expressionSlotPattern(e aom14.ExprItem) string {
 	op, ok := e.(*aom14.ExprBinaryOperator)
 	if !ok || op.Operator != aom14.OperatorKindMatches {
@@ -160,9 +162,7 @@ func expressionSlotPattern(e aom14.ExprItem) string {
 		return ""
 	}
 	right, ok := op.RightOperand.(*aom14.ExprLeaf)
-	if !ok ||
-		!strings.EqualFold(strings.TrimSpace(right.Type), "C_STRING") ||
-		!strings.EqualFold(strings.TrimSpace(right.ReferenceType), "constraint") {
+	if !ok || !strings.EqualFold(strings.TrimSpace(right.ReferenceType), "constraint") {
 		return ""
 	}
 	cs, ok := right.Item.(*aom14.CString)
