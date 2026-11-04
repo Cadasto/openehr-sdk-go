@@ -330,20 +330,22 @@ func TestREQ111_ReaderReadsARootInAnotherNamespace(t *testing.T) {
 
 // TestREQ111_ReaderReadsAnElementInAnotherNamespace pins that the default
 // mode reads an element below the root in a namespace other than none, the v1
-// one, the v2 one and the XSI one as the element of that name in the v1
-// namespace, as the deprecated parser, which reads no namespace, does: under
-// another default namespace, the definition's among them, under a prefix bound
-// to another namespace, and under a prefix no declaration binds, which
+// one and the v2 one, the XSI one among them, as the element of that name in
+// the v1 namespace, as the deprecated parser, which reads no namespace, does:
+// under another default namespace, the definition's among them, under a
+// prefix bound to another namespace, the xsi prefix of the xsi:type
+// attributes among them, and under a prefix no declaration binds, which
 // encoding/xml reads as a namespace of that name. WithUnmatched reports
-// nothing. Strict mode refuses each as an element in a foreign namespace. A
-// prefix bound to another namespace that no element name carries keeps its
-// namespace, so that a type written with it, such as the xsd:string of an
-// assertion, reads as it is written.
+// nothing. Strict mode refuses each as an element in a foreign namespace. An
+// xsi:type keeps its namespace, and so does a prefix bound to another
+// namespace that no element name carries, so that a type written with it,
+// such as the xsd:string of an assertion, reads as it is written.
 //
 // Can-fail control: read only a root element in another namespace so, and
-// the definition reads as missing and the item as no item; or read every
-// prefix bound to another namespace as the v1 one, and xsd:string names no
-// type.
+// the definition reads as missing and the item as no item; read an element in
+// the XSI namespace as one of no openEHR schema, and the flag and the bound
+// of xsi-element.opt read as absent; or read every prefix bound to another
+// namespace as the v1 one, and xsd:string names no type.
 func TestREQ111_ReaderReadsAnElementInAnotherNamespace(t *testing.T) {
 	t.Parallel()
 	string2 := `<item xsi:type="C_STRING"><list>a</list><list>b</list></item>`
@@ -365,6 +367,15 @@ func TestREQ111_ReaderReadsAnElementInAnotherNamespace(t *testing.T) {
 	}
 	cases := map[string]struct{ doc, want []byte }{
 		"foreign-namespaces.opt": {readerFixture(t, "foreign-namespaces.opt"), readerFixture(t, "foreign-namespaces.read.opt")},
+		"xsi-element.opt":        {readerFixture(t, "xsi-element.opt"), readerFixture(t, "xsi-element.read.opt")},
+		"an item under the prefix of the xsi:type attributes": {
+			[]byte(itemDoc(`<xsi:item xsi:type="C_STRING"><xsi:list>a</xsi:list><list>b</list></xsi:item>`)),
+			[]byte(itemDoc(string2)),
+		},
+		"an item in the XSI namespace declared as the default one": {
+			[]byte(itemDoc(`<item xmlns="http://www.w3.org/2001/XMLSchema-instance" xsi:type="C_STRING"><list>a</list><xsi:list>b</xsi:list></item>`)),
+			[]byte(itemDoc(string2)),
+		},
 		"an item in another default namespace": {
 			[]byte(itemDoc(`<item xmlns="urn:example" xsi:type="C_STRING"><list>a</list><list>b</list></item>`)),
 			[]byte(itemDoc(string2)),
@@ -908,19 +919,21 @@ func TestREQ111_ReaderReadsValuesInEveryMode(t *testing.T) {
 // TestREQ111_ReaderFindsWhatCanonicalXMLReadsWithoutAFailure pins the
 // readings of a document that canonical XML decodes without a failure, but
 // otherwise than the parser: a C_BOOLEAN flag left out or empty, or one that
-// stands only in an element the item holds or in the XSI namespace, which it
-// reads as false and the reading as absent, the item typed with a character
-// reference among them; an assumed_value that is empty, which it reads as
-// false or 0, or that is t or f, which it reads as a boolean; an empty list
-// entry or range bound, which it reads as 0; a flag, list entry or bound that
-// holds only a comment, a processing instruction or a CDATA section, which it
-// reads as an empty one; a bare type attribute, which it reads as the type,
-// right after the quote of the attribute before it among them; and, which
-// the default mode alone reads, a C_COMPLEX_OBJECT that holds an archetype
-// id, which it skips, and an element in another namespace, whose content it
-// skips, the root and one declared right after a quote among them. Each
-// document holds that one shape, so nothing else makes the reader read it a
-// second time. Strict mode refuses the shapes its default mode alone reads.
+// stands only in an element the item holds, which it reads as false and the
+// reading as absent, the item typed with a character reference among them; an
+// assumed_value that is empty, which it reads as false or 0, or that is t or
+// f, which it reads as a boolean; an empty list entry or range bound, which it
+// reads as 0; a flag, list entry or bound that holds only a comment, a
+// processing instruction or a CDATA section, which it reads as an empty one; a
+// bare type attribute, which it reads as the type, right after the quote of
+// the attribute before it among them; and, which the default mode alone
+// reads, a C_COMPLEX_OBJECT that holds an archetype id, which it skips, and an
+// element in another namespace, whose content it skips, the root, one
+// declared right after a quote and one in the XSI namespace among them, such
+// as a C_BOOLEAN flag or a range bound, which the reading reads as the
+// element of that name. Each document holds that one shape, so nothing else
+// makes the reader read it a second time. Strict mode refuses the shapes its
+// default mode alone reads.
 func TestREQ111_ReaderFindsWhatCanonicalXMLReadsWithoutAFailure(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -944,9 +957,21 @@ func TestREQ111_ReaderFindsWhatCanonicalXMLReadsWithoutAFailure(t *testing.T) {
 			strictRefuses: true,
 		},
 		{
-			name:          "a C_BOOLEAN whose flags are in the XSI namespace",
-			doc:           itemDoc(`<item xsi:type="C_BOOLEAN"><xsi:true_valid>false</xsi:true_valid><xsi:false_valid>false</xsi:false_valid></item>`),
-			want:          itemDoc(`<item xsi:type="C_BOOLEAN"><true_valid>true</true_valid><false_valid>true</false_valid></item>`),
+			name:          "a C_BOOLEAN whose true_valid is in the XSI namespace",
+			doc:           itemDoc(`<item xsi:type="C_BOOLEAN"><xsi:true_valid>false</xsi:true_valid></item>`),
+			want:          itemDoc(`<item xsi:type="C_BOOLEAN"><true_valid>false</true_valid><false_valid>true</false_valid></item>`),
+			strictRefuses: true,
+		},
+		{
+			name:          "a C_INTEGER range bound in the XSI namespace",
+			doc:           itemDoc(`<item xsi:type="C_INTEGER"><range><lower>0</lower><xsi:upper>9</xsi:upper></range></item>`),
+			want:          itemDoc(`<item xsi:type="C_INTEGER"><range><lower>0</lower><upper>9</upper></range></item>`),
+			strictRefuses: true,
+		},
+		{
+			name:          "an <item> in the XSI namespace declared as the default one",
+			doc:           itemDoc(`<item xmlns="http://www.w3.org/2001/XMLSchema-instance" xsi:type="C_STRING"><list>a</list></item>`),
+			want:          itemDoc(`<item xsi:type="C_STRING"><list>a</list></item>`),
 			strictRefuses: true,
 		},
 		{
@@ -1114,7 +1139,7 @@ func TestREQ111_ReaderReportsEachItemOnce(t *testing.T) {
 		"shapes.opt", "values.opt", "values-every-mode.opt", "namespace-v2.opt", "parser-readings.opt",
 		"integer-bounds.opt", "quantity-assumed-value.opt", "attribute-children.opt", "item-namespaces.opt",
 		"infinite-integer-bounds.opt", "foreign-namespaces.opt", "definition-type.opt", "nan-integer-bounds.opt",
-		"root-namespace.opt", "text-before-root.opt", "directive-after-root.opt",
+		"root-namespace.opt", "text-before-root.opt", "directive-after-root.opt", "xsi-element.opt",
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
