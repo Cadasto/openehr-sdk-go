@@ -10,6 +10,7 @@ import (
 	"maps"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
@@ -76,11 +77,21 @@ func nested(levels int) *aom14.OperationalTemplate {
 
 // TestREQ111_CompileRefusesModel pins the refusals of § REQ-111 Reading the
 // model: each wraps ErrInvalidInput, so a caller tells a template Compile
-// will not take from a failure of its own.
+// will not take from a failure of its own. A definition that holds nothing,
+// which the model cannot tell from a missing one, is refused as no
+// definition, and one that holds something but names no RM type as such, so
+// that the parity check tells the two apart.
 func TestREQ111_CompileRefusesModel(t *testing.T) {
+	const (
+		noDefinition = "template has no definition"
+		noRMType     = "template definition names no RM type"
+	)
 	cases := []struct {
 		name  string
 		model func() *aom14.OperationalTemplate
+		// msg, when set, is the text the error ends with, after the
+		// ErrInvalidInput it wraps.
+		msg string
 	}{
 		{name: "nil template", model: func() *aom14.OperationalTemplate { return nil }},
 		{name: "no template_id", model: func() *aom14.OperationalTemplate {
@@ -93,14 +104,24 @@ func TestREQ111_CompileRefusesModel(t *testing.T) {
 			m.TemplateID.Value = " \n "
 			return m
 		}},
-		{name: "no definition", model: func() *aom14.OperationalTemplate {
+		{name: "no definition", msg: noDefinition, model: func() *aom14.OperationalTemplate {
 			m := modelOf()
 			m.Definition = aom14.CArchetypeRoot{}
 			return m
 		}},
-		{name: "a definition that names no RM type", model: func() *aom14.OperationalTemplate {
+		{name: "a definition that names no RM type", msg: noRMType, model: func() *aom14.OperationalTemplate {
 			m := modelOf(single("name", complexObject("DV_TEXT", "")))
 			m.Definition.RMTypeName = "  "
+			return m
+		}},
+		{name: "a definition that holds only an archetype id", msg: noRMType, model: func() *aom14.OperationalTemplate {
+			m := modelOf()
+			m.Definition = aom14.CArchetypeRoot{ArchetypeID: rm.ArchetypeID{Value: "openEHR-EHR-COMPOSITION.model.v1"}}
+			return m
+		}},
+		{name: "a definition that holds only occurrences", msg: noRMType, model: func() *aom14.OperationalTemplate {
+			m := modelOf()
+			m.Definition = aom14.CArchetypeRoot{Occurrences: once}
 			return m
 		}},
 		{name: "inverted occurrences", model: func() *aom14.OperationalTemplate {
@@ -142,6 +163,9 @@ func TestREQ111_CompileRefusesModel(t *testing.T) {
 				_, err := templatecompile.Compile(tc.model(), templatecompile.Options{Strict: strict})
 				if !errors.Is(err, templatecompile.ErrInvalidInput) {
 					t.Fatalf("Compile error = %v, want an error wrapping ErrInvalidInput", err)
+				}
+				if tc.msg != "" && !strings.HasSuffix(err.Error(), ": "+tc.msg) {
+					t.Errorf("Compile error = %q, want it to end with %q", err, tc.msg)
 				}
 			})
 		}

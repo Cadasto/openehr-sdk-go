@@ -122,17 +122,17 @@ func WithStrict() Option {
 // addresses no node.
 //
 // Returns an error wrapping [ErrInvalidInput] when opt is nil, when it has
-// no template_id or no definition (a definition that names no RM type),
-// when an interval is inverted or closing leaves it empty, when an ordinal
-// symbol is neither a coded text nor a code phrase, when a constraint
-// object or an attribute is missing, when a primitive item is no primitive
-// class held by pointer, when constraint objects nest more than 128 levels
-// below the definition, when two nodes under different attributes have the
-// same AQL path, which is a defect in the template, and, with [WithStrict],
-// for each value it refuses and a default value that does not encode as
-// canonical JSON, which Compile otherwise skips. Nodes
-// under one attribute that share a path (alternatives, or siblings with the
-// same node id) and the descendants of such nodes are admitted, and
+// no template_id, no definition or a definition that names no RM type, each
+// with its own message, when an interval is inverted or closing leaves it
+// empty, when an ordinal symbol is neither a coded text nor a code phrase,
+// when a constraint object or an attribute is missing, when a primitive item
+// is no primitive class held by pointer, when constraint objects nest more
+// than 128 levels below the definition, when two nodes under different
+// attributes have the same AQL path, which is a defect in the template, and,
+// with [WithStrict], for each value it refuses and a default value that does
+// not encode as canonical JSON, which Compile otherwise skips. Nodes under
+// one attribute that share a path (alternatives, or siblings with the same
+// node id) and the descendants of such nodes are admitted, and
 // [Compiled.NodeAt] resolves the path to the first one walked. Returns an
 // error that does not wrap ErrInvalidInput when the model holds a constraint
 // object or an attribute of a kind Compile does not handle, which

@@ -9,6 +9,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 )
@@ -77,8 +78,9 @@ const maxDepth = 128
 // value that addresses no node.
 //
 // Returns an error wrapping ErrInvalidInput when opt is nil, when it has no
-// template_id or no definition, when it holds an interval that closing
-// refuses ([template.NewMultiplicity]), a missing constraint object or
+// template_id, no definition or a definition that names no RM type, each
+// with its own message, when it holds an interval that closing refuses
+// ([template.NewMultiplicity]), a missing constraint object or
 // attribute, an ordinal symbol that is neither a DV_CODED_TEXT nor a
 // CODE_PHRASE, an item that is no primitive class held by pointer, or
 // constraint objects nested more than 128 levels below the definition, when
@@ -101,9 +103,13 @@ func Compile(opt *aom14.OperationalTemplate, opts ...Options) (*Compiled, error)
 		return nil, fmt.Errorf("%w: template has no template_id", ErrInvalidInput)
 	}
 	// The definition is a value in the model, so an absent one is the zero
-	// archetype root, which names no RM type.
+	// archetype root, which names no RM type. A definition that holds
+	// nothing cannot be told from it.
 	if strings.TrimSpace(opt.Definition.RMTypeName) == "" {
-		return nil, fmt.Errorf("%w: template has no definition", ErrInvalidInput)
+		if holdsNothing(&opt.Definition) {
+			return nil, fmt.Errorf("%w: template has no definition", ErrInvalidInput)
+		}
+		return nil, fmt.Errorf("%w: template definition names no RM type", ErrInvalidInput)
 	}
 
 	o := Options{}
@@ -150,12 +156,21 @@ func Compile(opt *aom14.OperationalTemplate, opts ...Options) (*Compiled, error)
 	return c, nil
 }
 
+// holdsNothing reports whether d is the zero archetype root, the definition
+// the model holds where the template gives none.
+func holdsNothing(d *aom14.CArchetypeRoot) bool {
+	return d.RMTypeName == "" && d.NodeID == "" && len(d.Attributes) == 0 &&
+		d.Occurrences == (rm.Interval[aom14.Integer]{}) && d.ArchetypeID == (rm.ArchetypeID{}) &&
+		d.TemplateID == nil && len(d.TermBindings) == 0 && len(d.TermDefinitions) == 0
+}
+
 // ErrInvalidInput is returned, wrapped, by [Compile] for a template it
-// refuses: a nil one, one with no template_id or no definition, one holding
-// a value the compiled form cannot carry or nesting past the depth limit, one
-// in which two nodes under different attributes have the same AQL path, and,
-// with [Options.Strict], one holding a value the deprecated parser's strict
-// mode refuses or a default value that addresses no node.
+// refuses: a nil one, one with no template_id, no definition or a definition
+// that names no RM type, one holding a value the compiled form cannot carry
+// or nesting past the depth limit, one in which two nodes under different
+// attributes have the same AQL path, and, with [Options.Strict], one holding
+// a value the deprecated parser's strict mode refuses or a default value that
+// addresses no node.
 var ErrInvalidInput = errors.New("templatecompile: invalid input")
 
 // walker carries the per-call state shared across recursive node
