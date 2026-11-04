@@ -837,6 +837,36 @@ func TestREQ111_ReaderFindsWhatCanonicalXMLReadsWithoutAFailure(t *testing.T) {
 			strictRefuses: true,
 		},
 		{
+			name: "a C_BOOLEAN typed with a decimal character reference",
+			doc:  itemDoc(`<item xsi:type="&#67;_BOOLEAN"><true_valid>true</true_valid></item>`),
+			want: itemDoc(`<item xsi:type="C_BOOLEAN"><true_valid>true</true_valid><false_valid>true</false_valid></item>`),
+		},
+		{
+			name: "a C_BOOLEAN typed with a character reference inside the word",
+			doc:  itemDoc(`<item xsi:type="C_&#66;OOLEAN"><true_valid>true</true_valid></item>`),
+			want: itemDoc(`<item xsi:type="C_BOOLEAN"><true_valid>true</true_valid><false_valid>true</false_valid></item>`),
+		},
+		{
+			name: "a C_BOOLEAN typed with a hexadecimal character reference",
+			doc:  itemDoc(`<item xsi:type="&#x43;_BOOLEAN"><false_valid>true</false_valid></item>`),
+			want: itemDoc(`<item xsi:type="C_BOOLEAN"><true_valid>true</true_valid><false_valid>true</false_valid></item>`),
+		},
+		{
+			// The word C_BOOLEAN on the <children> makes the check walk it, which
+			// holds both flags itself and the item one level deeper.
+			name: "a C_BOOLEAN typed with a character reference inside an element whose start tag holds the word",
+			doc: definitionDoc(`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>value</rm_attribute_name>` +
+				`<existence><lower>0</lower><upper>1</upper></existence><children xsi:type="C_PRIMITIVE_OBJECT" note="C_BOOLEAN">` +
+				`<rm_type_name>BOOLEAN</rm_type_name><occurrences><lower>1</lower><upper>1</upper></occurrences><node_id/>` +
+				`<true_valid>true</true_valid><false_valid>true</false_valid>` +
+				`<item xsi:type="&#67;_BOOLEAN"><true_valid>true</true_valid></item></children></attributes>`),
+			want: definitionDoc(`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>value</rm_attribute_name>` +
+				`<existence><lower>0</lower><upper>1</upper></existence><children xsi:type="C_PRIMITIVE_OBJECT">` +
+				`<rm_type_name>BOOLEAN</rm_type_name><occurrences><lower>1</lower><upper>1</upper></occurrences><node_id/>` +
+				`<item xsi:type="C_BOOLEAN"><true_valid>true</true_valid><false_valid>true</false_valid></item></children></attributes>`),
+			strictRefuses: true,
+		},
+		{
 			name: "a C_BOOLEAN that assumes t",
 			doc:  itemDoc(`<item xsi:type="C_BOOLEAN"><true_valid>true</true_valid><false_valid>true</false_valid><assumed_value>t</assumed_value></item>`),
 			want: itemDoc(`<item xsi:type="C_BOOLEAN"><true_valid>true</true_valid><false_valid>true</false_valid></item>`),

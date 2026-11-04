@@ -738,13 +738,16 @@ func holdsLinearCost(t *testing.T, cases []costCase) {
 // proportion to its size, each match costing about as much as the bytes
 // around it: an element-holding text of 50 000 slashes before a `>`, 20 000
 // names of archetype_id under a prefix in text, a start tag that holds
-// C_BOOLEAN 20 000 times and 50 000 end tags after a comment each read in
-// about the time a document of that size without them takes. It runs alone,
-// since it times the reads.
+// C_BOOLEAN 20 000 times, 50 000 character references in text, after a long
+// start tag or before a C_BOOLEAN item, and 50 000 end tags after a comment
+// each read in about the time a document of that size without them takes. It
+// runs alone, since it times the reads.
 //
 // Can-fail control: find the start tag a match stands in by scanning back to
-// the last `<` once per match, or read the name of an end tag past its `>`,
-// and each document takes hundreds of times as long as its baseline.
+// the last `<`, or to the end of the tag it opens, once per match, look for
+// the next C_BOOLEAN again after each character reference, or read the name
+// of an end tag past its `>`, and each document takes hundreds of times as
+// long as its baseline.
 func TestREQ108_ReadOperationalTemplateChecksInLinearTime(t *testing.T) {
 	inConcept := func(content string) string {
 		return readTemplateHead + `<concept>` + content + `</concept></template>`
@@ -756,6 +759,11 @@ func TestREQ108_ReadOperationalTemplateChecksInLinearTime(t *testing.T) {
 		`<existence><lower>0</lower><upper>1</upper></existence><children xsi:type="C_PRIMITIVE_OBJECT">` +
 		`<rm_type_name>BOOLEAN</rm_type_name><node_id/><item xsi:type="C_BOOLEAN">` +
 		`<true_valid>true</true_valid><false_valid>true</false_valid></item></children></attributes></definition>`
+	// A template whose concept holds text and whose definition follows it.
+	inConceptBefore := func(text, definition string) string {
+		return `<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">` +
+			`<template_id><value>t</value></template_id><concept>` + text + `</concept>` + definition + `</template>`
+	}
 	// The root's name starts the name of none of its elements.
 	inRootTag := func(words string) string {
 		return `<OPERATIONAL_TEMPLATE xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ` +
@@ -778,6 +786,18 @@ func TestREQ108_ReadOperationalTemplateChecksInLinearTime(t *testing.T) {
 			name:     "C_BOOLEAN in one start tag",
 			doc:      inRootTag(strings.Repeat("C_BOOLEAN ", 20_000)),
 			baseline: inRootTag(strings.Repeat("X_BOOLEAN ", 20_000)),
+			modes:    []string{"default", "strict"},
+		},
+		{
+			name:     "character references in text after a long start tag",
+			doc:      readTemplateHead + `<concept note="` + strings.Repeat("x", 100_000) + `">` + strings.Repeat("&#97;", 50_000) + `</concept></template>`,
+			baseline: readTemplateHead + `<concept note="` + strings.Repeat("x", 100_000) + `">` + strings.Repeat("aaaaa", 50_000) + `</concept></template>`,
+			modes:    []string{"default"},
+		},
+		{
+			name:     "character references in text before a C_BOOLEAN",
+			doc:      inConceptBefore(strings.Repeat("&#97;", 50_000), booleanItem),
+			baseline: inConceptBefore(strings.Repeat("aaaaa", 50_000), booleanItem),
 			modes:    []string{"default", "strict"},
 		},
 		{

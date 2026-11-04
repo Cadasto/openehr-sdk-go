@@ -406,38 +406,47 @@ func tagEnd(data []byte, lt int) int {
 }
 
 // booleansHoldFlags reports whether each element whose start tag holds the
-// word C_BOOLEAN, as the type of a C_BOOLEAN item does, holds a true_valid
-// and a false_valid among the elements it holds itself, each without a
-// prefix: a flag that stands deeper, or under a prefix that may be bound to
-// a namespace the reading does not read, reads as none. A C_BOOLEAN anywhere
-// else, such as in text, a comment or an element such an element holds,
-// reads as an element without them, and so does markup the walk does not
-// read, such as a document type with an internal subset. It reads data once:
-// it looks for the last `<` before a match in the bytes it has not looked
-// through yet, and walks the markup of the element that tag opens, rather
-// than the whole document.
+// word C_BOOLEAN, as the type of a C_BOOLEAN item does, or a character
+// reference, which an attribute value may spell that type with, holds a
+// true_valid and a false_valid among the elements it holds itself, each
+// without a prefix: a flag that stands deeper, or under a prefix that may be
+// bound to a namespace the reading does not read, reads as none. A C_BOOLEAN
+// anywhere else, such as in text, a comment or an element such an element
+// holds, reads as an element without them, and so does markup the walk does
+// not read, such as a document type with an internal subset; a character
+// reference outside a start tag spells no type, and is passed over. It reads
+// data once: it looks for the next match of each word in the bytes it has
+// not looked through for it yet, and for the last `<` before a match, and
+// keeps the end of the tag that `<` opens once read, and walks the markup of
+// the element that tag opens, rather than the whole document.
 func booleansHoldFlags(data []byte) bool {
-	word := []byte("C_BOOLEAN")
+	words := finder{sep: []byte("C_BOOLEAN"), at: -1}
+	refs := finder{sep: []byte(charRef), at: -1}
 	scanned := 0 // the bytes before this are looked through for a '<'
 	lt := -1     // the offset of the last '<' before scanned
+	ltEnd := -1  // the end of the tag lt opens (tagEnd), once read
 	for i := 0; ; {
-		j := bytes.Index(data[i:], word)
-		if j < 0 {
+		w, r := words.next(data, i), refs.next(data, i)
+		j := min(w, r)
+		if j >= len(data) {
 			return true
 		}
-		j += i
 		if k := bytes.LastIndexByte(data[scanned:j], '<'); k >= 0 {
-			lt = scanned + k
+			lt, ltEnd = scanned+k, -1
 		}
-		if lt < 0 {
-			return false
+		scanned = j
+		if lt >= 0 && ltEnd < 0 {
+			ltEnd = tagEnd(data, lt)
 		}
-		end := tagEnd(data, lt)
-		if end <= j || data[end-1] != '>' || data[lt+1] == '/' || data[lt+1] == '!' || data[lt+1] == '?' {
+		if lt < 0 || ltEnd <= j || data[ltEnd-1] != '>' || data[lt+1] == '/' || data[lt+1] == '!' || data[lt+1] == '?' {
 			// Not in a start tag, or in one the walk does not read.
+			if j == r {
+				i = j + len(charRef)
+				continue
+			}
 			return false
 		}
-		next, ok := holdsFlags(data, lt, end)
+		next, ok := holdsFlags(data, lt, ltEnd)
 		if !ok {
 			return false
 		}
@@ -445,11 +454,36 @@ func booleansHoldFlags(data []byte) bool {
 	}
 }
 
+// charRef opens a character reference, with which an attribute value may
+// spell a type, such as &#67;_BOOLEAN for C_BOOLEAN.
+const charRef = "&#"
+
+// finder finds the matches of sep in data in turn, looking through each byte
+// of data once for them.
+type finder struct {
+	sep []byte
+	at  int // the offset of the match last found, len(data) for none, -1 before the first look
+}
+
+// next returns the offset of the first match of f.sep in data at or after
+// from, or len(data) where none follows. from does not go back from one call
+// to the next.
+func (f *finder) next(data []byte, from int) int {
+	if f.at < from {
+		f.at = len(data)
+		if k := bytes.Index(data[from:], f.sep); k >= 0 {
+			f.at = from + k
+		}
+	}
+	return f.at
+}
+
 // holdsFlags walks the element whose start tag spans data from lt to end,
 // and reports whether it holds a true_valid and a false_valid itself, each
 // without a prefix, and holds no element whose start tag holds the word
-// C_BOOLEAN, and returns the offset just past it. It reports false for
-// markup it does not read and for an element whose start tag closes it.
+// C_BOOLEAN or a character reference, and returns the offset just past it.
+// It reports false for markup it does not read and for an element whose
+// start tag closes it.
 func holdsFlags(data []byte, lt, end int) (int, bool) {
 	if data[end-2] == '/' {
 		return 0, false
@@ -487,7 +521,7 @@ func holdsFlags(data []byte, lt, end int) (int, bool) {
 				return 0, false
 			}
 			tag := data[lt:end]
-			if bytes.Contains(tag, word) {
+			if bytes.Contains(tag, word) || bytes.Contains(tag, []byte(charRef)) {
 				return 0, false
 			}
 			if depth == 1 {
