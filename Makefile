@@ -79,6 +79,7 @@ HELP_FOOTER    = Before a pull request: make ci · docs site: make docs-serve (h
 ##= ARGS='-base URL -deployment NAME ...' | probe-record flags
 ##= BMM_REF= ITS_XML_REF= ... | pin a Vendor sync (ITS_REST_REF, TERMINOLOGY_REF too; EHRbase pins: testkit/corpus/UPSTREAM_PINS.txt)
 ##= DOCS_SYNC=docs-sync-offline | build the docs site from the cached brand files
+##= DIR=/path/to/opts | the folder of OPTs template-parity walks
 
 .PHONY: help doctor go-version build-dev build-antlr \
         build clean \
@@ -90,7 +91,7 @@ HELP_FOOTER    = Before a pull request: make ci · docs site: make docs-serve (h
         mod-tidy-check codegen-check termgen-check aqlgen-check bmm-check its-xml-check flat-check crossformat-check corpus-pins-check terminology-check \
         operational-template-schema-check \
         spec-check sdd-check ci \
-        spec-context probe-status probe-record cdr-crosscheck \
+        spec-context probe-status probe-record cdr-crosscheck template-parity \
         docs-sync docs-sync-offline docs-build docs-check docs-serve docs-clean
 
 ##@ Setup
@@ -327,6 +328,15 @@ cdr-crosscheck: ## Cross-check generated documents and CDR examples against live
 	@rev="$$(git rev-parse HEAD 2>/dev/null)"; \
 	 if [ -n "$$(git status --porcelain 2>/dev/null)" ]; then rev="$$rev-dirty"; fi; \
 	 $(GO) run ./cmd/cdrcheck -sdk-commit "$$rev" $(ARGS)
+
+# The folder is read where it is: the Docker fallback mounts it read-only at
+# the same path, so the file names the check prints are the host's.
+PARITY_DIR = $(abspath $(DIR))
+PARITY_GO  = $(if $(HOST_GO_OK),TEMPLATE_PARITY_DIR="$(PARITY_DIR)" go,$(DOCKER_RUN) -v "$(PARITY_DIR):$(PARITY_DIR):ro" -e TEMPLATE_PARITY_DIR="$(PARITY_DIR)" go go)
+
+template-parity: ## Deprecated-parser parity over the OPTs under DIR (opt-in)
+	@test -n "$(DIR)" || { echo 'usage: make template-parity DIR=<folder of OPTs>' >&2; exit 2; }
+	@$(PARITY_GO) test ./internal/templatecompile/ -run '^TestREQ111_ParityOverFolder$$' -count=1 -v -timeout 30m
 
 ##@ Docs
 
