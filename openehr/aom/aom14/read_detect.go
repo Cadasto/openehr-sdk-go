@@ -168,7 +168,10 @@ func foreignElements(data []byte) bool {
 		return true
 	}
 	for p := range prefixes {
-		if !declared[p] && p != "xml" {
+		// The xml prefix needs no declaration: the XML specification binds
+		// it. An element that carries it is still in a namespace the default
+		// mode reads as canonical XML's.
+		if p == "xml" || !declared[p] {
 			return true
 		}
 	}

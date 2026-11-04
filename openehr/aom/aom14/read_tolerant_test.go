@@ -334,9 +334,10 @@ func TestREQ111_ReaderReadsARootInAnotherNamespace(t *testing.T) {
 // the v1 namespace, as the deprecated parser, which reads no namespace, does:
 // under another default namespace, the definition's among them, under a
 // prefix bound to another namespace, the xsi prefix of the xsi:type
-// attributes among them, and under a prefix no declaration binds, which
-// encoding/xml reads as a namespace of that name. WithUnmatched reports
-// nothing. Strict mode refuses each as an element in a foreign namespace.
+// attributes among them, under the xml prefix, and under a prefix no
+// declaration binds, which encoding/xml reads as a namespace of that name.
+// WithUnmatched reports nothing. Strict mode refuses each as an element in a
+// foreign namespace.
 // Every prefix keeps its namespace, so that an xsi:type, and a type written
 // with a prefix, such as the xsd:string of an assertion, read as written,
 // where an element name carries the prefix too.
@@ -420,6 +421,10 @@ func TestREQ111_ReaderReadsAnElementInAnotherNamespace(t *testing.T) {
 			[]byte(itemDoc(`<g:item xsi:type="C_STRING"><g:list>a</g:list><list>b</list></g:item>`)),
 			[]byte(itemDoc(string2)),
 		},
+		"an item under the xml prefix": {
+			[]byte(itemDoc(`<xml:item xsi:type="C_STRING"><xml:list>a</xml:list><list>b</list></xml:item>`)),
+			[]byte(itemDoc(string2)),
+		},
 		"an item in another namespace beside a type a prefix bound to another names": {
 			[]byte(slot(`<item xmlns="urn:example" xsi:type="C_STRING"><list>a</list><list>b</list></item>`)),
 			[]byte(slot(string2)),
@@ -445,6 +450,16 @@ func TestREQ111_ReaderReadsAnElementInAnotherNamespace(t *testing.T) {
 			}
 		})
 	}
+	// xml:lang stays an attribute of the item. The model has no place for it,
+	// so the report names it, and the constraint under the element is kept.
+	t.Run("an xml:lang attribute on an item under the xml prefix", func(t *testing.T) {
+		t.Parallel()
+		doc := []byte(itemDoc(`<xml:item xml:lang="en" xsi:type="C_STRING"><list>a</list><list>b</list></xml:item>`))
+		want := "/template[1]/definition[1]/attributes[1]/children[1]/item[1]/@lang"
+		if unmatched := readAs(t, doc, decoded(t, []byte(itemDoc(string2)))); !slices.Equal(unmatched, []string{want}) {
+			t.Errorf("WithUnmatched reported %q, want [%q]", unmatched, want)
+		}
+	})
 }
 
 // TestREQ111_ReaderReadsTheParsersDocumentShapes pins the default mode's

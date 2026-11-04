@@ -326,14 +326,16 @@ func (t *tolerantReading) start(tk xml.StartElement, off, end int) {
 		t.push(prefix, e.attrs[i].Value)
 	}
 	// An element under a prefix bound to a namespace of no openEHR schema,
-	// the XSI one among them, or bound by no declaration, which encoding/xml
-	// reads as a namespace of that name, reads in the default mode as the
-	// element of that name in canonical XML's, as the parser, which matches
-	// an element by its local name, reads it. It is written without its
-	// prefix, in the default namespace, which the default mode reads as
-	// canonical XML's (isForeignNamespace), and the prefix keeps its
-	// namespace.
-	if p := e.name.Space; !t.strict && p != "" && p != "xml" && p != "xmlns" {
+	// the XSI one and the XML one among them, or bound by no declaration,
+	// which encoding/xml reads as a namespace of that name, reads in the
+	// default mode as the element of that name in canonical XML's, as the
+	// parser, which matches an element by its local name, reads it. The xml
+	// prefix needs no declaration. It is written without its prefix, in the
+	// default namespace, which the default mode reads as canonical XML's
+	// (isForeignNamespace), and the prefix keeps its namespace, so an
+	// attribute such as xml:lang stays. xmlns is a declaration, not an
+	// element prefix.
+	if p := e.name.Space; !t.strict && p != "" && p != "xmlns" {
 		if uri, ok := t.lookup(p); !ok || isForeignNamespace(uri) {
 			e.renamed, e.dirty = true, true
 		}
