@@ -2,7 +2,9 @@ package templatecompile
 
 // parity_fixtures_test.go: REQ-111 § Parity with the deprecated parser, over
 // the parity fixtures, OPTs the SDK writes in testdata/parity for each value
-// the compile step tolerates and each default-value placement it names.
+// the compile step tolerates and each default-value placement it names: the
+// default values placed and the strict modes' refusals. parity_test.go holds
+// the fixtures, with the corpus, to the parser's constraints.
 
 import (
 	"bytes"
@@ -16,20 +18,19 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
-	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
 
 // parityFixtureDir holds the parity fixtures.
 const parityFixtureDir = "testdata/parity"
 
-// TestREQ111_ParityFixtures reads each parity fixture with the parser and
-// with the model's reader, both in their default mode, and compiles it: on
-// each node the compile step builds the primitive constraint the parser
-// reads, and it places the default values the fixture names. In their strict
-// modes ParseOPTStrict refuses a fixture of a tolerated value, and so does
-// the compile step, which also refuses a default value that addresses no
-// node or that it cannot hold as canonical JSON, which the parser does not
-// read.
+// TestREQ111_ParityFixtures reads each parity fixture with the model's
+// reader and compiles it, both in their default mode: the compile step places
+// the default values the fixture names. In their strict modes ParseOPTStrict
+// refuses a fixture of a tolerated value, and so does the compile step, which
+// also refuses a default value that addresses no node or that it cannot hold
+// as canonical JSON, which the parser does not read. That the parser reads
+// each fixture, and that the compiled nodes carry the primitive constraints
+// it reads, is TestREQ111_ParityWithDeprecatedParser's.
 func TestREQ111_ParityFixtures(t *testing.T) {
 	const items = "/context/other_context/items"
 	fixtures := []struct {
@@ -100,29 +101,9 @@ func TestREQ111_ParityFixtures(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			parsed, err := template.ParseOPT(bytes.NewReader(raw)) //nolint:staticcheck // the parity check reads the fixture with the deprecated parser
-			if err != nil {
-				t.Fatalf("template.ParseOPT = %v", err)
-			}
 			model, err := aom14.ReadOperationalTemplate(bytes.NewReader(raw))
 			if err != nil {
 				t.Fatalf("aom14.ReadOperationalTemplate = %v", err)
-			}
-			for _, p := range pairModelNodes(t, f.file, parsed.Root(), &model.Definition, nil) { //nolint:staticcheck // the parser's tree is what the check compares with
-				var want constraints.PrimitiveConstraint
-				if on, ok := p.parsed.(interface {
-					PrimitiveConstraint() constraints.PrimitiveConstraint
-				}); ok {
-					want = on.PrimitiveConstraint()
-				}
-				got, err := primitiveFromModel(p.model, false)
-				if err != nil {
-					t.Errorf("%s: primitiveFromModel(%T) = %v; want the parser's %s", p.where, p.model, err, renderPrimitive(want))
-					continue
-				}
-				if g, w := renderPrimitive(got), renderPrimitive(want); g != w {
-					t.Errorf("%s: primitiveFromModel(%T) =\n  %s\nwant the parser's\n  %s", p.where, p.model, g, w)
-				}
 			}
 
 			c, err := Compile(model)
@@ -135,7 +116,7 @@ func TestREQ111_ParityFixtures(t *testing.T) {
 				t.Errorf("default values placed = %v; want %v", got, f.defaults)
 			}
 
-			_, err = template.ParseOPTStrict(bytes.NewReader(raw)) //nolint:staticcheck // the parity check reads the fixture with the deprecated parser
+			_, err = template.ParseOPTStrict(bytes.NewReader(raw))
 			if refused := err != nil; refused != f.parserStrictRefuses {
 				t.Errorf("template.ParseOPTStrict = %v; want refused %t", err, f.parserStrictRefuses)
 			}

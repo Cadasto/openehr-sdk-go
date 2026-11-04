@@ -1,0 +1,490 @@
+package templatecompile
+
+// parity_test.go: REQ-111 § Parity with the deprecated parser. Every
+// operational template that template.ParseOPT reads, of the corpus, of the
+// parity fixtures and of the model reader's fixtures, is read by
+// aom14.ReadOperationalTemplate and compiled by Compile, both in their
+// default mode, with on each node the primitive constraint the parser reads
+// there. The exceptions the clause allows are told apart by their errors.
+// TestREQ111_ParityOverFolder runs the same check over a folder the
+// repository does not hold (make template-parity DIR=<folder>).
+
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"testing"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
+	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
+)
+
+// parityDirEnv names the folder TestREQ111_ParityOverFolder walks.
+const parityDirEnv = "TEMPLATE_PARITY_DIR"
+
+// readerFixtureDir holds the model reader's fixtures, OPTs the SDK writes
+// for the shapes and values the reader tolerates.
+const readerFixtureDir = "../../openehr/aom/aom14/testdata/reader"
+
+// parityExceptionDir holds OPTs the SDK writes that the parser reads and the
+// new path refuses for a reason the rule allows, one for each reason.
+const parityExceptionDir = "testdata/parity-exceptions"
+
+// parityKind is what the parity check makes of one operational template.
+type parityKind int
+
+const (
+	// parityNotRead: the parser does not read it, so the rule asks
+	// nothing of the new path.
+	parityNotRead parityKind = iota
+	// parityHolds: the new path reads and compiles it, with on each node
+	// the parser's primitive constraint.
+	parityHolds
+	// parityLargeInteger: the reader refuses an integer the model's 32-bit
+	// Integer cannot hold, which the parser reads.
+	parityLargeInteger
+	// parityMatchNegated: the reader refuses a match_negated of true, which
+	// the parser reads with its meaning inverted.
+	parityMatchNegated
+	// paritySharedPath: the compile step refuses two nodes under different
+	// attributes that share an AQL path.
+	paritySharedPath
+	// parityRefused: the new path refuses what the parser reads, for none
+	// of the reasons the rule allows.
+	parityRefused
+	// parityMismatch: the new path compiles it, but a node carries another
+	// primitive constraint than the parser reads there, or the compiled
+	// tree has another shape than the parser's.
+	parityMismatch
+)
+
+// fails reports whether the kind breaks the rule.
+func (k parityKind) fails() bool {
+	return k == parityRefused || k == parityMismatch
+}
+
+// allowed reports whether the kind is a refusal the rule allows.
+func (k parityKind) allowed() bool {
+	return k == parityLargeInteger || k == parityMatchNegated || k == paritySharedPath
+}
+
+// String names the kind as the summary of TestREQ111_ParityOverFolder
+// prints it.
+func (k parityKind) String() string {
+	switch k {
+	case parityNotRead:
+		return "the parser does not read it"
+	case parityHolds:
+		return "holds"
+	case parityLargeInteger:
+		return "allowed exception, an integer the model cannot hold"
+	case parityMatchNegated:
+		return "allowed exception, a match_negated of true"
+	case paritySharedPath:
+		return "allowed exception, two nodes under different attributes share an AQL path"
+	case parityRefused:
+		return "the new path refuses it"
+	case parityMismatch:
+		return "constraint mismatch"
+	}
+	return "parityKind(" + strconv.Itoa(int(k)) + ")"
+}
+
+// parityResult is what the parity check makes of one operational template.
+type parityResult struct {
+	kind parityKind
+	// err is the error behind the kind: the parser's, the reader's or the
+	// compile step's refusal, or the first mismatch.
+	err error
+	// mismatches names each node whose compiled constraint differs from
+	// the parser's.
+	mismatches []string
+	// seen counts the primitive constraints compiled, by Go type.
+	seen map[string]int
+	// bareCodeReferences names each C_CODE_REFERENCE with no reference set
+	// URI.
+	bareCodeReferences []string
+}
+
+// checkParity reads raw with the deprecated parser and, when the parser
+// reads it, with the model's reader and the compile step, each in its
+// default mode, and compares the primitive constraint of each node of the
+// parser's tree with that of the compiled node that stands where it stands.
+func checkParity(raw []byte) parityResult {
+	parsed, err := template.ParseOPT(bytes.NewReader(raw))
+	if err != nil {
+		return parityResult{kind: parityNotRead, err: err}
+	}
+	model, err := aom14.ReadOperationalTemplate(bytes.NewReader(raw))
+	if err != nil {
+		return parityResult{kind: readerRefusal(err), err: err}
+	}
+	c, err := Compile(model)
+	if err != nil {
+		return parityResult{kind: compileRefusal(err), err: err}
+	}
+	r := parityResult{kind: parityHolds, seen: map[string]int{}}
+	if err := r.compare(parsed.Root(), &model.Definition, c.root); err != nil {
+		r.kind, r.err = parityMismatch, err
+		return r
+	}
+	if len(r.mismatches) > 0 {
+		r.kind = parityMismatch
+		r.err = fmt.Errorf("the compiled primitive constraint differs from the parser's on %d node(s); the first, %s", len(r.mismatches), r.mismatches[0])
+	}
+	return r
+}
+
+// readerRefusal tells which reader refusal err is: an integer the model's
+// 32-bit Integer cannot hold, a match_negated of true, or another.
+func readerRefusal(err error) parityKind {
+	if !errors.Is(err, canxml.ErrInvalidShape) {
+		return parityRefused
+	}
+	if ne, ok := errors.AsType[*strconv.NumError](err); ok && ne != nil && ne.Func == "ParseInt" && errors.Is(ne, strconv.ErrRange) {
+		return parityLargeInteger
+	}
+	if innermostDecodePath(err) == "/match_negated" {
+		return parityMatchNegated
+	}
+	return parityRefused
+}
+
+// innermostDecodePath returns the path of the innermost decode error in err's
+// chain, the element the decode failed on, or "" when err holds none.
+func innermostDecodePath(err error) string {
+	var path string
+	for {
+		de, ok := errors.AsType[*canxml.DecodeError](err)
+		if !ok || de == nil {
+			return path
+		}
+		path, err = de.Path, de.Inner
+	}
+}
+
+// compileRefusal tells which compile refusal err is: two nodes under
+// different attributes that share an AQL path, or another.
+func compileRefusal(err error) parityKind {
+	if errors.Is(err, ErrInvalidInput) && strings.Contains(err.Error(), ": duplicate AQL path ") {
+		return paritySharedPath
+	}
+	return parityRefused
+}
+
+// compare compares the primitive constraint of parsed with that of compiled,
+// model being the node of the model compiled reads, then their descendants.
+// The compiled tree lists the attributes the template declares first, in
+// document order, and those the compile step injects after them, which hold
+// no child. It returns an error when the trees have different shapes.
+func (r *parityResult) compare(parsed template.Node, model aom14.CObject, compiled *CompiledNode) error {
+	where := fmt.Sprintf("%s (%s)", compiled.aqlPath, compiled.rmTypeName)
+	var want constraints.PrimitiveConstraint
+	if on, ok := parsed.(interface {
+		PrimitiveConstraint() constraints.PrimitiveConstraint
+	}); ok {
+		want = on.PrimitiveConstraint()
+	}
+	if ref, ok := model.(*aom14.CCodeReference); ok {
+		// The parser reads no constraint on a C_CODE_REFERENCE; the
+		// compile step reads its code phrase as a C_CODE_PHRASE's, with
+		// the reference set's URI beside it.
+		if want != nil {
+			r.mismatches = append(r.mismatches, fmt.Sprintf("%s: the parser reads %s on a C_CODE_REFERENCE; want none", where, renderPrimitive(want)))
+		}
+		uri := strings.TrimSpace(ref.ReferenceSetURI)
+		want = constraints.CodeReference{CodePhrase: codePhraseFromModel(&ref.CCodePhrase), ReferenceSetURI: uri}
+		if uri == "" {
+			r.bareCodeReferences = append(r.bareCodeReferences, where)
+		}
+	}
+	got := compiled.primitive
+	if g, w := renderPrimitive(got), renderPrimitive(want); g != w {
+		r.mismatches = append(r.mismatches, fmt.Sprintf("%s: compiled %s; the parser reads %s", where, g, w))
+	}
+	if got != nil {
+		r.seen[fmt.Sprintf("%T", got)]++
+	}
+
+	var parsedAttrs []*template.Attribute
+	if on, ok := parsed.(template.ObjectNode); ok {
+		parsedAttrs = on.Attributes()
+	}
+	modelAttrs := modelAttributes(model)
+	if len(modelAttrs) != len(parsedAttrs) || len(compiled.attributes) < len(parsedAttrs) {
+		return fmt.Errorf("at %s the parser reads %d attributes, the model holds %d and the compiled tree %d", where, len(parsedAttrs), len(modelAttrs), len(compiled.attributes))
+	}
+	for i, pa := range parsedAttrs {
+		_, modelKids := modelChildren(modelAttrs[i])
+		ca := compiled.attributes[i]
+		parsedKids := pa.Children()
+		if ca.name != pa.Name() || len(ca.children) != len(parsedKids) || len(modelKids) != len(parsedKids) {
+			return fmt.Errorf("at %s attribute %d: the parser reads %s with %d children, the model holds %d and the compiled tree reads %s with %d",
+				where, i+1, pa.Name(), len(parsedKids), len(modelKids), ca.name, len(ca.children))
+		}
+		for j, pc := range parsedKids {
+			if err := r.compare(pc, modelKids[j], ca.children[j]); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// TestREQ111_ParityWithDeprecatedParser holds the model's reader and the
+// compile step to the deprecated parser over every operational template of
+// the corpus, of the parity fixtures and of the reader's fixtures: where the
+// parser reads one, the new path reads and compiles it with on each node the
+// parser's primitive constraint, or refuses it for a reason the rule allows,
+// told by its error. The parser reads every corpus template and every parity
+// fixture, the corpus compiles each kind of primitive constraint, and each
+// fixture of testdata/parity-exceptions is refused for one of the reasons the
+// rule allows, each reason by one fixture at least.
+func TestREQ111_ParityWithDeprecatedParser(t *testing.T) {
+	glob := func(dir string) []string {
+		files, err := filepath.Glob(filepath.Join(dir, "*.opt"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return files
+	}
+	var corpus []string
+	for _, name := range corpusOperationalTemplates(t) {
+		corpus = append(corpus, filepath.Join(fixtures.CorpusRoot(), filepath.FromSlash(name)))
+	}
+	sources := []struct {
+		name  string
+		files []string
+		// parserReadsAll is true when the parser must read every file,
+		// so that a parser refusal cannot shrink the check unseen.
+		parserReadsAll bool
+		// exceptions is true when the new path must refuse every file
+		// for a reason the rule allows.
+		exceptions bool
+	}{
+		{name: "corpus", files: corpus, parserReadsAll: true},
+		{name: "parity", files: glob(parityFixtureDir), parserReadsAll: true},
+		{name: "reader", files: glob(readerFixtureDir)},
+		{name: "exception", files: glob(parityExceptionDir), parserReadsAll: true, exceptions: true},
+	}
+
+	// The files are walked in one test, not one subtest each, so that the
+	// floors below always see the whole walk.
+	corpusSeen := map[string]int{}
+	allowed := map[parityKind]int{}
+	for _, src := range sources {
+		if len(src.files) == 0 {
+			t.Errorf("the %s source holds no operational template", src.name)
+		}
+		var held int
+		for _, file := range src.files {
+			raw, err := os.ReadFile(file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			r := checkParity(raw)
+			switch {
+			case r.kind == parityNotRead && src.parserReadsAll:
+				t.Errorf("%s: template.ParseOPT = %v; want it read, so that the parity check covers it", file, r.err)
+			case r.kind == parityNotRead:
+				t.Logf("%s: the parser does not read it (%v), so the rule asks nothing", file, r.err)
+			case r.kind.fails():
+				t.Errorf("%s: %s: %v", file, r.kind, r.err)
+				for _, m := range r.mismatches[min(1, len(r.mismatches)):] {
+					t.Errorf("%s: also %s", file, m)
+				}
+			case r.kind.allowed():
+				allowed[r.kind]++
+				t.Logf("%s: %s: %v", file, r.kind, r.err)
+			case src.exceptions:
+				t.Errorf("%s: the new path reads and compiles it; want a refusal the rule allows", file)
+			default:
+				held++
+			}
+			if src.name != "corpus" {
+				continue
+			}
+			for k, n := range r.seen {
+				corpusSeen[k] += n
+			}
+			for _, where := range r.bareCodeReferences {
+				t.Errorf("%s: %s: a corpus C_CODE_REFERENCE with no reference set URI", file, where)
+			}
+		}
+		if !src.exceptions && held == 0 {
+			t.Errorf("no operational template of the %s source holds the rule; want at least one", src.name)
+		}
+	}
+	for _, k := range []parityKind{parityLargeInteger, parityMatchNegated, paritySharedPath} {
+		if allowed[k] == 0 {
+			t.Errorf("no operational template is refused as %q; want a fixture for each exception the rule allows", k)
+		}
+	}
+
+	// The corpus holds every constraint type, so a walk that paired no
+	// primitive node, or the wrong ones, cannot pass unseen.
+	for _, want := range []constraints.PrimitiveConstraint{
+		constraints.CBoolean{},
+		constraints.CInteger{},
+		constraints.CReal{},
+		constraints.CString{},
+		constraints.CDate{},
+		constraints.CTime{},
+		constraints.CDateTime{},
+		constraints.CDuration{},
+		constraints.CodePhrase{},
+		constraints.CodeReference{},
+		constraints.DvQuantity{},
+		constraints.CDvOrdinal{},
+		constraints.ConstraintRef{},
+	} {
+		if corpusSeen[fmt.Sprintf("%T", want)] == 0 {
+			t.Errorf("no corpus node compiled a %T; the parity walk pairs no such node", want)
+		}
+	}
+}
+
+// TestREQ111_ParityRefusalsByError pins how the parity check tells a refusal
+// the rule allows from one it does not, by the error alone: an integer past
+// the 32-bit range is the reader's ParseInt range refusal, a match_negated of
+// true is the reader's refusal of that element, and a shared AQL path is the
+// compile step's duplicate-path refusal. A refusal that shares part of one of
+// these, such as a real out of range or another element's refusal, breaks
+// the rule.
+func TestREQ111_ParityRefusalsByError(t *testing.T) {
+	shape := func(path string, inner error) error {
+		return &canxml.DecodeError{Path: "/attributes", Type: "C_SINGLE_ATTRIBUTE", Inner: &canxml.DecodeError{Path: path, Inner: inner}}
+	}
+	rangeErr := func(fn string) error {
+		return fmt.Errorf("%w: %w", canxml.ErrInvalidShape, &strconv.NumError{Func: fn, Num: "5000000000", Err: strconv.ErrRange})
+	}
+	readerCases := []struct {
+		name string
+		err  error
+		want parityKind
+	}{
+		{name: "an integer past the 32-bit range", err: shape("/upper", rangeErr("ParseInt")), want: parityLargeInteger},
+		{name: "a match_negated of true", err: shape("/match_negated", fmt.Errorf("%w: the element holds a value other than the one it may hold", canxml.ErrInvalidShape)), want: parityMatchNegated},
+		{name: "a real out of range", err: shape("/upper", rangeErr("ParseFloat")), want: parityRefused},
+		{name: "an integer that is no number", err: shape("/upper", fmt.Errorf("%w: %w", canxml.ErrInvalidShape, &strconv.NumError{Func: "ParseInt", Num: "x", Err: strconv.ErrSyntax})), want: parityRefused},
+		{name: "a range refusal that is no shape refusal", err: &strconv.NumError{Func: "ParseInt", Num: "5000000000", Err: strconv.ErrRange}, want: parityRefused},
+		{name: "another element's refusal", err: shape("/is_ordered", canxml.ErrInvalidShape), want: parityRefused},
+		{name: "a refusal inside a match_negated's parent", err: &canxml.DecodeError{Path: "/match_negated", Inner: &canxml.DecodeError{Path: "/value", Inner: canxml.ErrInvalidShape}}, want: parityRefused},
+		{name: "a match_negated that is no shape refusal", err: &canxml.DecodeError{Path: "/match_negated", Inner: errors.New("read failed")}, want: parityRefused},
+	}
+	for _, tc := range readerCases {
+		if got := readerRefusal(tc.err); got != tc.want {
+			t.Errorf("readerRefusal(%s: %v) = %q; want %q", tc.name, tc.err, got, tc.want)
+		}
+	}
+
+	compileCases := []struct {
+		name string
+		err  error
+		want parityKind
+	}{
+		{name: "a shared AQL path", err: fmt.Errorf(`%w: duplicate AQL path "/category" (existing DV_CODED_TEXT, new DV_CODED_TEXT)`, ErrInvalidInput), want: paritySharedPath},
+		{name: "another invalid input", err: fmt.Errorf("%w: template has no template_id", ErrInvalidInput), want: parityRefused},
+		{name: "a shared AQL path that is no invalid input", err: errors.New(`templatecompile: duplicate AQL path "/category"`), want: parityRefused},
+	}
+	for _, tc := range compileCases {
+		if got := compileRefusal(tc.err); got != tc.want {
+			t.Errorf("compileRefusal(%s: %v) = %q; want %q", tc.name, tc.err, got, tc.want)
+		}
+	}
+}
+
+// TestREQ111_ParityOverFolder runs the parity check of
+// TestREQ111_ParityWithDeprecatedParser over every *.opt file under the
+// folder TEMPLATE_PARITY_DIR names, a folder the repository does not hold,
+// and is skipped when it names none (make template-parity DIR=<folder>). It
+// skips, with a note, a file it cannot read or that holds no XML, prints how
+// many files fall in each kind and a line for each file that breaks the rule,
+// and fails when one does.
+func TestREQ111_ParityOverFolder(t *testing.T) {
+	dir := os.Getenv(parityDirEnv)
+	if dir == "" {
+		t.Skipf("%s names no folder; make template-parity DIR=<folder> runs this check", parityDirEnv)
+	}
+	say := func(format string, args ...any) {
+		t.Helper()
+		if _, err := fmt.Fprintf(t.Output(), format+"\n", args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var files, skipped int
+	counts := map[parityKind]int{}
+	var failed []string
+	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			if path == dir {
+				return err
+			}
+			say("skipped %s: %v", path, err)
+			if d != nil && d.IsDir() {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if !d.Type().IsRegular() || !strings.EqualFold(filepath.Ext(path), ".opt") {
+			return nil
+		}
+		files++
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			skipped++
+			say("skipped %s: %v", path, err)
+			return nil
+		}
+		if !looksLikeXML(raw) {
+			skipped++
+			say("skipped %s: not XML", path)
+			return nil
+		}
+		r := checkParity(raw)
+		counts[r.kind]++
+		if r.kind.fails() {
+			failed = append(failed, fmt.Sprintf("%s: %s: %v", path, r.kind, r.err))
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk %s: %v", dir, err)
+	}
+	if files == 0 {
+		t.Fatalf("%s holds no *.opt file", dir)
+	}
+
+	say("template parity over %s", dir)
+	say("  *.opt files: %d, skipped: %d", files, skipped)
+	say("  parser reads: %d", files-skipped-counts[parityNotRead])
+	say("  new path compiles: %d", counts[parityHolds]+counts[parityMismatch])
+	say("  constraint mismatches: %d", counts[parityMismatch])
+	for _, k := range []parityKind{parityLargeInteger, parityMatchNegated, paritySharedPath} {
+		say("  %s: %d", k, counts[k])
+	}
+	say("  new path refuses, for no allowed reason: %d", counts[parityRefused])
+	say("  files that break the rule: %d", len(failed))
+	for _, f := range failed {
+		say("FAIL %s", f)
+	}
+	if len(failed) > 0 {
+		t.Fail()
+	}
+}
+
+// looksLikeXML reports whether raw, after a UTF-8 byte-order mark and white
+// space, opens with a markup character, as an XML document does.
+func looksLikeXML(raw []byte) bool {
+	raw = bytes.TrimPrefix(raw, []byte("\xef\xbb\xbf"))
+	raw = bytes.TrimLeft(raw, " \t\r\n")
+	return len(raw) > 0 && raw[0] == '<'
+}

@@ -1,9 +1,9 @@
 package templatecompile
 
 // primitives_from_model_test.go: the compile step's primitive constraints,
-// built from the operational template model, held equal to the deprecated
-// parser's over every corpus node, and the readings and refusals that part
-// the two.
+// built from the operational template model, and the readings and refusals
+// that part them from the deprecated parser's; parity_test.go holds them
+// equal to the parser's over every corpus node.
 
 import (
 	json "encoding/json/v2"
@@ -159,65 +159,6 @@ func renderPrimitive(pc constraints.PrimitiveConstraint) string {
 		return fmt.Sprintf("%T<%v>", pc, err)
 	}
 	return fmt.Sprintf("%T%s", pc, b)
-}
-
-func TestREQ103_REQ111_PrimitiveFromModelMatchesParserOverCorpus(t *testing.T) {
-	seen := map[string]int{}
-	for _, p := range corpusModelNodePairs(t) {
-		var want constraints.PrimitiveConstraint
-		if on, ok := p.parsed.(interface {
-			PrimitiveConstraint() constraints.PrimitiveConstraint
-		}); ok {
-			want = on.PrimitiveConstraint()
-		}
-		got, err := primitiveFromModel(p.model, false)
-		if err != nil {
-			t.Errorf("%s: primitiveFromModel(%T) = %v; want the parser's %s", p.where, p.model, err, renderPrimitive(want))
-			continue
-		}
-		if ref, ok := p.model.(*aom14.CCodeReference); ok {
-			// The parser reads no constraint on a C_CODE_REFERENCE; the
-			// compile step reads its code phrase as a C_CODE_PHRASE's, with
-			// the reference set's URI beside it.
-			if want != nil {
-				t.Errorf("%s: the parser reads %s on a C_CODE_REFERENCE; want none", p.where, renderPrimitive(want))
-			}
-			want = constraints.CodeReference{
-				CodePhrase:      codePhraseFromModel(&ref.CCodePhrase),
-				ReferenceSetURI: strings.TrimSpace(ref.ReferenceSetURI),
-			}
-			if want.(constraints.CodeReference).ReferenceSetURI == "" {
-				t.Errorf("%s: a corpus C_CODE_REFERENCE with no reference set URI", p.where)
-			}
-		}
-		if g, w := renderPrimitive(got), renderPrimitive(want); g != w {
-			t.Errorf("%s: primitiveFromModel(%T) =\n  %s\nwant the parser's\n  %s", p.where, p.model, g, w)
-		}
-		if got != nil {
-			seen[fmt.Sprintf("%T", got)]++
-		}
-	}
-	// The corpus holds every constraint type, so a walk that paired no
-	// primitive node, or the wrong ones, cannot pass unseen.
-	for _, want := range []constraints.PrimitiveConstraint{
-		constraints.CBoolean{},
-		constraints.CInteger{},
-		constraints.CReal{},
-		constraints.CString{},
-		constraints.CDate{},
-		constraints.CTime{},
-		constraints.CDateTime{},
-		constraints.CDuration{},
-		constraints.CodePhrase{},
-		constraints.CodeReference{},
-		constraints.DvQuantity{},
-		constraints.CDvOrdinal{},
-		constraints.ConstraintRef{},
-	} {
-		if seen[fmt.Sprintf("%T", want)] == 0 {
-			t.Errorf("no corpus node built a %T; the parity walk pairs no such node", want)
-		}
-	}
 }
 
 // TestREQ103_PrimitiveFromModelReadings pins the readings the compile step
