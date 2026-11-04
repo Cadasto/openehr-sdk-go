@@ -162,11 +162,8 @@ type tolerantReading struct {
 	open  []*element
 	// inheriting holds the open elements that inherit, the innermost last.
 	inheriting []*element
-	// prefixes are the prefixes the names of the elements of the input
-	// carry, once read.
-	prefixes map[string]bool
-	edits    []edit
-	xsiFresh string // a prefix the input does not use, once one is chosen
+	edits      []edit
+	xsiFresh   string // a prefix the input does not use, once one is chosen
 	// failed is set where two edits a rendering makes overlap, which the
 	// reading does not make. The input is then left as it is, for the decode
 	// to refuse.
@@ -318,34 +315,26 @@ func (t *tolerantReading) start(tk xml.StartElement, off, end int) {
 		// An element in the namespace the AM Release-1.4 schemas declare
 		// reads as the element of that name in canonical XML's, and, in the
 		// default mode, so does one in a namespace of no openEHR schema, as
-		// the parser, which reads no namespace, reads it. A prefix no element
-		// name carries keeps its namespace, so that a type written with it,
-		// such as xsd:string, reads as written, and so does one bound to the
-		// XSI namespace, which the xsi:type attributes use: an element under
-		// it is renamed instead (below).
-		if a.Value == nsOpenEHRv2 || (!t.strict && isForeignNamespace(a.Value) &&
-			(prefix == "" || (a.Value != canxml.NSXSI && t.namesElements(prefix)))) {
+		// the parser, which reads no namespace, reads it. The default mode
+		// rebinds a default namespace, which no attribute takes, and renames
+		// an element under a prefix (below), which an attribute or a type,
+		// such as an xsi:type or xsd:string, may use too.
+		if a.Value == nsOpenEHRv2 || (!t.strict && prefix == "" && isForeignNamespace(a.Value)) {
 			e.attrs[i].Value = canxml.NSDefault
 			e.dirty = true
 		}
 		t.push(prefix, e.attrs[i].Value)
 	}
-	// encoding/xml reads a prefix no declaration binds as a namespace of that
-	// name, which the default mode reads as canonical XML's too.
+	// An element under a prefix bound to a namespace of no openEHR schema,
+	// the XSI one among them, or bound by no declaration, which encoding/xml
+	// reads as a namespace of that name, reads in the default mode as the
+	// element of that name in canonical XML's, as the parser, which matches
+	// an element by its local name, reads it. It is written without its
+	// prefix, in the default namespace, which the default mode reads as
+	// canonical XML's (isForeignNamespace), and the prefix keeps its
+	// namespace.
 	if p := e.name.Space; !t.strict && p != "" && p != "xml" && p != "xmlns" {
-		if _, ok := t.lookup(p); !ok {
-			e.attrs = append(e.attrs, xml.Attr{Name: xml.Name{Space: "xmlns", Local: p}, Value: canxml.NSDefault})
-			e.dirty = true
-			t.push(p, canxml.NSDefault)
-		}
-	}
-	// An element under a prefix bound to the XSI namespace reads, in the
-	// default mode, as the element of that name in canonical XML's, as the
-	// parser, which matches an element by its local name, reads it: it is
-	// written without its prefix, in the default namespace, which the
-	// default mode reads as canonical XML's (isForeignNamespace).
-	if p := e.name.Space; !t.strict && p != "" {
-		if uri, _ := t.lookup(p); uri == canxml.NSXSI {
+		if uri, ok := t.lookup(p); !ok || isForeignNamespace(uri) {
 			e.renamed, e.dirty = true, true
 		}
 	}
@@ -1360,15 +1349,6 @@ func freshPrefix(data []byte) string {
 		n++
 	}
 	return "xsi" + strconv.Itoa(n)
-}
-
-// namesElements reports whether the name of an element of the input carries
-// prefix.
-func (t *tolerantReading) namesElements(prefix string) bool {
-	if t.prefixes == nil {
-		t.prefixes = elementPrefixes(t.data)
-	}
-	return t.prefixes[prefix]
 }
 
 // push binds prefix to uri where the reading stands.

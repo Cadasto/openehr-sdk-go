@@ -336,16 +336,16 @@ func TestREQ111_ReaderReadsARootInAnotherNamespace(t *testing.T) {
 // prefix bound to another namespace, the xsi prefix of the xsi:type
 // attributes among them, and under a prefix no declaration binds, which
 // encoding/xml reads as a namespace of that name. WithUnmatched reports
-// nothing. Strict mode refuses each as an element in a foreign namespace. An
-// xsi:type keeps its namespace, and so does a prefix bound to another
-// namespace that no element name carries, so that a type written with it,
-// such as the xsd:string of an assertion, reads as it is written.
+// nothing. Strict mode refuses each as an element in a foreign namespace.
+// Every prefix keeps its namespace, so that an xsi:type, and a type written
+// with a prefix, such as the xsd:string of an assertion, read as written,
+// where an element name carries the prefix too.
 //
 // Can-fail control: read only a root element in another namespace so, and
 // the definition reads as missing and the item as no item; read an element in
 // the XSI namespace as one of no openEHR schema, and the flag and the bound
-// of xsi-element.opt read as absent; or read every prefix bound to another
-// namespace as the v1 one, and xsd:string names no type.
+// of xsi-element.opt read as absent; or bind to the v1 namespace a prefix an
+// element name carries, and xsd:string names no type.
 func TestREQ111_ReaderReadsAnElementInAnotherNamespace(t *testing.T) {
 	t.Parallel()
 	string2 := `<item xsi:type="C_STRING"><list>a</list><list>b</list></item>`
@@ -358,22 +358,28 @@ func TestREQ111_ReaderReadsAnElementInAnotherNamespace(t *testing.T) {
 		integerMembers  = `<rm_type_name>INTEGER</rm_type_name><occurrences><lower>1</lower><upper>1</upper></occurrences><node_id/>`
 		quantityMembers = `<rm_type_name>DV_QUANTITY</rm_type_name><occurrences><lower>1</lower><upper>1</upper></occurrences><node_id/>`
 	)
-	// A slot whose assertion holds an item typed xsd:string, and an item in
-	// another namespace, which makes the reader read the document a second
-	// time.
-	slot := func(item string) string {
-		return strings.Replace(definitionDoc(`<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>items</rm_attribute_name>`+
-			`<existence><lower>0</lower><upper>1</upper></existence><children xsi:type="ARCHETYPE_SLOT"><rm_type_name>CLUSTER</rm_type_name>`+
-			`<occurrences><lower>0</lower><upper_unbounded>true</upper_unbounded></occurrences><node_id>at0002</node_id><includes>`+
-			`<expression xsi:type="EXPR_BINARY_OPERATOR"><type>Boolean</type><operator>2007</operator><precedence_overridden>false</precedence_overridden>`+
-			`<left_operand xsi:type="EXPR_LEAF"><type>String</type><item xsi:type="xsd:string">archetype_id/value</item><reference_type>attribute</reference_type></left_operand>`+
-			`<right_operand xsi:type="EXPR_LEAF"><type>C_STRING</type><item xsi:type="C_STRING"><pattern>.*</pattern></item><reference_type>constraint</reference_type></right_operand>`+
-			`</expression></includes></children><children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>ELEMENT</rm_type_name><node_id>at0003</node_id>`+
-			`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>value</rm_attribute_name><existence><lower>0</lower><upper>1</upper></existence>`+
-			`<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>STRING</rm_type_name><node_id/>`+item+`</children></attributes></children>`+
-			`<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval><lower>0</lower><upper_unbounded>true</upper_unbounded></interval></cardinality>`+
-			`</attributes>`), `<template `, `<template xmlns:xsd="http://www.w3.org/2001/XMLSchema" `, 1)
+	// A slot, named under prefix, whose assertion holds an item typed
+	// xsd:string, and an item, the template declaring the prefix xsd where
+	// declare: the item or the slot in another namespace makes the reader
+	// read the document a second time.
+	slotUnder := func(prefix, item string, declare bool) string {
+		doc := definitionDoc(`<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>items</rm_attribute_name>` +
+			`<existence><lower>0</lower><upper>1</upper></existence><` + prefix + `children xsi:type="ARCHETYPE_SLOT"><rm_type_name>CLUSTER</rm_type_name>` +
+			`<occurrences><lower>0</lower><upper_unbounded>true</upper_unbounded></occurrences><node_id>at0002</node_id><includes>` +
+			`<expression xsi:type="EXPR_BINARY_OPERATOR"><type>Boolean</type><operator>2007</operator><precedence_overridden>false</precedence_overridden>` +
+			`<left_operand xsi:type="EXPR_LEAF"><type>String</type><item xsi:type="xsd:string">archetype_id/value</item><reference_type>attribute</reference_type></left_operand>` +
+			`<right_operand xsi:type="EXPR_LEAF"><type>C_STRING</type><item xsi:type="C_STRING"><pattern>.*</pattern></item><reference_type>constraint</reference_type></right_operand>` +
+			`</expression></includes></` + prefix + `children><children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>ELEMENT</rm_type_name><node_id>at0003</node_id>` +
+			`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>value</rm_attribute_name><existence><lower>0</lower><upper>1</upper></existence>` +
+			`<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>STRING</rm_type_name><node_id/>` + item + `</children></attributes></children>` +
+			`<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval><lower>0</lower><upper_unbounded>true</upper_unbounded></interval></cardinality>` +
+			`</attributes>`)
+		if declare {
+			doc = strings.Replace(doc, `<template `, `<template xmlns:xsd="http://www.w3.org/2001/XMLSchema" `, 1)
+		}
+		return doc
 	}
+	slot := func(item string) string { return slotUnder("", item, true) }
 	cases := map[string]struct{ doc, want []byte }{
 		"foreign-namespaces.opt": {readerFixture(t, "foreign-namespaces.opt"), readerFixture(t, "foreign-namespaces.read.opt")},
 		"xsi-element.opt":        {readerFixture(t, "xsi-element.opt"), readerFixture(t, "xsi-element.read.opt")},
@@ -417,6 +423,14 @@ func TestREQ111_ReaderReadsAnElementInAnotherNamespace(t *testing.T) {
 		"an item in another namespace beside a type a prefix bound to another names": {
 			[]byte(slot(`<item xmlns="urn:example" xsi:type="C_STRING"><list>a</list><list>b</list></item>`)),
 			[]byte(slot(string2)),
+		},
+		"an item under a prefix bound to another namespace that a type names too": {
+			[]byte(slot(`<xsd:item xsi:type="C_STRING"><xsd:list>a</xsd:list><list>b</list></xsd:item>`)),
+			[]byte(slot(string2)),
+		},
+		"a slot under a prefix no declaration binds that a type it holds names too": {
+			[]byte(slotUnder("xsd:", string2, false)),
+			[]byte(slotUnder("", string2, false)),
 		},
 	}
 	for name, tc := range cases {
