@@ -57,12 +57,13 @@ const maxDepth = 128
 // node it addresses ([CompiledNode.DefaultValue]): the first child, of the
 // T_COMPLEX_OBJECT's RM type, or of its default value's where it names none,
 // of the attribute named rm_attribute_name on the node that the
-// differential_path reaches. A differential_path that opens with the
-// definition's archetype id in brackets resolves from the rest, and one that
-// opens with a slash from the definition's root, as [Compiled.Resolve]
-// resolves a path, except that a segment's predicate may carry a name,
-// at0004, 'Systolic' or at0004 and name/value='Systolic', which selects the
-// node of that node id or archetype id whose template-level name
+// differential_path reaches, a child's generic parameters set aside, so that
+// DV_INTERVAL matches a DV_INTERVAL<DV_COUNT> child. A differential_path that
+// opens with the definition's archetype id in brackets resolves from the
+// rest, and one that opens with a slash from the definition's root, as
+// [Compiled.Resolve] resolves a path, except that a segment's predicate may
+// carry a name, at0004, 'Systolic' or at0004 and name/value='Systolic', which
+// selects the node of that node id or archetype id whose template-level name
 // ([CompiledNode.NodeName]) it is, each run of white space in the predicate
 // read as one space. Compile skips a default value that addresses no node.
 //

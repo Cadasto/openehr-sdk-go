@@ -102,14 +102,15 @@ func WithStrict() Option {
 // Each default value of the template's constraints is placed on the node its
 // differential path and attribute name address ([CompiledNode.DefaultValue]),
 // the first child of that attribute of the constraint object's RM type, or
-// of the default value's where the object names none. A differential path
-// that opens with the definition's archetype id in brackets resolves from the
-// rest, and one that opens with a slash from the definition's root. A segment's
-// predicate may carry a name, at0004, 'Systolic' or at0004 and
-// name/value='Systolic', which selects the node of that node id or archetype
-// id whose template-level name ([CompiledNode.NodeName]) it is, each run of
-// white space in the predicate read as one space. A default value that
-// addresses no node is skipped.
+// of the default value's where the object names none, a child's generic
+// parameters set aside, so that DV_INTERVAL matches a DV_INTERVAL<DV_COUNT>
+// child. A differential path that opens with the definition's archetype id in
+// brackets resolves from the rest, and one that opens with a slash from the
+// definition's root. A segment's predicate may carry a name, at0004,
+// 'Systolic' or at0004 and name/value='Systolic', which selects the node of
+// that node id or archetype id whose template-level name
+// ([CompiledNode.NodeName]) it is, each run of white space in the predicate
+// read as one space. A default value that addresses no node is skipped.
 //
 // By default Compile reads a value the model holds in the weaker form the
 // deprecated [github.com/cadasto/openehr-sdk-go/openehr/template.ParseOPT]
