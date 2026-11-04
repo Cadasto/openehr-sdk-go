@@ -31,7 +31,13 @@ import (
 // the value's bytes to do so.
 func depthModes(t *testing.T, n int) map[string]func(data []byte, v any) error {
 	t.Helper()
-	limit := canxml.WithMaxDepth(n)
+	return limitModes(t, canxml.WithMaxDepth(n))
+}
+
+// limitModes are the modes of depthModes, each given limit among its
+// options; a nil limit is no option at all, which a decode skips.
+func limitModes(t *testing.T, limit canxml.DecoderOption) map[string]func(data []byte, v any) error {
+	t.Helper()
 	unmarshal := func(opts ...canxml.DecoderOption) func([]byte, any) error {
 		all := slices.Concat(opts, []canxml.DecoderOption{limit})
 		return func(data []byte, v any) error { return canxml.Unmarshal(data, v, all...) }
@@ -334,6 +340,105 @@ func TestREQ108_XMLDecoderMaxDepthRefusalStays(t *testing.T) {
 			second := dec.Decode(new(rm.ItemTree))
 			checkDepthRefusal(t, mode+", the Decode after the refusal", second, clusterPath(4), 4, 3)
 		}
+	}
+}
+
+// xmlDepth is encoding/xml's own depth limit, 10 000 nested elements: it does
+// not decode an element nested deeper, the root at depth 1.
+const xmlDepth = 10_000
+
+// cutClusterPath is the path of a depth refusal of an item of nestedClusters
+// nested deeper than sixteen, cut short in the middle.
+var cutClusterPath = "/item_tree[1]" + strings.Repeat("/items[1]", 7) + "/..." + strings.Repeat("/items[1]", 8)
+
+// nestedConstraints returns an operational template whose definition holds
+// levels C_SINGLE_ATTRIBUTEs, each holding a C_COMPLEX_OBJECT that holds the
+// next. The template is at depth 1 and its definition at 2; the attribute of
+// level k is at depth 2k+1 and its object at 2k+2. Each object writes its own
+// members after the attribute it holds, so its first child is that attribute:
+// a decode that reads a primitive member through encoding/xml, as one given no
+// option does, would otherwise be refused at the object's first member, one
+// level down, rather than at the next attribute.
+func nestedConstraints(levels int) []byte {
+	var b strings.Builder
+	b.WriteString(`<template ` + ucNS + `><template_id><value>t</value></template_id>`)
+	b.WriteString(`<definition><rm_type_name>COMPOSITION</rm_type_name><node_id>at0000</node_id>`)
+	for range levels {
+		b.WriteString(`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>a</rm_attribute_name>`)
+		b.WriteString(`<children xsi:type="C_COMPLEX_OBJECT">`)
+	}
+	for range levels {
+		b.WriteString(`<rm_type_name>CLUSTER</rm_type_name><node_id>at0001</node_id></children></attributes>`)
+	}
+	b.WriteString(`</definition></template>`)
+	return []byte(b.String())
+}
+
+// TestREQ108_XMLRefusesPastEncodingXMLsDepthLimit pins the refusal of an
+// element nested past encoding/xml's own depth limit, 10 000 elements, in
+// every mode, with no WithMaxDepth and with one larger than that limit: a
+// *canxml.DecodeError on its own that wraps canxml.ErrLimitExceeded and names
+// the element's depth, the limit and its path, cut short in the middle, and
+// none of its content, as a WithMaxDepth refusal does, rather than one slot
+// envelope per level around an error no sentinel matches. An RM tree of
+// CLUSTER items and an operational template's constraint objects nest that
+// deep.
+//
+// Can-fail control: let a decode return encoding/xml's error as it comes, and
+// the error wraps no sentinel and names every slot it passed through, 330 044
+// bytes for the items and 469 950 for the template.
+func TestREQ108_XMLRefusesPastEncodingXMLsDepthLimit(t *testing.T) {
+	items := nestedClusters(xmlDepth+8, "")
+	// The attribute of level 4999 is at depth 9 999 and its object at
+	// 10 000; the attribute of level 5000 is the first element past the limit.
+	template := nestedConstraints(5008)
+	templateCut := "/template[1]/definition[1]" + strings.Repeat("/attributes[1]/children[1]", 3) +
+		"/..." + strings.Repeat("/children[1]/attributes[1]", 4)
+	for _, limit := range []struct {
+		name string
+		opt  canxml.DecoderOption
+	}{
+		{name: "no WithMaxDepth"},
+		{name: "WithMaxDepth(20000)", opt: canxml.WithMaxDepth(20_000)},
+	} {
+		for mode, decode := range limitModes(t, limit.opt) {
+			mode = mode + ", " + limit.name
+			checkDepthRefusal(t, mode+", items", decode(items, new(rm.ItemTree)), cutClusterPath, xmlDepth+1, xmlDepth)
+			checkDepthRefusal(t, mode+", template", decode(template, new(aom14.OperationalTemplate)), templateCut, xmlDepth+1, xmlDepth)
+		}
+	}
+}
+
+// TestREQ108_XMLDecoderRefusalPastEncodingXMLsLimitStays pins a stream Decoder
+// after it refuses an element nested past encoding/xml's own limit: its
+// stream stands inside that element, so every later Decode returns the same
+// refusal, with and without an option that tracks the decode. A Decoder given
+// no option that decoded an earlier value a second time, for a prefix declared
+// around its `xsi:type`, refuses a later deep value the same way.
+//
+// Can-fail control: let a later Decode read on through the plain encoding/xml
+// decoder and it returns encoding/xml's bare error; follow no element in the
+// decode a Decoder given no option starts after decoding a value again, and
+// the deep value's refusal names no path.
+func TestREQ108_XMLDecoderRefusalPastEncodingXMLsLimitStays(t *testing.T) {
+	deep := nestedClusters(xmlDepth+8, "")
+	for name, reader := range streamReaders {
+		for _, extra := range []struct {
+			name string
+			opts []canxml.DecoderOption
+		}{{name: "no option"}, {name: "WithStrict", opts: []canxml.DecoderOption{canxml.WithStrict()}}} {
+			mode := name + ", " + extra.name
+			dec := canxml.NewDecoder(reader(slices.Concat(deep, nestedClusters(1, ""))), extra.opts...)
+			checkDepthRefusal(t, mode+", the deep value", dec.Decode(new(rm.ItemTree)), cutClusterPath, xmlDepth+1, xmlDepth)
+			checkDepthRefusal(t, mode+", the Decode after the refusal", dec.Decode(new(rm.ItemTree)), cutClusterPath, xmlDepth+1, xmlDepth)
+		}
+
+		dec := canxml.NewDecoder(reader(slices.Concat(prefixSlot(), deep)))
+		if err := dec.Decode(new(aom14.ArchetypeSlot)); err != nil {
+			t.Errorf("%s: Decode of the slot whose prefix is declared around its item = %v; want nil", name, err)
+			continue
+		}
+		checkDepthRefusal(t, name+", the deep value after one decoded again", dec.Decode(new(rm.ItemTree)), cutClusterPath, xmlDepth+1, xmlDepth)
 	}
 }
 

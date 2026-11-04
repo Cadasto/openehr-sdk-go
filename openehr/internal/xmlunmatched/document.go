@@ -28,10 +28,11 @@ import (
 //
 // A primitive failure comes back on its own, naming the element by its path
 // from the root of the value (see "Primitive failures" in the package
-// documentation). A tracked decode knows the path; an untracked one finds it
-// by decoding data a second time, once the first decode has failed so, which
-// a decode that succeeds never pays for. Other XML syntax errors come back
-// unchanged from encoding/xml.
+// documentation), and so does the refusal of an element nested past
+// encoding/xml's own depth limit (see "Depth limit"). A tracked decode knows
+// the path; an untracked one finds it by decoding data a second time, once
+// the first decode has failed so, which a decode that succeeds never pays
+// for. Other XML syntax errors come back unchanged from encoding/xml.
 //
 // A tracked decode also knows the namespace prefixes declared around each
 // element, which an `xsi:type` written with a prefix needs ([LookupPrefix]).
@@ -47,7 +48,7 @@ func Unmarshal(data []byte, v any, t *Tracker) error {
 	if t == nil {
 		dec := xml.NewDecoder(bytes.NewReader(data))
 		if err := dec.Decode(v); err != nil {
-			if IsPrimitiveFailure(err) || IsUnresolvedPrefix(err) {
+			if IsPrimitiveFailure(err) || IsUnresolvedPrefix(err) || IsXMLDepthError(err) {
 				return decodeAgain(data, v, err)
 			}
 			return err
@@ -62,18 +63,21 @@ func Unmarshal(data []byte, v any, t *Tracker) error {
 }
 
 // decodeAgain decodes data into v once more after an untracked decode failed
-// with err: a primitive failure that names the element alone, or an `xsi:type`
-// whose prefix the decode could not resolve. The second decode reads through
-// a tracker that follows the open elements and their namespace scope and
-// applies no policy. A primitive failure fails again at the same element,
-// named by its path from the root of the value. A prefix resolves, and the
-// decode reads on to the end: so that it does not add to what the first
-// decode left in v, such as the items of a list, the root's decoder clears v
-// before it reads ([Enter]). It returns what the second decode returns, or
-// err should a primitive failure not fail again.
+// with err: a primitive failure that names the element alone, an `xsi:type`
+// whose prefix the decode could not resolve, or encoding/xml's refusal of an
+// element nested past its own depth limit, which names no element. The second
+// decode reads through a tracker that follows the open elements and their
+// namespace scope and applies no policy. A primitive failure fails again at
+// the same element, named by its path from the root of the value, and so does
+// a depth refusal. A prefix resolves, and the decode reads on to the end: so
+// that it does not add to what the first decode left in v, such as the items
+// of a list, the root's decoder clears v before it reads ([Enter]), as it does
+// after a depth refusal, should the tracked decode read on where the first
+// did not. It returns what the second decode returns, or err should a
+// primitive failure not fail again.
 func decodeAgain(data []byte, v any, err error) error {
 	t := NewTracker(nil, false)
-	t.again = IsUnresolvedPrefix(err)
+	t.again = IsUnresolvedPrefix(err) || IsXMLDepthError(err)
 	dec := t.NewDecoder(bytes.NewReader(data))
 	if again := t.Decode(dec, v); again != nil {
 		return again

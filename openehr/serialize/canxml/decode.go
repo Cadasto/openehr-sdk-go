@@ -168,6 +168,11 @@ func WithStrict() DecoderOption {
 // n holds, in whatever order they come. Following the elements costs a decode
 // some time, as [WithUnmatched] does; a decode without a limit pays nothing
 // for it.
+//
+// No n lifts the depth encoding/xml decodes, 10 000 nested elements: with n
+// above it, or with no limit, the decode refuses an element nested deeper
+// than that all the same, with a refusal of the same form that names 10 000
+// as the limit (see "Nesting depth" in the package documentation).
 func WithMaxDepth(n int) DecoderOption {
 	return func(c *decoderConfig) {
 		if n > 0 && (c.maxDepth == 0 || n < c.maxDepth) {
@@ -216,11 +221,12 @@ type Decoder struct {
 	// is an io.ByteReader and an io.Seeker, which dec reads directly and the
 	// decoder seeks back in to decode a value again; nil otherwise.
 	seeker io.ReadSeeker
-	// scope keeps the namespace declarations in scope for a decoder given
-	// none of those options once it has decoded a value a second time to
-	// resolve a prefix: it reads the rest of the stream through scope. nil
-	// until then. For a decoder given none of them but [WithMaxDepth], scope
-	// is there from the start, and follows the elements for the limit.
+	// scope keeps the namespace declarations in scope, and follows the
+	// elements, for a decoder given none of those options once it has decoded
+	// a value a second time, to resolve a prefix or to name an element nested
+	// past encoding/xml's depth limit: it reads the rest of the stream through
+	// scope. nil until then. For a decoder given none of them but
+	// [WithMaxDepth], scope is there from the start.
 	scope *xmlunmatched.Scope
 }
 
@@ -442,7 +448,9 @@ func (f failedReader) Read([]byte) (int, error) { return 0, f.err }
 // a prefix is declared on an element around the attribute, Decode decodes the
 // value a second time, from where the call began, through a reader that keeps
 // every declaration in scope, into v cleared to its zero value. The Decoder
-// then reads the rest of the stream through that reader. To read the value
+// then reads the rest of the stream through that reader. It does the same
+// when the value nests deeper than encoding/xml decodes, 10 000 elements, to
+// name the element refused by its path (see [WithMaxDepth]). To read the value
 // again, a Decoder whose reader is an io.ByteReader and an io.Seeker, such as
 // a *bytes.Reader, seeks the reader back to where the value began, and a seek
 // that fails is the error Decode returns; a Decoder over any other reader
@@ -468,7 +476,7 @@ func (d *Decoder) Decode(v any) error {
 		d.rec.from(start)
 	}
 	err := d.dec.Decode(v)
-	if !xmlunmatched.IsUnresolvedPrefix(err) {
+	if !xmlunmatched.IsUnresolvedPrefix(err) && !xmlunmatched.IsXMLDepthError(err) {
 		return err
 	}
 	src, err := d.rewind(start)
@@ -558,7 +566,10 @@ func (d *Decoder) RelaxedTypeDispatch() bool { return d.cfg.relaxedTypeDispatch 
 // [ErrUnknownElement]. A mandatory member the input leaves out is decoded
 // as its zero value by default, and [WithMissing] reports each one, by its
 // JSON Pointer in the canonical-JSON form of the instance; no mode refuses
-// one. [WithMaxDepth] refuses an element nested deeper than its limit.
+// one. [WithMaxDepth] refuses an element nested deeper than its limit, and
+// every decode refuses one nested deeper than encoding/xml decodes, 10 000
+// elements, the same way; given no option, Unmarshal finds the path of such
+// an element by decoding data a second time.
 func Unmarshal(data []byte, v any, opts ...DecoderOption) error {
 	return xmlunmatched.Unmarshal(data, v, newDecoderConfig(opts).documentTracker())
 }
