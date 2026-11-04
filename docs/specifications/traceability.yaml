@@ -1842,6 +1842,7 @@ requirements:
       - internal/templatecompile/compiled_golden_test.go
       - internal/templatecompile/default_value_test.go
       - internal/templatecompile/parity_fixtures_test.go
+      - internal/templatecompile/parity_test.go
       - internal/templatecompile/resolve_test.go
       - openehr/aom/aom14/read_tolerant_test.go
       - openehr/instance/local_term_text_test.go
