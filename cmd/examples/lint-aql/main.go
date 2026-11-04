@@ -87,10 +87,11 @@ func run() error {
 // compiles it. The compiled form is what every template-aware SDK entry point
 // takes, ValidateAQL included.
 //
-// ReadOperationalTemplate refuses a node type it does not know rather than
-// drop everything beneath it, which would make every archetype and path in
-// that subtree lint as not in the template. The program refuses such a
-// template instead of reporting those findings.
+// By default ReadOperationalTemplate reads a node type it does not know as a
+// leaf without its subtree, so every archetype and path in that subtree lints
+// as not in the template. A lint that must not report those findings passes
+// canxml.WithStrict() here and templatecompile.WithStrict() to Compile, which
+// refuse such readings.
 func loadTemplate(optPath string) (*templatecompile.Compiled, error) {
 	raw, err := os.ReadFile(optPath)
 	if err != nil {

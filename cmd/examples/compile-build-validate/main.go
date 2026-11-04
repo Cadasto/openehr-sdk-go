@@ -52,9 +52,11 @@ func run() error {
 	// Step 1: read the OPT. An operational template is the ADL 1.4 XML file
 	// a clinical modeller exports; it fixes which archetypes, nodes and value
 	// constraints a composition may contain. ReadOperationalTemplate reads it
-	// into the operational template model, and refuses a node type it does
-	// not know rather than drop the constraints beneath it, which a program
-	// that builds and validates data must not do.
+	// into the operational template model, and by default reads a node type
+	// it does not know as a leaf without the constraints beneath it. A
+	// program that builds and validates data against every constraint passes
+	// canxml.WithStrict() here and templatecompile.WithStrict() to Compile,
+	// which refuse such readings.
 	raw, err := os.ReadFile(optPath)
 	if err != nil {
 		return fmt.Errorf("read OPT %s: %w", optPath, err)

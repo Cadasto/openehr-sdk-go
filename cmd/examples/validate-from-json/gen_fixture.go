@@ -93,8 +93,9 @@ func injectPartySelf(v any) {
 }
 
 // compileVitalSigns reads the vendored vital_signs.opt into the operational
-// template model, which refuses a node type it does not know instead of
-// silently dropping the nodes beneath it, and compiles it.
+// template model, by default reading a node type it does not know as a leaf
+// without its subtree (canxml.WithStrict and templatecompile.WithStrict
+// refuse such readings), and compiles it.
 func compileVitalSigns() *templatecompile.Compiled {
 	raw, err := os.ReadFile(fixtures.TemplateOptForName("vital_signs"))
 	if err != nil {

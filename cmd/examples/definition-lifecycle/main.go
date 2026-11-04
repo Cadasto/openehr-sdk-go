@@ -104,10 +104,11 @@ func run() error {
 
 	// Step 5: turn the bytes into the local handle. Whatever form the server
 	// sent, the download has to be read and compiled.
-	// ReadOperationalTemplate fails on a node type it does not know instead
-	// of silently dropping what is under it. The compiled template is what
-	// the builder, validator and generator take; compile it once and reuse
-	// it.
+	// By default ReadOperationalTemplate reads a node type it does not know
+	// as a leaf without its subtree; canxml.WithStrict() and
+	// templatecompile.WithStrict() refuse such readings. The compiled
+	// template is what the builder, validator and generator take; compile it
+	// once and reuse it.
 	parsed, err := aom14.ReadOperationalTemplate(bytes.NewReader(raw))
 	if err != nil {
 		return fmt.Errorf("read OPT: %w", err)

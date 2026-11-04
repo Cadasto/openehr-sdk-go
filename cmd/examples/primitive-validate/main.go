@@ -62,9 +62,10 @@ func main() {
 
 func run() error {
 	// Step 1: read the template into the operational template model and
-	// compile it. ReadOperationalTemplate reads from any io.Reader and
-	// refuses a node type it does not know rather than drop everything
-	// beneath it.
+	// compile it. ReadOperationalTemplate reads from any io.Reader and by
+	// default reads a node type it does not know as a leaf without its
+	// subtree; canxml.WithStrict() and templatecompile.WithStrict() refuse
+	// such readings.
 	opt, err := aom14.ReadOperationalTemplate(strings.NewReader(minimalQuantityOPT))
 	if err != nil {
 		return fmt.Errorf("read OPT: %w", err)

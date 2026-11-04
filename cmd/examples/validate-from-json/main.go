@@ -119,10 +119,13 @@ func validateFiles(jsonPath, optPath string) (validation.Result, error) {
 	// deployable form of an openEHR template: every archetype it uses,
 	// flattened into one XML file with the template's constraints applied.
 	// ReadOperationalTemplate reads it into the operational template model,
-	// and refuses a node type it does not know rather than drop the
-	// constraints beneath it, which a validator must not do. Compile turns
-	// the model into the compiled template that the validator, the
-	// composition builder, the instance generator and the AQL lint all read.
+	// and by default reads a node type it does not know as a leaf without
+	// the constraints beneath it. A validator that must not check against a
+	// reduced template passes canxml.WithStrict() here and
+	// templatecompile.WithStrict() to Compile, which refuse such readings.
+	// Compile turns the model into the compiled template that the validator,
+	// the composition builder, the instance generator and the AQL lint all
+	// read.
 	raw, err := os.ReadFile(optPath)
 	if err != nil {
 		return validation.Result{}, fmt.Errorf("read OPT %q: %w", optPath, err)

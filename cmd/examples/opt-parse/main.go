@@ -1,7 +1,8 @@
 // Example: read an ADL 1.4 operational template (OPT), compile it, and look
 // around inside it: identity, provenance metadata, the root node with its
 // attributes, and path lookup. It reads the OPT with
-// aom14.ReadOperationalTemplate, which refuses a node type it does not know,
+// aom14.ReadOperationalTemplate, which by default reads a node type it does
+// not know as a leaf without its subtree (canxml.WithStrict refuses it),
 // compiles it with templatecompile.Compile, and looks paths up with
 // template.ParsePath, Compiled.ValidatePath and Compiled.Resolve, with and
 // without templatecompile.WithStrictPaths.
@@ -42,8 +43,9 @@ func run(args []string) error {
 	}
 
 	// Step 1: read the OPT into the operational template model.
-	// ReadOperationalTemplate refuses a node type it does not know rather
-	// than drop everything beneath it.
+	// By default ReadOperationalTemplate reads a node type it does not know
+	// as a leaf without its subtree; canxml.WithStrict() on the reader and
+	// templatecompile.WithStrict() on Compile refuse such readings.
 	raw, err := os.ReadFile(optPath)
 	if err != nil {
 		return fmt.Errorf("read OPT %s: %w", optPath, err)

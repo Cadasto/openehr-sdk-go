@@ -138,9 +138,11 @@ func report(result validation.Result) bool {
 
 // loadTemplate reads the vendored OPT into the operational template model,
 // compiles it, and builds its Web Template. Do this once per template in your
-// own code and reuse both results. ReadOperationalTemplate refuses a node
-// type it does not know rather than drop the constraints beneath it. That
-// matters here because the compiled template drives the validation below.
+// own code and reuse both results. By default ReadOperationalTemplate reads a
+// node type it does not know as a leaf without the constraints beneath it,
+// which matters here because the compiled template drives the validation
+// below; canxml.WithStrict() and templatecompile.WithStrict() refuse such
+// readings.
 func loadTemplate() (*templatecompile.Compiled, *webtemplate.WebTemplate, error) {
 	optPath := fixtures.TemplateOpt(templateID)
 	raw, err := os.ReadFile(optPath)

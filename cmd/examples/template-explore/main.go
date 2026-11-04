@@ -42,7 +42,9 @@ func run() error {
 	// builder and the validator work from; it is public so your own tooling
 	// can walk it too.
 	// ReadOperationalTemplate reads the OPT into the operational template
-	// model, and refuses a node type it does not know.
+	// model, and by default reads a node type it does not know as a leaf
+	// without its subtree; canxml.WithStrict() and templatecompile.WithStrict()
+	// refuse such readings.
 	raw, err := os.ReadFile(optPath)
 	if err != nil {
 		return fmt.Errorf("read OPT %s: %w", optPath, err)
