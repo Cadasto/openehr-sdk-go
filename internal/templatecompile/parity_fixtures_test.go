@@ -52,6 +52,9 @@ func TestREQ111_ParityFixtures(t *testing.T) {
 		{file: "temporal_bound_not_iso8601.opt", parserStrictRefuses: true, compileStrictRefuses: true},
 		{file: "duration_bounds_not_iso8601.opt", parserStrictRefuses: true, compileStrictRefuses: true},
 		{file: "primitive_object_no_item.opt", parserStrictRefuses: true, compileStrictRefuses: true},
+		// Its decimal and NaN integer bounds are read in every mode, so
+		// neither strict mode refuses it.
+		{file: "decimal_and_nan_bounds.opt"},
 		{
 			file: "default_value_placement.opt",
 			defaults: map[string]string{

@@ -40,12 +40,6 @@ const readerFixtureDir = "../../openehr/aom/aom14/testdata/reader"
 // new path refuses for a reason the rule allows, one for each reason.
 const parityExceptionDir = "testdata/parity-exceptions"
 
-// parityIntegerBoundDir holds the parity fixtures whose integer bounds the
-// reader reads otherwise than the parser, admitting the same integers. They
-// sit apart from TestREQ111_ParityFixtures' list, which pins each fixture's
-// strict-mode refusals, so they are checked here in the default mode only.
-const parityIntegerBoundDir = "testdata/parity/integer-bounds"
-
 // parityKind is what the parity check makes of one operational template.
 type parityKind int
 
@@ -377,7 +371,7 @@ func TestREQ111_ParityWithDeprecatedParser(t *testing.T) {
 		exceptions bool
 	}{
 		{name: "corpus", files: corpus, parserReadsAll: true},
-		{name: "parity", files: append(glob(parityFixtureDir), glob(parityIntegerBoundDir)...), parserReadsAll: true},
+		{name: "parity", files: glob(parityFixtureDir), parserReadsAll: true},
 		{name: "reader", files: glob(readerFixtureDir)},
 		{name: "exception", files: glob(parityExceptionDir), parserReadsAll: true, exceptions: true},
 	}
