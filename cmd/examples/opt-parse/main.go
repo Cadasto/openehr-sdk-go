@@ -28,14 +28,16 @@ import (
 )
 
 func main() {
-	if err := run(); err != nil {
+	if err := run(os.Args[1:]); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run() error {
+// run reads, compiles and looks around the OPT that args names first, or the
+// vital_signs fixture when args is empty.
+func run(args []string) error {
 	optPath := fixtures.TemplateOptForName("vital_signs")
-	if args := os.Args[1:]; len(args) > 0 {
+	if len(args) > 0 {
 		optPath = args[0]
 	}
 
@@ -66,8 +68,37 @@ func run() error {
 	// Step 4: the root node and its attributes.
 	printRoot(compiled.Root())
 
-	// Step 5: look a path up in the compiled template.
-	return lookUpContent(compiled)
+	// Step 5: look a path up in the compiled template: /content, or, where
+	// the root has nothing under content, its first attribute with a child.
+	path, ok := pathToLookUp(compiled.Root())
+	if !ok {
+		fmt.Println("lookup      : no attribute of the root has a child to look up")
+		return nil
+	}
+	if path != contentPath {
+		fmt.Printf("lookup      : the root has nothing under %s; looking up %s\n", contentPath, path)
+	}
+	return lookUp(compiled, path)
+}
+
+// contentPath is the path of the attribute that holds a COMPOSITION's clinical
+// entries.
+const contentPath = "/content"
+
+// pathToLookUp returns the path the program looks up: /content when the root
+// has a child under it, else the first attribute of the root that has a
+// child, such as a demographic template's name. ok is false when no
+// attribute of the root has a child.
+func pathToLookUp(root *templatecompile.CompiledNode) (path string, ok bool) {
+	if attr := root.Attribute("content"); attr != nil && len(attr.Children()) > 0 {
+		return contentPath, true
+	}
+	for _, attr := range root.Attributes() {
+		if len(attr.Children()) > 0 {
+			return "/" + attr.Name(), true
+		}
+	}
+	return "", false
 }
 
 // printIdentity prints the fields that name a template. UID and language are
@@ -126,12 +157,9 @@ func printRoot(root *templatecompile.CompiledNode) {
 	}
 }
 
-// lookUpContent looks up /content, the attribute that holds a COMPOSITION's
-// clinical entries, then shows what strict lookup adds and the predicate
-// that settles it.
-func lookUpContent(compiled *templatecompile.Compiled) error {
-	const path = "/content"
-
+// lookUp looks up path, an attribute of the root, then shows what strict
+// lookup adds and the predicate that settles it.
+func lookUp(compiled *templatecompile.Compiled, path string) error {
 	// ParsePath checks the syntax once and needs no template, so a malformed
 	// path fails before any lookup happens, and the same Path works on every
 	// compiled template.
@@ -161,7 +189,7 @@ func lookUpContent(compiled *templatecompile.Compiled) error {
 
 	// Strict lookup refuses to guess: the same lookup returns
 	// ErrAmbiguousPath. Validators and code generators should prefer it. A
-	// template with a single child under /content prints nothing more.
+	// template with a single child under the path prints nothing more.
 	switch _, err := compiled.Resolve(parsed, templatecompile.WithStrictPaths()); {
 	case errors.Is(err, template.ErrAmbiguousPath):
 		fmt.Printf("strict      : %s is ambiguous (multiple children)\n", path)
