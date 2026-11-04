@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"sync"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/decodeopts"
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
@@ -22,6 +24,14 @@ const readMaxBytes = 32 << 20
 // the root, the definition and the deepest content one constraint object
 // holds, such as an assumed value or an expression tree.
 const readMaxDepth = 2*128 + 64
+
+// inputBuffers holds the buffers [ReadOperationalTemplate] keeps its input in,
+// so that a read allocates none; a buffer larger than inputBufferMax is
+// dropped rather than kept for the next read.
+var inputBuffers = sync.Pool{New: func() any { return new(bytes.Buffer) }}
+
+// inputBufferMax is the largest buffer inputBuffers keeps: 4 MiB.
+const inputBufferMax = 4 << 20
 
 // ReadOperationalTemplate reads one ADL 1.4 operational template, in the XML
 // form of the AM Release-1.4 template schema, from r into the model, within
@@ -55,33 +65,157 @@ const readMaxDepth = 2*128 + 64
 // an error that wraps [io.ErrUnexpectedEOF], not [io.EOF], and carries none
 // of the input. Any other decode error comes back as the decode returns it.
 //
+// Operational templates in use hold shapes and values their schema does not
+// allow, which the deprecated template parser reads. The reader reads them as
+// that parser does. In every mode it reads:
+//
+//   - an element in the http://schemas.openehr.org/v2 namespace, which the
+//     AM Release-1.4 schemas declare, as the element of that name in the
+//     http://schemas.openehr.org/v1 namespace canonical XML reads;
+//   - a C_BOOLEAN whose true_valid or false_valid is absent or empty with
+//     that flag true;
+//   - the assumed_value of a C_BOOLEAN, C_INTEGER or C_REAL that holds no
+//     value of its type as absent, a boolean being true, false, 1 or 0 in
+//     any letter case;
+//   - an empty timezone_validity of a C_DATE, C_TIME or C_DATE_TIME as
+//     absent, which is optional;
+//   - a range bound that holds no number on a side the range writes
+//     unbounded, which the parser does not read, and a bound of the
+//     magnitude or precision of a C_DV_QUANTITY that holds none, as absent,
+//     the side unbounded.
+//
+// Without [canxml.WithStrict] it also reads, inside the definition:
+//
+//   - an <attributes>, a <children> or the <item> of a C_PRIMITIVE_OBJECT
+//     that names no type in the XML Schema instance namespace, none, an
+//     empty one or one under a prefix bound to another namespace: such an
+//     <attributes> as a C_MULTIPLE_ATTRIBUTE where it holds a <cardinality>
+//     and as a C_SINGLE_ATTRIBUTE otherwise, such a <children> as a
+//     C_ARCHETYPE_ROOT where it holds an archetype id and as a
+//     C_COMPLEX_OBJECT otherwise, and such an <item> as no item;
+//   - the type of an <attributes>, a <children> or an <item> without the
+//     white space around it;
+//   - a <children> whose type names no class of the AOM 1.4 constraint
+//     model, as a C_COMPLEX_OBJECT with the rm_type_name, node_id and
+//     occurrences it holds and none of its attributes;
+//   - an <item> whose type names neither a C_PRIMITIVE class nor another
+//     class the parser reads a constraint of, such as C_CODE_PHRASE, as no
+//     item;
+//   - a list entry of a C_INTEGER or C_REAL that holds no number of its
+//     type as absent, and a bound of its range that holds none as absent,
+//     the side unbounded;
+//   - a timezone_validity that names no validity kind as absent.
+//
+// A side a bound is read out of keeps the included flag the range gives it;
+// where the range gives none and does not write the side unbounded, the side
+// is included, as the parser reads it.
+//
+// What a reading leaves out is unmatched content, which
+// [canxml.WithUnmatched] reports at its path. Given [canxml.WithStrict], which
+// refuses unmatched content, the readings of every mode leave it out
+// unreported, and the reader refuses each shape of the second list, as it
+// refuses a bare type attribute on such an element, which canonical XML reads
+// as its type, and an empty list entry or range bound of a C_INTEGER or
+// C_REAL, which canonical XML reads as 0. In every mode it refuses an integer that the model's 32-bit
+// Integer cannot hold. A document that needs none of these readings is
+// decoded once; one that needs one is decoded a second time, from the bytes
+// the reader keeps of the input, and so is every document when opts pass
+// what the decode reports to a function, which sees each item once.
+//
 // A caller that decodes an operational template with [canxml.Unmarshal] or a
-// [canxml.Decoder] itself gets neither limit unless it applies them.
+// [canxml.Decoder] itself gets neither limit and none of these readings
+// unless it applies them.
 func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*OperationalTemplate, error) {
 	// lr.N reaches 0 only once r has given a byte past the limit.
 	lr := &io.LimitedReader{R: r, N: readMaxBytes + 1}
-	br := bufio.NewReader(lr)
-	// The stream decoder skips what comes before the root, so the prolog is
-	// checked first; the decode then reads the bytes the check read again.
-	ot := new(OperationalTemplate)
-	head, err := xmlunmatched.ReadProlog(br)
-	if err == nil {
-		// The decoder takes no byte past the root element from an
-		// io.ByteReader, so what follows the root is left for afterRoot.
-		src := bufio.NewReader(io.MultiReader(bytes.NewReader(head), br))
-		// WithMaxDepth keeps the smallest limit it is given, so the caller's
-		// own limit applies as well, in whatever order the options come.
-		opts = slices.Concat(opts, []canxml.DecoderOption{canxml.WithMaxDepth(readMaxDepth)})
-		err = canxml.NewDecoder(src, opts...).Decode(ot)
-		if err == nil {
-			err = afterRoot(src)
+	// in keeps every byte read from r, for the checks and a second decode; it
+	// is made as large as r says it is. Nothing the read returns refers to it.
+	in := inputBuffers.Get().(*bytes.Buffer)
+	in.Reset()
+	defer func() {
+		if in.Cap() <= inputBufferMax {
+			inputBuffers.Put(in)
+		}
+	}()
+	if l, ok := r.(interface{ Len() int }); ok {
+		in.Grow(min(l.Len(), readMaxBytes) + 1)
+	}
+	br := bufio.NewReader(io.TeeReader(lr, in))
+	settings := decodeopts.Of(opts)
+	// A decode that reports to the caller's function runs once the reader
+	// knows which input it decodes, so that the function sees each item once;
+	// the first decode then reports to none.
+	first := opts
+	if settings.Reports {
+		first = nil
+		if settings.Strict {
+			first = []canxml.DecoderOption{canxml.WithStrict()}
 		}
 	}
+	ot, err := readDocument(br, first)
 	// An input past the size limit is refused as such, whatever the decode
 	// made of the bytes it read: the limit may have cut it short.
 	if lr.N == 0 {
-		return nil, fmt.Errorf("aom14: input exceeds %d bytes: %w", readMaxBytes, canxml.ErrLimitExceeded)
+		return nil, errInputTooLarge()
 	}
+	var tolerant bool
+	if err == nil {
+		tolerant = needsTolerance(in.Bytes(), ot)
+	} else {
+		tolerant = retryable(err, settings.Strict)
+	}
+	if !tolerant && !settings.Reports {
+		return readResult(ot, err)
+	}
+	if tolerant && err != nil {
+		// The decode stopped short of the end, which the second reading needs.
+		if _, cerr := io.Copy(io.Discard, br); cerr != nil {
+			return readResult(ot, err)
+		}
+		if lr.N == 0 {
+			return nil, errInputTooLarge()
+		}
+	}
+	data := in.Bytes()
+	if tolerant {
+		if read, changed := tolerate(data, settings.Strict); changed {
+			return readResult(readDocument(bufio.NewReader(bytes.NewReader(read)), opts))
+		}
+	}
+	if settings.Reports {
+		return readResult(readDocument(bufio.NewReader(bytes.NewReader(data)), opts))
+	}
+	return readResult(ot, err)
+}
+
+// readDocument decodes one document from br with opts and the element limit:
+// what comes before the root, the root, and what comes after it.
+func readDocument(br *bufio.Reader, opts []canxml.DecoderOption) (*OperationalTemplate, error) {
+	// The stream decoder skips what comes before the root, so the prolog is
+	// checked first; the decode then reads the bytes the check read again.
+	head, err := xmlunmatched.ReadProlog(br)
+	if err != nil {
+		return nil, err
+	}
+	// The decoder takes no byte past the root element from an
+	// io.ByteReader, so what follows the root is left for afterRoot.
+	src := bufio.NewReader(io.MultiReader(bytes.NewReader(head), br))
+	// WithMaxDepth keeps the smallest limit it is given, so the caller's own
+	// limit applies as well, in whatever order the options come.
+	opts = slices.Concat(opts, []canxml.DecoderOption{canxml.WithMaxDepth(readMaxDepth)})
+	ot := new(OperationalTemplate)
+	if err := canxml.NewDecoder(src, opts...).Decode(ot); err != nil {
+		return nil, err
+	}
+	if err := afterRoot(src); err != nil {
+		return nil, err
+	}
+	return ot, nil
+}
+
+// readResult returns what [ReadOperationalTemplate] returns for a decode that
+// gave ot and err.
+func readResult(ot *OperationalTemplate, err error) (*OperationalTemplate, error) {
 	// The decode gives a bare io.EOF when the input holds no root element,
 	// which a caller reading a stream would take for the end of its own.
 	if errors.Is(err, io.EOF) {
@@ -91,6 +225,11 @@ func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*Operat
 		return nil, err
 	}
 	return ot, nil
+}
+
+// errInputTooLarge is the refusal of an input past the size limit.
+func errInputTooLarge() error {
+	return fmt.Errorf("aom14: input exceeds %d bytes: %w", readMaxBytes, canxml.ErrLimitExceeded)
 }
 
 // afterRoot reads r, the rest of the input after the root element, to its

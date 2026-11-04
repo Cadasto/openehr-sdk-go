@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Values the AM Release-1.4 schemas do not allow, which the reader's default mode reads as the deprecated template parser does, and its strict mode refuses. values.read.opt is how the reader reads it. SDK-authored. -->
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <language>
+        <terminology_id>
+            <value>ISO_639-1</value>
+        </terminology_id>
+        <code_string>en</code_string>
+    </language>
+    <template_id>
+        <value>sdk.reader_values.v0</value>
+    </template_id>
+    <concept>sdk.reader_values.v0</concept>
+    <definition>
+        <rm_type_name>CLUSTER</rm_type_name>
+        <occurrences>
+            <lower>1</lower>
+            <upper>1</upper>
+        </occurrences>
+        <node_id>at0000</node_id>
+        <attributes xsi:type="C_MULTIPLE_ATTRIBUTE">
+            <rm_attribute_name>items</rm_attribute_name>
+            <existence>
+                <lower>0</lower>
+                <upper>1</upper>
+            </existence>
+            <children xsi:type="C_COMPLEX_OBJECT">
+                <rm_type_name>ELEMENT</rm_type_name>
+                <occurrences>
+                    <lower>0</lower>
+                    <upper>1</upper>
+                </occurrences>
+                <node_id>at0001</node_id>
+                <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                    <rm_attribute_name>value</rm_attribute_name>
+                    <existence>
+                        <lower>0</lower>
+                        <upper>1</upper>
+                    </existence>
+                    <children xsi:type="C_COMPLEX_OBJECT">
+                        <rm_type_name>DV_COUNT</rm_type_name>
+                        <occurrences>
+                            <lower>1</lower>
+                            <upper>1</upper>
+                        </occurrences>
+                        <node_id/>
+                        <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                            <rm_attribute_name>magnitude</rm_attribute_name>
+                            <existence>
+                                <lower>1</lower>
+                                <upper>1</upper>
+                            </existence>
+                            <children xsi:type="C_PRIMITIVE_OBJECT">
+                                <rm_type_name>INTEGER</rm_type_name>
+                                <occurrences>
+                                    <lower>1</lower>
+                                    <upper>1</upper>
+                                </occurrences>
+                                <node_id/>
+                                <item xsi:type="C_INTEGER">
+                                    <list>1</list>
+                                    <list>one</list>
+                                    <list/>
+                                    <list>2.0</list>
+                                    <list>3</list>
+                                </item>
+                            </children>
+                        </attributes>
+                    </children>
+                </attributes>
+            </children>
+            <children xsi:type="C_COMPLEX_OBJECT">
+                <rm_type_name>ELEMENT</rm_type_name>
+                <occurrences>
+                    <lower>0</lower>
+                    <upper>1</upper>
+                </occurrences>
+                <node_id>at0002</node_id>
+                <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                    <rm_attribute_name>value</rm_attribute_name>
+                    <existence>
+                        <lower>0</lower>
+                        <upper>1</upper>
+                    </existence>
+                    <children xsi:type="C_COMPLEX_OBJECT">
+                        <rm_type_name>DV_COUNT</rm_type_name>
+                        <occurrences>
+                            <lower>1</lower>
+                            <upper>1</upper>
+                        </occurrences>
+                        <node_id/>
+                        <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                            <rm_attribute_name>magnitude</rm_attribute_name>
+                            <existence>
+                                <lower>1</lower>
+                                <upper>1</upper>
+                            </existence>
+                            <children xsi:type="C_PRIMITIVE_OBJECT">
+                                <rm_type_name>INTEGER</rm_type_name>
+                                <occurrences>
+                                    <lower>1</lower>
+                                    <upper>1</upper>
+                                </occurrences>
+                                <node_id/>
+                                <item xsi:type="C_INTEGER">
+                                    <range>
+                                        <lower_unbounded>false</lower_unbounded>
+                                        <upper_unbounded>false</upper_unbounded>
+                                        <lower>none</lower>
+                                        <upper>9</upper>
+                                    </range>
+                                </item>
+                            </children>
+                        </attributes>
+                    </children>
+                </attributes>
+            </children>
+            <children xsi:type="C_COMPLEX_OBJECT">
+                <rm_type_name>ELEMENT</rm_type_name>
+                <occurrences>
+                    <lower>0</lower>
+                    <upper>1</upper>
+                </occurrences>
+                <node_id>at0003</node_id>
+                <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                    <rm_attribute_name>value</rm_attribute_name>
+                    <existence>
+                        <lower>0</lower>
+                        <upper>1</upper>
+                    </existence>
+                    <children xsi:type="C_COMPLEX_OBJECT">
+                        <rm_type_name>DV_COUNT</rm_type_name>
+                        <occurrences>
+                            <lower>1</lower>
+                            <upper>1</upper>
+                        </occurrences>
+                        <node_id/>
+                        <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                            <rm_attribute_name>magnitude</rm_attribute_name>
+                            <existence>
+                                <lower>1</lower>
+                                <upper>1</upper>
+                            </existence>
+                            <children xsi:type="C_PRIMITIVE_OBJECT">
+                                <rm_type_name>INTEGER</rm_type_name>
+                                <occurrences>
+                                    <lower>1</lower>
+                                    <upper>1</upper>
+                                </occurrences>
+                                <node_id/>
+                                <item xsi:type="C_INTEGER">
+                                    <range>
+                                        <lower_included>false</lower_included>
+                                        <lower/>
+                                        <upper>9</upper>
+                                    </range>
+                                </item>
+                            </children>
+                        </attributes>
+                    </children>
+                </attributes>
+            </children>
+            <children xsi:type="C_COMPLEX_OBJECT">
+                <rm_type_name>ELEMENT</rm_type_name>
+                <occurrences>
+                    <lower>0</lower>
+                    <upper>1</upper>
+                </occurrences>
+                <node_id>at0004</node_id>
+                <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                    <rm_attribute_name>value</rm_attribute_name>
+                    <existence>
+                        <lower>0</lower>
+                        <upper>1</upper>
+                    </existence>
+                    <children xsi:type="C_COMPLEX_OBJECT">
+                        <rm_type_name>DV_PROPORTION</rm_type_name>
+                        <occurrences>
+                            <lower>1</lower>
+                            <upper>1</upper>
+                        </occurrences>
+                        <node_id/>
+                        <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                            <rm_attribute_name>numerator</rm_attribute_name>
+                            <existence>
+                                <lower>1</lower>
+                                <upper>1</upper>
+                            </existence>
+                            <children xsi:type="C_PRIMITIVE_OBJECT">
+                                <rm_type_name>REAL</rm_type_name>
+                                <occurrences>
+                                    <lower>1</lower>
+                                    <upper>1</upper>
+                                </occurrences>
+                                <node_id/>
+                                <item xsi:type="C_REAL">
+                                    <list>0.5</list>
+                                    <list>half</list>
+                                    <range>
+                                        <upper_included/>
+                                        <lower>0.0</lower>
+                                        <upper>abc</upper>
+                                    </range>
+                                </item>
+                            </children>
+                        </attributes>
+                    </children>
+                </attributes>
+            </children>
+            <children xsi:type="C_COMPLEX_OBJECT">
+                <rm_type_name>ELEMENT</rm_type_name>
+                <occurrences>
+                    <lower>0</lower>
+                    <upper>1</upper>
+                </occurrences>
+                <node_id>at0005</node_id>
+                <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                    <rm_attribute_name>value</rm_attribute_name>
+                    <existence>
+                        <lower>0</lower>
+                        <upper>1</upper>
+                    </existence>
+                    <children xsi:type="C_COMPLEX_OBJECT">
+                        <rm_type_name>DV_TIME</rm_type_name>
+                        <occurrences>
+                            <lower>1</lower>
+                            <upper>1</upper>
+                        </occurrences>
+                        <node_id/>
+                        <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                            <rm_attribute_name>value</rm_attribute_name>
+                            <existence>
+                                <lower>1</lower>
+                                <upper>1</upper>
+                            </existence>
+                            <children xsi:type="C_PRIMITIVE_OBJECT">
+                                <rm_type_name>TIME</rm_type_name>
+                                <occurrences>
+                                    <lower>1</lower>
+                                    <upper>1</upper>
+                                </occurrences>
+                                <node_id/>
+                                <item xsi:type="C_TIME">
+                                    <pattern>HH:MM:SS</pattern>
+                                    <timezone_validity>sometimes</timezone_validity>
+                                </item>
+                            </children>
+                        </attributes>
+                    </children>
+                </attributes>
+            </children>
+            <cardinality>
+                <is_ordered>false</is_ordered>
+                <is_unique>false</is_unique>
+                <interval>
+                    <lower>0</lower>
+                    <upper_unbounded>true</upper_unbounded>
+                </interval>
+            </cardinality>
+        </attributes>
+        <archetype_id>
+            <value>openEHR-EHR-CLUSTER.sdk_reader.v0</value>
+        </archetype_id>
+        <term_definitions code="at0000">
+            <items id="text">Reader</items>
+        </term_definitions>
+    </definition>
+</template>

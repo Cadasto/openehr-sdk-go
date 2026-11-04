@@ -7,6 +7,7 @@ import (
 	"io"
 	"slices"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/decodeopts"
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlschema"
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -44,6 +45,19 @@ func newDecoderConfig(opts []DecoderOption) decoderConfig {
 		}
 	}
 	return c
+}
+
+// init registers with decodeopts the function that tells the operational
+// template reader of openehr/aom/aom14 two things a []DecoderOption asks for:
+// whether it is strict, which turns off the reader's weaker readings, and
+// whether it reports to a function, which the reader then calls from one
+// decode only.
+func init() {
+	decodeopts.Register(func(opts any) decodeopts.Settings {
+		list, _ := opts.([]DecoderOption)
+		c := newDecoderConfig(list)
+		return decodeopts.Settings{Strict: c.strict, Reports: c.unmatched != nil || c.missing != nil}
+	})
 }
 
 // tracked reports whether the decode reports or refuses unmatched content,
