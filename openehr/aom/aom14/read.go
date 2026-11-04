@@ -3,6 +3,7 @@ package aom14
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -68,7 +69,10 @@ const inputBufferMax = 4 << 20
 // one whose root is `<template>`. An input with no root element, empty or
 // holding only a declaration, comments, whitespace or text, is refused with
 // an error that wraps [io.ErrUnexpectedEOF], not [io.EOF], and carries none
-// of the input. Any other decode error comes back as the decode returns it.
+// of the input. An error r returns, other than [io.EOF], ends the read and
+// comes back as r returned it, whatever the options and whatever a decode
+// made of the bytes before it. Any other decode error comes back as the
+// decode returns it.
 //
 // Operational templates in use hold shapes and values their schema does not
 // allow, which the deprecated template parser reads. The reader reads them as
@@ -173,7 +177,8 @@ const inputBufferMax = 4 << 20
 // unless it applies them.
 func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*OperationalTemplate, error) {
 	// lr.N reaches 0 only once r has given a byte past the limit.
-	lr := &io.LimitedReader{R: r, N: readMaxBytes + 1}
+	src := &sourceReader{r: r}
+	lr := &io.LimitedReader{R: src, N: readMaxBytes + 1}
 	// in keeps every byte read from r, for the checks and a second decode; it
 	// is made as large as r says it is. Nothing the read returns refers to it.
 	in := inputBuffers.Get().(*bytes.Buffer)
@@ -204,6 +209,11 @@ func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*Operat
 	if lr.N == 0 {
 		return nil, errInputTooLarge()
 	}
+	// A failure of r ends the read with its own error, whatever the decode
+	// made of the bytes before it, since the input is cut short.
+	if src.err != nil {
+		return nil, src.err
+	}
 	var tolerant bool
 	if err == nil {
 		tolerant = needsTolerance(in.Bytes(), ot, settings.Strict)
@@ -216,7 +226,7 @@ func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*Operat
 	if tolerant && err != nil {
 		// The decode stopped short of the end, which the second reading needs.
 		if _, cerr := io.Copy(io.Discard, br); cerr != nil {
-			return readResult(ot, err)
+			return nil, cmp.Or(src.err, cerr)
 		}
 		if lr.N == 0 {
 			return nil, errInputTooLarge()
@@ -242,6 +252,21 @@ func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*Operat
 		return readResult(readDocument(bufio.NewReader(bytes.NewReader(data)), opts, settings.Strict))
 	}
 	return readResult(ot, err)
+}
+
+// sourceReader reads r and keeps the first error it returns other than
+// [io.EOF].
+type sourceReader struct {
+	r   io.Reader
+	err error
+}
+
+func (s *sourceReader) Read(p []byte) (int, error) {
+	n, err := s.r.Read(p)
+	if err != nil && !errors.Is(err, io.EOF) && s.err == nil {
+		s.err = err
+	}
+	return n, err
 }
 
 // readDocument decodes one document from br with opts and the element limit:

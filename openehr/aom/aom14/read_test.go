@@ -21,9 +21,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/iotest"
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 	templateprobes "github.com/cadasto/openehr-sdk-go/testkit/probes/template"
@@ -500,6 +502,76 @@ func TestREQ108_ReadOperationalTemplateRefusesAnInputWithNoRootElement(t *testin
 	_, err := aom14.ReadOperationalTemplate(strings.NewReader(`<template xmlns="http://schemas.openehr.org/v1"><template_id>`))
 	if err == nil || strings.Contains(err.Error(), want) {
 		t.Errorf("ReadOperationalTemplate(cut short) = %v, want the decode's own error", err)
+	}
+}
+
+// errSource is the failure of a source of input.
+var errSource = errors.New("connection reset")
+
+// failingReader returns a reader of the first n bytes of doc that then fails
+// with errSource.
+func failingReader(doc string, n int) io.Reader {
+	return io.MultiReader(strings.NewReader(doc[:n]), iotest.ErrReader(errSource))
+}
+
+// TestREQ108_ReadOperationalTemplateReturnsTheSourcesError pins that a
+// failure of the caller's reader comes back as the error the reader
+// returned, whatever the options, where the decode meets it and where the
+// reader reads the rest of an input it reads a second time: never as the
+// syntax error of a decode of the bytes read before it, nor as the failure
+// of the first decode. Strict mode refuses an <attributes> with no type
+// before it reads on, so it returns that refusal.
+//
+// Can-fail control: decode the bytes read before the failure a second time,
+// as a reading that reports to the caller's function does, or read the rest
+// of the input without keeping the failure, and the error is the decode's.
+func TestREQ108_ReadOperationalTemplateReturnsTheSourcesError(t *testing.T) {
+	t.Parallel()
+	// The first decode fails on the <attributes> with no type, which the
+	// default mode reads a second time once it has read the rest.
+	untyped := `<template xmlns="http://schemas.openehr.org/v1"><template_id><value>t</value></template_id>` +
+		`<definition><rm_type_name>CLUSTER</rm_type_name><node_id>at0000</node_id><attributes>` +
+		`<rm_attribute_name>items</rm_attribute_name><existence><lower>0</lower><upper>1</upper></existence></attributes>` +
+		`<archetype_id><value>openEHR-EHR-CLUSTER.t.v0</value></archetype_id></definition></template>`
+	sources := map[string]struct {
+		open func() io.Reader
+		// strict is what strict mode returns.
+		strict error
+	}{
+		"failing after 60 bytes": {
+			open:   func() io.Reader { return failingReader(readTemplate, 60) },
+			strict: errSource,
+		},
+		"failing after a shape the default mode reads a second time": {
+			open:   func() io.Reader { return failingReader(untyped, strings.Index(untyped, "<rm_attribute_name>")) },
+			strict: typereg.ErrMissingType,
+		},
+	}
+	options := []struct {
+		name   string
+		opts   []canxml.DecoderOption
+		strict bool
+	}{
+		{name: "no option"},
+		{name: "WithUnmatched", opts: []canxml.DecoderOption{canxml.WithUnmatched(func(string) {})}},
+		{name: "WithMissing", opts: []canxml.DecoderOption{canxml.WithMissing(func(string) {})}},
+		{name: "WithStrict", opts: []canxml.DecoderOption{canxml.WithStrict()}, strict: true},
+		{name: "WithStrict and WithUnmatched", opts: []canxml.DecoderOption{canxml.WithStrict(), canxml.WithUnmatched(func(string) {})}, strict: true},
+	}
+	for name, src := range sources {
+		for _, o := range options {
+			t.Run(name+"/"+o.name, func(t *testing.T) {
+				t.Parallel()
+				want := errSource
+				if o.strict {
+					want = src.strict
+				}
+				ot, err := aom14.ReadOperationalTemplate(src.open(), o.opts...)
+				if ot != nil || !errors.Is(err, want) {
+					t.Errorf("ReadOperationalTemplate = %v, %v; want nil and an error wrapping %v", ot, err, want)
+				}
+			})
+		}
 	}
 }
 
