@@ -68,11 +68,12 @@ func failsInsideQuantity(err error) bool {
 // empty one, which the decode reads as false, or with an assumed value, which
 // may be one the parser reads as none; the namespace the AM Release-1.4
 // schemas declare; a bare type attribute, which the decode reads as an
-// xsi:type; or an empty element a number is read from, which the decode reads
-// as 0. Unless strict, it also looks for an element in a namespace the decode
-// does not read, which it skips, and for an archetype id on a constraint
-// object the decode read as a C_COMPLEX_OBJECT, which it skips: more
-// archetype_id elements than archetype roots that hold one. A
+// xsi:type; an empty element a number is read from, which the decode reads
+// as 0; or a <definition> typed with a class it cannot hold, whose type the
+// decode does not read. Unless strict, it also looks for an element in a
+// namespace the decode does not read, which it skips, and for an archetype id
+// on a constraint object the decode read as a C_COMPLEX_OBJECT, which it
+// skips: more archetype_id elements than archetype roots that hold one. A
 // check may find what tolerate then leaves as it is, which costs a second
 // reading that changes nothing; none misses what it looks for. Each check
 // reads data once, so that what they cost grows with the size of data.
@@ -83,6 +84,7 @@ func needsTolerance(data []byte, ot *OperationalTemplate, strict bool) bool {
 		bytes.Contains(data, []byte(nsOpenEHRv2)) ||
 		hasBareType(data) ||
 		hasEmptyValue(data) ||
+		typedDefinition(data) ||
 		!booleansHoldFlags(data) {
 		return true
 	}
@@ -244,6 +246,55 @@ func skipSpace(data []byte, i int) int {
 		i++
 	}
 	return i
+}
+
+// typedDefinition reports whether data may hold a <definition> typed with a
+// class it cannot hold: a start tag whose local name is definition, with a
+// prefix or without, that holds a type attribute, with a prefix or without,
+// whose value is other than C_ARCHETYPE_ROOT, T_ARCHETYPE_ROOT and
+// C_COMPLEX_OBJECT as written.
+func typedDefinition(data []byte) bool {
+	found := false
+	startTags(data, "definition", func(tag []byte) bool {
+		found = holdsOtherType(tag)
+		return !found
+	})
+	return found
+}
+
+// holdsOtherType reports whether tag, a start tag, holds an attribute whose
+// local name is type and whose value is other than C_ARCHETYPE_ROOT,
+// T_ARCHETYPE_ROOT and C_COMPLEX_OBJECT as written.
+func holdsOtherType(tag []byte) bool {
+	word := []byte("type")
+	for i := 0; ; {
+		j := bytes.Index(tag[i:], word)
+		if j < 0 {
+			return false
+		}
+		j += i
+		i = j + len(word)
+		if j == 0 || (!isXMLSpaceByte(tag[j-1]) && tag[j-1] != ':') {
+			continue
+		}
+		k := skipSpace(tag, i)
+		if k >= len(tag) || tag[k] != '=' {
+			continue
+		}
+		k = skipSpace(tag, k+1)
+		if k >= len(tag) || (tag[k] != '"' && tag[k] != '\'') {
+			continue
+		}
+		end := bytes.IndexByte(tag[k+1:], tag[k])
+		if end < 0 {
+			return true
+		}
+		switch string(tag[k+1 : k+1+end]) {
+		case "C_ARCHETYPE_ROOT", "T_ARCHETYPE_ROOT", "C_COMPLEX_OBJECT":
+		default:
+			return true
+		}
+	}
 }
 
 // archetypeIDs counts the start tags in data whose local name is

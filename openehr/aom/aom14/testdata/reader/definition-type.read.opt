@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- definition-type.opt as the reader's default mode reads it. SDK-authored. -->
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <language>
+        <terminology_id>
+            <value>ISO_639-1</value>
+        </terminology_id>
+        <code_string>en</code_string>
+    </language>
+    <template_id>
+        <value>sdk.reader_definition_type.v0</value>
+    </template_id>
+    <concept>sdk.reader_definition_type.v0</concept>
+    <definition>
+        <rm_type_name>CLUSTER</rm_type_name>
+        <occurrences>
+            <lower>1</lower>
+            <upper>1</upper>
+        </occurrences>
+        <node_id>at0000</node_id>
+        <archetype_id>
+            <value>openEHR-EHR-CLUSTER.sdk_reader.v0</value>
+        </archetype_id>
+        <term_definitions code="at0000">
+            <items id="text">Reader</items>
+        </term_definitions>
+    </definition>
+</template>

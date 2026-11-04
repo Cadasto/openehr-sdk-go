@@ -94,6 +94,70 @@ func readAs(t *testing.T, data []byte, want *aom14.OperationalTemplate, opts ...
 	return unmatched
 }
 
+// TestREQ111_ReaderReadsADefinitionOfAClassItCannotHoldAsALeaf pins that the
+// default mode reads a <definition> whose xsi:type names no class of the AOM
+// 1.4 constraint model, or a class a definition cannot hold, as the parser
+// does: as a C_COMPLEX_OBJECT leaf with the rm_type_name, node_id and
+// occurrences it holds and none of its attributes, which WithUnmatched
+// reports. Strict mode refuses it with the *canxml.DecodeError of the
+// definition, wrapping typereg.ErrUnknownType for no class and
+// typereg.ErrTypeMismatch for a class it cannot hold, a type with white space
+// around it among the first. A definition typed C_ARCHETYPE_ROOT, its
+// T_ARCHETYPE_ROOT spelling or C_COMPLEX_OBJECT reads whole in every mode, as
+// one with an empty type does.
+//
+// Can-fail control: read the definition as a C_ARCHETYPE_ROOT whatever its
+// type, as the reader did before, and the leaf reads with its attributes in
+// every mode.
+func TestREQ111_ReaderReadsADefinitionOfAClassItCannotHoldAsALeaf(t *testing.T) {
+	t.Parallel()
+	typed := func(class string) string {
+		return strings.Replace(attributeDoc(` xsi:type="C_SINGLE_ATTRIBUTE"`), `<definition>`, `<definition xsi:type="`+class+`">`, 1)
+	}
+	leafDoc := definitionDoc(``)
+	cases := []struct {
+		name      string
+		doc, want []byte
+		strict    error
+	}{
+		{"definition-type.opt", readerFixture(t, "definition-type.opt"), readerFixture(t, "definition-type.read.opt"), typereg.ErrUnknownType},
+		{"a definition of no class", []byte(typed("FOO")), []byte(leafDoc), typereg.ErrUnknownType},
+		{"a definition typed C_SINGLE_ATTRIBUTE", []byte(typed("C_SINGLE_ATTRIBUTE")), []byte(leafDoc), typereg.ErrTypeMismatch},
+		{"a definition typed ARCHETYPE_SLOT", []byte(typed("ARCHETYPE_SLOT")), []byte(leafDoc), typereg.ErrTypeMismatch},
+		{"a definition typed C_STRING", []byte(typed("C_STRING")), []byte(leafDoc), typereg.ErrTypeMismatch},
+		{"a definition typed C_ARCHETYPE_ROOT with white space around it", []byte(typed(" C_ARCHETYPE_ROOT ")), []byte(typed("C_ARCHETYPE_ROOT")), typereg.ErrUnknownType},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := readAs(t, tc.doc, decoded(t, tc.want))
+			want := []string{definition + "/attributes[1]"}
+			if bytes.Contains(tc.want, []byte("<attributes")) {
+				want = nil
+			}
+			if !slices.Equal(got, want) {
+				t.Errorf("WithUnmatched reported %q, want %q", got, want)
+			}
+			_, err := aom14.ReadOperationalTemplate(bytes.NewReader(tc.doc), canxml.WithStrict())
+			de, ok := errors.AsType[*canxml.DecodeError](err)
+			if !ok || de == nil || de.Path != "/definition" || !errors.Is(err, tc.strict) {
+				t.Errorf("ReadOperationalTemplate(WithStrict) = %v, want the *canxml.DecodeError of /definition wrapping %v", err, tc.strict)
+			}
+		})
+	}
+	for _, class := range []string{"C_ARCHETYPE_ROOT", "T_ARCHETYPE_ROOT", "C_COMPLEX_OBJECT", ""} {
+		t.Run("a definition typed "+class, func(t *testing.T) {
+			t.Parallel()
+			doc := []byte(typed(class))
+			for mode, opts := range modes {
+				if unmatched := readAs(t, doc, decoded(t, doc), opts...); len(unmatched) > 0 {
+					t.Errorf("%s mode: WithUnmatched reported %q, want nothing", mode, unmatched)
+				}
+			}
+		})
+	}
+}
+
 // TestREQ111_ReaderReadsTheNamespaceTheSchemasDeclare pins that, in every
 // mode, an element in the http://schemas.openehr.org/v2 namespace reads as
 // the element of that name in the http://schemas.openehr.org/v1 one, under
@@ -733,7 +797,7 @@ func TestREQ111_ReaderReportsEachItemOnce(t *testing.T) {
 	for _, name := range []string{
 		"shapes.opt", "values.opt", "values-every-mode.opt", "namespace-v2.opt", "parser-readings.opt",
 		"integer-bounds.opt", "quantity-assumed-value.opt", "attribute-children.opt", "item-namespaces.opt",
-		"infinite-integer-bounds.opt", "foreign-namespaces.opt",
+		"infinite-integer-bounds.opt", "foreign-namespaces.opt", "definition-type.opt",
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -1006,7 +1070,7 @@ func TestREQ111_ReaderRefusesAnInfiniteIntegerBoundThatAdmitsNoInteger(t *testin
 // TestREQ111_CanonicalXMLKeepsNoneOfTheReadersReadings pins that a canxml
 // decode called directly reads the fixtures as written: it refuses the
 // shapes and values, and reads nothing of the definition in the namespace the
-// schemas declare or in another.
+// schemas declare or in another, and reads a definition of no class whole.
 func TestREQ111_CanonicalXMLKeepsNoneOfTheReadersReadings(t *testing.T) {
 	t.Parallel()
 	for _, name := range []string{
@@ -1025,6 +1089,13 @@ func TestREQ111_CanonicalXMLKeepsNoneOfTheReadersReadings(t *testing.T) {
 	}
 	if len(ot.Definition.Attributes) != 0 || ot.TemplateID.Value != "" {
 		t.Errorf("canxml.Unmarshal(namespace-v2.opt) read the foreign namespace: %d attributes, template id %q", len(ot.Definition.Attributes), ot.TemplateID.Value)
+	}
+	ot = aom14.OperationalTemplate{}
+	if err := canxml.Unmarshal(readerFixture(t, "definition-type.opt"), &ot); err != nil {
+		t.Fatalf("canxml.Unmarshal(definition-type.opt): %v", err)
+	}
+	if len(ot.Definition.Attributes) != 1 {
+		t.Errorf("canxml.Unmarshal(definition-type.opt) read the definition as a leaf: %d attributes, want 1", len(ot.Definition.Attributes))
 	}
 	ot = aom14.OperationalTemplate{}
 	if err := canxml.Unmarshal(readerFixture(t, "foreign-namespaces.opt"), &ot); err != nil {

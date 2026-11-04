@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlschema"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
 
@@ -140,6 +141,9 @@ type tolerantReading struct {
 	// reading does not make. The input is then left as it is, for the decode
 	// to refuse.
 	failed bool
+	// refusal is the refusal of a shape strict mode refuses that the decode
+	// reads, which tolerate returns once the reading meets it.
+	refusal error
 }
 
 // tolerate returns data rewritten so that canonical XML decodes it as the
@@ -176,6 +180,9 @@ func tolerate(data []byte, strict bool, maxDepth int) ([]byte, bool, error) {
 				return nil, false, depthRefusal(data, maxDepth)
 			}
 			t.start(tk.Copy(), off, end)
+			if t.refusal != nil {
+				return nil, false, t.refusal
+			}
 		case xml.EndElement:
 			t.close(off, end)
 		case xml.CharData:
@@ -288,6 +295,7 @@ func (t *tolerantReading) roleOf(parent, e *element) role {
 	case roleRoot:
 		if local == "definition" {
 			e.class = "C_ARCHETYPE_ROOT"
+			t.typeDefinition(e)
 			return roleObject
 		}
 	case roleObject:
@@ -374,6 +382,37 @@ func (t *tolerantReading) typeAttribute(e *element) {
 	// The parser reads the type without the white space around it.
 	if name != written && !t.strict && (name == "C_SINGLE_ATTRIBUTE" || name == "C_MULTIPLE_ATTRIBUTE") {
 		e.retype = name
+	}
+}
+
+// typeDefinition reads the type of e, the definition, which the decode reads
+// as a C_ARCHETYPE_ROOT whatever its type. The parser reads a definition
+// typed with a class it cannot hold, of no class of the AOM 1.4 constraint
+// model or of one other than C_ARCHETYPE_ROOT and C_COMPLEX_OBJECT, as a leaf;
+// strict mode refuses it, a type with white space around it among them, as
+// canonical XML refuses such a type at a slot that dispatches on it.
+func (t *tolerantReading) typeDefinition(e *element) {
+	written, typed := e.xsiType()
+	name := strings.TrimSpace(written)
+	if !typed || name == "" {
+		return
+	}
+	if t.strict {
+		name = written
+	}
+	if alias, ok := xmlschema.AliasOf(name); ok {
+		name = alias
+	}
+	switch {
+	case name == "C_ARCHETYPE_ROOT", name == "C_COMPLEX_OBJECT":
+	case t.strict:
+		inner := typereg.ErrTypeMismatch
+		if kindOf(name) == kindNone {
+			inner = typereg.ErrUnknownType
+		}
+		t.refusal = &canxml.DecodeError{Path: "/definition", Type: written, Inner: inner}
+	default:
+		e.leaf = true
 	}
 }
 

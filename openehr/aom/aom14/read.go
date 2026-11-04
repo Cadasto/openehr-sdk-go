@@ -108,8 +108,12 @@ const inputBufferMax = 4 << 20
 // as the element of that name in the http://schemas.openehr.org/v1 namespace,
 // since the parser reads no namespace: under another default namespace, under
 // a prefix bound to another namespace, and under a prefix no declaration
-// binds, which encoding/xml reads as a namespace of that name. And, inside
-// the definition, it reads:
+// binds, which encoding/xml reads as a namespace of that name. It reads a
+// <definition> whose type names no class of the AOM 1.4 constraint model,
+// or a class other than C_ARCHETYPE_ROOT and C_COMPLEX_OBJECT, which a
+// definition cannot hold, as a C_COMPLEX_OBJECT leaf with the rm_type_name,
+// node_id and occurrences it holds and none of its attributes, as it reads
+// such a <children>. And, inside the definition, it reads:
 //
 //   - an <attributes>, a <children> or the <item> of a C_PRIMITIVE_OBJECT
 //     that names no type in the XML Schema instance namespace, none, an
@@ -156,7 +160,12 @@ const inputBufferMax = 4 << 20
 // unreported, and the reader refuses each shape and value the default mode
 // alone reads, as it refuses a bare type attribute on such an element, which
 // canonical XML reads as its type, and an empty list entry or range bound of
-// a C_INTEGER or C_REAL, which canonical XML reads as 0.
+// a C_INTEGER or C_REAL, which canonical XML reads as 0. It refuses a
+// <definition> typed with a class it cannot hold, or with white space around
+// the type, which canonical XML does not dispatch on, with a
+// [canxml.DecodeError] of the definition that wraps [typereg.ErrUnknownType]
+// where the type names no class and [typereg.ErrTypeMismatch] otherwise, as
+// canonical XML refuses such a type where it dispatches on it.
 //
 // In every mode the reader refuses an integer that the model's 32-bit
 // Integer cannot hold, a bound of a C_INTEGER range or of a quantity's
