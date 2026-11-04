@@ -261,6 +261,32 @@ func TestREQ111_ReaderReadsAnElementInAnotherNamespace(t *testing.T) {
 	}
 }
 
+// TestREQ111_ReaderReadsTheParsersDocumentShapes pins the default mode's
+// reading of the fixtures of the document shapes the parser reads: a root
+// element in a namespace of no openEHR schema, text before the root and a
+// declaration after it, each read as its *.read.opt with nothing unmatched.
+// Strict mode refuses the first as an element in a foreign namespace and the
+// others as content outside the root.
+func TestREQ111_ReaderReadsTheParsersDocumentShapes(t *testing.T) {
+	t.Parallel()
+	for name, strict := range map[string]error{
+		"root-namespace":       canxml.ErrNamespace,
+		"text-before-root":     canxml.ErrInvalidShape,
+		"directive-after-root": canxml.ErrInvalidShape,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			data := readerFixture(t, name+".opt")
+			if unmatched := readAs(t, data, decoded(t, readerFixture(t, name+".read.opt"))); len(unmatched) > 0 {
+				t.Errorf("WithUnmatched reported %q, want nothing", unmatched)
+			}
+			if _, err := aom14.ReadOperationalTemplate(bytes.NewReader(data), canxml.WithStrict()); !errors.Is(err, strict) {
+				t.Errorf("ReadOperationalTemplate(WithStrict) = %v, want an error wrapping %v", err, strict)
+			}
+		})
+	}
+}
+
 // TestREQ111_ReaderReadsWhatElseTheParserReads pins the default mode's
 // reading of the other shapes and values the parser's default mode reads: a
 // C_COMPLEX_OBJECT that holds an archetype id, as a C_ARCHETYPE_ROOT; a
@@ -798,6 +824,7 @@ func TestREQ111_ReaderReportsEachItemOnce(t *testing.T) {
 		"shapes.opt", "values.opt", "values-every-mode.opt", "namespace-v2.opt", "parser-readings.opt",
 		"integer-bounds.opt", "quantity-assumed-value.opt", "attribute-children.opt", "item-namespaces.opt",
 		"infinite-integer-bounds.opt", "foreign-namespaces.opt", "definition-type.opt", "nan-integer-bounds.opt",
+		"root-namespace.opt", "text-before-root.opt", "directive-after-root.opt",
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
