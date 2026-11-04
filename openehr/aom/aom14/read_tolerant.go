@@ -88,6 +88,12 @@ type element struct {
 	// leaf is an object of no class of the AOM 1.4 constraint model, read as
 	// a C_COMPLEX_OBJECT without its attributes.
 	leaf bool
+	// itemLevel is, for a definition typed C_PRIMITIVE_OBJECT, 1, and for an
+	// <item> such a definition holds, or such an item, one more than the
+	// level of the item it is: the level of the items it holds, whose types
+	// decide whether the parser reads a constraint from the definition
+	// (definitionItem).
+	itemLevel int
 	// complexTyped is an object typed C_COMPLEX_OBJECT, which the default
 	// mode reads as a C_ARCHETYPE_ROOT where it holds an archetype id.
 	complexTyped bool
@@ -161,8 +167,14 @@ type tolerantReading struct {
 	// to refuse.
 	failed bool
 	// refusal is the refusal of a shape strict mode refuses that the decode
-	// reads, which tolerate returns once the reading meets it.
+	// reads, or of one every mode refuses, which tolerate returns once the
+	// reading meets it.
 	refusal error
+	// itemTypes are the types, without the white space around them, of the
+	// last <item> that names one at each level below a definition typed
+	// C_PRIMITIVE_OBJECT, the definition's own items first: the parser reads
+	// the items of a level as one.
+	itemTypes []string
 }
 
 // tolerate returns data rewritten so that canonical XML decodes it as the
@@ -220,6 +232,9 @@ read:
 				return nil, false, syntaxRefusal(data[base:])
 			}
 			t.close(off, end)
+			if t.refusal != nil {
+				return nil, false, t.refusal
+			}
 			if n == 1 {
 				// The root element ends here.
 				break read
@@ -355,6 +370,9 @@ func (t *tolerantReading) start(tk xml.StartElement, off, end int) {
 // parent is parent, and gives an attribute, an object or an item its class.
 func (t *tolerantReading) roleOf(parent, e *element) role {
 	local := e.name.Local
+	if parent.itemLevel > 0 && local == "item" {
+		t.definitionItem(parent, e)
+	}
 	switch parent.role {
 	case roleRoot:
 		if local == "definition" {
@@ -454,7 +472,13 @@ func (t *tolerantReading) typeAttribute(e *element) {
 // typed with a class it cannot hold, of no class of the AOM 1.4 constraint
 // model or of one other than C_ARCHETYPE_ROOT and C_COMPLEX_OBJECT, as a leaf;
 // strict mode refuses it, a type with white space around it among them, as
-// canonical XML refuses such a type at a slot that dispatches on it.
+// canonical XML refuses such a type at a slot that dispatches on it. The
+// parser reads one typed ARCHETYPE_SLOT, or with a class it reads a primitive
+// constraint from, as a slot or as a leaf that carries that constraint, which
+// the model's definition holds neither of: every mode refuses it, as strict
+// mode refuses any other class it cannot hold, and one typed
+// C_PRIMITIVE_OBJECT where the parser reads a constraint from the items it
+// holds, once it closes (definitionRefusal).
 func (t *tolerantReading) typeDefinition(e *element) {
 	written, typed := e.xsiType()
 	name := strings.TrimSpace(written)
@@ -475,9 +499,50 @@ func (t *tolerantReading) typeDefinition(e *element) {
 			inner = typereg.ErrUnknownType
 		}
 		t.refusal = &canxml.DecodeError{Path: "/definition", Type: written, Inner: inner}
+	case name == "ARCHETYPE_SLOT", parserConstraintClass(name):
+		t.refusal = definitionRefusal(written)
+	case name == "C_PRIMITIVE_OBJECT":
+		e.leaf, e.itemLevel = true, 1
 	default:
 		e.leaf = true
 	}
+}
+
+// definitionRefusal is the refusal, in every mode, of a definition of the
+// type written, which the parser reads as a slot or as a leaf that carries a
+// primitive constraint.
+func definitionRefusal(written string) error {
+	return &canxml.DecodeError{Path: "/definition", Type: written, Inner: typereg.ErrTypeMismatch}
+}
+
+// definitionItem reads e, an <item> of parent, a definition typed
+// C_PRIMITIVE_OBJECT or an item it holds an item of: it keeps the type e
+// names, if any, as that of the items of its level, and gives e the level of
+// the items it holds.
+func (t *tolerantReading) definitionItem(parent, e *element) {
+	level := parent.itemLevel - 1
+	e.itemLevel = parent.itemLevel + 1
+	written, typed := e.xsiType()
+	if !typed {
+		return
+	}
+	for len(t.itemTypes) <= level {
+		t.itemTypes = append(t.itemTypes, "")
+	}
+	t.itemTypes[level] = strings.TrimSpace(written)
+}
+
+// itemsHoldConstraint reports whether the parser reads a primitive constraint
+// from the items below a definition typed C_PRIMITIVE_OBJECT, whose types
+// t.itemTypes holds: whether, at the first level whose items name another
+// type than C_PRIMITIVE_OBJECT, they name a class it reads one from.
+func (t *tolerantReading) itemsHoldConstraint() bool {
+	for _, class := range t.itemTypes {
+		if class != "C_PRIMITIVE_OBJECT" {
+			return parserConstraintClass(class)
+		}
+	}
+	return false
 }
 
 // typeObject reads the type of e, a <children> of an attribute, and returns
@@ -610,6 +675,11 @@ func (t *tolerantReading) close(off, end int) {
 		}
 		t.closeTag(e)
 	case roleObject:
+		if e.itemLevel == 1 && t.itemsHoldConstraint() {
+			// The definition, read as a leaf that carries a constraint.
+			written, _ := e.xsiType()
+			t.refusal = definitionRefusal(written)
+		}
 		switch {
 		case e.untyped:
 			e.retype = "C_COMPLEX_OBJECT"
@@ -1390,6 +1460,13 @@ func parserItemClass(class string) bool {
 		return true
 	}
 	return false
+}
+
+// parserConstraintClass reports whether the parser reads a primitive
+// constraint from an object of class: a C_PRIMITIVE class, or a class
+// parserItemClass names but C_PRIMITIVE_OBJECT, whose item decides.
+func parserConstraintClass(class string) bool {
+	return kindOf(class) == kindPrimitive || (class != "C_PRIMITIVE_OBJECT" && parserItemClass(class))
 }
 
 // isComplexObject reports whether an object of class holds attributes.

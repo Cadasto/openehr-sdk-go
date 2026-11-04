@@ -116,9 +116,10 @@ const inputBufferMax = 4 << 20
 // that a type written with it, such as xsd:string, reads as written. It reads a
 // <definition> whose type names no class of the AOM 1.4 constraint model,
 // or a class other than C_ARCHETYPE_ROOT and C_COMPLEX_OBJECT, which a
-// definition cannot hold, as a C_COMPLEX_OBJECT leaf with the rm_type_name,
-// node_id and occurrences it holds and none of its attributes, as it reads
-// such a <children>. And, inside the definition, it reads:
+// definition cannot hold, but those it refuses in every mode (below), as a
+// C_COMPLEX_OBJECT leaf with the rm_type_name, node_id and occurrences it
+// holds and none of its attributes, as it reads such a <children>. And,
+// inside the definition, it reads:
 //
 //   - an <attributes>, a <children> or the <item> of a C_PRIMITIVE_OBJECT
 //     that names no type in the XML Schema instance namespace, none, an
@@ -179,9 +180,18 @@ const inputBufferMax = 4 << 20
 // lower side or of negative infinity on the upper one, on a side the range
 // does not write unbounded, which admits no integer, with the error of the
 // decode that reads it as an integer: one that wraps [strconv.ErrSyntax],
-// whose [strconv.NumError] holds the infinity as written. And it refuses a
+// whose [strconv.NumError] holds the infinity as written. It refuses a
 // match_negated of true, which the parser ignores and so reads with its
-// meaning inverted.
+// meaning inverted. And it refuses a <definition> typed ARCHETYPE_SLOT, or
+// with a class the parser reads a primitive constraint from: a C_PRIMITIVE
+// class, such as C_STRING, one of C_CODE_PHRASE, C_DV_QUANTITY, C_DV_ORDINAL
+// and CONSTRAINT_REF, or C_PRIMITIVE_OBJECT where the parser reads such a
+// constraint from the items it holds. The parser reads it as a slot or as a
+// leaf that carries that constraint, and the model's definition, a
+// C_ARCHETYPE_ROOT, holds neither. The refusal is a [canxml.DecodeError] of
+// the definition, whose Type is the type as written, that wraps
+// [typereg.ErrTypeMismatch]. These are the four readings of the parser the
+// reader does not keep.
 //
 // A document that needs none of these readings is decoded once; one that
 // needs one is decoded a second time, from the bytes the reader keeps of the

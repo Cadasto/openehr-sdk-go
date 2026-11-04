@@ -3,9 +3,9 @@ package aom14_test
 // REQ-111 (clinical-modeling.md § REQ-111, Reading the model, "What the
 // reader tolerates"): aom14.ReadOperationalTemplate reads every OPT the
 // deprecated parser reads in its default mode, as the parser reads it, but an
-// integer the model's 32-bit Integer cannot hold, a match_negated of true and
-// an infinite integer bound that admits no integer, which it refuses in every
-// mode. REQ-100 (§ REQ-100, Strict parse mode): given canxml.WithStrict it
+// integer the model's 32-bit Integer cannot hold, a match_negated of true, an
+// infinite integer bound that admits no integer and a <definition> the parser
+// reads as a slot or a primitive constraint, which it refuses in every mode. REQ-100 (§ REQ-100, Strict parse mode): given canxml.WithStrict it
 // refuses the shapes the parser's strict mode refuses, and the other readings
 // of the parser's default mode. REQ-170
 // (wire.md § REQ-170): what a tolerance leaves out is unmatched content, which
@@ -97,9 +97,11 @@ func readAs(t *testing.T, data []byte, want *aom14.OperationalTemplate, opts ...
 
 // TestREQ111_ReaderReadsADefinitionOfAClassItCannotHoldAsALeaf pins that the
 // default mode reads a <definition> whose xsi:type names no class of the AOM
-// 1.4 constraint model, or a class a definition cannot hold, as the parser
-// does: as a C_COMPLEX_OBJECT leaf with the rm_type_name, node_id and
-// occurrences it holds and none of its attributes, which WithUnmatched
+// 1.4 constraint model, or a class a definition cannot hold other than those
+// the parser reads as a slot or a constraint
+// (TestREQ111_ReaderRefusesADefinitionTheParserReadsAsASlotOrAConstraint), as
+// the parser does: as a C_COMPLEX_OBJECT leaf with the rm_type_name, node_id
+// and occurrences it holds and none of its attributes, which WithUnmatched
 // reports. Strict mode refuses it with the *canxml.DecodeError of the
 // definition, wrapping typereg.ErrUnknownType for no class and
 // typereg.ErrTypeMismatch for a class it cannot hold, a type with white space
@@ -124,8 +126,7 @@ func TestREQ111_ReaderReadsADefinitionOfAClassItCannotHoldAsALeaf(t *testing.T) 
 		{"definition-type.opt", readerFixture(t, "definition-type.opt"), readerFixture(t, "definition-type.read.opt"), typereg.ErrUnknownType},
 		{"a definition of no class", []byte(typed("FOO")), []byte(leafDoc), typereg.ErrUnknownType},
 		{"a definition typed C_SINGLE_ATTRIBUTE", []byte(typed("C_SINGLE_ATTRIBUTE")), []byte(leafDoc), typereg.ErrTypeMismatch},
-		{"a definition typed ARCHETYPE_SLOT", []byte(typed("ARCHETYPE_SLOT")), []byte(leafDoc), typereg.ErrTypeMismatch},
-		{"a definition typed C_STRING", []byte(typed("C_STRING")), []byte(leafDoc), typereg.ErrTypeMismatch},
+		{"a definition typed C_CODE_REFERENCE", []byte(typed("C_CODE_REFERENCE")), []byte(leafDoc), typereg.ErrTypeMismatch},
 		{"a definition typed C_ARCHETYPE_ROOT with white space around it", []byte(typed(" C_ARCHETYPE_ROOT ")), []byte(typed("C_ARCHETYPE_ROOT")), typereg.ErrUnknownType},
 	}
 	for _, tc := range cases {
@@ -154,6 +155,100 @@ func TestREQ111_ReaderReadsADefinitionOfAClassItCannotHoldAsALeaf(t *testing.T) 
 				if unmatched := readAs(t, doc, decoded(t, doc), opts...); len(unmatched) > 0 {
 					t.Errorf("%s mode: WithUnmatched reported %q, want nothing", mode, unmatched)
 				}
+			}
+		})
+	}
+}
+
+// TestREQ111_ReaderRefusesADefinitionTheParserReadsAsASlotOrAConstraint pins
+// that, in every mode, a <definition> typed ARCHETYPE_SLOT, or with a class
+// the parser reads a primitive constraint from, is refused with the
+// *canxml.DecodeError of the definition that wraps typereg.ErrTypeMismatch,
+// its Type the type as written: the parser reads it as a slot or as a leaf
+// that carries that constraint, and the model's definition, a
+// C_ARCHETYPE_ROOT, holds neither. The default mode reads the type without
+// the white space around it, which strict mode refuses as no class. A
+// definition typed C_PRIMITIVE_OBJECT is refused where the parser reads a
+// constraint from the items it holds, which it reads as one item for each
+// level, the last that names a type deciding; otherwise the default mode
+// reads it as it reads a definition of no class, as a leaf.
+//
+// Can-fail control: read such a definition as a leaf, as the reader did
+// before, and the default mode reads it.
+func TestREQ111_ReaderRefusesADefinitionTheParserReadsAsASlotOrAConstraint(t *testing.T) {
+	t.Parallel()
+	typed := func(class, content string) []byte {
+		return []byte(strings.Replace(definitionDoc(content), `<definition>`, `<definition xsi:type="`+class+`">`, 1))
+	}
+	const (
+		str     = `<item xsi:type="C_STRING"><list>a</list></item>`
+		integer = `<item xsi:type="C_INTEGER"><list>1</list></item>`
+		future  = `<item xsi:type="C_FUTURE"/>`
+	)
+	refused := []struct {
+		name, class, content string
+		strict               error
+	}{
+		{"a definition typed ARCHETYPE_SLOT", "ARCHETYPE_SLOT", ``, typereg.ErrTypeMismatch},
+		{"a definition typed C_BOOLEAN", "C_BOOLEAN", `<true_valid>true</true_valid><false_valid>true</false_valid>`, typereg.ErrTypeMismatch},
+		{"a definition typed C_INTEGER", "C_INTEGER", `<list>1</list>`, typereg.ErrTypeMismatch},
+		{"a definition typed C_REAL", "C_REAL", ``, typereg.ErrTypeMismatch},
+		{"a definition typed C_STRING", "C_STRING", `<list>a</list>`, typereg.ErrTypeMismatch},
+		{"a definition typed C_DATE", "C_DATE", ``, typereg.ErrTypeMismatch},
+		{"a definition typed C_TIME", "C_TIME", ``, typereg.ErrTypeMismatch},
+		{"a definition typed C_DATE_TIME", "C_DATE_TIME", ``, typereg.ErrTypeMismatch},
+		{"a definition typed C_DURATION", "C_DURATION", ``, typereg.ErrTypeMismatch},
+		{"a definition typed C_CODE_PHRASE", "C_CODE_PHRASE", `<code_list>at1</code_list>`, typereg.ErrTypeMismatch},
+		{"a definition typed C_DV_QUANTITY", "C_DV_QUANTITY", ``, typereg.ErrTypeMismatch},
+		{"a definition typed C_DV_ORDINAL", "C_DV_ORDINAL", ``, typereg.ErrTypeMismatch},
+		{"a definition typed CONSTRAINT_REF", "CONSTRAINT_REF", `<reference>ac0001</reference>`, typereg.ErrTypeMismatch},
+		{"a definition typed C_STRING with white space around it", " C_STRING ", `<list>a</list>`, typereg.ErrUnknownType},
+		{"a C_PRIMITIVE_OBJECT definition whose item is a C_STRING", "C_PRIMITIVE_OBJECT", str, typereg.ErrTypeMismatch},
+		{"a C_PRIMITIVE_OBJECT definition whose item's item is a C_INTEGER", "C_PRIMITIVE_OBJECT", `<item xsi:type="C_PRIMITIVE_OBJECT">` + integer + `</item>`, typereg.ErrTypeMismatch},
+		{"a C_PRIMITIVE_OBJECT definition whose last typed item is a C_STRING", "C_PRIMITIVE_OBJECT", future + str + `<item/>`, typereg.ErrTypeMismatch},
+		{"a C_PRIMITIVE_OBJECT definition whose item is a C_STRING with white space around it", "C_PRIMITIVE_OBJECT", `<item xsi:type=" C_STRING "/>`, typereg.ErrTypeMismatch},
+	}
+	for _, tc := range refused {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := aom14.ReadOperationalTemplate(bytes.NewReader(typed(tc.class, tc.content)))
+			de, ok := errors.AsType[*canxml.DecodeError](err)
+			if !ok || de == nil || de.Path != "/definition" || de.Type != tc.class || !errors.Is(err, typereg.ErrTypeMismatch) {
+				t.Errorf("ReadOperationalTemplate = %v, want the *canxml.DecodeError of /definition, of type %q, wrapping %v", err, tc.class, typereg.ErrTypeMismatch)
+			}
+			// Strict mode refuses the members the model's definition does not
+			// hold as unmatched content first, and the type of one without them.
+			if _, err := aom14.ReadOperationalTemplate(bytes.NewReader(typed(tc.class, tc.content)), canxml.WithStrict()); err == nil {
+				t.Errorf("ReadOperationalTemplate(WithStrict) = nil error, want a refusal")
+			}
+			_, err = aom14.ReadOperationalTemplate(bytes.NewReader(typed(tc.class, ``)), canxml.WithStrict())
+			de, ok = errors.AsType[*canxml.DecodeError](err)
+			if !ok || de == nil || de.Path != "/definition" || de.Type != tc.class || !errors.Is(err, tc.strict) {
+				t.Errorf("ReadOperationalTemplate(WithStrict) of the definition without its members = %v, want the *canxml.DecodeError of /definition, of type %q, wrapping %v", err, tc.class, tc.strict)
+			}
+		})
+	}
+	leaves := map[string]string{
+		"no item":                                          ``,
+		"an item that names no type":                       `<item><list>a</list></item>`,
+		"an item of no class":                              future,
+		"a C_STRING item and then one of no class":         str + future,
+		"an empty C_PRIMITIVE_OBJECT item":                 `<item xsi:type="C_PRIMITIVE_OBJECT"/>`,
+		"items whose items' last typed one is of no class": `<item xsi:type="C_PRIMITIVE_OBJECT">` + str + `</item><item>` + future + `</item>`,
+	}
+	for name, content := range leaves {
+		t.Run("a C_PRIMITIVE_OBJECT definition with "+name, func(t *testing.T) {
+			t.Parallel()
+			got, err := aom14.ReadOperationalTemplate(bytes.NewReader(typed("C_PRIMITIVE_OBJECT", content)))
+			if err != nil {
+				t.Fatalf("ReadOperationalTemplate: %v", err)
+			}
+			want, err := aom14.ReadOperationalTemplate(bytes.NewReader(typed("C_FUTURE_ROOT", content)))
+			if err != nil {
+				t.Fatalf("ReadOperationalTemplate(a definition of no class): %v", err)
+			}
+			if g, w := encoded(t, got), encoded(t, want); g != w {
+				t.Errorf("ReadOperationalTemplate reads\n%s\nwant the leaf of a definition of no class\n%s", g, w)
 			}
 		})
 	}

@@ -46,12 +46,13 @@
 // document as the schemas write it: it refuses each of those shapes and
 // values, and any content the model does not read, keeping only the
 // readings the function lists for every mode, such as the v2 namespace the
-// schemas declare. In both modes it refuses three readings of the parser:
+// schemas declare. In both modes it refuses four readings of the parser:
 // an integer the model's 32-bit Integer cannot hold, an integer bound of
 // positive infinity on the lower side or of negative infinity on the upper
-// one, which admits no integer, and a match_negated of true, which the
-// parser ignores and so reads with its meaning inverted. The function's
-// documentation lists each reading.
+// one, which admits no integer, a match_negated of true, which the parser
+// ignores and so reads with its meaning inverted, and a definition the
+// parser reads as a slot or as a primitive constraint, which the model's
+// definition cannot hold. The function's documentation lists each reading.
 //
 // # Hand-written companions
 //
