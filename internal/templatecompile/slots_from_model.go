@@ -103,11 +103,11 @@ func assertionSlotPatterns(a aom14.Assertion) []string {
 }
 
 // archetypeIDMatchesPattern returns the trimmed text between the braces of
-// the first `archetype_id … matches {…}` in text, the case of the two words
-// ignored and an escaped brace kept inside, or "" when text holds none.
+// the first `archetype_id … matches {…}` in text, the ASCII case of the two
+// words ignored and an escaped brace kept inside, or "" when text holds none.
 func archetypeIDMatchesPattern(text string) string {
 	const prefix = "archetype_id"
-	lower := strings.ToLower(text)
+	lower := asciiLower(text)
 	i := strings.Index(lower, prefix)
 	if i < 0 {
 		return ""
@@ -140,6 +140,20 @@ func archetypeIDMatchesPattern(text string) string {
 		}
 	}
 	return ""
+}
+
+// asciiLower returns s with each ASCII capital letter lowercased and every
+// other byte kept, so an offset into the result is the same offset into s.
+// strings.ToLower does not keep offsets: some runes take more bytes
+// lowercased than as written, such as Ⱥ (U+023A) lowercased to ⱥ (U+2C65).
+func asciiLower(s string) string {
+	b := []byte(s)
+	for i, c := range b {
+		if 'A' <= c && c <= 'Z' {
+			b[i] = c + ('a' - 'A')
+		}
+	}
+	return string(b)
 }
 
 // expressionSlotPattern returns the pattern of the expression tree e where it
