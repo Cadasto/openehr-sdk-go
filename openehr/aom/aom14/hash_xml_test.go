@@ -5,7 +5,8 @@ package aom14_test
 // ANNOTATION's items as StringDictionaryItems, the key in `id` and the value
 // as text; ARCHETYPE's translations one TRANSLATION_DETAILS per value, with no
 // `id`, keyed by the value's language code; entries in ascending key order.
-// REQ-170: an OPT repeating a Hash key is refused in every mode.
+// REQ-170: an OPT repeating a Hash key decodes with the earlier entry kept,
+// the repeat being unmatched content.
 
 import (
 	"encoding/xml"
@@ -13,6 +14,7 @@ import (
 	"os"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -150,35 +152,120 @@ func TestREQ176_REQ056_ArchetypeTranslations(t *testing.T) {
 	}
 }
 
-// TestREQ176_REQ170_RepeatedHashKeyRefused pins that an OPT repeating the key
-// of a Hash entry, which the pinned schemas do not forbid, is refused in every
-// mode rather than decoded with the earlier entry replaced: a corpus OPT given
-// a second `original_author` with the `id` of an earlier one fails with
-// canxml.ErrInvalidShape, naming the entry by its path and not its key.
-func TestREQ176_REQ170_RepeatedHashKeyRefused(t *testing.T) {
+// TestREQ176_REQ170_RepeatedHashKeyUnmatched pins that an OPT repeating the
+// key of a Hash entry, which the pinned schemas do not forbid and CKM and
+// Archetype Designer exports do in `other_details`, decodes with the earlier
+// entry kept, the repeat being unmatched content: a corpus OPT given a second
+// entry of a key it holds, with another value, in a Hash<String,String> or in
+// the language-keyed `details`, decodes by default to the value of the OPT
+// without it; the report option reports the repeat's element alone; and
+// strict refuses it with canxml.ErrUnknownElement, naming that path and none
+// of its key or value.
+func TestREQ176_REQ170_RepeatedHashKeyUnmatched(t *testing.T) {
 	raw, err := os.ReadFile("../../../testkit/corpus/crossformat/consult_record/template.opt")
 	if err != nil {
 		t.Fatalf("read the corpus OPT: %v", err)
 	}
-	const last = `<original_author id="date">2023-03-30</original_author>`
-	if !strings.Contains(string(raw), last) {
-		t.Fatalf("the corpus OPT holds no %s", last)
+	var want aom14.OperationalTemplate
+	if err := canxml.Unmarshal(raw, &want, canxml.WithStrict()); err != nil {
+		t.Fatalf("canxml.Unmarshal(corpus OPT, strict) = %v; want nil", err)
 	}
-	doc := strings.Replace(string(raw), last, last+`<original_author id="email">second@example.org</original_author>`, 1)
+	const planted = "planted-repeat"
+	for _, tc := range []struct {
+		name, after, repeat, key, path string
+	}{
+		{
+			name:   "original_author",
+			after:  `<original_author id="date">2023-03-30</original_author>`,
+			repeat: `<original_author id="email">` + planted + `</original_author>`,
+			key:    "email",
+			path:   "/template[1]/description[1]/original_author[5]",
+		},
+		{
+			name:   "other_details",
+			after:  `<other_details id="sem_ver">2.0.0</other_details>`,
+			repeat: `<other_details id="sem_ver">` + planted + `</other_details>`,
+			key:    "sem_ver",
+			path:   "/template[1]/description[1]/other_details[7]",
+		},
+		{
+			name:  "details, keyed by language",
+			after: `</details>`,
+			repeat: `<details><language><terminology_id><value>ISO_639-1</value></terminology_id>` +
+				`<code_string>en</code_string></language><purpose>` + planted + `</purpose></details>`,
+			path: "/template[1]/description[1]/details[2]",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if strings.Count(string(raw), tc.after) != 1 {
+				t.Fatalf("the corpus OPT does not hold %s once", tc.after)
+			}
+			doc := []byte(strings.Replace(string(raw), tc.after, tc.after+tc.repeat, 1))
+			var got aom14.OperationalTemplate
+			if err := canxml.Unmarshal(doc, &got); err != nil || !reflect.DeepEqual(got, want) {
+				t.Errorf("canxml.Unmarshal = %v; want nil and the OPT without the repeat, the earlier entry kept", err)
+			}
+			var reported []string
+			got = aom14.OperationalTemplate{}
+			if err := canxml.Unmarshal(doc, &got, canxml.WithUnmatched(func(p string) { reported = append(reported, p) })); err != nil || !reflect.DeepEqual(got, want) {
+				t.Errorf("canxml.Unmarshal(WithUnmatched) = %v; want nil and the OPT without the repeat", err)
+			}
+			if w := []string{tc.path}; !slices.Equal(reported, w) {
+				t.Errorf("canxml.Unmarshal(WithUnmatched) reported %q; want %q", reported, w)
+			}
+			err := canxml.Unmarshal(doc, new(aom14.OperationalTemplate), canxml.WithStrict())
+			if !errors.Is(err, canxml.ErrUnknownElement) || errors.Is(err, canxml.ErrInvalidShape) {
+				t.Fatalf("canxml.Unmarshal(WithStrict) = %v; want canxml.ErrUnknownElement and not canxml.ErrInvalidShape", err)
+			}
+			if msg := err.Error(); !strings.Contains(msg, strconv.Quote(tc.path)) || strings.Contains(msg, planted) || (tc.key != "" && strings.Contains(msg, tc.key)) {
+				t.Errorf("canxml.Unmarshal(WithStrict) = %q; want it to name %s and none of the repeat's key or value", msg, tc.path)
+			}
+		})
+	}
+}
+
+// TestREQ176_REQ170_RepeatedTranslationUnmatched pins the same of ARCHETYPE's
+// translations, the other Hash keyed by its values' language: a second
+// TRANSLATION_DETAILS of a language an earlier one holds, with another author,
+// is unmatched content, so the earlier one is kept by default, the report
+// option reports the repeat alone and strict refuses it.
+func TestREQ176_REQ170_RepeatedTranslationUnmatched(t *testing.T) {
+	lang := func(code string) rm.CodePhrase {
+		return rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}, CodeString: code}
+	}
+	in := &aom14.Archetype{
+		ArchetypeID:      rm.ArchetypeID{Value: "openEHR-EHR-OBSERVATION.blood_pressure.v2"},
+		Concept:          "at0000",
+		OriginalLanguage: lang("en"),
+		Translations:     &map[string]rm.TranslationDetails{"de": {Language: lang("de"), Author: map[string]string{"name": "W"}}},
+	}
+	out, err := canxml.Marshal(in)
+	if err != nil {
+		t.Fatalf("canxml.Marshal = %v; want nil", err)
+	}
+	const planted = "planted-repeat"
+	i, j := strings.Index(string(out), "<translations>"), strings.Index(string(out), "</translations>")
+	if i < 0 || j < i {
+		t.Fatalf("%s holds no translations element", out)
+	}
+	block := string(out[i : j+len("</translations>")])
+	repeat := strings.Replace(block, `>W<`, `>`+planted+`<`, 1)
+	doc := []byte(string(out[:j+len("</translations>")]) + repeat + string(out[j+len("</translations>"):]))
+	const path = "/archetype[1]/translations[2]"
+	var got aom14.Archetype
+	if err := canxml.Unmarshal(doc, &got); err != nil || !reflect.DeepEqual(got.Translations, in.Translations) {
+		t.Errorf("canxml.Unmarshal(%s) = %#v, %v; want %#v, the earlier translation kept", doc, got.Translations, err, *in.Translations)
+	}
 	var reported []string
-	for mode, opts := range decodeModes(&reported) {
-		var ot aom14.OperationalTemplate
-		err := canxml.Unmarshal([]byte(doc), &ot, opts...)
-		if !errors.Is(err, canxml.ErrInvalidShape) {
-			t.Fatalf("canxml.Unmarshal(%s) = %v; want canxml.ErrInvalidShape", mode, err)
-		}
-		const path = "/template[1]/description[1]/original_author[5]"
-		if de, ok := errors.AsType[*canxml.DecodeError](err); !ok || de == nil || de.Path != path {
-			t.Errorf("canxml.Unmarshal(%s) = %v; want a DecodeError naming %s", mode, err, path)
-		}
-		if msg := err.Error(); strings.Contains(msg, "email") || strings.Contains(msg, "example.org") {
-			t.Errorf("canxml.Unmarshal(%s) error %q quotes the entry's key or value", mode, msg)
-		}
+	if err := canxml.Unmarshal(doc, new(aom14.Archetype), canxml.WithUnmatched(func(p string) { reported = append(reported, p) })); err != nil {
+		t.Errorf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
+	}
+	if w := []string{path}; !slices.Equal(reported, w) {
+		t.Errorf("canxml.Unmarshal(WithUnmatched) reported %q; want %q", reported, w)
+	}
+	err = canxml.Unmarshal(doc, new(aom14.Archetype), canxml.WithStrict())
+	if !errors.Is(err, canxml.ErrUnknownElement) || !strings.Contains(err.Error(), strconv.Quote(path)) || strings.Contains(err.Error(), planted) {
+		t.Errorf("canxml.Unmarshal(WithStrict) = %v; want canxml.ErrUnknownElement naming %s and not the repeat's value", err, path)
 	}
 }
 

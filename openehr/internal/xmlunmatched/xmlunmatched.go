@@ -8,9 +8,10 @@
 // attribute that names no attribute of the RM or AOM 1.4 type its element
 // decodes as, other than namespace declarations and attributes in the XML
 // Schema instance namespace (`xsi:type`, `xsi:schemaLocation`, `xsi:nil`, …);
-// an element in a namespace other than the openEHR one; and an element whose
+// an element in a namespace other than the openEHR one; an element whose
 // content the codec does not model: a `Hash` of `Hash`es and a member whose Go
-// type has no decoder of its own. So is text other than
+// type has no decoder of its own; and an entry of a `Hash` member whose key an
+// earlier entry of the member holds. So is text other than
 // XML whitespace directly inside an element whose content is elements, one
 // item per element however many runs of text it holds. By default the decode
 // skips it. A caller can instead track it: report each item, in document
@@ -121,13 +122,12 @@
 // error encoding/xml or a TextUnmarshaler gives, whose text may quote the
 // value. [DropElement] returns one for an element whose text is not its one
 // value, and [DecodeEntry] and [DecodeEntryKeyedBy] for a `Hash` entry with
-// no key or with the key of an earlier entry, each with a cause whose fixed
-// text names no value. A tracked decode names the element by its path from
-// the root of the value and [Tracker.Decode] returns the failure on its own;
-// an untracked decode names the element alone, and the failure travels out
-// inside the dispatch envelopes it passes through. [IsPrimitiveFailure] tells
-// such a failure apart, so canxml can decode the input again, tracked, to
-// find the path.
+// no key, each with a cause whose fixed text names no value. A tracked decode
+// names the element by its path from the root of the value and
+// [Tracker.Decode] returns the failure on its own; an untracked decode names
+// the element alone, and the failure travels out inside the dispatch
+// envelopes it passes through. [IsPrimitiveFailure] tells such a failure
+// apart, so canxml can decode the input again, tracked, to find the path.
 package xmlunmatched
 
 import (
@@ -213,6 +213,11 @@ type Tracker struct {
 	// read of the decoder returns it again, the input standing inside that
 	// element; nil until an element is refused.
 	refusal *typereg.DecodeError
+	// held collects, while [DecodeEntryKeyedBy] reads the value of a Hash
+	// entry whose key lies inside the value, the unmatched items and the
+	// missing members the value holds, in place of applying the policy to
+	// them ([Tracker.holdEntry]); nil otherwise.
+	held *[]heldItem
 }
 
 // frame is one open element: its local name, its 1-based position among its
@@ -536,6 +541,10 @@ func (t *Tracker) closedPath(p place) string {
 // unmatched applies the policy to the unmatched item at path: report it, then
 // refuse it under strict. foreign marks an element in a foreign namespace.
 func (t *Tracker) unmatched(path string, foreign bool) error {
+	if t.held != nil {
+		*t.held = append(*t.held, heldItem{path: path, foreign: foreign})
+		return nil
+	}
 	if t.report != nil {
 		t.report(path)
 	}
@@ -1040,11 +1049,14 @@ type Held struct {
 	items []heldItem
 }
 
-// heldItem is one unmatched element a [Held] holds: its path from the root of
-// the value, and whether it lies in a foreign namespace.
+// heldItem is one unmatched element a [Held] holds, or one item a held Hash
+// entry holds ([Tracker.holdEntry]): its path from the root of the value, and
+// whether it lies in a foreign namespace; or, when missing is set, the JSON
+// Pointer of a mandatory member the entry leaves out.
 type heldItem struct {
 	path    string
 	foreign bool
+	missing bool
 }
 
 // SkipUnmatchedAfter skips the element start opens, which the decoder does

@@ -127,7 +127,7 @@ func (t *Tracker) closing(n int) {
 			t.writePointer(&b, n)
 			b.WriteByte('/')
 			b.WriteString(name)
-			t.missing(b.String())
+			t.missingMember(b.String())
 		}
 	}
 	p := &t.open[n-2]
@@ -137,6 +137,17 @@ func (t *Tracker) closing(n int) {
 	if i := slices.Index(p.class.Required, f.name); i >= 0 {
 		p.seen |= 1 << i
 	}
+}
+
+// missingMember passes the pointer of a mandatory member the document leaves
+// out to the decode's hook, or holds it while a Hash entry's key is unknown
+// ([Tracker.holdEntry]).
+func (t *Tracker) missingMember(pointer string) {
+	if t.held != nil {
+		*t.held = append(*t.held, heldItem{path: pointer, missing: true})
+		return
+	}
+	t.missing(pointer)
 }
 
 // writePointer writes the JSON Pointer of the element whose frame is

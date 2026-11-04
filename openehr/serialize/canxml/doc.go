@@ -120,11 +120,12 @@
 // that names no attribute of the RM type its element decodes as; an
 // element in a namespace other than the openEHR one ([ErrNamespace]); text
 // other than XML whitespace directly inside an element whose content is
-// elements, such as an RM object's, a CDATA section included; and the
-// element of a `Hash` of `Hash`es (see below). The
-// key attribute of a `Hash` entry is read, not unmatched. The text of a
-// primitive element is its value, and whitespace between elements is never
-// unmatched, so an indented document decodes as a compact one does.
+// elements, such as an RM object's, a CDATA section included; the element
+// of a `Hash` of `Hash`es; and a `Hash` entry whose key an earlier entry of
+// the member holds (see below). The key attribute of a `Hash` entry is read,
+// not unmatched. The text of a primitive element is its value, and
+// whitespace between elements is never unmatched, so an indented document
+// decodes as a compact one does.
 // Two kinds of attribute are never unmatched: a namespace declaration,
 // and an attribute in the XML Schema instance namespace, whether the
 // `xsi:type` discriminator, `xsi:schemaLocation`, `xsi:nil` or another.
@@ -325,10 +326,15 @@
 //
 // A member's map starts empty at the element's first entry of it, in every
 // mode, so a key repeats only within the element, and a value decoded into
-// twice holds the second document's entries. Decode refuses an entry whose
-// key an earlier entry of the member holds, and an entry with no key, no key
-// attribute or no language code, with [ErrInvalidShape]: the error names the
-// entry's path and not its key. The encoder refuses, with [ErrInvalidShape],
+// twice holds the second document's entries. An entry whose key an earlier
+// entry of the member holds is unmatched content, whatever its value: decode
+// keeps the earlier entry, so by default it reads the member as if the repeat
+// were absent, [WithUnmatched] reports the repeat's element as one item, and
+// [WithStrict] refuses it. A language-keyed repeat is read to find its key,
+// so a value that does not decode fails the decode all the same. In every
+// mode, decode refuses an entry with no key, no key attribute or no language
+// code with [ErrInvalidShape]: the error names the entry's path and not its
+// key. The encoder refuses, with [ErrInvalidShape],
 // an entry keyed by language held under a key other than its value's
 // language code, the empty key included: decode would not read it back under
 // that key.

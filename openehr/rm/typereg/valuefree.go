@@ -502,11 +502,10 @@ var (
 		`the _type of a typed item names no primitive an XML Schema built-in datatype reads as`,
 		`an Any member holds a JSON object, a string or null`,
 		`a member of a choice of shapes holds a JSON object or null`,
-		// The canonical-XML refusals of a Hash entry with no key or with the
-		// key of an earlier entry, and of a dropped element's text other than
-		// its one value, which this package cannot import either.
+		// The canonical-XML refusals of a Hash entry with no key, and of a
+		// dropped element's text other than its one value, which this package
+		// cannot import either.
 		`a Hash entry has no key`,
-		`a Hash entry repeats the key of an earlier entry`,
 		`the element holds a value other than the one it may hold`,
 	)
 )
