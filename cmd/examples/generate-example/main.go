@@ -60,11 +60,12 @@ func run() error {
 	// deployable form of an openEHR template: every archetype it uses,
 	// flattened into one XML file with the template's constraints applied.
 	// ReadOperationalTemplate reads it into the operational template model,
-	// and refuses a node type it does not know rather than drop everything
-	// beneath it, which would leave that whole subtree missing from the
-	// instance. Compile turns the model into the driver the generator walks;
-	// the same compiled value feeds the validator and the composition
-	// builder.
+	// and by default reads a node type it does not know as a leaf without
+	// its subtree, so the instance lacks that subtree. A generator that must
+	// not see a node reduced passes canxml.WithStrict() here and
+	// templatecompile.WithStrict() to Compile, which refuse such readings.
+	// Compile turns the model into the driver the generator walks; the same
+	// compiled value feeds the validator and the composition builder.
 	raw, err := os.ReadFile(optPath)
 	if err != nil {
 		return fmt.Errorf("read OPT %q: %w", optPath, err)

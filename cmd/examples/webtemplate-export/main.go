@@ -45,9 +45,10 @@ func run() error {
 	// Step 1: parse and compile the OPT. The Web Template is derived from the
 	// compiled form, so the template has to be compiled first.
 	// ReadOperationalTemplate reads the OPT into the operational template
-	// model, and refuses a node type it does not know rather than drop
-	// everything beneath it, so the export is never an incomplete Web
-	// Template with nothing to say so.
+	// model, and by default reads a node type it does not know as a leaf
+	// without its subtree, which the export then lacks. An export that must
+	// not lose a node passes canxml.WithStrict() here and
+	// templatecompile.WithStrict() to Compile, which refuse such readings.
 	raw, err := os.ReadFile(optPath)
 	if err != nil {
 		return fmt.Errorf("read OPT %s: %w", optPath, err)

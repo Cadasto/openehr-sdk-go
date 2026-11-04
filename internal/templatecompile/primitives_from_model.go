@@ -3,8 +3,9 @@ package templatecompile
 // primitives_from_model.go: the primitive constraint of a node, built from
 // the primitive classes of the operational template model. The builders read
 // the model as the deprecated parser reads an OPT, white space trimmed and
-// blank entries left out, and refuse what its strict mode refuses where its
-// default mode weakens the constraint instead.
+// blank entries left out. Where the parser's default mode reads a value in a
+// weaker form, so do the builders, and when strict they refuse it, as the
+// parser's strict mode does.
 
 import (
 	"errors"
@@ -20,23 +21,31 @@ import (
 // primitiveFromModel returns the primitive constraint of the model node o:
 // the one its C_PRIMITIVE_OBJECT item, C_CODE_PHRASE, C_CODE_REFERENCE,
 // C_DV_QUANTITY, C_DV_ORDINAL or CONSTRAINT_REF states, or nil for any other
-// node, and for a C_PRIMITIVE_OBJECT with no item, which allows any value. A
-// C_CODE_REFERENCE's code phrase is read as a C_CODE_PHRASE's.
+// node. A C_CODE_REFERENCE's code phrase is read as a C_CODE_PHRASE's.
 //
-// An error reports a value the constraint cannot carry: a temporal range
-// bound that is not ISO 8601 text of its type, a timezone_validity that names
-// no VALIDITY_KIND or is mandatory on a C_DATE, a CONSTRAINT_REF with no
-// reference, an ordinal symbol that is neither a DV_CODED_TEXT nor a
-// CODE_PHRASE, an item that is no primitive class held by pointer, and one
-// that is a nil pointer to one, which a model built in code can hold. The
-// caller wraps it in ErrInvalidInput with the node's place.
-func primitiveFromModel(o aom14.CObject) (constraints.PrimitiveConstraint, error) {
+// Unless strict, it reads a value the constraint cannot carry in the weaker
+// form the parser's default mode reads it: a C_PRIMITIVE_OBJECT with no item,
+// or with a nil pointer for one, as no constraint, which allows any value; a
+// CONSTRAINT_REF with no reference as one with an empty reference; a temporal
+// range bound that is not ISO 8601 text of its type as unbounded on its side;
+// and a timezone_validity that names no VALIDITY_KIND, or is mandatory on a
+// C_DATE, as optional. When strict, each is an error, as the parser's strict
+// mode refuses it.
+//
+// In both modes an error reports an ordinal symbol that is neither a
+// DV_CODED_TEXT nor a CODE_PHRASE and an item that is no primitive class held
+// by pointer, which only a model built in code can hold. The caller wraps an
+// error in ErrInvalidInput with the node's place.
+func primitiveFromModel(o aom14.CObject, strict bool) (constraints.PrimitiveConstraint, error) {
 	switch n := o.(type) {
 	case *aom14.CPrimitiveObject:
-		if n.Item == nil {
+		if n.Item == nil || isNilPrimitive(n.Item) {
+			if strict {
+				return nil, fmt.Errorf("C_PRIMITIVE_OBJECT for %q has no item", strings.TrimSpace(n.RMTypeName))
+			}
 			return nil, nil
 		}
-		return primitiveItemFromModel(n.Item)
+		return primitiveItemFromModel(n.Item, strict)
 	case *aom14.CCodePhrase:
 		return codePhraseFromModel(n), nil
 	case *aom14.CCodeReference:
@@ -54,10 +63,9 @@ func primitiveFromModel(o aom14.CObject) (constraints.PrimitiveConstraint, error
 		return c, nil
 	case *aom14.ConstraintRef:
 		// A reference is required. The parser's default mode keeps a leaf
-		// with an empty one; the compile step refuses it, as strict mode
-		// does.
+		// with an empty one, and its strict mode refuses it.
 		ref := strings.TrimSpace(n.Reference)
-		if ref == "" {
+		if ref == "" && strict {
 			return nil, fmt.Errorf("CONSTRAINT_REF for %q has no reference", strings.TrimSpace(n.RMTypeName))
 		}
 		return constraints.ConstraintRef{Reference: ref}, nil
@@ -66,11 +74,9 @@ func primitiveFromModel(o aom14.CObject) (constraints.PrimitiveConstraint, error
 }
 
 // primitiveItemFromModel returns the constraint the item of a
-// C_PRIMITIVE_OBJECT states.
-func primitiveItemFromModel(item aom14.CPrimitive) (constraints.PrimitiveConstraint, error) {
-	if isNilPrimitive(item) {
-		return nil, fmt.Errorf("item of C_PRIMITIVE_OBJECT missing (%T)", item)
-	}
+// C_PRIMITIVE_OBJECT states. item is neither nil nor a nil pointer, and
+// strict is as for [primitiveFromModel].
+func primitiveItemFromModel(item aom14.CPrimitive, strict bool) (constraints.PrimitiveConstraint, error) {
 	switch p := item.(type) {
 	case *aom14.CBoolean:
 		c := constraints.CBoolean{TrueValid: p.TrueValid, FalseValid: p.FalseValid}
@@ -109,25 +115,25 @@ func primitiveItemFromModel(item aom14.CPrimitive) (constraints.PrimitiveConstra
 		c.ListOpen = p.ListOpen != nil && *p.ListOpen
 		return c, nil
 	case *aom14.CDate:
-		r, tz, err := clockPartsFromModel(p.Range, p.TimezoneValidity, "C_DATE", constraints.CDate{}.Validate)
+		r, tz, err := clockPartsFromModel(p.Range, p.TimezoneValidity, "C_DATE", constraints.CDate{}.Validate, strict)
 		if err != nil {
 			return nil, err
 		}
 		return constraints.CDate{Pattern: trimmedOrEmpty(p.Pattern), Range: r, TimezoneValidity: tz}, nil
 	case *aom14.CTime:
-		r, tz, err := clockPartsFromModel(p.Range, p.TimezoneValidity, "C_TIME", constraints.CTime{}.Validate)
+		r, tz, err := clockPartsFromModel(p.Range, p.TimezoneValidity, "C_TIME", constraints.CTime{}.Validate, strict)
 		if err != nil {
 			return nil, err
 		}
 		return constraints.CTime{Pattern: trimmedOrEmpty(p.Pattern), Range: r, TimezoneValidity: tz}, nil
 	case *aom14.CDateTime:
-		r, tz, err := clockPartsFromModel(p.Range, p.TimezoneValidity, "C_DATE_TIME", constraints.CDateTime{}.Validate)
+		r, tz, err := clockPartsFromModel(p.Range, p.TimezoneValidity, "C_DATE_TIME", constraints.CDateTime{}.Validate, strict)
 		if err != nil {
 			return nil, err
 		}
 		return constraints.CDateTime{Pattern: trimmedOrEmpty(p.Pattern), Range: r, TimezoneValidity: tz}, nil
 	case *aom14.CDuration:
-		r, err := temporalRangeFromModel(p.Range, "C_DURATION", constraints.CDuration{}.Validate)
+		r, err := temporalRangeFromModel(p.Range, "C_DURATION", constraints.CDuration{}.Validate, strict)
 		if err != nil {
 			return nil, err
 		}
@@ -186,10 +192,11 @@ func numericRangeFromModel[T aom14.Integer | aom14.Real](iv *rm.Interval[T]) con
 // temporalRangeFromModel returns the range of a C_DATE, C_TIME, C_DATE_TIME
 // or C_DURATION named class, or the zero range, which constrains nothing,
 // when the model gives none. validate is the zero constraint of the type,
-// which admits exactly the ISO 8601 text of the type. A bound it refuses is an
-// error: the parser's default mode reads that side as unbounded, and the
-// compile step refuses it, as strict mode does.
-func temporalRangeFromModel(iv *rm.Interval[string], class string, validate func(any) []constraints.Violation) (constraints.TemporalRange, error) {
+// which admits exactly the ISO 8601 text of the type. A bound it refuses
+// leaves its side unbounded, and not inclusive, as the parser's default mode
+// reads it, or, when strict, is an error, as the parser's strict mode
+// refuses it.
+func temporalRangeFromModel(iv *rm.Interval[string], class string, validate func(any) []constraints.Violation, strict bool) (constraints.TemporalRange, error) {
 	if iv == nil {
 		return constraints.TemporalRange{}, nil
 	}
@@ -201,53 +208,69 @@ func temporalRangeFromModel(iv *rm.Interval[string], class string, validate func
 	}
 	if !r.LowerUnbounded {
 		lower := strings.TrimSpace(iv.Lower)
-		if len(validate(lower)) != 0 {
+		switch {
+		case len(validate(lower)) == 0:
+			r.Lower = lower
+		case strict:
 			return constraints.TemporalRange{}, fmt.Errorf("%s range: lower bound %q is not ISO 8601 text of the type", class, lower)
+		default:
+			r.LowerUnbounded, r.LowerInclusive = true, false
 		}
-		r.Lower = lower
 	}
 	if !r.UpperUnbounded {
 		upper := strings.TrimSpace(iv.Upper)
-		if len(validate(upper)) != 0 {
+		switch {
+		case len(validate(upper)) == 0:
+			r.Upper = upper
+		case strict:
 			return constraints.TemporalRange{}, fmt.Errorf("%s range: upper bound %q is not ISO 8601 text of the type", class, upper)
+		default:
+			r.UpperUnbounded, r.UpperInclusive = true, false
 		}
-		r.Upper = upper
 	}
 	return r, nil
 }
 
 // clockPartsFromModel returns the range and the timezone validity of a
-// C_DATE, C_TIME or C_DATE_TIME named class.
-func clockPartsFromModel(iv *rm.Interval[string], tz *aom14.TimezoneValidityKind, class string, validate func(any) []constraints.Violation) (constraints.TemporalRange, constraints.ValidityKind, error) {
-	r, err := temporalRangeFromModel(iv, class, validate)
+// C_DATE, C_TIME or C_DATE_TIME named class, as [temporalRangeFromModel] and
+// [timezoneValidityFromModel] read them.
+func clockPartsFromModel(iv *rm.Interval[string], tz *aom14.TimezoneValidityKind, class string, validate func(any) []constraints.Violation, strict bool) (constraints.TemporalRange, constraints.ValidityKind, error) {
+	r, err := temporalRangeFromModel(iv, class, validate, strict)
 	if err != nil {
 		return r, constraints.ValidityOptional, err
 	}
-	v, err := timezoneValidityFromModel(tz, class)
+	v, err := timezoneValidityFromModel(tz, class, strict)
 	return r, v, err
 }
 
 // timezoneValidityFromModel returns the timezone validity of a C_DATE, C_TIME
-// or C_DATE_TIME named class: optional when the model gives none. The parser's
-// default mode reads a mandatory one on a C_DATE as optional; the compile
-// step refuses it, as strict mode does, and refuses a kind that names no
-// VALIDITY_KIND, which only a model built in code can hold.
-func timezoneValidityFromModel(tz *aom14.TimezoneValidityKind, class string) (constraints.ValidityKind, error) {
+// or C_DATE_TIME named class: optional when the model gives none. A mandatory
+// one on a C_DATE, which no date meets, and a kind that names no
+// VALIDITY_KIND, which only a model built in code can hold, read as optional,
+// as the parser's default mode reads them, or, when strict, are an error, as
+// the parser's strict mode refuses them.
+func timezoneValidityFromModel(tz *aom14.TimezoneValidityKind, class string, strict bool) (constraints.ValidityKind, error) {
 	if tz == nil {
 		return constraints.ValidityOptional, nil
 	}
 	switch *tz {
 	case aom14.TimezoneValidityKindMandatory:
-		if class == "C_DATE" {
+		if class != "C_DATE" {
+			return constraints.ValidityMandatory, nil
+		}
+		if strict {
 			return constraints.ValidityOptional, errors.New("C_DATE timezone_validity is mandatory, which no date meets: a date has no timezone")
 		}
-		return constraints.ValidityMandatory, nil
+		return constraints.ValidityOptional, nil
 	case aom14.TimezoneValidityKindOptional:
 		return constraints.ValidityOptional, nil
 	case aom14.TimezoneValidityKindDisallowed: // the code of prohibited too
 		return constraints.ValidityDisallowed, nil
 	}
-	return constraints.ValidityOptional, fmt.Errorf("%s timezone_validity %d is no VALIDITY_KIND", class, int32(*tz))
+	if strict {
+		return constraints.ValidityOptional, fmt.Errorf("%s timezone_validity %d is no VALIDITY_KIND", class, int32(*tz))
+	}
+	return constraints.ValidityOptional, nil
 }
 
 // codePhraseFromModel returns the constraint of a C_CODE_PHRASE.

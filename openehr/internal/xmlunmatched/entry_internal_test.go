@@ -240,26 +240,184 @@ func TestREQ176_EntryValueFailureNamesNoValue(t *testing.T) {
 	}
 }
 
-// REQ-170: decode refuses, in every mode, a Hash entry whose key an earlier
-// entry of the member holds, or that has none.
+// REQ-170: a Hash entry whose key an earlier entry of the member holds is
+// unmatched content, and decode refuses, in every mode, an entry that has no
+// key.
 
-// entryModes are the decodes a Hash entry is refused in alike: a whole
-// document read untracked, as canxml.Unmarshal reads one given no option, and
-// read through a tracker that reports unmatched content or refuses it.
+// entryModes are the decodes a Hash entry with no key is refused in alike: a
+// whole document read untracked, as canxml.Unmarshal reads one given no
+// option, and read through a tracker that reports unmatched content or
+// refuses it.
 var entryModes = map[string]func(doc string, v any) error{
 	"default": func(doc string, v any) error { return Unmarshal([]byte(doc), v, nil) },
 	"report":  func(doc string, v any) error { return Unmarshal([]byte(doc), v, NewTracker(func(string) {}, false)) },
 	"strict":  func(doc string, v any) error { return Unmarshal([]byte(doc), v, NewTracker(nil, true)) },
 }
 
-// TestREQ176_REQ170_EntryRepeatedOrMissingKeyRefused pins that a Hash entry
-// whose key an earlier entry of the same member holds, or that has none, is
-// refused in every mode, whether its value is a String or a class keyed by an
-// attribute or by its language: the error wraps ErrInvalidShape, is a
-// *typereg.DecodeError naming the entry by its path from the root, and
-// carries none of the key's text. An empty `id` is a key.
-func TestREQ176_REQ170_EntryRepeatedOrMissingKeyRefused(t *testing.T) {
-	const key = "secret-key"
+// TestREQ176_REQ170_EntryRepeatedKeyUnmatched pins that a Hash entry whose key
+// an earlier entry of the same member holds is unmatched content, whether its
+// value is a String or a class keyed by an attribute or by its language. The
+// earlier entry is kept, though the repeat's value differs, so the default
+// decode reads the member as if the repeat were absent. The report option
+// reports the repeat's element once, by its path, and nothing inside it: not
+// the attributes and child elements it holds besides its value, nor, for the
+// missing-member report, the mandatory members it leaves out. Strict refuses
+// it with ErrUnknownElement, naming that path and none of its key or value.
+func TestREQ176_REQ170_EntryRepeatedKeyUnmatched(t *testing.T) {
+	const key, repeat = "secret-key", "secret-value"
+	item := func(lang, purpose string) string {
+		return `<language>` + lang + `</language><purpose>` + purpose + `</purpose>`
+	}
+	for _, tc := range []struct {
+		name, body, path string
+		want             entryHolder
+	}{
+		{
+			name: "a String entry repeating an id",
+			body: `<author id="` + key + `">A</author><author id="b">B</author>` +
+				`<author id="` + key + `" lang="x">` + repeat + `<note/></author>` +
+				`<details>` + item("en", "p") + `</details>`,
+			path: "/holder[1]/author[3]",
+			want: entryHolder{
+				Author:  map[string]string{key: "A", "b": "B"},
+				Details: map[string]entryItem{"en": {Language: "en", Purpose: "p"}},
+			},
+		},
+		{
+			name: "a class entry repeating an id",
+			body: `<author id="a">A</author><details>` + item("en", "p") + `</details>` +
+				`<parts id="` + key + `">` + item("fr", "r") + `</parts>` +
+				`<parts id="` + key + `" extra="y">` + item("de", repeat) + `<note/></parts>`,
+			path: "/holder[1]/parts[2]",
+			want: entryHolder{
+				Author:  map[string]string{"a": "A"},
+				Details: map[string]entryItem{"en": {Language: "en", Purpose: "p"}},
+				Parts:   map[string]entryItem{key: {Language: "fr", Purpose: "r"}},
+			},
+		},
+		{
+			name: "a language-keyed entry repeating a language",
+			body: `<author id="a">A</author><details>` + item(key, "p") + `</details>` +
+				`<details extra="y">` + item(key, repeat) + `<note/></details>`,
+			path: "/holder[1]/details[2]",
+			want: entryHolder{
+				Author:  map[string]string{"a": "A"},
+				Details: map[string]entryItem{key: {Language: key, Purpose: "p"}},
+			},
+		},
+		{
+			name: "a language-keyed entry repeating a language, a mandatory member left out",
+			body: `<author id="a">A</author><details>` + item(key, "p") + `</details>` +
+				`<details><language>` + key + `</language></details>`,
+			path: "/holder[1]/details[2]",
+			want: entryHolder{
+				Author:  map[string]string{"a": "A"},
+				Details: map[string]entryItem{key: {Language: key, Purpose: "p"}},
+			},
+		},
+	} {
+		doc := `<holder ` + xmlnsDecl + `>` + tc.body + `</holder>`
+		t.Run(tc.name, func(t *testing.T) {
+			var plain entryHolder
+			if err := Unmarshal([]byte(doc), &plain, nil); err != nil || !reflect.DeepEqual(plain, tc.want) {
+				t.Errorf("default decode = %#v, %v; want %#v, the earlier entry kept", plain, err, tc.want)
+			}
+			var reported entryHolder
+			var paths []string
+			if err := Unmarshal([]byte(doc), &reported, NewTracker(func(p string) { paths = append(paths, p) }, false)); err != nil || !reflect.DeepEqual(reported, tc.want) {
+				t.Errorf("report decode = %#v, %v; want %#v, the earlier entry kept", reported, err, tc.want)
+			}
+			if want := []string{tc.path}; !slices.Equal(paths, want) {
+				t.Errorf("reported %q; want %q, the repeat as one item", paths, want)
+			}
+			err := Unmarshal([]byte(doc), new(entryHolder), NewTracker(nil, true))
+			if ue, ok := errors.AsType[*unknownElementError](err); !ok || ue == nil || ue.path != tc.path {
+				t.Errorf("strict decode = %v; want the refusal of %s as unmatched content", err, tc.path)
+			}
+			if !errors.Is(err, ErrUnknownElement) || errors.Is(err, ErrInvalidShape) {
+				t.Errorf("strict decode = %v; want an error wrapping ErrUnknownElement and not ErrInvalidShape", err)
+			}
+			if err != nil && (strings.Contains(err.Error(), key) || strings.Contains(err.Error(), repeat)) {
+				t.Errorf("strict decode error %q quotes the repeat's key or value", err)
+			}
+			missing, err := decodeMissing(doc, new(entryHolder), false)
+			if err != nil || len(missing) > 0 {
+				t.Errorf("missing-member decode = %q, %v; want nothing missing, the repeat unread", missing, err)
+			}
+		})
+	}
+}
+
+// TestREQ176_REQ170_LanguageKeyedEntryContentKept pins that what a
+// language-keyed Hash entry that repeats no key holds besides what it reads
+// is unmatched as in any element, though the decode learns the entry's key
+// only once the entry has closed: an attribute and a child element are
+// reported in document order, with the mandatory members it leaves out
+// between them as the missing-member report finds them, and before what
+// follows the entry; strict refuses the first, with ErrNamespace too for a
+// child in a foreign namespace, even when the entry fails to decode after it;
+// and an entry with no language reports what it holds before it is refused.
+func TestREQ176_REQ170_LanguageKeyedEntryContentKept(t *testing.T) {
+	doc := `<holder ` + xmlnsDecl + `><author id="a">A</author>` +
+		`<details><language>en</language><purpose>p</purpose></details>` +
+		`<details extra="y"><note/><language>de</language></details>` +
+		`<other/></holder>`
+	var got []string
+	tr := NewTracker(func(p string) { got = append(got, "unmatched "+p) }, false)
+	tr.ReportMissing(func(p string) { got = append(got, "missing "+p) })
+	var v entryHolder
+	if err := tr.Decode(tr.NewDecoder(strings.NewReader(doc)), &v); err != nil {
+		t.Fatalf("Decode = %v; want nil", err)
+	}
+	want := []string{
+		"unmatched /holder[1]/details[2]/@extra",
+		"unmatched /holder[1]/details[2]/note[1]",
+		"missing /details/de/purpose",
+		"unmatched /holder[1]/other[1]",
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("reported %q; want %q", got, want)
+	}
+	if d, ok := v.Details["de"]; !ok || d.Language != "de" {
+		t.Errorf("Details = %#v; want the de entry", v.Details)
+	}
+	for _, tc := range []struct {
+		name, body, path string
+		foreign          bool
+	}{
+		{name: "an entry that decodes", body: `<details><language>en</language><purpose>p</purpose></details><details><note/><language>de</language><purpose>q</purpose></details>`, path: "/holder[1]/details[2]/note[1]"},
+		{name: "an entry with a foreign child", body: `<details><x:note xmlns:x="urn:other"/><language>de</language><purpose>q</purpose></details>`, path: "/holder[1]/details[1]/note[1]", foreign: true},
+		{name: "an entry that fails after its unmatched child", body: `<details><note/><language>de</purpose></details>`, path: "/holder[1]/details[1]/note[1]"},
+		{name: "an entry with no language", body: `<details><note/><purpose>q</purpose></details>`, path: "/holder[1]/details[1]/note[1]"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			doc := `<holder ` + xmlnsDecl + `><author id="a">A</author>` + tc.body + `</holder>`
+			err := Unmarshal([]byte(doc), new(entryHolder), NewTracker(nil, true))
+			if ue, ok := errors.AsType[*unknownElementError](err); !ok || ue == nil || ue.path != tc.path {
+				t.Errorf("strict decode = %v; want the refusal of %s", err, tc.path)
+			}
+			if got := errors.Is(err, ErrNamespace); got != tc.foreign {
+				t.Errorf("strict decode = %v; errors.Is(_, ErrNamespace) = %v, want %v", err, got, tc.foreign)
+			}
+		})
+	}
+	var paths []string
+	doc = `<holder ` + xmlnsDecl + `><author id="a">A</author><details><note/><purpose>q</purpose></details></holder>`
+	err := Unmarshal([]byte(doc), new(entryHolder), NewTracker(func(p string) { paths = append(paths, p) }, false))
+	if de, ok := errors.AsType[*typereg.DecodeError](err); !ok || de == nil || de.Path != "/holder[1]/details[1]" || !errors.Is(err, ErrInvalidShape) {
+		t.Errorf("report decode of an entry with no language = %v; want ErrInvalidShape naming /holder[1]/details[1]", err)
+	}
+	if want := []string{"/holder[1]/details[1]/note[1]"}; !slices.Equal(paths, want) {
+		t.Errorf("report decode of an entry with no language reported %q; want %q", paths, want)
+	}
+}
+
+// TestREQ176_REQ170_EntryMissingKeyRefused pins that a Hash entry that has no
+// key is refused in every mode, whether its value is a String or a class keyed
+// by an attribute or by its language: the error wraps ErrInvalidShape and is
+// a *typereg.DecodeError naming the entry by its path from the root. An empty
+// `id` is a key.
+func TestREQ176_REQ170_EntryMissingKeyRefused(t *testing.T) {
 	item := func(lang string) string {
 		return `<language>` + lang + `</language><purpose>p</purpose>`
 	}
@@ -267,31 +425,14 @@ func TestREQ176_REQ170_EntryRepeatedOrMissingKeyRefused(t *testing.T) {
 		name, body, path string
 	}{
 		{
-			name: "a String entry repeating an id",
-			body: `<author id="` + key + `">A</author><author id="b">B</author><author id="` + key + `">C</author>` +
-				`<details>` + item("en") + `</details>`,
-			path: "/holder[1]/author[3]",
-		},
-		{
 			name: "a String entry with no id",
 			body: `<author id="a">A</author><author>B</author><details>` + item("en") + `</details>`,
 			path: "/holder[1]/author[2]",
 		},
 		{
-			name: "a class entry repeating an id",
-			body: `<author id="a">A</author><details>` + item("en") + `</details>` +
-				`<parts id="` + key + `">` + item("fr") + `</parts><parts id="` + key + `">` + item("de") + `</parts>`,
-			path: "/holder[1]/parts[2]",
-		},
-		{
 			name: "a class entry with no id",
 			body: `<author id="a">A</author><details>` + item("en") + `</details><parts>` + item("fr") + `</parts>`,
 			path: "/holder[1]/parts[1]",
-		},
-		{
-			name: "a language-keyed entry repeating a language",
-			body: `<author id="a">A</author><details>` + item(key) + `</details><details>` + item(key) + `</details>`,
-			path: "/holder[1]/details[2]",
 		},
 		{
 			name: "a language-keyed entry with no language",
@@ -309,9 +450,6 @@ func TestREQ176_REQ170_EntryRepeatedOrMissingKeyRefused(t *testing.T) {
 				de, ok := errors.AsType[*typereg.DecodeError](err)
 				if !ok || de == nil || de.Path != tc.path {
 					t.Errorf("decode = %v; want a *typereg.DecodeError naming %s", err, tc.path)
-				}
-				if strings.Contains(err.Error(), key) {
-					t.Errorf("decode error %q quotes the key", err)
 				}
 			})
 		}
@@ -410,19 +548,21 @@ func TestREQ176_REQ170_EntriesStartEmptyAtTheFirstEntry(t *testing.T) {
 	}
 }
 
-// TestREQ176_REQ052_EntryRefusalsKeepTheirText pins that the text of a Hash
-// entry's refusal, a repeated key or none, keeps the refusal's own text, which
+// TestREQ176_REQ052_EntryRefusalsKeepTheirText pins that the text of the
+// refusal of a Hash entry with no key keeps the refusal's own text, which
 // holds no value, rather than naming it by its Go type alone, in every mode.
+// A repeated key is unmatched content, whose strict refusal names its path
+// (TestREQ176_REQ170_EntryRepeatedKeyUnmatched).
 //
-// Can-fail control: drop the two texts from typereg's whole-message forms and
+// Can-fail control: drop the text from typereg's whole-message forms and
 // each case reads "cause withheld (*errors.errorString)".
 func TestREQ176_REQ052_EntryRefusalsKeepTheirText(t *testing.T) {
 	for _, tc := range []struct {
 		name, body string
 		cause      error
 	}{
-		{name: "a repeated key", body: `<author id="a">A</author><author id="a">B</author>`, cause: errEntryRepeatedKey},
 		{name: "no key", body: `<author>A</author>`, cause: errEntryNoKey},
+		{name: "no language", body: `<author id="a">A</author><details><purpose>p</purpose></details>`, cause: errEntryNoKey},
 	} {
 		doc := `<holder ` + xmlnsDecl + `>` + tc.body + `</holder>`
 		for mode, decode := range entryModes {

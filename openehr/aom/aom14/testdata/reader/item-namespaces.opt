@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Items typed with a class the deprecated template parser reads a constraint of, which declare a namespace that the object that holds them binds otherwise or does not bind. The reader's default mode reads them as the parser does, and its strict mode refuses them. item-namespaces.read.opt is how the reader reads it. SDK-authored. -->
+<oe:template xmlns:oe="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:p="urn:x-openehr-sdk-go:test:other">
+    <oe:language>
+        <oe:terminology_id>
+            <oe:value>ISO_639-1</oe:value>
+        </oe:terminology_id>
+        <oe:code_string>en</oe:code_string>
+    </oe:language>
+    <oe:template_id>
+        <oe:value>sdk.reader_item_namespaces.v0</oe:value>
+    </oe:template_id>
+    <oe:concept>sdk.reader_item_namespaces.v0</oe:concept>
+    <oe:definition>
+        <oe:rm_type_name>CLUSTER</oe:rm_type_name>
+        <oe:occurrences>
+            <oe:lower>1</oe:lower>
+            <oe:upper>1</oe:upper>
+        </oe:occurrences>
+        <oe:node_id>at0000</oe:node_id>
+        <oe:attributes xsi:type="C_MULTIPLE_ATTRIBUTE">
+            <oe:rm_attribute_name>items</oe:rm_attribute_name>
+            <oe:existence>
+                <oe:lower>0</oe:lower>
+                <oe:upper>1</oe:upper>
+            </oe:existence>
+            <!-- An item typed C_DV_QUANTITY that declares the default namespace, which nothing around it declares: the object a C_DV_QUANTITY of what the item holds. -->
+            <oe:children xsi:type="C_COMPLEX_OBJECT">
+                <oe:rm_type_name>ELEMENT</oe:rm_type_name>
+                <oe:occurrences>
+                    <oe:lower>0</oe:lower>
+                    <oe:upper>1</oe:upper>
+                </oe:occurrences>
+                <oe:node_id>at0001</oe:node_id>
+                <oe:attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                    <oe:rm_attribute_name>value</oe:rm_attribute_name>
+                    <oe:existence>
+                        <oe:lower>0</oe:lower>
+                        <oe:upper>1</oe:upper>
+                    </oe:existence>
+                    <oe:children xsi:type="C_PRIMITIVE_OBJECT">
+                        <oe:rm_type_name>DV_QUANTITY</oe:rm_type_name>
+                        <oe:occurrences>
+                            <oe:lower>1</oe:lower>
+                            <oe:upper>1</oe:upper>
+                        </oe:occurrences>
+                        <oe:node_id/>
+                        <oe:item xsi:type="C_DV_QUANTITY" xmlns="http://schemas.openehr.org/v1">
+                            <property>
+                                <terminology_id>
+                                    <value>openehr</value>
+                                </terminology_id>
+                                <code_string>124</code_string>
+                            </property>
+                            <list>
+                                <magnitude>
+                                    <lower>0</lower>
+                                    <upper>100</upper>
+                                </magnitude>
+                                <units>kg</units>
+                            </list>
+                        </oe:item>
+                    </oe:children>
+                </oe:attributes>
+            </oe:children>
+            <!-- An item typed C_CODE_PHRASE that binds the prefix p, bound around it to another namespace, with an rm_type_name of its own: the object a C_CODE_PHRASE of what the item holds. -->
+            <oe:children xsi:type="C_COMPLEX_OBJECT">
+                <oe:rm_type_name>ELEMENT</oe:rm_type_name>
+                <oe:occurrences>
+                    <oe:lower>0</oe:lower>
+                    <oe:upper>1</oe:upper>
+                </oe:occurrences>
+                <oe:node_id>at0002</oe:node_id>
+                <oe:attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                    <oe:rm_attribute_name>value</oe:rm_attribute_name>
+                    <oe:existence>
+                        <oe:lower>0</oe:lower>
+                        <oe:upper>1</oe:upper>
+                    </oe:existence>
+                    <oe:children xsi:type="C_PRIMITIVE_OBJECT">
+                        <oe:rm_type_name>CODE_PHRASE</oe:rm_type_name>
+                        <oe:occurrences>
+                            <oe:lower>1</oe:lower>
+                            <oe:upper>1</oe:upper>
+                        </oe:occurrences>
+                        <oe:node_id/>
+                        <oe:item xsi:type="C_CODE_PHRASE" xmlns:p="http://schemas.openehr.org/v1">
+                            <p:rm_type_name>CODE_PHRASE</p:rm_type_name>
+                            <p:terminology_id>
+                                <p:value>local</p:value>
+                            </p:terminology_id>
+                            <p:code_list>at1</p:code_list>
+                        </oe:item>
+                    </oe:children>
+                </oe:attributes>
+            </oe:children>
+            <!-- An item typed C_PRIMITIVE_OBJECT that binds the prefix p to the v2 namespace: its own item is the object's. -->
+            <oe:children xsi:type="C_COMPLEX_OBJECT">
+                <oe:rm_type_name>ELEMENT</oe:rm_type_name>
+                <oe:occurrences>
+                    <oe:lower>0</oe:lower>
+                    <oe:upper>1</oe:upper>
+                </oe:occurrences>
+                <oe:node_id>at0003</oe:node_id>
+                <oe:attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                    <oe:rm_attribute_name>value</oe:rm_attribute_name>
+                    <oe:existence>
+                        <oe:lower>0</oe:lower>
+                        <oe:upper>1</oe:upper>
+                    </oe:existence>
+                    <oe:children xsi:type="C_PRIMITIVE_OBJECT">
+                        <oe:rm_type_name>STRING</oe:rm_type_name>
+                        <oe:occurrences>
+                            <oe:lower>1</oe:lower>
+                            <oe:upper>1</oe:upper>
+                        </oe:occurrences>
+                        <oe:node_id/>
+                        <oe:item xsi:type="C_PRIMITIVE_OBJECT" xmlns:p="http://schemas.openehr.org/v2">
+                            <p:item xsi:type="C_STRING">
+                                <p:list>a</p:list>
+                            </p:item>
+                        </oe:item>
+                    </oe:children>
+                </oe:attributes>
+            </oe:children>
+            <oe:cardinality>
+                <oe:is_ordered>false</oe:is_ordered>
+                <oe:is_unique>false</oe:is_unique>
+                <oe:interval>
+                    <oe:lower>0</oe:lower>
+                    <oe:upper_unbounded>true</oe:upper_unbounded>
+                </oe:interval>
+            </oe:cardinality>
+        </oe:attributes>
+        <oe:archetype_id>
+            <oe:value>openEHR-EHR-CLUSTER.sdk_reader.v0</oe:value>
+        </oe:archetype_id>
+        <oe:term_definitions code="at0000">
+            <oe:items id="text">Reader</oe:items>
+        </oe:term_definitions>
+    </oe:definition>
+</oe:template>

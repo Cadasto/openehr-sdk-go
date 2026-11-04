@@ -51,8 +51,9 @@ func run() error {
 	}
 
 	// Step 1: read the OPT into the operational template model.
-	// ReadOperationalTemplate refuses a node type it does not know rather
-	// than drop everything beneath it.
+	// By default ReadOperationalTemplate reads a node type it does not know
+	// as a leaf without its subtree; canxml.WithStrict() on the reader and
+	// templatecompile.WithStrict() on Compile refuse such readings.
 	raw, err := os.ReadFile(optPath)
 	if err != nil {
 		return fmt.Errorf("read OPT %s: %w", optPath, err)

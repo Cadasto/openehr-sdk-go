@@ -18,8 +18,12 @@ import (
 // unmatched content; an empty one is a key. A String value reads as the text
 // of a primitive element: a tracked decode reports or refuses any other
 // attribute and any child element as unmatched. An entry with no key
-// attribute, or whose key an earlier entry of the member holds, is refused
-// ([putEntry]).
+// attribute is refused ([putEntry]). An entry whose key an earlier entry of
+// the member holds is unmatched content, as an element the decoder does not
+// read is ([SkipUnmatched]): the earlier entry is kept and the repeat is
+// skipped unread, so by default the member reads as if the repeat were
+// absent, a tracked decode reports the repeat's element as one item, and a
+// strict one refuses it.
 //
 // begun is the decoder's mark of the member in the element being decoded:
 // false until the element's first entry of the member, which starts m empty
@@ -32,6 +36,9 @@ func DecodeEntry[V any](dec *xml.Decoder, start *xml.StartElement, attr string, 
 	key, entry, keyed := withoutKey(start, attr)
 	setEntryKey(dec, func() string { return key })
 	t, at := beginEntry(dec, m, begun)
+	if _, repeated := (*m)[key]; keyed && repeated {
+		return SkipUnmatched(dec, *start)
+	}
 	var v V
 	if err := decodeEntryValue(dec, &entry, &v); err != nil {
 		return err
@@ -44,9 +51,18 @@ func DecodeEntry[V any](dec *xml.Decoder, start *xml.StartElement, attr string, 
 // RESOURCE_DESCRIPTION_ITEM, into m under the key keyOf reads from the decoded
 // value. It allocates m when m is nil. start must be the token the decoder
 // read last. An entry whose value has an empty key, as a language with no
-// code has, or whose key an earlier entry of the member holds, is refused
-// ([putEntry]). begun is the decoder's mark of the member, as for
-// [DecodeEntry].
+// code has, is refused ([putEntry]). begun is the decoder's mark of the
+// member, as for [DecodeEntry].
+//
+// An entry whose key an earlier entry of the member holds is unmatched
+// content, as for [DecodeEntry]: the earlier entry is kept, so by default the
+// member reads as if the repeat were absent, a tracked decode reports the
+// repeat's element as one item, and a strict one refuses it. The key lies
+// inside the value, so the value is read to find it, and a value that fails
+// to decode fails the decode, repeat or not. Meanwhile a tracked decode holds
+// back the unmatched content and the missing members the value holds, and
+// applies its policy to them, in document order, only once the key shows that
+// the entry repeats none.
 //
 // For the missing-member report ([Tracker.ReportMissing]), the members inside
 // the value are named under the key keyOf reads from the value as decoded so
@@ -55,11 +71,61 @@ func DecodeEntryKeyedBy[V any](dec *xml.Decoder, start *xml.StartElement, keyOf 
 	var v V
 	setEntryKey(dec, func() string { return keyOf(&v) })
 	t, at := beginEntry(dec, m, begun)
-	if err := decodeEntryValue(dec, start, &v); err != nil {
+	if t == nil {
+		if err := decodeEntryValue(dec, start, &v); err != nil {
+			return err
+		}
+		key := keyOf(&v)
+		if _, repeated := (*m)[key]; key != "" && repeated {
+			return nil
+		}
+		return putEntry(nil, at, start, m, key, key != "", v)
+	}
+	held, err := t.holdEntry(func() error { return decodeEntryValue(dec, start, &v) })
+	key := keyOf(&v)
+	if _, repeated := (*m)[key]; err == nil && key != "" && repeated {
+		return t.unmatched(t.closedPath(at), false)
+	}
+	if refusal := t.release(held); refusal != nil {
+		return refusal
+	}
+	if err != nil {
 		return err
 	}
-	key := keyOf(&v)
 	return putEntry(t, at, start, m, key, key != "", v)
+}
+
+// holdEntry runs read, which reads the value of a Hash entry whose key lies
+// inside the value, with the unmatched items and the missing members the
+// value holds held back, in document order, and returns them with read's
+// error: only the key, known once the entry has closed, tells whether the
+// entry repeats an earlier one, whose element is then one unmatched item and
+// whose content counts for nothing. A hold inside another adds what it
+// releases to the outer one.
+func (t *Tracker) holdEntry(read func() error) ([]heldItem, error) {
+	outer := t.held
+	var held []heldItem
+	t.held = &held
+	err := read()
+	t.held = outer
+	return held, err
+}
+
+// release applies the decode's policy to what [Tracker.holdEntry] held, in
+// document order: to an unmatched item as [Tracker.unmatched] does, so a
+// strict decode refuses the first, and to a missing member as the
+// missing-member report does.
+func (t *Tracker) release(held []heldItem) error {
+	for _, it := range held {
+		if it.missing {
+			t.missingMember(it.path)
+			continue
+		}
+		if err := t.unmatched(it.path, it.foreign); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // withoutKey returns the value of start's attribute attr in no namespace, the
@@ -118,31 +184,21 @@ func decodeEntryValue(dec *xml.Decoder, start *xml.StartElement, v any) error {
 }
 
 // putEntry adds v to m under key, the key of the entry start opens, which the
-// decoder has read: keyed reports that the entry has one, and t and at are
-// the decode's tracker and where the entry sits, as [beginEntry] returned
-// them. It allocates m when it is nil.
+// decoder has read and no earlier entry of the member holds: keyed reports
+// that the entry has one, and t and at are the decode's tracker and where the
+// entry sits, as [beginEntry] returned them. It allocates m when it is nil.
 //
-// An entry with no key, or with the key of an earlier entry of the member, is
-// refused in every decode, as the canonical-JSON decoder refuses a member name
-// an object repeats: keeping one of the two would lose the other's content.
-// The refusal is a primitive failure (see "Primitive failures" in the package
-// documentation): a *typereg.DecodeError whose cause wraps [ErrInvalidShape],
-// which names the entry by its path, from the root of the value in a tracked
-// decode and by its name alone in an untracked one, and carries none of its
-// key.
+// An entry with no key is refused in every decode: the member has no key to
+// hold it under. The refusal is a primitive failure (see "Primitive failures"
+// in the package documentation): a *typereg.DecodeError whose cause wraps
+// [ErrInvalidShape], which names the entry by its path, from the root of the
+// value in a tracked decode and by its name alone in an untracked one.
 func putEntry[V any](t *Tracker, at place, start *xml.StartElement, m *map[string]V, key string, keyed bool, v V) error {
-	cause := errEntryNoKey
-	if keyed {
-		cause = nil
-		if _, repeated := (*m)[key]; repeated {
-			cause = errEntryRepeatedKey
-		}
-	}
-	if cause != nil {
+	if !keyed {
 		if t != nil {
-			return t.fail(t.closedPath(at), cause)
+			return t.fail(t.closedPath(at), errEntryNoKey)
 		}
-		return primitiveFailure("/"+start.Name.Local, cause)
+		return primitiveFailure("/"+start.Name.Local, errEntryNoKey)
 	}
 	if *m == nil {
 		*m = make(map[string]V)
@@ -151,14 +207,9 @@ func putEntry[V any](t *Tracker, at place, start *xml.StartElement, m *map[strin
 	return nil
 }
 
-var (
-	// errEntryNoKey is the refusal of a Hash entry with no key: no key
-	// attribute, or a value whose own key is empty.
-	errEntryNoKey = errors.New("a Hash entry has no key")
-	// errEntryRepeatedKey is the refusal of a Hash entry whose key an earlier
-	// entry of the member holds. It names no key.
-	errEntryRepeatedKey = errors.New("a Hash entry repeats the key of an earlier entry")
-)
+// errEntryNoKey is the refusal of a Hash entry with no key: no key attribute,
+// or a value whose own key is empty.
+var errEntryNoKey = errors.New("a Hash entry has no key")
 
 // pointerKey escapes key as one reference token of a JSON Pointer (RFC 6901):
 // `~` as `~0` and `/` as `~1`.

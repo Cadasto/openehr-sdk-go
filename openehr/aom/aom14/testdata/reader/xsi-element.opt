@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Elements in the XML Schema instance namespace, under the prefix xsi the root binds to it for its xsi:type attributes, which the deprecated template parser, reading no namespace, reads by their local names: the true_valid of a C_BOOLEAN and the upper bound of a C_INTEGER range. The reader's default mode reads each as the element of that name in the http://schemas.openehr.org/v1 namespace, every xsi:type keeping its namespace, and its strict mode refuses them. xsi-element.read.opt is how the reader reads it. SDK-authored. -->
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <language>
+        <terminology_id>
+            <value>ISO_639-1</value>
+        </terminology_id>
+        <code_string>en</code_string>
+    </language>
+    <template_id>
+        <value>sdk.reader_xsi_element.v0</value>
+    </template_id>
+    <concept>sdk.reader_xsi_element.v0</concept>
+    <definition>
+        <rm_type_name>CLUSTER</rm_type_name>
+        <occurrences>
+            <lower>1</lower>
+            <upper>1</upper>
+        </occurrences>
+        <node_id>at0000</node_id>
+        <attributes xsi:type="C_MULTIPLE_ATTRIBUTE">
+            <rm_attribute_name>items</rm_attribute_name>
+            <existence>
+                <lower>0</lower>
+                <upper>1</upper>
+            </existence>
+            <!-- A C_BOOLEAN whose true_valid is in the XSI namespace, under the prefix xsi: its false_valid, which it leaves out, reads as true. -->
+            <children xsi:type="C_COMPLEX_OBJECT">
+                <rm_type_name>ELEMENT</rm_type_name>
+                <occurrences>
+                    <lower>0</lower>
+                    <upper>1</upper>
+                </occurrences>
+                <node_id>at0001</node_id>
+                <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                    <rm_attribute_name>value</rm_attribute_name>
+                    <existence>
+                        <lower>0</lower>
+                        <upper>1</upper>
+                    </existence>
+                    <children xsi:type="C_PRIMITIVE_OBJECT">
+                        <rm_type_name>BOOLEAN</rm_type_name>
+                        <occurrences>
+                            <lower>1</lower>
+                            <upper>1</upper>
+                        </occurrences>
+                        <node_id/>
+                        <item xsi:type="C_BOOLEAN">
+                            <xsi:true_valid>false</xsi:true_valid>
+                        </item>
+                    </children>
+                </attributes>
+            </children>
+            <!-- A C_INTEGER range whose upper bound is in the XSI namespace, under the prefix xsi. -->
+            <children xsi:type="C_COMPLEX_OBJECT">
+                <rm_type_name>ELEMENT</rm_type_name>
+                <occurrences>
+                    <lower>0</lower>
+                    <upper>1</upper>
+                </occurrences>
+                <node_id>at0002</node_id>
+                <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                    <rm_attribute_name>value</rm_attribute_name>
+                    <existence>
+                        <lower>0</lower>
+                        <upper>1</upper>
+                    </existence>
+                    <children xsi:type="C_PRIMITIVE_OBJECT">
+                        <rm_type_name>INTEGER</rm_type_name>
+                        <occurrences>
+                            <lower>1</lower>
+                            <upper>1</upper>
+                        </occurrences>
+                        <node_id/>
+                        <item xsi:type="C_INTEGER">
+                            <range>
+                                <lower>0</lower>
+                                <xsi:upper>9</xsi:upper>
+                            </range>
+                        </item>
+                    </children>
+                </attributes>
+            </children>
+            <cardinality>
+                <is_ordered>false</is_ordered>
+                <is_unique>false</is_unique>
+                <interval>
+                    <lower>0</lower>
+                    <upper_unbounded>true</upper_unbounded>
+                </interval>
+            </cardinality>
+        </attributes>
+        <archetype_id>
+            <value>openEHR-EHR-CLUSTER.sdk_reader.v0</value>
+        </archetype_id>
+        <term_definitions code="at0000">
+            <items id="text">Reader</items>
+        </term_definitions>
+    </definition>
+</template>

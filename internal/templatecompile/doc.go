@@ -4,8 +4,10 @@
 // generator consume.
 //
 // The model is a faithful decode of the template's XML; this package reads
-// it as the compiled form needs it, values trimmed and intervals closed, and
-// adds what downstream consumers repeatedly need:
+// it as the compiled form needs it, values trimmed and intervals closed, a
+// value the template's schema does not allow in the weaker form the
+// deprecated parser's default mode reads it unless [Options.Strict] refuses
+// it, and adds what downstream consumers repeatedly need:
 //
 //   - Stable AQL paths for every node (computed once, cached).
 //   - Implicit RM attributes the OPT omits but the BMM declares
@@ -14,7 +16,8 @@
 //   - Typed primitive constraints and slot rules, built from the model's
 //     primitive classes and slot assertions (openehr/template/constraints).
 //   - The default values of the template's <constraints>, each on the node
-//     it addresses ([CompiledNode.DefaultValue]).
+//     it addresses ([CompiledNode.DefaultValue]); one that addresses no node
+//     is skipped, or refused with [Options.Strict].
 //   - Per-archetype-root term definitions on [CompiledNode]
 //     (scoped at-codes; not flattened to a single global map).
 //     Term bindings flatten to [Compiled.TermBindings].

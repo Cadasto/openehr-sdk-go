@@ -9,6 +9,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 )
@@ -27,6 +28,14 @@ type Options struct {
 	// declared. Useful for tests and for round-trip serialisation
 	// that needs to preserve the OPT's explicit-only shape.
 	SkipImplicitAttributes bool
+
+	// Strict refuses, with an error wrapping ErrInvalidInput, each value
+	// Compile otherwise reads in the weaker form the deprecated parser's
+	// default mode reads it, which its strict mode refuses, and a default
+	// value of the template's <constraints> that addresses no node or that
+	// Compile cannot hold as canonical JSON, such as a NaN magnitude, each of
+	// which Compile otherwise skips (see [Compile]).
+	Strict bool
 }
 
 // maxDepth is how many levels of constraint objects below the definition
@@ -46,21 +55,45 @@ const maxDepth = 128
 // [template.Multiplicity]. It does not carry the occurrences of a slot.
 //
 // Compile places each default value of the template's <constraints> on the
-// node it addresses ([CompiledNode.DefaultValue]).
+// node it addresses ([CompiledNode.DefaultValue]): the first child, of the
+// T_COMPLEX_OBJECT's RM type, or of its default value's where it names none,
+// of the attribute named rm_attribute_name on the node that the
+// differential_path reaches, a child's generic parameters set aside, so that
+// DV_INTERVAL matches a DV_INTERVAL<DV_COUNT> child. A differential_path that
+// opens with the definition's archetype id in brackets resolves from the
+// rest, and one that opens with a slash from the definition's root, as
+// [Compiled.Resolve] resolves a path, except that a segment's predicate may
+// carry a name, at0004, 'Systolic' or at0004 and name/value='Systolic', which
+// selects the node of that node id or archetype id whose template-level name
+// ([CompiledNode.NodeName]) it is, each run of white space in the predicate
+// read as one space. Compile skips a default value that addresses no node.
+//
+// In its default mode Compile reads a value the model holds in the weaker
+// form the deprecated parser's default mode reads it: a CONSTRAINT_REF with
+// no reference, with an empty one; a timezone_validity that names no
+// VALIDITY_KIND, or is mandatory on a C_DATE, as optional; a temporal range
+// bound that is not ISO 8601 text of its type as unbounded on its side; and
+// a C_PRIMITIVE_OBJECT with no item as no constraint. With [Options.Strict]
+// it refuses each of these, as the parser's strict mode does, and a default
+// value that addresses no node.
 //
 // Returns an error wrapping ErrInvalidInput when opt is nil, when it has no
-// template_id or no definition, when it holds an interval that closing
-// refuses ([template.NewMultiplicity]), a primitive constraint whose value
-// the constraint cannot carry, a missing constraint object, attribute or
-// primitive item, or constraint objects nested more than 128 levels below the
-// definition, when two nodes under different attributes have the same AQL
-// path, which is a defect in the template, and when a default value addresses
-// no node ([placeDefaultValues]). Nodes under one attribute that share a path
-// (alternatives, or siblings with the same node id) and the descendants of
-// such nodes are admitted, and [Compiled.NodeAt] resolves the path to the
-// first one walked. Returns an error that does not wrap ErrInvalidInput when
-// the model holds a constraint object or an attribute of a kind Compile does
-// not handle, which the model's decode does not produce.
+// template_id, no definition or a definition that names no RM type, each
+// with its own message, when it holds an interval that closing refuses
+// ([template.NewMultiplicity]), a missing constraint object or
+// attribute, an ordinal symbol that is neither a DV_CODED_TEXT nor a
+// CODE_PHRASE, an item that is no primitive class held by pointer, or
+// constraint objects nested more than 128 levels below the definition, when
+// two nodes under different attributes have the same AQL path, which is a
+// defect in the template, and, with [Options.Strict], for each value the
+// paragraph above names and a default value that does not encode as
+// canonical JSON, which Compile otherwise skips. Nodes
+// under one attribute that share a path (alternatives, or siblings with the
+// same node id) and the descendants of such nodes are admitted, and
+// [Compiled.NodeAt] resolves the path to the first one walked. Returns an
+// error that does not wrap ErrInvalidInput when the model holds a constraint
+// object or an attribute of a kind Compile does not handle, which the
+// model's decode does not produce.
 func Compile(opt *aom14.OperationalTemplate, opts ...Options) (*Compiled, error) {
 	if opt == nil {
 		return nil, fmt.Errorf("%w: nil template", ErrInvalidInput)
@@ -70,9 +103,13 @@ func Compile(opt *aom14.OperationalTemplate, opts ...Options) (*Compiled, error)
 		return nil, fmt.Errorf("%w: template has no template_id", ErrInvalidInput)
 	}
 	// The definition is a value in the model, so an absent one is the zero
-	// archetype root, which names no RM type.
+	// archetype root, which names no RM type. A definition that holds
+	// nothing cannot be told from it.
 	if strings.TrimSpace(opt.Definition.RMTypeName) == "" {
-		return nil, fmt.Errorf("%w: template has no definition", ErrInvalidInput)
+		if holdsNothing(&opt.Definition) {
+			return nil, fmt.Errorf("%w: template has no definition", ErrInvalidInput)
+		}
+		return nil, fmt.Errorf("%w: template definition names no RM type", ErrInvalidInput)
 	}
 
 	o := Options{}
@@ -113,17 +150,27 @@ func Compile(opt *aom14.OperationalTemplate, opts ...Options) (*Compiled, error)
 		return nil, err
 	}
 	c.root = root
-	if err := placeDefaultValues(c, opt.Constraints); err != nil {
+	if err := placeDefaultValues(c, opt.Constraints, o.Strict); err != nil {
 		return nil, err
 	}
 	return c, nil
 }
 
+// holdsNothing reports whether d is the zero archetype root, the definition
+// the model holds where the template gives none.
+func holdsNothing(d *aom14.CArchetypeRoot) bool {
+	return d.RMTypeName == "" && d.NodeID == "" && len(d.Attributes) == 0 &&
+		d.Occurrences == (rm.Interval[aom14.Integer]{}) && d.ArchetypeID == (rm.ArchetypeID{}) &&
+		d.TemplateID == nil && len(d.TermBindings) == 0 && len(d.TermDefinitions) == 0
+}
+
 // ErrInvalidInput is returned, wrapped, by [Compile] for a template it
-// refuses: a nil one, one with no template_id or no definition, one holding
-// a value the compiled form cannot carry or nesting past the depth limit, one
-// in which two nodes under different attributes have the same AQL path, and
-// one with a default value that addresses no node.
+// refuses: a nil one, one with no template_id, no definition or a definition
+// that names no RM type, one holding a value the compiled form cannot carry
+// or nesting past the depth limit, one in which two nodes under different
+// attributes have the same AQL path, and, with [Options.Strict], one holding
+// a value the deprecated parser's strict mode refuses or a default value that
+// addresses no node.
 var ErrInvalidInput = errors.New("templatecompile: invalid input")
 
 // walker carries the per-call state shared across recursive node
@@ -286,7 +333,7 @@ func (w *walker) descend(ob object, cn *CompiledNode, heldAs string, depth int) 
 	if ob.complex != nil {
 		attrs = ob.complex.Attributes
 	} else {
-		primitive, err := primitiveFromModel(ob.o)
+		primitive, err := primitiveFromModel(ob.o, w.opts.Strict)
 		if err != nil {
 			return fmt.Errorf("%w: at %q (%s %q): %w", ErrInvalidInput, cn.aqlPath, cn.rmTypeName, cn.nodeID, err)
 		}

@@ -29,6 +29,14 @@
 // ValidateComposition checks the template constraints and the Reference
 // Model floor in one call, reporting a defect both find once.
 //
+// By default Compile reads every template the deprecated
+// [github.com/cadasto/openehr-sdk-go/openehr/template.ParseOPT] reads, a
+// value the template's schema does not allow in the weaker form the parser
+// reads it, and skips a default value that addresses no node. [WithStrict]
+// refuses those values, as
+// [github.com/cadasto/openehr-sdk-go/openehr/template.ParseOPTStrict] does,
+// and the default value, with an error wrapping [ErrInvalidInput].
+//
 // # Public surface
 //
 // The public surface is [Compile], the [Compiled] handle, its
@@ -36,8 +44,8 @@
 // lookup ([Compiled.Resolve] / [Compiled.ValidatePath], which take a path
 // that [github.com/cadasto/openehr-sdk-go/openehr/template.ParsePath] reads
 // and are tuned by a [ResolveOption] such as [WithStrictPaths]), the
-// functional [Option]s, and the [ErrInvalidInput] / [ErrPathNotFound]
-// sentinels. The types are aliases of the engine's compiled form, so values
+// functional [Option]s ([WithRMInfo], [WithoutImplicitAttributes],
+// [WithStrict]), and the [ErrInvalidInput] / [ErrPathNotFound] sentinels. The types are aliases of the engine's compiled form, so values
 // returned by [Compile] are accepted as-is by the consuming packages with no
 // conversion. Downstream code (form generation, path discovery, custom
 // mapping) can walk the whole tree: [Compiled.Root] / [Compiled.NodeAt] /

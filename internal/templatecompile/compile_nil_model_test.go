@@ -13,44 +13,74 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
 
-// TestREQ111_CompileRefusesNilModelParts pins that Compile refuses, with an
-// error wrapping ErrInvalidInput, a model holding a nil pointer where it
-// needs a value: a C_PRIMITIVE_OBJECT's item that is a nil pointer to a
-// primitive class, which is no item missing from the model but an item with
-// nothing in it, and a default value that is a nil pointer to a data value.
-func TestREQ111_CompileRefusesNilModelParts(t *testing.T) {
+// TestREQ111_CompileReadsNilPrimitiveItemAsNoItem pins that Compile reads a
+// C_PRIMITIVE_OBJECT whose item is a nil pointer to a primitive class as one
+// with no item: in its default mode as no constraint, and with
+// Options.Strict as a value it refuses with an error wrapping
+// ErrInvalidInput.
+func TestREQ111_CompileReadsNilPrimitiveItemAsNoItem(t *testing.T) {
+	const path = "/context/other_context"
 	primitive := func(item aom14.CPrimitive) *aom14.OperationalTemplate {
 		p := &aom14.CPrimitiveObject{RMTypeName: "STRING", Occurrences: once, Item: item}
 		return modelOf(single("context", complexObject("EVENT_CONTEXT", "", single("other_context", p))))
 	}
 	cases := []struct {
-		name  string
-		model *aom14.OperationalTemplate
+		name string
+		item aom14.CPrimitive
 	}{
-		{name: "a nil pointer to a C_BOOLEAN item", model: primitive((*aom14.CBoolean)(nil))},
-		{name: "a nil pointer to a C_INTEGER item", model: primitive((*aom14.CInteger)(nil))},
-		{name: "a nil pointer to a C_REAL item", model: primitive((*aom14.CReal)(nil))},
-		{name: "a nil pointer to a C_STRING item", model: primitive((*aom14.CString)(nil))},
-		{name: "a nil pointer to a C_DATE item", model: primitive((*aom14.CDate)(nil))},
-		{name: "a nil pointer to a C_TIME item", model: primitive((*aom14.CTime)(nil))},
-		{name: "a nil pointer to a C_DATE_TIME item", model: primitive((*aom14.CDateTime)(nil))},
-		{name: "a nil pointer to a C_DURATION item", model: primitive((*aom14.CDuration)(nil))},
-		{name: "a default value that is a nil pointer to a DV_CODED_TEXT", model: func() *aom14.OperationalTemplate {
-			m := modelOf(single("category", complexObject("DV_CODED_TEXT", "")))
-			m.Constraints = &aom14.TConstraint{Attributes: []aom14.TAttribute{{
-				DifferentialPath: "[openEHR-EHR-COMPOSITION.model.v1]",
-				RMAttributeName:  "category",
-				Children:         []aom14.TComplexObject{{RMTypeName: "DV_CODED_TEXT", DefaultValue: (*rm.DVCodedText)(nil)}},
-			}}}
-			return m
-		}()},
+		{name: "a nil pointer to a C_BOOLEAN item", item: (*aom14.CBoolean)(nil)},
+		{name: "a nil pointer to a C_INTEGER item", item: (*aom14.CInteger)(nil)},
+		{name: "a nil pointer to a C_REAL item", item: (*aom14.CReal)(nil)},
+		{name: "a nil pointer to a C_STRING item", item: (*aom14.CString)(nil)},
+		{name: "a nil pointer to a C_DATE item", item: (*aom14.CDate)(nil)},
+		{name: "a nil pointer to a C_TIME item", item: (*aom14.CTime)(nil)},
+		{name: "a nil pointer to a C_DATE_TIME item", item: (*aom14.CDateTime)(nil)},
+		{name: "a nil pointer to a C_DURATION item", item: (*aom14.CDuration)(nil)},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := templatecompile.Compile(tc.model); !errors.Is(err, templatecompile.ErrInvalidInput) {
-				t.Fatalf("Compile error = %v, want an error wrapping ErrInvalidInput", err)
+			c, err := templatecompile.Compile(primitive(tc.item))
+			if err != nil {
+				t.Fatalf("Compile = %v, want no error", err)
+			}
+			n, err := c.NodeAt(path)
+			if err != nil {
+				t.Fatalf("NodeAt(%s) = %v", path, err)
+			}
+			if got := n.PrimitiveConstraint(); got != nil {
+				t.Errorf("PrimitiveConstraint() = %#v, want none", got)
+			}
+			if _, err := templatecompile.Compile(primitive(tc.item), templatecompile.Options{Strict: true}); !errors.Is(err, templatecompile.ErrInvalidInput) {
+				t.Errorf("Compile(Strict) error = %v, want an error wrapping ErrInvalidInput", err)
 			}
 		})
+	}
+}
+
+// TestREQ111_CompileSkipsNilDefaultValue pins that Compile skips, in its
+// default mode, a default value that is a nil pointer to a data value, which
+// does not encode as canonical JSON, and refuses it with Options.Strict with
+// an error wrapping ErrInvalidInput.
+func TestREQ111_CompileSkipsNilDefaultValue(t *testing.T) {
+	m := modelOf(single("category", complexObject("DV_CODED_TEXT", "")))
+	m.Constraints = &aom14.TConstraint{Attributes: []aom14.TAttribute{{
+		DifferentialPath: "[openEHR-EHR-COMPOSITION.model.v1]",
+		RMAttributeName:  "category",
+		Children:         []aom14.TComplexObject{{RMTypeName: "DV_CODED_TEXT", DefaultValue: (*rm.DVCodedText)(nil)}},
+	}}}
+	c, err := templatecompile.Compile(m)
+	if err != nil {
+		t.Fatalf("Compile = %v, want the default value skipped", err)
+	}
+	n, err := c.NodeAt("/category")
+	if err != nil {
+		t.Fatalf("NodeAt(/category) = %v", err)
+	}
+	if dv := n.DefaultValue(); dv != nil {
+		t.Errorf("node /category carries the default value %#v; want none", dv)
+	}
+	if _, err := templatecompile.Compile(m, templatecompile.Options{Strict: true}); !errors.Is(err, templatecompile.ErrInvalidInput) {
+		t.Errorf("Compile(Strict) error = %v, want an error wrapping ErrInvalidInput", err)
 	}
 }
 

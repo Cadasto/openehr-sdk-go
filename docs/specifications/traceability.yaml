@@ -1336,6 +1336,7 @@ requirements:
       - internal/templatecompile/resolve_test.go
       - internal/templatecompile/untyped_test.go
       - internal/templatecompile/webtemplate_oracle_compile_test.go
+      - openehr/aom/aom14/read_tolerant_test.go
       - openehr/rm/rminfo/lookup_test.go
       - openehr/template/archetype_root_template_id_test.go
       - openehr/template/constraint_ref_test.go
@@ -1833,6 +1834,7 @@ requirements:
       - openehr/template
       - internal/templatecompile
       - openehr/aom/aom14
+      - openehr/internal/decodeopts
     probes: []
     tests:
       - internal/templatecompile/compile_model_test.go
@@ -1840,7 +1842,10 @@ requirements:
       - internal/templatecompile/compile_test.go
       - internal/templatecompile/compiled_golden_test.go
       - internal/templatecompile/default_value_test.go
+      - internal/templatecompile/parity_fixtures_test.go
+      - internal/templatecompile/parity_test.go
       - internal/templatecompile/resolve_test.go
+      - openehr/aom/aom14/read_tolerant_test.go
       - openehr/instance/local_term_text_test.go
       - openehr/template/path_test.go
       - openehr/template/slot_assertion_test.go
@@ -2514,6 +2519,7 @@ requirements:
       - internal/rmjsonwalk/root_test.go
       - internal/rmjsonwalk/walk_test.go
       - openehr/aom/aom14/hash_xml_test.go
+      - openehr/aom/aom14/read_tolerant_test.go
       - openehr/client/ehr/contribution/submission_decode_test.go
       - openehr/internal/xmlunmatched/document_internal_test.go
       - openehr/internal/xmlunmatched/entry_internal_test.go

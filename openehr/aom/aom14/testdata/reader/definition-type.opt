@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A definition whose xsi:type names no class of the AOM 1.4 constraint model. The deprecated template parser reads it as a C_COMPLEX_OBJECT leaf with the rm_type_name, node_id and occurrences it holds and none of its attributes, and so does the reader's default mode; its strict mode refuses it. definition-type.read.opt is how the reader reads it. SDK-authored. -->
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <language>
+        <terminology_id>
+            <value>ISO_639-1</value>
+        </terminology_id>
+        <code_string>en</code_string>
+    </language>
+    <template_id>
+        <value>sdk.reader_definition_type.v0</value>
+    </template_id>
+    <concept>sdk.reader_definition_type.v0</concept>
+    <definition xsi:type="C_FUTURE_ROOT">
+        <rm_type_name>CLUSTER</rm_type_name>
+        <occurrences>
+            <lower>1</lower>
+            <upper>1</upper>
+        </occurrences>
+        <node_id>at0000</node_id>
+        <attributes xsi:type="C_MULTIPLE_ATTRIBUTE">
+            <rm_attribute_name>items</rm_attribute_name>
+            <existence>
+                <lower>0</lower>
+                <upper>1</upper>
+            </existence>
+            <children xsi:type="C_COMPLEX_OBJECT">
+                <rm_type_name>ELEMENT</rm_type_name>
+                <occurrences>
+                    <lower>0</lower>
+                    <upper>1</upper>
+                </occurrences>
+                <node_id>at0001</node_id>
+            </children>
+            <cardinality>
+                <is_ordered>false</is_ordered>
+                <is_unique>false</is_unique>
+                <interval>
+                    <lower>0</lower>
+                    <upper_unbounded>true</upper_unbounded>
+                </interval>
+            </cardinality>
+        </attributes>
+        <archetype_id>
+            <value>openEHR-EHR-CLUSTER.sdk_reader.v0</value>
+        </archetype_id>
+        <term_definitions code="at0000">
+            <items id="text">Reader</items>
+        </term_definitions>
+    </definition>
+</template>

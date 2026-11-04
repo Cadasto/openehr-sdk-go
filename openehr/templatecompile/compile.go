@@ -50,6 +50,7 @@ type Option func(*config)
 type config struct {
 	lookup       rminfo.Lookup
 	skipImplicit bool
+	strict       bool
 }
 
 // WithRMInfo overrides the RM-info source used to inject the implicit
@@ -69,6 +70,20 @@ func WithoutImplicitAttributes() Option {
 	return func(c *config) { c.skipImplicit = true }
 }
 
+// WithStrict makes [Compile] refuse, with an error wrapping
+// [ErrInvalidInput], each value it otherwise reads in a weaker form, as
+// [github.com/cadasto/openehr-sdk-go/openehr/template.ParseOPTStrict]
+// refuses them: a constraint reference with no reference, a timezone
+// validity that names no validity kind or is mandatory on a date, a temporal
+// range bound that is not ISO 8601 text of its type, and a primitive object
+// with no item. It also refuses a default value of the template's
+// constraints that addresses no node or that Compile cannot hold as
+// canonical JSON, such as a NaN magnitude, each of which Compile otherwise
+// skips.
+func WithStrict() Option {
+	return func(c *config) { c.strict = true }
+}
+
 // Compile turns an operational template, read into the model with
 // [aom14.ReadOperationalTemplate], into the compiled driver used by the
 // composition builder and the validator. The input is read-only.
@@ -82,25 +97,45 @@ func WithoutImplicitAttributes() Option {
 // as absent. A slot's includes and excludes are its archetype-id patterns,
 // one per assertion, and a slot with no node id takes the first of its
 // includes, without its regex escapes, as the predicate of its AQL path
-// segment. Each default value of the template's constraints is placed on
-// the node its differential path and attribute name address
-// ([CompiledNode.DefaultValue]).
+// segment.
+//
+// Each default value of the template's constraints is placed on the node its
+// differential path and attribute name address ([CompiledNode.DefaultValue]),
+// the first child of that attribute of the constraint object's RM type, or
+// of the default value's where the object names none, a child's generic
+// parameters set aside, so that DV_INTERVAL matches a DV_INTERVAL<DV_COUNT>
+// child. A differential path that opens with the definition's archetype id in
+// brackets resolves from the rest, and one that opens with a slash from the
+// definition's root. A segment's predicate may carry a name, at0004,
+// 'Systolic' or at0004 and name/value='Systolic', which selects the node of
+// that node id or archetype id whose template-level name
+// ([CompiledNode.NodeName]) it is, each run of white space in the predicate
+// read as one space. A default value that addresses no node is skipped.
+//
+// By default Compile reads a value the model holds in the weaker form the
+// deprecated [github.com/cadasto/openehr-sdk-go/openehr/template.ParseOPT]
+// reads it: a constraint reference with no reference, with an empty one; a
+// timezone validity that names no validity kind, or is mandatory on a date,
+// as optional; a temporal range bound that is not ISO 8601 text of its type
+// as unbounded on its side; and a primitive object with no item as no
+// constraint. [WithStrict] refuses each of these, and a default value that
+// addresses no node.
 //
 // Returns an error wrapping [ErrInvalidInput] when opt is nil, when it has
-// no template_id or no definition (a definition that names no RM type),
-// when an interval is inverted or closing leaves it empty, when a primitive
-// constraint holds a value it cannot carry (a temporal range bound that is
-// not ISO 8601 text of its type, a mandatory timezone validity on a date, a
-// constraint reference with no reference), when a constraint object, an
-// attribute or a primitive item is missing, when constraint objects nest more than 128 levels
-// below the definition, when two nodes under different attributes have
-// the same AQL path, which is a defect in the template, and when a default
-// value of the template's constraints addresses no node. Nodes under one
-// attribute that share a path (alternatives, or siblings with the same node
-// id) and the descendants of such nodes are admitted, and [Compiled.NodeAt]
-// resolves the path to the first one walked. Returns an error that does not
-// wrap ErrInvalidInput when the model holds a constraint object or an
-// attribute of a kind Compile does not handle, which
+// no template_id, no definition or a definition that names no RM type, each
+// with its own message, when an interval is inverted or closing leaves it
+// empty, when an ordinal symbol is neither a coded text nor a code phrase,
+// when a constraint object or an attribute is missing, when a primitive item
+// is no primitive class held by pointer, when constraint objects nest more
+// than 128 levels below the definition, when two nodes under different
+// attributes have the same AQL path, which is a defect in the template, and,
+// with [WithStrict], for each value it refuses and a default value that does
+// not encode as canonical JSON, which Compile otherwise skips. Nodes under
+// one attribute that share a path (alternatives, or siblings with the same
+// node id) and the descendants of such nodes are admitted, and
+// [Compiled.NodeAt] resolves the path to the first one walked. Returns an
+// error that does not wrap ErrInvalidInput when the model holds a constraint
+// object or an attribute of a kind Compile does not handle, which
 // [aom14.ReadOperationalTemplate] does not produce.
 func Compile(opt *aom14.OperationalTemplate, opts ...Option) (*Compiled, error) {
 	var cfg config
@@ -112,6 +147,7 @@ func Compile(opt *aom14.OperationalTemplate, opts ...Option) (*Compiled, error) 
 	return impl.Compile(opt, impl.Options{
 		Lookup:                 cfg.lookup,
 		SkipImplicitAttributes: cfg.skipImplicit,
+		Strict:                 cfg.strict,
 	})
 }
 
