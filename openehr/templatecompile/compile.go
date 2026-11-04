@@ -91,8 +91,8 @@ func WithoutImplicitAttributes() Option {
 // when an interval is inverted or closing leaves it empty, when a primitive
 // constraint holds a value it cannot carry (a temporal range bound that is
 // not ISO 8601 text of its type, a mandatory timezone validity on a date, a
-// constraint reference with no reference), when a constraint object or an
-// attribute is missing, when constraint objects nest more than 128 levels
+// constraint reference with no reference), when a constraint object, an
+// attribute or a primitive item is missing, when constraint objects nest more than 128 levels
 // below the definition, when two nodes under different attributes have
 // the same AQL path, which is a defect in the template, and when a default
 // value of the template's constraints addresses no node. Nodes under one
