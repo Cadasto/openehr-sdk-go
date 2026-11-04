@@ -177,7 +177,7 @@ The size limit **MUST** be 32 MiB for an OPT, an uploaded template and a BMM doc
 
 ### Canonical-XML decode depth (`openehr/serialize/canxml/`)
 
-- With `canxml.WithMaxDepth(n)`, `canxml.Unmarshal` and a `canxml.Decoder` **MUST** refuse, during the decode, an element nested deeper than `n`, the root element at depth 1, with a `*canxml.DecodeError` that wraps `canxml.ErrLimitExceeded` and names the depth and the element's path but none of its content. Without the option a decode has no depth limit. Given more than one, the smallest positive `n` holds, in any order; an `n` of 0 or less sets no limit and does not lift one already given.
+- With `canxml.WithMaxDepth(n)`, `canxml.Unmarshal` and a `canxml.Decoder` **MUST** refuse, during the decode, an element nested deeper than `n`, the root element at depth 1, with a `*canxml.DecodeError` that wraps `canxml.ErrLimitExceeded` and names the depth and the element's path but none of its content. Without the option a decode has no depth limit of its own, but `encoding/xml` decodes no element nested deeper than 10 000 elements, and a decode refuses the first such element it hands to `encoding/xml` the same way, naming 10 000 as the limit. Given more than one, the smallest positive `n` holds, in any order; an `n` of 0 or less sets no limit and does not lift one already given.
 
 ### Compile step and path lookup (`openehr/templatecompile/`)
 

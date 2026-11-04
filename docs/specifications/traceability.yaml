@@ -1767,12 +1767,14 @@ requirements:
       - internal/templatecompile/resolve_test.go
       - openehr/aom/aom14/read_test.go
       - openehr/bmm/load_test.go
+      - openehr/internal/xmlunmatched/xml_depth_internal_test.go
       - openehr/rm/typereg/registry_test.go
       - openehr/rm/typereg/streaming_hotpath_test.go
       - openehr/serialize/canjson/edgecases_test.go
       - openehr/serialize/canxml/max_depth_test.go
       - openehr/template/parse_cap_test.go
       - openehr/template/parse_depth_test.go
+      - openehr/template/slot_assertion_test.go
 
   - id: REQ-109
     title: AQL static lint
