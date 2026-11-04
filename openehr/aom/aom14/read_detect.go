@@ -210,9 +210,9 @@ var endsName = func() (t [256]bool) {
 // declarations calls fn with the prefix and the namespace of each namespace
 // declaration in data, an attribute named xmlns, the prefix empty, or
 // xmlns:prefix, where an attribute name may start (opensAttribute), until fn
-// returns false. A namespace written with a reference
-// reads as itself, a namespace of no openEHR schema. What reads as a
-// declaration in text or a comment counts as well.
+// returns false. A namespace written with a reference reads as itself, a
+// namespace of no openEHR schema. What reads as a declaration in text or a
+// comment counts as well.
 func declarations(data []byte, fn func(prefix, uri []byte) bool) {
 	word := []byte("xmlns")
 	for i := 0; ; {
@@ -605,9 +605,8 @@ func hasBareType(data []byte) bool {
 // an element that may hold only such markup, which the end tag names. It
 // reads data once: it looks for the last two `<` before a slash in the bytes
 // it has not looked through yet, and keeps them and the name of the start
-// tag each opens, once read, rather than look back to them at each slash;
-// the name of an end tag it reads runs to the `>` of the next such slash at
-// most.
+// tag each opens, once read, rather than look back to them at each slash,
+// and reads the name of an end tag no further than its `>`.
 func hasEmptyValue(data []byte) bool {
 	// last is the last '<' before scanned, and from is where the bytes
 	// looked through for it began; prev is the last '<' before from.
