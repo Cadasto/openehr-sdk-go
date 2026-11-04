@@ -209,7 +209,8 @@ var endsName = func() (t [256]bool) {
 
 // declarations calls fn with the prefix and the namespace of each namespace
 // declaration in data, an attribute named xmlns, the prefix empty, or
-// xmlns:prefix, until fn returns false. A namespace written with a reference
+// xmlns:prefix, where an attribute name may start (opensAttribute), until fn
+// returns false. A namespace written with a reference
 // reads as itself, a namespace of no openEHR schema. What reads as a
 // declaration in text or a comment counts as well.
 func declarations(data []byte, fn func(prefix, uri []byte) bool) {
@@ -221,7 +222,7 @@ func declarations(data []byte, fn func(prefix, uri []byte) bool) {
 		}
 		j += i
 		i = j + len(word)
-		if j == 0 || !isXMLSpaceByte(data[j-1]) {
+		if j == 0 || !opensAttribute(data[j-1]) {
 			continue
 		}
 		k := i
@@ -287,7 +288,7 @@ func holdsOtherType(tag []byte) bool {
 		}
 		j += i
 		i = j + len(word)
-		if j == 0 || (!isXMLSpaceByte(tag[j-1]) && tag[j-1] != ':') {
+		if j == 0 || (!opensAttribute(tag[j-1]) && tag[j-1] != ':') {
 			continue
 		}
 		k := skipSpace(tag, i)
@@ -568,8 +569,8 @@ func isTagEnd(c byte) bool {
 }
 
 // hasBareType reports whether data may hold a bare type attribute: the word
-// type after XML white space and before an equals sign. Text that reads so
-// gives a false positive.
+// type where an attribute name may start (opensAttribute) and before an
+// equals sign. Text that reads so gives a false positive.
 func hasBareType(data []byte) bool {
 	word := []byte("type")
 	for i := 0; ; {
@@ -579,7 +580,7 @@ func hasBareType(data []byte) bool {
 		}
 		j += i
 		i = j + len(word)
-		if j == 0 || !isXMLSpaceByte(data[j-1]) {
+		if j == 0 || !opensAttribute(data[j-1]) {
 			continue
 		}
 		k := i
@@ -706,6 +707,14 @@ func isValueName(local []byte) bool {
 		return true
 	}
 	return false
+}
+
+// opensAttribute reports whether c may stand just before the name of an
+// attribute in a start tag: XML white space, or the quote that closes the
+// value of the attribute before it, which encoding/xml reads without white
+// space between the two.
+func opensAttribute(c byte) bool {
+	return isXMLSpaceByte(c) || c == '"' || c == '\''
 }
 
 // isXMLSpaceByte reports whether c is XML white space.

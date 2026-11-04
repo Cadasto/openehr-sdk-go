@@ -800,14 +800,18 @@ func TestREQ111_ReaderReadsValuesInEveryMode(t *testing.T) {
 // readings of a document that canonical XML decodes without a failure, but
 // otherwise than the parser: a C_BOOLEAN flag left out or empty, or one that
 // stands only in an element the item holds or in the XSI namespace, which it
-// reads as false and the reading as absent; an assumed_value that is empty, which it reads as false or
-// 0, or that is t or f, which it reads as a boolean; an empty list entry or
-// range bound, which it reads as 0; a bare type attribute, which it reads as
-// the type; and, which the default mode alone reads, a C_COMPLEX_OBJECT that
-// holds an archetype id, which it skips, and a root element in another
-// namespace, whose content it skips. Each document holds that one shape, so
-// nothing else makes the reader read it a second time. Strict mode refuses
-// the shapes its default mode alone reads.
+// reads as false and the reading as absent, the item typed with a character
+// reference among them; an assumed_value that is empty, which it reads as
+// false or 0, or that is t or f, which it reads as a boolean; an empty list
+// entry or range bound, which it reads as 0; a flag, list entry or bound that
+// holds only a comment, a processing instruction or a CDATA section, which it
+// reads as an empty one; a bare type attribute, which it reads as the type,
+// right after the quote of the attribute before it among them; and, which
+// the default mode alone reads, a C_COMPLEX_OBJECT that holds an archetype
+// id, which it skips, and an element in another namespace, whose content it
+// skips, the root and one declared right after a quote among them. Each
+// document holds that one shape, so nothing else makes the reader read it a
+// second time. Strict mode refuses the shapes its default mode alone reads.
 func TestREQ111_ReaderFindsWhatCanonicalXMLReadsWithoutAFailure(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -939,6 +943,24 @@ func TestREQ111_ReaderFindsWhatCanonicalXMLReadsWithoutAFailure(t *testing.T) {
 			name:          "an <attributes> typed by a bare type attribute",
 			doc:           attributeDoc(` type="C_MULTIPLE_ATTRIBUTE"`),
 			want:          attributeDoc(` xsi:type="C_SINGLE_ATTRIBUTE"`),
+			strictRefuses: true,
+		},
+		{
+			name:          "an <attributes> typed by a bare type attribute right after a double quote",
+			doc:           attributeDoc(` xsi:nil="false"type="C_MULTIPLE_ATTRIBUTE"`),
+			want:          attributeDoc(` xsi:type="C_SINGLE_ATTRIBUTE"`),
+			strictRefuses: true,
+		},
+		{
+			name:          "an <attributes> typed by a bare type attribute right after a single quote",
+			doc:           attributeDoc(` xsi:nil='false'type="C_MULTIPLE_ATTRIBUTE"`),
+			want:          attributeDoc(` xsi:type="C_SINGLE_ATTRIBUTE"`),
+			strictRefuses: true,
+		},
+		{
+			name:          "an <item> in another namespace declared right after a quote",
+			doc:           itemDoc(`<item xsi:nil="false"xmlns="urn:example" xsi:type="C_STRING"><list>a</list></item>`),
+			want:          itemDoc(`<item xsi:type="C_STRING"><list>a</list></item>`),
 			strictRefuses: true,
 		},
 		{
