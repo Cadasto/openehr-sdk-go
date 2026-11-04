@@ -1834,6 +1834,7 @@ requirements:
       - openehr/template
       - internal/templatecompile
       - openehr/aom/aom14
+      - openehr/internal/decodeopts
     probes: []
     tests:
       - internal/templatecompile/compile_model_test.go
