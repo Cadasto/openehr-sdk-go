@@ -4,6 +4,8 @@ package validation_test
 // two bounds of an interval when neither side is unbounded and the two are
 // strictly comparable as the RM defines is_strictly_comparable_to for their
 // type, by the RM's less_than for that type, and it orders no other pair. Two
+// DV_DATE, DV_TIME or DV_DATE_TIME values written with one zone designator,
+// or both with none, are ordered at the precision they share instead; two
 // DV_TIME or DV_DATE_TIME values in different time zones are ordered as
 // instants, partial values and leap seconds included, and one with a zone is
 // not ordered against one without. A pair that is not strictly comparable
@@ -117,13 +119,19 @@ func checkInOrder[T rm.DVOrdered](t *testing.T, name string, lower, upper T) {
 // Limits_consistent, for each bound type, in each interval form; the same
 // bounds in order do not. The order is the RM's less_than for the type:
 // magnitude for DV_COUNT, DV_QUANTITY and DV_PROPORTION (numerator over
-// denominator), value for DV_ORDINAL and DV_SCALE, and for the temporal
-// types the magnitude the REQ-123 parse gives (days since 0001-01-01 for a
-// date, seconds for the others). A DV_TIME's magnitude reads the clock, so
+// denominator), value for DV_ORDINAL and DV_SCALE, and for a duration the
+// magnitude the REQ-123 parse gives. Two dates, and two times or date-times
+// written with one zone designator or both with none, are ordered at the
+// precision they share, which
+// orders the full values here as their magnitudes do
+// ([TestValidateRM_REQ112_IntervalOrderAtSharedPrecision] pins partial
+// values); Value holds their magnitudes (days since 0001-01-01 for a date,
+// seconds for the others). A DV_TIME's magnitude reads the clock, so
 // two DV_TIME values in different time zones are ordered as instants
 // instead, each by its magnitude less its zone's offset from UTC; a
 // DV_DATE_TIME's magnitude reads a zoned value in UTC already, so it orders
-// two zoned date-times as instants. Partial values and leap seconds are
+// two date-times in different zones as instants. Partial values and leap
+// seconds are
 // included, and Value holds the magnitudes read in UTC. The floor does not
 // compare units_system, so a same-units pair is ordered whatever its
 // units_system.
@@ -217,6 +225,61 @@ func TestValidateRM_REQ112_IntervalOrderEveryBoundType(t *testing.T) {
 	checkInOrder(t, "DV_TIME at one instant in Z and +00:00", rm.DVTime{Value: "10:00:00Z"}, rm.DVTime{Value: "10:00:00+00:00"})
 	checkInOrder(t, "DV_DATE_TIME at one instant in +00:00 and Z", rm.DVDateTime{Value: "2025-01-01T10:00:00+00:00"}, rm.DVDateTime{Value: "2025-01-01T10:00:00Z"})
 	checkInOrder(t, "DV_TIME at one instant in two offsets", rm.DVTime{Value: "10:00:00+05:00"}, rm.DVTime{Value: "05:00:00Z"})
+}
+
+// checkSharedEqual validates every form of the interval from a to b and of
+// the interval from b to a, two bounds equal at the precision they share.
+// Neither may draw a Limits_consistent issue.
+func checkSharedEqual[T rm.DVOrdered](t *testing.T, name string, a, b T) {
+	t.Helper()
+	checkInOrder(t, name, a, b)
+	checkInOrder(t, name+", reversed", b, a)
+}
+
+// REQ-112 — two DV_DATE, two DV_TIME or two DV_DATE_TIME bounds written with
+// one zone designator, or both with none, are ordered at the precision they
+// share, as a temporal range check compares a value with a bound: field by
+// field from the largest down, over the fields both carry. So a partial
+// bound covers the whole period it names. A pair equal on every shared field
+// is in order either way round, although reading a partial value as the
+// start of its period would put the finer one above the coarser one: 2021-05
+// against 2021, 23:59:30 against 23:59, 10:30 against 10, in one zone or in
+// none. A pair that differs on a shared field is ordered by the first that
+// differs, and Value still holds the two magnitudes, lower first. Two zoned
+// values whose designators differ are still ordered as instants, a partial
+// value standing for the start of its period: 10:30+00:00 is above 10Z
+// although the two are equal on the hour they share.
+func TestValidateRM_REQ112_IntervalOrderAtSharedPrecision(t *testing.T) {
+	t.Parallel()
+	checkSharedEqual(t, "DV_DATE, a month against its year", rm.DVDate{Value: "2021-05"}, rm.DVDate{Value: "2021"})
+	checkSharedEqual(t, "DV_DATE, a month against a day in it, compact", rm.DVDate{Value: "2021-05"}, rm.DVDate{Value: "20210520"})
+	checkSharedEqual(t, "DV_TIME, a minute against its hour", rm.DVTime{Value: "10:30"}, rm.DVTime{Value: "10"})
+	checkSharedEqual(t, "DV_TIME, a fraction against its minute", rm.DVTime{Value: "10:30:15.5"}, rm.DVTime{Value: "10:30"})
+	checkSharedEqual(t, "DV_DATE_TIME, a second against its minute",
+		rm.DVDateTime{Value: "2021-12-31T23:59:30"}, rm.DVDateTime{Value: "2021-12-31T23:59"})
+	checkSharedEqual(t, "DV_DATE_TIME, a time against its date", rm.DVDateTime{Value: "2021-12-31T23:59:30"}, rm.DVDateTime{Value: "2021-12-31"})
+	checkSharedEqual(t, "DV_DATE_TIME, a date against its month", rm.DVDateTime{Value: "2021-05-20"}, rm.DVDateTime{Value: "2021-05"})
+	checkSharedEqual(t, "DV_TIME in one zone", rm.DVTime{Value: "10:30+02:00"}, rm.DVTime{Value: "10+02:00"})
+	checkSharedEqual(t, "DV_DATE_TIME in one zone", rm.DVDateTime{Value: "2021-05-20T10:30Z"}, rm.DVDateTime{Value: "2021-05-20T10Z"})
+
+	// The first shared field that differs decides: the month of 2021-06 is
+	// after that of 2021-05-20, and 11 is after 10:30 on the hour.
+	checkOrder(t, "DV_DATE, a month after a day in the month before", "DV_DATE",
+		rm.DVDate{Value: "2021-06"}, rm.DVDate{Value: "2021-05-20"}, [2]float64{737941, 737929})
+	checkOrder(t, "DV_TIME in one zone, an hour after a minute in the hour before", "DV_TIME",
+		rm.DVTime{Value: "11+02:00"}, rm.DVTime{Value: "10:30+02:00"}, [2]float64{39600, 37800})
+	checkOrder(t, "DV_DATE_TIME in one zone, an hour after a minute in the hour before", "DV_DATE_TIME",
+		rm.DVDateTime{Value: "2021-05-20T11Z"}, rm.DVDateTime{Value: "2021-05-20T10:30Z"}, [2]float64{63757105200, 63757103400})
+
+	// Designators that differ: 10:30+02:00 is 08:30Z, above 08Z; and
+	// 10:30+00:00 is 10:30Z, above 10Z, although the two are equal on the
+	// hour they share.
+	checkOrder(t, "DV_TIME in different zones, both partial", "DV_TIME",
+		rm.DVTime{Value: "10:30+02:00"}, rm.DVTime{Value: "08Z"}, [2]float64{30600, 28800})
+	checkOrder(t, "DV_TIME in +00:00 and Z, equal on the shared hour", "DV_TIME",
+		rm.DVTime{Value: "10:30+00:00"}, rm.DVTime{Value: "10Z"}, [2]float64{37800, 36000})
+	checkOrder(t, "DV_DATE_TIME in +00:00 and Z, equal on the shared hour", "DV_DATE_TIME",
+		rm.DVDateTime{Value: "2021-05-20T10:30+00:00"}, rm.DVDateTime{Value: "2021-05-20T10Z"}, [2]float64{63757103400, 63757101600})
 }
 
 // REQ-112, REQ-171 — the floor neither orders nor reports a pair it reads as

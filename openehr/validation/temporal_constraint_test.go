@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/iso8601"
@@ -193,8 +194,35 @@ type orderCase struct {
 	clockAbove func(a, b string) bool
 	// zoned reports whether s carries a time zone; nil for a type with
 	// no zones.
-	zoned   func(s string) bool
+	zoned func(s string) bool
+	// shared compares a with b at the precision the two share
+	// (iso8601.Fields.Compare) and reports ok when they are written with one
+	// zone designator, or both with none, the pairs the range and the floor
+	// compare so; nil for a duration.
+	shared  func(a, b string) (sign int, ok bool)
 	samples []string
+}
+
+// sharedDates, sharedTimes and sharedDateTimes are the shared order of
+// [orderCase] for dates, times and date-times.
+func sharedDates(a, b string) (int, bool) {
+	da, _ := iso8601.ParseDate(a)
+	db, _ := iso8601.ParseDate(b)
+	return iso8601.DateFields(da).Compare(iso8601.DateFields(db)), true
+}
+
+func sharedTimes(a, b string) (int, bool) {
+	ta, _ := iso8601.ParseTime(a)
+	tb, _ := iso8601.ParseTime(b)
+	return iso8601.TimeFields(ta).Compare(iso8601.TimeFields(tb)), ta.Zone == tb.Zone
+}
+
+func sharedDateTimes(a, b string) (int, bool) {
+	da, ta, _ := iso8601.ParseDateTime(a)
+	db, tb, _ := iso8601.ParseDateTime(b)
+	fa := iso8601.DateTimeFields(da, ta, strings.Contains(a, "T"))
+	fb := iso8601.DateTimeFields(db, tb, strings.Contains(b, "T"))
+	return fa.Compare(fb), ta.Zone == tb.Zone
 }
 
 // clockDateTime is the magnitude of the date-time s read on its clock, its
@@ -202,6 +230,14 @@ type orderCase struct {
 func clockDateTime(s string) float64 {
 	d, t, _ := iso8601.ParseDateTime(s)
 	return iso8601.DateTimeMagnitude(d, t)
+}
+
+// sharedOrder is tc.shared of a and b, or not ok for a type that has none.
+func sharedOrder(tc orderCase, a, b string) (int, bool) {
+	if tc.shared == nil {
+		return 0, false
+	}
+	return tc.shared(a, b)
 }
 
 // limitsBroken reports whether the closed interval from lower to upper
@@ -218,11 +254,19 @@ func limitsBroken[T rm.DVOrdered](lower, upper T) bool {
 // up to b, included, exactly when it does not put a above b; and a range up
 // to b, excluded, exactly when it puts b above a. A zoned value and one
 // without a zone are not ordered: the floor puts neither above the other,
-// and each range admits a. The samples mix full and partial
-// values, both layouts, zones on neither, one or both sides, a leap second,
-// and the to_seconds averages of a year and a month. For times and
-// date-times some zoned pairs order one way by their clocks and the other as
-// instants, so a clock-local range check fails the test.
+// and each range admits a. The range compares a date, a time or a date-time
+// with a bound written with one zone designator, or both with none, at the
+// precision the two share, and the floor orders two such bounds the same
+// way: a pair equal there, as 2004-05 and 2004-05-20 are, is one neither
+// puts above the other, so the ranges from b and up to b, included, admit a
+// and the excluded ones refuse it. The floor is held to that order too, so a
+// floor that read a partial value as the start of its period fails the
+// test, and the samples must hold such a pair. The samples mix full and
+// partial values, both layouts, zones on neither, one or both sides, a leap
+// second, and the to_seconds averages of a year and a month. For times and
+// date-times some pairs with different zone designators order one way by
+// their clocks and the other as instants, so a clock-local range check
+// fails the test.
 func TestREQ103TemporalRangeAgreesWithREQ112Order(t *testing.T) {
 	t.Parallel()
 	tests := []orderCase{
@@ -235,6 +279,7 @@ func TestREQ103TemporalRangeAgreesWithREQ112Order(t *testing.T) {
 			clockAbove: func(a, b string) bool {
 				return (&rm.DVDate{Value: a}).Compare(rm.DVDate{Value: b}) > 0
 			},
+			shared: sharedDates,
 			samples: []string{
 				"2004", "2004-05", "2004-05-01", "2004-05-20", "20040521", "200406", "2005-01-01",
 				"0001-01-01", "2024-02-29",
@@ -249,7 +294,8 @@ func TestREQ103TemporalRangeAgreesWithREQ112Order(t *testing.T) {
 			clockAbove: func(a, b string) bool {
 				return (&rm.DVTime{Value: a}).Compare(rm.DVTime{Value: b}) > 0
 			},
-			zoned: func(s string) bool { return (&rm.DVTime{Value: s}).Timezone() != "" },
+			zoned:  func(s string) bool { return (&rm.DVTime{Value: s}).Timezone() != "" },
+			shared: sharedTimes,
 			samples: []string{
 				"09", "09:30", "09:30:00", "09:30:00.5", "0930", "23:59:60",
 				"09:30:00+05:00", "09:00:00-05:00", "00:00:00Z", "14:00Z", "08:00:00Z", "07:30:00Z",
@@ -265,7 +311,8 @@ func TestREQ103TemporalRangeAgreesWithREQ112Order(t *testing.T) {
 			clockAbove: func(a, b string) bool {
 				return clockDateTime(a) > clockDateTime(b)
 			},
-			zoned: func(s string) bool { return (&rm.DVDateTime{Value: s}).Timezone() != "" },
+			zoned:  func(s string) bool { return (&rm.DVDateTime{Value: s}).Timezone() != "" },
+			shared: sharedDateTimes,
 			samples: []string{
 				"2004-05-20", "2004-05-20T00", "2004-05-20T00:00:00", "20040520T100000", "2004-05",
 				"2004-05-20T23:59:59.9", "2004", "2004-05-20T10:00:00+02:00", "2004-05-20T09:00:00Z",
@@ -294,7 +341,7 @@ func TestREQ103TemporalRangeAgreesWithREQ112Order(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			var admitted, refused, unordered, clockDisagrees int
+			var admitted, refused, unordered, clockDisagrees, sharedEqual int
 			for _, b := range tc.samples {
 				from := constraints.TemporalRange{Lower: b, LowerInclusive: true, UpperUnbounded: true}
 				after := constraints.TemporalRange{Lower: b, UpperUnbounded: true}
@@ -309,6 +356,13 @@ func TestREQ103TemporalRangeAgreesWithREQ112Order(t *testing.T) {
 							t.Errorf("the floor orders %q against %q, want a zoned value not ordered against one without a zone", a, b)
 						}
 						wantFrom, wantAfter, wantUpTo, wantBefore = true, true, true, true
+					} else if sign, ok := sharedOrder(tc, a, b); ok {
+						if sign == 0 {
+							sharedEqual++
+						}
+						if aAbove != (sign > 0) {
+							t.Errorf("the floor puts %q above %q: %t, want %t, their order at the precision they share", a, b, aAbove, sign > 0)
+						}
 					} else if aAbove != tc.clockAbove(a, b) {
 						clockDisagrees++
 					}
@@ -331,6 +385,9 @@ func TestREQ103TemporalRangeAgreesWithREQ112Order(t *testing.T) {
 			}
 			if admitted == 0 || refused == 0 {
 				t.Errorf("%s samples: the ranges admit %d and refuse %d, want at least one of each", tc.name, admitted, refused)
+			}
+			if tc.shared != nil && sharedEqual == 0 {
+				t.Errorf("%s samples: no pair is equal at the precision it shares, want at least one", tc.name)
 			}
 			if tc.zoned != nil && (unordered == 0 || clockDisagrees == 0) {
 				t.Errorf("%s samples: %d unordered pairs and %d pairs whose clocks and instants disagree, want at least one of each", tc.name, unordered, clockDisagrees)

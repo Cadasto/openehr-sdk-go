@@ -23,9 +23,14 @@ import (
 // that grammar, or one that breaks the ADL rule that only ?? or XX follow a
 // ?? field and only XX an XX field, is a CodeInvalidValue on every value.
 //
-// Range is the AOM 1.4 range, in the order of rm.DVDate.Compare: a reduced
-// date stands for the first day of the period it names, so "2004-05" is
-// before "2004-05-20". A value outside it is a CodeOutOfRange.
+// Range is the AOM 1.4 range. A date is compared with each bound at the
+// precision the two share: field by field from the year down, over the
+// fields both carry, the first that differs deciding, and a date equal to
+// the bound on every shared field equal to it. A bound so covers the whole
+// period it names: "2021-05" lies within the range from 1900 to 2021, both
+// included, and outside the one that excludes 2021. That is not the order of
+// rm.DVDate.Compare, which reads "2021-05" as its first day. A value outside
+// the range is a CodeOutOfRange.
 //
 // TimezoneValidity is the timezone_validity the ITS-XML C_DATE carries. A
 // date has no zone, so ValidityOptional and ValidityDisallowed admit every
@@ -44,9 +49,12 @@ func (CDate) isPrimitive() {}
 // sentinel "2020-01-01", else the range's lower bound, else its upper
 // bound, the first that Validate accepts. The sentinel takes the fields
 // the pattern allows; a bound is tried as written, then with those fields,
-// moved inside the range by one unit of its last field where that drops a
-// part of it or its end is excluded. When none passes, it returns
-// "2020-01-01", which Validate then refuses. That happens when no date
+// which equal it at the precision the two share, and where the range
+// excludes it, moved: a lower bound up by one unit of the last field they
+// share, to the start of the next period, and an upper bound down by one
+// unit of its own last field, to the end of the period before. Under
+// "yyyy-mm-dd" the range above 2021 gives "2022-01-01". When none passes, it returns "2020-01-01",
+// which Validate then refuses. That happens when no date
 // meets both the pattern and the range, or the pattern or a bound is
 // malformed, and also, though a date meets both, when the pattern writes
 // the month or the day as a literal number beside a range: written to the
@@ -80,14 +88,16 @@ func (c CDate) Validate(value any) []Violation {
 // admits any zone, Z included, whatever shape the suffix writes. Without
 // one, a zone is optional.
 //
-// Range is the AOM 1.4 range. A time is ordered against each bound as the
-// RM floor orders two DV_TIME bounds of a DV_INTERVAL: by
-// rm.DVTime.Compare, clock-local, when the two carry one zone designator or
-// none, a minute or a second the time leaves out counting as 0; as
-// instants, each clock read in UTC, when both carry a zone; and not at all
-// when one carries a zone and the other does not, so that bound does not
-// refuse it. "08:00:00Z" is after "09:30:00+02:00", and "09:00:00" is not
-// ordered against it. A value outside the range is a CodeOutOfRange.
+// Range is the AOM 1.4 range. A time and a bound written with one zone
+// designator, or both with none, are compared on their clocks at the
+// precision they share, as [CDate] compares a date, from the hour down, the
+// seconds with their fraction as one field: "10:30" lies within the range
+// up to 10, included. When both carry a zone and the designators differ,
+// they are ordered as instants, each clock read in UTC, a minute or a second
+// left out counting as 0; when one carries a zone and the other does not,
+// they are not ordered, so that bound does not refuse the time. "08:00:00Z"
+// is after "09:30:00+02:00", and "09:00:00" is not ordered against it. A
+// value outside the range is a CodeOutOfRange.
 //
 // TimezoneValidity is the AOM 1.4 timezone_validity: ValidityMandatory
 // refuses a time with no zone, and ValidityDisallowed one with a zone, as a
@@ -106,11 +116,14 @@ func (CTime) isPrimitive() {}
 // can move a bound out of the range. Written to the pattern, a time keeps
 // its zone, takes Z where the pattern or TimezoneValidity requires a zone it
 // lacks, is read in UTC where the pattern requires Z and it carries another
-// zone, and drops its zone where TimezoneValidity disallows one. Its
-// sentinel is "12:00:00". No candidate carries a fraction of a second or
-// changes its zone, so a range only such a time meets gives the sentinel,
-// which Validate refuses: the range above 23:59:59 gives "12:00:00",
-// though "23:59:59.5" is valid.
+// zone, and drops its zone where TimezoneValidity disallows one. A bound
+// that keeps its zone moves as a date does, and a lower bound that loses a
+// fraction of a second moves up by a second. A bound read in UTC is ordered
+// as an instant, so a lower one also moves up by one unit of its last field
+// where writing it drops a part of it. Its sentinel is "12:00:00". No
+// candidate carries a fraction of a second or changes its zone, so a range
+// only such a time meets gives the sentinel, which Validate refuses: the
+// range above 23:59:59 gives "12:00:00", though "23:59:59.5" is valid.
 func (c CTime) ExampleValue() any {
 	return clockExample(clockTime, c.Pattern, c.Range, c.TimezoneValidity, "12:00:00")
 }
@@ -135,12 +148,14 @@ func (c CTime) Validate(value any) []Violation {
 // ("yyyy-mm-ddTHH:MM:SS", "yyyy-mm-ddThh:??:??"), read as [CDate] and
 // [CTime] read theirs; "T" or a space separates its date from its time.
 //
-// Range is the AOM 1.4 range, in the order of rm.DVDateTime.Compare, where
-// a reduced value stands for the start of the period it names, and the
-// zones read as [CTime] reads them: a date-time is ordered against a bound
-// as instants when both carry a zone and the designators differ, and not
-// at all when one carries a zone and the other does not. A date with no
-// time carries none. A value outside the range is a CodeOutOfRange.
+// Range is the AOM 1.4 range, compared as [CTime] compares a time, from the
+// year down: at the precision a date-time and a bound share when they carry
+// one zone designator or none, so "2021-12-31T23:59:30" lies within the
+// range up to 2021-12-31T23:59, included; as instants, a reduced value
+// standing for the start of the period it names, when both carry a zone and
+// the designators differ; and not at all when one carries a zone and the
+// other does not. A date with no time carries none. A value outside the
+// range is a CodeOutOfRange.
 //
 // TimezoneValidity is read as [CTime] reads it; a date-time with no time has
 // no zone, so ValidityMandatory refuses it.
@@ -153,12 +168,14 @@ type CDateTime struct {
 func (CDateTime) isPrimitive() {}
 
 // ExampleValue returns a date-time written to Pattern and inside Range,
-// chosen as [CDate.ExampleValue] chooses a date, with the zone written as
-// [CTime.ExampleValue] writes it; a literal field after the year can move a
-// bound out of the range. Its sentinel is "2020-01-01T12:00:00Z". No
-// candidate carries a fraction of a second, so a range only such a
-// date-time meets, one whose excluded bounds are a second apart, gives the
-// sentinel, which Validate refuses.
+// chosen as [CDate.ExampleValue] chooses a date, with the zone written and a
+// bound moved as [CTime.ExampleValue] says; a literal field after the year
+// can move a bound out of the range. Its sentinel is "2020-01-01T12:00:00Z".
+// No candidate carries a fraction of a second, so a range whose excluded
+// bounds are a second apart gives the sentinel. Where the bounds carry a
+// zone, Validate refuses it as out of range; where they carry none, the
+// sentinel, which carries one, is not ordered against them, so Validate
+// does not refuse it for the range.
 func (c CDateTime) ExampleValue() any {
 	return clockExample(clockDateTime, c.Pattern, c.Range, c.TimezoneValidity, "2020-01-01T12:00:00Z")
 }
@@ -497,7 +514,8 @@ var fieldLayouts = [fieldCount]struct {
 	fieldSecond: {'s', 2, ':'},
 }
 
-// fieldMinimum is the value a field the value leaves out stands for.
+// fieldMinimum is the value a field the value leaves out is written with,
+// and stands for where the value is ordered as an instant.
 var fieldMinimum = [fieldCount]int{fieldMonth: 1, fieldDay: 1}
 
 // validity is what a pattern field asks of the value's field, the AOM 1.4
@@ -732,32 +750,46 @@ func (v clockValue) magnitude(k clockKind) float64 {
 	return iso8601.DateTimeMagnitude(v.date, v.time)
 }
 
+// fields returns the value's fields as written, clock-local, for the order
+// at the precision two values share.
+func (v clockValue) fields(k clockKind) iso8601.Fields {
+	switch k {
+	case clockDate:
+		return iso8601.DateFields(v.date)
+	case clockTime:
+		return iso8601.TimeFields(v.time)
+	case clockDateTime:
+	}
+	return iso8601.DateTimeFields(v.date, v.time, v.hasTime)
+}
+
 // zone returns the zone designator the value carries, as written, or ""
 // for a date, a time with no zone, or a date-time with no time.
 func (v clockValue) zone() string {
 	return v.time.Zone
 }
 
-// clockOrder returns the order of the value v of kind k against a bound,
-// the order REQ-112 gives two DV_TIME or DV_DATE_TIME bounds of a
-// DV_INTERVAL: by the clock-local magnitudes when the two carry one zone
-// designator or none, as instants (iso8601.UTCMagnitude) when both carry a
-// zone and the designators differ, and not ordered when one carries a zone
-// and the other does not. A date carries none, so dates are ordered by
-// their magnitudes.
+// clockOrder returns the order of the value v of kind k against a bound
+// (REQ-103): at the precision the two share (iso8601.Fields.Compare) when
+// they carry one zone designator or none, so a bound covers the whole
+// period it names; as instants (iso8601.UTCMagnitude), a partial value
+// standing for the start of its period, when both carry a zone and the
+// designators differ; and not ordered when one carries a zone and the other
+// does not. A date carries none, so dates are ordered at their shared
+// precision.
 func clockOrder(k clockKind, v clockValue) boundOrder {
-	mag, zone := v.magnitude(k), v.zone()
+	fields, zone := v.fields(k), v.zone()
 	return func(bound string) (sign int, ordered, ok bool) {
 		b, ok := parseClock(k, bound)
 		if !ok {
 			return 0, false, false
 		}
-		bmag, bzone := b.magnitude(k), b.zone()
+		bzone := b.zone()
 		if zone == bzone {
-			return cmp.Compare(mag, bmag), true, true
+			return fields.Compare(b.fields(k)), true, true
 		}
-		utc, zoned := iso8601.UTCMagnitude(mag, zone)
-		butc, bzoned := iso8601.UTCMagnitude(bmag, bzone)
+		utc, zoned := iso8601.UTCMagnitude(v.magnitude(k), zone)
+		butc, bzoned := iso8601.UTCMagnitude(b.magnitude(k), bzone)
 		if !zoned || !bzoned {
 			return 0, false, true
 		}
@@ -879,18 +911,29 @@ func clockExample(k clockKind, pattern string, r TemporalRange, tz ValidityKind,
 
 // fit writes the value v of kind k with the fields the pattern allows,
 // fractions left out, and with the zone [clockPattern.zoneOf] gives it
-// under the constraint's timezone_validity tz.
-// Toward 1 it moves the result up by one unit of its last field when that
-// drops a part of v, or when excluded asks for a value past v; toward -1 it
-// moves it down by one unit when excluded asks for a value before v. A
-// field the pattern writes as a literal takes that literal. It returns ""
-// when a move leaves the day of a time.
+// under the constraint's timezone_validity tz. Toward 1 it moves the result
+// up to lie after v, as a value past a lower bound v must; toward -1 down
+// to lie before v, as a value below an upper bound must, by one unit of a
+// field where the order against v asks it. Written with the zone designator
+// v carries, the result is compared with v at the precision the two share,
+// where it equals v but for a fraction of a second it leaves out: it moves
+// up by one unit of the last field the two share when excluded or when it
+// left out a fraction, and down by one unit of its own last field when
+// excluded and it left out none. Written with
+// another zone, or none, it is compared with v as an instant, where a part
+// it drops puts it before v: it moves by one unit of its last field, up when
+// it dropped a part of v or excluded, down when excluded and it dropped
+// nothing. A field the pattern writes as a literal takes that literal. It
+// returns "" when a move leaves the day of a time.
 func (p clockPattern) fit(k clockKind, v clockValue, tz ValidityKind, toward int, excluded bool) string {
 	lo, hi := k.span()
 	var f [fieldCount]int
+	carried := lo // one past the last field v carries
 	for i := lo; i < hi; i++ {
 		n, known := v.field(i)
-		if !known {
+		if known {
+			carried = i + 1
+		} else {
 			n = fieldMinimum[i]
 		}
 		f[i] = n
@@ -906,19 +949,35 @@ func (p clockPattern) fit(k clockKind, v clockValue, tz ValidityKind, toward int
 			break
 		}
 	}
-	dropped := v.time.Fraction > 0
+	// at is the field a move steps, and before reports whether the result
+	// lies before v before any move.
+	at, before := cut-1, v.time.Fraction > 0
+	if zone == v.zone() {
+		// A lower bound moves past the whole period v names, its start the
+		// first value after it. An upper bound written at the start of that
+		// period lies before it after one unit of its last field, the latest
+		// value it can take, so it stays clear of a lower bound in another
+		// zone that the period's start would meet.
+		if toward > 0 {
+			at = min(cut, carried) - 1
+		}
+		before = before && cut == hi
+	} else {
+		for i := cut; i < hi; i++ {
+			before = before || f[i] != fieldMinimum[i]
+		}
+	}
 	for i := cut; i < hi; i++ {
-		dropped = dropped || f[i] != fieldMinimum[i]
 		f[i] = fieldMinimum[i]
 	}
 	var step int
 	switch {
-	case toward > 0 && (dropped || excluded):
+	case toward > 0 && (before || excluded):
 		step = 1
-	case toward < 0 && excluded && !dropped:
+	case toward < 0 && excluded && !before:
 		step = -1
 	}
-	if step != 0 && !moveField(k, &f, cut-1, step) {
+	if step != 0 && !moveField(k, &f, at, step) {
 		return ""
 	}
 	for i := lo; i < cut; i++ {

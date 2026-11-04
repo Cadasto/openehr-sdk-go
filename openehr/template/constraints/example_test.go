@@ -276,7 +276,10 @@ func TestREQ107_CodePhraseEmptyListPlaceholder(t *testing.T) {
 // range's lower bound and its upper bound, each written to the pattern, that
 // Validate accepts, so the sentinel stays wherever it satisfies both. A
 // value written to the pattern keeps its zone, takes Z where a zone is
-// required, and is read in UTC where Z is. Where none is accepted, it is the
+// required, and is read in UTC where Z is. Written with its own zone, a bound
+// equals itself at the precision the two share, so an included one keeps
+// its place and an excluded one moves by one unit of the last field they
+// share; read in UTC, it moves as an instant. Where none is accepted, it is the
 // sentinel, which Validate then refuses: when no value satisfies the pattern
 // and the range, when the pattern or a bound is malformed, and, in the
 // exception the spec names, when a literal field after the first moves each
@@ -328,7 +331,10 @@ func TestREQ103_TemporalExampleValue(t *testing.T) {
 		{name: "duration, malformed pattern", c: constraints.CDuration{Pattern: "PX"}, want: "P0D", unsatisfiable: true},
 		{name: "duration, malformed bound", c: constraints.CDuration{Range: from("P1X", true)}, want: "P0D", unsatisfiable: true},
 		{name: "date, range", c: constraints.CDate{Range: closed("2004-05-20", "2004-06-02")}, want: "2004-05-20"},
-		{name: "date, day dropped inside the range", c: constraints.CDate{Pattern: "yyyy-mm-XX", Range: closed("2004-05-20", "2004-06-02")}, want: "2004-06"},
+		{name: "date, day dropped inside the range", c: constraints.CDate{Pattern: "yyyy-mm-XX", Range: closed("2004-05-20", "2004-06-02")}, want: "2004-05"},
+		{name: "date, excluded year bound under a full pattern", c: constraints.CDate{Pattern: "yyyy-mm-dd", Range: constraints.TemporalRange{Lower: "2021", Upper: "2030", UpperInclusive: true}}, want: "2022-01-01"},
+		{name: "date, excluded upper with its day dropped", c: constraints.CDate{Pattern: "yyyy-mm-XX", Range: upTo("2019-05-15", false)}, want: "2019-04"},
+		{name: "date, included upper with its day dropped", c: constraints.CDate{Pattern: "yyyy-mm-XX", Range: upTo("2019-05-15", true)}, want: "2019-05"},
 		{name: "date, sentinel inside the range", c: constraints.CDate{Range: from("2004-05-20", false)}, want: "2020-01-01"},
 		{name: "date, excluded lower", c: constraints.CDate{Range: from("2024-05-20", false)}, want: "2024-05-21"},
 		{name: "date, excluded lower at the year end", c: constraints.CDate{Range: from("2024-12-31", false)}, want: "2025-01-01"},
@@ -337,15 +343,20 @@ func TestREQ103_TemporalExampleValue(t *testing.T) {
 		// The documented exception: 2003-06-01 meets both, but the literal
 		// month moves the sentinel and the bound past the range.
 		{name: "date, literal month beside a range", c: constraints.CDate{Pattern: "yyyy-06-dd", Range: upTo("2004-05-20", true)}, want: "2020-01-01", unsatisfiable: true},
-		{name: "time, hour rounded up", c: constraints.CTime{Pattern: "hh:XX:XX", Range: closed("09:30:00", "10:00:00")}, want: "10"},
+		{name: "time, hour of the lower bound", c: constraints.CTime{Pattern: "hh:XX:XX", Range: closed("09:30:00", "10:00:00")}, want: "09"},
 		{name: "time, excluded lower", c: constraints.CTime{Range: from("13:30:00", false)}, want: "13:30:01"},
+		{name: "time, excluded hour bound under a full pattern", c: constraints.CTime{Pattern: "hh:mm:ss", Range: from("13", false)}, want: "14:00:00"},
+		{name: "time, fraction left out of an excluded lower", c: constraints.CTime{Pattern: "hh:mm:ss", Range: from("13:30:00.5", false)}, want: "13:30:01"},
+		{name: "time, fraction left out of an excluded upper", c: constraints.CTime{Pattern: "hh:mm:ss", Range: upTo("11:30:00.5", false)}, want: "11:30:00"},
 		{name: "time, zone Z, sentinel after the bound as instants", c: constraints.CTime{Pattern: "hh:mm:ssZ", Range: from("13:30:00+02:00", true)}, want: "12:00:00Z"},
 		{name: "time, zone Z, bound read in UTC", c: constraints.CTime{Pattern: "hh:mm:ssZ", Range: closed("13:30:00+02:00", "13:45:00+02:00")}, want: "11:30:00Z"},
 		{name: "time, zone Z, bound read in UTC leaves the day", c: constraints.CTime{Pattern: "hh:mm:ssZ", Range: closed("01:00:00+02:00", "01:30:00+02:00")}, want: "12:00:00", unsatisfiable: true},
-		{name: "time, zone required, bound keeps its zone", c: constraints.CTime{Pattern: "hh:mm:XX+hh:mm", Range: closed("13:30:30+02:00", "13:32:00+02:00")}, want: "13:31+02:00"},
+		{name: "time, zone required, bound keeps its zone", c: constraints.CTime{Pattern: "hh:mm:XX+hh:mm", Range: closed("13:30:30+02:00", "13:32:00+02:00")}, want: "13:30+02:00"},
+		{name: "time, zone Z, lower read in UTC drops its seconds", c: constraints.CTime{Pattern: "hh:mm:XXZ", Range: closed("13:30:30+02:00", "13:32:00+02:00")}, want: "11:31Z"},
 		{name: "time, sentinel not ordered against a zoned bound", c: constraints.CTime{Range: from("13:30:00+02:00", false)}, want: "12:00:00"},
-		{name: "date-time, minute rounded up", c: constraints.CDateTime{Pattern: "yyyy-mm-ddThh:mm:XX", Range: from("2024-05-20T10:15:30Z", true)}, want: "2024-05-20T10:16Z"},
-		{name: "date-time, bound keeps its zone", c: constraints.CDateTime{Pattern: "yyyy-mm-ddThh:mm:XX", Range: closed("2024-05-20T10:15:30+02:00", "2024-05-20T10:17:00+02:00")}, want: "2024-05-20T10:16+02:00"},
+		{name: "date-time, minute of the lower bound", c: constraints.CDateTime{Pattern: "yyyy-mm-ddThh:mm:XX", Range: from("2024-05-20T10:15:30Z", true)}, want: "2024-05-20T10:15Z"},
+		{name: "date-time, bound keeps its zone", c: constraints.CDateTime{Pattern: "yyyy-mm-ddThh:mm:XX", Range: closed("2024-05-20T10:15:30+02:00", "2024-05-20T10:17:00+02:00")}, want: "2024-05-20T10:15+02:00"},
+		{name: "date-time, excluded date bound under a full pattern", c: constraints.CDateTime{Pattern: "yyyy-mm-ddThh:mm:ss", Range: from("2024-05-20", false), TimezoneValidity: constraints.ValidityDisallowed}, want: "2024-05-21T00:00:00"},
 		{name: "date-time, excluded upper across midnight", c: constraints.CDateTime{Pattern: "yyyy-mm-ddThh:XX:XX", Range: upTo("2004-01-01T00:00:00Z", false)}, want: "2003-12-31T23Z"},
 		{name: "date-time, sentinel not ordered against a date bound", c: constraints.CDateTime{Pattern: "yyyy-mm-ddThh:mm:ss", Range: from("2024-05-20", true)}, want: "2020-01-01T12:00:00Z"},
 		{name: "time, zone mandatory", c: constraints.CTime{TimezoneValidity: constraints.ValidityMandatory}, want: "12:00:00Z"},
@@ -373,6 +384,145 @@ func TestREQ103_TemporalExampleValue(t *testing.T) {
 				t.Errorf("Validate(ExampleValue()=%#v) = no violation, want the sentinel refused", got)
 			case !tc.unsatisfiable && len(violations) != 0:
 				t.Errorf("Validate(ExampleValue()=%#v) = %v, want no violation", got, violations)
+			}
+		})
+	}
+}
+
+// TestREQ103_TemporalExampleValueSweep holds REQ-103 § Example value
+// emission over a sweep of bounded date, time and date-time constraints: for
+// each pattern, full or reduced, and each range from or up to a bound,
+// included or excluded, and each range between a lower and an upper bound
+// far enough apart, Validate(ExampleValue()) has no violation. The bounds
+// are written to every precision, with a fraction of a second, and, for a
+// time and a date-time, with a zone the pattern keeps or reads in UTC.
+// TestREQ103_TemporalExampleValueCloseBoundsAcrossZones pins the upper
+// bound's move under REQ-103 § Example value emission when the two excluded
+// bounds sit in different zones less than one unit of the upper bound's last
+// field apart. The lower bound, moved to the start of its next period, meets
+// the upper bound's instant, so only the upper bound can give the example; it
+// moves down by one unit of its own last field, to just before its period,
+// and so stays above the lower bound's instant. Moved by a whole shared field
+// to the start of the period before, it would meet that instant and the
+// example would be the sentinel Validate refuses.
+func TestREQ103_TemporalExampleValueCloseBoundsAcrossZones(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		c    constraints.PrimitiveConstraint
+		want string
+	}{
+		{
+			name: "date-time (10+02:00..09Z)",
+			c:    constraints.CDateTime{Range: constraints.TemporalRange{Lower: "2021-05-20T10+02:00", Upper: "2021-05-20T09Z"}, TimezoneValidity: constraints.ValidityMandatory},
+			want: "2021-05-20T08:59:59Z",
+		},
+		{
+			name: "time (10+02:00..09Z)",
+			c:    constraints.CTime{Range: constraints.TemporalRange{Lower: "10+02:00", Upper: "09Z"}, TimezoneValidity: constraints.ValidityMandatory},
+			want: "08:59:59Z",
+		},
+		{
+			name: "time (10:30+02:00..08:31Z)",
+			c:    constraints.CTime{Range: constraints.TemporalRange{Lower: "10:30+02:00", Upper: "08:31Z"}, TimezoneValidity: constraints.ValidityMandatory},
+			want: "08:30:59Z",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := tc.c.ExampleValue()
+			if got != tc.want {
+				t.Errorf("ExampleValue() = %#v, want %q", got, tc.want)
+			}
+			if v := tc.c.Validate(got); len(v) != 0 {
+				t.Errorf("Validate(ExampleValue()=%#v) = %v, want no violation", got, v)
+			}
+		})
+	}
+}
+
+func TestREQ103_TemporalExampleValueSweep(t *testing.T) {
+	t.Parallel()
+	ranges := func(lows, highs []string) []constraints.TemporalRange {
+		var out []constraints.TemporalRange
+		for _, b := range append(append([]string(nil), lows...), highs...) {
+			for _, in := range []bool{true, false} {
+				out = append(out,
+					constraints.TemporalRange{Lower: b, LowerInclusive: in, UpperUnbounded: true},
+					constraints.TemporalRange{LowerUnbounded: true, Upper: b, UpperInclusive: in})
+			}
+		}
+		for _, lo := range lows {
+			for _, hi := range highs {
+				for _, flags := range [][2]bool{{true, true}, {true, false}, {false, true}, {false, false}} {
+					out = append(out, constraints.TemporalRange{Lower: lo, Upper: hi, LowerInclusive: flags[0], UpperInclusive: flags[1]})
+				}
+			}
+		}
+		return out
+	}
+	tests := []struct {
+		name     string
+		patterns []string
+		ranges   []constraints.TemporalRange
+		build    func(pattern string, r constraints.TemporalRange) constraints.PrimitiveConstraint
+	}{
+		{
+			name:     "date",
+			patterns: []string{"", "yyyy-mm-dd", "yyyy-mm-??", "yyyy-??-??", "yyyy-mm-XX", "yyyy-??-XX", "yyyy-XX-XX"},
+			ranges: ranges(
+				[]string{"2021", "2021-01", "2021-05", "2021-05-15", "2021-12-31"},
+				[]string{"2023", "2023-02", "2023-02-28", "2023-01-01"},
+			),
+			build: func(p string, r constraints.TemporalRange) constraints.PrimitiveConstraint {
+				return constraints.CDate{Pattern: p, Range: r}
+			},
+		},
+		{
+			name: "time",
+			patterns: []string{
+				"", "hh:mm:ss", "hh:mm:??", "hh:??:??", "hh:mm:XX", "hh:??:XX", "hh:XX:XX",
+				"hh:mm:ssZ", "hh:mm:XXZ", "hh:XX:XXZ", "hh:mm:ss±hh:mm",
+			},
+			ranges: ranges(
+				[]string{"10", "10:30", "10:30:15", "10:30:15.5", "10:59:59.5", "10+02:00", "10:30:15+02:00", "10:59:59.5Z"},
+				[]string{"14", "14:00", "14:15:30", "14:15:30.25", "14+02:00", "14:15:30.25+02:00", "14:15Z"},
+			),
+			build: func(p string, r constraints.TemporalRange) constraints.PrimitiveConstraint {
+				return constraints.CTime{Pattern: p, Range: r}
+			},
+		},
+		{
+			name: "date-time",
+			patterns: []string{
+				"", "yyyy-mm-ddThh:mm:ss", "yyyy-mm-ddThh:mm:XX", "yyyy-mm-ddThh:XX:XX", "yyyy-mm-ddTXX:XX:XX",
+				"yyyy-mm-XXTXX:XX:XX", "yyyy-XX-XXTXX:XX:XX", "yyyy-mm-ddT??:??:??", "yyyy-??-??T??:??:??",
+				"yyyy-mm-ddThh:mm:ssZ", "yyyy-mm-ddThh:mm:XXZ",
+			},
+			ranges: ranges(
+				[]string{
+					"2021", "2021-05", "2021-05-15", "2021-05-15T10", "2021-05-15T10:30", "2021-05-15T10:30:15",
+					"2021-05-15T10:30:15.5", "2021-05-15T23:59:59.5", "2021-05-15T10:30:15.5Z", "2021-05-15T10:30+02:00",
+				},
+				[]string{"2023", "2023-02", "2023-02-28", "2023-02-28T14", "2023-02-28T14:15:30.25", "2023-02-28T00:00Z", "2023-02-28T14+02:00"},
+			),
+			build: func(p string, r constraints.TemporalRange) constraints.PrimitiveConstraint {
+				return constraints.CDateTime{Pattern: p, Range: r}
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			for _, p := range tc.patterns {
+				for _, r := range tc.ranges {
+					c := tc.build(p, r)
+					got := c.ExampleValue()
+					if v := c.Validate(got); len(v) != 0 {
+						t.Errorf("pattern %q, range %s: Validate(ExampleValue()=%#v) = %v, want no violation", p, r, got, v)
+					}
+				}
 			}
 		})
 	}

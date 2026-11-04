@@ -238,7 +238,9 @@ type Issue struct {
 	//     with a fractional operand, the numerator and the denominator, a
 	//     [2]float64;
 	//   - on an rm_invariant issue for interval bounds out of order, the
-	//     two compared magnitudes, lower first, a [2]float64;
+	//     two bounds' magnitudes, lower first, a [2]float64, a date-time
+	//     with a zone read in UTC, and two times written with different
+	//     zone designators each read in UTC;
 	//   - on an rm_invariant issue for a date, time or duration that is
 	//     not valid ISO 8601, its value, a string;
 	//   - on a term_mapping_match issue, the match, an rm.Character;
