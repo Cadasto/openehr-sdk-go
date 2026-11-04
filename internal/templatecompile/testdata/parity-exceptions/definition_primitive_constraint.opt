@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SDK-authored parity fixture: a definition typed C_STRING, which the parser reads as a leaf that carries a string constraint and the model's reader refuses, since the model's definition, an archetype root, cannot hold one, an exception the parity rule allows. -->
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <language>
+    <terminology_id><value>ISO_639-1</value></terminology_id>
+    <code_string>en</code_string>
+  </language>
+  <template_id><value>parity.definition_primitive_constraint.v1</value></template_id>
+  <concept>Parity</concept>
+  <definition xsi:type="C_STRING">
+    <rm_type_name>STRING</rm_type_name>
+    <occurrences><lower>1</lower><upper>1</upper></occurrences>
+    <node_id>at0000</node_id>
+    <list>first</list>
+    <list>second</list>
+  </definition>
+</template>
