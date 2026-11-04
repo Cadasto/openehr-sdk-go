@@ -13,27 +13,23 @@ import (
 // cardinality intervals with: each bounded side closed as the parser closes
 // it, and the intervals the parser refuses refused.
 func TestREQ111_NewMultiplicityClosesAndRefuses(t *testing.T) {
-	type bounds struct {
-		lower, upper                   int
-		lowerIncluded, upperIncluded   bool
-		lowerUnbounded, upperUnbounded bool
-	}
+	type bounds = template.IntervalBounds
 	closed := []struct {
 		name                           string
 		in                             bounds
 		lower, upper                   int
 		lowerUnbounded, upperUnbounded bool
 	}{
-		{name: "closed 0..1", in: bounds{lower: 0, upper: 1, lowerIncluded: true, upperIncluded: true}, lower: 0, upper: 1},
-		{name: "excluded ends >0..<3", in: bounds{lower: 0, upper: 3}, lower: 1, upper: 2},
-		{name: "open above 1..*", in: bounds{lower: 1, lowerIncluded: true, upperUnbounded: true}, lower: 1, upperUnbounded: true},
-		{name: "open below, its included flag moves nothing", in: bounds{upper: 4, lowerIncluded: false, upperIncluded: true, lowerUnbounded: true}, upper: 4, lowerUnbounded: true},
-		{name: "one item 1..1", in: bounds{lower: 1, upper: 1, lowerIncluded: true, upperIncluded: true}, lower: 1, upper: 1},
+		{name: "closed 0..1", in: bounds{Lower: 0, Upper: 1, LowerIncluded: true, UpperIncluded: true}, lower: 0, upper: 1},
+		{name: "excluded ends >0..<3", in: bounds{Lower: 0, Upper: 3}, lower: 1, upper: 2},
+		{name: "open above 1..*", in: bounds{Lower: 1, LowerIncluded: true, UpperUnbounded: true}, lower: 1, upperUnbounded: true},
+		{name: "open below, its included flag moves nothing", in: bounds{Upper: 4, LowerIncluded: false, UpperIncluded: true, LowerUnbounded: true}, upper: 4, lowerUnbounded: true},
+		{name: "one item 1..1", in: bounds{Lower: 1, Upper: 1, LowerIncluded: true, UpperIncluded: true}, lower: 1, upper: 1},
 	}
 	for _, tc := range closed {
 		t.Run(tc.name, func(t *testing.T) {
 			in := tc.in
-			m, err := template.NewMultiplicity(in.lower, in.upper, in.lowerIncluded, in.upperIncluded, in.lowerUnbounded, in.upperUnbounded)
+			m, err := template.NewMultiplicity(in)
 			if err != nil {
 				t.Fatalf("NewMultiplicity(%+v) = %v; want no error", in, err)
 			}
@@ -58,15 +54,15 @@ func TestREQ111_NewMultiplicityClosesAndRefuses(t *testing.T) {
 		in      bounds
 		wantMsg string
 	}{
-		{name: "inverted", in: bounds{lower: 5, upper: 2, lowerIncluded: true, upperIncluded: true}, wantMsg: "inverted interval lower=5 > upper=2 (written 5..2)"},
-		{name: "empty once closed", in: bounds{lower: 2, upper: 3}, wantMsg: "inverted interval lower=3 > upper=2 (written >2..<3)"},
-		{name: "excluded lower past the largest int", in: bounds{lower: math.MaxInt, upperUnbounded: true}, wantMsg: "closed lower bound overflows int"},
-		{name: "excluded upper below the smallest int", in: bounds{upper: math.MinInt, lowerUnbounded: true}, wantMsg: "closed upper bound overflows int"},
+		{name: "inverted", in: bounds{Lower: 5, Upper: 2, LowerIncluded: true, UpperIncluded: true}, wantMsg: "inverted interval lower=5 > upper=2 (written 5..2)"},
+		{name: "empty once closed", in: bounds{Lower: 2, Upper: 3}, wantMsg: "inverted interval lower=3 > upper=2 (written >2..<3)"},
+		{name: "excluded lower past the largest int", in: bounds{Lower: math.MaxInt, UpperUnbounded: true}, wantMsg: "closed lower bound overflows int"},
+		{name: "excluded upper below the smallest int", in: bounds{Upper: math.MinInt, LowerUnbounded: true}, wantMsg: "closed upper bound overflows int"},
 	}
 	for _, tc := range refused {
 		t.Run(tc.name, func(t *testing.T) {
 			in := tc.in
-			m, err := template.NewMultiplicity(in.lower, in.upper, in.lowerIncluded, in.upperIncluded, in.lowerUnbounded, in.upperUnbounded)
+			m, err := template.NewMultiplicity(in)
 			if err == nil {
 				t.Fatalf("NewMultiplicity(%+v) = %+v, nil; want an error containing %q", in, m, tc.wantMsg)
 			}

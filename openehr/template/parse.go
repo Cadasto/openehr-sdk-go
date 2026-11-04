@@ -819,9 +819,14 @@ func intervalToMultiplicity(i *xmlInterval) (*Multiplicity, error) {
 	if err != nil {
 		return nil, err
 	}
-	lowerIncluded := includedFlag(i.LowerIncluded.ptr(), lowerUnbounded)
-	upperIncluded := includedFlag(i.UpperIncluded.ptr(), upperUnbounded)
-	return NewMultiplicity(intOrZero(i.Lower), intOrZero(i.Upper), lowerIncluded, upperIncluded, lowerUnbounded, upperUnbounded)
+	return NewMultiplicity(IntervalBounds{
+		Lower:          intOrZero(i.Lower),
+		Upper:          intOrZero(i.Upper),
+		LowerIncluded:  includedFlag(i.LowerIncluded.ptr(), lowerUnbounded),
+		UpperIncluded:  includedFlag(i.UpperIncluded.ptr(), upperUnbounded),
+		LowerUnbounded: lowerUnbounded,
+		UpperUnbounded: upperUnbounded,
+	})
 }
 
 // intOrZero returns the bound p points to, or 0 for a bound the OPT omits.

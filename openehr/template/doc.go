@@ -6,7 +6,7 @@
 //
 //   - [Path] and the path grammar, read by [ParsePath];
 //   - [Cardinality] with [Single] and [Multiple], and [Multiplicity]
-//     with [NewMultiplicity];
+//     with [NewMultiplicity], which closes an [IntervalBounds];
 //   - [ArchetypeTerm], [TermBinding] and [CodedTermRef], the term records
 //     of an archetype;
 //   - the errors [ErrPathSyntax], [ErrPathNotFound] and [ErrAmbiguousPath];

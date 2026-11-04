@@ -303,7 +303,14 @@ func multiplicityOf(iv *rm.Interval[aom14.Integer]) (*template.Multiplicity, err
 	if iv == nil || *iv == (rm.Interval[aom14.Integer]{}) {
 		return nil, nil
 	}
-	return template.NewMultiplicity(int(iv.Lower), int(iv.Upper), iv.LowerIncluded, iv.UpperIncluded, iv.LowerUnbounded, iv.UpperUnbounded)
+	return template.NewMultiplicity(template.IntervalBounds{
+		Lower:          int(iv.Lower),
+		Upper:          int(iv.Upper),
+		LowerIncluded:  iv.LowerIncluded,
+		UpperIncluded:  iv.UpperIncluded,
+		LowerUnbounded: iv.LowerUnbounded,
+		UpperUnbounded: iv.UpperUnbounded,
+	})
 }
 
 // termsFromModel returns an archetype root's term definitions keyed by

@@ -266,20 +266,35 @@ type Multiplicity struct {
 	upperUnbounded bool
 }
 
-// NewMultiplicity returns the Multiplicity of an AOM 1.4 integer interval,
-// given by its two bounds and its four flags, closed on each bounded side as
-// the parser closes an OPT interval: an end the interval excludes becomes the
-// closed end it stands for, so the bounds 0 and 3 with both ends excluded give
-// Lower 1 and Upper 2. An unbounded side keeps the bound it is given, which
-// its included flag does not move. NewMultiplicity returns an error for an
-// interval whose closed ends are inverted, one that closing leaves empty,
-// such as ">2..<3", and an excluded end whose closed end an int cannot hold.
-func NewMultiplicity(lower, upper int, lowerIncluded, upperIncluded, lowerUnbounded, upperUnbounded bool) (*Multiplicity, error) {
+// IntervalBounds is an AOM 1.4 integer interval as an OPT writes it, its two
+// bounds and its four flags, which [NewMultiplicity] closes into a
+// [Multiplicity]. A flag is false unless set, so each side is bounded and
+// excludes its end unless the fields say otherwise.
+type IntervalBounds struct {
+	// Lower and Upper are the bounds of the interval.
+	Lower, Upper int
+	// LowerIncluded and UpperIncluded report whether the interval includes
+	// the bound of that side.
+	LowerIncluded, UpperIncluded bool
+	// LowerUnbounded and UpperUnbounded report whether that side of the
+	// interval has no bound.
+	LowerUnbounded, UpperUnbounded bool
+}
+
+// NewMultiplicity returns the Multiplicity of the AOM 1.4 integer interval b,
+// closed on each bounded side as the parser closes an OPT interval: an end
+// the interval excludes becomes the closed end it stands for, so the bounds 0
+// and 3 with both ends excluded give Lower 1 and Upper 2. An unbounded side
+// keeps the bound it is given, which its included flag does not move.
+// NewMultiplicity returns an error for an interval whose closed ends are
+// inverted, one that closing leaves empty, such as ">2..<3", and an excluded
+// end whose closed end an int cannot hold.
+func NewMultiplicity(b IntervalBounds) (*Multiplicity, error) {
 	m := &Multiplicity{
-		lower:          lower,
-		upper:          upper,
-		lowerUnbounded: lowerUnbounded,
-		upperUnbounded: upperUnbounded,
+		lower:          b.Lower,
+		upper:          b.Upper,
+		lowerUnbounded: b.LowerUnbounded,
+		upperUnbounded: b.UpperUnbounded,
 	}
 	// A Multiplicity counts whole items, so an excluded end on a bounded
 	// side becomes the closed end it stands for: ">0" is 1 and "<3" is 2.
@@ -287,15 +302,15 @@ func NewMultiplicity(lower, upper int, lowerIncluded, upperIncluded, lowerUnboun
 	// says. An int cannot hold the closed end of "> the largest int" or
 	// "< the smallest int", so such an end is refused instead of being
 	// left to wrap around to the other end of the int range.
-	if !lowerUnbounded && !lowerIncluded {
+	if !b.LowerUnbounded && !b.LowerIncluded {
 		if m.lower == math.MaxInt {
-			return nil, fmt.Errorf("closed lower bound overflows int: excluded lower=%d", lower)
+			return nil, fmt.Errorf("closed lower bound overflows int: excluded lower=%d", b.Lower)
 		}
 		m.lower++
 	}
-	if !upperUnbounded && !upperIncluded {
+	if !b.UpperUnbounded && !b.UpperIncluded {
 		if m.upper == math.MinInt {
-			return nil, fmt.Errorf("closed upper bound overflows int: excluded upper=%d", upper)
+			return nil, fmt.Errorf("closed upper bound overflows int: excluded upper=%d", b.Upper)
 		}
 		m.upper--
 	}
@@ -307,7 +322,7 @@ func NewMultiplicity(lower, upper int, lowerIncluded, upperIncluded, lowerUnboun
 	// they have no concrete value to compare.
 	if !m.lowerUnbounded && !m.upperUnbounded && m.lower > m.upper {
 		return nil, fmt.Errorf("inverted interval lower=%d > upper=%d (written %s)",
-			m.lower, m.upper, writtenBounds(lower, upper, lowerIncluded, upperIncluded))
+			m.lower, m.upper, writtenBounds(b.Lower, b.Upper, b.LowerIncluded, b.UpperIncluded))
 	}
 	return m, nil
 }
