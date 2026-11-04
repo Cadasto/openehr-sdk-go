@@ -93,8 +93,8 @@ const inputBufferMax = 4 << 20
 //     rounded up and an upper one down, the side included where the number
 //     is not a whole one; and one written as an infinity that admits every
 //     integer on its side, such as -Inf on the lower side or +Infinity on the
-//     upper one, as that side unbounded, included unless the range says
-//     otherwise;
+//     upper one, or as NaN, which the parser compares no integer against, as
+//     that side unbounded, included unless the range says otherwise;
 //   - an empty timezone_validity of a C_DATE, C_TIME or C_DATE_TIME as
 //     absent, which is optional;
 //   - a range bound on a side the range writes unbounded, which the parser

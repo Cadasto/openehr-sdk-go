@@ -797,7 +797,7 @@ func TestREQ111_ReaderReportsEachItemOnce(t *testing.T) {
 	for _, name := range []string{
 		"shapes.opt", "values.opt", "values-every-mode.opt", "namespace-v2.opt", "parser-readings.opt",
 		"integer-bounds.opt", "quantity-assumed-value.opt", "attribute-children.opt", "item-namespaces.opt",
-		"infinite-integer-bounds.opt", "foreign-namespaces.opt", "definition-type.opt",
+		"infinite-integer-bounds.opt", "foreign-namespaces.opt", "definition-type.opt", "nan-integer-bounds.opt",
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -1015,6 +1015,78 @@ func TestREQ111_ReaderReadsAnInfiniteIntegerBoundThatAdmitsEveryInteger(t *testi
 	}
 }
 
+// TestREQ111_ReaderReadsANaNIntegerBoundAsUnbounded pins that, in every mode,
+// a bound of a C_INTEGER range or of a quantity's precision written as NaN,
+// in any letter case, which the parser compares no integer against, is read
+// as that side unbounded: the bound is left out, an unbounded flag the range
+// writes reads true, and the side is included unless the range says
+// otherwise. The default mode reports each bound it leaves out; strict mode
+// leaves it out unreported. A NaN on a side written unbounded is left out as
+// any bound there is.
+//
+// Can-fail control: leave a NaN to the decode, as the reader did in strict
+// mode, and strict mode refuses each.
+func TestREQ111_ReaderReadsANaNIntegerBoundAsUnbounded(t *testing.T) {
+	t.Parallel()
+	fixture := readerFixture(t, "nan-integer-bounds.opt")
+	fixtureWant := decoded(t, readerFixture(t, "nan-integer-bounds.read.opt"))
+	fixtureUnmatched := []string{
+		item(1) + "/range[1]/lower[1]",
+		item(2) + "/range[1]/upper[1]",
+		definition + "/attributes[1]/children[3]/attributes[1]/children[1]/list[1]/precision[1]/lower[1]",
+		definition + "/attributes[1]/children[3]/attributes[1]/children[1]/list[1]/precision[1]/upper[1]",
+	}
+	integer := func(rng string) string {
+		return itemDoc(`<item xsi:type="C_INTEGER"><range>` + rng + `</range></item>`)
+	}
+	itemRange := definition + "/attributes[1]/children[1]/item[1]/range[1]"
+	cases := map[string]struct {
+		doc, want string
+		// unmatched is what the default mode reports.
+		unmatched []string
+	}{
+		"a lower bound of NaN": {
+			integer(`<lower>NaN</lower><upper>9</upper>`),
+			integer(`<lower_included>true</lower_included><lower_unbounded>true</lower_unbounded><upper>9</upper>`),
+			[]string{itemRange + "/lower[1]"},
+		},
+		"an upper bound of nan, written bounded and excluded": {
+			integer(`<upper_included>false</upper_included><upper_unbounded>false</upper_unbounded><lower>0</lower><upper> nan </upper>`),
+			integer(`<upper_included>false</upper_included><upper_unbounded>true</upper_unbounded><lower>0</lower>`),
+			[]string{itemRange + "/upper[1]"},
+		},
+		"a NaN on a side written unbounded": {
+			integer(`<lower_unbounded>true</lower_unbounded><lower>NAN</lower><upper>9</upper>`),
+			integer(`<lower_unbounded>true</lower_unbounded><upper>9</upper>`),
+			[]string{itemRange + "/lower[1]"},
+		},
+	}
+	for mode, opts := range modes {
+		t.Run(mode+"/nan-integer-bounds.opt", func(t *testing.T) {
+			t.Parallel()
+			want := fixtureUnmatched
+			if mode == "strict" {
+				want = nil
+			}
+			if got := readAs(t, fixture, fixtureWant, opts...); !slices.Equal(got, want) {
+				t.Errorf("WithUnmatched reported %q, want %q", got, want)
+			}
+		})
+		for name, tc := range cases {
+			t.Run(mode+"/"+name, func(t *testing.T) {
+				t.Parallel()
+				want := tc.unmatched
+				if mode == "strict" {
+					want = nil
+				}
+				if got := readAs(t, []byte(tc.doc), decoded(t, []byte(tc.want)), opts...); !slices.Equal(got, want) {
+					t.Errorf("WithUnmatched reported %q, want %q", got, want)
+				}
+			})
+		}
+	}
+}
+
 // TestREQ111_ReaderRefusesAnInfiniteIntegerBoundThatAdmitsNoInteger pins
 // that, in every mode, a bound of a C_INTEGER range or of a quantity's
 // precision written as an infinity that admits no integer, positive on the
@@ -1076,7 +1148,7 @@ func TestREQ111_CanonicalXMLKeepsNoneOfTheReadersReadings(t *testing.T) {
 	for _, name := range []string{
 		"shapes.opt", "values.opt", "values-every-mode.opt", "parser-readings.opt",
 		"integer-bounds.opt", "quantity-assumed-value.opt", "attribute-children.opt", "item-namespaces.opt",
-		"infinite-integer-bounds.opt",
+		"infinite-integer-bounds.opt", "nan-integer-bounds.opt",
 	} {
 		var ot aom14.OperationalTemplate
 		if err := canxml.Unmarshal(readerFixture(t, name), &ot); err == nil {

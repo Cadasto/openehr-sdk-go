@@ -792,7 +792,8 @@ func (t *tolerantReading) unboundSide(r *element, i int) {
 // as the integer bound that admits the same integers (integerBound), its side
 // included where the number is not a whole one, or, where it is the infinity
 // that admits every integer there, negative on the lower side or positive on
-// the upper one, as the side unbounded (unboundSide); and, in the default
+// the upper one, or NaN, which the parser compares no integer against, as the
+// side unbounded (unboundSide); and, in the default
 // mode, a bound of a C_REAL range or of a quantity's magnitude as the Real the
 // parser reads. An integer bound past 32 bits is written as that integer,
 // which the decode refuses as such, and an infinity that admits no integer
@@ -813,11 +814,11 @@ func (t *tolerantReading) closeNumberBound(r *element, i int, kind string, openS
 			return false
 		}
 		switch {
-		case !math.IsInf(f, 0):
-			text, rounded = integerBound(f, i == 0)
-		case (i == 0) == math.IsInf(f, -1):
+		case math.IsNaN(f), (i == 0) == math.IsInf(f, -1) && math.IsInf(f, 0):
 			// It admits every integer on its side, so the side is unbounded.
 			unbounded = true
+		case !math.IsInf(f, 0):
+			text, rounded = integerBound(f, i == 0)
 		}
 		differs = true
 	case !parserNumber(kind, b.text):
@@ -1286,11 +1287,10 @@ func boundText(kind string, text []byte) (string, bool) {
 
 // parserFloat reads text, a bound of a C_INTEGER range or of a quantity's
 // precision, as the parser does, with strconv.ParseFloat, without the white
-// space around it. It reports whether the parser reads a number from it that
-// bounds the integers, which a NaN, compared with no integer, does not.
+// space around it, and reports whether it reads one.
 func parserFloat(text []byte) (float64, bool) {
 	f, err := strconv.ParseFloat(strings.TrimSpace(string(text)), 64)
-	return f, err == nil && !math.IsNaN(f)
+	return f, err == nil
 }
 
 // integerBound returns the text of the integer bound that admits the
