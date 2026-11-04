@@ -256,10 +256,13 @@ func tagEnd(data []byte, lt int) int {
 
 // booleansHoldFlags reports whether each element whose start tag holds the
 // word C_BOOLEAN, as the type of a C_BOOLEAN item does, holds a true_valid
-// and a false_valid, with a prefix or without. A C_BOOLEAN anywhere else, such as in text or a comment, reads as an
-// element without them, and so does markup the walk does not read, such as a
-// document type with an internal subset. It walks the markup of data once,
-// keeping the open elements that hold the word on a stack.
+// and a false_valid among the elements it holds itself, each without a
+// prefix: a flag that stands deeper, or under a prefix that may be bound to
+// a namespace the reading does not read, reads as none. A C_BOOLEAN anywhere
+// else, such as in text or a comment, reads as an element without them, and
+// so does markup the walk does not read, such as a document type with an
+// internal subset. It walks the markup of data once, keeping the open
+// elements that hold the word on a stack.
 func booleansHoldFlags(data []byte) bool {
 	word := []byte("C_BOOLEAN")
 	total := bytes.Count(data, word)
@@ -312,12 +315,8 @@ func booleansHoldFlags(data []byte) bool {
 			}
 			tag := data[lt:end]
 			self := tag[len(tag)-2] == '/'
-			if n := len(open); n > 0 {
-				name := tagName(tag)
-				if _, local, ok := bytes.Cut(name, []byte(":")); ok {
-					name = local
-				}
-				switch string(name) {
+			if n := len(open); n > 0 && open[n-1].depth == depth {
+				switch string(tagName(tag)) {
 				case "true_valid":
 					open[n-1].seen |= seenTrueValid
 				case "false_valid":

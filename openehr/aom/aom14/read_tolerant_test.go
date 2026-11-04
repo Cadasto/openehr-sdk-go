@@ -569,8 +569,9 @@ func TestREQ111_ReaderReadsValuesInEveryMode(t *testing.T) {
 
 // TestREQ111_ReaderFindsWhatCanonicalXMLReadsWithoutAFailure pins the
 // readings of a document that canonical XML decodes without a failure, but
-// otherwise than the parser: a C_BOOLEAN flag left out or empty, which it
-// reads as false; an assumed_value that is empty, which it reads as false or
+// otherwise than the parser: a C_BOOLEAN flag left out or empty, or one that
+// stands only in an element the item holds or in the XSI namespace, which it
+// reads as false and the reading as absent; an assumed_value that is empty, which it reads as false or
 // 0, or that is t or f, which it reads as a boolean; an empty list entry or
 // range bound, which it reads as 0; a bare type attribute, which it reads as
 // the type; and, which the default mode alone reads, a C_COMPLEX_OBJECT that
@@ -593,6 +594,18 @@ func TestREQ111_ReaderFindsWhatCanonicalXMLReadsWithoutAFailure(t *testing.T) {
 			name: "a C_BOOLEAN with an empty false_valid",
 			doc:  itemDoc(`<item xsi:type="C_BOOLEAN"><true_valid>true</true_valid><false_valid/></item>`),
 			want: itemDoc(`<item xsi:type="C_BOOLEAN"><true_valid>true</true_valid><false_valid>true</false_valid></item>`),
+		},
+		{
+			name:          "a C_BOOLEAN whose flags stand in an element it holds",
+			doc:           itemDoc(`<item xsi:type="C_BOOLEAN"><x><true_valid>false</true_valid><false_valid>false</false_valid></x></item>`),
+			want:          itemDoc(`<item xsi:type="C_BOOLEAN"><true_valid>true</true_valid><false_valid>true</false_valid></item>`),
+			strictRefuses: true,
+		},
+		{
+			name:          "a C_BOOLEAN whose flags are in the XSI namespace",
+			doc:           itemDoc(`<item xsi:type="C_BOOLEAN"><xsi:true_valid>false</xsi:true_valid><xsi:false_valid>false</xsi:false_valid></item>`),
+			want:          itemDoc(`<item xsi:type="C_BOOLEAN"><true_valid>true</true_valid><false_valid>true</false_valid></item>`),
+			strictRefuses: true,
 		},
 		{
 			name: "a C_BOOLEAN that assumes t",
