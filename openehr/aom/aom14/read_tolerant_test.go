@@ -154,6 +154,49 @@ func TestREQ111_ReaderReadsARootInAnotherNamespace(t *testing.T) {
 	}
 }
 
+// TestREQ111_ReaderReadsAnElementInAnotherNamespace pins that the default
+// mode reads an element below the root in a namespace other than none, the v1
+// one, the v2 one and the XSI one as the element of that name in the v1
+// namespace, as the deprecated parser, which reads no namespace, does: under
+// another default namespace, the definition's among them, under a prefix bound
+// to another namespace, and under a prefix no declaration binds, which
+// encoding/xml reads as a namespace of that name. WithUnmatched reports
+// nothing. Strict mode refuses each as an element in a foreign namespace.
+//
+// Can-fail control: read only a root element in another namespace so, and
+// the definition reads as missing and the item as no item.
+func TestREQ111_ReaderReadsAnElementInAnotherNamespace(t *testing.T) {
+	t.Parallel()
+	string2 := `<item xsi:type="C_STRING"><list>a</list><list>b</list></item>`
+	cases := map[string]struct{ doc, want []byte }{
+		"foreign-namespaces.opt": {readerFixture(t, "foreign-namespaces.opt"), readerFixture(t, "foreign-namespaces.read.opt")},
+		"an item in another default namespace": {
+			[]byte(itemDoc(`<item xmlns="urn:example" xsi:type="C_STRING"><list>a</list><list>b</list></item>`)),
+			[]byte(itemDoc(string2)),
+		},
+		"a definition in another default namespace": {
+			[]byte(strings.Replace(itemDoc(string2), `<definition>`, `<definition xmlns="urn:example">`, 1)),
+			[]byte(itemDoc(string2)),
+		},
+		"an item under a prefix no declaration binds": {
+			[]byte(itemDoc(`<g:item xsi:type="C_STRING"><g:list>a</g:list><list>b</list></g:item>`)),
+			[]byte(itemDoc(string2)),
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if unmatched := readAs(t, tc.doc, decoded(t, tc.want)); len(unmatched) > 0 {
+				t.Errorf("WithUnmatched reported %q, want nothing", unmatched)
+			}
+			_, err := aom14.ReadOperationalTemplate(bytes.NewReader(tc.doc), canxml.WithStrict())
+			if !errors.Is(err, canxml.ErrNamespace) {
+				t.Errorf("ReadOperationalTemplate(WithStrict) = %v, want an error wrapping canxml.ErrNamespace", err)
+			}
+		})
+	}
+}
+
 // TestREQ111_ReaderReadsWhatElseTheParserReads pins the default mode's
 // reading of the other shapes and values the parser's default mode reads: a
 // C_COMPLEX_OBJECT that holds an archetype id, as a C_ARCHETYPE_ROOT; a
@@ -690,7 +733,7 @@ func TestREQ111_ReaderReportsEachItemOnce(t *testing.T) {
 	for _, name := range []string{
 		"shapes.opt", "values.opt", "values-every-mode.opt", "namespace-v2.opt", "parser-readings.opt",
 		"integer-bounds.opt", "quantity-assumed-value.opt", "attribute-children.opt", "item-namespaces.opt",
-		"infinite-integer-bounds.opt",
+		"infinite-integer-bounds.opt", "foreign-namespaces.opt",
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -963,7 +1006,7 @@ func TestREQ111_ReaderRefusesAnInfiniteIntegerBoundThatAdmitsNoInteger(t *testin
 // TestREQ111_CanonicalXMLKeepsNoneOfTheReadersReadings pins that a canxml
 // decode called directly reads the fixtures as written: it refuses the
 // shapes and values, and reads nothing of the definition in the namespace the
-// schemas declare.
+// schemas declare or in another.
 func TestREQ111_CanonicalXMLKeepsNoneOfTheReadersReadings(t *testing.T) {
 	t.Parallel()
 	for _, name := range []string{
@@ -982,6 +1025,13 @@ func TestREQ111_CanonicalXMLKeepsNoneOfTheReadersReadings(t *testing.T) {
 	}
 	if len(ot.Definition.Attributes) != 0 || ot.TemplateID.Value != "" {
 		t.Errorf("canxml.Unmarshal(namespace-v2.opt) read the foreign namespace: %d attributes, template id %q", len(ot.Definition.Attributes), ot.TemplateID.Value)
+	}
+	ot = aom14.OperationalTemplate{}
+	if err := canxml.Unmarshal(readerFixture(t, "foreign-namespaces.opt"), &ot); err != nil {
+		t.Fatalf("canxml.Unmarshal(foreign-namespaces.opt): %v", err)
+	}
+	if ot.Definition.RMTypeName != "" || len(ot.Definition.Attributes) != 0 {
+		t.Errorf("canxml.Unmarshal(foreign-namespaces.opt) read the foreign namespace: rm_type_name %q, %d attributes", ot.Definition.RMTypeName, len(ot.Definition.Attributes))
 	}
 }
 

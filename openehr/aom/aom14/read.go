@@ -103,10 +103,13 @@ const inputBufferMax = 4 << 20
 //     does not read, and a bound of the magnitude or precision of a
 //     C_DV_QUANTITY that holds no number, as absent, the side unbounded.
 //
-// Without [canxml.WithStrict] it also reads a root element in a namespace
-// other than none and those two, and every element in that namespace, as in
-// the http://schemas.openehr.org/v1 one, since the parser reads no namespace,
-// and, inside the definition:
+// Without [canxml.WithStrict] it also reads an element in a namespace other
+// than none, those two and the XML Schema instance one, the root among them,
+// as the element of that name in the http://schemas.openehr.org/v1 namespace,
+// since the parser reads no namespace: under another default namespace, under
+// a prefix bound to another namespace, and under a prefix no declaration
+// binds, which encoding/xml reads as a namespace of that name. And, inside
+// the definition, it reads:
 //
 //   - an <attributes>, a <children> or the <item> of a C_PRIMITIVE_OBJECT
 //     that names no type in the XML Schema instance namespace, none, an

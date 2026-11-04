@@ -2,7 +2,6 @@ package aom14
 
 import (
 	"bytes"
-	"encoding/xml"
 	"errors"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
@@ -70,10 +69,10 @@ func failsInsideQuantity(err error) bool {
 // may be one the parser reads as none; the namespace the AM Release-1.4
 // schemas declare; a bare type attribute, which the decode reads as an
 // xsi:type; or an empty element a number is read from, which the decode reads
-// as 0. Unless strict, it also looks for a root element in a namespace the
-// decode does not read, whose content the decode skips, and for an archetype
-// id on a constraint object the decode read as a C_COMPLEX_OBJECT, which it
-// skips: more archetype_id elements than archetype roots that hold one. A
+// as 0. Unless strict, it also looks for an element in a namespace the decode
+// does not read, which it skips, and for an archetype id on a constraint
+// object the decode read as a C_COMPLEX_OBJECT, which it skips: more
+// archetype_id elements than archetype roots that hold one. A
 // check may find what tolerate then leaves as it is, which costs a second
 // reading that changes nothing; none misses what it looks for. Each check
 // reads data once, so that what they cost grows with the size of data.
@@ -93,7 +92,7 @@ func needsTolerance(data []byte, ot *OperationalTemplate, strict bool) bool {
 	if ot.Definition.ArchetypeID.Value != "" {
 		m.roots++
 	}
-	return foreignRoot(data) || archetypeIDs(data) > m.roots
+	return foreignElements(data) || archetypeIDs(data) > m.roots
 }
 
 // modelFacts is what [needsTolerance] reads off the model the first decode
@@ -144,21 +143,107 @@ func (m *modelFacts) walk(attrs []CAttribute) {
 	}
 }
 
-// foreignRoot reports whether the root element of data is in a namespace
-// other than none, the one canonical XML reads, the one the AM Release-1.4
-// schemas declare and the XSI one: a namespace the default mode reads as
-// canonical XML's. It reads data up to the root's start tag.
-func foreignRoot(data []byte) bool {
-	d := xml.NewDecoder(bytes.NewReader(bytes.TrimPrefix(data, byteOrderMark)))
-	for {
-		tok, err := d.RawToken()
-		if err != nil {
-			return false
+// foreignElements reports whether data may hold an element in a namespace
+// the default mode reads as canonical XML's (isForeignNamespace): whether it
+// declares such a namespace as the default one, or under a prefix the name
+// of an element carries, or whether the name of an element carries a prefix
+// data declares nowhere, which encoding/xml reads as a namespace of that
+// name. A declaration in text or a comment counts as well.
+func foreignElements(data []byte) bool {
+	prefixes := elementPrefixes(data)
+	declared := make(map[string]bool, len(prefixes))
+	foreign := false
+	declarations(data, func(prefix, uri []byte) bool {
+		declared[string(prefix)] = true
+		if isForeignNamespace(string(uri)) && (len(prefix) == 0 || prefixes[string(prefix)]) {
+			foreign = true
 		}
-		if start, ok := tok.(xml.StartElement); ok {
-			return isForeignNamespace(ownNamespace(start.Name, start.Attr))
+		return !foreign
+	})
+	if foreign {
+		return true
+	}
+	for p := range prefixes {
+		if !declared[p] && p != "xml" {
+			return true
 		}
 	}
+	return false
+}
+
+// elementPrefixes returns the prefixes the names in the start tags of data
+// carry, and in what reads as one in a comment or a CDATA section.
+func elementPrefixes(data []byte) map[string]bool {
+	prefixes := make(map[string]bool)
+	for i := 0; ; {
+		k := bytes.IndexByte(data[i:], '<')
+		if k < 0 {
+			return prefixes
+		}
+		i += k + 1
+		// A name ends at the first byte no name holds; a `<` ends it too, so
+		// that each byte is read once.
+		end := bytes.IndexAny(data[i:], " \t\r\n/>:<=\"'!?")
+		if end <= 0 || data[i+end] != ':' {
+			continue
+		}
+		prefixes[string(data[i:i+end])] = true
+		i += end
+	}
+}
+
+// declarations calls fn with the prefix and the namespace of each namespace
+// declaration in data, an attribute named xmlns, the prefix empty, or
+// xmlns:prefix, until fn returns false. A namespace written with a reference
+// reads as itself, a namespace of no openEHR schema. What reads as a
+// declaration in text or a comment counts as well.
+func declarations(data []byte, fn func(prefix, uri []byte) bool) {
+	word := []byte("xmlns")
+	for i := 0; ; {
+		j := bytes.Index(data[i:], word)
+		if j < 0 {
+			return
+		}
+		j += i
+		i = j + len(word)
+		if j == 0 || !isXMLSpaceByte(data[j-1]) {
+			continue
+		}
+		k := i
+		var prefix []byte
+		if k < len(data) && data[k] == ':' {
+			end := bytes.IndexAny(data[k+1:], " \t\r\n/>:<=\"'")
+			if end <= 0 {
+				continue
+			}
+			prefix = data[k+1 : k+1+end]
+			k += 1 + end
+		}
+		k = skipSpace(data, k)
+		if k >= len(data) || data[k] != '=' {
+			continue
+		}
+		k = skipSpace(data, k+1)
+		if k >= len(data) || (data[k] != '"' && data[k] != '\'') {
+			continue
+		}
+		end := bytes.IndexByte(data[k+1:], data[k])
+		if end < 0 {
+			return
+		}
+		if !fn(prefix, data[k+1:k+1+end]) {
+			return
+		}
+	}
+}
+
+// skipSpace returns the offset of the first byte of data at or after i that
+// is no XML white space.
+func skipSpace(data []byte, i int) int {
+	for i < len(data) && isXMLSpaceByte(data[i]) {
+		i++
+	}
+	return i
 }
 
 // archetypeIDs counts the start tags in data whose local name is

@@ -136,9 +136,6 @@ type tolerantReading struct {
 	open     []*element
 	edits    []edit
 	xsiFresh string // a prefix the input does not use, once one is chosen
-	// foreign is the namespace of the root element, when the default mode
-	// reads it as canonical XML's.
-	foreign string
 	// failed is set where two edits a rendering makes overlap, which the
 	// reading does not make. The input is then left as it is, for the decode
 	// to refuse.
@@ -228,25 +225,29 @@ func (t *tolerantReading) start(tk xml.StartElement, off, end int) {
 		typeAt: -1,
 		bareAt: -1,
 	}
-	// The parser reads a root element in a namespace of its own, and all in
-	// that namespace, as it reads one in canonical XML's.
-	if parent == nil && !t.strict {
-		if uri := ownNamespace(e.name, e.attrs); isForeignNamespace(uri) {
-			t.foreign = uri
-		}
-	}
 	for i, a := range e.attrs {
 		prefix, ok := declared(a.Name)
 		if !ok {
 			continue
 		}
 		// An element in the namespace the AM Release-1.4 schemas declare
-		// reads as the element of that name in canonical XML's.
-		if a.Value == nsOpenEHRv2 || (t.foreign != "" && a.Value == t.foreign) {
+		// reads as the element of that name in canonical XML's, and, in the
+		// default mode, so does one in a namespace of no openEHR schema, as
+		// the parser, which reads no namespace, reads it.
+		if a.Value == nsOpenEHRv2 || (!t.strict && isForeignNamespace(a.Value)) {
 			e.attrs[i].Value = canxml.NSDefault
 			e.dirty = true
 		}
 		t.scope = append(t.scope, binding{prefix: prefix, uri: e.attrs[i].Value})
+	}
+	// encoding/xml reads a prefix no declaration binds as a namespace of that
+	// name, which the default mode reads as canonical XML's too.
+	if p := e.name.Space; !t.strict && p != "" && p != "xml" && p != "xmlns" {
+		if _, ok := t.lookup(p); !ok {
+			e.attrs = append(e.attrs, xml.Attr{Name: xml.Name{Space: "xmlns", Local: p}, Value: canxml.NSDefault})
+			e.dirty = true
+			t.scope = append(t.scope, binding{prefix: p, uri: canxml.NSDefault})
+		}
 	}
 	for i, a := range e.attrs {
 		switch {
@@ -1105,17 +1106,10 @@ func declaredIn(attrs []xml.Attr, prefix string) (string, bool) {
 	return "", false
 }
 
-// ownNamespace returns the namespace the start tag of an element named name,
-// with attrs, binds its own prefix to, "" where it binds none.
-func ownNamespace(name xml.Name, attrs []xml.Attr) string {
-	uri, _ := declaredIn(attrs, name.Space)
-	return uri
-}
-
 // isForeignNamespace reports whether the default mode reads uri, the
-// namespace of the root element, as canonical XML's: a namespace other than
-// none, canonical XML's, the one the AM Release-1.4 schemas declare and the
-// XSI one, whose xsi:type attributes would otherwise read as none.
+// namespace of an element, as canonical XML's: a namespace other than none,
+// canonical XML's, the one the AM Release-1.4 schemas declare and the XSI
+// one, whose xsi:type attributes would otherwise read as none.
 func isForeignNamespace(uri string) bool {
 	switch uri {
 	case "", canxml.NSDefault, nsOpenEHRv2, canxml.NSXSI:
