@@ -28,7 +28,8 @@ const parityFixtureDir = "testdata/parity"
 // reads, and it places the default values the fixture names. In their strict
 // modes ParseOPTStrict refuses a fixture of a tolerated value, and so does
 // the compile step, which also refuses a default value that addresses no
-// node, which the parser does not read.
+// node or that it cannot hold as canonical JSON, which the parser does not
+// read.
 func TestREQ111_ParityFixtures(t *testing.T) {
 	const items = "/context/other_context/items"
 	fixtures := []struct {
@@ -65,6 +66,19 @@ func TestREQ111_ParityFixtures(t *testing.T) {
 			file:                 "default_value_no_node.opt",
 			compileStrictRefuses: true,
 			defaults:             map[string]string{items + "[at0003]/value DV_TEXT": "DV_TEXT"},
+		},
+		{
+			file:                 "default_value_not_canonical_json.opt",
+			compileStrictRefuses: true,
+			defaults:             map[string]string{items + "[at0003]/value DV_TEXT": "DV_TEXT"},
+		},
+		{
+			file: "default_value_generic_child.opt",
+			defaults: map[string]string{
+				items + "[at0002]/value DV_INTERVAL<DV_COUNT>": "DV_INTERVAL",
+				items + "[at0003]/value DV_INTERVAL<DV_COUNT>": "DV_INTERVAL",
+				items + "[at0004]/value DV_INTERVAL<DV_COUNT>": "DV_INTERVAL",
+			},
 		},
 	}
 	files, err := filepath.Glob(filepath.Join(parityFixtureDir, "*.opt"))

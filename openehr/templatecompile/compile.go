@@ -123,11 +123,11 @@ func WithStrict() Option {
 // when an interval is inverted or closing leaves it empty, when an ordinal
 // symbol is neither a coded text nor a code phrase, when a constraint
 // object or an attribute is missing, when a primitive item is no primitive
-// class held by pointer, when a default value does not encode as canonical
-// JSON, when
-// constraint objects nest more than 128 levels below the definition, when two
-// nodes under different attributes have the same AQL path, which is a defect
-// in the template, and, with [WithStrict], for each value it refuses. Nodes
+// class held by pointer, when constraint objects nest more than 128 levels
+// below the definition, when two nodes under different attributes have the
+// same AQL path, which is a defect in the template, and, with [WithStrict],
+// for each value it refuses and a default value that does not encode as
+// canonical JSON, which Compile otherwise skips. Nodes
 // under one attribute that share a path (alternatives, or siblings with the
 // same node id) and the descendants of such nodes are admitted, and
 // [Compiled.NodeAt] resolves the path to the first one walked. Returns an

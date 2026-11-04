@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -19,15 +20,15 @@ import (
 // rm_attribute_name, the name read as [attributeName] reads it, on the node
 // that the T_ATTRIBUTE's differential_path reaches ([differentialPathNode]),
 // whose RM type is the T_COMPLEX_OBJECT's, or its default value's where it
-// names none. A T_COMPLEX_OBJECT with no default value places nothing, so
-// its T_ATTRIBUTE is not resolved. The node keeps a copy of the value, so c
-// shares none with the model.
+// names none ([defaultValueTarget]). A T_COMPLEX_OBJECT with no default
+// value places nothing, so its T_ATTRIBUTE is not resolved. The node keeps a
+// copy of the value, so c shares none with the model.
 //
 // A default value that addresses no node, as its path reaches no node or
 // that node has no attribute of the name or the attribute no child of the RM
 // type, is skipped, or, when strict, refused with an error wrapping
-// ErrInvalidInput. In both modes a value that does not encode and decode as
-// canonical JSON is refused with an error wrapping ErrInvalidInput. An error
+// ErrInvalidInput. So is a value that does not encode and decode as
+// canonical JSON, such as a DV_QUANTITY whose magnitude is NaN. An error
 // names the place, which is template structure, and not the value.
 func placeDefaultValues(c *Compiled, tc *aom14.TConstraint, strict bool) error {
 	if tc == nil {
@@ -60,8 +61,11 @@ func placeDefaultValues(c *Compiled, tc *aom14.TConstraint, strict bool) error {
 			}
 			encoded, err := encodeDefaultValue(tco.DefaultValue)
 			if err != nil {
-				return fmt.Errorf("%w: default value of RM type %q at %q: %T does not encode and decode as canonical JSON",
-					ErrInvalidInput, rmType, ta.DifferentialPath, tco.DefaultValue)
+				if strict {
+					return fmt.Errorf("%w: default value of RM type %q at %q: %T does not encode and decode as canonical JSON",
+						ErrInvalidInput, rmType, ta.DifferentialPath, tco.DefaultValue)
+				}
+				continue
 			}
 			target.defaultValue = encoded
 		}
@@ -69,8 +73,10 @@ func placeDefaultValues(c *Compiled, tc *aom14.TConstraint, strict bool) error {
 	return nil
 }
 
-// defaultValueTarget returns the first child of attr whose RM type is rmType,
-// the node a default value of that RM type is placed on, or the error that
+// defaultValueTarget returns the first child of attr whose RM type is
+// rmType, as written or with the child's generic parameters set aside, so
+// that DV_INTERVAL matches a DV_INTERVAL<DV_COUNT> child: the node a default
+// value of that RM type is placed on. Otherwise it returns the error that
 // says why there is none: attrErr, where the T_ATTRIBUTE addresses no
 // attribute, and otherwise that attr has no such child.
 func defaultValueTarget(attr *CompiledAttribute, attrErr error, rmType string) (*CompiledNode, error) {
@@ -81,7 +87,7 @@ func defaultValueTarget(attr *CompiledAttribute, attrErr error, rmType string) (
 		return nil, errors.New("neither the constraint object nor its default value names an RM type")
 	}
 	for _, child := range attr.children {
-		if child.rmTypeName == rmType {
+		if child.rmTypeName == rmType || bmmtype.Class(child.rmTypeName) == rmType {
 			return child, nil
 		}
 	}

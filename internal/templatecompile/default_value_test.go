@@ -147,9 +147,9 @@ func TestREQ111_DefaultValueIsACopy(t *testing.T) {
 // id nor a slash, or does not split into segments, or that reaches no node, no
 // attribute of its name or no child of its RM type. With Options.Strict it
 // refuses one, with an error wrapping ErrInvalidInput that names the place
-// and not the value. In both modes it refuses a value that does not encode as
-// canonical JSON, and a constraint with no default value places nothing and
-// is not read.
+// and not the value. It skips, and refuses with Options.Strict, a value that
+// does not encode as canonical JSON in the same way, and a constraint with no
+// default value places nothing and is not read.
 func TestREQ111_CompileSkipsADefaultValueThatAddressesNoNode(t *testing.T) {
 	const (
 		root    = "[openEHR-EHR-COMPOSITION.encounter.v1]"
@@ -167,8 +167,6 @@ func TestREQ111_CompileSkipsADefaultValueThatAddressesNoNode(t *testing.T) {
 		// wantMsg is what the strict mode's error names, "" when both
 		// modes place the value or the case has none.
 		wantMsg string
-		// refused is true when both modes refuse the value.
-		refused bool
 		// wantAt is the node that then carries the default value, if any.
 		wantAt string
 	}{
@@ -255,7 +253,14 @@ func TestREQ111_CompileSkipsADefaultValueThatAddressesNoNode(t *testing.T) {
 				a.Children[0].DefaultValue = &rm.DVQuantity{Magnitude: rm.Real(math.NaN()), Units: sentinel}
 			},
 			wantMsg: "*rm.DVQuantity does not encode",
-			refused: true,
+		},
+		{
+			name: "a value of an infinite magnitude",
+			edit: func(a *aom14.TAttribute) {
+				a.Children[0].RMTypeName = "DV_TEXT"
+				a.Children[0].DefaultValue = &rm.DVQuantity{Magnitude: rm.Real(math.Inf(-1)), Units: sentinel}
+			},
+			wantMsg: "*rm.DVQuantity does not encode",
 		},
 		{
 			name: "a constraint with no default value addresses nothing",
@@ -281,7 +286,7 @@ func TestREQ111_CompileSkipsADefaultValueThatAddressesNoNode(t *testing.T) {
 				target.Children[0].DefaultValue = &rm.DVText{Value: sentinel}
 				tc.edit(target)
 				c, err := templatecompile.Compile(model, templatecompile.Options{Strict: strict})
-				if tc.refused || (strict && tc.wantMsg != "") {
+				if strict && tc.wantMsg != "" {
 					if !errors.Is(err, templatecompile.ErrInvalidInput) {
 						t.Fatalf("Compile = %v; want an error wrapping ErrInvalidInput", err)
 					}
@@ -334,9 +339,10 @@ func TestREQ111_CompileSkipsADefaultValueThatAddressesNoNode(t *testing.T) {
 // /context/other_context[at0001], two CLUSTER archetype roots of one
 // archetype id, named Infusion pump and Ventilator, each over an ELEMENT
 // at0001; an ELEMENT at0002; two ELEMENTs at0003, named Smith and O'Brien;
-// and an ELEMENT at0004 whose value has a DV_COUNT and a DV_PROPORTION
-// alternative. Each ELEMENT's value is a DV_TEXT unless said otherwise, and
-// the definition declares a category.
+// an ELEMENT at0004 whose value has a DV_COUNT and a DV_PROPORTION
+// alternative; and an ELEMENT at0006 whose value is a DV_INTERVAL<DV_COUNT>.
+// Each ELEMENT's value is a DV_TEXT unless said otherwise, and the
+// definition declares a category.
 func placementModel() *aom14.OperationalTemplate {
 	named := func(name string) aom14.CAttribute {
 		return single("name", complexObject("DV_TEXT", "", single("value",
@@ -370,7 +376,16 @@ func placementModel() *aom14.OperationalTemplate {
 					element("at0003", "Smith", "DV_TEXT"),
 					element("at0003", "O'Brien", "DV_TEXT"),
 					element("at0004", "", "DV_COUNT", "DV_PROPORTION"),
+					element("at0006", "", "DV_INTERVAL<DV_COUNT>"),
 				))))))
+}
+
+// countInterval is a default value of RM type DV_INTERVAL, from one to five.
+func countInterval() *rm.DVInterval[rm.DVCount] {
+	return &rm.DVInterval[rm.DVCount]{
+		Lower: rm.DVCount{Magnitude: 1}, LowerIncluded: true,
+		Upper: rm.DVCount{Magnitude: 5}, UpperIncluded: true,
+	}
 }
 
 // TestREQ111_DefaultValuePlacementRules pins the placements of § REQ-111
@@ -379,8 +394,10 @@ func placementModel() *aom14.OperationalTemplate {
 // a slash from the definition's root; a segment's predicate may carry a
 // name, after a comma or in an and name/value clause, which selects the node
 // of that node id or archetype id whose template-level name it is, each run
-// of white space inside the predicate read as one space; and a constraint
-// object that names no RM type takes its default value's.
+// of white space inside the predicate read as one space; a constraint
+// object that names no RM type takes its default value's; and a child's
+// generic parameters are set aside when its RM type is matched, so
+// DV_INTERVAL matches DV_INTERVAL<DV_COUNT>.
 func TestREQ111_DefaultValuePlacementRules(t *testing.T) {
 	const (
 		root    = "[openEHR-EHR-COMPOSITION.model.v1]"
@@ -442,6 +459,18 @@ func TestREQ111_DefaultValuePlacementRules(t *testing.T) {
 		{
 			name: "a constraint object that names no RM type takes its default value's", path: root + items + "[at0004]",
 			value: &rm.DVProportion{Numerator: 1, Denominator: 2}, wantAt: atItems + "[at0004]/value", wantType: "DV_PROPORTION",
+		},
+		{
+			name: "a constraint object that names no RM type takes its default value's, a child's generic parameters set aside", path: root + items + "[at0006]",
+			value: countInterval(), wantAt: atItems + "[at0006]/value", wantType: "DV_INTERVAL<DV_COUNT>",
+		},
+		{
+			name: "a constraint object's RM type matched with a child's generic parameters set aside", path: root + items + "[at0006]",
+			rmType: "DV_INTERVAL", value: countInterval(), wantAt: atItems + "[at0006]/value", wantType: "DV_INTERVAL<DV_COUNT>",
+		},
+		{
+			name: "a constraint object that names the child's generic parameters", path: root + items + "[at0006]",
+			rmType: "DV_INTERVAL<DV_COUNT>", value: countInterval(), wantAt: atItems + "[at0006]/value", wantType: "DV_INTERVAL<DV_COUNT>",
 		},
 	}
 	for _, tc := range cases {
@@ -595,6 +624,34 @@ func TestREQ111_DefaultValueOnAMalformedPathAddressesNoNode(t *testing.T) {
 				t.Errorf("Compile(Strict) = %v; want an error wrapping ErrInvalidInput", err)
 			}
 		})
+	}
+}
+
+// TestREQ111_DefaultValueOfAnotherGenericParameterAddressesNoNode pins that
+// only a child's generic parameters are set aside when its RM type is
+// matched: a constraint object that names DV_INTERVAL<DV_QUANTITY> does not
+// match a DV_INTERVAL<DV_COUNT> child, so Compile skips its default value in
+// its default mode and refuses it with Options.Strict.
+func TestREQ111_DefaultValueOfAnotherGenericParameterAddressesNoNode(t *testing.T) {
+	model := placementModel()
+	model.Constraints = &aom14.TConstraint{Attributes: []aom14.TAttribute{{
+		DifferentialPath: "[openEHR-EHR-COMPOSITION.model.v1]/context/other_context[at0001]/items[at0006]",
+		RMAttributeName:  "value",
+		Children:         []aom14.TComplexObject{{RMTypeName: "DV_INTERVAL<DV_QUANTITY>", DefaultValue: countInterval()}},
+	}}}
+	c, err := templatecompile.Compile(model)
+	if err != nil {
+		t.Fatalf("Compile = %v; want the default value skipped", err)
+	}
+	if got := defaultValues(t, c); len(got) != 0 {
+		t.Errorf("default values placed = %v; want none", got)
+	}
+	_, err = templatecompile.Compile(model, templatecompile.Options{Strict: true})
+	if !errors.Is(err, templatecompile.ErrInvalidInput) {
+		t.Fatalf("Compile(Strict) = %v; want an error wrapping ErrInvalidInput", err)
+	}
+	if !strings.Contains(err.Error(), "DV_INTERVAL<DV_QUANTITY>") {
+		t.Errorf("Compile(Strict) error = %q; want it to name the RM type DV_INTERVAL<DV_QUANTITY>", err)
 	}
 }
 

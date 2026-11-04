@@ -78,11 +78,12 @@ const maxDepth = 128
 // template_id or no definition, when it holds an interval that closing
 // refuses ([template.NewMultiplicity]), a missing constraint object or
 // attribute, an ordinal symbol that is neither a DV_CODED_TEXT nor a
-// CODE_PHRASE, an item that is no primitive class held by pointer, a default
-// value that does not encode as canonical JSON, or constraint objects nested
-// more than 128 levels below the definition, when two nodes under different
-// attributes have the same AQL path, which is a defect in the template, and,
-// with [Options.Strict], for each value the paragraph above names. Nodes
+// CODE_PHRASE, an item that is no primitive class held by pointer, or
+// constraint objects nested more than 128 levels below the definition, when
+// two nodes under different attributes have the same AQL path, which is a
+// defect in the template, and, with [Options.Strict], for each value the
+// paragraph above names and a default value that does not encode as
+// canonical JSON, which Compile otherwise skips. Nodes
 // under one attribute that share a path (alternatives, or siblings with the
 // same node id) and the descendants of such nodes are admitted, and
 // [Compiled.NodeAt] resolves the path to the first one walked. Returns an

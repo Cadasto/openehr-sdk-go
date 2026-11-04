@@ -57,21 +57,30 @@ func TestREQ111_CompileReadsNilPrimitiveItemAsNoItem(t *testing.T) {
 	}
 }
 
-// TestREQ111_CompileRefusesNilDefaultValue pins that Compile refuses, in
-// both of its modes and with an error wrapping ErrInvalidInput, a default
-// value that is a nil pointer to a data value, which does not encode as
-// canonical JSON.
-func TestREQ111_CompileRefusesNilDefaultValue(t *testing.T) {
+// TestREQ111_CompileSkipsNilDefaultValue pins that Compile skips, in its
+// default mode, a default value that is a nil pointer to a data value, which
+// does not encode as canonical JSON, and refuses it with Options.Strict with
+// an error wrapping ErrInvalidInput.
+func TestREQ111_CompileSkipsNilDefaultValue(t *testing.T) {
 	m := modelOf(single("category", complexObject("DV_CODED_TEXT", "")))
 	m.Constraints = &aom14.TConstraint{Attributes: []aom14.TAttribute{{
 		DifferentialPath: "[openEHR-EHR-COMPOSITION.model.v1]",
 		RMAttributeName:  "category",
 		Children:         []aom14.TComplexObject{{RMTypeName: "DV_CODED_TEXT", DefaultValue: (*rm.DVCodedText)(nil)}},
 	}}}
-	for _, strict := range []bool{false, true} {
-		if _, err := templatecompile.Compile(m, templatecompile.Options{Strict: strict}); !errors.Is(err, templatecompile.ErrInvalidInput) {
-			t.Errorf("Compile(Strict: %t) error = %v, want an error wrapping ErrInvalidInput", strict, err)
-		}
+	c, err := templatecompile.Compile(m)
+	if err != nil {
+		t.Fatalf("Compile = %v, want the default value skipped", err)
+	}
+	n, err := c.NodeAt("/category")
+	if err != nil {
+		t.Fatalf("NodeAt(/category) = %v", err)
+	}
+	if dv := n.DefaultValue(); dv != nil {
+		t.Errorf("node /category carries the default value %#v; want none", dv)
+	}
+	if _, err := templatecompile.Compile(m, templatecompile.Options{Strict: true}); !errors.Is(err, templatecompile.ErrInvalidInput) {
+		t.Errorf("Compile(Strict) error = %v, want an error wrapping ErrInvalidInput", err)
 	}
 }
 
