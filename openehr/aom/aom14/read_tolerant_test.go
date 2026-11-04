@@ -225,13 +225,34 @@ func TestREQ111_ReaderReadsARootInAnotherNamespace(t *testing.T) {
 // another default namespace, the definition's among them, under a prefix bound
 // to another namespace, and under a prefix no declaration binds, which
 // encoding/xml reads as a namespace of that name. WithUnmatched reports
-// nothing. Strict mode refuses each as an element in a foreign namespace.
+// nothing. Strict mode refuses each as an element in a foreign namespace. A
+// prefix bound to another namespace that no element name carries keeps its
+// namespace, so that a type written with it, such as the xsd:string of an
+// assertion, reads as it is written.
 //
 // Can-fail control: read only a root element in another namespace so, and
-// the definition reads as missing and the item as no item.
+// the definition reads as missing and the item as no item; or read every
+// prefix bound to another namespace as the v1 one, and xsd:string names no
+// type.
 func TestREQ111_ReaderReadsAnElementInAnotherNamespace(t *testing.T) {
 	t.Parallel()
 	string2 := `<item xsi:type="C_STRING"><list>a</list><list>b</list></item>`
+	// A slot whose assertion holds an item typed xsd:string, and an item in
+	// another namespace, which makes the reader read the document a second
+	// time.
+	slot := func(item string) string {
+		return strings.Replace(definitionDoc(`<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>items</rm_attribute_name>`+
+			`<existence><lower>0</lower><upper>1</upper></existence><children xsi:type="ARCHETYPE_SLOT"><rm_type_name>CLUSTER</rm_type_name>`+
+			`<occurrences><lower>0</lower><upper_unbounded>true</upper_unbounded></occurrences><node_id>at0002</node_id><includes>`+
+			`<expression xsi:type="EXPR_BINARY_OPERATOR"><type>Boolean</type><operator>2007</operator><precedence_overridden>false</precedence_overridden>`+
+			`<left_operand xsi:type="EXPR_LEAF"><type>String</type><item xsi:type="xsd:string">archetype_id/value</item><reference_type>attribute</reference_type></left_operand>`+
+			`<right_operand xsi:type="EXPR_LEAF"><type>C_STRING</type><item xsi:type="C_STRING"><pattern>.*</pattern></item><reference_type>constraint</reference_type></right_operand>`+
+			`</expression></includes></children><children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>ELEMENT</rm_type_name><node_id>at0003</node_id>`+
+			`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>value</rm_attribute_name><existence><lower>0</lower><upper>1</upper></existence>`+
+			`<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>STRING</rm_type_name><node_id/>`+item+`</children></attributes></children>`+
+			`<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval><lower>0</lower><upper_unbounded>true</upper_unbounded></interval></cardinality>`+
+			`</attributes>`), `<template `, `<template xmlns:xsd="http://www.w3.org/2001/XMLSchema" `, 1)
+	}
 	cases := map[string]struct{ doc, want []byte }{
 		"foreign-namespaces.opt": {readerFixture(t, "foreign-namespaces.opt"), readerFixture(t, "foreign-namespaces.read.opt")},
 		"an item in another default namespace": {
@@ -245,6 +266,10 @@ func TestREQ111_ReaderReadsAnElementInAnotherNamespace(t *testing.T) {
 		"an item under a prefix no declaration binds": {
 			[]byte(itemDoc(`<g:item xsi:type="C_STRING"><g:list>a</g:list><list>b</list></g:item>`)),
 			[]byte(itemDoc(string2)),
+		},
+		"an item in another namespace beside a type a prefix bound to another names": {
+			[]byte(slot(`<item xmlns="urn:example" xsi:type="C_STRING"><list>a</list><list>b</list></item>`)),
+			[]byte(slot(string2)),
 		},
 	}
 	for name, tc := range cases {

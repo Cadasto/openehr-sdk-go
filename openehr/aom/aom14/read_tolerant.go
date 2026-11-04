@@ -151,8 +151,11 @@ type tolerantReading struct {
 	open  []*element
 	// inheriting holds the open elements that inherit, the innermost last.
 	inheriting []*element
-	edits      []edit
-	xsiFresh   string // a prefix the input does not use, once one is chosen
+	// prefixes are the prefixes the names of the elements of the input
+	// carry, once read.
+	prefixes map[string]bool
+	edits    []edit
+	xsiFresh string // a prefix the input does not use, once one is chosen
 	// failed is set where two edits a rendering makes overlap, which the
 	// reading does not make. The input is then left as it is, for the decode
 	// to refuse.
@@ -256,8 +259,10 @@ func (t *tolerantReading) start(tk xml.StartElement, off, end int) {
 		// An element in the namespace the AM Release-1.4 schemas declare
 		// reads as the element of that name in canonical XML's, and, in the
 		// default mode, so does one in a namespace of no openEHR schema, as
-		// the parser, which reads no namespace, reads it.
-		if a.Value == nsOpenEHRv2 || (!t.strict && isForeignNamespace(a.Value)) {
+		// the parser, which reads no namespace, reads it. A prefix no element
+		// name carries keeps its namespace, so that a type written with it,
+		// such as xsd:string, reads as written.
+		if a.Value == nsOpenEHRv2 || (!t.strict && isForeignNamespace(a.Value) && (prefix == "" || t.namesElements(prefix))) {
 			e.attrs[i].Value = canxml.NSDefault
 			e.dirty = true
 		}
@@ -1219,6 +1224,15 @@ func freshPrefix(data []byte) string {
 		n++
 	}
 	return "xsi" + strconv.Itoa(n)
+}
+
+// namesElements reports whether the name of an element of the input carries
+// prefix.
+func (t *tolerantReading) namesElements(prefix string) bool {
+	if t.prefixes == nil {
+		t.prefixes = elementPrefixes(t.data)
+	}
+	return t.prefixes[prefix]
 }
 
 // push binds prefix to uri where the reading stands.

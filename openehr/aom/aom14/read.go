@@ -108,7 +108,9 @@ const inputBufferMax = 4 << 20
 // as the element of that name in the http://schemas.openehr.org/v1 namespace,
 // since the parser reads no namespace: under another default namespace, under
 // a prefix bound to another namespace, and under a prefix no declaration
-// binds, which encoding/xml reads as a namespace of that name. It reads a
+// binds, which encoding/xml reads as a namespace of that name. A prefix bound
+// to another namespace that no element name carries keeps that namespace, so
+// that a type written with it, such as xsd:string, reads as written. It reads a
 // <definition> whose type names no class of the AOM 1.4 constraint model,
 // or a class other than C_ARCHETYPE_ROOT and C_COMPLEX_OBJECT, which a
 // definition cannot hold, as a C_COMPLEX_OBJECT leaf with the rm_type_name,
