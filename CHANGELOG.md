@@ -8,18 +8,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.45.0] - 2026-11-05
+
+Forty-fifth `v0.x` minor: the ADL 1.4 operational template model, a compile step that reads it in place of the deprecated OPT parser and reads every template the parser read, and typed failures for contribution and composition writes. **Breaking:** `templatecompile.Compile` takes the model, the `aom14` types follow the AOM 1.4 schema, canonical XML reads `Real` text and a repeated `Hash` key differently, `Accreditaton` is renamed, slot includes give patterns, and five template shapes no longer compile.
+
 ### Added
 
 - **The `aom14` package models the ADL 1.4 operational template: `ReadOperationalTemplate` reads an OPT within bounds, both canonical codecs write it back with nothing dropped, and `CQuantityItem` carries its units system and display name (REQ-176, PROBE-111).**
 - **The compiled template carries the template's default values (`CompiledNode.DefaultValue`) and a `C_CODE_REFERENCE` as `constraints.CodeReference`, which validation, generation, FLAT and the Web Template read as its code phrase constraint (REQ-111, REQ-103).**
+- **The operational template reader and compile step read every OPT `template.ParseOPT` read, as it read it, and refuse its weaker readings given `canxml.WithStrict` or the new `templatecompile.WithStrict` (REQ-111).**
 - **`canxml.WithMaxDepth` bounds a decode's element depth, and a document past it, or past encoding/xml's own limit, fails with a short error wrapping `canxml.ErrLimitExceeded` (REQ-108).**
 - **`contribution.UnmarshalSubmission` decodes a canonical-JSON Contribution_create body into a `Submission`, and a composition save or update the format cannot carry fails before any request with a typed `*composition.EncodeError` (REQ-130, REQ-173).**
 
 ### Changed
 
 - **Breaking: `templatecompile.Compile` takes an `*aom14.OperationalTemplate`, path lookup runs on the compiled template through `Compiled.Resolve`, and `template.NewMultiplicity` takes interval bounds (REQ-111, REQ-100).**
+- **Breaking: `CompiledNode.SlotIncludes` and `SlotExcludes`, and a slot's AQL path predicate, give each assertion's archetype-id pattern rather than its raw text (REQ-111).**
+- **Breaking: an OPT holding an integer past 32 bits, a `match_negated` of true, an infinite bound no integer meets, or a definition typed as a slot or constraint, or with no RM type, no longer compiles (REQ-111).**
 - **Breaking: the `aom14` types follow the AOM 1.4 schema: `CCodedText`, `COrdinal` and `CQuantity` take the schema's class names, an archetype's definition and ontology become interfaces, and a quantity item's magnitude a pointer (REQ-176).**
-- **Breaking: canonical XML reads `Real` text in the `xs:double` lexical space, refuses a repeated `Hash` key and an `xsi:type` prefix other than XML Schema's, and writes an archetype term's code as an attribute (REQ-056).**
+- **Breaking: canonical XML reads `Real` text in the `xs:double` lexical space, keeps a repeated `Hash` key's first entry, refuses an `xsi:type` prefix other than XML Schema's, and writes archetype term codes as attributes (REQ-056, REQ-170).**
 - **Breaking: `rm.TranslationDetails.Accreditaton` is renamed `Accreditation`, which canonical XML now writes before `other_details`, in ITS-XML order (REQ-041).**
 - **Canonical JSON writes a present empty `ITEM_LIST.items`, `ITEM_TREE.items` or `ITEM_TABLE.rows` as `[]`, the instance generator writes one the template requires by existence, and template validation reports it required when absent (REQ-052, REQ-102, REQ-107).**
 - **`CDate`, `CTime` and `CDateTime` compare a value and a range bound at the precision both share, as do the RM floor's interval check and the generator's interval ordering (REQ-103, REQ-112, REQ-107).**
