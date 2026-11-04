@@ -75,7 +75,8 @@ func failsInsideQuantity(err error) bool {
 // id on a constraint object the decode read as a C_COMPLEX_OBJECT, which it
 // skips: more archetype_id elements than archetype roots that hold one. A
 // check may find what tolerate then leaves as it is, which costs a second
-// reading that changes nothing; none misses what it looks for.
+// reading that changes nothing; none misses what it looks for. Each check
+// reads data once, so that what they cost grows with the size of data.
 func needsTolerance(data []byte, ot *OperationalTemplate, strict bool) bool {
 	var m modelFacts
 	m.walk(ot.Definition.Attributes)
@@ -164,83 +165,201 @@ func foreignRoot(data []byte) bool {
 // archetype_id, with a prefix or without. Text that reads so, in a comment
 // or a CDATA section, counts as well.
 func archetypeIDs(data []byte) int {
-	word := []byte("archetype_id")
 	n := 0
+	startTags(data, "archetype_id", func([]byte) bool {
+		n++
+		return true
+	})
+	return n
+}
+
+// startTags calls fn with each start tag in data whose local name is local,
+// with a prefix or without, from its `<` to its end (tagEnd), until fn
+// returns false. Text that reads so, in a comment or a CDATA section, counts
+// as well. It reads data once: it keeps the offset of the last `<` it has
+// passed, and where the name after it ends, rather than look back for them
+// at each match.
+func startTags(data []byte, local string, fn func(tag []byte) bool) {
+	word := []byte(local)
+	lt := -1  // the offset of the last '<' before i
+	brk := -1 // the offset of the first white space, '>' or '<' after lt, once read
 	for i := 0; ; {
 		j := bytes.Index(data[i:], word)
 		if j < 0 {
-			return n
+			return
 		}
 		j += i
+		if k := bytes.LastIndexByte(data[i:j], '<'); k >= 0 {
+			lt, brk = i+k, -1
+		}
 		i = j + len(word)
-		if j == 0 || i >= len(data) || !isTagEnd(data[i]) {
+		if lt < 0 || i >= len(data) || !isTagEnd(data[i]) {
 			continue
 		}
-		switch data[j-1] {
-		case '<':
-			n++
-		case ':':
-			if lt := bytes.LastIndexByte(data[:j], '<'); lt >= 0 && data[lt+1] != '/' && !bytes.ContainsAny(data[lt:j], " \t\r\n>") {
-				n++
+		switch {
+		case lt == j-1:
+		case data[j-1] == ':' && data[lt+1] != '/':
+			// The name carries a prefix: no white space or `>` stands between
+			// the `<` and the match.
+			if brk < 0 {
+				brk = len(data)
+				if k := bytes.IndexAny(data[lt+1:], " \t\r\n><"); k >= 0 {
+					brk = lt + 1 + k
+				}
 			}
+			if brk < j {
+				continue
+			}
+		default:
+			continue
 		}
+		end := tagEnd(data, lt)
+		if !fn(data[lt:end]) {
+			return
+		}
+		i = max(i, end)
 	}
 }
 
-// booleansHoldFlags reports whether each C_BOOLEAN in data is the type of an
-// element that holds a true_valid and a false_valid. A C_BOOLEAN anywhere
-// else, such as in text, reads as an element without them.
+// tagEnd returns the offset just past the start tag whose `<` stands at lt
+// in data: past the first `>` outside a quoted attribute value. A `<` ends it
+// before that, at its own offset, since no tag holds one, and so does the end
+// of data.
+func tagEnd(data []byte, lt int) int {
+	for i := lt + 1; ; {
+		k := bytes.IndexAny(data[i:], `<>"'`)
+		if k < 0 {
+			return len(data)
+		}
+		i += k
+		switch data[i] {
+		case '<':
+			return i
+		case '>':
+			return i + 1
+		}
+		quote := `"<`
+		if data[i] == '\'' {
+			quote = `'<`
+		}
+		k = bytes.IndexAny(data[i+1:], quote)
+		if k < 0 {
+			return len(data)
+		}
+		i += 1 + k
+		if data[i] == '<' {
+			return i
+		}
+		i++
+	}
+}
+
+// booleansHoldFlags reports whether each element whose start tag holds the
+// word C_BOOLEAN, as the type of a C_BOOLEAN item does, holds a true_valid
+// and a false_valid, with a prefix or without. A C_BOOLEAN anywhere else, such as in text or a comment, reads as an
+// element without them, and so does markup the walk does not read, such as a
+// document type with an internal subset. It walks the markup of data once,
+// keeping the open elements that hold the word on a stack.
 func booleansHoldFlags(data []byte) bool {
 	word := []byte("C_BOOLEAN")
-	for i := 0; ; {
-		j := bytes.Index(data[i:], word)
-		if j < 0 {
-			return true
-		}
-		j += i
-		i = j + len(word)
-		lt := bytes.LastIndexByte(data[:j], '<')
-		if lt < 0 || bytes.IndexByte(data[lt:j], '>') >= 0 {
-			return false
-		}
-		name := data[lt+1:]
-		if end := bytes.IndexAny(name, " \t\r\n/>"); end > 0 {
-			name = name[:end]
-		} else {
-			return false
-		}
-		gt := bytes.IndexByte(data[i:], '>')
-		if gt < 0 || data[i+gt-1] == '/' {
-			return false
-		}
-		content := data[i+gt+1:]
-		if end := bytes.Index(content, append([]byte("</"), name...)); end >= 0 {
-			content = content[:end]
-		}
-		if !opens(content, "true_valid") || !opens(content, "false_valid") {
-			return false
-		}
+	total := bytes.Count(data, word)
+	if total == 0 {
+		return true
 	}
+	// open holds the open elements whose start tag holds the word, the
+	// innermost last: the depth of each and the flags it holds.
+	type boolean struct {
+		depth int
+		seen  uint8
+	}
+	var open []boolean
+	depth, inTags := 0, 0
+	for i := 0; ; {
+		k := bytes.IndexByte(data[i:], '<')
+		if k < 0 {
+			break
+		}
+		lt := i + k
+		rest := data[lt+1:]
+		end := -1 // the offset just past the markup, -1 where it does not end
+		switch {
+		case bytes.HasPrefix(rest, []byte("!--")):
+			end = pastIndex(data, lt, "-->")
+		case bytes.HasPrefix(rest, []byte("![CDATA[")):
+			end = pastIndex(data, lt, "]]>")
+		case bytes.HasPrefix(rest, []byte("?")):
+			end = pastIndex(data, lt, "?>")
+		case bytes.HasPrefix(rest, []byte("!")), bytes.HasPrefix(rest, []byte("/")):
+			// A declaration or an end tag; a declaration that holds `[` or `<`
+			// is not read.
+			if k := bytes.IndexAny(rest, "<>["); k >= 0 && rest[k] == '>' {
+				end = lt + 1 + k + 1
+			}
+			if end < 0 || rest[0] == '!' {
+				break
+			}
+			if n := len(open); n > 0 && open[n-1].depth == depth {
+				if open[n-1].seen != seenTrueValid|seenFalseValid {
+					return false
+				}
+				open = open[:n-1]
+			}
+			depth--
+		default:
+			end = tagEnd(data, lt)
+			if data[end-1] != '>' {
+				return false
+			}
+			tag := data[lt:end]
+			self := tag[len(tag)-2] == '/'
+			if n := len(open); n > 0 {
+				name := tagName(tag)
+				if _, local, ok := bytes.Cut(name, []byte(":")); ok {
+					name = local
+				}
+				switch string(name) {
+				case "true_valid":
+					open[n-1].seen |= seenTrueValid
+				case "false_valid":
+					open[n-1].seen |= seenFalseValid
+				}
+			}
+			if c := bytes.Count(tag, word); c > 0 {
+				if self {
+					return false
+				}
+				inTags += c
+				open = append(open, boolean{depth: depth + 1})
+			}
+			if !self {
+				depth++
+			}
+		}
+		if end < 0 {
+			return false
+		}
+		i = end
+	}
+	return inTags == total && len(open) == 0
 }
 
-// opens reports whether content holds a start tag named local, with or
-// without a prefix.
-func opens(content []byte, local string) bool {
-	name := []byte(local)
-	for i := 0; ; {
-		j := bytes.Index(content[i:], name)
-		if j < 0 {
-			return false
-		}
-		j += i
-		i = j + len(name)
-		if j == 0 || (content[j-1] != '<' && content[j-1] != ':') || (i < len(content) && !isTagEnd(content[i])) {
-			continue // a longer name, or no name of an element
-		}
-		if lt := bytes.LastIndexByte(content[:j], '<'); lt >= 0 && content[lt+1] != '/' && !bytes.ContainsAny(content[lt:j], " \t\r\n>") {
-			return true
-		}
+// pastIndex returns the offset just past the first sep in data at or after
+// from, or -1 where data holds none there.
+func pastIndex(data []byte, from int, sep string) int {
+	k := bytes.Index(data[from:], []byte(sep))
+	if k < 0 {
+		return -1
 	}
+	return from + k + len(sep)
+}
+
+// tagName returns the name of tag, a start tag, as written, with its prefix.
+func tagName(tag []byte) []byte {
+	name := tag[1:]
+	if end := bytes.IndexAny(name, " \t\r\n/>"); end >= 0 {
+		name = name[:end]
+	}
+	return name
 }
 
 // isTagEnd reports whether c may follow the name of an element in its tag.
@@ -278,37 +397,54 @@ func hasBareType(data []byte) bool {
 // that of an element a number or a boolean is read from: list, lower, upper,
 // assumed_value, true_valid or false_valid. It looks at each slash: one
 // before `>` ends a start tag that closes its element, and one after `><`
-// opens the end tag of an element that holds nothing.
+// opens the end tag of an element that holds nothing. It reads data once,
+// keeping the last two `<` it has passed and the name of the start tag each
+// opens, once read.
 func hasEmptyValue(data []byte) bool {
+	last, before := tagStart{at: -1}, tagStart{at: -1}
 	for i := 0; ; {
-		j := bytes.IndexByte(data[i:], '/')
-		if j < 0 {
+		k := bytes.IndexAny(data[i:], "</")
+		if k < 0 {
 			return false
 		}
-		j += i
+		j := i + k
 		i = j + 1
+		if data[j] == '<' {
+			before, last = last, tagStart{at: j}
+			continue
+		}
 		switch {
 		case j+1 < len(data) && data[j+1] == '>':
-			if isValueName(startTagName(data[:j])) {
+			if isValueName(last.local(data)) {
 				return true
 			}
 		case j >= 2 && data[j-1] == '<' && data[j-2] == '>':
-			if isValueName(startTagName(data[:j-2])) {
+			if isValueName(before.local(data)) {
 				return true
 			}
 		}
 	}
 }
 
-// startTagName returns the local name of the start tag that head ends in, or
-// nil when head ends in no start tag: the name after the last `<`, without
-// its prefix.
-func startTagName(head []byte) []byte {
-	lt := bytes.LastIndexByte(head, '<')
-	if lt < 0 || lt+1 >= len(head) {
+// tagStart is a `<` of the input, at offset at, -1 for none, and the local
+// name of the start tag it opens, once read.
+type tagStart struct {
+	at   int
+	read bool
+	name []byte
+}
+
+// local returns the local name of the start tag s opens in data, or nil where
+// s opens none: the name after the `<`, without its prefix.
+func (s *tagStart) local(data []byte) []byte {
+	if s.read {
+		return s.name
+	}
+	s.read = true
+	if s.at < 0 || s.at+1 >= len(data) {
 		return nil
 	}
-	tag := head[lt+1:]
+	tag := data[s.at+1:]
 	if c := tag[0]; c == '/' || c == '!' || c == '?' {
 		return nil
 	}
@@ -318,6 +454,7 @@ func startTagName(head []byte) []byte {
 	if _, local, ok := bytes.Cut(tag, []byte(":")); ok {
 		tag = local
 	}
+	s.name = tag
 	return tag
 }
 

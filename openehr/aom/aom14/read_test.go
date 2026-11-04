@@ -16,10 +16,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
@@ -615,6 +617,148 @@ func TestREQ108_ReadOperationalTemplateReadsNoFurtherThanTheElementLimit(t *test
 	if deep > shallow+slack {
 		t.Errorf("refusing a left-out item 100 000 deep costs %.0f allocations, one %d deep %.0f; want at most %d more", deep, readElementLimit+1, shallow, slack)
 	}
+}
+
+// readCost returns the least time ReadOperationalTemplate takes to read doc
+// with opts over three runs, whatever it returns.
+func readCost(doc string, opts ...canxml.DecoderOption) time.Duration {
+	best := time.Duration(math.MaxInt64)
+	for range 3 {
+		start := time.Now()
+		_, _ = aom14.ReadOperationalTemplate(strings.NewReader(doc), opts...)
+		best = min(best, time.Since(start))
+	}
+	return best
+}
+
+// costCase is a document whose reading would cost the square of its size
+// were the reader to scan back, or through what it has done, once per match,
+// and a document of about its size whose reading does neither.
+type costCase struct {
+	name          string
+	doc, baseline string
+	modes         []string
+}
+
+// holdsLinearCost fails the test unless the reader reads each case's document,
+// in each of its modes, in at most ten times the time it takes to read its
+// baseline. A reader that scans back to the document's start once per match,
+// or through every edit it has made once per element, takes hundreds of times
+// as long on these sizes. The times are the least of three runs each, taken
+// one after the other, so that a load on the machine weighs on both alike.
+func holdsLinearCost(t *testing.T, cases []costCase) {
+	t.Helper()
+	const factor = 10
+	for _, tc := range cases {
+		for _, mode := range tc.modes {
+			opts := readModes[mode]
+			got, base := readCost(tc.doc, opts...), readCost(tc.baseline, opts...)
+			if got > factor*base {
+				t.Errorf("%s, %s mode: reading %d bytes takes %v, more than %d times the %v a baseline of %d bytes takes",
+					tc.name, mode, len(tc.doc), got, factor, base, len(tc.baseline))
+			}
+		}
+	}
+}
+
+// TestREQ108_ReadOperationalTemplateChecksInLinearTime pins that the checks
+// that decide whether a document needs a second reading cost time in
+// proportion to its size, each match costing about as much as the bytes
+// around it: an element-holding text of 50 000 slashes before a `>`, 20 000
+// names of archetype_id under a prefix in text, and a start tag that holds
+// C_BOOLEAN 20 000 times each read in about the time a document of that size
+// without them takes. It runs alone, since it times the reads.
+//
+// Can-fail control: find the start tag a match stands in by scanning back to
+// the last `<` once per match, and each document takes hundreds of times as
+// long as its baseline.
+func TestREQ108_ReadOperationalTemplateChecksInLinearTime(t *testing.T) {
+	inConcept := func(content string) string {
+		return readTemplateHead + `<concept>` + content + `</concept></template>`
+	}
+	// A C_BOOLEAN item that holds both its flags, so that the document needs no
+	// second reading for the item.
+	booleanItem := `<definition><rm_type_name>CLUSTER</rm_type_name><node_id>at0000</node_id>` +
+		`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>value</rm_attribute_name>` +
+		`<existence><lower>0</lower><upper>1</upper></existence><children xsi:type="C_PRIMITIVE_OBJECT">` +
+		`<rm_type_name>BOOLEAN</rm_type_name><node_id/><item xsi:type="C_BOOLEAN">` +
+		`<true_valid>true</true_valid><false_valid>true</false_valid></item></children></attributes></definition>`
+	// The root's name starts the name of none of its elements.
+	inRootTag := func(words string) string {
+		return `<OPERATIONAL_TEMPLATE xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ` +
+			`xsi:schemaLocation="` + words + `"><template_id><value>t</value></template_id>` + booleanItem + `</OPERATIONAL_TEMPLATE>`
+	}
+	holdsLinearCost(t, []costCase{
+		{
+			name:     "slashes before a > in an element's text",
+			doc:      inConcept(strings.Repeat("/>", 50_000)),
+			baseline: inConcept(strings.Repeat("a>", 50_000)),
+			modes:    []string{"default", "strict"},
+		},
+		{
+			name:     "archetype_id under a prefix in text",
+			doc:      inConcept(strings.Repeat(":archetype_id ", 20_000)),
+			baseline: inConcept(strings.Repeat("-archetype_id ", 20_000)),
+			modes:    []string{"default"},
+		},
+		{
+			name:     "C_BOOLEAN in one start tag",
+			doc:      inRootTag(strings.Repeat("C_BOOLEAN ", 20_000)),
+			baseline: inRootTag(strings.Repeat("X_BOOLEAN ", 20_000)),
+			modes:    []string{"default", "strict"},
+		},
+	})
+}
+
+// TestREQ108_ReadOperationalTemplateRewritesInLinearTime pins that the second
+// reading rewrites a document in time in proportion to its size, however
+// many elements it rewrites: 50 000 empty list entries of a C_INTEGER, 20 000
+// C_BOOLEAN items with an empty true_valid and false_valid, and 20 000
+// <children> typed with a primitive class each read in about the time a
+// document of that size that needs no rewrite takes. It runs alone, since it
+// times the reads.
+//
+// Can-fail control: let each rewritten element forget the edits made inside
+// it by scanning every edit made so far, or render its content by scanning
+// them all once for each member, and each document takes tens of times as
+// long as its baseline.
+func TestREQ108_ReadOperationalTemplateRewritesInLinearTime(t *testing.T) {
+	const head = `<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">` +
+		`<template_id><value>t</value></template_id><definition><rm_type_name>CLUSTER</rm_type_name><node_id>at0000</node_id>` +
+		`<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>items</rm_attribute_name>` +
+		`<existence><lower>0</lower><upper>1</upper></existence>` +
+		`<cardinality><is_ordered>true</is_ordered><is_unique>false</is_unique><interval><lower>0</lower><upper_unbounded>true</upper_unbounded></interval></cardinality>`
+	const tail = `</attributes></definition></template>`
+	integer := func(entries string) string {
+		return head + `<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>INTEGER</rm_type_name><node_id/>` +
+			`<item xsi:type="C_INTEGER">` + entries + `</item></children>` + tail
+	}
+	boolean := func(flags string) string {
+		return `<children xsi:type="C_PRIMITIVE_OBJECT"><item xsi:type="C_BOOLEAN">` + flags + `</item></children>`
+	}
+	leaf := func(class string) string {
+		return `<children xsi:type="` + class + `"><node_id/></children>`
+	}
+	holdsLinearCost(t, []costCase{
+		{
+			name:     "empty list entries of a C_INTEGER",
+			doc:      integer(strings.Repeat(`<list></list>`, 50_000)),
+			baseline: integer(strings.Repeat(`<list>1</list>`, 50_000)),
+			modes:    []string{"default", "strict"},
+		},
+		{
+			name:     "C_BOOLEAN items with empty flags",
+			doc:      head + strings.Repeat(boolean(`<true_valid/><false_valid/>`), 20_000) + tail,
+			baseline: head + strings.Repeat(boolean(`<true_valid>1</true_valid><false_valid>1</false_valid>`), 20_000) + tail,
+			modes:    []string{"default"},
+		},
+		{
+			name:     "<children> typed with a primitive class",
+			doc:      head + strings.Repeat(leaf("C_STRING"), 20_000) + tail,
+			baseline: head + strings.Repeat(leaf("C_COMPLEX_OBJECT"), 20_000) + tail,
+			modes:    []string{"default"},
+		},
+	})
 }
 
 // TestREQ108_ReadOperationalTemplateRefusesADeepElementAfterTheRoot pins that

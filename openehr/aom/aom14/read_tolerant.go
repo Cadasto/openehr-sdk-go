@@ -66,6 +66,7 @@ type element struct {
 	name   xml.Name   // as written: Space holds the prefix
 	attrs  []xml.Attr // as written, but for the rewrites of the reading
 	off    int        // the offset of its start tag
+	mark   int        // the number of edits the reading had made when it opened
 	tagEnd int        // the offset just past its start tag
 	endTag int        // the offset of its end tag, or tagEnd when its start tag closes it
 	end    int        // the offset just past it
@@ -114,10 +115,12 @@ type rangeSide struct {
 	bound, unbounded, included *element
 }
 
-// edit replaces the bytes off to end of the input with text.
+// edit replaces the bytes off to end of the input with text, unless an edit
+// of an element that holds them has replaced it since (dead).
 type edit struct {
 	off, end int
 	text     string
+	dead     bool
 }
 
 // binding is a namespace declaration in scope.
@@ -221,6 +224,7 @@ func (t *tolerantReading) start(tk xml.StartElement, off, end int) {
 		tagEnd: end,
 		self:   bytes.HasSuffix(t.data[off:end], []byte("/>")),
 		scope:  len(t.scope),
+		mark:   len(t.edits),
 		typeAt: -1,
 		bareAt: -1,
 	}
@@ -675,7 +679,7 @@ func (t *tolerantReading) holdsQuantity(e *element) bool {
 		b.WriteString("/>")
 	} else {
 		b.WriteByte('>')
-		b.Write(t.render(e.tagEnd, e.endTag))
+		b.Write(t.render(e.mark, e.tagEnd, e.endTag))
 		b.WriteString("</" + qualified(e.name) + ">")
 	}
 	b.WriteString("</holder>")
@@ -858,17 +862,21 @@ func (t *tolerantReading) wrapMembers(p *element) {
 		p.insert = slices.Concat([]byte(open), p.insert, []byte(end))
 		return
 	}
+	// The spans the members cut p's content into follow one another, so one
+	// pass over the edits made inside p, in the order of their offsets,
+	// renders them all.
+	edits := t.editsIn(p.mark, p.tagEnd, p.endTag)
 	var before, inside []byte
 	pos := p.tagEnd
 	for _, m := range p.members {
 		if !isObjectMember(m.name.Local) {
 			continue
 		}
-		inside = append(inside, t.render(pos, m.off)...)
-		before = append(before, t.render(m.off, m.end)...)
+		inside = t.renderSpan(inside, &edits, pos, m.off)
+		before = t.renderSpan(before, &edits, m.off, m.end)
 		pos = m.end
 	}
-	inside = append(inside, t.render(pos, p.endTag)...)
+	inside = t.renderSpan(inside, &edits, pos, p.endTag)
 	t.drop(p)
 	t.add(p.tagEnd, p.endTag, string(before)+open+string(inside)+string(p.insert)+end)
 	p.insert = nil
@@ -913,21 +921,41 @@ func inheritDeclarations(e, parent *element) {
 }
 
 // render returns the input from off to end with the edits made that start
-// there.
-func (t *tolerantReading) render(off, end int) []byte {
+// there, of those made since the reading made mark edits: the span of an
+// element the reading opened when it had made mark edits, which no edit made
+// before it touches.
+func (t *tolerantReading) render(mark, off, end int) []byte {
+	edits := t.editsIn(mark, off, end)
+	return t.renderSpan(nil, &edits, off, end)
+}
+
+// editsIn returns the live edits made since the reading made mark edits that
+// start from off to end, in the order of their offsets, and in the order the
+// reading made them where two start alike.
+func (t *tolerantReading) editsIn(mark, off, end int) []edit {
 	var edits []edit
-	for _, d := range t.edits {
-		if d.off >= off && d.off < end {
+	for _, d := range t.edits[mark:] {
+		if !d.dead && d.off >= off && d.off < end {
 			edits = append(edits, d)
 		}
 	}
 	slices.SortStableFunc(edits, func(a, b edit) int { return cmp.Compare(a.off, b.off) })
-	var out []byte
-	pos := off
-	for _, d := range edits {
+	return edits
+}
+
+// renderSpan appends to out the input from off to end with the edits that
+// start there made, which it takes off the front of *edits, edits in the
+// order of their offsets of which none starts before off. Two edits that
+// overlap, which the reading does not make, set t.failed, and the span is
+// then appended as it is.
+func (t *tolerantReading) renderSpan(out []byte, edits *[]edit, off, end int) []byte {
+	start, pos := len(out), off
+	for len(*edits) > 0 && (*edits)[0].off < end {
+		d := (*edits)[0]
+		*edits = (*edits)[1:]
 		if d.off < pos || d.end > end {
 			t.failed = true
-			return t.data[off:end]
+			return append(out[:start], t.data[off:end]...)
 		}
 		out = append(out, t.data[pos:d.off]...)
 		out = append(out, d.text...)
@@ -986,9 +1014,14 @@ func (t *tolerantReading) leaveOut(e *element) {
 }
 
 // drop forgets the edits that start inside e, which an edit of the whole of
-// e replaces.
+// e replaces. Only an edit made since e opened starts there, so it reads no
+// edit made before.
 func (t *tolerantReading) drop(e *element) {
-	t.edits = slices.DeleteFunc(t.edits, func(d edit) bool { return d.off >= e.off && d.off < e.end })
+	for i := e.mark; i < len(t.edits); i++ {
+		if d := &t.edits[i]; d.off >= e.off && d.off < e.end {
+			d.dead = true
+		}
+	}
 }
 
 // add records an edit.
@@ -1105,14 +1138,15 @@ func (t *tolerantReading) isOpenEHR(name xml.Name) bool {
 // apply returns the input with the edits made, or the input as it is and
 // false should two edits overlap, which the reading does not make.
 func (t *tolerantReading) apply() ([]byte, bool) {
-	slices.SortStableFunc(t.edits, func(a, b edit) int { return cmp.Compare(a.off, b.off) })
+	edits := slices.DeleteFunc(t.edits, func(d edit) bool { return d.dead })
+	slices.SortStableFunc(edits, func(a, b edit) int { return cmp.Compare(a.off, b.off) })
 	size := len(t.data)
-	for _, d := range t.edits {
+	for _, d := range edits {
 		size += len(d.text) - (d.end - d.off)
 	}
 	out := make([]byte, 0, size)
 	pos := 0
-	for _, d := range t.edits {
+	for _, d := range edits {
 		if d.off < pos {
 			return t.data, false
 		}
