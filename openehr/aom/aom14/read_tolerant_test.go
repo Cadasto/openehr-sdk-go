@@ -349,6 +349,15 @@ func TestREQ111_ReaderReadsARootInAnotherNamespace(t *testing.T) {
 func TestREQ111_ReaderReadsAnElementInAnotherNamespace(t *testing.T) {
 	t.Parallel()
 	string2 := `<item xsi:type="C_STRING"><list>a</list><list>b</list></item>`
+	// A template whose definition's value attribute holds children.
+	value := func(children string) string {
+		return definitionDoc(`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>value</rm_attribute_name>` +
+			`<existence><lower>0</lower><upper>1</upper></existence>` + children + `</attributes>`)
+	}
+	const (
+		integerMembers  = `<rm_type_name>INTEGER</rm_type_name><occurrences><lower>1</lower><upper>1</upper></occurrences><node_id/>`
+		quantityMembers = `<rm_type_name>DV_QUANTITY</rm_type_name><occurrences><lower>1</lower><upper>1</upper></occurrences><node_id/>`
+	)
 	// A slot whose assertion holds an item typed xsd:string, and an item in
 	// another namespace, which makes the reader read the document a second
 	// time.
@@ -375,6 +384,23 @@ func TestREQ111_ReaderReadsAnElementInAnotherNamespace(t *testing.T) {
 		"an item in the XSI namespace declared as the default one": {
 			[]byte(itemDoc(`<item xmlns="http://www.w3.org/2001/XMLSchema-instance" xsi:type="C_STRING"><list>a</list><xsi:list>b</xsi:list></item>`)),
 			[]byte(itemDoc(string2)),
+		},
+		// The reading writes the flag it fills and the one it adds without the
+		// prefix, as it writes the item.
+		"a C_BOOLEAN item with an empty flag under the prefix of the xsi:type attributes": {
+			[]byte(itemDoc(`<xsi:item xsi:type="C_BOOLEAN"><xsi:true_valid></xsi:true_valid></xsi:item>`)),
+			[]byte(itemDoc(`<item xsi:type="C_BOOLEAN"><true_valid>true</true_valid><false_valid>true</false_valid></item>`)),
+		},
+		// The reading writes the item of a <children> typed with a primitive
+		// class, and the included flag of a bound it rounds, without the prefix.
+		"a <children> typed C_INTEGER under the prefix of the xsi:type attributes": {
+			[]byte(value(`<xsi:children xsi:type="C_INTEGER">` + integerMembers + `<xsi:range><xsi:lower>1.5</xsi:lower><upper>9</upper></xsi:range></xsi:children>`)),
+			[]byte(value(`<children xsi:type="C_PRIMITIVE_OBJECT">` + integerMembers +
+				`<item xsi:type="C_INTEGER"><range><lower_included>true</lower_included><lower>2</lower><upper>9</upper></range></item></children>`)),
+		},
+		"a quantity's assumed value under the prefix of the xsi:type attributes": {
+			[]byte(value(`<children xsi:type="C_DV_QUANTITY">` + quantityMembers + `<xsi:assumed_value><magnitude>1</magnitude><units>kg</units></xsi:assumed_value></children>`)),
+			[]byte(value(`<children xsi:type="C_DV_QUANTITY">` + quantityMembers + `<assumed_value><magnitude>1</magnitude><units>kg</units></assumed_value></children>`)),
 		},
 		"an item in another default namespace": {
 			[]byte(itemDoc(`<item xmlns="urn:example" xsi:type="C_STRING"><list>a</list><list>b</list></item>`)),

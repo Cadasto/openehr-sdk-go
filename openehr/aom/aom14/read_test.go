@@ -814,6 +814,7 @@ func TestREQ108_ReadOperationalTemplateChecksInLinearTime(t *testing.T) {
 // many elements it rewrites and however many namespaces it declares: 50 000
 // empty list entries of a C_INTEGER, 20 000 C_BOOLEAN items with an empty
 // true_valid and false_valid, 20 000 <children> typed with a primitive class,
+// 40 000 node ids in the XSI namespace, each written without its prefix,
 // 20 000 <children> with no type under 20 000 namespace declarations, 2 000
 // quantities whose assumed value the model cannot hold under 2 000
 // declarations, an item typed C_PRIMITIVE_OBJECT that declares 4 000
@@ -822,13 +823,14 @@ func TestREQ108_ReadOperationalTemplateChecksInLinearTime(t *testing.T) {
 // that needs no rewrite, or that needs one but holds none of these. It runs
 // alone, since it times the reads.
 //
-// Can-fail control: let each rewritten element forget the edits made inside
-// it by scanning every edit made so far, render its content by scanning them
-// all once for each member, look a prefix up by scanning back through every
-// declaration in scope, bind every prefix in scope around each assumed value
-// it checks, copy every declaration of an item it takes off to each element
-// the item holds, or try one fresh prefix after another against the whole
-// input, and the documents take tens of times as long as their baselines.
+// Can-fail control: let each rewritten element, or each element written
+// without its prefix, forget the edits made inside it by scanning every edit
+// made so far, render its content by scanning them all once for each member,
+// look a prefix up by scanning back through every declaration in scope, bind
+// every prefix in scope around each assumed value it checks, copy every
+// declaration of an item it takes off to each element the item holds, or try
+// one fresh prefix after another against the whole input, and the documents
+// take tens of times as long as their baselines.
 func TestREQ108_ReadOperationalTemplateRewritesInLinearTime(t *testing.T) {
 	declarations := func(n int) string {
 		var b strings.Builder
@@ -893,6 +895,12 @@ func TestREQ108_ReadOperationalTemplateRewritesInLinearTime(t *testing.T) {
 			name:     "<children> typed with a primitive class",
 			doc:      head + strings.Repeat(leaf("C_STRING"), 20_000) + tail,
 			baseline: head + strings.Repeat(leaf("C_COMPLEX_OBJECT"), 20_000) + tail,
+			modes:    []string{"default"},
+		},
+		{
+			name:     "node ids in the XSI namespace",
+			doc:      head + strings.Repeat(`<children xsi:type="C_COMPLEX_OBJECT"><xsi:node_id>at1</xsi:node_id></children>`, 40_000) + tail,
+			baseline: head + strings.Repeat(`<children xsi:type="C_COMPLEX_OBJECT"><node_id>at1</node_id></children>`, 40_000) + tail,
 			modes:    []string{"default"},
 		},
 		{

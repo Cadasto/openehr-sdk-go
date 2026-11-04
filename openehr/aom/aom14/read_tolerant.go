@@ -81,7 +81,11 @@ type element struct {
 	typeAt int    // the index in attrs of its xsi:type, or -1
 	bareAt int    // the index in attrs of a bare type attribute, or -1
 	retype string // the xsi:type the reading gives it, or ""
-	dirty  bool   // attrs differ from the input
+	dirty  bool   // its start tag differs from the input: attrs, or its name
+	// renamed is an element the default mode writes without the prefix of
+	// its name (written), in the default namespace, which is none or
+	// canonical XML's there.
+	renamed bool
 	// untyped is an attribute or object that names no type in the XSI
 	// namespace, which the reading types when it closes.
 	untyped bool
@@ -316,8 +320,11 @@ func (t *tolerantReading) start(tk xml.StartElement, off, end int) {
 		// default mode, so does one in a namespace of no openEHR schema, as
 		// the parser, which reads no namespace, reads it. A prefix no element
 		// name carries keeps its namespace, so that a type written with it,
-		// such as xsd:string, reads as written.
-		if a.Value == nsOpenEHRv2 || (!t.strict && isForeignNamespace(a.Value) && (prefix == "" || t.namesElements(prefix))) {
+		// such as xsd:string, reads as written, and so does one bound to the
+		// XSI namespace, which the xsi:type attributes use: an element under
+		// it is renamed instead (below).
+		if a.Value == nsOpenEHRv2 || (!t.strict && isForeignNamespace(a.Value) &&
+			(prefix == "" || (a.Value != canxml.NSXSI && t.namesElements(prefix)))) {
 			e.attrs[i].Value = canxml.NSDefault
 			e.dirty = true
 		}
@@ -330,6 +337,16 @@ func (t *tolerantReading) start(tk xml.StartElement, off, end int) {
 			e.attrs = append(e.attrs, xml.Attr{Name: xml.Name{Space: "xmlns", Local: p}, Value: canxml.NSDefault})
 			e.dirty = true
 			t.push(p, canxml.NSDefault)
+		}
+	}
+	// An element under a prefix bound to the XSI namespace reads, in the
+	// default mode, as the element of that name in canonical XML's, as the
+	// parser, which matches an element by its local name, reads it: it is
+	// written without its prefix, in the default namespace, which the
+	// default mode reads as canonical XML's (isForeignNamespace).
+	if p := e.name.Space; !t.strict && p != "" {
+		if uri, _ := t.lookup(p); uri == canxml.NSXSI {
+			e.renamed, e.dirty = true, true
 		}
 	}
 	for i, a := range e.attrs {
@@ -356,7 +373,7 @@ func (t *tolerantReading) start(tk xml.StartElement, off, end int) {
 	if n := len(t.inheriting); n > 0 {
 		t.inheriting[n-1].useNames(e)
 	}
-	if parent != nil && t.isOpenEHR(e.name) {
+	if parent != nil && (e.renamed || t.isOpenEHR(e.name)) {
 		e.role = t.roleOf(parent, e)
 		if parent.wrap {
 			parent.members = append(parent.members, e)
@@ -851,7 +868,7 @@ func (t *tolerantReading) holdsQuantity(e *element) bool {
 	} else {
 		frag.WriteByte('>')
 		frag.Write(t.render(e.mark, e.tagEnd, e.endTag))
-		frag.WriteString("</" + qualified(e.name) + ">")
+		frag.WriteString(e.closing())
 	}
 	var b bytes.Buffer
 	b.WriteString("<holder")
@@ -1030,7 +1047,7 @@ func (t *tolerantReading) includeSide(r *element, i int, force bool) {
 	}
 	switch {
 	case included == nil:
-		r.insert = appendElement(r.insert, r.name.Space, name, "true")
+		r.insert = appendElement(r.insert, r.written().Space, name, "true")
 	case included.nested:
 	case force || isBlank(included.text):
 		t.setText(included, "true")
@@ -1054,10 +1071,10 @@ func boundaryFlag(e *element) (written, value bool) {
 func (t *tolerantReading) closeItem(p *element) {
 	if p.class == "C_BOOLEAN" {
 		if p.seen&seenTrueValid == 0 {
-			p.insert = appendElement(p.insert, p.name.Space, "true_valid", "true")
+			p.insert = appendElement(p.insert, p.written().Space, "true_valid", "true")
 		}
 		if p.seen&seenFalseValid == 0 {
-			p.insert = appendElement(p.insert, p.name.Space, "false_valid", "true")
+			p.insert = appendElement(p.insert, p.written().Space, "false_valid", "true")
 		}
 	}
 	if p.wrap {
@@ -1072,7 +1089,7 @@ func (t *tolerantReading) closeItem(p *element) {
 // the reading adds to p. p's start tag then reads as a C_PRIMITIVE_OBJECT.
 // The members the item holds have their paths in it.
 func (t *tolerantReading) wrapMembers(p *element) {
-	name := qualified(xml.Name{Space: p.name.Space, Local: "item"})
+	name := qualified(xml.Name{Space: p.written().Space, Local: "item"})
 	open := "<" + name + " " + qualified(p.attrs[p.typeAt].Name) + `="` + p.class + `">`
 	end := "</" + name + ">"
 	if p.self {
@@ -1117,11 +1134,12 @@ func (t *tolerantReading) unwrapItem(e *element) {
 	t.add(e.endTag, e.end, "")
 }
 
-// useNames adds to e.uses the prefixes the name of x, and the names of its
-// attributes but its namespace declarations, carry, the default namespace's
-// "" for a name without one.
+// useNames adds to e.uses the prefixes the name of x, as written and as the
+// reading writes it, and the names of its attributes but its namespace
+// declarations, carry, the default namespace's "" for a name without one.
 func (e *element) useNames(x *element) {
 	e.uses[x.name.Space] = true
+	e.uses[x.written().Space] = true
 	for _, a := range x.attrs {
 		if !isDeclaration(a.Name) && a.Name.Space != "" {
 			e.uses[a.Name.Space] = true
@@ -1214,14 +1232,17 @@ func (t *tolerantReading) closeTag(e *element) {
 	tag := t.startTag(e)
 	switch {
 	case e.self && len(e.insert) > 0:
-		t.add(e.off, e.end, tag+">"+string(e.insert)+"</"+qualified(e.name)+">")
+		t.add(e.off, e.end, tag+">"+string(e.insert)+e.closing())
 	case e.self:
 		t.add(e.off, e.end, tag+"/>")
 	default:
 		if e.dirty || e.retype != "" {
 			t.add(e.off, e.tagEnd, tag+">")
 		}
-		if len(e.insert) > 0 {
+		switch {
+		case e.renamed:
+			t.add(e.endTag, e.end, string(e.insert)+e.closing())
+		case len(e.insert) > 0:
 			t.add(e.endTag, e.endTag, string(e.insert))
 		}
 	}
@@ -1232,11 +1253,15 @@ func (t *tolerantReading) setText(e *element, text string) {
 	t.drop(e)
 	tag := t.startTag(e)
 	if e.self {
-		t.add(e.off, e.end, tag+">"+text+"</"+qualified(e.name)+">")
+		t.add(e.off, e.end, tag+">"+text+e.closing())
 		return
 	}
 	if e.dirty {
 		t.add(e.off, e.tagEnd, tag+">")
+	}
+	if e.renamed {
+		t.add(e.tagEnd, e.end, text+e.closing())
+		return
 	}
 	t.add(e.tagEnd, e.endTag, text)
 }
@@ -1287,7 +1312,7 @@ func (t *tolerantReading) startTag(e *element) string {
 		}
 	}
 	var b bytes.Buffer
-	b.WriteString("<" + qualified(e.name))
+	b.WriteString("<" + qualified(e.written()))
 	for _, a := range attrs {
 		b.WriteString(" " + qualified(a.Name) + `="`)
 		_ = xml.EscapeText(&b, []byte(a.Value)) // a bytes.Buffer does not fail
@@ -1372,12 +1397,12 @@ func (t *tolerantReading) lookup(prefix string) (string, bool) {
 }
 
 // isForeignNamespace reports whether the default mode reads uri, the
-// namespace of an element, as canonical XML's: a namespace other than none,
-// canonical XML's, the one the AM Release-1.4 schemas declare and the XSI
-// one, whose xsi:type attributes would otherwise read as none.
+// namespace of an element, as canonical XML's, as every mode reads the one
+// the AM Release-1.4 schemas declare: a namespace other than none, canonical
+// XML's and that one, the XSI one among them.
 func isForeignNamespace(uri string) bool {
 	switch uri {
-	case "", canxml.NSDefault, nsOpenEHRv2, canxml.NSXSI:
+	case "", canxml.NSDefault, nsOpenEHRv2:
 		return false
 	}
 	return true
@@ -1414,6 +1439,20 @@ func (t *tolerantReading) apply() ([]byte, bool) {
 		pos = d.end
 	}
 	return append(out, t.data[pos:]...), true
+}
+
+// written returns the name the reading writes e with: its name as written,
+// or its local name alone where renamed.
+func (e *element) written() xml.Name {
+	if e.renamed {
+		return xml.Name{Local: e.name.Local}
+	}
+	return e.name
+}
+
+// closing returns the end tag the reading writes e with.
+func (e *element) closing() string {
+	return "</" + qualified(e.written()) + ">"
 }
 
 // xsiType returns the value of the xsi:type of e, and whether it has one.

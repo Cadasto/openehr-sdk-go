@@ -107,20 +107,22 @@ const inputBufferMax = 4 << 20
 //     C_DV_QUANTITY that holds no number, as absent, the side unbounded.
 //
 // Without [canxml.WithStrict] it also reads an element in a namespace other
-// than none, those two and the XML Schema instance one, the root among them,
-// as the element of that name in the http://schemas.openehr.org/v1 namespace,
-// since the parser reads no namespace: under another default namespace, under
-// a prefix bound to another namespace, and under a prefix no declaration
-// binds, which encoding/xml reads as a namespace of that name. A prefix bound
-// to another namespace that no element name carries keeps that namespace, so
-// that a type written with it, such as xsd:string, reads as written. It reads a
-// <definition> whose type names no class of the AOM 1.4 constraint model,
-// or a class other than C_ARCHETYPE_ROOT and C_COMPLEX_OBJECT, which a
-// definition cannot hold, but those it refuses in every mode (below), as a
-// C_COMPLEX_OBJECT leaf with the rm_type_name, node_id and occurrences it
-// holds and none of its other members, such as its attributes, archetype id
-// and term definitions, as it reads such a <children>. And, inside the
-// definition, it reads:
+// than none and those two, the root and the XML Schema instance one among
+// them, as the element of that name in the http://schemas.openehr.org/v1
+// namespace, since the parser reads no namespace: under another default
+// namespace, under a prefix bound to another namespace, the xsi of the
+// xsi:type attributes among them, and under a prefix no declaration binds,
+// which encoding/xml reads as a namespace of that name. A prefix bound to the
+// XML Schema instance namespace keeps it, so that an xsi:type reads as one,
+// and so does a prefix bound to another namespace that no element name
+// carries, so that a type written with it, such as xsd:string, reads as
+// written. It reads a <definition> whose type names no class of the AOM 1.4
+// constraint model, or a class other than C_ARCHETYPE_ROOT and
+// C_COMPLEX_OBJECT, which a definition cannot hold, but those it refuses in
+// every mode (below), as a C_COMPLEX_OBJECT leaf with the rm_type_name,
+// node_id and occurrences it holds and none of its other members, such as its
+// attributes, archetype id and term definitions, as it reads such a
+// <children>. And, inside the definition, it reads:
 //
 //   - an <attributes>, a <children> or the <item> of a C_PRIMITIVE_OBJECT
 //     that names no type in the XML Schema instance namespace, none, an
