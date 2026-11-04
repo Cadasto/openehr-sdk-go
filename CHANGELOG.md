@@ -10,13 +10,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- **`aom14.CQuantityItem` carries `UnitsSystem` and `UnitsDisplayName`, AOM 1.4 generic List members decode from canonical XML, and the vendored ITS-XML schemas add the AM Release-1.4 `Template.xsd` (REQ-041, REQ-056).**
+- **The `aom14` package models the ADL 1.4 operational template: `ReadOperationalTemplate` reads an OPT within bounds, both canonical codecs write it back with nothing dropped, and `CQuantityItem` carries its units system and display name (REQ-176, PROBE-111).**
+- **The compiled template carries the template's default values (`CompiledNode.DefaultValue`) and a `C_CODE_REFERENCE` as `constraints.CodeReference`, which validation, generation, FLAT and the Web Template read as its code phrase constraint (REQ-111, REQ-103).**
+- **`canxml.WithMaxDepth` bounds a decode's element depth, and a document past it, or past encoding/xml's own limit, fails with a short error wrapping `canxml.ErrLimitExceeded` (REQ-108).**
+- **`contribution.UnmarshalSubmission` decodes a canonical-JSON Contribution_create body into a `Submission`, and a composition save or update the format cannot carry fails before any request with a typed `*composition.EncodeError` (REQ-130, REQ-173).**
 
 ### Changed
 
-- **Breaking: canonical XML reads `Real` element text in the `xs:double` lexical space, refusing spellings Go's float parser accepted, such as hexadecimal, digit separators and `Inf` (REQ-056).**
+- **Breaking: `templatecompile.Compile` takes an `*aom14.OperationalTemplate`, path lookup runs on the compiled template through `Compiled.Resolve`, and `template.NewMultiplicity` takes interval bounds (REQ-111, REQ-100).**
+- **Breaking: the `aom14` types follow the AOM 1.4 schema: `CCodedText`, `COrdinal` and `CQuantity` take the schema's class names, an archetype's definition and ontology become interfaces, and a quantity item's magnitude a pointer (REQ-176).**
+- **Breaking: canonical XML reads `Real` text in the `xs:double` lexical space, refuses a repeated `Hash` key and an `xsi:type` prefix other than XML Schema's, and writes an archetype term's code as an attribute (REQ-056).**
+- **Breaking: `rm.TranslationDetails.Accreditaton` is renamed `Accreditation`, which canonical XML now writes before `other_details`, in ITS-XML order (REQ-041).**
 - **Canonical JSON writes a present empty `ITEM_LIST.items`, `ITEM_TREE.items` or `ITEM_TABLE.rows` as `[]`, the instance generator writes one the template requires by existence, and template validation reports it required when absent (REQ-052, REQ-102, REQ-107).**
+- **`CDate`, `CTime` and `CDateTime` compare a value and a range bound at the precision both share, as do the RM floor's interval check and the generator's interval ordering (REQ-103, REQ-112, REQ-107).**
 - **`template.ParseOPT` reads `timezone_validity` as a `VALIDITY_KIND` word, which strict mode refused and lenient mode misread for two words, or as the code 1001 to 1003 (REQ-103).**
+- **A stored query's `Location` decodes each name and version segment once, so a name holding a literal `%` comes back as stored (REQ-057).**
+- **`bmm.LoadAll` settles a class that several includes reach whatever their order, the schema descending from the others winning, and otherwise returns `ErrSchemaConflict` (REQ-045).**
+- **The minimum `go-jose/v4` moves to v4.1.7, which fixes five security advisories, among them denial of service and panics on crafted JOSE input.**
+
+### Deprecated
+
+- **`template.ParseOPT` and its tree: read an OPT with `aom14.ReadOperationalTemplate` and compile it with `templatecompile.Compile`; a later release removes them (REQ-100, REQ-111).**
 
 ## [0.44.0] - 2026-10-30
 
