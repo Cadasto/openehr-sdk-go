@@ -27,6 +27,13 @@ type Options struct {
 	// declared. Useful for tests and for round-trip serialisation
 	// that needs to preserve the OPT's explicit-only shape.
 	SkipImplicitAttributes bool
+
+	// Strict refuses, with an error wrapping ErrInvalidInput, each value
+	// Compile otherwise reads in the weaker form the deprecated parser's
+	// default mode reads it, which its strict mode refuses, and a default
+	// value of the template's <constraints> that addresses no node, which
+	// Compile otherwise skips (see [Compile]).
+	Strict bool
 }
 
 // maxDepth is how many levels of constraint objects below the definition
@@ -46,21 +53,42 @@ const maxDepth = 128
 // [template.Multiplicity]. It does not carry the occurrences of a slot.
 //
 // Compile places each default value of the template's <constraints> on the
-// node it addresses ([CompiledNode.DefaultValue]).
+// node it addresses ([CompiledNode.DefaultValue]): the first child, of the
+// T_COMPLEX_OBJECT's RM type, or of its default value's where it names none,
+// of the attribute named rm_attribute_name on the node that the
+// differential_path reaches. A differential_path that opens with the
+// definition's archetype id in brackets resolves from the rest, and one that
+// opens with a slash from the definition's root, as [Compiled.Resolve]
+// resolves a path, except that a segment's predicate may carry a name,
+// at0004, 'Systolic' or at0004 and name/value='Systolic', which selects the
+// node of that node id or archetype id whose template-level name
+// ([CompiledNode.NodeName]) it is, each run of white space in the predicate
+// read as one space. Compile skips a default value that addresses no node.
+//
+// In its default mode Compile reads a value the model holds in the weaker
+// form the deprecated parser's default mode reads it: a CONSTRAINT_REF with
+// no reference, with an empty one; a timezone_validity that names no
+// VALIDITY_KIND, or is mandatory on a C_DATE, as optional; a temporal range
+// bound that is not ISO 8601 text of its type as unbounded on its side; and
+// a C_PRIMITIVE_OBJECT with no item as no constraint. With [Options.Strict]
+// it refuses each of these, as the parser's strict mode does, and a default
+// value that addresses no node.
 //
 // Returns an error wrapping ErrInvalidInput when opt is nil, when it has no
 // template_id or no definition, when it holds an interval that closing
-// refuses ([template.NewMultiplicity]), a primitive constraint whose value
-// the constraint cannot carry, a missing constraint object, attribute or
-// primitive item, or constraint objects nested more than 128 levels below the
-// definition, when two nodes under different attributes have the same AQL
-// path, which is a defect in the template, and when a default value addresses
-// no node ([placeDefaultValues]). Nodes under one attribute that share a path
-// (alternatives, or siblings with the same node id) and the descendants of
-// such nodes are admitted, and [Compiled.NodeAt] resolves the path to the
-// first one walked. Returns an error that does not wrap ErrInvalidInput when
-// the model holds a constraint object or an attribute of a kind Compile does
-// not handle, which the model's decode does not produce.
+// refuses ([template.NewMultiplicity]), a missing constraint object or
+// attribute, an ordinal symbol that is neither a DV_CODED_TEXT nor a
+// CODE_PHRASE, an item that is no primitive class held by pointer, a default
+// value that does not encode as canonical JSON, or constraint objects nested
+// more than 128 levels below the definition, when two nodes under different
+// attributes have the same AQL path, which is a defect in the template, and,
+// with [Options.Strict], for each value the paragraph above names. Nodes
+// under one attribute that share a path (alternatives, or siblings with the
+// same node id) and the descendants of such nodes are admitted, and
+// [Compiled.NodeAt] resolves the path to the first one walked. Returns an
+// error that does not wrap ErrInvalidInput when the model holds a constraint
+// object or an attribute of a kind Compile does not handle, which the
+// model's decode does not produce.
 func Compile(opt *aom14.OperationalTemplate, opts ...Options) (*Compiled, error) {
 	if opt == nil {
 		return nil, fmt.Errorf("%w: nil template", ErrInvalidInput)
@@ -113,7 +141,7 @@ func Compile(opt *aom14.OperationalTemplate, opts ...Options) (*Compiled, error)
 		return nil, err
 	}
 	c.root = root
-	if err := placeDefaultValues(c, opt.Constraints); err != nil {
+	if err := placeDefaultValues(c, opt.Constraints, o.Strict); err != nil {
 		return nil, err
 	}
 	return c, nil
@@ -122,8 +150,9 @@ func Compile(opt *aom14.OperationalTemplate, opts ...Options) (*Compiled, error)
 // ErrInvalidInput is returned, wrapped, by [Compile] for a template it
 // refuses: a nil one, one with no template_id or no definition, one holding
 // a value the compiled form cannot carry or nesting past the depth limit, one
-// in which two nodes under different attributes have the same AQL path, and
-// one with a default value that addresses no node.
+// in which two nodes under different attributes have the same AQL path, and,
+// with [Options.Strict], one holding a value the deprecated parser's strict
+// mode refuses or a default value that addresses no node.
 var ErrInvalidInput = errors.New("templatecompile: invalid input")
 
 // walker carries the per-call state shared across recursive node
@@ -286,7 +315,7 @@ func (w *walker) descend(ob object, cn *CompiledNode, heldAs string, depth int) 
 	if ob.complex != nil {
 		attrs = ob.complex.Attributes
 	} else {
-		primitive, err := primitiveFromModel(ob.o)
+		primitive, err := primitiveFromModel(ob.o, w.opts.Strict)
 		if err != nil {
 			return fmt.Errorf("%w: at %q (%s %q): %w", ErrInvalidInput, cn.aqlPath, cn.rmTypeName, cn.nodeID, err)
 		}

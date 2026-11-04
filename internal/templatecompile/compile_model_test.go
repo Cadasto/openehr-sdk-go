@@ -6,7 +6,9 @@ package templatecompile_test
 
 import (
 	"errors"
+	"fmt"
 	"maps"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -121,15 +123,6 @@ func TestREQ111_CompileRefusesModel(t *testing.T) {
 			a.Cardinality.Interval = rm.Interval[aom14.Integer]{Lower: 5, Upper: 2, LowerIncluded: true, UpperIncluded: true}
 			return modelOf(a)
 		}},
-		{name: "a C_DATE whose timezone validity is mandatory", model: func() *aom14.OperationalTemplate {
-			tz := aom14.TimezoneValidityKindMandatory
-			date := &aom14.CPrimitiveObject{RMTypeName: "DATE", Occurrences: once, Item: &aom14.CDate{TimezoneValidity: &tz}}
-			return modelOf(single("context", complexObject("EVENT_CONTEXT", "", single("start_time", date))))
-		}},
-		{name: "a CONSTRAINT_REF with a blank reference", model: func() *aom14.OperationalTemplate {
-			ref := &aom14.ConstraintRef{RMTypeName: "CODE_PHRASE", Occurrences: once, Reference: " "}
-			return modelOf(single("category", complexObject("DV_CODED_TEXT", "", single("defining_code", ref))))
-		}},
 		{name: "a nil constraint object", model: func() *aom14.OperationalTemplate {
 			return modelOf(multiple("content", nil))
 		}},
@@ -144,9 +137,78 @@ func TestREQ111_CompileRefusesModel(t *testing.T) {
 		}},
 	}
 	for _, tc := range cases {
+		for _, strict := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/strict=%t", tc.name, strict), func(t *testing.T) {
+				_, err := templatecompile.Compile(tc.model(), templatecompile.Options{Strict: strict})
+				if !errors.Is(err, templatecompile.ErrInvalidInput) {
+					t.Fatalf("Compile error = %v, want an error wrapping ErrInvalidInput", err)
+				}
+			})
+		}
+	}
+}
+
+// TestREQ111_CompileReadsWeakValuesUnlessStrict pins § REQ-111 What the
+// compile step tolerates on whole models: in its default mode Compile reads a
+// value the model holds in the weaker form the parser's default mode reads
+// it, and with Options.Strict it refuses it with an error wrapping
+// ErrInvalidInput.
+func TestREQ111_CompileReadsWeakValuesUnlessStrict(t *testing.T) {
+	// leaf is a model whose definition holds o at /context/start_time/value.
+	leaf := func(o aom14.CObject) *aom14.OperationalTemplate {
+		return modelOf(single("context", complexObject("EVENT_CONTEXT", "",
+			single("start_time", complexObject("DV_DATE_TIME", "", single("value", o))))))
+	}
+	tz := func(k aom14.TimezoneValidityKind) *aom14.TimezoneValidityKind { return &k }
+	cases := []struct {
+		name  string
+		model *aom14.OperationalTemplate
+		want  constraints.PrimitiveConstraint // the default mode's reading
+	}{
+		{
+			name:  "a C_DATE whose timezone validity is mandatory",
+			model: leaf(&aom14.CPrimitiveObject{RMTypeName: "DATE", Occurrences: once, Item: &aom14.CDate{TimezoneValidity: tz(aom14.TimezoneValidityKindMandatory)}}),
+			want:  constraints.CDate{TimezoneValidity: constraints.ValidityOptional},
+		},
+		{
+			name:  "a C_DATE_TIME whose timezone validity names no VALIDITY_KIND",
+			model: leaf(&aom14.CPrimitiveObject{RMTypeName: "DATE_TIME", Occurrences: once, Item: &aom14.CDateTime{TimezoneValidity: tz(7)}}),
+			want:  constraints.CDateTime{TimezoneValidity: constraints.ValidityOptional},
+		},
+		{
+			name: "a C_DATE_TIME range bound that is not a date-time",
+			model: leaf(&aom14.CPrimitiveObject{RMTypeName: "DATE_TIME", Occurrences: once, Item: &aom14.CDateTime{
+				Range: &rm.Interval[string]{Lower: "yesterday", LowerIncluded: true, UpperUnbounded: true},
+			}}),
+			want: constraints.CDateTime{Range: constraints.TemporalRange{LowerUnbounded: true, UpperUnbounded: true}},
+		},
+		{
+			name:  "a CONSTRAINT_REF with a blank reference",
+			model: leaf(&aom14.ConstraintRef{RMTypeName: "CODE_PHRASE", Occurrences: once, Reference: " "}),
+			want:  constraints.ConstraintRef{},
+		},
+		{
+			name:  "a C_PRIMITIVE_OBJECT with no item",
+			model: leaf(&aom14.CPrimitiveObject{RMTypeName: "DATE_TIME", Occurrences: once}),
+			want:  nil,
+		},
+	}
+	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := templatecompile.Compile(tc.model()); !errors.Is(err, templatecompile.ErrInvalidInput) {
-				t.Fatalf("Compile error = %v, want an error wrapping ErrInvalidInput", err)
+			c, err := templatecompile.Compile(tc.model)
+			if err != nil {
+				t.Fatalf("Compile = %v, want the weaker reading", err)
+			}
+			n, err := c.NodeAt("/context/start_time/value")
+			if err != nil {
+				t.Fatalf("NodeAt(/context/start_time/value) = %v", err)
+			}
+			if got := n.PrimitiveConstraint(); !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("PrimitiveConstraint() = %#v, want %#v", got, tc.want)
+			}
+
+			if _, err := templatecompile.Compile(tc.model, templatecompile.Options{Strict: true}); !errors.Is(err, templatecompile.ErrInvalidInput) {
+				t.Errorf("Compile(Strict) error = %v, want an error wrapping ErrInvalidInput", err)
 			}
 		})
 	}

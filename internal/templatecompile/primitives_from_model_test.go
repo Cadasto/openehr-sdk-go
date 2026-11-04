@@ -170,7 +170,7 @@ func TestREQ103_REQ111_PrimitiveFromModelMatchesParserOverCorpus(t *testing.T) {
 		}); ok {
 			want = on.PrimitiveConstraint()
 		}
-		got, err := primitiveFromModel(p.model)
+		got, err := primitiveFromModel(p.model, false)
 		if err != nil {
 			t.Errorf("%s: primitiveFromModel(%T) = %v; want the parser's %s", p.where, p.model, err, renderPrimitive(want))
 			continue
@@ -221,10 +221,11 @@ func TestREQ103_REQ111_PrimitiveFromModelMatchesParserOverCorpus(t *testing.T) {
 }
 
 // TestREQ103_PrimitiveFromModelReadings pins the readings the compile step
-// gives the model's primitive classes beyond what the corpus shows: white
-// space trimmed, blank entries left out, an absent list_open read as a closed
-// list, the timezone_validity codes, the quantity property units, both forms
-// of an ordinal symbol, and the nodes that carry no constraint.
+// gives the model's primitive classes beyond what the corpus shows, in both
+// of its modes: white space trimmed, blank entries left out, an absent
+// list_open read as a closed list, the timezone_validity codes, the quantity
+// property units, both forms of an ordinal symbol, and the nodes that carry
+// no constraint.
 func TestREQ103_PrimitiveFromModelReadings(t *testing.T) {
 	tz := func(k aom14.TimezoneValidityKind) *aom14.TimezoneValidityKind { return &k }
 	trueValue := true
@@ -277,11 +278,6 @@ func TestREQ103_PrimitiveFromModelReadings(t *testing.T) {
 			name:  "C_DURATION: no range is the zero range",
 			model: &aom14.CPrimitiveObject{RMTypeName: "DURATION", Item: &aom14.CDuration{Pattern: new("PTHMS")}},
 			want:  constraints.CDuration{Pattern: "PTHMS"},
-		},
-		{
-			name:  "C_PRIMITIVE_OBJECT with no item carries no constraint",
-			model: &aom14.CPrimitiveObject{RMTypeName: "STRING"},
-			want:  nil,
 		},
 		{
 			name: "C_CODE_PHRASE: terminology and codes trimmed, a blank code left out",
@@ -375,13 +371,131 @@ func TestREQ103_PrimitiveFromModelReadings(t *testing.T) {
 		},
 	}
 	for _, tc := range cases {
+		for _, strict := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/strict=%t", tc.name, strict), func(t *testing.T) {
+				got, err := primitiveFromModel(tc.model, strict)
+				if err != nil {
+					t.Fatalf("primitiveFromModel = %v; want %s", err, renderPrimitive(tc.want))
+				}
+				if g, w := renderPrimitive(got), renderPrimitive(tc.want); g != w {
+					t.Errorf("primitiveFromModel =\n  %s\nwant\n  %s", g, w)
+				}
+			})
+		}
+	}
+}
+
+// TestREQ103_REQ111_PrimitiveFromModelReadsWeakValues pins the values the
+// compile step reads, in its default mode, in the weaker form the parser's
+// default mode reads them, and refuses in its strict mode, as ParseOPTStrict
+// does: a temporal range bound that is not ISO 8601 text of its type, read as
+// unbounded on its side; a timezone_validity that names no VALIDITY_KIND, and
+// a mandatory one on a C_DATE, read as optional; a CONSTRAINT_REF with no or a
+// blank reference, read with an empty one; and a C_PRIMITIVE_OBJECT with no
+// item, or with a nil pointer for one, read as no constraint.
+func TestREQ103_REQ111_PrimitiveFromModelReadsWeakValues(t *testing.T) {
+	primitive := func(item aom14.CPrimitive) aom14.CObject {
+		return &aom14.CPrimitiveObject{RMTypeName: "ANY", Item: item}
+	}
+	tz := func(k aom14.TimezoneValidityKind) *aom14.TimezoneValidityKind { return &k }
+	cases := []struct {
+		name    string
+		model   aom14.CObject
+		want    constraints.PrimitiveConstraint // the default mode's reading
+		wantMsg string                          // what the strict mode's error names
+	}{
+		{
+			name:    "C_DATE lower bound not a date",
+			model:   primitive(&aom14.CDate{Range: &rm.Interval[string]{Lower: "2020-13-45", LowerIncluded: true, Upper: "2021-12-31", UpperIncluded: true}}),
+			want:    constraints.CDate{Range: constraints.TemporalRange{LowerUnbounded: true, Upper: "2021-12-31", UpperInclusive: true}},
+			wantMsg: `C_DATE range: lower bound "2020-13-45" is not ISO 8601 text of the type`,
+		},
+		{
+			name:    "C_TIME upper bound not a time",
+			model:   primitive(&aom14.CTime{Range: &rm.Interval[string]{Lower: "09:00:00", LowerIncluded: true, Upper: "noon", UpperIncluded: true}}),
+			want:    constraints.CTime{Range: constraints.TemporalRange{Lower: "09:00:00", LowerInclusive: true, UpperUnbounded: true}},
+			wantMsg: `C_TIME range: upper bound "noon" is not ISO 8601 text of the type`,
+		},
+		{
+			name:    "C_DATE_TIME lower bound a duration",
+			model:   primitive(&aom14.CDateTime{Range: &rm.Interval[string]{Lower: "PT1H", LowerIncluded: true, UpperUnbounded: true}}),
+			want:    constraints.CDateTime{Range: constraints.TemporalRange{LowerUnbounded: true, UpperUnbounded: true}},
+			wantMsg: `C_DATE_TIME range: lower bound "PT1H" is not ISO 8601 text of the type`,
+		},
+		{
+			name:    "C_DURATION upper bound empty",
+			model:   primitive(&aom14.CDuration{Range: &rm.Interval[string]{Lower: "PT0S", LowerIncluded: true, Upper: " ", UpperIncluded: true}}),
+			want:    constraints.CDuration{Range: constraints.TemporalRange{Lower: "PT0S", LowerInclusive: true, UpperUnbounded: true}},
+			wantMsg: `C_DURATION range: upper bound "" is not ISO 8601 text of the type`,
+		},
+		{
+			name:    "C_DURATION bounds P and P",
+			model:   primitive(&aom14.CDuration{Range: &rm.Interval[string]{Lower: "P", LowerIncluded: true, Upper: "P", UpperIncluded: true}}),
+			want:    constraints.CDuration{Range: constraints.TemporalRange{LowerUnbounded: true, UpperUnbounded: true}},
+			wantMsg: `C_DURATION range: lower bound "P" is not ISO 8601 text of the type`,
+		},
+		{
+			name:    "C_DATE timezone_validity mandatory",
+			model:   primitive(&aom14.CDate{Pattern: new("yyyy-mm-dd"), TimezoneValidity: tz(aom14.TimezoneValidityKindMandatory)}),
+			want:    constraints.CDate{Pattern: "yyyy-mm-dd", TimezoneValidity: constraints.ValidityOptional},
+			wantMsg: "C_DATE timezone_validity is mandatory",
+		},
+		{
+			name:    "C_TIME timezone_validity no VALIDITY_KIND",
+			model:   primitive(&aom14.CTime{TimezoneValidity: tz(42)}),
+			want:    constraints.CTime{TimezoneValidity: constraints.ValidityOptional},
+			wantMsg: "C_TIME timezone_validity 42 is no VALIDITY_KIND",
+		},
+		{
+			name:    "C_DATE_TIME timezone_validity no VALIDITY_KIND",
+			model:   primitive(&aom14.CDateTime{TimezoneValidity: tz(0)}),
+			want:    constraints.CDateTime{TimezoneValidity: constraints.ValidityOptional},
+			wantMsg: "C_DATE_TIME timezone_validity 0 is no VALIDITY_KIND",
+		},
+		{
+			name:    "CONSTRAINT_REF no reference",
+			model:   &aom14.ConstraintRef{RMTypeName: "CODE_PHRASE"},
+			want:    constraints.ConstraintRef{},
+			wantMsg: `CONSTRAINT_REF for "CODE_PHRASE" has no reference`,
+		},
+		{
+			name:    "CONSTRAINT_REF blank reference",
+			model:   &aom14.ConstraintRef{RMTypeName: "CODE_PHRASE", Reference: " \t"},
+			want:    constraints.ConstraintRef{},
+			wantMsg: `CONSTRAINT_REF for "CODE_PHRASE" has no reference`,
+		},
+		{
+			name:    "C_PRIMITIVE_OBJECT with no item",
+			model:   &aom14.CPrimitiveObject{RMTypeName: " STRING "},
+			want:    nil,
+			wantMsg: `C_PRIMITIVE_OBJECT for "STRING" has no item`,
+		},
+		{
+			name:    "C_PRIMITIVE_OBJECT with a nil pointer for an item",
+			model:   &aom14.CPrimitiveObject{RMTypeName: "DATE", Item: (*aom14.CDate)(nil)},
+			want:    nil,
+			wantMsg: `C_PRIMITIVE_OBJECT for "DATE" has no item`,
+		},
+	}
+	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := primitiveFromModel(tc.model)
+			got, err := primitiveFromModel(tc.model, false)
 			if err != nil {
-				t.Fatalf("primitiveFromModel = %v; want %s", err, renderPrimitive(tc.want))
+				t.Fatalf("primitiveFromModel(default) = %v; want %s", err, renderPrimitive(tc.want))
 			}
 			if g, w := renderPrimitive(got), renderPrimitive(tc.want); g != w {
-				t.Errorf("primitiveFromModel =\n  %s\nwant\n  %s", g, w)
+				t.Errorf("primitiveFromModel(default) =\n  %s\nwant\n  %s", g, w)
+			}
+
+			got, err = primitiveFromModel(tc.model, true)
+			if err == nil {
+				t.Fatalf("primitiveFromModel(strict) = %s, nil; want an error containing %q", renderPrimitive(got), tc.wantMsg)
+			}
+			if got != nil {
+				t.Errorf("primitiveFromModel(strict) returned %s beside its error; want nil", renderPrimitive(got))
+			}
+			if !strings.Contains(err.Error(), tc.wantMsg) {
+				t.Errorf("primitiveFromModel(strict) error = %q; want it to contain %q", err, tc.wantMsg)
 			}
 		})
 	}
@@ -395,64 +509,19 @@ func openCString(list []string) constraints.CString {
 }
 
 // TestREQ103_REQ111_PrimitiveFromModelRefuses pins the refusals of the
-// compile step, which reads the model as the parser's strict mode reads an
-// OPT and not as its default mode: a temporal bound that is not ISO 8601 text
-// of its type, a mandatory timezone_validity on a C_DATE, a CONSTRAINT_REF
-// with no or a blank reference, and the model values no reading names.
+// compile step in both of its modes: the model values no reading names, an
+// item that is no primitive class held by pointer and an ordinal symbol that
+// is neither a DV_CODED_TEXT nor a CODE_PHRASE, which only a model built in
+// code can hold.
 func TestREQ103_REQ111_PrimitiveFromModelRefuses(t *testing.T) {
-	primitive := func(item aom14.CPrimitive) aom14.CObject {
-		return &aom14.CPrimitiveObject{RMTypeName: "ANY", Item: item}
-	}
-	mandatory := aom14.TimezoneValidityKindMandatory
-	unknownKind := aom14.TimezoneValidityKind(42)
 	cases := []struct {
 		name    string
 		model   aom14.CObject
 		wantMsg string
 	}{
 		{
-			name:    "C_DATE lower bound not a date",
-			model:   primitive(&aom14.CDate{Range: &rm.Interval[string]{Lower: "2020-13-45", LowerIncluded: true, UpperUnbounded: true}}),
-			wantMsg: `C_DATE range: lower bound "2020-13-45" is not ISO 8601 text of the type`,
-		},
-		{
-			name:    "C_TIME upper bound not a time",
-			model:   primitive(&aom14.CTime{Range: &rm.Interval[string]{LowerUnbounded: true, Upper: "noon", UpperIncluded: true}}),
-			wantMsg: `C_TIME range: upper bound "noon" is not ISO 8601 text of the type`,
-		},
-		{
-			name:    "C_DATE_TIME lower bound a duration",
-			model:   primitive(&aom14.CDateTime{Range: &rm.Interval[string]{Lower: "PT1H", LowerIncluded: true, UpperUnbounded: true}}),
-			wantMsg: `C_DATE_TIME range: lower bound "PT1H" is not ISO 8601 text of the type`,
-		},
-		{
-			name:    "C_DURATION upper bound empty",
-			model:   primitive(&aom14.CDuration{Range: &rm.Interval[string]{Lower: "PT0S", LowerIncluded: true, Upper: " ", UpperIncluded: true}}),
-			wantMsg: `C_DURATION range: upper bound "" is not ISO 8601 text of the type`,
-		},
-		{
-			name:    "C_DATE timezone_validity mandatory",
-			model:   primitive(&aom14.CDate{TimezoneValidity: &mandatory}),
-			wantMsg: "C_DATE timezone_validity is mandatory",
-		},
-		{
-			name:    "C_TIME timezone_validity no VALIDITY_KIND",
-			model:   primitive(&aom14.CTime{TimezoneValidity: &unknownKind}),
-			wantMsg: "C_TIME timezone_validity 42 is no VALIDITY_KIND",
-		},
-		{
-			name:    "CONSTRAINT_REF no reference",
-			model:   &aom14.ConstraintRef{RMTypeName: "CODE_PHRASE"},
-			wantMsg: `CONSTRAINT_REF for "CODE_PHRASE" has no reference`,
-		},
-		{
-			name:    "CONSTRAINT_REF blank reference",
-			model:   &aom14.ConstraintRef{RMTypeName: "CODE_PHRASE", Reference: " \t"},
-			wantMsg: `CONSTRAINT_REF for "CODE_PHRASE" has no reference`,
-		},
-		{
 			name:    "an item held by value",
-			model:   primitive(aom14.CString{}),
+			model:   &aom14.CPrimitiveObject{RMTypeName: "ANY", Item: aom14.CString{}},
 			wantMsg: "item aom14.CString of C_PRIMITIVE_OBJECT",
 		},
 		{
@@ -464,30 +533,42 @@ func TestREQ103_REQ111_PrimitiveFromModelRefuses(t *testing.T) {
 		},
 	}
 	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			got, err := primitiveFromModel(tc.model)
-			if err == nil {
-				t.Fatalf("primitiveFromModel = %s, nil; want an error containing %q", renderPrimitive(got), tc.wantMsg)
-			}
-			if got != nil {
-				t.Errorf("primitiveFromModel returned %s beside its error; want nil", renderPrimitive(got))
-			}
-			if !strings.Contains(err.Error(), tc.wantMsg) {
-				t.Errorf("primitiveFromModel error = %q; want it to contain %q", err, tc.wantMsg)
-			}
-		})
+		for _, strict := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/strict=%t", tc.name, strict), func(t *testing.T) {
+				got, err := primitiveFromModel(tc.model, strict)
+				if err == nil {
+					t.Fatalf("primitiveFromModel = %s, nil; want an error containing %q", renderPrimitive(got), tc.wantMsg)
+				}
+				if got != nil {
+					t.Errorf("primitiveFromModel returned %s beside its error; want nil", renderPrimitive(got))
+				}
+				if !strings.Contains(err.Error(), tc.wantMsg) {
+					t.Errorf("primitiveFromModel error = %q; want it to contain %q", err, tc.wantMsg)
+				}
+			})
+		}
 	}
+}
 
-	// The controls: the same shapes with a value the reading admits build.
+// TestREQ103_REQ111_PrimitiveFromModelStrictBuildsValidValues pins the
+// controls of the strict refusals: the shapes they refuse, with a value the
+// reading admits, build in the strict mode.
+func TestREQ103_REQ111_PrimitiveFromModelStrictBuildsValidValues(t *testing.T) {
+	primitive := func(item aom14.CPrimitive) aom14.CObject {
+		return &aom14.CPrimitiveObject{RMTypeName: "ANY", Item: item}
+	}
+	mandatory := aom14.TimezoneValidityKindMandatory
 	optional := aom14.TimezoneValidityKindOptional
 	for _, model := range []aom14.CObject{
 		primitive(&aom14.CDate{Range: &rm.Interval[string]{Lower: "2020-12-31", LowerIncluded: true, UpperUnbounded: true}, TimezoneValidity: &optional}),
 		primitive(&aom14.CTime{Range: &rm.Interval[string]{LowerUnbounded: true, Upper: "12:00:00", UpperIncluded: true}, TimezoneValidity: &mandatory}),
+		primitive(&aom14.CDateTime{TimezoneValidity: &mandatory}),
 		primitive(&aom14.CDuration{Range: &rm.Interval[string]{Lower: "PT0S", LowerIncluded: true, Upper: "PT1H", UpperIncluded: true}}),
+		primitive(&aom14.CString{}),
 		&aom14.ConstraintRef{RMTypeName: "CODE_PHRASE", Reference: "ac0001"},
 	} {
-		if _, err := primitiveFromModel(model); err != nil {
-			t.Errorf("primitiveFromModel(%s) = %v; want no error", describeModel(model), err)
+		if _, err := primitiveFromModel(model, true); err != nil {
+			t.Errorf("primitiveFromModel(%s, strict) = %v; want no error", describeModel(model), err)
 		}
 	}
 }

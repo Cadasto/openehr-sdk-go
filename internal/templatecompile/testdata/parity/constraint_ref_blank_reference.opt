@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SDK-authored parity fixture: a CONSTRAINT_REF with a blank reference, which the parser's default mode reads with an empty reference and its strict mode refuses. -->
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <language>
+    <terminology_id><value>ISO_639-1</value></terminology_id>
+    <code_string>en</code_string>
+  </language>
+  <template_id><value>parity.constraint_ref_blank_reference.v1</value></template_id>
+  <concept>Parity</concept>
+  <definition>
+    <rm_type_name>COMPOSITION</rm_type_name>
+    <occurrences><lower>1</lower><upper>1</upper></occurrences>
+    <node_id>at0000</node_id>
+    <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+      <rm_attribute_name>context</rm_attribute_name>
+      <existence><lower>1</lower><upper>1</upper></existence>
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>EVENT_CONTEXT</rm_type_name>
+        <occurrences><lower>1</lower><upper>1</upper></occurrences>
+        <node_id/>
+        <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+          <rm_attribute_name>other_context</rm_attribute_name>
+          <existence><lower>0</lower><upper>1</upper></existence>
+          <children xsi:type="C_COMPLEX_OBJECT">
+            <rm_type_name>ITEM_TREE</rm_type_name>
+            <occurrences><lower>1</lower><upper>1</upper></occurrences>
+            <node_id>at0001</node_id>
+            <attributes xsi:type="C_MULTIPLE_ATTRIBUTE">
+              <rm_attribute_name>items</rm_attribute_name>
+              <existence><lower>0</lower><upper>1</upper></existence>
+              <children xsi:type="C_COMPLEX_OBJECT">
+                <rm_type_name>ELEMENT</rm_type_name>
+                <occurrences><lower>0</lower><upper>1</upper></occurrences>
+                <node_id>at0002</node_id>
+                <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                  <rm_attribute_name>value</rm_attribute_name>
+                  <existence><lower>0</lower><upper>1</upper></existence>
+                  <children xsi:type="C_COMPLEX_OBJECT">
+                    <rm_type_name>DV_CODED_TEXT</rm_type_name>
+                    <occurrences><lower>1</lower><upper>1</upper></occurrences>
+                    <node_id/>
+                    <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                      <rm_attribute_name>defining_code</rm_attribute_name>
+                      <existence><lower>1</lower><upper>1</upper></existence>
+                      <children xsi:type="CONSTRAINT_REF">
+                        <rm_type_name>CODE_PHRASE</rm_type_name>
+                        <occurrences><lower>1</lower><upper>1</upper></occurrences>
+                        <node_id/>
+                        <reference>  </reference>
+                      </children>
+                    </attributes>
+                  </children>
+                </attributes>
+              </children>
+              <cardinality>
+                <is_ordered>false</is_ordered>
+                <is_unique>false</is_unique>
+                <interval><lower>0</lower><upper_unbounded>true</upper_unbounded></interval>
+              </cardinality>
+            </attributes>
+          </children>
+        </attributes>
+      </children>
+    </attributes>
+    <archetype_id><value>openEHR-EHR-COMPOSITION.parity.v1</value></archetype_id>
+    <term_definitions code="at0000"><items id="text">Parity</items></term_definitions>
+    <term_definitions code="at0001"><items id="text">Tree</items></term_definitions>
+    <term_definitions code="at0002"><items id="text">Element</items></term_definitions>
+  </definition>
+</template>

@@ -219,9 +219,10 @@ func (n *CompiledNode) PrimitiveConstraint() constraints.PrimitiveConstraint {
 // DefaultValue returns the default value that the template's <constraints>
 // give this node, or nil when they give it none. A default value is the
 // default_value of a T_COMPLEX_OBJECT, and it is placed on the first child,
-// of that object's RM type, of the attribute that its T_ATTRIBUTE names on
-// the node that the T_ATTRIBUTE's differential_path addresses. Each call
-// returns a new value, which the caller may change.
+// of that object's RM type, or of the value's own where the object names
+// none, of the attribute that its T_ATTRIBUTE names on the node that the
+// T_ATTRIBUTE's differential_path addresses ([Compile]). Each call returns a
+// new value, which the caller may change.
 func (n *CompiledNode) DefaultValue() rm.DataValue {
 	if n.defaultValue == nil {
 		return nil
