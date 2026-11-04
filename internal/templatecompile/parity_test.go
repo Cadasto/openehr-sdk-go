@@ -14,8 +14,10 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -54,6 +56,10 @@ const (
 	// parityMatchNegated: the reader refuses a match_negated of true, which
 	// the parser reads with its meaning inverted.
 	parityMatchNegated
+	// parityInfiniteBound: the reader refuses an integer bound of positive
+	// infinity on a lower side or negative infinity on an upper one, which
+	// the parser reads as a float and which admits no integer.
+	parityInfiniteBound
 	// paritySharedPath: the compile step refuses two nodes under different
 	// attributes that share an AQL path.
 	paritySharedPath
@@ -73,7 +79,7 @@ func (k parityKind) fails() bool {
 
 // allowed reports whether the kind is a refusal the rule allows.
 func (k parityKind) allowed() bool {
-	return k == parityLargeInteger || k == parityMatchNegated || k == paritySharedPath
+	return k == parityLargeInteger || k == parityMatchNegated || k == parityInfiniteBound || k == paritySharedPath
 }
 
 // String names the kind as the summary of TestREQ111_ParityOverFolder
@@ -88,6 +94,8 @@ func (k parityKind) String() string {
 		return "allowed exception, an integer the model cannot hold"
 	case parityMatchNegated:
 		return "allowed exception, a match_negated of true"
+	case parityInfiniteBound:
+		return "allowed exception, an infinite integer bound that admits no integer"
 	case paritySharedPath:
 		return "allowed exception, two nodes under different attributes share an AQL path"
 	case parityRefused:
@@ -144,18 +152,45 @@ func checkParity(raw []byte) parityResult {
 }
 
 // readerRefusal tells which reader refusal err is: an integer the model's
-// 32-bit Integer cannot hold, a match_negated of true, or another.
+// 32-bit Integer cannot hold, the reader's ParseInt range refusal; a
+// match_negated of true; an infinite integer bound that admits no integer,
+// the reader's ParseInt syntax refusal of a lower or upper bound whose text
+// strconv.ParseFloat reads as the infinity no integer is above or below; or
+// another.
 func readerRefusal(err error) parityKind {
 	if !errors.Is(err, canxml.ErrInvalidShape) {
 		return parityRefused
 	}
-	if ne, ok := errors.AsType[*strconv.NumError](err); ok && ne != nil && ne.Func == "ParseInt" && errors.Is(ne, strconv.ErrRange) {
-		return parityLargeInteger
+	if ne, ok := errors.AsType[*strconv.NumError](err); ok && ne != nil && ne.Func == "ParseInt" {
+		switch {
+		case errors.Is(ne, strconv.ErrRange):
+			return parityLargeInteger
+		case errors.Is(ne, strconv.ErrSyntax) && admitsNoInteger(innermostDecodePath(err), ne.Num):
+			return parityInfiniteBound
+		}
 	}
 	if innermostDecodePath(err) == "/match_negated" {
 		return parityMatchNegated
 	}
 	return parityRefused
+}
+
+// admitsNoInteger reports whether text, the bound at path, is an infinity
+// that admits no integer there: positive infinity on a lower side, path
+// "/lower", or negative infinity on an upper one, path "/upper", as
+// strconv.ParseFloat reads it, as the parser does.
+func admitsNoInteger(path, text string) bool {
+	f, err := strconv.ParseFloat(strings.TrimSpace(text), 64)
+	if err != nil {
+		return false
+	}
+	switch path {
+	case "/lower":
+		return math.IsInf(f, 1)
+	case "/upper":
+		return math.IsInf(f, -1)
+	}
+	return false
 }
 
 // innermostDecodePath returns the path of the innermost decode error in err's
@@ -191,7 +226,7 @@ func (r *parityResult) compare(parsed template.Node, model aom14.CObject, compil
 	if on, ok := parsed.(interface {
 		PrimitiveConstraint() constraints.PrimitiveConstraint
 	}); ok {
-		want = on.PrimitiveConstraint()
+		want = unboundedWhereInfinite(on.PrimitiveConstraint())
 	}
 	if ref, ok := model.(*aom14.CCodeReference); ok {
 		// The parser reads no constraint on a C_CODE_REFERENCE; the
@@ -237,6 +272,36 @@ func (r *parityResult) compare(parsed template.Node, model aom14.CObject, compil
 		}
 	}
 	return nil
+}
+
+// unboundedWhereInfinite returns pc, the primitive constraint the parser
+// reads, with each side of an integer range, of a C_INTEGER or of a quantity's
+// precision, whose bound is the infinity that admits every integer there,
+// negative on the lower side or positive on the upper one, read as unbounded,
+// as the reader reads it. The two admit the same integers; only the parser's
+// writes a bound no JSON number holds.
+func unboundedWhereInfinite(pc constraints.PrimitiveConstraint) constraints.PrimitiveConstraint {
+	unbound := func(r constraints.NumericRange) constraints.NumericRange {
+		if !r.LowerUnbounded && math.IsInf(r.Lower, -1) {
+			r.LowerUnbounded, r.Lower = true, 0
+		}
+		if !r.UpperUnbounded && math.IsInf(r.Upper, 1) {
+			r.UpperUnbounded, r.Upper = true, 0
+		}
+		return r
+	}
+	switch c := pc.(type) {
+	case constraints.CInteger:
+		c.Range = unbound(c.Range)
+		return c
+	case constraints.DvQuantity:
+		c.Units = slices.Clone(c.Units)
+		for i := range c.Units {
+			c.Units[i].Precision = unbound(c.Units[i].Precision)
+		}
+		return c
+	}
+	return pc
 }
 
 // TestREQ111_ParityWithDeprecatedParser holds the model's reader and the
@@ -323,7 +388,7 @@ func TestREQ111_ParityWithDeprecatedParser(t *testing.T) {
 			t.Errorf("no operational template of the %s source holds the rule; want at least one", src.name)
 		}
 	}
-	for _, k := range []parityKind{parityLargeInteger, parityMatchNegated, paritySharedPath} {
+	for _, k := range []parityKind{parityLargeInteger, parityMatchNegated, parityInfiniteBound, paritySharedPath} {
 		if allowed[k] == 0 {
 			t.Errorf("no operational template is refused as %q; want a fixture for each exception the rule allows", k)
 		}
@@ -355,16 +420,22 @@ func TestREQ111_ParityWithDeprecatedParser(t *testing.T) {
 // TestREQ111_ParityRefusalsByError pins how the parity check tells a refusal
 // the rule allows from one it does not, by the error alone: an integer past
 // the 32-bit range is the reader's ParseInt range refusal, a match_negated of
-// true is the reader's refusal of that element, and a shared AQL path is the
-// compile step's duplicate-path refusal. A refusal that shares part of one of
-// these, such as a real out of range or another element's refusal, breaks
-// the rule.
+// true is the reader's refusal of that element, an infinite integer bound
+// that admits no integer is the reader's ParseInt syntax refusal of a lower
+// bound of positive infinity or an upper one of negative infinity, and a
+// shared AQL path is the compile step's duplicate-path refusal. A refusal
+// that shares part of one of these, such as a real out of range, another
+// element's refusal or an infinity on the side it admits every integer,
+// breaks the rule.
 func TestREQ111_ParityRefusalsByError(t *testing.T) {
 	shape := func(path string, inner error) error {
 		return &canxml.DecodeError{Path: "/attributes", Type: "C_SINGLE_ATTRIBUTE", Inner: &canxml.DecodeError{Path: path, Inner: inner}}
 	}
 	rangeErr := func(fn string) error {
 		return fmt.Errorf("%w: %w", canxml.ErrInvalidShape, &strconv.NumError{Func: fn, Num: "5000000000", Err: strconv.ErrRange})
+	}
+	syntaxErr := func(num string) error {
+		return fmt.Errorf("%w: %w", canxml.ErrInvalidShape, &strconv.NumError{Func: "ParseInt", Num: num, Err: strconv.ErrSyntax})
 	}
 	readerCases := []struct {
 		name string
@@ -379,6 +450,14 @@ func TestREQ111_ParityRefusalsByError(t *testing.T) {
 		{name: "another element's refusal", err: shape("/is_ordered", canxml.ErrInvalidShape), want: parityRefused},
 		{name: "a refusal inside a match_negated's parent", err: &canxml.DecodeError{Path: "/match_negated", Inner: &canxml.DecodeError{Path: "/value", Inner: canxml.ErrInvalidShape}}, want: parityRefused},
 		{name: "a match_negated that is no shape refusal", err: &canxml.DecodeError{Path: "/match_negated", Inner: errors.New("read failed")}, want: parityRefused},
+		{name: "a lower bound of positive infinity", err: shape("/lower", syntaxErr("+Inf")), want: parityInfiniteBound},
+		{name: "an upper bound of negative infinity", err: shape("/upper", syntaxErr("-Infinity")), want: parityInfiniteBound},
+		{name: "a lower bound of negative infinity, which admits every integer", err: shape("/lower", syntaxErr("-Inf")), want: parityRefused},
+		{name: "an upper bound of positive infinity, which admits every integer", err: shape("/upper", syntaxErr("INF")), want: parityRefused},
+		{name: "a list entry of positive infinity", err: shape("/list", syntaxErr("+Inf")), want: parityRefused},
+		{name: "a lower bound past the range of a float", err: shape("/lower", syntaxErr("1e400")), want: parityRefused},
+		{name: "a real lower bound of positive infinity", err: shape("/lower", fmt.Errorf("%w: %w", canxml.ErrInvalidShape, &strconv.NumError{Func: "ParseFloat", Num: "+Inf", Err: strconv.ErrSyntax})), want: parityRefused},
+		{name: "an infinite bound that is no shape refusal", err: &canxml.DecodeError{Path: "/lower", Inner: &strconv.NumError{Func: "ParseInt", Num: "+Inf", Err: strconv.ErrSyntax}}, want: parityRefused},
 	}
 	for _, tc := range readerCases {
 		if got := readerRefusal(tc.err); got != tc.want {
@@ -468,7 +547,7 @@ func TestREQ111_ParityOverFolder(t *testing.T) {
 	say("  parser reads: %d", files-skipped-counts[parityNotRead])
 	say("  new path compiles: %d", counts[parityHolds]+counts[parityMismatch])
 	say("  constraint mismatches: %d", counts[parityMismatch])
-	for _, k := range []parityKind{parityLargeInteger, parityMatchNegated, paritySharedPath} {
+	for _, k := range []parityKind{parityLargeInteger, parityMatchNegated, parityInfiniteBound, paritySharedPath} {
 		say("  %s: %d", k, counts[k])
 	}
 	say("  new path refuses, for no allowed reason: %d", counts[parityRefused])

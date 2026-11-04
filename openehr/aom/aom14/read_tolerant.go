@@ -149,7 +149,11 @@ type tolerantReading struct {
 // reads, into ones canonical XML refuses as well. It returns data unchanged
 // when data is not well-formed where it reads it: the decode then fails on
 // it as it would have.
-func tolerate(data []byte, strict bool) ([]byte, bool) {
+//
+// A reading may leave out content the decode then does not read, so tolerate
+// holds data to maxDepth itself: it reads no further than the first element
+// nested deeper, and returns the refusal of that element (depthRefusal).
+func tolerate(data []byte, strict bool, maxDepth int) ([]byte, bool, error) {
 	t := &tolerantReading{data: data, strict: strict}
 	base := 0
 	if bytes.HasPrefix(data, byteOrderMark) {
@@ -163,11 +167,14 @@ func tolerate(data []byte, strict bool) ([]byte, bool) {
 			break
 		}
 		if err != nil {
-			return data, false
+			return data, false, nil
 		}
 		end := base + int(dec.InputOffset())
 		switch tk := tok.(type) {
 		case xml.StartElement:
+			if len(t.open) >= maxDepth {
+				return nil, false, depthRefusal(data, maxDepth)
+			}
 			t.start(tk.Copy(), off, end)
 		case xml.EndElement:
 			t.close(off, end)
@@ -178,9 +185,25 @@ func tolerate(data []byte, strict bool) ([]byte, bool) {
 		}
 	}
 	if len(t.edits) == 0 || t.failed {
-		return data, false
+		return data, false, nil
 	}
-	return t.apply()
+	read, changed := t.apply()
+	return read, changed, nil
+}
+
+// depthRefusal returns the refusal of the first element of data nested deeper
+// than limit, the one [canxml.WithMaxDepth] gives: a decode with that limit
+// alone, into a value that reads no element, follows each element of the root
+// up to that one and refuses it there. A decode that fails before it, on
+// markup encoding/xml does not read, returns its own error. Where the root
+// holds no such element, the element follows the root, and the refusal is
+// that of content after the root.
+func depthRefusal(data []byte, limit int) error {
+	dec := canxml.NewDecoder(bytes.NewReader(bytes.TrimPrefix(data, byteOrderMark)), canxml.WithMaxDepth(limit))
+	if err := dec.Decode(new(struct{})); err != nil {
+		return err
+	}
+	return errAfterRoot()
 }
 
 // start opens the element whose start tag tk spans data from off to end.
@@ -628,8 +651,8 @@ func (t *tolerantReading) closeTimezoneValidity(e *element) {
 
 // holdsQuantity reports whether the model holds e, the assumed_value of a
 // C_DV_QUANTITY: whether canonical XML decodes it, as the reading writes it,
-// inside an element that binds the namespaces bound around it. One nested
-// past the element limit counts as held, for the decode to refuse.
+// inside an element that binds the namespaces bound around it. Nothing e
+// holds is nested past the depth limit, which tolerate refused on the way in.
 func (t *tolerantReading) holdsQuantity(e *element) bool {
 	var b bytes.Buffer
 	b.WriteString("<holder")
@@ -656,8 +679,7 @@ func (t *tolerantReading) holdsQuantity(e *element) bool {
 		b.WriteString("</" + qualified(e.name) + ">")
 	}
 	b.WriteString("</holder>")
-	err := canxml.Unmarshal(b.Bytes(), new(CDVQuantity), canxml.WithMaxDepth(readMaxDepth))
-	return err == nil || errors.Is(err, canxml.ErrLimitExceeded)
+	return canxml.Unmarshal(b.Bytes(), new(CDVQuantity)) == nil
 }
 
 // closeRange reads the bounds of the range r. A bound the parser reads a
@@ -694,16 +716,27 @@ func (t *tolerantReading) closeRange(r *element) {
 			}
 			continue
 		}
-		if s.unbounded != nil && !s.unbounded.nested && !written && !isBlank(s.unbounded.text) {
-			// A flag that is no boolean, which the decode refuses.
-			continue
-		}
-		t.leaveOut(b)
-		if written {
-			t.setText(s.unbounded, "true")
-		}
-		t.includeSide(r, i, false)
+		t.unboundSide(r, i)
 	}
+}
+
+// unboundSide leaves out the bound of side i of the range r and reads the
+// side as unbounded: the unbounded flag the range writes reads true, and the
+// side is included unless the range says otherwise, as a bounded side is,
+// which is how the parser reads a side whose bound bounds nothing. A flag the
+// range writes that is no boolean is left as it is, with the bound, for the
+// decode to refuse.
+func (t *tolerantReading) unboundSide(r *element, i int) {
+	s := r.sides[i]
+	written, _ := boundaryFlag(s.unbounded)
+	if s.unbounded != nil && !s.unbounded.nested && !written && !isBlank(s.unbounded.text) {
+		return
+	}
+	t.leaveOut(s.bound)
+	if written {
+		t.setText(s.unbounded, "true")
+	}
+	t.includeSide(r, i, false)
 }
 
 // closeNumberBound reads the bound of side i of the range r, a range of kind,
@@ -713,25 +746,34 @@ func (t *tolerantReading) closeRange(r *element) {
 // openSide, whose bound the parser does not read. On a bounded side, a bound
 // of a C_INTEGER range or of a quantity's precision is read, in every mode,
 // as the integer bound that admits the same integers (integerBound), its side
-// included where the number is not a whole one; and, in the default mode, a
-// bound of a C_REAL range or of a quantity's magnitude as the Real the parser
-// reads. An integer bound past 32 bits is written as that integer, which the
-// decode refuses as such, and an infinite one stays as it is, which the
-// decode refuses too.
+// included where the number is not a whole one, or, where it is the infinity
+// that admits every integer there, negative on the lower side or positive on
+// the upper one, as the side unbounded (unboundSide); and, in the default
+// mode, a bound of a C_REAL range or of a quantity's magnitude as the Real the
+// parser reads. An integer bound past 32 bits is written as that integer,
+// which the decode refuses as such, and an infinity that admits no integer
+// stays as it is, which the decode refuses as no integer.
 func (t *tolerantReading) closeNumberBound(r *element, i int, kind string, openSide bool) bool {
 	b := r.sides[i].bound
 	integer := kind == "C_INTEGER" || kind == "precision"
 	var (
-		text             string
-		rounded, differs bool
+		text                        string
+		rounded, unbounded, differs bool
 	)
 	switch {
 	case integer && isInteger32(b.text):
 		return true
 	case integer:
-		var ok bool
-		if text, rounded, ok = integerBound(b.text, i == 0); !ok {
+		f, ok := parserFloat(b.text)
+		if !ok {
 			return false
+		}
+		switch {
+		case !math.IsInf(f, 0):
+			text, rounded = integerBound(f, i == 0)
+		case (i == 0) == math.IsInf(f, -1):
+			// It admits every integer on its side, so the side is unbounded.
+			unbounded = true
 		}
 		differs = true
 	case !parserNumber(kind, b.text):
@@ -743,6 +785,8 @@ func (t *tolerantReading) closeNumberBound(r *element, i int, kind string, openS
 	case !differs:
 	case openSide:
 		t.leaveOut(b)
+	case unbounded:
+		t.unboundSide(r, i)
 	case text == "", t.strict && !integer:
 		// Left as it is, for the decode to refuse.
 	default:
@@ -1173,28 +1217,25 @@ func boundText(kind string, text []byte) (string, bool) {
 	return string(b), true
 }
 
-// integerBound reads text, a bound of a C_INTEGER range or of a quantity's
-// precision that is no integer of 32 bits, on the lower side of its range
-// where lower, as the parser does, with strconv.ParseFloat. It reports
-// whether the parser reads a number from it that bounds the integers, which a
-// NaN, compared with no integer, does not, and returns the text of the
-// integer bound that admits the integers that number admits, the number
-// rounded up on the lower side and down on the upper one, and whether
-// rounding changed it. It returns no text for an infinity, which no integer
-// of the model holds.
-func integerBound(text []byte, lower bool) (bound string, rounded, ok bool) {
+// parserFloat reads text, a bound of a C_INTEGER range or of a quantity's
+// precision, as the parser does, with strconv.ParseFloat, without the white
+// space around it. It reports whether the parser reads a number from it that
+// bounds the integers, which a NaN, compared with no integer, does not.
+func parserFloat(text []byte) (float64, bool) {
 	f, err := strconv.ParseFloat(strings.TrimSpace(string(text)), 64)
-	switch {
-	case err != nil, math.IsNaN(f):
-		return "", false, false
-	case math.IsInf(f, 0):
-		return "", false, true
-	}
+	return f, err == nil && !math.IsNaN(f)
+}
+
+// integerBound returns the text of the integer bound that admits the
+// integers f, a finite bound on the lower side of its range where lower,
+// admits: f rounded up on the lower side and down on the upper one, and
+// whether rounding changed it.
+func integerBound(f float64, lower bool) (bound string, rounded bool) {
 	n := math.Floor(f)
 	if lower {
 		n = math.Ceil(f)
 	}
-	return strconv.FormatFloat(n, 'f', -1, 64), n != f, true
+	return strconv.FormatFloat(n, 'f', -1, 64), n != f
 }
 
 // isInteger32 reports whether text, without the white space around it, is an

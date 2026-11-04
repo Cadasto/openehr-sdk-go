@@ -3,10 +3,11 @@ package aom14_test
 // REQ-111 (clinical-modeling.md § REQ-111, Reading the model, "What the
 // reader tolerates"): aom14.ReadOperationalTemplate reads every OPT the
 // deprecated parser reads in its default mode, as the parser reads it, but an
-// integer the model's 32-bit Integer cannot hold and a match_negated of true,
-// which it refuses in every mode. REQ-100 (§ REQ-100, Strict parse mode):
-// given canxml.WithStrict it refuses the shapes the parser's strict mode
-// refuses, and the other readings of the parser's default mode. REQ-170
+// integer the model's 32-bit Integer cannot hold, a match_negated of true and
+// an infinite integer bound that admits no integer, which it refuses in every
+// mode. REQ-100 (§ REQ-100, Strict parse mode): given canxml.WithStrict it
+// refuses the shapes the parser's strict mode refuses, and the other readings
+// of the parser's default mode. REQ-170
 // (wire.md § REQ-170): what a tolerance leaves out is unmatched content, which
 // canxml.WithUnmatched reports, once, at the path it has in the input, or in
 // the element a reading moves it into.
@@ -17,6 +18,7 @@ package aom14_test
 import (
 	"bytes"
 	"errors"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -675,6 +677,7 @@ func TestREQ111_ReaderReportsEachItemOnce(t *testing.T) {
 	for _, name := range []string{
 		"shapes.opt", "values.opt", "values-every-mode.opt", "namespace-v2.opt", "parser-readings.opt",
 		"integer-bounds.opt", "quantity-assumed-value.opt", "attribute-children.opt", "item-namespaces.opt",
+		"infinite-integer-bounds.opt",
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -765,7 +768,7 @@ func TestREQ100_ReaderStrictModeRefusesWhatTheParsersStrictModeRefuses(t *testin
 // TestREQ111_ReaderRefusesAnIntegerPastThirtyTwoBits pins that, in every
 // mode, an integer the model's 32-bit Integer cannot hold is refused, which
 // the parser read, and a range or precision bound written as a decimal that
-// rounds to one or as an infinity, while the largest it holds reads.
+// rounds to one, while the largest it holds reads.
 func TestREQ111_ReaderRefusesAnIntegerPastThirtyTwoBits(t *testing.T) {
 	t.Parallel()
 	const big = "5000000000"
@@ -796,17 +799,6 @@ func TestREQ111_ReaderRefusesAnIntegerPastThirtyTwoBits(t *testing.T) {
 				}
 			})
 		}
-		t.Run(mode+"/an infinite bound", func(t *testing.T) {
-			t.Parallel()
-			for name, doc := range map[string]string{
-				"of a C_INTEGER range":      itemDoc(`<item xsi:type="C_INTEGER"><range><lower>0</lower><upper>Inf</upper></range></item>`),
-				"of a quantity's precision": quantityDoc(`<precision><lower>-Inf</lower><upper>2</upper></precision>`),
-			} {
-				if _, err := aom14.ReadOperationalTemplate(strings.NewReader(doc), opts...); !errors.Is(err, canxml.ErrInvalidShape) {
-					t.Errorf("ReadOperationalTemplate(%s) = %v, want an error wrapping canxml.ErrInvalidShape", name, err)
-				}
-			}
-		})
 		t.Run(mode+"/the largest integer it holds", func(t *testing.T) {
 			t.Parallel()
 			doc := itemDoc(`<item xsi:type="C_INTEGER"><list>2147483647</list></item>`)
@@ -814,6 +806,144 @@ func TestREQ111_ReaderRefusesAnIntegerPastThirtyTwoBits(t *testing.T) {
 				t.Errorf("ReadOperationalTemplate: %v", err)
 			}
 		})
+	}
+}
+
+// TestREQ111_ReaderReadsAnInfiniteIntegerBoundThatAdmitsEveryInteger pins
+// that, in every mode, a bound of a C_INTEGER range or of a quantity's
+// precision written as an infinity that admits every integer on its side,
+// negative on the lower side and positive on the upper one, in any spelling
+// strconv.ParseFloat reads, is read as that side unbounded: the bound is left
+// out, an unbounded flag the range writes reads true, and the side is
+// included unless the range says otherwise. The default mode reports each
+// bound it leaves out; strict mode leaves it out unreported. An infinity that
+// admits no integer, on a side written unbounded, is left out as any bound
+// there is.
+//
+// Can-fail control: refuse every infinite bound, as the reader did before,
+// and each case is refused.
+func TestREQ111_ReaderReadsAnInfiniteIntegerBoundThatAdmitsEveryInteger(t *testing.T) {
+	t.Parallel()
+	fixture := readerFixture(t, "infinite-integer-bounds.opt")
+	fixtureWant := decoded(t, readerFixture(t, "infinite-integer-bounds.read.opt"))
+	fixtureUnmatched := []string{
+		item(1) + "/range[1]/lower[1]",
+		item(2) + "/range[1]/upper[1]",
+		definition + "/attributes[1]/children[3]/attributes[1]/children[1]/list[1]/precision[1]/lower[1]",
+		definition + "/attributes[1]/children[3]/attributes[1]/children[1]/list[1]/precision[1]/upper[1]",
+	}
+	integer := func(rng string) string {
+		return itemDoc(`<item xsi:type="C_INTEGER"><range>` + rng + `</range></item>`)
+	}
+	itemRange := definition + "/attributes[1]/children[1]/item[1]/range[1]"
+	precision := definition + "/attributes[1]/children[1]/list[1]/precision[1]"
+	cases := map[string]struct {
+		doc, want string
+		// unmatched is what the default mode reports.
+		unmatched []string
+	}{
+		"a lower bound of -Inf": {
+			integer(`<lower>-Inf</lower><upper>9</upper>`),
+			integer(`<lower_included>true</lower_included><lower_unbounded>true</lower_unbounded><upper>9</upper>`),
+			[]string{itemRange + "/lower[1]"},
+		},
+		"an upper bound of +Infinity, written bounded and excluded": {
+			integer(`<upper_included>false</upper_included><upper_unbounded>false</upper_unbounded><lower>0</lower><upper> +Infinity </upper>`),
+			integer(`<upper_included>false</upper_included><upper_unbounded>true</upper_unbounded><lower>0</lower>`),
+			[]string{itemRange + "/upper[1]"},
+		},
+		"an upper bound of INF, its included flag empty": {
+			integer(`<upper_included/><lower>0</lower><upper>INF</upper>`),
+			integer(`<upper_included>true</upper_included><upper_unbounded>true</upper_unbounded><lower>0</lower>`),
+			[]string{itemRange + "/upper[1]"},
+		},
+		"a quantity's precision of -infinity and inf": {
+			quantityDoc(`<precision><lower>-infinity</lower><upper>inf</upper></precision>`),
+			quantityDoc(`<precision><lower_included>true</lower_included><upper_included>true</upper_included>` +
+				`<lower_unbounded>true</lower_unbounded><upper_unbounded>true</upper_unbounded></precision>`),
+			[]string{precision + "/lower[1]", precision + "/upper[1]"},
+		},
+		"an infinity that admits no integer on a side written unbounded": {
+			integer(`<lower_unbounded>true</lower_unbounded><lower>+Inf</lower><upper>9</upper>`),
+			integer(`<lower_unbounded>true</lower_unbounded><upper>9</upper>`),
+			[]string{itemRange + "/lower[1]"},
+		},
+	}
+	for mode, opts := range modes {
+		t.Run(mode+"/infinite-integer-bounds.opt", func(t *testing.T) {
+			t.Parallel()
+			want := fixtureUnmatched
+			if mode == "strict" {
+				want = nil
+			}
+			if got := readAs(t, fixture, fixtureWant, opts...); !slices.Equal(got, want) {
+				t.Errorf("WithUnmatched reported %q, want %q", got, want)
+			}
+		})
+		for name, tc := range cases {
+			t.Run(mode+"/"+name, func(t *testing.T) {
+				t.Parallel()
+				want := tc.unmatched
+				if mode == "strict" {
+					want = nil
+				}
+				if got := readAs(t, []byte(tc.doc), decoded(t, []byte(tc.want)), opts...); !slices.Equal(got, want) {
+					t.Errorf("WithUnmatched reported %q, want %q", got, want)
+				}
+			})
+		}
+	}
+}
+
+// TestREQ111_ReaderRefusesAnInfiniteIntegerBoundThatAdmitsNoInteger pins
+// that, in every mode, a bound of a C_INTEGER range or of a quantity's
+// precision written as an infinity that admits no integer, positive on the
+// lower side or negative on the upper one, on a side the range does not write
+// unbounded, is refused with the refusal of the decode that reads it as an
+// integer: an error that wraps canxml.ErrInvalidShape, with the
+// *strconv.NumError of ParseInt beneath it, which wraps strconv.ErrSyntax,
+// not strconv.ErrRange as an integer past 32 bits does, and holds the
+// infinity as written. The error's text carries none of it.
+//
+// Can-fail control: read every infinite bound as unbounded on its side, and
+// each case reads.
+func TestREQ111_ReaderRefusesAnInfiniteIntegerBoundThatAdmitsNoInteger(t *testing.T) {
+	t.Parallel()
+	integer := func(rng string) string {
+		return itemDoc(`<item xsi:type="C_INTEGER"><range>` + rng + `</range></item>`)
+	}
+	cases := map[string]struct {
+		doc     string
+		written string
+		sign    int
+	}{
+		"a C_INTEGER lower bound of +Inf":                 {integer(`<lower>+Inf</lower><upper>9</upper>`), "+Inf", 1},
+		"a C_INTEGER lower bound of Infinity, included":   {integer(`<lower_included>true</lower_included><lower_unbounded>false</lower_unbounded><lower>Infinity</lower><upper>9</upper>`), "Infinity", 1},
+		"a C_INTEGER upper bound of -Infinity":            {integer(`<lower>0</lower><upper> -Infinity </upper>`), "-Infinity", -1},
+		"a quantity's precision lower bound of INF":       {quantityDoc(`<precision><lower>INF</lower><upper>2</upper></precision>`), "INF", 1},
+		"a quantity's precision upper bound of -inf":      {quantityDoc(`<precision><lower>0</lower><upper>-inf</upper></precision>`), "-inf", -1},
+		"a C_INTEGER range, the other bound -Inf as well": {integer(`<lower>-Inf</lower><upper>-Inf</upper>`), "-Inf", -1},
+	}
+	for mode, opts := range modes {
+		for name, tc := range cases {
+			t.Run(mode+"/"+name, func(t *testing.T) {
+				t.Parallel()
+				_, err := aom14.ReadOperationalTemplate(strings.NewReader(tc.doc), opts...)
+				if !errors.Is(err, canxml.ErrInvalidShape) || !errors.Is(err, strconv.ErrSyntax) || errors.Is(err, strconv.ErrRange) {
+					t.Fatalf("ReadOperationalTemplate = %v, want an error wrapping canxml.ErrInvalidShape and strconv.ErrSyntax, not strconv.ErrRange", err)
+				}
+				ne, ok := errors.AsType[*strconv.NumError](err)
+				if !ok || ne == nil || ne.Func != "ParseInt" || ne.Num != tc.written {
+					t.Fatalf("ReadOperationalTemplate = %v, whose *strconv.NumError is %#v; want ParseInt's of %q", err, ne, tc.written)
+				}
+				if f, perr := strconv.ParseFloat(ne.Num, 64); perr != nil || !math.IsInf(f, tc.sign) {
+					t.Errorf("the refused bound %q reads as %v (%v), want an infinity of sign %d", ne.Num, f, perr, tc.sign)
+				}
+				if strings.Contains(err.Error(), tc.written) {
+					t.Errorf("error %q carries the bound", err)
+				}
+			})
+		}
 	}
 }
 
@@ -826,6 +956,7 @@ func TestREQ111_CanonicalXMLKeepsNoneOfTheReadersReadings(t *testing.T) {
 	for _, name := range []string{
 		"shapes.opt", "values.opt", "values-every-mode.opt", "parser-readings.opt",
 		"integer-bounds.opt", "quantity-assumed-value.opt", "attribute-children.opt", "item-namespaces.opt",
+		"infinite-integer-bounds.opt",
 	} {
 		var ot aom14.OperationalTemplate
 		if err := canxml.Unmarshal(readerFixture(t, name), &ot); err == nil {

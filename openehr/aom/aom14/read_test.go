@@ -3,16 +3,18 @@ package aom14_test
 // REQ-108 (clinical-modeling.md § REQ-108, Operational template model reader):
 // aom14.ReadOperationalTemplate refuses an input larger than the size limit,
 // reading at most one byte past it, and an element nested deeper than the
-// element limit, during the decode through canxml.WithMaxDepth, each with an
-// error wrapping canxml.ErrLimitExceeded. REQ-176 (clinical-modeling.md
-// § REQ-176): it reads every corpus operational template into the model as
-// canxml.Unmarshal does, a byte-order-marked one among them, and does not
-// match the root element by name.
+// element limit, during the decode through canxml.WithMaxDepth, and inside
+// content a reading leaves out, each with an error wrapping
+// canxml.ErrLimitExceeded. REQ-176 (clinical-modeling.md § REQ-176): it reads
+// every corpus operational template into the model as canxml.Unmarshal does,
+// a byte-order-marked one among them, and does not match the root element by
+// name.
 
 import (
 	"bytes"
 	"encoding/xml"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -516,6 +518,116 @@ func TestREQ108_ReadOperationalTemplateRefusesADeepElementDuringTheDecode(t *tes
 	if limit := int64(len(head)) + 64<<10; in.n > limit {
 		t.Errorf("read %d bytes of %d before the refusal, want at most %d", in.n, size, limit)
 	}
+}
+
+// leftOut returns a template whose deepest element stands at depth, the root
+// element at depth 1, inside the <item> of a C_PRIMITIVE_OBJECT, at depth 5,
+// whose type names no class, which the default mode leaves out with all it
+// holds. The item carries planted.
+func leftOut(depth int, planted string) string {
+	const itemDepth = 5
+	n := depth - itemDepth
+	return itemDoc(`<item xsi:type="C_FUTURE" note="` + planted + `">` + strings.Repeat("<x>", n) + strings.Repeat("</x>", n) + `</item>`)
+}
+
+// TestREQ108_ReadOperationalTemplateRefusesADeepElementAReadingLeavesOut pins
+// that the element limit, and a caller's smaller limit, hold inside content a
+// reading of the default mode leaves out, which no decode reads: an element
+// nested past the limit there is refused with the *canxml.DecodeError
+// canxml.WithMaxDepth gives, wrapping canxml.ErrLimitExceeded, naming the
+// depth and the element's path and none of the input. A left-out item whose
+// deepest element stands at the limit reads.
+//
+// Can-fail control: let the reading leave the item out without following its
+// elements, and the deep item reads.
+func TestREQ108_ReadOperationalTemplateRefusesADeepElementAReadingLeavesOut(t *testing.T) {
+	t.Parallel()
+	const planted = "PLANTED"
+	// The path of the first element past the limit: eight segments at each
+	// end, the item and its parents first, and its elements past them.
+	const wantPath = "/template[1]/definition[1]/attributes[1]/children[1]/item[1]/x[1]/x[1]/x[1]/..." +
+		"/x[1]/x[1]/x[1]/x[1]/x[1]/x[1]/x[1]/x[1]"
+	cases := []struct {
+		name  string
+		opts  []canxml.DecoderOption
+		limit int
+	}{
+		{name: "the element limit", limit: readElementLimit},
+		{name: "the element limit, with WithUnmatched", opts: []canxml.DecoderOption{canxml.WithUnmatched(func(string) {})}, limit: readElementLimit},
+		{name: "a larger limit of the caller's", opts: []canxml.DecoderOption{canxml.WithMaxDepth(2 * readElementLimit)}, limit: readElementLimit},
+		{name: "a caller's limit of 50", opts: []canxml.DecoderOption{canxml.WithMaxDepth(50)}, limit: 50},
+		{name: "a caller's limit of 50, with WithUnmatched", opts: []canxml.DecoderOption{canxml.WithMaxDepth(50), canxml.WithUnmatched(func(string) {})}, limit: 50},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			within := leftOut(tc.limit, planted)
+			if depth := maxDepth(t, within); depth != tc.limit {
+				t.Fatalf("the document nests %d elements, want %d", depth, tc.limit)
+			}
+			if _, err := aom14.ReadOperationalTemplate(strings.NewReader(within), tc.opts...); err != nil {
+				t.Errorf("ReadOperationalTemplate(a left-out item %d deep): %v", tc.limit, err)
+			}
+			for _, depth := range []int{tc.limit + 1, 400} {
+				_, err := aom14.ReadOperationalTemplate(strings.NewReader(leftOut(depth, planted)), tc.opts...)
+				if !errors.Is(err, canxml.ErrLimitExceeded) {
+					t.Fatalf("ReadOperationalTemplate(a left-out item %d deep) = %v, want an error wrapping canxml.ErrLimitExceeded", depth, err)
+				}
+				de, ok := errors.AsType[*canxml.DecodeError](err)
+				if !ok || de == nil {
+					t.Fatalf("depth refusal %v is not a *canxml.DecodeError", err)
+				}
+				if de.Path != wantPath {
+					t.Errorf("depth refusal names %q, want %q", de.Path, wantPath)
+				}
+				if want := fmt.Sprintf("element depth (%d > %d)", tc.limit+1, tc.limit); !strings.Contains(err.Error(), want) {
+					t.Errorf("depth refusal reads %q, want it to name %q", err, want)
+				}
+				if strings.Contains(err.Error(), planted) {
+					t.Errorf("depth refusal %q carries the input", err)
+				}
+			}
+		})
+	}
+}
+
+// TestREQ108_ReadOperationalTemplateReadsNoFurtherThanTheElementLimit pins
+// that the reader stops at the first element past the element limit inside
+// content a reading leaves out, as the decode does elsewhere, rather than
+// following each element the content holds: refusing an item nested 100 000
+// deep costs about as many allocations as refusing one nested just past the
+// limit. It runs alone, since it counts the allocations of the process.
+//
+// Can-fail control: let the reading note the first element past the limit and
+// read on, refusing the input at its end, and the deeper item costs a few
+// allocations for each of its elements.
+func TestREQ108_ReadOperationalTemplateReadsNoFurtherThanTheElementLimit(t *testing.T) {
+	allocs := func(depth int) float64 {
+		doc := leftOut(depth, "")
+		return testing.AllocsPerRun(2, func() {
+			if _, err := aom14.ReadOperationalTemplate(strings.NewReader(doc)); !errors.Is(err, canxml.ErrLimitExceeded) {
+				t.Fatalf("ReadOperationalTemplate(a left-out item %d deep) = %v, want an error wrapping canxml.ErrLimitExceeded", depth, err)
+			}
+		})
+	}
+	const slack = 1000
+	shallow, deep := allocs(readElementLimit+1), allocs(100_000)
+	if deep > shallow+slack {
+		t.Errorf("refusing a left-out item 100 000 deep costs %.0f allocations, one %d deep %.0f; want at most %d more", deep, readElementLimit+1, shallow, slack)
+	}
+}
+
+// TestREQ108_ReadOperationalTemplateRefusesADeepElementAfterTheRoot pins that
+// an element nested past the element limit after the root element, in a
+// document a reading of the default mode rewrites, is refused as the content
+// after the root it is, with an error wrapping canxml.ErrInvalidShape that
+// carries none of it.
+func TestREQ108_ReadOperationalTemplateRefusesADeepElementAfterTheRoot(t *testing.T) {
+	t.Parallel()
+	const planted = "PLANTED"
+	n := readElementLimit + 80
+	doc := itemDoc(`<item xsi:type="C_FUTURE"/>`) + strings.Repeat("<x>", n) + planted + strings.Repeat("</x>", n)
+	refusesContentOutsideTheRoot(t, doc, planted)
 }
 
 // TestREQ108_ReadOperationalTemplateReads128ConstraintLevels pins that the

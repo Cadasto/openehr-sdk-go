@@ -48,15 +48,16 @@ func newDecoderConfig(opts []DecoderOption) decoderConfig {
 }
 
 // init registers with decodeopts the function that tells the operational
-// template reader of openehr/aom/aom14 two things a []DecoderOption asks for:
-// whether it is strict, which turns off the reader's weaker readings, and
+// template reader of openehr/aom/aom14 three things a []DecoderOption asks
+// for: whether it is strict, which turns off the reader's weaker readings,
 // whether it reports to a function, which the reader then calls from one
-// decode only.
+// decode only, and the depth limit it sets, which the reader applies to what
+// its weaker readings leave out as well.
 func init() {
 	decodeopts.Register(func(opts any) decodeopts.Settings {
 		list, _ := opts.([]DecoderOption)
 		c := newDecoderConfig(list)
-		return decodeopts.Settings{Strict: c.strict, Reports: c.unmatched != nil || c.missing != nil}
+		return decodeopts.Settings{Strict: c.strict, Reports: c.unmatched != nil || c.missing != nil, MaxDepth: c.maxDepth}
 	})
 }
 

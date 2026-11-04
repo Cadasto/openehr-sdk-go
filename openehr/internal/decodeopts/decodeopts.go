@@ -13,6 +13,9 @@ type Settings struct {
 	// Reports is true when the options pass unmatched content, or the
 	// mandatory members the input leaves out, to a function of the caller's.
 	Reports bool
+	// MaxDepth is the depth limit the options set, the smallest positive one
+	// they give, or 0 when they set none.
+	MaxDepth int
 }
 
 // read returns the Settings of a list of options; nil until canxml registers

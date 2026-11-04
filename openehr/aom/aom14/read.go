@@ -41,7 +41,8 @@ const inputBufferMax = 4 << 20
 // byte past the limit to tell the two apart. It refuses an element nested
 // deeper than 320 elements, the root element at depth 1, when it reads the
 // element's start tag, before it reads on; that leaves room for 128 levels of
-// constraint objects below the definition. Both refusals wrap
+// constraint objects below the definition. It does so wherever the element
+// stands, inside content a reading below leaves out too. Both refusals wrap
 // [canxml.ErrLimitExceeded], so one errors.Is test matches either, and
 // neither carries any of the input. The size refusal names the limit; the
 // depth refusal is the [canxml.DecodeError] that [canxml.WithMaxDepth]
@@ -86,7 +87,10 @@ const inputBufferMax = 4 << 20
 //     decimal number, such as 1.0 or 2.5, which the parser reads as a float,
 //     as the integer bound that admits the same integers: a lower bound
 //     rounded up and an upper one down, the side included where the number
-//     is not a whole one;
+//     is not a whole one; and one written as an infinity that admits every
+//     integer on its side, such as -Inf on the lower side or +Infinity on the
+//     upper one, as that side unbounded, included unless the range says
+//     otherwise;
 //   - an empty timezone_validity of a C_DATE, C_TIME or C_DATE_TIME as
 //     absent, which is optional;
 //   - a range bound on a side the range writes unbounded, which the parser
@@ -145,15 +149,24 @@ const inputBufferMax = 4 << 20
 // unreported, and the reader refuses each shape and value the default mode
 // alone reads, as it refuses a bare type attribute on such an element, which
 // canonical XML reads as its type, and an empty list entry or range bound of
-// a C_INTEGER or C_REAL, which canonical XML reads as 0. In every mode it
-// refuses an integer that the model's 32-bit Integer cannot hold, a bound of
-// a C_INTEGER range or of a quantity's precision that rounds to one or is
-// infinite among them, and a match_negated of true, which the parser ignores
-// and so reads with its meaning inverted. A document that needs none of these
-// readings is decoded once; one that needs one is decoded a second time,
-// from the bytes the reader keeps of the input, but for what it reads past
-// before and after the root, and so is every document when opts pass what
-// the decode reports to a function, which sees each item once.
+// a C_INTEGER or C_REAL, which canonical XML reads as 0.
+//
+// In every mode the reader refuses an integer that the model's 32-bit
+// Integer cannot hold, a bound of a C_INTEGER range or of a quantity's
+// precision that rounds to one among them, with an error that wraps
+// [strconv.ErrRange]. It refuses such a bound of positive infinity on the
+// lower side or of negative infinity on the upper one, on a side the range
+// does not write unbounded, which admits no integer, with the error of the
+// decode that reads it as an integer: one that wraps [strconv.ErrSyntax],
+// whose [strconv.NumError] holds the infinity as written. And it refuses a
+// match_negated of true, which the parser ignores and so reads with its
+// meaning inverted.
+//
+// A document that needs none of these readings is decoded once; one that
+// needs one is decoded a second time, from the bytes the reader keeps of the
+// input, but for what it reads past before and after the root, and so is
+// every document when opts pass what the decode reports to a function, which
+// sees each item once.
 //
 // A caller that decodes an operational template with [canxml.Unmarshal] or a
 // [canxml.Decoder] itself gets neither limit and none of these readings
@@ -211,7 +224,17 @@ func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*Operat
 	}
 	data := in.Bytes()
 	if tolerant {
-		if read, changed := tolerate(data, settings.Strict); changed {
+		// The second reading may leave out content no decode then reads, so
+		// it holds the input to the decode's depth limit itself.
+		maxDepth := readMaxDepth
+		if settings.MaxDepth > 0 {
+			maxDepth = min(maxDepth, settings.MaxDepth)
+		}
+		read, changed, err := tolerate(data, settings.Strict, maxDepth)
+		if err != nil {
+			return nil, err
+		}
+		if changed {
 			return readResult(readDocument(bufio.NewReader(bytes.NewReader(read)), opts, settings.Strict))
 		}
 	}
