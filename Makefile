@@ -330,8 +330,10 @@ cdr-crosscheck: ## Cross-check generated documents and CDR examples against live
 	 $(GO) run ./cmd/cdrcheck -sdk-commit "$$rev" $(ARGS)
 
 # The folder is read where it is: the Docker fallback mounts it read-only at
-# the same path, so the file names the check prints are the host's.
-PARITY_DIR = $(abspath $(DIR))
+# the same path, so the file names the check prints are the host's. Make's
+# abspath splits its argument on white space, so a folder name that contains
+# a space would be two paths. Resolve DIR as one path.
+PARITY_DIR = $(shell python3 -c 'import os,sys; print(os.path.abspath(sys.argv[1]))' '$(DIR)')
 PARITY_GO  = $(if $(HOST_GO_OK),TEMPLATE_PARITY_DIR="$(PARITY_DIR)" go,$(DOCKER_RUN) -v "$(PARITY_DIR):$(PARITY_DIR):ro" -e TEMPLATE_PARITY_DIR="$(PARITY_DIR)" go go)
 
 template-parity: ## Deprecated-parser parity over the OPTs under DIR (opt-in)
