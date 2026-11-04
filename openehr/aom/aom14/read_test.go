@@ -784,22 +784,40 @@ func TestREQ108_ReadOperationalTemplateChecksInLinearTime(t *testing.T) {
 
 // TestREQ108_ReadOperationalTemplateRewritesInLinearTime pins that the second
 // reading rewrites a document in time in proportion to its size, however
-// many elements it rewrites: 50 000 empty list entries of a C_INTEGER, 20 000
-// C_BOOLEAN items with an empty true_valid and false_valid, and 20 000
-// <children> typed with a primitive class each read in about the time a
-// document of that size that needs no rewrite takes. It runs alone, since it
-// times the reads.
+// many elements it rewrites and however many namespaces it declares: 50 000
+// empty list entries of a C_INTEGER, 20 000 C_BOOLEAN items with an empty
+// true_valid and false_valid, 20 000 <children> typed with a primitive class,
+// 20 000 <children> with no type under 20 000 namespace declarations, 2 000
+// quantities whose assumed value the model cannot hold under 2 000
+// declarations, an item typed C_PRIMITIVE_OBJECT that declares 4 000
+// namespaces and holds 4 000 elements, and 40 000 names a fresh prefix could
+// take in text each read in about the time a document of that size takes
+// that needs no rewrite, or that needs one but holds none of these. It runs
+// alone, since it times the reads.
 //
 // Can-fail control: let each rewritten element forget the edits made inside
-// it by scanning every edit made so far, or render its content by scanning
-// them all once for each member, and each document takes tens of times as
-// long as its baseline.
+// it by scanning every edit made so far, render its content by scanning them
+// all once for each member, look a prefix up by scanning back through every
+// declaration in scope, bind every prefix in scope around each assumed value
+// it checks, copy every declaration of an item it takes off to each element
+// the item holds, or try one fresh prefix after another against the whole
+// input, and the documents take tens of times as long as their baselines.
 func TestREQ108_ReadOperationalTemplateRewritesInLinearTime(t *testing.T) {
-	const head = `<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">` +
-		`<template_id><value>t</value></template_id><definition><rm_type_name>CLUSTER</rm_type_name><node_id>at0000</node_id>` +
-		`<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>items</rm_attribute_name>` +
-		`<existence><lower>0</lower><upper>1</upper></existence>` +
-		`<cardinality><is_ordered>true</is_ordered><is_unique>false</is_unique><interval><lower>0</lower><upper_unbounded>true</upper_unbounded></interval></cardinality>`
+	declarations := func(n int) string {
+		var b strings.Builder
+		for i := range n {
+			fmt.Fprintf(&b, ` xmlns:p%d="urn:x-openehr-sdk-go:test:p%d"`, i, i)
+		}
+		return b.String()
+	}
+	headWith := func(rootAttrs string) string {
+		return `<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"` + rootAttrs + `>` +
+			`<template_id><value>t</value></template_id><definition><rm_type_name>CLUSTER</rm_type_name><node_id>at0000</node_id>` +
+			`<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>items</rm_attribute_name>` +
+			`<existence><lower>0</lower><upper>1</upper></existence>` +
+			`<cardinality><is_ordered>true</is_ordered><is_unique>false</is_unique><interval><lower>0</lower><upper_unbounded>true</upper_unbounded></interval></cardinality>`
+	}
+	head := headWith("")
 	const tail = `</attributes></definition></template>`
 	integer := func(entries string) string {
 		return head + `<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>INTEGER</rm_type_name><node_id/>` +
@@ -810,6 +828,26 @@ func TestREQ108_ReadOperationalTemplateRewritesInLinearTime(t *testing.T) {
 	}
 	leaf := func(class string) string {
 		return `<children xsi:type="` + class + `"><node_id/></children>`
+	}
+	quantity := func(magnitude string) string {
+		return `<children xsi:type="C_DV_QUANTITY"><rm_type_name>DV_QUANTITY</rm_type_name><node_id/>` +
+			`<assumed_value><magnitude>` + magnitude + `</magnitude><units>kg</units></assumed_value></children>`
+	}
+	item := func(class string, n int) string {
+		return head + `<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>STRING</rm_type_name><node_id/>` +
+			`<item xsi:type="` + class + `"` + declarations(n) + `>` + strings.Repeat(`<x/>`, n) +
+			`<item xsi:type="C_STRING"><list>a</list></item></item></children>` + tail
+	}
+	// A template with no namespace declaration of the XSI one, every slot of
+	// which the second reading types, whose concept holds n names.
+	untypedWith := func(name string, n int) string {
+		var b strings.Builder
+		for i := range n {
+			fmt.Fprintf(&b, "%s%d: ", name, i)
+		}
+		return `<template xmlns="http://schemas.openehr.org/v1"><concept>` + b.String() + `</concept>` +
+			`<template_id><value>t</value></template_id><definition><rm_type_name>CLUSTER</rm_type_name><node_id>at0000</node_id>` +
+			`<attributes><rm_attribute_name>items</rm_attribute_name><children><node_id>at0001</node_id></children></attributes></definition></template>`
 	}
 	holdsLinearCost(t, []costCase{
 		{
@@ -828,6 +866,30 @@ func TestREQ108_ReadOperationalTemplateRewritesInLinearTime(t *testing.T) {
 			name:     "<children> typed with a primitive class",
 			doc:      head + strings.Repeat(leaf("C_STRING"), 20_000) + tail,
 			baseline: head + strings.Repeat(leaf("C_COMPLEX_OBJECT"), 20_000) + tail,
+			modes:    []string{"default"},
+		},
+		{
+			name:     "<children> with no type under namespace declarations",
+			doc:      headWith(declarations(20_000)) + strings.Repeat(`<children><node_id/></children>`, 20_000) + tail,
+			baseline: headWith(declarations(20_000)) + strings.Repeat(leaf("C_COMPLEX_OBJECT"), 20_000) + tail,
+			modes:    []string{"default"},
+		},
+		{
+			name:     "quantities whose assumed value the model cannot hold under namespace declarations",
+			doc:      headWith(declarations(2_000)) + strings.Repeat(quantity("x"), 2_000) + tail,
+			baseline: headWith(declarations(2_000)) + strings.Repeat(quantity("1"), 2_000) + tail,
+			modes:    []string{"default", "strict"},
+		},
+		{
+			name:     "an item typed C_PRIMITIVE_OBJECT that declares namespaces and holds elements",
+			doc:      item("C_PRIMITIVE_OBJECT", 4_000),
+			baseline: item("C_STRING", 4_000),
+			modes:    []string{"default"},
+		},
+		{
+			name:     "names a fresh prefix could take",
+			doc:      untypedWith("xsi", 40_000),
+			baseline: untypedWith("xsj", 40_000),
 			modes:    []string{"default"},
 		},
 	})

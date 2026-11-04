@@ -6,6 +6,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"io"
+	"maps"
 	"math"
 	"slices"
 	"strconv"
@@ -99,8 +100,17 @@ type element struct {
 	// unwrap is an item of a class the parser reads a constraint of that is
 	// no primitive, read as the object that holds it: host, of the item's
 	// class unless it is a C_PRIMITIVE_OBJECT, whose own item is then host's.
-	unwrap      bool
-	host        *element
+	unwrap bool
+	host   *element
+	// inherits is an element an item the reading takes off holds, which
+	// declares what the item declares that it and what it holds use.
+	inherits bool
+	// uses are the prefixes an element that inherits, and what it holds, use
+	// in their names, but those an element that inherits inside it uses.
+	uses map[string]bool
+	// declares are the namespace declarations an item the reading takes off
+	// makes, by prefix, once read.
+	declares    map[string]xml.Attr
 	cardinality bool         // an attribute that holds a <cardinality>
 	archetypeID bool         // an object that holds an archetype id
 	seen        uint8        // the flags a C_BOOLEAN item holds
@@ -131,12 +141,18 @@ type binding struct {
 
 // tolerantReading rewrites one document; see [tolerate].
 type tolerantReading struct {
-	data     []byte
-	strict   bool
-	scope    []binding
-	open     []*element
-	edits    []edit
-	xsiFresh string // a prefix the input does not use, once one is chosen
+	data   []byte
+	strict bool
+	// scope holds the namespace declarations in scope, in the order the
+	// reading met them, and bound the namespaces each prefix is bound to
+	// there, the innermost last, so that a lookup costs one step.
+	scope []binding
+	bound map[string][]string
+	open  []*element
+	// inheriting holds the open elements that inherit, the innermost last.
+	inheriting []*element
+	edits      []edit
+	xsiFresh   string // a prefix the input does not use, once one is chosen
 	// failed is set where two edits a rendering makes overlap, which the
 	// reading does not make. The input is then left as it is, for the decode
 	// to refuse.
@@ -158,7 +174,7 @@ type tolerantReading struct {
 // holds data to maxDepth itself: it reads no further than the first element
 // nested deeper, and returns the refusal of that element (depthRefusal).
 func tolerate(data []byte, strict bool, maxDepth int) ([]byte, bool, error) {
-	t := &tolerantReading{data: data, strict: strict}
+	t := &tolerantReading{data: data, strict: strict, bound: make(map[string][]string)}
 	base := 0
 	if bytes.HasPrefix(data, byteOrderMark) {
 		base = len(byteOrderMark)
@@ -245,7 +261,7 @@ func (t *tolerantReading) start(tk xml.StartElement, off, end int) {
 			e.attrs[i].Value = canxml.NSDefault
 			e.dirty = true
 		}
-		t.scope = append(t.scope, binding{prefix: prefix, uri: e.attrs[i].Value})
+		t.push(prefix, e.attrs[i].Value)
 	}
 	// encoding/xml reads a prefix no declaration binds as a namespace of that
 	// name, which the default mode reads as canonical XML's too.
@@ -253,7 +269,7 @@ func (t *tolerantReading) start(tk xml.StartElement, off, end int) {
 		if _, ok := t.lookup(p); !ok {
 			e.attrs = append(e.attrs, xml.Attr{Name: xml.Name{Space: "xmlns", Local: p}, Value: canxml.NSDefault})
 			e.dirty = true
-			t.scope = append(t.scope, binding{prefix: p, uri: canxml.NSDefault})
+			t.push(p, canxml.NSDefault)
 		}
 	}
 	for i, a := range e.attrs {
@@ -274,7 +290,11 @@ func (t *tolerantReading) start(tk xml.StartElement, off, end int) {
 		e.endTag = end
 	}
 	if parent != nil && parent.unwrap {
-		inheritDeclarations(e, parent)
+		e.inherits, e.uses = true, make(map[string]bool)
+		t.inheriting = append(t.inheriting, e)
+	}
+	if n := len(t.inheriting); n > 0 {
+		t.inheriting[n-1].useNames(e)
 	}
 	if parent != nil && t.isOpenEHR(e.name) {
 		e.role = t.roleOf(parent, e)
@@ -520,6 +540,15 @@ func (t *tolerantReading) close(off, end int) {
 	if !e.self {
 		e.endTag, e.end = off, end
 	}
+	if e.inherits {
+		t.inheriting = t.inheriting[:len(t.inheriting)-1]
+		inheritDeclarations(e)
+		if n := len(t.inheriting); n > 0 {
+			for p := range e.uses {
+				t.inheriting[n-1].uses[p] = true
+			}
+		}
+	}
 	switch e.role {
 	case roleValue:
 		t.closeValue(e)
@@ -565,7 +594,7 @@ func (t *tolerantReading) close(off, end int) {
 	case roleNone, roleRoot, roleQuantityItem, roleArchetypeID:
 		t.closeTag(e)
 	}
-	t.scope = t.scope[:e.scope]
+	t.popScope(e.scope)
 }
 
 // closeValue reads the text of the value e.
@@ -695,35 +724,66 @@ func (t *tolerantReading) closeTimezoneValidity(e *element) {
 
 // holdsQuantity reports whether the model holds e, the assumed_value of a
 // C_DV_QUANTITY: whether canonical XML decodes it, as the reading writes it,
-// inside an element that binds the namespaces bound around it. Nothing e
-// holds is nested past the depth limit, which tolerate refused on the way in.
+// inside an element that binds the prefixes it uses as they are bound around
+// it. Nothing e holds is nested past the depth limit, which tolerate refused
+// on the way in.
 func (t *tolerantReading) holdsQuantity(e *element) bool {
+	var frag bytes.Buffer
+	frag.WriteString(t.startTag(e))
+	if e.self {
+		frag.WriteString("/>")
+	} else {
+		frag.WriteByte('>')
+		frag.Write(t.render(e.mark, e.tagEnd, e.endTag))
+		frag.WriteString("</" + qualified(e.name) + ">")
+	}
 	var b bytes.Buffer
 	b.WriteString("<holder")
-	bound := make(map[string]bool)
-	for _, d := range slices.Backward(t.scope[:e.scope]) {
-		if bound[d.prefix] {
+	for _, prefix := range usedPrefixes(frag.Bytes()) {
+		// e's own declarations, in scope where it closes, bind its prefixes
+		// as its start tag does.
+		uri, ok := t.lookup(prefix)
+		if !ok {
 			continue
 		}
-		bound[d.prefix] = true
-		name := xml.Name{Space: "xmlns", Local: d.prefix}
-		if d.prefix == "" {
+		name := xml.Name{Space: "xmlns", Local: prefix}
+		if prefix == "" {
 			name = xml.Name{Local: "xmlns"}
 		}
 		b.WriteString(" " + qualified(name) + `="`)
-		_ = xml.EscapeText(&b, []byte(d.uri)) // a bytes.Buffer does not fail
+		_ = xml.EscapeText(&b, []byte(uri)) // a bytes.Buffer does not fail
 		b.WriteByte('"')
 	}
-	b.WriteString(">" + t.startTag(e))
-	if e.self {
-		b.WriteString("/>")
-	} else {
-		b.WriteByte('>')
-		b.Write(t.render(e.mark, e.tagEnd, e.endTag))
-		b.WriteString("</" + qualified(e.name) + ">")
-	}
+	b.WriteByte('>')
+	b.Write(frag.Bytes())
 	b.WriteString("</holder>")
 	return canxml.Unmarshal(b.Bytes(), new(CDVQuantity)) == nil
+}
+
+// usedPrefixes returns the prefixes the names of the elements and attributes
+// of frag, a fragment of the input, use, but those of namespace
+// declarations, the default namespace's "" first and the others in the order
+// of their names. A fragment encoding/xml does not read uses those it reads.
+func usedPrefixes(frag []byte) []string {
+	used := map[string]bool{"": true}
+	d := xml.NewDecoder(bytes.NewReader(frag))
+	for {
+		tok, err := d.RawToken()
+		if err != nil {
+			break
+		}
+		start, ok := tok.(xml.StartElement)
+		if !ok {
+			continue
+		}
+		used[start.Name.Space] = true
+		for _, a := range start.Attr {
+			if !isDeclaration(a.Name) && a.Name.Space != "" {
+				used[a.Name.Space] = true
+			}
+		}
+	}
+	return slices.Sorted(maps.Keys(used))
 }
 
 // closeRange reads the bounds of the range r. A bound the parser reads a
@@ -941,23 +1001,47 @@ func (t *tolerantReading) unwrapItem(e *element) {
 	t.add(e.endTag, e.end, "")
 }
 
-// inheritDeclarations adds to the start tag of e each namespace declaration
-// of its parent, an item the reading takes off, that e does not make itself
-// for the same prefix. Taking the item's tags off then changes the name of no
-// element: e and what it holds keep the names they had inside the item, and
-// no element outside it sees the item's declarations.
-func inheritDeclarations(e, parent *element) {
-	own := len(e.attrs)
-	for _, a := range parent.attrs {
-		prefix, ok := declared(a.Name)
-		if !ok {
-			continue
+// useNames adds to e.uses the prefixes the name of x, and the names of its
+// attributes but its namespace declarations, carry, the default namespace's
+// "" for a name without one.
+func (e *element) useNames(x *element) {
+	e.uses[x.name.Space] = true
+	for _, a := range x.attrs {
+		if !isDeclaration(a.Name) && a.Name.Space != "" {
+			e.uses[a.Name.Space] = true
 		}
-		if _, declares := declaredIn(e.attrs[:own], prefix); declares {
-			continue
+	}
+}
+
+// inheritDeclarations adds to the start tag of e, an element that inherits,
+// each namespace declaration of its parent, an item the reading takes off,
+// for a prefix e or what it holds uses (e.uses) that e does not declare
+// itself. Taking the item's tags off then changes the name of no element: e
+// and what it holds keep the names they had inside the item, and no element
+// outside it sees the item's declarations. Each element the item holds
+// declares only what it uses, so that the item's declarations are not
+// written once for each of them.
+func inheritDeclarations(e *element) {
+	item := e.parent
+	if item.declares == nil {
+		item.declares = make(map[string]xml.Attr)
+		for _, a := range item.attrs {
+			if prefix, ok := declared(a.Name); ok {
+				item.declares[prefix] = a
+			}
 		}
-		e.attrs = append(e.attrs, a)
-		e.dirty = true
+	}
+	own := make(map[string]bool)
+	for _, a := range e.attrs {
+		if prefix, ok := declared(a.Name); ok {
+			own[prefix] = true
+		}
+	}
+	for _, prefix := range slices.Sorted(maps.Keys(e.uses)) {
+		if a, ok := item.declares[prefix]; ok && !own[prefix] {
+			e.attrs = append(e.attrs, a)
+			e.dirty = true
+		}
 	}
 }
 
@@ -1097,53 +1181,69 @@ func (t *tolerantReading) startTag(e *element) string {
 }
 
 // xsiPrefix returns a prefix to write an xsi:type with on the innermost open
-// element: one bound to the XSI namespace there, or else one the input does
-// not use, which the element must declare.
+// element: xsi where it is bound to the XSI namespace there, or else one the
+// input does not use (freshPrefix), which the element must declare.
 func (t *tolerantReading) xsiPrefix() (string, bool) {
-	for _, b := range slices.Backward(t.scope) {
-		if b.prefix == "" || b.uri != canxml.NSXSI {
-			continue
-		}
-		if uri, _ := t.lookup(b.prefix); uri == canxml.NSXSI {
-			return b.prefix, false
-		}
+	if uri, _ := t.lookup("xsi"); uri == canxml.NSXSI {
+		return "xsi", false
 	}
 	if t.xsiFresh == "" {
-		for n := 0; ; n++ {
-			p := "xsi" + strconv.Itoa(n)
-			if !bytes.Contains(t.data, []byte(p+":")) && !bytes.Contains(t.data, []byte("xmlns:"+p)) {
-				t.xsiFresh = p
-				break
-			}
-		}
+		t.xsiFresh = freshPrefix(t.data)
 	}
 	return t.xsiFresh, true
 }
 
+// freshPrefix returns xsiN for the least N such that data holds no xsi
+// followed by the digits of N: a prefix data neither declares nor uses. It
+// reads data once.
+func freshPrefix(data []byte) string {
+	used := make(map[int]bool)
+	word := []byte("xsi")
+	for i := 0; ; {
+		j := bytes.Index(data[i:], word)
+		if j < 0 {
+			break
+		}
+		i += j + len(word)
+		k := i
+		// A number of more digits than this names no prefix a small N gives.
+		for k < len(data) && k-i < 9 && '0' <= data[k] && data[k] <= '9' {
+			k++
+		}
+		if n, err := strconv.Atoi(string(data[i:k])); err == nil {
+			used[n] = true
+		}
+	}
+	n := 0
+	for used[n] {
+		n++
+	}
+	return "xsi" + strconv.Itoa(n)
+}
+
+// push binds prefix to uri where the reading stands.
+func (t *tolerantReading) push(prefix, uri string) {
+	t.scope = append(t.scope, binding{prefix: prefix, uri: uri})
+	t.bound[prefix] = append(t.bound[prefix], uri)
+}
+
+// popScope unbinds the declarations past the first n in scope.
+func (t *tolerantReading) popScope(n int) {
+	for len(t.scope) > n {
+		b := t.scope[len(t.scope)-1]
+		t.scope = t.scope[:len(t.scope)-1]
+		stack := t.bound[b.prefix]
+		t.bound[b.prefix] = stack[:len(stack)-1]
+	}
+}
+
 // lookup returns the namespace prefix is bound to where the reading stands.
 func (t *tolerantReading) lookup(prefix string) (string, bool) {
-	return lookupIn(t.scope, prefix)
-}
-
-// lookupIn returns the namespace prefix is bound to in scope.
-func lookupIn(scope []binding, prefix string) (string, bool) {
-	for _, b := range slices.Backward(scope) {
-		if b.prefix == prefix {
-			return b.uri, true
-		}
+	stack := t.bound[prefix]
+	if len(stack) == 0 {
+		return "", false
 	}
-	return "", false
-}
-
-// declaredIn returns the namespace attrs, the attributes of a start tag,
-// bind prefix to, "" for the default namespace.
-func declaredIn(attrs []xml.Attr, prefix string) (string, bool) {
-	for _, a := range attrs {
-		if p, ok := declared(a.Name); ok && p == prefix {
-			return a.Value, true
-		}
-	}
-	return "", false
+	return stack[len(stack)-1], true
 }
 
 // isForeignNamespace reports whether the default mode reads uri, the
