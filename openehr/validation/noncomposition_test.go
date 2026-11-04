@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
@@ -47,9 +47,9 @@ func mustReplaceOnce(t *testing.T, s, old, replacement string) string {
 
 func mustCompileOPT(t *testing.T, name string) *templatecompile.Compiled {
 	t.Helper()
-	opt, err := template.ParseFile(fixtures.TemplateOpt(name))
+	opt, err := readOPTFile(fixtures.TemplateOpt(name))
 	if err != nil {
-		t.Fatalf("ParseFile(%s): %v", name, err)
+		t.Fatalf("readOPTFile(%s): %v", name, err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
@@ -60,9 +60,9 @@ func mustCompileOPT(t *testing.T, name string) *templatecompile.Compiled {
 
 func mustCompileInline(t *testing.T, body string) *templatecompile.Compiled {
 	t.Helper()
-	opt, err := template.ParseOPT(strings.NewReader(body))
+	opt, err := aom14.ReadOperationalTemplate(strings.NewReader(body))
 	if err != nil {
-		t.Fatalf("ParseOPT: %v", err)
+		t.Fatalf("ReadOperationalTemplate: %v", err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {

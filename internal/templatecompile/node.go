@@ -4,6 +4,8 @@ import (
 	"maps"
 	"slices"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
@@ -25,23 +27,22 @@ func IsAOMPrimitiveShortName(s string) bool {
 	}
 }
 
-// CompiledNode is one node in the compiled OPT tree. Mirrors the
-// OPT's [template.Node] taxonomy (ComplexObject / ArchetypeRoot /
-// Slot) collapsed into a single struct because walker code rarely
-// cares about the wire-side discrimination; it asks
+// CompiledNode is one node in the compiled OPT tree: one constraint object
+// of the operational template model, whichever its kind (complex object,
+// archetype root, slot, or a primitive or domain-type leaf), collapsed into a
+// single struct because walker code rarely cares about the kind; it asks
 // "what's the AQL path of this thing, what does it constrain, and
 // can I descend".
 //
 // IsSlot distinguishes leaf slot-fill points from descendable
 // objects; ArchetypeID is non-empty exactly when the OPT pinned an
-// archetype id on this node (i.e. it was a *ArchetypeRoot on the
-// wire side).
+// archetype id on this node (i.e. it was a C_ARCHETYPE_ROOT).
 type CompiledNode struct {
 	aqlPath     string
 	rmTypeName  string
 	nodeID      string
 	nodeName    string
-	archetypeID string // empty unless this node was an *ArchetypeRoot on the wire
+	archetypeID string // empty unless this node is a C_ARCHETYPE_ROOT
 	occurrences *template.Multiplicity
 	attributes  []*CompiledAttribute
 	parent      *CompiledNode
@@ -51,11 +52,19 @@ type CompiledNode struct {
 	slot *slotInfo
 
 	// primitive carries the typed REQ-103 constraint value when the
-	// wire xsi:type was a primitive. Nil for non-primitive nodes
-	// (composition root, archetype roots, slots, plain complex objects).
+	// constraint object is a primitive or domain-type leaf. Nil for
+	// non-primitive nodes (composition root, archetype roots, slots, plain
+	// complex objects).
 	primitive constraints.PrimitiveConstraint
 
-	// terms is populated only on *ArchetypeRoot-derived nodes. At-codes
+	// defaultValue is the canonical JSON of the default value the
+	// template's <constraints> give the node, which Compile has decoded
+	// once; nil when they give none ([placeDefaultValues]). The node keeps
+	// the encoding rather than the value so that each call of
+	// [CompiledNode.DefaultValue] decodes a value of the caller's own.
+	defaultValue []byte
+
+	// terms is populated only on archetype-root nodes. At-codes
 	// are scoped to their enclosing archetype root; the same at-code
 	// can have different meanings under sibling roots. See [Term] for
 	// the parent-walk lookup that respects scope.
@@ -71,7 +80,8 @@ type CompiledNode struct {
 }
 
 // slotInfo is what a slot node carries beyond the fields every node has:
-// its raw include and exclude assertion strings and its parsed rules. It
+// the archetype-id pattern of each include and exclude assertion and its
+// parsed rules. It
 // sits behind a pointer so that the many nodes that are not slots do not
 // carry room for it.
 type slotInfo struct {
@@ -89,7 +99,7 @@ func (n *CompiledNode) AQLPath() string { return n.aqlPath }
 func (n *CompiledNode) RMTypeName() string { return n.rmTypeName }
 
 // NodeID returns the archetype node id (at-code) of this node, or
-// "" when none is set on the wire.
+// "" when the template sets none.
 func (n *CompiledNode) NodeID() string { return n.nodeID }
 
 // NodeName returns the template-level node name (the fixed C_STRING
@@ -97,16 +107,20 @@ func (n *CompiledNode) NodeID() string { return n.nodeID }
 // pins no fixed name. The archetype concept term is never
 // substituted: distinct sibling names are what disambiguate a reused
 // archetype under one slot, and the reference WebTemplate derives its
-// node ids and name-predicated paths from this value. Carried
-// verbatim from [template.ObjectNode.NodeName].
+// node ids and name-predicated paths from this value. A node pins a name
+// when its name attribute holds a DV_TEXT or DV_CODED_TEXT whose value is a
+// C_STRING listing exactly one entry, not blank, in a list that is not open;
+// the name is that entry, trimmed. Where the name attribute has
+// alternatives, the first that pins a name gives it. A slot pins none.
 func (n *CompiledNode) NodeName() string { return n.nodeName }
 
-// ArchetypeID returns the slot-fill archetype id when this node was
-// a *ArchetypeRoot on the OPT wire side; otherwise "".
+// ArchetypeID returns the slot-fill archetype id when this node is a
+// C_ARCHETYPE_ROOT; otherwise "".
 func (n *CompiledNode) ArchetypeID() string { return n.archetypeID }
 
-// Occurrences returns the parsed occurrences interval, or nil when
-// the OPT did not declare one for this node.
+// Occurrences returns the occurrences interval, closed on each bounded
+// side, or nil when the OPT did not declare one for this node, and for a
+// slot, whose occurrences the compiled node does not carry.
 func (n *CompiledNode) Occurrences() *template.Multiplicity {
 	return n.occurrences
 }
@@ -133,12 +147,16 @@ func (n *CompiledNode) Attribute(name string) *CompiledAttribute {
 // Parent returns the immediate parent node, or nil for the root.
 func (n *CompiledNode) Parent() *CompiledNode { return n.parent }
 
-// IsSlot reports whether the wire-side node was an *ARCHETYPE_SLOT
-// (i.e. an opaque slot-fill point with no descendable structure).
+// IsSlot reports whether the node is an ARCHETYPE_SLOT (i.e. an opaque
+// slot-fill point with no descendable structure).
 func (n *CompiledNode) IsSlot() bool { return n.slot != nil }
 
-// SlotIncludes returns a defensive copy of the slot's raw
-// archetype-id include assertion strings. Empty for non-slot nodes.
+// SlotIncludes returns the archetype-id pattern of each of the slot's
+// include assertions, in order, as its slot rules read it: the pattern of
+// its `archetype_id/value matches {…}` text form, else of its expression
+// tree, trimmed and without its enclosing slashes. An assertion that gives
+// no pattern is left out. The slice is the caller's own; it is empty for
+// non-slot nodes.
 func (n *CompiledNode) SlotIncludes() []string {
 	if n.slot == nil {
 		return nil
@@ -146,8 +164,9 @@ func (n *CompiledNode) SlotIncludes() []string {
 	return slices.Clone(n.slot.includes)
 }
 
-// SlotExcludes returns a defensive copy of the slot's raw
-// archetype-id exclude assertion strings. Empty for non-slot nodes.
+// SlotExcludes returns the archetype-id pattern of each of the slot's
+// exclude assertions, as [CompiledNode.SlotIncludes] does for its includes.
+// The slice is the caller's own; it is empty for non-slot nodes.
 func (n *CompiledNode) SlotExcludes() []string {
 	if n.slot == nil {
 		return nil
@@ -188,11 +207,32 @@ func (n *CompiledNode) ExampleSlotFillArchetypeID() string {
 }
 
 // PrimitiveConstraint returns the typed primitive constraint value for
-// this node, or nil when the wire xsi:type was not a primitive in
-// the closed set. Mirrors [template.ComplexObject.PrimitiveConstraint];
-// the compile step copies the value through without modification.
+// this node, or nil when the node is not a primitive in the closed set: the
+// constraint a C_PRIMITIVE_OBJECT's item, a C_CODE_PHRASE, a
+// C_CODE_REFERENCE, a C_DV_QUANTITY, a C_DV_ORDINAL or a CONSTRAINT_REF
+// states. A C_PRIMITIVE_OBJECT with no item, which allows any value, has
+// none.
 func (n *CompiledNode) PrimitiveConstraint() constraints.PrimitiveConstraint {
 	return n.primitive
+}
+
+// DefaultValue returns the default value that the template's <constraints>
+// give this node, or nil when they give it none. A default value is the
+// default_value of a T_COMPLEX_OBJECT, and it is placed on the first child,
+// of that object's RM type, of the attribute that its T_ATTRIBUTE names on
+// the node that the T_ATTRIBUTE's differential_path addresses. Each call
+// returns a new value, which the caller may change.
+func (n *CompiledNode) DefaultValue() rm.DataValue {
+	if n.defaultValue == nil {
+		return nil
+	}
+	v, err := typereg.DecodeAs[rm.DataValue](n.defaultValue)
+	if err != nil {
+		// Compile decoded the same bytes before it kept them, so the
+		// decode does not fail here.
+		return nil
+	}
+	return v
 }
 
 // Term returns the term definition for an at-code from the nearest

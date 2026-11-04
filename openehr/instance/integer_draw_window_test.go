@@ -2,7 +2,6 @@ package instance_test
 
 import (
 	"fmt"
-	"math"
 	mrand "math/rand/v2"
 	"testing"
 
@@ -12,28 +11,19 @@ import (
 
 // TestREQ107_RandomFillDrawsAOneSidedIntegerRangeFromTheSamplersWindow is the
 // REQ-107 Primitive-leaf value fill and Precedence 3 check that a C_INTEGER
-// bounded on one side alone, and narrowed to the 32-bit range of an RM
-// Integer or to a precision from -1 up, draws from the 100 whole numbers
-// next to the side it bounds, as the sampler draws from any one-sided range
-// that needs no narrowing, and not across the whole of the range it was
-// narrowed to: `precision >= -5` draws from -1 to 99, `<= 5000000000` from
-// 100 below the greatest Integer to it, and `>= -5000000000` from the least
-// Integer to 100 above it. The draws vary between seeds. ExampleFill keeps
-// the value on the side the range bounds: the least value of a range
-// bounded below, the upper end of one bounded above alone. It holds under
-// every policy, and with and without the implicit attributes.
+// bounded on one side alone, and narrowed to a precision from -1 up, draws
+// from the 100 whole numbers next to the side it bounds, as the sampler
+// draws from any one-sided range that needs no narrowing, and not across
+// the whole of the range it was narrowed to: `precision >= -5` draws from
+// -1 to 99. The draws vary between seeds. ExampleFill keeps the value on the
+// side the range bounds: the least value of a range bounded below. It holds
+// under every policy, and with and without the implicit attributes.
 func TestREQ107_RandomFillDrawsAOneSidedIntegerRangeFromTheSamplersWindow(t *testing.T) {
-	const (
-		past   = 5_000_000_000
-		top    = math.MaxInt32
-		bottom = math.MinInt32
-		seeds  = 40
-	)
+	const seeds = 40
 	precision := func(body string) string {
 		return optNode("DV_QUANTITY", "", optSingle("units", guardString("mm")),
 			optSingle("precision", optPrimitive("INTEGER", "C_INTEGER", body)))
 	}
-	ordinal := func(body string) string { return optPrimitive("DV_ORDINAL", "C_INTEGER", body) }
 	readPrecision := func(t *testing.T, out any) int64 {
 		t.Helper()
 		p := dvValue[*rm.DVQuantity](t, out).Precision
@@ -41,10 +31,6 @@ func TestREQ107_RandomFillDrawsAOneSidedIntegerRangeFromTheSamplersWindow(t *tes
 			t.Fatalf("DV_QUANTITY.precision is unset, want the value the OPT constrains")
 		}
 		return int64(*p)
-	}
-	readOrdinal := func(t *testing.T, out any) int64 {
-		t.Helper()
-		return int64(dvValue[*rm.DVOrdinal](t, out).Value)
 	}
 	cases := []struct {
 		name  string
@@ -58,21 +44,6 @@ func TestREQ107_RandomFillDrawsAOneSidedIntegerRangeFromTheSamplersWindow(t *tes
 			name:  "DV_QUANTITY precision at least -5",
 			value: precision(instance.IntRange(instance.Closed(-5), instance.NoEnd)),
 			read:  readPrecision, lo: -1, hi: 99, example: -1,
-		},
-		{
-			name:  "DV_QUANTITY precision at most 5000000000",
-			value: precision(instance.IntRange(instance.NoEnd, instance.Closed(past))),
-			read:  readPrecision, lo: top - 100, hi: top, example: top,
-		},
-		{
-			name:  "DV_ORDINAL value at most 5000000000",
-			value: ordinal(instance.IntRange(instance.NoEnd, instance.Closed(past))),
-			read:  readOrdinal, lo: top - 100, hi: top, example: top,
-		},
-		{
-			name:  "DV_ORDINAL value at least -5000000000",
-			value: ordinal(instance.IntRange(instance.Closed(-past), instance.NoEnd)),
-			read:  readOrdinal, lo: bottom, hi: bottom + 100, example: bottom,
 		},
 		{
 			// A bound that is exclusive moves the window with it.
@@ -116,5 +87,30 @@ func TestREQ107_RandomFillDrawsAOneSidedIntegerRangeFromTheSamplersWindow(t *tes
 				})
 			}
 		}
+	}
+}
+
+// TestREQ107_REQ056_OneSidedIntegerRangePastTheIntegerRangeIsRefusedAtRead is
+// the REQ-107 and REQ-056 check that a C_INTEGER bounded on one side alone
+// at a value past the 32-bit range of an RM Integer, on a DV_QUANTITY's
+// precision or on a DV_ORDINAL's value, never reaches the sampler: reading
+// the template is refused with an error wrapping canxml.ErrInvalidShape.
+func TestREQ107_REQ056_OneSidedIntegerRangePastTheIntegerRangeIsRefusedAtRead(t *testing.T) {
+	precision := func(body string) string {
+		return optNode("DV_QUANTITY", "", optSingle("units", guardString("mm")),
+			optSingle("precision", optPrimitive("INTEGER", "C_INTEGER", body)))
+	}
+	ordinal := func(body string) string { return optPrimitive("DV_ORDINAL", "C_INTEGER", body) }
+	for _, tc := range []struct {
+		name  string
+		value string // the ELEMENT's value node
+	}{
+		{"DV_QUANTITY precision at most 5000000000", precision(intRangeBody("", "5000000000", true))},
+		{"DV_ORDINAL value at most 5000000000", ordinal(intRangeBody("", "5000000000", true))},
+		{"DV_ORDINAL value at least -5000000000", ordinal(intRangeBody("-5000000000", "", true))},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			requireReadRefused(t, optTemplate("ELEMENT", optSingle("value", tc.value)))
+		})
 	}
 }

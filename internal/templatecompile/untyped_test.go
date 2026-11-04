@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 )
 
 // heldOPT is a template whose root, of rmType, carries attrs.
@@ -57,8 +56,8 @@ func heldList(name string, children ...string) string {
 // to is read. So an attribute the RM makes mandatory reports Required, in
 // both compile modes, and the implicit-attribute mode injects the mandatory
 // attributes the template leaves out, as on a node of that type. The node's
-// own RMTypeName stays empty, and the attributes of a template root that
-// names no type, which no attribute holds, are read on no type.
+// own RMTypeName stays empty. A definition that names no type is no
+// definition, which Compile refuses (TestREQ111_CompileRefusesModel).
 func TestREQ100_UntypedNodeReadsItsAttributesOnItsHoldingType(t *testing.T) {
 	cases := []struct {
 		name string
@@ -102,20 +101,11 @@ func TestREQ100_UntypedNodeReadsItsAttributesOnItsHoldingType(t *testing.T) {
 			required: "name",
 			implicit: map[string]string{"archetype_node_id": "String"},
 		},
-		{
-			name:     "a template root",
-			opt:      heldOPT("", heldSingle("name", true, heldObject("DV_TEXT", ""))),
-			path:     "/",
-			optional: "name",
-		},
 	}
 	for _, tc := range cases {
 		for _, implicit := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%s/implicit=%t", tc.name, implicit), func(t *testing.T) {
-				opt, err := template.ParseOPT(strings.NewReader(tc.opt))
-				if err != nil {
-					t.Fatalf("ParseOPT: %v", err)
-				}
+				opt := mustReadModel(t, tc.opt)
 				c, err := templatecompile.Compile(opt, templatecompile.Options{SkipImplicitAttributes: !implicit})
 				if err != nil {
 					t.Fatalf("Compile: %v", err)

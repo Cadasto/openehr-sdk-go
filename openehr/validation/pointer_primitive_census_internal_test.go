@@ -41,6 +41,10 @@ func pointerPrimitiveFields(t *testing.T) map[reflect.Type][]string {
 	if len(names) == 0 {
 		t.Fatal("precondition: the type registry decodes no class")
 	}
+	// The registry also holds the classes of any other generated package the
+	// test binary links, such as the AOM 1.4 model the compile step reads;
+	// only the RM package's classes count.
+	rmPackage := reflect.TypeFor[rm.Integer]().PkgPath()
 	held := map[reflect.Type][]string{}
 	for _, name := range names {
 		ctor, _ := typereg.Default.Lookup(name)
@@ -48,7 +52,7 @@ func pointerPrimitiveFields(t *testing.T) map[reflect.Type][]string {
 		for class.Kind() == reflect.Pointer {
 			class = class.Elem()
 		}
-		if class.Kind() != reflect.Struct {
+		if class.Kind() != reflect.Struct || class.PkgPath() != rmPackage {
 			continue
 		}
 		for _, field := range reflect.VisibleFields(class) {

@@ -19,16 +19,15 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rmpath"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 func TestUnmarshalFlatPinnedContainer(t *testing.T) {
-	parsed, err := template.ParseFile(fixtures.WebTemplateOpt("GECCO_Diagnose"))
+	parsed, err := readOPTFile(fixtures.WebTemplateOpt("GECCO_Diagnose"))
 	if err != nil {
-		t.Fatalf("ParseFile: %v", err)
+		t.Fatalf("readOPTFile: %v", err)
 	}
 	c, err := templatecompile.Compile(parsed)
 	if err != nil {
@@ -96,9 +95,9 @@ func TestUnmarshalFlatPinnedContainer(t *testing.T) {
 // instances would collapse onto one list slot. The residual and its owner are
 // recorded in deviations.md § Conformance.
 func TestUnmarshalFlatReusedSiblingsRefused(t *testing.T) {
-	parsed, err := template.ParseFile(fixtures.WebTemplateOpt("Corona_Anamnese"))
+	parsed, err := readOPTFile(fixtures.WebTemplateOpt("Corona_Anamnese"))
 	if err != nil {
-		t.Fatalf("ParseFile: %v", err)
+		t.Fatalf("readOPTFile: %v", err)
 	}
 	c, err := templatecompile.Compile(parsed)
 	if err != nil {

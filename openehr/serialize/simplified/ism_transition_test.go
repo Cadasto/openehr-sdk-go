@@ -16,7 +16,6 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
@@ -362,7 +361,7 @@ const (
 // template.
 func minimalActionWT(t *testing.T) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
 	t.Helper()
-	opt, err := template.ParseFile(fixtures.TemplateOpt("minimal_action_2"))
+	opt, err := readOPTFile(fixtures.TemplateOpt("minimal_action_2"))
 	if err != nil {
 		t.Fatalf("parse minimal_action_2: %v", err)
 	}

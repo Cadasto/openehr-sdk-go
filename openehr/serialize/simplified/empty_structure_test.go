@@ -15,10 +15,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
@@ -164,9 +164,9 @@ func editedStructureTemplate(t *testing.T, edits ...optEdit) (*webtemplate.WebTe
 	for _, edit := range edits {
 		opt = edit(t, opt)
 	}
-	parsed, err := template.ParseOPT(strings.NewReader(opt))
+	parsed, err := aom14.ReadOperationalTemplate(strings.NewReader(opt))
 	if err != nil {
-		t.Fatalf("ParseOPT(edited %s): %v", structureTemplate, err)
+		t.Fatalf("ReadOperationalTemplate(edited %s): %v", structureTemplate, err)
 	}
 	return compileTemplate(t, structureTemplate, parsed)
 }

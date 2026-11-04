@@ -13,7 +13,6 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
@@ -89,10 +88,10 @@ func benchCases(tb testing.TB) []benchCase {
 	return append(out, benchCase{name: syntheticName, comp: syntheticComposition(tb), c: out[1].c})
 }
 
-// compileFixture parses and compiles the corpus template id.
+// compileFixture reads and compiles the corpus template id.
 func compileFixture(tb testing.TB, id string) *templatecompile.Compiled {
 	tb.Helper()
-	opt, err := template.ParseFile(fixtures.TemplateOpt(id))
+	opt, err := readOPTFile(fixtures.TemplateOpt(id))
 	if err != nil {
 		tb.Fatalf("parse %s: %v", id, err)
 	}

@@ -64,11 +64,22 @@ var ErrUnknownElement = xmlunmatched.ErrUnknownElement
 // foreign default namespace from the root is foreign.
 var ErrNamespace = xmlunmatched.ErrNamespace
 
+// ErrLimitExceeded is the sentinel for input past a limit of the decode. The
+// limits this package applies are the depth [WithMaxDepth] sets and the depth
+// encoding/xml decodes, 10 000 nested elements (see "Nesting depth" in the
+// package documentation): an element nested deeper is refused with a
+// [DecodeError] that wraps this sentinel and names the element's path, its
+// depth and the limit, never its content. A reader that applies a limit of
+// its own to canonical XML, such as one on the size of its input, can wrap it
+// too, so that one errors.Is test matches each such refusal.
+var ErrLimitExceeded = xmlunmatched.ErrLimitExceeded
+
 // DecodeError is the unified error returned by the decoder at
-// polymorphic dispatch sites and for the text of a primitive element that
-// does not decode as its type. Re-exported from the internal poly
-// helper so consumers can `errors.As` against a stable type without
-// importing internal packages. It has the same shape as canjson's.
+// polymorphic dispatch sites, for the text of a primitive element that
+// does not decode as its type and for an element nested deeper than
+// [WithMaxDepth] allows or encoding/xml decodes. Re-exported from the
+// internal poly helper so consumers can `errors.As` against a stable type
+// without importing internal packages. It has the same shape as canjson's.
 //
 // Each one names its own slot. A failure inside a slot that sits in
 // another slot comes back as one DecodeError per slot, each the Inner of

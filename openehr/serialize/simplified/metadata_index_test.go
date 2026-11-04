@@ -17,7 +17,6 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
@@ -26,9 +25,9 @@ import (
 // PROBE-086 corpus OPT, the template the reported bug was found on.
 func corpusTarget(t *testing.T) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
 	t.Helper()
-	parsed, err := template.ParseFile(corpusFlatOPT)
+	parsed, err := readOPTFile(corpusFlatOPT)
 	if err != nil {
-		t.Fatalf("ParseFile(%s): %v", corpusFlatOPT, err)
+		t.Fatalf("readOPTFile(%s): %v", corpusFlatOPT, err)
 	}
 	compiled, err := templatecompile.Compile(parsed)
 	if err != nil {

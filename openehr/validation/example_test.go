@@ -5,8 +5,9 @@ import (
 	"log"
 	"strings"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
@@ -54,7 +55,7 @@ const reportOPT = `<?xml version="1.0" encoding="UTF-8"?>
         <lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded>
         <lower>1</lower><upper>1</upper>
       </existence>
-      <children xsi:type="C_COMPLEX_OBJECT">
+      <children xsi:type="C_ARCHETYPE_ROOT">
         <rm_type_name>OBSERVATION</rm_type_name>
         <node_id>at0000</node_id>
         <archetype_id><value>openEHR-EHR-OBSERVATION.blood_pressure.v1</value></archetype_id>
@@ -75,7 +76,7 @@ const reportOPT = `<?xml version="1.0" encoding="UTF-8"?>
 // Model floor, so one call reports what the template requires and what the
 // Reference Model requires; ValidateRM reports the floor alone.
 func ExampleValidateComposition() {
-	opt, err := template.ParseOPTStrict(strings.NewReader(reportOPT))
+	opt, err := aom14.ReadOperationalTemplate(strings.NewReader(reportOPT), canxml.WithStrict())
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -11,16 +11,19 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 	compositionprobes "github.com/cadasto/openehr-sdk-go/testkit/probes/composition"
 )
 
 func compileFixture(t *testing.T, name string) *templatecompile.Compiled {
 	t.Helper()
-	opt, err := template.ParseFile(fixtures.TemplateOptForName(name))
+	raw, err := os.ReadFile(fixtures.TemplateOptForName(name))
 	if err != nil {
-		t.Fatalf("ParseFile %s: %v", name, err)
+		t.Fatalf("ReadFile %s: %v", name, err)
+	}
+	opt, err := fixtures.ReadOperationalTemplate(raw)
+	if err != nil {
+		t.Fatalf("ReadOperationalTemplate %s: %v", name, err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {

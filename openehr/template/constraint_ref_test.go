@@ -3,6 +3,7 @@ package template_test
 import (
 	"errors"
 	"io"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -219,9 +220,13 @@ func TestREQ103_ConstraintRefThreadedThroughCompile(t *testing.T) {
 	for _, tc := range constraintRefCorpus {
 		t.Run(tc.template, func(t *testing.T) {
 			t.Parallel()
-			tmpl, err := template.ParseFile(fixtures.TemplateOpt(tc.template))
+			raw, err := os.ReadFile(fixtures.TemplateOpt(tc.template))
 			if err != nil {
-				t.Fatalf("ParseFile(%s) error = %v", tc.template, err)
+				t.Fatalf("ReadFile(%s) error = %v", tc.template, err)
+			}
+			tmpl, err := fixtures.ReadOperationalTemplate(raw)
+			if err != nil {
+				t.Fatalf("ReadOperationalTemplate(%s) error = %v", tc.template, err)
 			}
 			compiled, err := templatecompile.Compile(tmpl)
 			if err != nil {

@@ -3,6 +3,8 @@ package template_test
 import (
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
@@ -119,6 +121,79 @@ func TestParseFile_TextSlotAssertionWithRegexQuantifier(t *testing.T) {
 	if slot.AllowsArchetypeID("openEHR-EHR-CLUSTER.device.v123") {
 		t.Error("expected quantifier pattern to reject v123")
 	}
+}
+
+// REQ-103, REQ-108: the parser reads the pattern of a slot include's
+// `archetype_id … matches {…}` text, the two words in any ASCII case, where
+// runes before, between or inside them take more bytes lowercased than as
+// written, as Ⱥ (U+023A, two bytes) does lowercased to ⱥ (U+2C65, three
+// bytes): it does not panic, and it reads the pattern from its own place in
+// the text.
+func TestParseOPT_SlotTextAfterLengtheningRunes(t *testing.T) {
+	lengthening := strings.Repeat("Ⱥ", 30)
+	cases := []struct {
+		name string
+		text string
+		want []string
+	}{
+		{
+			name: "lengthening runes before the match",
+			text: lengthening + " archetype_id/value matches {/.*/}",
+			want: []string{".*"},
+		},
+		{
+			name: "lengthening runes between the two words",
+			text: "archetype_id/value " + lengthening + ` matches {/openEHR-EHR-CLUSTER\.device\.v1/}`,
+			want: []string{`openEHR-EHR-CLUSTER\.device\.v1`},
+		},
+		{
+			name: "the two words in capitals, lengthening runes in the pattern too",
+			text: lengthening + ` ARCHETYPE_ID/value MATCHES {/openEHR-EHR-CLUSTER\.Ⱥ\.v1/}`,
+			want: []string{`openEHR-EHR-CLUSTER\.Ⱥ\.v1`},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			opt, err := template.ParseOPT(strings.NewReader(stringExpressionSlotOPTWith(tc.text)))
+			if err != nil {
+				t.Fatalf("ParseOPT: %v", err)
+			}
+			var slot *template.Slot
+			walkSlots(opt.Root(), func(s *template.Slot) {
+				if slot == nil {
+					slot = s
+				}
+			})
+			if slot == nil {
+				t.Fatal("no slot in the OPT")
+			}
+			if got := slotPatterns(slot.ParsedIncludes()); !slices.Equal(got, tc.want) {
+				t.Errorf("ParsedIncludes() patterns of a slot whose include reads %q = %q, want %q", tc.text, got, tc.want)
+			}
+		})
+	}
+}
+
+// stringExpressionSlotOPTWith is an OPT whose one slot has one include, the
+// <string_expression> text.
+func stringExpressionSlotOPTWith(text string) string {
+	return `<?xml version="1.0" encoding="utf-8"?>
+<template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.openehr.org/v1">
+  <template_id><value>slot_text_scan</value></template_id>
+  <concept>slot_text_scan</concept>
+  <definition>
+    <rm_type_name>COMPOSITION</rm_type_name>
+    <node_id>at0000</node_id>
+    <attributes xsi:type="C_MULTIPLE_ATTRIBUTE">
+      <rm_attribute_name>content</rm_attribute_name>
+      <children xsi:type="ARCHETYPE_SLOT">
+        <rm_type_name>SECTION</rm_type_name>
+        <node_id>at0001</node_id>
+        <includes><string_expression>` + text + `</string_expression></includes>
+      </children>
+    </attributes>
+  </definition>
+</template>`
 }
 
 func TestParseFile_XMLSlotAssertionRequiresSupportedShape(t *testing.T) {

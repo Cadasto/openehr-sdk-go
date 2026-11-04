@@ -61,11 +61,12 @@ func (c *Compiled) Root() *CompiledNode { return c.root }
 // at compile time, e.g. "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]",
 // not predicate-less prefixes like "/content".
 //
-// This differs from [template.OperationalTemplate.NodeAt], which
-// walks the wire tree and applies lenient first-child rules for
-// predicate-less segments on multi-cardinality attributes. Use
-// [CompiledNode.AQLPath] or wire NodeAt when you need tree-walk
-// semantics; use NodeAt here when you already hold a canonical path.
+// This differs from [Compiled.Resolve], which walks the tree along a
+// parsed path and takes the first child for a segment without a
+// predicate. Use Resolve when you need tree-walk semantics; use NodeAt
+// when you already hold a canonical path, such as one
+// [CompiledNode.AQLPath] returns. Where several nodes share a path
+// (alternatives under one attribute), NodeAt returns the first walked.
 //
 // Returns [ErrPathNotFound] when the path string is not indexed.
 func (c *Compiled) NodeAt(path string) (*CompiledNode, error) {
@@ -175,9 +176,10 @@ func termBindingMatchesNode(b template.TermBinding, nodeID, predicate string) bo
 	return ok && strings.HasSuffix(rest, "/")
 }
 
-// ErrPathNotFound is returned by [Compiled.NodeAt] when the path
-// string does not resolve to a compiled node. Distinct from
-// [template.ErrPathNotFound]: the compiled API operates over
-// pre-computed AQL paths, so the resolution semantics differ
-// (exact-match lookup, not tree-walk).
+// ErrPathNotFound is returned, wrapped, by [Compiled.NodeAt] when the
+// path string does not resolve to a compiled node, and by
+// [Compiled.Resolve] and [Compiled.ValidatePath] when a path reaches no
+// node. It is a sentinel of its own, distinct from
+// [template.ErrPathNotFound]; an error of Resolve and ValidatePath
+// matches both.
 var ErrPathNotFound = errors.New("templatecompile: path not found in compiled template")

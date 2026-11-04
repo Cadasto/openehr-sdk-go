@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/rmbind"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
@@ -21,7 +21,7 @@ func elementValueChildren(t *testing.T, types ...string) []*tcimpl.CompiledNode 
 	for _, rmType := range types {
 		children.WriteString(`<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>` + rmType + `</rm_type_name><node_id></node_id></children>`)
 	}
-	opt, err := template.ParseOPT(strings.NewReader(`<?xml version="1.0"?>
+	opt, err := aom14.ReadOperationalTemplate(strings.NewReader(`<?xml version="1.0"?>
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <template_id><value>tier</value></template_id>
   <concept>tier</concept>
@@ -33,7 +33,7 @@ func elementValueChildren(t *testing.T, types ...string) []*tcimpl.CompiledNode 
   </definition>
 </template>`))
 	if err != nil {
-		t.Fatalf("ParseOPT: %v", err)
+		t.Fatalf("ReadOperationalTemplate: %v", err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {

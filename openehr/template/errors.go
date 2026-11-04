@@ -16,18 +16,30 @@ var (
 	// document must name but does not, in the XML Schema instance
 	// namespace: an <attributes> or <children> inside <definition>, or
 	// the <item> of a C_PRIMITIVE_OBJECT (see [ParseOPTStrict]).
+	//
+	// Deprecated: The OPT parser is deprecated.
+	// aom14.ReadOperationalTemplate reports a malformed document with a
+	// canxml error, and templatecompile.Compile reports a template it
+	// refuses with templatecompile.ErrInvalidInput. A later release
+	// removes ErrInvalidOPT.
 	ErrInvalidOPT = errors.New("template: invalid OPT")
 
 	// ErrNotOPTFile signals ParseFile was called with a path whose
 	// suffix is not .opt (case-insensitive).
+	//
+	// Deprecated: ParseFile is deprecated, and
+	// aom14.ReadOperationalTemplate reads from an io.Reader and checks no
+	// file suffix. A later release removes ErrNotOPTFile.
 	ErrNotOPTFile = errors.New("template: not an .opt file")
 
 	// ErrPathSyntax signals a path string failed the supported path
 	// grammar (see [ParsePath]).
 	ErrPathSyntax = errors.New("template: invalid path syntax")
 
-	// ErrPathNotFound signals NodeAt traversed through an unknown
-	// attribute or could not match a segment predicate.
+	// ErrPathNotFound signals that path lookup, Compiled.Resolve in
+	// package templatecompile or the deprecated NodeAt, traversed
+	// through an unknown attribute or could not match a segment
+	// predicate.
 	ErrPathNotFound = errors.New("template: path not found")
 
 	// ErrUnsupportedNode signals the parser encountered an
@@ -37,12 +49,17 @@ var (
 	// does not recognise and that carries nested attributes. In
 	// lenient mode, unknown <children> xsi:type values are admitted
 	// as leaf *ComplexObject nodes, for forward compatibility.
+	//
+	// Deprecated: The OPT parser is deprecated;
+	// aom14.ReadOperationalTemplate with canxml.WithStrict refuses content
+	// the model does not read. A later release removes ErrUnsupportedNode.
 	ErrUnsupportedNode = errors.New("template: unsupported node shape")
 
 	// ErrAmbiguousPath signals strict-mode resolution found multiple
 	// candidate children for a predicate-less segment. Lenient mode
 	// picks the first child; strict mode makes the caller disambiguate
-	// with a predicate. Only returned when NodeAt is called with
-	// WithStrictPaths().
+	// with a predicate. Only returned when Compiled.Resolve is called
+	// with templatecompile.WithStrictPaths, or the deprecated NodeAt
+	// with WithStrictPaths.
 	ErrAmbiguousPath = errors.New("template: ambiguous path resolution")
 )

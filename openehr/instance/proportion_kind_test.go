@@ -13,7 +13,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
@@ -74,7 +73,7 @@ func corpusSettings(composition bool) []corpusSetting {
 	return out
 }
 
-// eachCorpusRun generates every vendored template that parses and
+// eachCorpusRun generates every vendored template that reads and
 // compiles under corpusSettings and calls check with each root Generate
 // returns. A template Generate refuses is skipped: its refusal is the
 // corpus ratchet's business. It fails t when no template was generated.
@@ -86,7 +85,7 @@ func eachCorpusRun(t *testing.T, check func(run corpusRun)) {
 	}
 	runs := 0
 	for _, ref := range refs {
-		opt, err := template.ParseFile(ref.Path)
+		opt, err := readOPTFile(ref.Path)
 		if err != nil {
 			continue
 		}

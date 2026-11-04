@@ -14,13 +14,14 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
@@ -82,18 +83,22 @@ func run() error {
 	return nil
 }
 
-// loadTemplate parses the OPT file and compiles it. The compiled form is what
-// every template-aware SDK entry point takes, ValidateAQL included.
+// loadTemplate reads the OPT file into the operational template model and
+// compiles it. The compiled form is what every template-aware SDK entry point
+// takes, ValidateAQL included.
 //
-// ParseFileStrict rejects an unknown node type that has attributes under it.
-// The lenient ParseFile would keep such a node as a leaf and silently drop
-// everything beneath it, and every archetype and path in that subtree would
-// then lint as not in the template. The program refuses such a template
-// instead of reporting those findings.
+// ReadOperationalTemplate refuses a node type it does not know rather than
+// drop everything beneath it, which would make every archetype and path in
+// that subtree lint as not in the template. The program refuses such a
+// template instead of reporting those findings.
 func loadTemplate(optPath string) (*templatecompile.Compiled, error) {
-	opt, err := template.ParseFileStrict(optPath)
+	raw, err := os.ReadFile(optPath)
 	if err != nil {
-		return nil, fmt.Errorf("parse OPT %q: %w", optPath, err)
+		return nil, fmt.Errorf("read OPT %q: %w", optPath, err)
+	}
+	opt, err := aom14.ReadOperationalTemplate(bytes.NewReader(raw))
+	if err != nil {
+		return nil, fmt.Errorf("read OPT %q: %w", optPath, err)
 	}
 	compiled, err := templatecompile.Compile(opt)
 	if err != nil {

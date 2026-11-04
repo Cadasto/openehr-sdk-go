@@ -1,0 +1,317 @@
+# compiled tree of templates/test_template_rename_node_2.opt
+template_id="test_template_rename_node_2" concept="test_template_rename_node_2" language="en" uid="6a7a1265-4568-4111-a326-d6c616fbe34b" num_nodes=57
+
+node /
+  rm_type="COMPOSITION" node_id="at0000" archetype_id="openEHR-EHR-COMPOSITION.test_observation.v1" node_name="" occurrences=1..1 slot=false
+  term[en] "at0000" code="at0000" description="unknown" text="test_observation"
+  attr "category" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "content" rm_type="CONTENT_ITEM" cardinality=multiple existence=1..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "territory" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "composer" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /category
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /category/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["433"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]
+  rm_type="OBSERVATION" node_id="at0000" archetype_id="openEHR-EHR-OBSERVATION.test_template_rename_node.v1" node_name="" occurrences=0..* slot=false
+  term[en] "at0000" code="at0000" description="unknown" text="test_template_rename_node"
+  attr "data" rm_type="HISTORY" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "encoding" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "subject" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data
+  rm_type="HISTORY" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="@ internal @" text="Event Series"
+  attr "events" rm_type="EVENT" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "origin" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]
+  rm_type="EVENT" node_id="at0002" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0002" code="at0002" description="*" text="Any event"
+  attr "data" rm_type="T" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data
+  rm_type="ITEM_TREE" node_id="at0003" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0003" code="at0003" description="@ internal @" text="List"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=14
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0010]
+  rm_type="ELEMENT" node_id="at0010" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0010" code="at0010" description="*" text="Original_text"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0010]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0011,'Text_is_changed']
+  rm_type="ELEMENT" node_id="at0011" archetype_id="" node_name="Text_is_changed" occurrences=0..1 slot=false
+  term[en] "at0011" code="at0011" description="*" text="Text_should_be_changed"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0011,'Text_is_changed']/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0011,'Text_is_changed']/name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0011,'Text_is_changed']/name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["Text_is_changed"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0012]
+  rm_type="ELEMENT" node_id="at0012" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0012" code="at0012" description="*" text="Original_count"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0012]/value
+  rm_type="DV_COUNT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "magnitude" rm_type="Integer64" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0013,'Count_is_changed']
+  rm_type="ELEMENT" node_id="at0013" archetype_id="" node_name="Count_is_changed" occurrences=0..1 slot=false
+  term[en] "at0013" code="at0013" description="*" text="Count_should_be_changed"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0013,'Count_is_changed']/value
+  rm_type="DV_COUNT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "magnitude" rm_type="Integer64" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0013,'Count_is_changed']/name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0013,'Count_is_changed']/name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["Count_is_changed"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0014]
+  rm_type="ELEMENT" node_id="at0014" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0014" code="at0014" description="*" text="Original_boolean"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0014]/value
+  rm_type="DV_BOOLEAN" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="Boolean" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0014]/value/value
+  rm_type="BOOLEAN" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CBoolean{TrueValid:true FalseValid:true Default:nil}
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0015,'Boolean_is_changed']
+  rm_type="ELEMENT" node_id="at0015" archetype_id="" node_name="Boolean_is_changed" occurrences=0..1 slot=false
+  term[en] "at0015" code="at0015" description="*" text="Boolean_should_be_changed"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0015,'Boolean_is_changed']/value
+  rm_type="DV_BOOLEAN" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="Boolean" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0015,'Boolean_is_changed']/value/value
+  rm_type="BOOLEAN" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CBoolean{TrueValid:true FalseValid:true Default:nil}
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0015,'Boolean_is_changed']/name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0015,'Boolean_is_changed']/name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["Boolean_is_changed"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0016]
+  rm_type="CLUSTER" node_id="at0016" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0016" code="at0016" description="*" text="Original_cluster"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=0..* implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0016]/items[at0018]
+  rm_type="ELEMENT" node_id="at0018" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0018" code="at0018" description="*" text="Original_inside_cluster"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0016]/items[at0018]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017,'Cluster_is_changed']
+  rm_type="CLUSTER" node_id="at0017" archetype_id="" node_name="Cluster_is_changed" occurrences=0..1 slot=false
+  term[en] "at0017" code="at0017" description="*" text="Cluster_should_be_changed"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=0..* implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017,'Cluster_is_changed']/items[at0019,'Should_is_in_cluster']
+  rm_type="ELEMENT" node_id="at0019" archetype_id="" node_name="Should_is_in_cluster" occurrences=0..1 slot=false
+  term[en] "at0019" code="at0019" description="*" text="Should_be_changed_in_cluster"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017,'Cluster_is_changed']/items[at0019,'Should_is_in_cluster']/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017,'Cluster_is_changed']/items[at0019,'Should_is_in_cluster']/name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017,'Cluster_is_changed']/items[at0019,'Should_is_in_cluster']/name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["Should_is_in_cluster"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017,'Cluster_is_changed']/name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017,'Cluster_is_changed']/name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["Cluster_is_changed"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0020]
+  rm_type="ELEMENT" node_id="at0020" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0020" code="at0020" description="*" text="Original_quantity"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0020]/value
+  rm_type="DV_QUANTITY" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.DvQuantity{Units:[constraints.QuantityUnit{Units:"cm/s" Magnitude:constraints.NumericRange{Lower:0 Upper:0 LowerInclusive:false UpperInclusive:false LowerUnbounded:true UpperUnbounded:true} Precision:constraints.NumericRange{Lower:0 Upper:0 LowerInclusive:false UpperInclusive:false LowerUnbounded:true UpperUnbounded:true}} constraints.QuantityUnit{Units:"km/h" Magnitude:constraints.NumericRange{Lower:0 Upper:0 LowerInclusive:false UpperInclusive:false LowerUnbounded:true UpperUnbounded:true} Precision:constraints.NumericRange{Lower:0 Upper:0 LowerInclusive:false UpperInclusive:false LowerUnbounded:true UpperUnbounded:true}}] Property:constraints.CodedTermRef{Terminology:"openehr" CodeString:"338"} PropertyUnits:["m/s" "cm/s" "[ft_i]/min" "[ft_i]/s" "km/h" "m/h" "[mi_i]/h" "mm/(24.h)" "mm/h" "mm/s"]}
+  attr "magnitude" rm_type="Real" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "units" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0021,'Quantity_is_changed']
+  rm_type="ELEMENT" node_id="at0021" archetype_id="" node_name="Quantity_is_changed" occurrences=0..1 slot=false
+  term[en] "at0021" code="at0021" description="*" text="Quantity_should_be_changed"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0021,'Quantity_is_changed']/value
+  rm_type="DV_QUANTITY" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.DvQuantity{Units:[constraints.QuantityUnit{Units:"cm/s" Magnitude:constraints.NumericRange{Lower:0 Upper:0 LowerInclusive:false UpperInclusive:false LowerUnbounded:true UpperUnbounded:true} Precision:constraints.NumericRange{Lower:0 Upper:0 LowerInclusive:false UpperInclusive:false LowerUnbounded:true UpperUnbounded:true}} constraints.QuantityUnit{Units:"km/h" Magnitude:constraints.NumericRange{Lower:0 Upper:0 LowerInclusive:false UpperInclusive:false LowerUnbounded:true UpperUnbounded:true} Precision:constraints.NumericRange{Lower:0 Upper:0 LowerInclusive:false UpperInclusive:false LowerUnbounded:true UpperUnbounded:true}}] Property:constraints.CodedTermRef{Terminology:"openehr" CodeString:"338"} PropertyUnits:["m/s" "cm/s" "[ft_i]/min" "[ft_i]/s" "km/h" "m/h" "[mi_i]/h" "mm/(24.h)" "mm/h" "mm/s"]}
+  attr "magnitude" rm_type="Real" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "units" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0021,'Quantity_is_changed']/name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0021,'Quantity_is_changed']/name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["Quantity_is_changed"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0023]
+  rm_type="ELEMENT" node_id="at0023" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0023" code="at0023" description="*" text="Original_coded_text"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0023]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0023]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:[]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0027,'Coded_text_is_changed']
+  rm_type="ELEMENT" node_id="at0027" archetype_id="" node_name="Coded_text_is_changed" occurrences=0..1 slot=false
+  term[en] "at0027" code="at0027" description="*" text="Coded_text_should_be_changed"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0027,'Coded_text_is_changed']/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0027,'Coded_text_is_changed']/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:[]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0027,'Coded_text_is_changed']/name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0027,'Coded_text_is_changed']/name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["Coded_text_is_changed"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0028]
+  rm_type="ELEMENT" node_id="at0028" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0028" code="at0028" description="*" text="Original_uri"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0028]/value
+  rm_type="DV_URI" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0029,'Uri_is_changed']
+  rm_type="ELEMENT" node_id="at0029" archetype_id="" node_name="Uri_is_changed" occurrences=0..1 slot=false
+  term[en] "at0029" code="at0029" description="*" text="Uri_should_be_changed"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0029,'Uri_is_changed']/value
+  rm_type="DV_URI" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0029,'Uri_is_changed']/name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0029,'Uri_is_changed']/name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["Uri_is_changed"] ListOpen:false Default:""}
+
+# walked nodes=57

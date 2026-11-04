@@ -17,7 +17,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rmpath"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
@@ -28,7 +27,7 @@ const minimalObsOPT = "../../../testkit/corpus/templates/minimal_observation.en.
 // composition under the Large policy against it (REQ-107).
 func genComposition(t *testing.T, optPath string) (*rm.Composition, *webtemplate.WebTemplate) {
 	t.Helper()
-	opt, err := template.ParseFile(optPath)
+	opt, err := readOPTFile(optPath)
 	if err != nil {
 		t.Fatalf("parse %s: %v", optPath, err)
 	}

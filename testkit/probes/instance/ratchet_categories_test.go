@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
@@ -199,9 +199,9 @@ func TestREQ107_RatchetKeysArchetypeIDMissing(t *testing.T) {
 	}
 
 	t.Run("refusal from Generate", func(t *testing.T) {
-		opt, err := template.ParseOPT(strings.NewReader(archetypeIDMissingOPT))
+		opt, err := aom14.ReadOperationalTemplate(strings.NewReader(archetypeIDMissingOPT))
 		if err != nil {
-			t.Fatalf("ParseOPT: %v", err)
+			t.Fatalf("ReadOperationalTemplate: %v", err)
 		}
 		c, err := templatecompile.Compile(opt)
 		if err != nil {

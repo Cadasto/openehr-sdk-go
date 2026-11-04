@@ -26,6 +26,24 @@ import (
 
 // OPT children for the empty-part cases.
 const (
+	// codeReferenceChild admits a DV_CODED_TEXT whose defining code is
+	// local at0001 or at0002, from a reference set the SDK does not consult.
+	codeReferenceChild = `
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>DV_CODED_TEXT</rm_type_name>
+        <node_id></node_id>
+        <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+          <rm_attribute_name>defining_code</rm_attribute_name>
+          <children xsi:type="C_CODE_REFERENCE">
+            <rm_type_name>CODE_PHRASE</rm_type_name>
+            <node_id></node_id>
+            <terminology_id><value>local</value></terminology_id>
+            <code_list>at0001</code_list>
+            <code_list>at0002</code_list>
+            <referenceSetUri>terminology:local?subset=severity</referenceSetUri>
+          </children>
+        </attributes>
+      </children>`
 	// quantityChild admits a DV_QUANTITY of 1 to 100 cm.
 	quantityChild = `
       <children xsi:type="C_DV_QUANTITY">
@@ -137,7 +155,8 @@ func codedAs(terminology, code string) rm.DVCodedText {
 // rules report: the RM's `required` at the part is its one finding, and the
 // constraint judges only what the part leaves. The other rows are judged as
 // before the rule: the part is one the RM lets be blank or does not
-// require, or the value is not empty.
+// require, or the value is not empty. REQ-103 — a C_CODE_REFERENCE is
+// judged as the C_CODE_PHRASE it carries.
 func TestValidate_REQ102_REQ112_PrimitiveLeavesTheEmptyPartToTheRM(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -161,6 +180,23 @@ func TestValidate_REQ102_REQ112_PrimitiveLeavesTheEmptyPartToTheRM(t *testing.T)
 				templateFinding("invalid_value", "/value/defining_code"),
 				rmRequired("/value/defining_code/code_string"),
 			},
+		},
+		{
+			// REQ-103: a C_CODE_REFERENCE is judged by the code phrase
+			// constraint it carries, its terminology included.
+			name:  "C_CODE_REFERENCE list, blank code_string in another terminology",
+			child: codeReferenceChild,
+			value: codedAs("SNOMED-CT", ""),
+			want: []pinnedIssue{
+				templateFinding("invalid_value", "/value/defining_code"),
+				rmRequired("/value/defining_code/code_string"),
+			},
+		},
+		{
+			name:  "C_CODE_REFERENCE list, unlisted code",
+			child: codeReferenceChild,
+			value: codedAs("local", "at0003"),
+			want:  []pinnedIssue{templateFinding("not_in_list", "/value/defining_code")},
 		},
 		{
 			// The magnitude is outside every range, but the ranges are per

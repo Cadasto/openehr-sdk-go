@@ -1,0 +1,229 @@
+# compiled tree of crossformat/multi_occurrence/template.opt
+template_id="ehrbase_multi_occurrence.de.v1" concept="ehrbase_multi_occurrence.de.v1" language="en" uid="0ae4d9ce-fd94-4e1c-aa87-98fc44209ddd" num_nodes=30
+template_binding terminology="LNC205" node_or_path="at0004" target_terminology="LNC205" target_code="8310-5"
+template_binding terminology="SNOMED-CT" node_or_path="at0004" target_terminology="SNOMED-CT" target_code="386725007"
+
+node /
+  rm_type="COMPOSITION" node_id="at0000" archetype_id="openEHR-EHR-COMPOSITION.encounter.v1" node_name="" occurrences=1..1 slot=false
+  term[en] "at0000" code="at0000" description="Interaction, contact or care event between a subject of care and healthcare                 provider(s)." text="Encounter"
+  attr "category" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "context" rm_type="EVENT_CONTEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "content" rm_type="CONTENT_ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "territory" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "composer" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /category
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /category/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["433"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context
+  rm_type="EVENT_CONTEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "other_context" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "start_time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "setting" rm_type="DV_CODED_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context/other_context
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context/other_context/items[at0002]
+  rm_type="CLUSTER" node_id="at0002" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0002" code="at0002" comment="e.g. Local hospital departmental infomation or additional metadata to align with FHIR or\n                CIMI equivalents." description="Additional information required to capture local context or to align with other                reference models/formalisms." text="Extension"
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]
+  rm_type="OBSERVATION" node_id="at0000" archetype_id="openEHR-EHR-OBSERVATION.body_temperature.v2" node_name="" occurrences=0..* slot=false
+  term[en] "at0000" code="at0000" description="A measurement of the body temperature, which is a surrogate for the core                         body temperature of the individual." text="Body temperature"
+  attr "data" rm_type="HISTORY" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "protocol" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "encoding" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "subject" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data
+  rm_type="HISTORY" node_id="at0002" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0002" code="at0002" description="@ internal @" text="History"
+  attr "events" rm_type="EVENT" cardinality=multiple existence=0..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "origin" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]
+  rm_type="EVENT" node_id="at0003" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[en] "at0003" code="at0003" description="Default, unspecified point in time or interval event which may be explicitly                         defined in a template or at run-time." text="Any event"
+  attr "data" rm_type="T" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "state" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/data
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/data/items[at0004]
+  rm_type="ELEMENT" node_id="at0004" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0004" code="at0004" description="The measured body temperature (as a surrogate for the core of the body)." text="Temperature"
+  binding terminology="LNC205" node_or_path="at0004" target_terminology="LNC205" target_code="8310-5"
+  binding terminology="SNOMED-CT" node_or_path="at0004" target_terminology="SNOMED-CT" target_code="386725007"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/data/items[at0004]/value
+  rm_type="DV_QUANTITY" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.DvQuantity{Units:[constraints.QuantityUnit{Units:"Cel" Magnitude:constraints.NumericRange{Lower:0 Upper:100 LowerInclusive:true UpperInclusive:false LowerUnbounded:false UpperUnbounded:false} Precision:constraints.NumericRange{Lower:1 Upper:1 LowerInclusive:true UpperInclusive:true LowerUnbounded:false UpperUnbounded:false}} constraints.QuantityUnit{Units:"[degF]" Magnitude:constraints.NumericRange{Lower:30 Upper:200 LowerInclusive:true UpperInclusive:false LowerUnbounded:false UpperUnbounded:false} Precision:constraints.NumericRange{Lower:1 Upper:1 LowerInclusive:true UpperInclusive:true LowerUnbounded:false UpperUnbounded:false}}] Property:constraints.CodedTermRef{Terminology:"openehr" CodeString:"127"} PropertyUnits:["K" "Cel" "[degF]" "[degR]"]}
+  attr "magnitude" rm_type="Real" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "units" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state
+  rm_type="ITEM_TREE" node_id="at0029" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0029" code="at0029" description="State information about the patient." text="State"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=5
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0030]
+  rm_type="ELEMENT" node_id="at0030" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0030" code="at0030" description="The degree of exposure of the individual at the time of measurement." text="Body exposure"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0030]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0030]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0031" "at0032" "at0033" "at0034"]}
+  code_term[en] "at0031" code="at0031" description="No clothing, bedding or covering." text="Naked"
+  code_term[en] "at0032" code="at0032" description="The person is covered by a lesser amount of clothing or bedding than deemed                         appropriate for the environmental circumstances." text="Reduced clothing/bedding"
+  code_term[en] "at0033" code="at0033" description="The person is covered by an amount of clothing or bedding deemed appropriate                         for the environmental circumstances." text="Appropriate clothing/bedding"
+  code_term[en] "at0034" code="at0034" description="The person is covered by an increased amount of clothing or bedding than                         deemed appropriate for the environmental circumstances." text="Increased clothing/bedding"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0030]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0041]
+  rm_type="ELEMENT" node_id="at0041" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0041" code="at0041" description="Description of the conditions applied to the subject that might influence                         their measured body temperature." text="Description of thermal stress"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0041]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0065]
+  rm_type="ELEMENT" node_id="at0065" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0065" code="at0065" description="Number of days since onset of last normal menstrual period." text="Current day of menstrual cycle"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0065]/value
+  rm_type="DV_COUNT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "magnitude" rm_type="Integer64" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0065]/value/magnitude
+  rm_type="INTEGER" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CInteger{Range:constraints.NumericRange{Lower:1 Upper:0 LowerInclusive:true UpperInclusive:false LowerUnbounded:false UpperUnbounded:true} List:[] Default:nil}
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0056]
+  rm_type="CLUSTER" node_id="at0056" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.environmental_conditions\\.v1|openEHR-EHR-CLUSTER\\.environmental_conditions\\.v0|openEHR-EHR-CLUSTER\\.device(-[a-zA-Z0-9_]+)*\\.v1"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.environmental_conditions\\.v1|openEHR-EHR-CLUSTER\\.environmental_conditions\\.v0|openEHR-EHR-CLUSTER\\.device(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[] raw_include_count=1
+  term[en] "at0056" code="at0056" description="Details about the environmental conditions at the time of temperature                         measurement." text="Environmental conditions"
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0057]
+  rm_type="CLUSTER" node_id="at0057" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.level_of_exertion\\.v1|openEHR-EHR-CLUSTER\\.level_of_exertion\\.v0"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.level_of_exertion\\.v1|openEHR-EHR-CLUSTER\\.level_of_exertion\\.v0"] excludes=[] raw_include_count=1
+  term[en] "at0057" code="at0057" description="Details about the exertion of the person at the time of temperature                         measurement." text="Exertion"
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/protocol
+  rm_type="ITEM_TREE" node_id="at0020" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0020" code="at0020" description="@ internal @" text="Protocol"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=4
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/protocol/items[at0021]
+  rm_type="ELEMENT" node_id="at0021" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0021" code="at0021" description="The anatomical site of measurement of the temperature." text="Location of measurement"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/protocol/items[at0021]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/protocol/items[at0021]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0025" "at0024" "at0023" "at0061" "at0022" "at0026" "at0027" "at0028" "at0043" "at0051" "at0054" "at0055" "at0060"]}
+  code_term[en] "at0025" code="at0025" description="Temperature measured within the rectum." text="Rectum"
+  code_term[en] "at0024" code="at0024" description="Temperature is measured from the skin of the axilla with the arm positioned                         down by the side." text="Axilla"
+  code_term[en] "at0023" code="at0023" description="Temperature is measured from within the external auditory canal." text="Ear canal"
+  code_term[en] "at0061" code="at0061" description="Temperature is measured on the forehead." text="Forehead"
+  code_term[en] "at0022" code="at0022" description="Temperature is measured within the mouth." text="Mouth"
+  code_term[en] "at0026" code="at0026" description="Temperature is measured within the nasopharynx." text="Nasopharynx"
+  code_term[en] "at0027" code="at0027" description="Temperature is measured in the urinary bladder." text="Urinary bladder"
+  code_term[en] "at0028" code="at0028" description="Temperature is measured within the vascular system." text="Intravascular"
+  code_term[en] "at0043" code="at0043" description="Temperature is measured from exposed skin." text="Skin"
+  code_term[en] "at0051" code="at0051" description="Temperature is measured within the vagina." text="Vagina"
+  code_term[en] "at0054" code="at0054" description="Temperatue is measured within the oesophagus." text="Oesophagus"
+  code_term[en] "at0055" code="at0055" description="Temperature is measured in the inguinal skin crease between the leg and                         abdominal wall." text="Inguinal skin crease"
+  code_term[en] "at0060" code="at0060" description="Temperature is measured at the temple, over the superficial temporal                         artery." text="Temple"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/protocol/items[at0021]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/protocol/items[at0064]
+  rm_type="CLUSTER" node_id="at0064" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.anatomical_location(-[a-zA-Z0-9_]+)*\\.v1"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.anatomical_location(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[] raw_include_count=1
+  term[en] "at0064" code="at0064" description="Structured anatomical location of where the measurement was taken." text="Structured measurement location"
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/protocol/items[at0059]
+  rm_type="CLUSTER" node_id="at0059" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.device\\.v1"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.device\\.v1"] excludes=[] raw_include_count=1
+  term[en] "at0059" code="at0059" description="Details about the device use to measure body temperature." text="Device"
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/protocol/items[at0062]
+  rm_type="CLUSTER" node_id="at0062" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0062" code="at0062" comment="e.g. Local information requirements or additional metadata to align with FHIR or                         CIMI equivalents." description="Additional information required to capture local content or to align with                         other reference models/formalisms." text="Extension"
+
+# walked nodes=32

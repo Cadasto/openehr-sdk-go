@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 )
 
 // tierValuePath is the ELEMENT value of the template tierOPT builds.
@@ -102,9 +102,9 @@ func TestREQ101_BindRMTypeTierOrder(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			opt, err := template.ParseOPT(strings.NewReader(tierOPT(tc.values...)))
+			opt, err := aom14.ReadOperationalTemplate(strings.NewReader(tierOPT(tc.values...)))
 			if err != nil {
-				t.Fatalf("ParseOPT: %v", err)
+				t.Fatalf("ReadOperationalTemplate: %v", err)
 			}
 			c, err := tcimpl.Compile(opt)
 			if err != nil {

@@ -2,14 +2,15 @@ package constraints_test
 
 import (
 	"io/fs"
+	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
 	"testing"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -63,7 +64,7 @@ var slotExampleEdgePatterns = []string{
 }
 
 // corpusSlotPatterns returns every include and exclude pattern of every
-// corpus OPT that parses.
+// corpus OPT that reads into the operational template model and compiles.
 func corpusSlotPatterns(t *testing.T) []string {
 	t.Helper()
 	var paths []string
@@ -81,15 +82,24 @@ func corpusSlotPatterns(t *testing.T) []string {
 	}
 	var out []string
 	for _, path := range paths {
-		opt, err := template.ParseFile(path)
+		b, err := os.ReadFile(path)
 		if err != nil {
-			continue // an OPT the parser refuses carries no slot pattern
+			t.Fatalf("read %s: %v", path, err)
 		}
-		walkSlotNodes(opt.Root(), func(s *template.Slot) {
-			for _, a := range s.ParsedIncludes() {
+		model, err := fixtures.ReadOperationalTemplate(b)
+		if err != nil {
+			continue // an OPT the model's reader refuses carries no slot pattern
+		}
+		compiled, err := templatecompile.Compile(model)
+		if err != nil {
+			continue // nor does one the compile step refuses
+		}
+		walkSlotNodes(compiled.Root(), func(n *templatecompile.CompiledNode) {
+			rules := n.SlotRules()
+			for _, a := range rules.Includes {
 				out = append(out, a.Pattern())
 			}
-			for _, a := range s.ParsedExcludes() {
+			for _, a := range rules.Excludes {
 				out = append(out, a.Pattern())
 			}
 		})
@@ -97,15 +107,13 @@ func corpusSlotPatterns(t *testing.T) []string {
 	return out
 }
 
-func walkSlotNodes(n template.Node, fn func(*template.Slot)) {
-	if s, ok := n.(*template.Slot); ok {
-		fn(s)
+func walkSlotNodes(n *templatecompile.CompiledNode, fn func(*templatecompile.CompiledNode)) {
+	if n.IsSlot() {
+		fn(n)
 	}
-	if o, ok := n.(template.ObjectNode); ok {
-		for _, a := range o.Attributes() {
-			for _, c := range a.Children() {
-				walkSlotNodes(c, fn)
-			}
+	for _, a := range n.Attributes() {
+		for _, c := range a.Children() {
+			walkSlotNodes(c, fn)
 		}
 	}
 }

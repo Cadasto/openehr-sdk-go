@@ -9,7 +9,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
@@ -95,9 +94,9 @@ func compileCorpusOPT(t *testing.T, name string) *templatecompile.Compiled {
 		if ref.Name != name {
 			continue
 		}
-		opt, err := template.ParseFile(ref.Path)
+		opt, err := readOPTFile(ref.Path)
 		if err != nil {
-			t.Fatalf("ParseFile %s: %v", name, err)
+			t.Fatalf("readOPTFile %s: %v", name, err)
 		}
 		c, err := templatecompile.Compile(opt)
 		if err != nil {

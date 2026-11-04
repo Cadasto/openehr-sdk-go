@@ -35,12 +35,18 @@ func elementCodedName(t *testing.T, out any) rm.DVCodedText {
 // texts and whose defining code a C_CODE_PHRASE limits to codes of
 // terminologyID.
 func optCodedNameListing(texts []string, terminologyID string, codes ...string) string {
+	return optCodedNameOver(texts, optCodePhrase(terminologyID, codes...))
+}
+
+// optCodedNameOver is a DV_CODED_TEXT whose value a C_STRING limits to
+// texts and whose defining code the OPT child definingCode constrains.
+func optCodedNameOver(texts []string, definingCode string) string {
 	var list strings.Builder
 	for _, text := range texts {
 		list.WriteString("<list>" + text + "</list>")
 	}
 	return optNode("DV_CODED_TEXT", "", optStringAttr("value", list.String()),
-		optSingle("defining_code", optCodePhrase(terminologyID, codes...)))
+		optSingle("defining_code", definingCode))
 }
 
 // localNameTerms are the term definitions of at0001, at0002 and at0003,
@@ -82,6 +88,14 @@ func TestREQ107_CodedNameTakesTheCodeOfItsPinnedText(t *testing.T) {
 		{
 			name:  "local codes, the second code's text pinned",
 			opt:   optTemplate("ELEMENT", localNameTerms, optSingle("name", optCodedNameListing([]string{"Second"}, "local", "at0001", "at0002"))),
+			codes: []string{"at0002"}, exampleCode: "at0002",
+		},
+		{
+			// REQ-103: a C_CODE_REFERENCE lists the codes of the code
+			// phrase constraint it carries.
+			name: "local codes of a reference set, the second code's text pinned",
+			opt: optTemplate("ELEMENT", localNameTerms, optSingle("name",
+				optCodedNameOver([]string{"Second"}, optCodeReference("local", "at0001", "at0002")))),
 			codes: []string{"at0002"}, exampleCode: "at0002",
 		},
 		{

@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/internal/rmroots"
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
@@ -206,18 +206,6 @@ func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 	checkGuardClasses(t)
 	cases := []guardCase{
 		{
-			name: "content child of an unknown xsi:type",
-			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence11,
-				guardChild("X_UNKNOWN", "OBSERVATION", "at0000", guardOccurrences11, ""))),
-			detail: "OBSERVATION at /content[at0000]",
-		},
-		{
-			name: "archetype id under an xsi:type the parser does not recognise",
-			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence11,
-				guardChild("ARCHETYPE_ROOT", "OBSERVATION", "at0000", guardOccurrences11, guardObservationID))),
-			detail: "OBSERVATION at /content[at0000]",
-		},
-		{
 			name: "abstract CONTENT_ITEM without an archetype id",
 			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence11,
 				guardChild("C_COMPLEX_OBJECT", "CONTENT_ITEM", "at0001", guardOccurrences11, ""))),
@@ -307,7 +295,7 @@ func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 			// The RM makes content non-empty once present, so its existence
 			// asks for a member, and the top-up fills the slot, the only
 			// source (REQ-107 What a visit writes). Its occurrences of 1..1
-			// are not what asks, since the parser does not read a slot's
+			// are not what asks, since the compile step does not carry a slot's
 			// occurrences (REQ-107 Known gap: slot occurrences).
 			name: "control: content at existence 1..1, whose one child is a slot",
 			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence11,
@@ -487,9 +475,9 @@ func (l contentRequiredLookup) RequiredAttributes(rmType string) []string {
 // ErrArchetypeIDMissing, under every policy, both value fills and both
 // compile modes.
 func TestREQ107_SingleAttributeRMListTheLookupRequires(t *testing.T) {
-	opt, err := template.ParseOPT(strings.NewReader(guardOPT(guardCompositionID, guardSingle("content", guardExistence11))))
+	opt, err := aom14.ReadOperationalTemplate(strings.NewReader(guardOPT(guardCompositionID, guardSingle("content", guardExistence11))))
 	if err != nil {
-		t.Fatalf("ParseOPT: %v", err)
+		t.Fatalf("ReadOperationalTemplate: %v", err)
 	}
 	for _, implicit := range []bool{true, false} {
 		compileOpts := []templatecompile.Option{templatecompile.WithRMInfo(contentRequiredLookup{rminfo.Default})}

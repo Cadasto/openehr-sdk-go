@@ -12,13 +12,14 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
@@ -91,11 +92,15 @@ func injectPartySelf(v any) {
 	}
 }
 
-// compileVitalSigns parses the vendored vital_signs.opt strictly, so an
-// unknown node type that has attributes under it stops the generator instead
-// of silently dropping the nodes beneath it, and compiles it.
+// compileVitalSigns reads the vendored vital_signs.opt into the operational
+// template model, which refuses a node type it does not know instead of
+// silently dropping the nodes beneath it, and compiles it.
 func compileVitalSigns() *templatecompile.Compiled {
-	opt, err := template.ParseFileStrict(fixtures.TemplateOptForName("vital_signs"))
+	raw, err := os.ReadFile(fixtures.TemplateOptForName("vital_signs"))
+	if err != nil {
+		panic(err)
+	}
+	opt, err := aom14.ReadOperationalTemplate(bytes.NewReader(raw))
 	if err != nil {
 		panic(err)
 	}

@@ -12,7 +12,7 @@ Each entry says what the program shows, which packages it uses, how to run it, a
 
 A few openEHR terms recur throughout. A **COMPOSITION** is the top-level clinical document. An **OPT** (operational template) is the deployable form of a template: every archetype it uses, flattened into one XML file with the template's constraints applied; it fixes which archetypes, nodes and value constraints a composition may contain. **Canonical JSON** is the openEHR REST wire format for those documents. **AQL** (Archetype Query Language) is the openEHR query language. A **Web Template** is the JSON form of a compiled OPT that form renderers and the FLAT / STRUCTURED simplified formats work from. The **RM floor** is the check against the Reference Model's own rules. The template-driven validators (`validation.ValidateComposition` and its siblings) include it; `validation.ValidateRM` runs it alone, for a root no template applies to.
 
-The examples that read an OPT file parse it with `template.ParseFileStrict`, so a program that validates, builds, generates, exports or lints stops on a template with an unknown node type that has attributes under it, instead of silently dropping that subtree. `template-explore` is the one exception: it parses leniently with `template.ParseFile` by choice, to show the parts of a template it understands. An unknown node type with no attributes under it is still kept as a leaf, without its constraint, in both modes. [opt-parse](#opt-parse) covers both modes and how they differ.
+The examples that read an OPT read it with `aom14.ReadOperationalTemplate` (package `openehr/aom/aom14`) into the operational template model, then compile it with `templatecompile.Compile`. The reader has one mode: it refuses a node type it does not know, so a program that validates, builds, generates, exports or lints stops on such a template instead of silently dropping what lies beneath that node. [opt-parse](#opt-parse) walks the steps from the file to a path lookup.
 
 ---
 
@@ -24,21 +24,21 @@ The Packages column lists the SDK packages each program imports, by short name (
 |---|---|---|---|
 | [canonical_json](#canonical_json) | No | `rm`, `canjson` | Decode canonical JSON → typed `Composition` |
 | [canxml_roundtrip](#canxml_roundtrip) | No | `rm`, `canjson`, `canxml` | JSON ↔ XML cross-format round-trip |
-| [opt-parse](#opt-parse) | No | `template` | Parse an ADL 1.4 OPT, walk paths |
-| [primitive-validate](#primitive-validate) | No | `template`, `constraints` | Single values against one OPT leaf constraint |
-| [validate-composition](#validate-composition) | No | `template`, `templatecompile`, `validation`, `rm`, `terminology` | In-memory composition vs the RM and an OPT |
-| [validate-from-json](#validate-from-json) | No | `template`, `templatecompile`, `validation`, `rm` | Wire bytes → decode and validate in one call |
-| [generate-example](#generate-example) | No | `template`, `templatecompile`, `instance`, `canjson`, `rm` | OPT → generated RM instance → JSON |
+| [opt-parse](#opt-parse) | No | `aom14`, `templatecompile`, `template` | Read and compile an ADL 1.4 OPT, look paths up |
+| [primitive-validate](#primitive-validate) | No | `aom14`, `templatecompile`, `template`, `constraints` | Single values against one OPT leaf constraint |
+| [validate-composition](#validate-composition) | No | `aom14`, `templatecompile`, `validation`, `rm`, `terminology` | In-memory composition vs the RM and an OPT |
+| [validate-from-json](#validate-from-json) | No | `aom14`, `templatecompile`, `validation`, `rm` | Wire bytes → decode and validate in one call |
+| [generate-example](#generate-example) | No | `aom14`, `templatecompile`, `instance`, `canjson`, `rm` | OPT → generated RM instance → JSON |
 | [aql-build](#aql-build) | No | `aql`, `aql/contain` | Struct + verb builders → byte-identical AQL; nested CONTAINS + in-text paging; opt-in RM containment check |
 | [aql-parse-structured](#aql-parse-structured) | No | `aql`, `aql/parse` | Parse AQL → structured tree, print each clause, emit canonical text back |
-| [lint-aql](#lint-aql) | No | `aql`, `template`, `templatecompile`, `validation` | AQL lint through `ValidateAQL`: syntax, shape, RM, template |
-| [compile-build-validate](#compile-build-validate) | No | `template`, `templatecompile`, `composition`, `validation`, `canjson`, `rm` | Compile → build → round-trip → validate, public imports only |
-| [template-explore](#template-explore) | No | `template`, `templatecompile` | Walk a compiled OPT: structure tree + leaf paths |
-| [webtemplate-export](#webtemplate-export) | No | `template`, `templatecompile`, `template/webtemplate` | Compiled OPT → Web Template JSON |
-| [flat-roundtrip](#flat-roundtrip) | No | `serialize/simplified`, `template`, `template/webtemplate`, `templatecompile`, `canjson`, `validation`, `rm` | COMPOSITION ↔ FLAT / STRUCTURED simplified formats + template-aware `WithTemplate` decode |
+| [lint-aql](#lint-aql) | No | `aql`, `aom14`, `templatecompile`, `validation` | AQL lint through `ValidateAQL`: syntax, shape, RM, template |
+| [compile-build-validate](#compile-build-validate) | No | `aom14`, `templatecompile`, `composition`, `validation`, `canjson`, `rm` | Compile → build → round-trip → validate, public imports only |
+| [template-explore](#template-explore) | No | `aom14`, `template`, `templatecompile` | Walk a compiled OPT: structure tree + leaf paths |
+| [webtemplate-export](#webtemplate-export) | No | `aom14`, `templatecompile`, `template/webtemplate` | Compiled OPT → Web Template JSON |
+| [flat-roundtrip](#flat-roundtrip) | No | `serialize/simplified`, `aom14`, `template/webtemplate`, `templatecompile`, `canjson`, `validation`, `rm` | COMPOSITION ↔ FLAT / STRUCTURED simplified formats + template-aware `WithTemplate` decode |
 | [ehr_create](#ehr_create) | Fake (`httptest`) | `discovery`, `transport`, `client/ehr` | Smallest REST create path |
 | [contribution-build](#contribution-build) | Optional fake (`-commit`) | `client/ehr/contribution`, `client/ehr`, `canjson`, `rm`, `discovery`, `transport` | Multi-version `Contribution_create` assembly, optionally committed |
-| [definition-lifecycle](#definition-lifecycle) | Fake (`sandbox`) | `client/definition`, `template`, `templatecompile`, `discovery`, `transport`, `sandbox` | Upload, list, download and compile a template; the server's copy vs the local compiled handle |
+| [definition-lifecycle](#definition-lifecycle) | Fake (`sandbox`) | `client/definition`, `aom14`, `templatecompile`, `discovery`, `transport`, `sandbox` | Upload, list, download and compile a template; the server's copy vs the local compiled handle |
 | [composition-crud](#composition-crud) | Fake (`sandbox`) | `client/ehr/composition`, `client/ehr`, `rm`, `rmpath`, `canjson`, `discovery`, `transport`, `sandbox` | Save, read, update; a stale `If-Match` refused with 412 |
 | [query-execute](#query-execute) | Fake (`sandbox`) | `aql`, `client/query`, `rm`, `typereg`, `discovery`, `transport`, `sandbox` | Execute bound AQL, decode a RESULT_SET cell into a typed value, classify a refusal |
 | [smart-launch](#smart-launch) | Fake (`httptest`) | `auth/smart`, `auth`, `discovery` | Standalone PKCE launch; **state + verifier persistence** across the redirect |
@@ -108,21 +108,21 @@ The byte counts differ because the fixture is pretty-printed and the SDK's encod
 
 ### opt-parse
 
-**Purpose:** Parse an ADL 1.4 operational template (OPT) and look around inside it: identity, provenance metadata, the root node with its attributes, and path resolution. Nothing here needs a network or a compiled template.
+**Purpose:** Read an ADL 1.4 operational template (OPT), compile it, and look around inside it: identity, provenance metadata, the root node with its attributes, and path lookup. Nothing here needs a network.
 
 ```bash
 go run ./cmd/examples/opt-parse
 go run ./cmd/examples/opt-parse path/to/template.opt
 ```
 
-**Packages:** `openehr/template`
+**Packages:** `openehr/aom/aom14`, `openehr/templatecompile`, `openehr/template`
 
 **Surfaces shown:**
 
-- `ParseFileStrict`, which rejects an unknown node type that has attributes under it, and the lenient `ParseFile`, which keeps such a node as a leaf and silently drops everything beneath it (an unknown node with no attributes under it is a leaf in both modes)
-- `TemplateID`, `Concept`, `UID`, `Language`, `Description`, `Annotations`
-- `Root`, the `ObjectNode` interface a tree walker dispatches on, and `Attributes`
-- `ParsePath`, `ValidatePath`, `NodeAt`, `WithStrictPaths`, `ErrAmbiguousPath`
+- `aom14.ReadOperationalTemplate`, which reads the OPT into the operational template model and refuses a node type it does not know
+- the model's `TemplateID`, `Concept`, `UID`, `Language`, `Description` and `Annotations`
+- `templatecompile.Compile`, `Compiled.Root`, and the `CompiledNode` and `CompiledAttribute` of the compiled tree, declared and implicit attributes alike
+- `template.ParsePath`, `Compiled.ValidatePath`, `Compiled.Resolve`, `templatecompile.WithStrictPaths`, `template.ErrAmbiguousPath`
 
 **Default fixture:** `testkit/corpus/templates/vital_signs.opt`
 
@@ -140,25 +140,27 @@ archetype   : openEHR-EHR-COMPOSITION.encounter.v1
 attributes  :
   category (single, children=1)
   content (multiple, children=4)
-NodeAt(/content): OBSERVATION [at0000] archetype=openEHR-EHR-OBSERVATION.blood_pressure.v1
-strict       : /content is ambiguous (multiple children) — add an [archetype-id] or [at-code] predicate
+implicit    : name, archetype_node_id, language, territory, composer
+Resolve(/content): OBSERVATION [at0000] archetype=openEHR-EHR-OBSERVATION.blood_pressure.v1
+strict      : /content is ambiguous (multiple children)
+strict      : Resolve(/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]): OBSERVATION [at0000]
 ```
 
-The root is the COMPOSITION archetype the template is built on. `content` is the attribute that holds its clinical entries and has four child nodes here. `NodeAt(/content)` in the default (lenient) mode picks the first child; in strict mode the same lookup returns `ErrAmbiguousPath`, and the caller adds a predicate such as `/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]` to say which child it means.
+The identity and provenance lines come from the model; the rest comes from the compiled template. The root is the COMPOSITION archetype the template is built on. `content` is the attribute that holds its clinical entries and has four child nodes here. The `implicit` line names the attributes the Reference Model requires and the OPT leaves out: the compile adds them with no child, and a composition builder fills them. `Resolve(/content)` takes the first child by default. With `WithStrictPaths` the same lookup returns `ErrAmbiguousPath`, and a predicate such as `/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]` says which child the caller means; the program builds that predicate from the child's archetype id and resolves it strictly. Given a template whose root has nothing under `/content`, such as a demographic one, the program looks up the root's first attribute with a child instead and prints a `lookup` line that says so.
 
-**What to copy into your app:** `template.ParseFileStrict` in a validator that must fail loudly on an unknown node type that has attributes under it; `ParseFile` when forward compatibility matters more, knowing that it drops the subtree under such a node. Call `opt.ParsePath` once per path, then `ValidatePath` for a precondition check or `NodeAt` for the node itself. Validators and code generators should pass `template.WithStrictPaths()` and handle `template.ErrAmbiguousPath` with `errors.Is`, so a path never silently resolves to the wrong child.
+**What to copy into your app:** `aom14.ReadOperationalTemplate` then `templatecompile.Compile`, once per template; reading fails loudly on a node type the reader does not know. Read identity and provenance from the model and the structure from the compiled tree. Call `template.ParsePath` once per path: it needs no template, so the same `Path` works on every compiled template. Then call `Compiled.ValidatePath` for a precondition check or `Compiled.Resolve` for the node itself. Validators and code generators should pass `templatecompile.WithStrictPaths()` and handle `template.ErrAmbiguousPath` with `errors.Is`, so a path never silently resolves to the wrong child.
 
 ---
 
 ### primitive-validate
 
-**Purpose:** Validate single values (a `DV_QUANTITY` magnitude and units) against one leaf constraint of an OPT, without compiling the template or building a composition. The embedded OPT constrains a DV_QUANTITY to a magnitude of 0..300 in `mm[Hg]`; the program resolves that leaf by path and checks three values against it, two of which fail on purpose.
+**Purpose:** Validate single values (a `DV_QUANTITY` magnitude and units) against one leaf constraint of an OPT, without building a composition. The embedded OPT constrains a DV_QUANTITY to a magnitude of 0..300 in `mm[Hg]`; the program reads it with `aom14.ReadOperationalTemplate`, compiles it with `templatecompile.Compile`, resolves that leaf by path in the compiled template and checks three values against it, two of which fail on purpose.
 
 ```bash
 go run ./cmd/examples/primitive-validate
 ```
 
-**Packages:** `openehr/template`, `openehr/template/constraints`
+**Packages:** `openehr/aom/aom14`, `openehr/templatecompile`, `openehr/template`, `openehr/template/constraints`
 
 **Fixture:** none; the minimal OPT is embedded in the program.
 
@@ -177,7 +179,7 @@ summary     : 2/3 cases failed validation (expected for demo)
 
 Each violation carries a `Code`, the stable identifier a program branches on, and a `Detail`, the explanation for people. `Detail` names the clause that failed and never repeats the submitted value, so it is safe to log or return to a client. The value sits in `Value`, which prints as `[redacted]` whenever it holds one; `Value.Reveal()` returns the value itself, and the demo calls it on its own input to print the `(submitted: …)` part.
 
-**What to copy into your app:** resolve the leaf with `opt.ParsePath` and `opt.NodeAt`, assert `*template.ComplexObject`, and read its `PrimitiveConstraint()` (nil on a structural node). `constraint.Validate(constraints.QuantityValue{Magnitude: m, Units: u})` returns nil when every clause holds, otherwise one `Violation` per failed clause. Use this for field-level checks in a form; use the composition validators when you hold a whole document.
+**What to copy into your app:** read the OPT with `aom14.ReadOperationalTemplate` and compile it with `templatecompile.Compile`, resolve the leaf with `template.ParsePath` and `Compiled.Resolve`, and read the node's `PrimitiveConstraint()` (nil on a structural node). `constraint.Validate(constraints.QuantityValue{Magnitude: m, Units: u})` returns nil when every clause holds, otherwise one `Violation` per failed clause. Use this for field-level checks in a form; use the composition validators when you hold a whole document.
 
 ---
 
@@ -191,7 +193,7 @@ go run ./cmd/examples/validate-composition path/to/template.opt
 go run ./cmd/examples/validate-composition -invalid   # clear a required attribute first
 ```
 
-**Packages:** `openehr/rm`, `openehr/template`, `openehr/templatecompile`, `openehr/terminology`, `openehr/validation`. **No `internal/` import.**
+**Packages:** `openehr/rm`, `openehr/aom/aom14`, `openehr/templatecompile`, `openehr/terminology`, `openehr/validation`. **No `internal/` import.**
 
 It uses the same public `templatecompile.Compile` bridge as [compile-build-validate](#compile-build-validate), so the program can be copied into another module unchanged.
 
@@ -238,11 +240,11 @@ At each node the walk first asks whether the template admits the content there, 
 | `-corpus` | Validate `testkit/corpus/compositions/vital_signs.json`, demo data that reports issues, instead of the clean local fixture |
 | `-cassette` | Deprecated spelling of `-corpus`, kept so older scripts keep working |
 
-The exit status lets the command gate a pipeline. It is 0 when validation reports no error, and 1 when it does. A composition that does not decode is one of those outcomes: its `invalid_shape` issue prints under `validation` and the status is 1. The status is also 1 when the program cannot run: a missing or unreadable file, an OPT that does not parse, or the wrong number of file arguments. A bad flag exits with status 2. Both failure cases exit 1, but they print differently: a program error is logged on stderr and stops the run, while validation issues print on stdout under `validation`.
+The exit status lets the command gate a pipeline. It is 0 when validation reports no error, and 1 when it does. A composition that does not decode is one of those outcomes: its `invalid_shape` issue prints under `validation` and the status is 1. The status is also 1 when the program cannot run: a missing or unreadable file, an OPT that does not read or compile, or the wrong number of file arguments. A bad flag exits with status 2. Both failure cases exit 1, but they print differently: a program error is logged on stderr and stops the run, while validation issues print on stdout under `validation`.
 
 **Default JSON fixture:** `cmd/examples/validate-from-json/testdata/minimal_blood_pressure.json`, a hand-made composition that is valid against `vital_signs.opt`. Its generator, `gen_fixture.go` in the same directory, refuses to write a fixture that fails validation.
 
-**Packages:** `openehr/rm`, `openehr/template`, `openehr/templatecompile`, `openehr/validation`. **No `internal/` import.**
+**Packages:** `openehr/rm`, `openehr/aom/aom14`, `openehr/templatecompile`, `openehr/validation`. **No `internal/` import.**
 
 **Sample output:**
 
@@ -256,7 +258,7 @@ result               : valid, no error found
 
 With `-corpus` validation reports 12 issues, one `path [code] detail` line each: a magnitude out of range (`primitive_out_of_range`), two units the template does not allow (`primitive_unit_unknown`), and nine `required` findings. All 12 come from the template constraints; the RM floor finds nothing wrong in this document, and it leaves out no member the Reference Model makes mandatory. The nine `required` findings are the `items` lists of its state and protocol structures, which the document leaves out. The template gives those lists an existence of 1, which asks for the list to be there even when it holds no member, so a document meets it with `"items": []` and fails it with no `items` at all. The result line says the composition is not valid, and a note says the issues are expected. The two checks catch different things: the RM floor accepts those values, and the template does not. The reverse holds too: a composition with no `archetype_details` on its COMPOSITION or an ENTRY, or with an ELEMENT that has neither a value nor a null flavour, can meet the template constraints and fail on the RM floor. That is why the one call runs both.
 
-**What to copy into your app:** the steps in order: read the bytes, `template.ParseFileStrict` plus `templatecompile.Compile` once per template, then `validation.ValidateJSON(body, &composition, compiled)`, which decodes and validates in one call and leaves the decoded value in `composition`. A document that does not decode comes back as an `invalid_shape` issue at `/`, not as an error, so there is no separate decode step to handle. Accept the document when the result is OK, map that to your exit status, and print `result.Issues`. Decoding with `canjson.Unmarshal` and then calling `validation.ValidateComposition` would miss a mandatory number, boolean or value struct the document leaves out, because it decodes to its zero value. For canonical XML the same call is `validation.ValidateXML`. Parse strictly in a validator: on an unknown node type that has attributes under it, `ParseFileStrict` refuses the template, while the lenient `ParseFile` keeps the node as a leaf and drops the constraints beneath it. The same compiled template also feeds the composition builder, the instance generator and the AQL lint.
+**What to copy into your app:** the steps in order: read the bytes, `aom14.ReadOperationalTemplate` plus `templatecompile.Compile` once per template, then `validation.ValidateJSON(body, &composition, compiled)`, which decodes and validates in one call and leaves the decoded value in `composition`. A document that does not decode comes back as an `invalid_shape` issue at `/`, not as an error, so there is no separate decode step to handle. Accept the document when the result is OK, map that to your exit status, and print `result.Issues`. Decoding with `canjson.Unmarshal` and then calling `validation.ValidateComposition` would miss a mandatory number, boolean or value struct the document leaves out, because it decodes to its zero value. For canonical XML the same call is `validation.ValidateXML`. The reader refuses a template with a node type it does not know, so a validator never checks against a template whose constraints were partly dropped. The same compiled template also feeds the composition builder, the instance generator and the AQL lint.
 
 ---
 
@@ -282,7 +284,7 @@ go run ./cmd/examples/generate-example \
 | `--territory` | `NL` | ISO 3166-1 code; a COMPOSITION root requires one |
 | `--composer-name` | `Example Composer` | Name recorded as the composition's composer |
 
-**Packages:** `openehr/template`, `openehr/templatecompile`, `openehr/instance`, `openehr/rm`, `openehr/serialize/canjson`. **No `internal/` import.**
+**Packages:** `openehr/aom/aom14`, `openehr/templatecompile`, `openehr/instance`, `openehr/rm`, `openehr/serialize/canjson`. **No `internal/` import.**
 
 The output is one line of JSON. Each run gets a wall-clock context start time, and fresh ids wherever it writes one, so two runs are never byte-identical; that is why this entry shows no sample block. Pipe the output to a file or into `validate-from-json` to see that generated data passes validation, the template constraints and the RM floor:
 
@@ -291,7 +293,7 @@ go run ./cmd/examples/generate-example --policy medium > /tmp/generated.json
 go run ./cmd/examples/validate-from-json /tmp/generated.json testkit/corpus/templates/vital_signs.opt
 ```
 
-**What to copy into your app:** `template.ParseFileStrict` plus `templatecompile.Compile`, then `instance.Generate(ctx, compiled, instance.Options{Policy: ..., Territory: ..., Composer: ...})`. Parse strictly: on an unknown node type that has attributes under it, the lenient `ParseFile` keeps the node as a leaf and drops everything beneath it, so the generated instance would lack that subtree. `Generate` returns the root as `any`, because a template can be rooted on any archetypeable type; `canjson.Marshal` encodes it as is, and `instance.AsComposition` (with siblings for the other root types) gives you the typed value. Optional RM strings are pointers, hence `new(name)` for the composer name. An unknown policy name is an error, so a typo on the command line does not silently pick a default. For two byte-identical runs, fix `Options.Now` and pass `UIDSource: instance.UIDsFrom(rand.NewPCG(1, 2))`; under `ValueFill: instance.RandomFill`, also pass a `ValueSource` built on a source of its own. `composition.NewSkeleton` takes the same through `WithNow`, `WithUIDSource` and `WithValueSource`.
+**What to copy into your app:** `aom14.ReadOperationalTemplate` plus `templatecompile.Compile`, then `instance.Generate(ctx, compiled, instance.Options{Policy: ..., Territory: ..., Composer: ...})`. The reader refuses a node type it does not know, so a generated instance never silently lacks the subtree under such a node. `Generate` returns the root as `any`, because a template can be rooted on any archetypeable type; `canjson.Marshal` encodes it as is, and `instance.AsComposition` (with siblings for the other root types) gives you the typed value. Optional RM strings are pointers, hence `new(name)` for the composer name. An unknown policy name is an error, so a typo on the command line does not silently pick a default. For two byte-identical runs, fix `Options.Now` and pass `UIDSource: instance.UIDsFrom(rand.NewPCG(1, 2))`; under `ValueFill: instance.RandomFill`, also pass a `ValueSource` built on a source of its own. `composition.NewSkeleton` takes the same through `WithNow`, `WithUIDSource` and `WithValueSource`.
 
 ---
 
@@ -438,7 +440,7 @@ go run ./cmd/examples/lint-aql
 go run ./cmd/examples/lint-aql path/to/template.opt
 ```
 
-**Packages:** `openehr/aql`, `openehr/template`, `openehr/templatecompile`, `openehr/validation` (`openehr/aql/parse` and `openehr/aql/lint` run underneath `ValidateAQL`)
+**Packages:** `openehr/aql`, `openehr/aom/aom14`, `openehr/templatecompile`, `openehr/validation` (`openehr/aql/parse` and `openehr/aql/lint` run underneath `ValidateAQL`)
 
 **Sample output:**
 
@@ -474,20 +476,20 @@ result   : OK — no errors, 3 advisories
 
 Four queries: a clean one; a broken one, where an archetype missing from the template and an unbound `$threshold` are errors while an unpredicated `events` step and a missing alias are advisories; a well-formed query that can never match, because under the RM an OBSERVATION never contains a COMPOSITION; and one that is OK yet not issue-free, because a FOLDER reaches a COMPOSITION only through a reference. `Result.OK` is false only when an error-severity issue is present, so an OK result can still carry warnings.
 
-**What to copy into your app:** for CI or pre-flight checks call `lint.LintString(q, nil)` (syntax, shape and RM checks, no template needed); when you hold a compiled OPT, pass it via `lint.Options{Compiled: c}` (or call `validation.ValidateAQL`) to add the archetype and path checks. Parse that OPT with `template.ParseFileStrict`, as the program does, so a template with an unknown node type that has attributes under it is refused before the lint runs. After a lenient `ParseFile`, the subtree under that node is dropped, and the lint would report every archetype and path in it as not in the template. Dispatch on `Issue.Code` and treat only `Error`-severity issues as hard failures. Still read `Result.Issues`, not only `Result.OK`: OK means *no errors*, not *no issues*. Most of the portability codes and all of the path-shape codes are advisory (the last block above).
+**What to copy into your app:** for CI or pre-flight checks call `lint.LintString(q, nil)` (syntax, shape and RM checks, no template needed); when you hold a compiled OPT, pass it via `lint.Options{Compiled: c}` (or call `validation.ValidateAQL`) to add the archetype and path checks. Read that OPT with `aom14.ReadOperationalTemplate` and compile it, as the program does: the reader refuses a template with a node type it does not know before the lint runs, so the lint never reports the archetypes and paths under such a node as not in the template. Dispatch on `Issue.Code` and treat only `Error`-severity issues as hard failures. Still read `Result.Issues`, not only `Result.OK`: OK means *no errors*, not *no issues*. Most of the portability codes and all of the path-shape codes are advisory (the last block above).
 
 ---
 
 ### compile-build-validate
 
-**Purpose:** Drive the whole clinical pipeline through public packages only, as a program in another Go module would. Parse an OPT, compile it with `openehr/templatecompile.Compile`, build a `*rm.Composition` with the builder, serialise it to canonical JSON and decode it again, and validate the result with `validation.ValidateComposition` against the same compiled template, which checks the template constraints and the RM floor in one call.
+**Purpose:** Drive the whole clinical pipeline through public packages only, as a program in another Go module would. Read an OPT with `aom14.ReadOperationalTemplate`, compile it with `openehr/templatecompile.Compile`, build a `*rm.Composition` with the builder, serialise it to canonical JSON and decode it again, and validate the result with `validation.ValidateComposition` against the same compiled template, which checks the template constraints and the RM floor in one call.
 
 ```bash
 go run ./cmd/examples/compile-build-validate
 go run ./cmd/examples/compile-build-validate path/to/template.opt
 ```
 
-**Packages:** `openehr/template`, `openehr/templatecompile`, `openehr/composition`, `openehr/serialize/canjson`, `openehr/validation`, `openehr/rm`. **No `internal/` import.**
+**Packages:** `openehr/aom/aom14`, `openehr/templatecompile`, `openehr/composition`, `openehr/serialize/canjson`, `openehr/validation`, `openehr/rm`. **No `internal/` import.**
 
 **Sample output:**
 
@@ -512,7 +514,7 @@ go run ./cmd/examples/template-explore
 go run ./cmd/examples/template-explore path/to/template.opt
 ```
 
-**Packages:** `openehr/template`, `openehr/templatecompile`. **No `internal/` import.**
+**Packages:** `openehr/aom/aom14`, `openehr/template`, `openehr/templatecompile`. **No `internal/` import.**
 
 **Sample output (abridged):**
 
@@ -536,7 +538,7 @@ addressable primitive-leaf paths (6) — Builder.Set targets:
 
 In the structure view, `[1]` marks a single-valued attribute and `[*]` a multi-valued one; `required` means the Reference Model makes the attribute mandatory on that type. The bracketed identity is the archetype id where an archetype is plugged in, otherwise the at-code from the archetype's own definition; a data value such as DV_QUANTITY has neither. `(slot)` marks an opaque fill point another archetype plugs into, and `·primitive` marks a node with a value constraint, the editable leaf. The quoted text is the term the archetype defines for the node's at-code.
 
-**What to copy into your app:** hold `*templatecompile.CompiledNode` / `*templatecompile.CompiledAttribute` in your own walker. `node.RMTypeName()` plus `attr.Cardinality()` / `Required()` drive widget choice and required markers, and `node.Term(code, "")` gives the label. `node.PrimitiveConstraint()` marks the editable leaves, and `node.AQLPath()` yields the `Builder.Set` path. The program parses with the lenient `template.ParseFile` on purpose, so it still shows the parts of a template it understands; the cost is that an unknown node type shows as a leaf with nothing beneath it. Use `template.ParseFileStrict` when an unknown node type that has attributes under it has to be an error.
+**What to copy into your app:** hold `*templatecompile.CompiledNode` / `*templatecompile.CompiledAttribute` in your own walker. `node.RMTypeName()` plus `attr.Cardinality()` / `Required()` drive widget choice and required markers, and `node.Term(code, "")` gives the label. `node.PrimitiveConstraint()` marks the editable leaves, and `node.AQLPath()` yields the `Builder.Set` path. The program reads the OPT with `aom14.ReadOperationalTemplate`, which refuses a node type it does not know, so the tree it walks leaves nothing out.
 
 ---
 
@@ -550,7 +552,7 @@ go run ./cmd/examples/webtemplate-export path/to/template.opt
 go run ./cmd/examples/webtemplate-export -json path/to/template.opt
 ```
 
-**Packages:** `openehr/template`, `openehr/templatecompile`, `openehr/template/webtemplate`. **No `internal/` import.**
+**Packages:** `openehr/aom/aom14`, `openehr/templatecompile`, `openehr/template/webtemplate`. **No `internal/` import.**
 
 **Sample output (abridged):**
 
@@ -573,7 +575,7 @@ encounter [COMPOSITION] 1..1
 
 Each line is one node as a form renderer reads it: the `id` is the segment a FLAT path is built from, then the RM type and the min..max occurrences (`*` for unbounded). After the dash come the inputs a data-entry client draws for a leaf, as `suffix:type` pairs; the suffix is the FLAT-path suffix the value is posted under (`|magnitude`, `|unit`, `|code`), and a coded input also reports how many codes its list offers. A hint to rerun with `-json` goes to stderr, so stdout stays the summary alone.
 
-**What to copy into your app:** parse the OPT with `template.ParseFileStrict` and compile it; after a lenient `ParseFile`, an unknown node type that has attributes under it loses everything beneath it, and the export would be an incomplete Web Template. Then `webtemplate.Marshal(compiled)` for the bytes (`application/openehr.wt+json`), or `webtemplate.Build(compiled)` when you post-process the typed tree first. Each `Node.ID` is the FLAT-path segment consumers bind to, and each leaf's `Inputs` (`suffix` / `type` / `list` / `validation`) drives the widget. Both fail loudly (`ErrEmptyTemplate` / `ErrNoDefaultLanguage` / `ErrIDCollision`) instead of emitting ambiguous output. The package's `deviations.md` lists the accepted reference deltas.
+**What to copy into your app:** read the OPT with `aom14.ReadOperationalTemplate` and compile it; the reader refuses a node type it does not know, so the export is never an incomplete Web Template. Then `webtemplate.Marshal(compiled)` for the bytes (`application/openehr.wt+json`), or `webtemplate.Build(compiled)` when you post-process the typed tree first. Each `Node.ID` is the FLAT-path segment consumers bind to, and each leaf's `Inputs` (`suffix` / `type` / `list` / `validation`) drives the widget. Both fail loudly (`ErrEmptyTemplate` / `ErrNoDefaultLanguage` / `ErrIDCollision`) instead of emitting ambiguous output. The package's `deviations.md` lists the accepted reference deltas.
 
 ---
 
@@ -585,7 +587,7 @@ Each line is one node as a form renderer reads it: the `id` is the segment a FLA
 go run ./cmd/examples/flat-roundtrip
 ```
 
-**Packages:** `openehr/serialize/simplified`, `openehr/template`, `openehr/template/webtemplate`, `openehr/templatecompile`, `openehr/serialize/canjson`, `openehr/validation`, `openehr/rm`. **No `internal/` import.**
+**Packages:** `openehr/serialize/simplified`, `openehr/aom/aom14`, `openehr/template/webtemplate`, `openehr/templatecompile`, `openehr/serialize/canjson`, `openehr/validation`, `openehr/rm`. **No `internal/` import.**
 
 **Sample output (abridged, keys sorted):**
 
@@ -692,7 +694,7 @@ Per-version overrides (`WithLifecycleState`, `WithVersionCommitter`, `WithVersio
 go run ./cmd/examples/definition-lifecycle
 ```
 
-**Packages:** `openehr/client/definition`, `openehr/template`, `openehr/templatecompile`, `smart/discovery`, `transport`, `sandbox` (plus `testkit/fixtures`, which locates the fixtures)
+**Packages:** `openehr/client/definition`, `openehr/aom/aom14`, `openehr/templatecompile`, `smart/discovery`, `transport`, `sandbox` (plus `testkit/fixtures`, which locates the fixtures)
 
 **Fixtures:** `testkit/corpus/templates/body_weight.opt` (uploaded), `testkit/corpus/compositions/body_weight.json` (the fake's example composition)
 
@@ -707,14 +709,14 @@ example composition  : openEHR-EHR-COMPOSITION.encounter.v1 with 1 content item(
 OK: template uploaded, listed, downloaded and compiled; example received
 ```
 
-`definition.UploadTemplate` sends no `Prefer` header, and the fake answers the way ITS-REST describes for that case: `201 Created`, a `Location` header naming the template, and an empty body. `UploadTemplate` then takes the template id from the last segment of `Location`; a server that sends a JSON body with a `template_id` works as well. The SDK has no call that returns the metadata of one template, so the program filters `definition.ListTemplates` by the id. The server matches that filter as a pattern and may list other templates too, so the program picks the entry whose `TemplateID` is exactly the id. This fake stores the OPT unchanged, so the download is identical to the upload. A real server may store a template in another form, so the program only reports the comparison; the check is that the download parses with `template.ParseOPTStrict` and compiles. For the example, the fake ignores the `type` and `detail_level` parameters and returns a composition recorded against the same template; a real server generates the example from the template.
+`definition.UploadTemplate` sends no `Prefer` header, and the fake answers the way ITS-REST describes for that case: `201 Created`, a `Location` header naming the template, and an empty body. `UploadTemplate` then takes the template id from the last segment of `Location`; a server that sends a JSON body with a `template_id` works as well. The SDK has no call that returns the metadata of one template, so the program filters `definition.ListTemplates` by the id. The server matches that filter as a pattern and may list other templates too, so the program picks the entry whose `TemplateID` is exactly the id. This fake stores the OPT unchanged, so the download is identical to the upload. A real server may store a template in another form, so the program only reports the comparison; the check is that the download reads with `aom14.ReadOperationalTemplate` and compiles. For the example, the fake ignores the `type` and `detail_level` parameters and returns a composition recorded against the same template; a real server generates the example from the template.
 
 **What to copy into your app:**
 
 1. Bound the work with `context.WithTimeout`, give your `*http.Client` a `Timeout` of its own, and pass it to `transport.New` with `transport.WithHTTPClient`.
 2. `definition.UploadTemplate(ctx, client, definition.FormatADL14, body)`, then read the id from the returned metadata's `TemplateID`.
 3. `definition.ListTemplates(ctx, client, definition.FormatADL14, definition.WithTemplateID(id))` to read one template's metadata. ITS-REST makes the filter a wildcard pattern, matched by the server, so take the entry whose `TemplateID` equals the id, not the first entry.
-4. To compile exactly what the server holds, download it with `definition.GetTemplate`, then run `template.ParseOPTStrict` and `templatecompile.Compile`. The download may differ from the bytes you uploaded. Compile once per template and reuse the handle.
+4. To compile exactly what the server holds, download it with `definition.GetTemplate`, then run `aom14.ReadOperationalTemplate` and `templatecompile.Compile`. The download may differ from the bytes you uploaded. Compile once per template and reuse the handle.
 5. `definition.ExampleComposition` gives a starting payload for a template. `WithExampleType` and `WithExampleDetailLevel` choose the kind of example; without them the server applies the ITS-REST defaults, `input` and `required`.
 
 ---

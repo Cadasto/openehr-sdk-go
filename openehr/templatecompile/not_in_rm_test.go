@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
@@ -35,10 +34,7 @@ const oneAttributeOPT = `<?xml version="1.0" encoding="UTF-8"?>
 func compileOneAttribute(t *testing.T, rmType, attr string, opts ...templatecompile.Option) *templatecompile.CompiledNode {
 	t.Helper()
 	escaped := strings.NewReplacer("<", "&lt;", ">", "&gt;").Replace(rmType)
-	opt, err := template.ParseOPTStrict(strings.NewReader(fmt.Sprintf(oneAttributeOPT, escaped, attr)))
-	if err != nil {
-		t.Fatalf("ParseOPTStrict(%s.%s): %v", rmType, attr, err)
-	}
+	opt := mustReadModel(t, fmt.Sprintf(oneAttributeOPT, escaped, attr))
 	c, err := templatecompile.Compile(opt, opts...)
 	if err != nil {
 		t.Fatalf("Compile(%s.%s): %v", rmType, attr, err)

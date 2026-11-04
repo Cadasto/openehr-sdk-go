@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
@@ -531,9 +531,9 @@ func TestValidateComposition_AlternativeMismatch_Positive(t *testing.T) {
     </attributes>
   </definition>
 </template>`
-	opt, err := template.ParseOPT(strings.NewReader(body))
+	opt, err := aom14.ReadOperationalTemplate(strings.NewReader(body))
 	if err != nil {
-		t.Fatalf("ParseOPT: %v", err)
+		t.Fatalf("ReadOperationalTemplate: %v", err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
@@ -583,9 +583,9 @@ func TestValidateComposition_AlternativeMismatch_Negative(t *testing.T) {
     </attributes>
   </definition>
 </template>`
-	opt, err := template.ParseOPT(strings.NewReader(body))
+	opt, err := aom14.ReadOperationalTemplate(strings.NewReader(body))
 	if err != nil {
-		t.Fatalf("ParseOPT: %v", err)
+		t.Fatalf("ReadOperationalTemplate: %v", err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
@@ -940,9 +940,9 @@ func validSingleAttributeSlotComposition(protocolID string) *rm.Composition {
 
 func mustCompile(t *testing.T, fixture string) *templatecompile.Compiled {
 	t.Helper()
-	opt, err := template.ParseFile(fixtures.TemplateOptForName(fixture))
+	opt, err := readOPTFile(fixtures.TemplateOptForName(fixture))
 	if err != nil {
-		t.Fatalf("ParseFile(%s): %v", fixture, err)
+		t.Fatalf("readOPTFile(%s): %v", fixture, err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
@@ -957,9 +957,9 @@ func mustCompileSyntheticOPT(t *testing.T, xml string) *templatecompile.Compiled
 	if err := os.WriteFile(path, []byte(xml), 0o600); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
-	opt, err := template.ParseFile(path)
+	opt, err := readOPTFile(path)
 	if err != nil {
-		t.Fatalf("ParseFile(synthetic): %v", err)
+		t.Fatalf("readOPTFile(synthetic): %v", err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
@@ -991,7 +991,7 @@ const singleAttributeSlotOPT = `<?xml version="1.0" encoding="utf-8"?>
     <node_id>at0000</node_id>
     <attributes xsi:type="C_MULTIPLE_ATTRIBUTE">
       <rm_attribute_name>content</rm_attribute_name>
-      <children xsi:type="C_COMPLEX_OBJECT">
+      <children xsi:type="C_ARCHETYPE_ROOT">
         <rm_type_name>OBSERVATION</rm_type_name>
         <node_id>at0000</node_id>
         <attributes xsi:type="C_SINGLE_ATTRIBUTE">

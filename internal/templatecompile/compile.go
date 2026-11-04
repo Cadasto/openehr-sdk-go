@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 )
@@ -28,25 +29,50 @@ type Options struct {
 	SkipImplicitAttributes bool
 }
 
-// Compile turns a parsed OPT into a walker-friendly compiled
-// representation. The input is read-only: the returned Compiled
-// tree shares no mutable state with opt (struct values are copied,
-// slices are freshly allocated).
+// maxDepth is how many levels of constraint objects below the definition
+// Compile walks: the depth limit the model's reader applies, which a model
+// decoded or built some other way has not been held to.
+const maxDepth = 128
+
+// Compile turns an operational template, read into the model, into a
+// walker-friendly compiled representation. The input is read-only: the
+// returned Compiled tree shares no mutable state with opt (struct values are
+// copied, slices and maps are freshly allocated).
 //
-// Returns an error wrapping ErrInvalidInput when opt is nil, when it has
-// no root, and when two nodes under different attributes have the same
-// AQL path, which is a defect in the OPT. Nodes under one attribute that
-// share a path (alternatives, or siblings with the same node id) and the
-// descendants of such nodes are admitted, and [Compiled.NodeAt] resolves
-// the path to the first one walked. Returns an error that does not wrap
-// ErrInvalidInput when the tree holds a node of a kind Compile does not
-// handle, which a parsed OPT does not contain.
-func Compile(opt *template.OperationalTemplate, opts ...Options) (*Compiled, error) {
+// Compile reads identifiers, codes, list entries and term texts without
+// their leading and trailing white space, reads an ELEMENT attribute named
+// null_flavor as null_flavour, unless the node also names null_flavour, and
+// closes each occurrences, existence and cardinality interval into a
+// [template.Multiplicity]. It does not carry the occurrences of a slot.
+//
+// Compile places each default value of the template's <constraints> on the
+// node it addresses ([CompiledNode.DefaultValue]).
+//
+// Returns an error wrapping ErrInvalidInput when opt is nil, when it has no
+// template_id or no definition, when it holds an interval that closing
+// refuses ([template.NewMultiplicity]), a primitive constraint whose value
+// the constraint cannot carry, a missing constraint object, attribute or
+// primitive item, or constraint objects nested more than 128 levels below the
+// definition, when two nodes under different attributes have the same AQL
+// path, which is a defect in the template, and when a default value addresses
+// no node ([placeDefaultValues]). Nodes under one attribute that share a path
+// (alternatives, or siblings with the same node id) and the descendants of
+// such nodes are admitted, and [Compiled.NodeAt] resolves the path to the
+// first one walked. Returns an error that does not wrap ErrInvalidInput when
+// the model holds a constraint object or an attribute of a kind Compile does
+// not handle, which the model's decode does not produce.
+func Compile(opt *aom14.OperationalTemplate, opts ...Options) (*Compiled, error) {
 	if opt == nil {
 		return nil, fmt.Errorf("%w: nil template", ErrInvalidInput)
 	}
-	if opt.Root() == nil {
-		return nil, fmt.Errorf("%w: template has no root", ErrInvalidInput)
+	templateID := strings.TrimSpace(opt.TemplateID.Value)
+	if templateID == "" {
+		return nil, fmt.Errorf("%w: template has no template_id", ErrInvalidInput)
+	}
+	// The definition is a value in the model, so an absent one is the zero
+	// archetype root, which names no RM type.
+	if strings.TrimSpace(opt.Definition.RMTypeName) == "" {
+		return nil, fmt.Errorf("%w: template has no definition", ErrInvalidInput)
 	}
 
 	o := Options{}
@@ -58,14 +84,16 @@ func Compile(opt *template.OperationalTemplate, opts ...Options) (*Compiled, err
 	}
 
 	c := &Compiled{
-		templateID:    opt.TemplateID(),
-		concept:       opt.Concept(),
-		uid:           opt.UID(),
-		language:      opt.Language(),
+		templateID:    templateID,
+		concept:       strings.TrimSpace(opt.Concept),
+		language:      strings.TrimSpace(opt.Language.CodeString),
 		byPath:        make(map[string]*CompiledNode),
 		byNodeID:      make(map[string][]*CompiledNode),
 		byRMType:      make(map[string][]*CompiledNode),
 		byArchetypeID: make(map[string][]*CompiledNode),
+	}
+	if opt.UID != nil {
+		c.uid = strings.TrimSpace(opt.UID.Value)
 	}
 
 	w := walker{
@@ -76,17 +104,26 @@ func Compile(opt *template.OperationalTemplate, opts ...Options) (*Compiled, err
 		implicit: map[implicitKey]*CompiledAttribute{},
 		paths:    map[string]pathMark{},
 	}
-	root, err := w.compileNode(opt.Root(), nil, "/", "")
+	definition, err := objectOf(&opt.Definition)
+	if err != nil {
+		return nil, fmt.Errorf("definition: %w", err)
+	}
+	root, err := w.compileNode(definition, nil, "/", "", 0)
 	if err != nil {
 		return nil, err
 	}
 	c.root = root
+	if err := placeDefaultValues(c, opt.Constraints); err != nil {
+		return nil, err
+	}
 	return c, nil
 }
 
-// ErrInvalidInput is returned, wrapped, by [Compile] for a nil
-// template, a template with no root, and a template in which two nodes
-// under different attributes have the same AQL path.
+// ErrInvalidInput is returned, wrapped, by [Compile] for a template it
+// refuses: a nil one, one with no template_id or no definition, one holding
+// a value the compiled form cannot carry or nesting past the depth limit, one
+// in which two nodes under different attributes have the same AQL path, and
+// one with a default value that addresses no node.
 var ErrInvalidInput = errors.New("templatecompile: invalid input")
 
 // walker carries the per-call state shared across recursive node
@@ -115,20 +152,20 @@ type walker struct {
 	// ([walker.descendantsOf]). Nil until the first such attribute.
 	descendants map[string][]string
 
-	// currentAttr is the wire-side *template.Attribute under whose
-	// Children() the immediately-recursed compileNode is descending.
-	// Set by buildAttribute around the per-child loop and consumed by
-	// registerPath to discriminate AOM 1.4 C_SINGLE_ATTRIBUTE
-	// alternatives (legal path duplicates) from genuine cross-
-	// attribute path collisions (an OPT bug).
-	currentAttr *template.Attribute
+	// currentAttr is the model's attribute under whose children the
+	// immediately-recursed compileNode is descending. Set by buildAttribute
+	// around the per-child loop and consumed by registerPath to discriminate
+	// AOM 1.4 C_SINGLE_ATTRIBUTE alternatives (legal path duplicates) from
+	// genuine cross-attribute path collisions (an OPT bug). The attribute is
+	// held by pointer, so it identifies its place in the model.
+	currentAttr aom14.CAttribute
 
 	// paths holds every AQL path reached at node *entry* (pre-order).
 	// byPath cannot serve here: registration is post-order (a node
 	// registers after its own subtree), so at the time a second node
 	// with the same path descends, the first node's own entry is not yet
 	// in byPath while its descendants already are. Each entry also
-	// records which wire-side attribute first registered the path (see
+	// records which model attribute first registered the path (see
 	// [pathMark]).
 	paths map[string]pathMark
 
@@ -159,20 +196,24 @@ type walker struct {
 type implicitKey struct{ owner, attr string }
 
 // pathMark is what the walk knows of an AQL path it has reached: attr is
-// the wire-side attribute that first registered the path, nil until a node
+// the model's attribute that first registered the path, nil until a node
 // registers it (and for the root, which no attribute holds). registerPath
 // consults it on duplicates: same attribute → alternative, keep first;
 // different attribute → reject with ErrInvalidInput.
 type pathMark struct {
-	attr *template.Attribute
+	attr aom14.CAttribute
 }
 
-// compileNode walks one OPT node, recurses into its children, and
+// compileNode walks one constraint object, recurses into its children, and
 // registers the result in the indexes. path is the node's AQL path ("/"
 // for the root), which the caller computes ([childPath]). heldAs is the
 // type the node's attributes are read on when the node names no RM type
-// ([heldType]), "" for the root.
-func (w *walker) compileNode(n template.Node, parent *CompiledNode, path, heldAs string) (*CompiledNode, error) {
+// ([heldType]), "" for the root. depth is the node's level below the
+// definition, 0 for the definition itself.
+func (w *walker) compileNode(ob object, parent *CompiledNode, path, heldAs string, depth int) (*CompiledNode, error) {
+	if depth > maxDepth {
+		return nil, fmt.Errorf("%w: constraint objects nest more than %d levels below the definition, at %q", ErrInvalidInput, maxDepth, path)
+	}
 	cn := &CompiledNode{parent: parent, aqlPath: path}
 
 	// A repeated path means this node shares an AQL path with one already
@@ -185,7 +226,7 @@ func (w *walker) compileNode(n template.Node, parent *CompiledNode, path, heldAs
 	} else {
 		w.paths[cn.aqlPath] = pathMark{}
 	}
-	err := w.descend(n, cn, heldAs)
+	err := w.descend(ob, cn, heldAs, depth)
 	if inDup {
 		w.dupDepth--
 	}
@@ -209,49 +250,49 @@ func (w *walker) compileNode(n template.Node, parent *CompiledNode, path, heldAs
 	return cn, nil
 }
 
-// descend copies the wire node's own fields onto cn and recurses into
-// its children. Split out of compileNode so the caller can scope the
-// duplicate-path subtree marker (dupDepth) to the recursion alone,
-// leaving cn's own path registration subject to the full collision
-// check. heldAs is as for compileNode.
-func (w *walker) descend(n template.Node, cn *CompiledNode, heldAs string) error {
-	// The template-level node name (REQ-116) is read via ObjectNode,
-	// the interface that exists so this carry cannot miss one of the
-	// two object kinds; slots are not ObjectNodes and cannot pin one.
-	if on, ok := n.(template.ObjectNode); ok {
-		cn.nodeName = on.NodeName()
-	}
-	switch v := n.(type) {
-	case *template.ArchetypeRoot:
-		cn.rmTypeName = v.RMTypeName()
-		cn.nodeID = v.NodeID()
-		cn.archetypeID = v.ArchetypeID()
-		cn.occurrences = v.Occurrences()
-		// Per-archetype-root terms live on the node; bindings flatten
-		// to the Compiled aggregate (binding records carry their own
-		// terminology + at-code/path, so collisions are non-issues).
-		// Terms already copies each term and its items.
-		cn.terms = v.Terms()
-		w.compiled.termBindings = append(w.compiled.termBindings, v.TermBindings()...)
-		return w.attachAttributes(cn, readAs(cn.rmTypeName, heldAs), v.Attributes())
-	case *template.ComplexObject:
-		cn.rmTypeName = v.RMTypeName()
-		cn.nodeID = v.NodeID()
-		cn.occurrences = v.Occurrences()
-		cn.primitive = v.PrimitiveConstraint()
-		return w.attachAttributes(cn, readAs(cn.rmTypeName, heldAs), v.Attributes())
-	case *template.Slot:
-		cn.rmTypeName = v.RMTypeName()
-		cn.nodeID = v.NodeID()
+// descend copies the constraint object's own fields onto cn and recurses
+// into its children. Split out of compileNode so the caller can scope the
+// duplicate-path subtree marker (dupDepth) to the recursion alone, leaving
+// cn's own path registration subject to the full collision check. heldAs
+// and depth are as for compileNode.
+func (w *walker) descend(ob object, cn *CompiledNode, heldAs string, depth int) error {
+	cn.rmTypeName = ob.rmTypeName
+	cn.nodeID = ob.nodeID
+	cn.nodeName = ob.nodeName
+	if ob.slot != nil {
 		cn.slot = &slotInfo{
-			includes: v.Includes(),
-			excludes: v.Excludes(),
-			rules:    v.SlotRules(),
+			includes: slotPatterns(ob.slot.Includes),
+			excludes: slotPatterns(ob.slot.Excludes),
+			rules:    slotRulesFromModel(ob.slot),
 		}
 		return nil
-	default:
-		return fmt.Errorf("templatecompile: unhandled wire node type %T", n)
 	}
+	occurrences, err := multiplicityOf(ob.occurrences)
+	if err != nil {
+		return fmt.Errorf("%w: occurrences at %q (%s %q): %w", ErrInvalidInput, cn.aqlPath, cn.rmTypeName, cn.nodeID, err)
+	}
+	cn.occurrences = occurrences
+	if ob.root != nil {
+		cn.archetypeID = ob.archetypeID
+		// Per-archetype-root terms live on the node; bindings flatten to
+		// the Compiled aggregate (binding records carry their own
+		// terminology + at-code/path, so collisions are non-issues).
+		cn.terms = termsFromModel(ob.root.TermDefinitions)
+		w.compiled.termBindings = appendTermBindings(w.compiled.termBindings, ob.root.TermBindings)
+	}
+	// A leaf, a constraint object of a kind with no attributes, gets the
+	// implicit attributes of its RM type all the same.
+	var attrs []aom14.CAttribute
+	if ob.complex != nil {
+		attrs = ob.complex.Attributes
+	} else {
+		primitive, err := primitiveFromModel(ob.o)
+		if err != nil {
+			return fmt.Errorf("%w: at %q (%s %q): %w", ErrInvalidInput, cn.aqlPath, cn.rmTypeName, cn.nodeID, err)
+		}
+		cn.primitive = primitive
+	}
+	return w.attachAttributes(cn, readAs(cn.rmTypeName, heldAs), attrs, depth)
 }
 
 // readAs returns the RM type the attributes of a node are read on: the
@@ -279,13 +320,13 @@ func heldType(class, attrType string) string {
 }
 
 // attachAttributes builds the explicit attributes of cn from the
-// OPT-declared list, then (unless disabled) injects implicit
-// attributes for every RM-declared field the OPT did not name.
-// owner is the RM type the attributes are read on ([readAs]): cn's own,
-// or, for a node that names none, the type of the attribute that holds it.
-// Order: OPT-declared first (document order), then implicit
-// (sorted by RM declaration order from rminfo).
-func (w *walker) attachAttributes(cn *CompiledNode, owner string, declared []*template.Attribute) error {
+// attributes attrs the model declares, then (unless disabled) injects
+// implicit attributes for every RM-declared field the template did not
+// name. owner is the RM type the attributes are read on ([readAs]): cn's
+// own, or, for a node that names none, the type of the attribute that holds
+// it. Order: declared first (document order), then implicit (sorted by RM
+// declaration order from rminfo).
+func (w *walker) attachAttributes(cn *CompiledNode, owner string, attrs []aom14.CAttribute, depth int) error {
 	// rminfo knows each class by its bare BMM name; the OPT may declare a
 	// generic instantiation (DV_INTERVAL<DV_QUANTITY>) that it does not.
 	class := bmmtype.Class(owner)
@@ -305,18 +346,23 @@ func (w *walker) attachAttributes(cn *CompiledNode, owner string, declared []*te
 	}
 	// Room for every attribute up front, so appending never grows the
 	// slice; a node with none keeps a nil slice.
-	if n := len(declared) + countUndeclared(implicit, declared); n > 0 {
+	if n := len(attrs) + countUndeclared(implicit, cn.rmTypeName, attrs); n > 0 {
 		cn.attributes = make([]*CompiledAttribute, 0, n)
 	}
-	for _, a := range declared {
-		ca, err := w.buildAttribute(cn, owner, class, required, a)
+	for i, a := range attrs {
+		ma, err := attributeOf(a)
+		if err != nil {
+			return fmt.Errorf("attribute %d of %q (%s %q): %w", i+1, cn.aqlPath, cn.rmTypeName, cn.nodeID, err)
+		}
+		ma.name = attributeName(cn.rmTypeName, attrs, ma.name)
+		ca, err := w.buildAttribute(cn, owner, class, required, ma, depth)
 		if err != nil {
 			return err
 		}
 		cn.attributes = append(cn.attributes, ca)
 	}
 	for _, attrName := range implicit {
-		if declares(declared, attrName) {
+		if declares(cn.rmTypeName, attrs, attrName) {
 			continue
 		}
 		if ca := w.implicitAttribute(owner, class, attrName); ca != nil {
@@ -326,16 +372,21 @@ func (w *walker) attachAttributes(cn *CompiledNode, owner string, declared []*te
 	return nil
 }
 
-// declares reports whether declared holds an attribute named name.
-func declares(declared []*template.Attribute, name string) bool {
-	return slices.ContainsFunc(declared, func(a *template.Attribute) bool { return a.Name() == name })
+// declares reports whether attrs, the attributes the model declares on a
+// node of RM type rmType, holds one the compile names name
+// ([attributeName]).
+func declares(rmType string, attrs []aom14.CAttribute, name string) bool {
+	return slices.ContainsFunc(attrs, func(a aom14.CAttribute) bool {
+		return attributeName(rmType, attrs, rawAttributeName(a)) == name
+	})
 }
 
-// countUndeclared returns how many of names declared does not hold.
-func countUndeclared(names []string, declared []*template.Attribute) int {
+// countUndeclared returns how many of names attrs, the attributes the model
+// declares on a node of RM type rmType, does not hold.
+func countUndeclared(names []string, rmType string, attrs []aom14.CAttribute) int {
 	n := 0
 	for _, name := range names {
-		if !declares(declared, name) {
+		if !declares(rmType, attrs, name) {
 			n++
 		}
 	}
@@ -383,38 +434,49 @@ func (w *walker) requiredAttributes(class string) []string {
 	return required
 }
 
-// buildAttribute compiles one OPT-declared attribute, recursing
+// buildAttribute compiles one attribute the model declares, recursing
 // into its children. The attribute's BMM RM type is looked up so
 // downstream consumers can resolve type-aware constraints without a
 // separate rminfo query. owner is the RM type parent's attributes are
-// read on ([readAs]), class its bare class, and required the attributes
-// that class requires.
-func (w *walker) buildAttribute(parent *CompiledNode, owner, class string, required []string, a *template.Attribute) (*CompiledAttribute, error) {
-	rm, isProperty := w.attributeType(owner, class, a.Name())
-	ca := &CompiledAttribute{
-		name:              a.Name(),
-		cardinality:       a.Cardinality(),
-		existence:         a.Existence(),
-		childMultiplicity: a.ChildMultiplicity(),
-		rmTypeName:        rm,
-		required:          slices.Contains(required, a.Name()),
-		notInRM:           !isProperty && w.absentFrom(class, a.Name()),
-	}
-	prevAttr := w.currentAttr
-	w.currentAttr = a
-	defer func() { w.currentAttr = prevAttr }()
-	children := a.Children()
-	if len(children) > 0 {
-		ca.children = make([]*CompiledNode, 0, len(children))
-	}
+// read on ([readAs]), class its bare class, required the attributes
+// that class requires, and depth parent's level below the definition.
+func (w *walker) buildAttribute(parent *CompiledNode, owner, class string, required []string, ma modelAttribute, depth int) (*CompiledAttribute, error) {
 	// The root's path is "/", and a child of the root starts its own.
 	base := parent.aqlPath
 	if base == "/" {
 		base = ""
 	}
+	existence, err := multiplicityOf(ma.existence)
+	if err != nil {
+		return nil, fmt.Errorf("%w: existence of the attribute at %q: %w", ErrInvalidInput, base+"/"+ma.name, err)
+	}
+	childMultiplicity, err := multiplicityOf(ma.cardinality)
+	if err != nil {
+		return nil, fmt.Errorf("%w: cardinality of the attribute at %q: %w", ErrInvalidInput, base+"/"+ma.name, err)
+	}
+	rm, isProperty := w.attributeType(owner, class, ma.name)
+	ca := &CompiledAttribute{
+		name:              ma.name,
+		cardinality:       ma.card,
+		existence:         existence,
+		childMultiplicity: childMultiplicity,
+		rmTypeName:        rm,
+		required:          slices.Contains(required, ma.name),
+		notInRM:           !isProperty && w.absentFrom(class, ma.name),
+	}
+	prevAttr := w.currentAttr
+	w.currentAttr = ma.key
+	defer func() { w.currentAttr = prevAttr }()
+	if len(ma.children) > 0 {
+		ca.children = make([]*CompiledNode, 0, len(ma.children))
+	}
 	heldAs := heldType(class, rm)
-	for i, child := range children {
-		cn, err := w.compileNode(child, parent, childPath(base, a.Name(), a.Cardinality(), child, i), heldAs)
+	for i, child := range ma.children {
+		ob, err := objectOf(child)
+		if err != nil {
+			return nil, fmt.Errorf("child %d of the attribute at %q: %w", i+1, base+"/"+ma.name, err)
+		}
+		cn, err := w.compileNode(ob, parent, childPath(base, ma.name, ma.card, ob, i), heldAs, depth+1)
 		if err != nil {
 			return nil, err
 		}
@@ -499,24 +561,24 @@ func (w *walker) descendantsOf(class string) (descendants []string, ok bool) {
 // multiple attributes it also contributes a predicate (archetype id,
 // at-code, slot include pattern, or a 1-based sibling suffix when the OPT
 // omits all of the above), with the template-level node name appended to
-// an id-derived predicate (see [namePredicated]). Each path is built in one
+// an id-derived predicate (see [NamePredicate]). Each path is built in one
 // concatenation.
-func childPath(base, attrName string, card template.Cardinality, child template.Node, siblingIndex int) string {
+func childPath(base, attrName string, card template.Cardinality, child object, siblingIndex int) string {
 	if card != template.Multiple {
 		// No named node in the vendored corpus sits under a single
 		// attribute, and no reference golden predicates one, so the
 		// bare form stands: a name never *creates* a predicate.
 		return base + "/" + attrName
 	}
-	if ar, ok := child.(*template.ArchetypeRoot); ok && ar.ArchetypeID() != "" {
-		return base + "/" + attrName + "[" + namePredicated(ar.ArchetypeID(), child) + "]"
+	if child.archetypeID != "" {
+		return base + "/" + attrName + "[" + NamePredicate(child.archetypeID, child.nodeName) + "]"
 	}
-	if id := child.NodeID(); id != "" {
-		return base + "/" + attrName + "[" + namePredicated(id, child) + "]"
+	if child.nodeID != "" {
+		return base + "/" + attrName + "[" + NamePredicate(child.nodeID, child.nodeName) + "]"
 	}
-	if sl, ok := child.(*template.Slot); ok {
-		if p := slotPathPredicate(sl); p != "" {
-			// Slots are not ObjectNodes and cannot pin a name.
+	if child.slot != nil {
+		if p := slotPathPredicateFromModel(child.slot); p != "" {
+			// A slot pins no name.
 			return base + "/" + attrName + "[" + p + "]"
 		}
 	}
@@ -559,34 +621,12 @@ func NamePredicate(id, name string) string {
 	return id + ",'" + name + "'"
 }
 
-// namePredicated is the wire-side adapter for [NamePredicate]: slots are
-// not ObjectNodes and pin no name, so they pass through unchanged.
-func namePredicated(id string, child template.Node) string {
-	on, ok := child.(template.ObjectNode)
-	if !ok {
-		return id
-	}
-	return NamePredicate(id, on.NodeName())
-}
-
-// slotPathPredicate derives a stable bracket predicate for an
-// ARCHETYPE_SLOT that omits node_id. Uses the first include
-// assertion (regex escapes stripped) so sibling slots under the
-// same attribute do not collide in byPath.
-func slotPathPredicate(s *template.Slot) string {
-	inc := s.Includes()
-	if len(inc) == 0 || inc[0] == "" {
-		return ""
-	}
-	return strings.ReplaceAll(inc[0], `\`, "")
-}
-
 func (w *walker) registerPath(cn *CompiledNode) error {
 	if prev, exists := w.compiled.byPath[cn.aqlPath]; exists {
 		// AOM 1.4 admits C_SINGLE_ATTRIBUTE with multiple
 		// `<children>` (alternatives); every alternative shares
 		// the same AQL path. Admit the collision when both
-		// nodes were registered under the SAME wire attribute —
+		// nodes were registered under the SAME model attribute —
 		// then we are looking at alternatives, not unrelated
 		// subtrees colliding on a synthetic predicate. byPath
 		// keeps the first; the structural validator walks the

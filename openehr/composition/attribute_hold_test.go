@@ -6,9 +6,9 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 )
 
 // TestREQ101_PlainValueTypesArePrimitives checks, for REQ-101 Type
@@ -150,9 +150,9 @@ func TestREQ101_AttributeHoldsUnderAnUnknownClass(t *testing.T) {
 	if _, known := h.IsAbstract(unknownOwnerClass); known {
 		t.Fatalf("rminfo.Default knows %s; pick a class name it does not know (fixture drift)", unknownOwnerClass)
 	}
-	opt, err := template.ParseOPT(strings.NewReader(unknownOwnerOPT))
+	opt, err := aom14.ReadOperationalTemplate(strings.NewReader(unknownOwnerOPT))
 	if err != nil {
-		t.Fatalf("ParseOPT: %v", err)
+		t.Fatalf("ReadOperationalTemplate: %v", err)
 	}
 	c, err := tcimpl.Compile(opt)
 	if err != nil {

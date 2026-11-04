@@ -6,7 +6,6 @@ import (
 
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -18,9 +17,9 @@ import (
 // cannot pass a DV_INTERVAL<DV_QUANTITY> node. Typed-nil pointers fail
 // as unrecognised.
 func TestBindRMTypeTypedInterval(t *testing.T) {
-	opt, err := template.ParseFile(fixtures.TemplateOptForName("Demonstration.v1"))
+	opt, err := readOPTFile(fixtures.TemplateOptForName("Demonstration.v1"))
 	if err != nil {
-		t.Fatalf("ParseFile: %v", err)
+		t.Fatalf("readOPTFile: %v", err)
 	}
 	c, err := tcimpl.Compile(opt)
 	if err != nil {
@@ -50,9 +49,9 @@ func TestBindRMTypeTypedInterval(t *testing.T) {
 // path, after checking that the node still has the RM type rmType.
 func compiledNodeAt(t *testing.T, name, path, rmType string) *tcimpl.CompiledNode {
 	t.Helper()
-	opt, err := template.ParseFile(fixtures.TemplateOptForName(name))
+	opt, err := readOPTFile(fixtures.TemplateOptForName(name))
 	if err != nil {
-		t.Fatalf("ParseFile(%s): %v", name, err)
+		t.Fatalf("readOPTFile(%s): %v", name, err)
 	}
 	c, err := tcimpl.Compile(opt)
 	if err != nil {
@@ -166,9 +165,9 @@ func TestREQ101_BindRMTypeBindsAlternative(t *testing.T) {
 
 	t.Run("Set records the bound node", func(t *testing.T) {
 		t.Parallel()
-		opt, err := template.ParseFile(fixtures.TemplateOptForName("alternative_types.en.v1"))
+		opt, err := readOPTFile(fixtures.TemplateOptForName("alternative_types.en.v1"))
 		if err != nil {
-			t.Fatalf("ParseFile: %v", err)
+			t.Fatalf("readOPTFile: %v", err)
 		}
 		c, err := tcimpl.Compile(opt)
 		if err != nil {

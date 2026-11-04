@@ -57,7 +57,7 @@ func loadCompiledFormatFixture(t *testing.T) (*templatecompile.Compiled, *webtem
 	if err != nil {
 		t.Fatalf("read OPT: %v", err)
 	}
-	opt, err := fixtures.ParseOPTBytes(optBody)
+	opt, err := fixtures.ReadOperationalTemplate(optBody)
 	if err != nil {
 		t.Fatalf("parse OPT: %v", err)
 	}

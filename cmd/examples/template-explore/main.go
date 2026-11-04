@@ -13,12 +13,14 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
@@ -39,20 +41,21 @@ func run() error {
 	// Step 1: parse and compile. The compiled tree is what the composition
 	// builder and the validator work from; it is public so your own tooling
 	// can walk it too.
-	// This program parses with the lenient ParseFile on purpose: an
-	// inspection tool should still show the parts of a template it
-	// understands. The cost is that an unknown node type that has
-	// attributes under it shows as a leaf with nothing beneath it. Use
-	// ParseFileStrict when that has to be an error.
-	opt, err := template.ParseFile(optPath)
+	// ReadOperationalTemplate reads the OPT into the operational template
+	// model, and refuses a node type it does not know.
+	raw, err := os.ReadFile(optPath)
 	if err != nil {
-		return fmt.Errorf("parse OPT %s: %w", optPath, err)
+		return fmt.Errorf("read OPT %s: %w", optPath, err)
+	}
+	opt, err := aom14.ReadOperationalTemplate(bytes.NewReader(raw))
+	if err != nil {
+		return fmt.Errorf("read OPT %s: %w", optPath, err)
 	}
 	compiled, err := templatecompile.Compile(opt)
 	if err != nil {
 		return fmt.Errorf("compile template: %w", err)
 	}
-	fmt.Printf("template : %s (%s)\n", opt.TemplateID(), filepath.Base(optPath))
+	fmt.Printf("template : %s (%s)\n", compiled.TemplateID(), filepath.Base(optPath))
 	fmt.Printf("root     : %s\n\n", compiled.Root().RMTypeName())
 
 	// Step 2: the structure, one node per line with its attributes indented

@@ -19,16 +19,17 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"flag"
 	"fmt"
 	"log"
 	"os"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
@@ -58,15 +59,19 @@ func run() error {
 	// Step 1: parse and compile the OPT. An operational template is the
 	// deployable form of an openEHR template: every archetype it uses,
 	// flattened into one XML file with the template's constraints applied.
-	// ParseFileStrict rejects an unknown node type that has attributes under
-	// it. The lenient ParseFile would keep such a node as a leaf and silently
-	// drop everything beneath it, and the generator would then emit an
-	// instance with that whole subtree missing. Compile turns the parsed template into
-	// the driver the generator walks; the same compiled value feeds the
-	// validator and the composition builder.
-	opt, err := template.ParseFileStrict(optPath)
+	// ReadOperationalTemplate reads it into the operational template model,
+	// and refuses a node type it does not know rather than drop everything
+	// beneath it, which would leave that whole subtree missing from the
+	// instance. Compile turns the model into the driver the generator walks;
+	// the same compiled value feeds the validator and the composition
+	// builder.
+	raw, err := os.ReadFile(optPath)
 	if err != nil {
-		return fmt.Errorf("parse OPT %q: %w", optPath, err)
+		return fmt.Errorf("read OPT %q: %w", optPath, err)
+	}
+	opt, err := aom14.ReadOperationalTemplate(bytes.NewReader(raw))
+	if err != nil {
+		return fmt.Errorf("read OPT %q: %w", optPath, err)
 	}
 	compiled, err := templatecompile.Compile(opt)
 	if err != nil {

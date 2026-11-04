@@ -10,7 +10,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
@@ -247,9 +246,9 @@ func TestValidate_REQ102_CorpusCodedTextValues(t *testing.T) {
 		listed++
 		t.Run(ref.Name, func(t *testing.T) {
 			entered++
-			opt, err := template.ParseFile(ref.Path)
+			opt, err := readOPTFile(ref.Path)
 			if err != nil {
-				t.Skipf("ParseFile: %v", err)
+				t.Skipf("readOPTFile: %v", err)
 			}
 			c, err := templatecompile.Compile(opt)
 			if err != nil {

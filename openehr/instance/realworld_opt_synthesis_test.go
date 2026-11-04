@@ -10,7 +10,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -20,9 +19,9 @@ func compileRealWorldFixture(t *testing.T, name string) *templatecompile.Compile
 	if err != nil {
 		t.Fatalf("ReadFile %s: %v", name, err)
 	}
-	opt, err := fixtures.ParseOPTBytes(raw)
+	opt, err := fixtures.ReadOperationalTemplate(raw)
 	if err != nil {
-		t.Fatalf("ParseOPTBytes %s: %v", name, err)
+		t.Fatalf("ReadOperationalTemplate %s: %v", name, err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
@@ -42,9 +41,9 @@ func compileRealWorldFixture(t *testing.T, name string) *templatecompile.Compile
 // alone. Large and Medium must each contain at least one ELEMENT; a hollow
 // tree passes the content check and both validators.
 func TestREQ107_GenerateSocialContentArchetypes(t *testing.T) {
-	opt, err := template.ParseFile(fixtures.TemplateOptForName("social"))
+	opt, err := readOPTFile(fixtures.TemplateOptForName("social"))
 	if err != nil {
-		t.Fatalf("ParseFile social.opt: %v", err)
+		t.Fatalf("readOPTFile social.opt: %v", err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {

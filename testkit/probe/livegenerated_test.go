@@ -7,12 +7,13 @@ import (
 	"testing"
 	"uuid"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
@@ -53,12 +54,12 @@ func liveGeneratedOPT(t *testing.T, tmpl liveGeneratedTemplate, templateID strin
 	if !bytes.Contains(optBody, dst) || bytes.Contains(optBody, src) {
 		t.Fatalf("OPT %s does not carry the per-run template id %s in place of %s", tmpl.name, templateID, tmpl.id)
 	}
-	opt, err := template.ParseOPTStrict(bytes.NewReader(optBody))
+	opt, err := aom14.ReadOperationalTemplate(bytes.NewReader(optBody), canxml.WithStrict())
 	if err != nil {
-		t.Fatalf("ParseOPTStrict(%s rewritten to %s): %v", tmpl.name, templateID, err)
+		t.Fatalf("ReadOperationalTemplate(%s rewritten to %s, strict): %v", tmpl.name, templateID, err)
 	}
-	if got := opt.TemplateID(); got != templateID {
-		t.Fatalf("ParseOPTStrict(%s rewritten) template id = %q, want %q", tmpl.name, got, templateID)
+	if got := opt.TemplateID.Value; got != templateID {
+		t.Fatalf("ReadOperationalTemplate(%s rewritten) template id = %q, want %q", tmpl.name, got, templateID)
 	}
 	compiled, err := templatecompile.Compile(opt)
 	if err != nil {

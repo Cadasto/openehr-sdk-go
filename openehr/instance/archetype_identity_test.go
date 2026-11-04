@@ -8,7 +8,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
@@ -115,9 +114,9 @@ func TestREQ107_MediumKeepsOneOptionalContentArchetype(t *testing.T) {
 // compileCoronaAnamnese compiles the Corona_Anamnese web-template OPT.
 func compileCoronaAnamnese(t *testing.T) *templatecompile.Compiled {
 	t.Helper()
-	opt, err := template.ParseFile(fixtures.WebTemplateOpt("Corona_Anamnese"))
+	opt, err := readOPTFile(fixtures.WebTemplateOpt("Corona_Anamnese"))
 	if err != nil {
-		t.Fatalf("ParseFile Corona_Anamnese: %v", err)
+		t.Fatalf("readOPTFile Corona_Anamnese: %v", err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {

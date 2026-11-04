@@ -30,7 +30,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
@@ -297,7 +296,7 @@ func compileCorpusTemplate(t *testing.T, templateID string) (*templatecompile.Co
 	if _, err := os.Stat(path); err != nil {
 		return nil, false
 	}
-	opt, err := template.ParseFile(path)
+	opt, err := readOPTFile(path)
 	if err != nil {
 		return nil, false
 	}

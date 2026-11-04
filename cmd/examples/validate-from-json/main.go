@@ -47,6 +47,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"flag"
 	"fmt"
@@ -56,8 +57,8 @@ import (
 	"runtime"
 	"slices"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
@@ -114,24 +115,27 @@ func validateFiles(jsonPath, optPath string) (validation.Result, error) {
 	}
 	fmt.Printf("json                 : %s (%d bytes)\n", filepath.Base(jsonPath), len(body))
 
-	// Step 2: parse and compile the OPT. An operational template is the
+	// Step 2: read and compile the OPT. An operational template is the
 	// deployable form of an openEHR template: every archetype it uses,
 	// flattened into one XML file with the template's constraints applied.
-	// ParseFileStrict rejects an unknown node type that has attributes under
-	// it, where the lenient ParseFile would keep it as a leaf and silently
-	// drop the constraints beneath it, which a validator must not do.
-	// Compile turns the parsed XML into the compiled template that the
-	// validator, the composition builder, the instance generator and the
-	// AQL lint all read.
-	opt, err := template.ParseFileStrict(optPath)
+	// ReadOperationalTemplate reads it into the operational template model,
+	// and refuses a node type it does not know rather than drop the
+	// constraints beneath it, which a validator must not do. Compile turns
+	// the model into the compiled template that the validator, the
+	// composition builder, the instance generator and the AQL lint all read.
+	raw, err := os.ReadFile(optPath)
 	if err != nil {
-		return validation.Result{}, fmt.Errorf("parse OPT %q: %w", optPath, err)
+		return validation.Result{}, fmt.Errorf("read OPT %q: %w", optPath, err)
+	}
+	opt, err := aom14.ReadOperationalTemplate(bytes.NewReader(raw))
+	if err != nil {
+		return validation.Result{}, fmt.Errorf("read OPT %q: %w", optPath, err)
 	}
 	compiled, err := templatecompile.Compile(opt)
 	if err != nil {
 		return validation.Result{}, fmt.Errorf("compile OPT %q: %w", optPath, err)
 	}
-	fmt.Printf("template             : %s (%s)\n", opt.TemplateID(), filepath.Base(optPath))
+	fmt.Printf("template             : %s (%s)\n", compiled.TemplateID(), filepath.Base(optPath))
 
 	// Step 3: decode and validate in one call. ValidateJSON decodes the bytes
 	// as canjson.Unmarshal does: it reads the "_type" discriminators and fills

@@ -17,7 +17,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
@@ -29,9 +28,9 @@ import (
 func crossFormatComposerSet(t *testing.T, name string) (*webtemplate.WebTemplate, *templatecompile.Compiled, []byte, *rm.Composition) {
 	t.Helper()
 	dir := filepath.Join(fixtures.CrossFormatRoot(), name)
-	opt, err := template.ParseFile(filepath.Join(dir, "template.opt"))
+	opt, err := readOPTFile(filepath.Join(dir, "template.opt"))
 	if err != nil {
-		t.Fatalf("ParseFile(%s template.opt): %v", name, err)
+		t.Fatalf("readOPTFile(%s template.opt): %v", name, err)
 	}
 	compiled, err := templatecompile.Compile(opt)
 	if err != nil {

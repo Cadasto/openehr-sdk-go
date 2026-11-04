@@ -3,25 +3,21 @@ package templatecompile_test
 import (
 	"errors"
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
-// TestCompile_ProducesUsableCompiled is the headline REQ-111 assertion:
-// a parsed OPT (public template.ParseFile output) compiles to a usable
-// *Compiled via the public bridge — no internal/ import required.
+// TestCompile_ProducesUsableCompiled is the headline REQ-111 assertion: an
+// OPT read into the model (public aom14.ReadOperationalTemplate output)
+// compiles to a usable *Compiled via the public bridge — no internal/ import
+// required.
 func TestCompile_ProducesUsableCompiled(t *testing.T) {
-	opt, err := template.ParseFile(fixtures.TemplateOptForName("vital_signs"))
-	if err != nil {
-		t.Fatalf("ParseFile: %v", err)
-	}
+	opt := mustReadModelFile(t, fixtures.TemplateOptForName("vital_signs"))
 
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
@@ -30,7 +26,7 @@ func TestCompile_ProducesUsableCompiled(t *testing.T) {
 	if c == nil {
 		t.Fatal("Compile returned nil *Compiled")
 	}
-	if got, want := c.TemplateID(), opt.TemplateID(); got != want {
+	if got, want := c.TemplateID(), opt.TemplateID.Value; got != want {
 		t.Errorf("TemplateID = %q, want %q", got, want)
 	}
 	if c.Root() == nil {
@@ -56,10 +52,7 @@ func TestCompile_NilOPT_ReturnsErrInvalidInput(t *testing.T) {
 // root with strictly fewer attributes than the default compile (the OPT
 // omits some BMM-required attributes that default injection restores).
 func TestCompile_WithoutImplicitAttributes(t *testing.T) {
-	opt, err := template.ParseFile(fixtures.TemplateOptForName("vital_signs"))
-	if err != nil {
-		t.Fatalf("ParseFile: %v", err)
-	}
+	opt := mustReadModelFile(t, fixtures.TemplateOptForName("vital_signs"))
 
 	withImplicit, err := templatecompile.Compile(opt)
 	if err != nil {
@@ -89,10 +82,7 @@ type noRequiredLookup struct {
 func (noRequiredLookup) RequiredAttributes(string) []string { return nil }
 
 func TestCompile_WithRMInfo_DrivesImplicitInjection(t *testing.T) {
-	opt, err := template.ParseFile(fixtures.TemplateOptForName("vital_signs"))
-	if err != nil {
-		t.Fatalf("ParseFile: %v", err)
-	}
+	opt := mustReadModelFile(t, fixtures.TemplateOptForName("vital_signs"))
 
 	custom, err := templatecompile.Compile(opt, templatecompile.WithRMInfo(noRequiredLookup{rminfo.Default}))
 	if err != nil {
@@ -162,10 +152,7 @@ const observationLinksOPT = `<?xml version="1.0"?>
 // at /links is the RM's own LOCATABLE Links_valid, on links that are present
 // and empty, which ValidateRM and both compiles report alike.
 func TestCompile_WithRMInfo_ShapesTheTemplateNotTheRMRules(t *testing.T) {
-	opt, err := template.ParseOPT(strings.NewReader(observationLinksOPT))
-	if err != nil {
-		t.Fatalf("ParseOPT: %v", err)
-	}
+	opt := mustReadModel(t, observationLinksOPT)
 	def, err := templatecompile.Compile(opt)
 	if err != nil {
 		t.Fatalf("Compile (default): %v", err)
@@ -234,10 +221,7 @@ func TestCompile_WithRMInfo_ShapesTheTemplateNotTheRMRules(t *testing.T) {
 // matching templatecompile.ErrPathNotFound across the boundary is the
 // only way to detect an unknown path from Compiled.NodeAt.
 func TestNodeAt_UnknownPath_ReturnsErrPathNotFound(t *testing.T) {
-	opt, err := template.ParseFile(fixtures.TemplateOptForName("vital_signs"))
-	if err != nil {
-		t.Fatalf("ParseFile: %v", err)
-	}
+	opt := mustReadModelFile(t, fixtures.TemplateOptForName("vital_signs"))
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
 		t.Fatalf("Compile: %v", err)

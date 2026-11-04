@@ -1,7 +1,6 @@
 package templatecompile
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
@@ -30,14 +29,7 @@ func TestREQ102_REQ107_MandatoryListChildrenReadsTheAttribute(t *testing.T) {
 <node_id>at0001</node_id></children>
 </attributes></definition>
 </template>`
-	parsed, err := template.ParseOPT(strings.NewReader(opt))
-	if err != nil {
-		t.Fatalf("ParseOPT: %v", err)
-	}
-	c, err := Compile(parsed)
-	if err != nil {
-		t.Fatalf("Compile: %v", err)
-	}
+	c := compileModelXML(t, opt)
 	items := c.Root().Attribute("items")
 	if items.rmTypeName != "ITEM" {
 		t.Fatalf("items RM type = %q, want ITEM", items.rmTypeName)

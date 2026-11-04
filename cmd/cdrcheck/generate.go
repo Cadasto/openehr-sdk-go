@@ -1,18 +1,20 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	mrand "math/rand/v2"
+	"os"
 	"path"
 	"sync"
 	"time"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
@@ -97,7 +99,12 @@ func (c *compiler) get(file string) (*templatecompile.Compiled, string, error) {
 	}
 	c.mu.Unlock()
 	e.once.Do(func() {
-		opt, err := template.ParseFileStrict(file)
+		raw, err := os.ReadFile(file)
+		if err != nil {
+			e.stage, e.err = "parse", err
+			return
+		}
+		opt, err := aom14.ReadOperationalTemplate(bytes.NewReader(raw))
 		if err != nil {
 			e.stage, e.err = "parse", err
 			return

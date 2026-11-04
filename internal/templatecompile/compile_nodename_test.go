@@ -1,11 +1,9 @@
 package templatecompile_test
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -37,10 +35,7 @@ func TestCompile_NodeNameCarriedComplexObject(t *testing.T) {
     </attributes>
   </definition>
 </template>`
-	parsed, err := template.ParseOPT(strings.NewReader(opt))
-	if err != nil {
-		t.Fatalf("ParseOPT: %v", err)
-	}
+	parsed := mustReadModel(t, opt)
 	c, err := templatecompile.Compile(parsed)
 	if err != nil {
 		t.Fatalf("Compile: %v", err)
@@ -57,10 +52,7 @@ func TestCompile_NodeNameCarriedComplexObject(t *testing.T) {
 // the precondition for Phase 3's name predicates. Nodes without a
 // pinned name stay "" (never the concept term).
 func TestCompile_NodeNameCarriedCoronaOracle(t *testing.T) {
-	parsed, err := template.ParseFile(fixtures.WebTemplateOpt("Corona_Anamnese"))
-	if err != nil {
-		t.Fatalf("ParseFile: %v", err)
-	}
+	parsed := mustReadModelFile(t, fixtures.WebTemplateOpt("Corona_Anamnese"))
 	c, err := templatecompile.Compile(parsed)
 	if err != nil {
 		t.Fatalf("Compile: %v", err)

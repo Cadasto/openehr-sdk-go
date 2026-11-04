@@ -259,6 +259,23 @@
 // that path, so it names the element alone, "/is_queryable", inside the
 // envelope of each polymorphic slot the element sits in.
 //
+// # Nesting depth
+//
+// encoding/xml, which a decode reads through, decodes no element nested
+// deeper than 10 000 elements, the root of the value at depth 1: a decode
+// refuses the first such element it hands to encoding/xml, in every mode.
+// [WithMaxDepth] sets a limit of the decode's own, for input from outside the
+// caller's control; given more than once, the smallest positive limit wins.
+// The decode refuses an element nested deeper than that limit as it reads
+// the element's start tag, before anything decodes it, in every mode. Either
+// refusal is a [DecodeError] on its own that wraps [ErrLimitExceeded]; it
+// names the element's depth, the limit and the element's path, cut short in
+// the middle when it is long, and none of the element's content. To find the
+// path past encoding/xml's limit, [Unmarshal] and a [Decoder] given no option
+// decode the value a second time, once the first decode has failed so. A
+// [Decoder] that refuses an element returns the same refusal from every later
+// Decode.
+//
 // # Polymorphic dispatch
 //
 // [EncodePoly] uses a small reflect.New fallback only to bridge

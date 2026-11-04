@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
@@ -33,9 +33,9 @@ func compileValues(t *testing.T, edit func(opt string) string) *templatecompile.
 	if err != nil {
 		t.Fatalf("read %s: %v", codedValuesTemplate, err)
 	}
-	opt, err := template.ParseOPT(strings.NewReader(edit(string(raw))))
+	opt, err := aom14.ReadOperationalTemplate(strings.NewReader(edit(string(raw))))
 	if err != nil {
-		t.Fatalf("ParseOPT(edited %s): %v", codedValuesTemplate, err)
+		t.Fatalf("ReadOperationalTemplate(edited %s): %v", codedValuesTemplate, err)
 	}
 	compiled, err := templatecompile.Compile(opt)
 	if err != nil {

@@ -8,18 +8,19 @@
 // The taxonomy mirrors the ADL 1.4 OPT XSD primitive `xsi:type`
 // values one-to-one:
 //
-//   - C_BOOLEAN       → [CBoolean]
-//   - C_INTEGER       → [CInteger]
-//   - C_REAL          → [CReal]
-//   - C_STRING        → [CString]
-//   - C_DATE          → [CDate]
-//   - C_TIME          → [CTime]
-//   - C_DATE_TIME     → [CDateTime]
-//   - C_DURATION      → [CDuration]
-//   - C_CODE_PHRASE   → [CodePhrase]
-//   - C_DV_QUANTITY   → [DvQuantity]
-//   - C_DV_ORDINAL    → [CDvOrdinal]
-//   - CONSTRAINT_REF  → [ConstraintRef]
+//   - C_BOOLEAN         → [CBoolean]
+//   - C_INTEGER         → [CInteger]
+//   - C_REAL            → [CReal]
+//   - C_STRING          → [CString]
+//   - C_DATE            → [CDate]
+//   - C_TIME            → [CTime]
+//   - C_DATE_TIME       → [CDateTime]
+//   - C_DURATION        → [CDuration]
+//   - C_CODE_PHRASE     → [CodePhrase]
+//   - C_CODE_REFERENCE  → [CodeReference]
+//   - C_DV_QUANTITY     → [DvQuantity]
+//   - C_DV_ORDINAL      → [CDvOrdinal]
+//   - CONSTRAINT_REF    → [ConstraintRef]
 //
 // Every type implements the sealed [PrimitiveConstraint] interface,
 // so validators can pattern-match the closed set:
@@ -30,6 +31,9 @@
 //	case nil:
 //	    // not a primitive leaf
 //	}
+//
+// A [CodeReference] carries the [CodePhrase] it refines; [CodePhraseOf]
+// reads either as that code phrase constraint.
 //
 // Each constraint exposes Validate(value any) []Violation. A nil
 // (empty) result means the value satisfies every clause; a non-empty

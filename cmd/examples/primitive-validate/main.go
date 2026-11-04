@@ -1,8 +1,10 @@
 // Example: validate single values against one leaf constraint of an
-// operational template (OPT), without compiling the template or building a
-// composition. The embedded OPT constrains a DV_QUANTITY to a magnitude of
-// 0..300 in mm[Hg]; the program resolves that leaf by path and checks three
-// values against it, two of which fail on purpose.
+// operational template (OPT), without building a composition. The embedded
+// OPT constrains a DV_QUANTITY to a magnitude of 0..300 in mm[Hg]; the
+// program reads it with aom14.ReadOperationalTemplate, compiles it with
+// templatecompile.Compile, resolves that leaf by path in the compiled
+// template, and checks three values against its constraint, two of which
+// fail on purpose.
 //
 // Runs offline and needs no fixture; the template is embedded below:
 //
@@ -14,8 +16,10 @@ import (
 	"log"
 	"strings"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
 // minimalQuantityOPT is the smallest OPT with one primitive leaf: a
@@ -57,18 +61,22 @@ func main() {
 }
 
 func run() error {
-	// Step 1: parse the template. ParseOPTStrict reads from any io.Reader;
-	// ParseFileStrict is the convenience for a path on disk. Strict parsing
-	// refuses an unknown node type that has attributes under it, where the
-	// lenient ParseOPT would silently drop that subtree.
-	opt, err := template.ParseOPTStrict(strings.NewReader(minimalQuantityOPT))
+	// Step 1: read the template into the operational template model and
+	// compile it. ReadOperationalTemplate reads from any io.Reader and
+	// refuses a node type it does not know rather than drop everything
+	// beneath it.
+	opt, err := aom14.ReadOperationalTemplate(strings.NewReader(minimalQuantityOPT))
 	if err != nil {
-		return fmt.Errorf("parse OPT: %w", err)
+		return fmt.Errorf("read OPT: %w", err)
 	}
-	fmt.Printf("template_id : %s\n", opt.TemplateID())
+	compiled, err := templatecompile.Compile(opt)
+	if err != nil {
+		return fmt.Errorf("compile template: %w", err)
+	}
+	fmt.Printf("template_id : %s\n", compiled.TemplateID())
 
 	// Step 2: find the leaf and its typed constraint.
-	constraint, err := primitiveConstraintAt(opt, "/content")
+	constraint, err := primitiveConstraintAt(compiled, "/content")
 	if err != nil {
 		return err
 	}
@@ -114,27 +122,22 @@ func run() error {
 	return nil
 }
 
-// primitiveConstraintAt resolves a template path to its node and returns the
-// typed value constraint on it. Only leaf nodes such as DV_QUANTITY or
-// CODE_PHRASE carry one; on a structural node PrimitiveConstraint is nil.
-func primitiveConstraintAt(opt *template.OperationalTemplate, path string) (constraints.PrimitiveConstraint, error) {
-	// ParsePath checks the path syntax once; NodeAt then walks the tree.
-	parsed, err := opt.ParsePath(path)
+// primitiveConstraintAt resolves a template path to its node in the compiled
+// template and returns the typed value constraint on it. Only leaf nodes such
+// as DV_QUANTITY or CODE_PHRASE carry one; on a structural node
+// PrimitiveConstraint is nil.
+func primitiveConstraintAt(compiled *templatecompile.Compiled, path string) (constraints.PrimitiveConstraint, error) {
+	// ParsePath checks the path syntax once and needs no template; Resolve
+	// then walks the compiled tree.
+	parsed, err := template.ParsePath(path)
 	if err != nil {
 		return nil, fmt.Errorf("parse path %s: %w", path, err)
 	}
-	node, err := opt.NodeAt(parsed)
+	node, err := compiled.Resolve(parsed)
 	if err != nil {
 		return nil, fmt.Errorf("resolve %s: %w", path, err)
 	}
-
-	// NodeAt returns the tree's Node interface. The value constraint lives on
-	// *template.ComplexObject, the node kind that stands for an RM object.
-	object, ok := node.(*template.ComplexObject)
-	if !ok {
-		return nil, fmt.Errorf("node at %s is %T, want *template.ComplexObject", path, node)
-	}
-	constraint := object.PrimitiveConstraint()
+	constraint := node.PrimitiveConstraint()
 	if constraint == nil {
 		return nil, fmt.Errorf("node at %s carries no primitive constraint", path)
 	}

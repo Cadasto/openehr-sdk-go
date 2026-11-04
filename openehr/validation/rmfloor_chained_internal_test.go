@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
@@ -36,9 +36,9 @@ func keys(issues []Issue) []string {
 // each node the RM rules of its class, then its attributes, those the
 // template declares first.
 func TestValidate_REQ102_REQ112_REQ116_REQ171_EachDefectOnceAtTheWalksPath(t *testing.T) {
-	opt, err := template.ParseOPT(strings.NewReader(handoffOPT))
+	opt, err := aom14.ReadOperationalTemplate(strings.NewReader(handoffOPT))
 	if err != nil {
-		t.Fatalf("ParseOPT: %v", err)
+		t.Fatalf("ReadOperationalTemplate: %v", err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
@@ -77,7 +77,7 @@ func TestValidate_REQ102_REQ112_REQ116_REQ171_EachDefectOnceAtTheWalksPath(t *te
 // unconstrained.
 func TestValidate_REQ102_ConstraintRefLeafWalksCodePhrase(t *testing.T) {
 	const code = "/content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0002]/data/items[at0004]/items[at0011]/value/defining_code"
-	opt, err := template.ParseFile(fixtures.TemplateOpt("Demonstration.v1"))
+	opt, err := readOPTFile(fixtures.TemplateOpt("Demonstration.v1"))
 	if err != nil {
 		t.Fatalf("parse Demonstration.v1: %v", err)
 	}

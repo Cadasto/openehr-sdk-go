@@ -72,6 +72,22 @@ func TestSampleValue_codeListMember(t *testing.T) {
 	}
 }
 
+// TestSampleValue_codeReferenceDrawsAsItsCodePhrase confirms a
+// C_CODE_REFERENCE draws as the code phrase constraint it carries (REQ-103):
+// the same members, in the same order for one seed.
+func TestSampleValue_codeReferenceDrawsAsItsCodePhrase(t *testing.T) {
+	cp := constraints.CodePhrase{Terminology: "local", CodeList: []string{"at0001", "at0002", "at0003"}}
+	ref := constraints.CodeReference{CodePhrase: cp, ReferenceSetURI: "terminology:local?subset=severity"}
+	got := draws(ref, newSampler(mrand.NewPCG(3, 4)), 12)
+	want := draws(cp, newSampler(mrand.NewPCG(3, 4)), 12)
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Errorf("C_CODE_REFERENCE draws %v; want its code phrase's %v", got, want)
+	}
+	if distinct(got) < 2 {
+		t.Errorf("C_CODE_REFERENCE draws %v; want varied members", got)
+	}
+}
+
 // TestSampleValue_unboundedFallsBackToExample confirms an unconstrained
 // primitive yields the deterministic ExampleValue (no spurious draw).
 func TestSampleValue_unboundedFallsBackToExample(t *testing.T) {

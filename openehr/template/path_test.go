@@ -11,7 +11,6 @@ import (
 
 // REQ-100 § Path syntax — accept valid forms.
 func TestParsePath_ValidForms(t *testing.T) {
-	opt := mustParseVitalSigns(t)
 	cases := []struct {
 		in   string
 		want string // String() round-trip
@@ -25,7 +24,7 @@ func TestParsePath_ValidForms(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.in, func(t *testing.T) {
-			p, err := opt.ParsePath(tc.in)
+			p, err := template.ParsePath(tc.in)
 			if err != nil {
 				t.Fatalf("ParsePath(%q): %v", tc.in, err)
 			}
@@ -38,7 +37,6 @@ func TestParsePath_ValidForms(t *testing.T) {
 
 // REQ-100 § Path syntax — reject malformed grammar.
 func TestParsePath_RejectsMalformed(t *testing.T) {
-	opt := mustParseVitalSigns(t)
 	cases := []struct {
 		in     string
 		reason string
@@ -59,11 +57,25 @@ func TestParsePath_RejectsMalformed(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.reason, func(t *testing.T) {
-			_, err := opt.ParsePath(tc.in)
+			_, err := template.ParsePath(tc.in)
 			if !errors.Is(err, template.ErrPathSyntax) {
 				t.Fatalf("ParsePath(%q) = %v, want ErrPathSyntax", tc.in, err)
 			}
 		})
+	}
+}
+
+// REQ-100 § Path syntax — the deprecated method reads the same grammar
+// as the function, on a nil receiver too.
+func TestOperationalTemplateParsePath_DelegatesToParsePath(t *testing.T) {
+	var opt *template.OperationalTemplate
+	const valid = "/content[at0001]/data"
+	if p, err := opt.ParsePath(valid); err != nil || p.String() != valid {
+		t.Errorf("(*OperationalTemplate)(nil).ParsePath(%q) = %q, %v, want %q, nil", valid, p, err, valid)
+	}
+	const invalid = "/content[name='x']"
+	if _, err := opt.ParsePath(invalid); !errors.Is(err, template.ErrPathSyntax) {
+		t.Errorf("(*OperationalTemplate)(nil).ParsePath(%q) error = %v, want ErrPathSyntax", invalid, err)
 	}
 }
 
@@ -328,8 +340,7 @@ func TestParseFile_ClinicalNote_Path(t *testing.T) {
 // segment separator '/' (or end of input). Any other character is a
 // grammar error. Guards against accidental AQL-style trailing tags.
 func TestParsePath_RejectsCharAfterCloseBracket(t *testing.T) {
-	opt := mustParseVitalSigns(t)
-	_, err := opt.ParsePath("/content[at0001]extra")
+	_, err := template.ParsePath("/content[at0001]extra")
 	if !errors.Is(err, template.ErrPathSyntax) {
 		t.Fatalf("got %v, want ErrPathSyntax", err)
 	}

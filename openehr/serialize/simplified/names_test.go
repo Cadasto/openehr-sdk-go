@@ -34,7 +34,7 @@ func TestDecodeWithTemplateNamesAreConformant(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	opt, err := fixtures.ParseOPTBytes(optB)
+	opt, err := fixtures.ReadOperationalTemplate(optB)
 	if err != nil {
 		t.Fatal(err)
 	}

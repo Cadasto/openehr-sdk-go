@@ -9,7 +9,6 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -97,14 +96,7 @@ func TestTermItemMatchesTerm(t *testing.T) {
 	t.Parallel()
 	var tally termItemTally
 	for _, id := range []string{"BMI", "vital_signs", "Demonstration.v1", "clinical_notes.v0"} {
-		opt, err := template.ParseFile(fixtures.TemplateOpt(id))
-		if err != nil {
-			t.Fatalf("ParseFile(%s): %v", id, err)
-		}
-		c, err := Compile(opt)
-		if err != nil {
-			t.Fatalf("Compile(%s): %v", id, err)
-		}
+		c := compileModelFile(t, fixtures.TemplateOpt(id))
 		checkTermItem(t, id, c.root, &tally)
 	}
 	// A comparison that never finds an item, never misses one, or never

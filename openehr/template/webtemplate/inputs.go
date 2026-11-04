@@ -59,13 +59,14 @@ func textInputs(v *templatecompile.CompiledNode) []Input {
 }
 
 // codedTextInputs emits the single "code" input for DV_CODED_TEXT. The
-// C_CODE_PHRASE constraint lives on the value node's defining_code child;
-// an absent or code-less constraint leaves the list open. Local
-// (archetype-internal) terminology is implied and omitted, mirroring the
-// reference, which carries `terminology` only for external bindings.
+// C_CODE_PHRASE constraint, or the one a C_CODE_REFERENCE carries, lives on
+// the value node's defining_code child; an absent or code-less constraint
+// leaves the list open. Local (archetype-internal) terminology is implied
+// and omitted, mirroring the reference, which carries `terminology` only
+// for external bindings.
 func codedTextInputs(v *templatecompile.CompiledNode) []Input {
 	in := Input{Suffix: "code", Type: "CODED_TEXT"}
-	cp := childConstraint[constraints.CodePhrase](v, "defining_code")
+	cp, _ := constraints.CodePhraseOf(childConstraint[constraints.PrimitiveConstraint](v, "defining_code"))
 	if cp.Terminology != localTerminology {
 		in.Terminology = cp.Terminology
 	}

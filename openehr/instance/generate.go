@@ -3487,12 +3487,13 @@ func defaultAdmitted(opt *tcimpl.CompiledNode, attrName string, admits func(*tci
 // phraseAdmitted reports whether the OPT node that constrains a code
 // phrase, or a coded text through its defining_code, admits phrase. It
 // reads the two shapes an OPT gives that constraint, as the template
-// validator does: a C_CODE_PHRASE, and a CODE_PHRASE node whose
-// code_string, or whose terminology_id's value, carries a C_STRING. Below
-// node it reads, like the walk, the alternative the walk builds under
-// ([bindingChild]), among those the OPT does not prohibit.
+// validator does: a C_CODE_PHRASE, or the one a C_CODE_REFERENCE carries,
+// and a CODE_PHRASE node whose code_string, or whose terminology_id's
+// value, carries a C_STRING. Below node it reads, like the walk, the
+// alternative the walk builds under ([bindingChild]), among those the OPT
+// does not prohibit.
 func phraseAdmitted(node *tcimpl.CompiledNode, phrase rm.CodePhrase) bool {
-	if cp, ok := node.PrimitiveConstraint().(constraints.CodePhrase); ok {
+	if cp, ok := constraints.CodePhraseOf(node.PrimitiveConstraint()); ok {
 		ref := constraints.CodedTermRef{Terminology: phrase.TerminologyID.Value, CodeString: phrase.CodeString}
 		return len(cp.Validate(ref)) == 0
 	}

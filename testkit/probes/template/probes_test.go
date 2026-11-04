@@ -9,10 +9,10 @@ import (
 	probes "github.com/cadasto/openehr-sdk-go/testkit/probes/template"
 )
 
-// PROBE-022 — fixture-driven assertion that the OPT parser resolves
-// known paths to the expected RM types, node ids, and (for archetype
-// roots) archetype ids. Uses the vital_signs.opt fixture vendored
-// under openehr/template/testdata/.
+// PROBE-022 — fixture-driven assertion that the compiled template
+// resolves known paths to the expected RM types, node ids, and (for
+// archetype roots) archetype ids. Uses the vital_signs.opt fixture
+// vendored under testkit/corpus/templates/.
 func TestProbe022OPTPathResolution_VitalSigns(t *testing.T) {
 	body := loadFixture(t, "vital_signs")
 	assertions := []probes.PathAssertion{
@@ -26,8 +26,8 @@ func TestProbe022OPTPathResolution_VitalSigns(t *testing.T) {
 		},
 		// At-code predicate — every OBSERVATION archetype root in
 		// vital_signs.opt carries at0000 as its own node id. Exercises
-		// the at-code branch of matchesPredicate (REQ-100 § Resolution
-		// semantics).
+		// the node-id match of a predicate (REQ-100 § Resolution
+		// semantics, REQ-111 § Path lookup).
 		{Path: "/content[at0000]", WantRMType: "OBSERVATION", WantNodeID: "at0000"},
 		{Path: "/no_such_attribute", ExpectNotFound: true},
 		{Path: "/content[at9999]", ExpectNotFound: true},
@@ -116,7 +116,7 @@ func TestProbe022OPTPathResolution_RejectsEmptyAssertions(t *testing.T) {
 func TestProbe022OPTPathResolution_ExpectNotFoundRequiresSentinel(t *testing.T) {
 	body := loadFixture(t, "vital_signs")
 	// A syntactically invalid path triggers ParsePath (ErrPathSyntax)
-	// before NodeAt; the probe MUST report this as a parse failure,
+	// before Resolve; the probe MUST report this as a parse failure,
 	// not silently accept it as "not found".
 	r, err := probes.Probe022OPTPathResolution(body, []probes.PathAssertion{
 		{Path: "no_leading_slash", ExpectNotFound: true},
@@ -131,12 +131,12 @@ func TestProbe022OPTPathResolution_ExpectNotFoundRequiresSentinel(t *testing.T) 
 
 // PROBE-024 — primitive constraint Validate against fixture cases.
 // Uses a small synthetic OPT carrying a C_DV_QUANTITY child so the
-// probe surface is exercised end-to-end (parse → resolve → validate)
-// without depending on the much larger vital_signs.opt's actual
-// path predicates.
+// probe surface is exercised end-to-end (read → compile → resolve →
+// validate) without depending on the much larger vital_signs.opt's
+// actual path predicates.
 //
 // REQ-103: PROBE-024 runs a typed primitive constraint's Validate end to end,
-// from parse through resolve.
+// from reading the template through resolving the node.
 func TestProbe024PrimitiveValidate_Synthetic(t *testing.T) {
 	body := []byte(syntheticDvQuantityOPT)
 	cases := []probes.ValidateCase{
@@ -155,6 +155,8 @@ func TestProbe024PrimitiveValidate_Synthetic(t *testing.T) {
 			Value:     constraints.QuantityValue{Magnitude: 50, Units: "psi"},
 			WantCodes: []constraints.ViolationCode{constraints.CodeUnitUnknown},
 		},
+		// The COMPOSITION root constrains no primitive value.
+		{Path: "/", ExpectNoConstraint: true},
 	}
 	r, err := probes.Probe024PrimitiveValidate(body, cases)
 	if err != nil {
@@ -165,6 +167,20 @@ func TestProbe024PrimitiveValidate_Synthetic(t *testing.T) {
 	}
 	if r.Probe != "PROBE-024" {
 		t.Errorf("Probe id = %q, want PROBE-024", r.Probe)
+	}
+}
+
+// PROBE-024 — a case marked ExpectNoConstraint fails the probe where
+// the node it addresses carries a primitive constraint.
+func TestProbe024PrimitiveValidate_ExpectNoConstraintOnAPrimitive(t *testing.T) {
+	r, err := probes.Probe024PrimitiveValidate([]byte(syntheticDvQuantityOPT), []probes.ValidateCase{
+		{Path: "/content", ExpectNoConstraint: true},
+	})
+	if err != nil {
+		t.Fatalf("Probe024: %v", err)
+	}
+	if r.Status != "fail" {
+		t.Errorf("status = %q, want fail: /content carries a C_DV_QUANTITY constraint", r.Status)
 	}
 }
 

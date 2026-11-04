@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	mrand "math/rand/v2"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -15,7 +16,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
@@ -60,7 +60,7 @@ type ratchetFailure struct {
 	reason   string
 }
 
-// corpusCompileFailures names vendored OPTs whose ParseFile or Compile
+// corpusCompileFailures names vendored OPTs whose read or Compile
 // fails. An allowlisted name that compiles, or a compile failure that
 // is not listed, fails the test. Every vendored OPT compiles.
 var corpusCompileFailures = []string{}
@@ -175,7 +175,12 @@ func TestREQ107_CorpusRatchet(t *testing.T) {
 	// under Medium holds no ELEMENT.
 	mediumHollow := make(map[string]struct{})
 	for _, ref := range refs {
-		opt, err := template.ParseFile(ref.Path)
+		raw, err := os.ReadFile(ref.Path)
+		if err != nil {
+			compileFails = append(compileFails, ref.Name)
+			continue
+		}
+		opt, err := fixtures.ReadOperationalTemplate(raw)
 		if err != nil {
 			compileFails = append(compileFails, ref.Name)
 			continue

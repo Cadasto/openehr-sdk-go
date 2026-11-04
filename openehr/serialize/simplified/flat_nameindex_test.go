@@ -18,7 +18,6 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -79,9 +78,9 @@ func TestBareAQLPath(t *testing.T) {
 // A name-pinning template must expose every rubric under the bare spelling
 // decode actually looks up, and additionally under the compiled one.
 func TestBuildNameIndex_AnswersBareSpelling(t *testing.T) {
-	parsed, err := template.ParseFile(fixtures.TemplateOpt("IDCR -  Adverse Reaction List.v1"))
+	parsed, err := readOPTFile(fixtures.TemplateOpt("IDCR -  Adverse Reaction List.v1"))
 	if err != nil {
-		t.Fatalf("ParseFile: %v", err)
+		t.Fatalf("readOPTFile: %v", err)
 	}
 	c, err := templatecompile.Compile(parsed)
 	if err != nil {
@@ -156,7 +155,7 @@ func buildNameIndexReference(c *templatecompile.Compiled) map[string]string {
 
 // minNameIndexTemplates is a floor on how many corpus templates
 // TestBuildNameIndexMatchesReference compares, so the comparison cannot
-// shrink unnoticed when templates stop parsing or compiling. 61 of the 62
+// shrink unnoticed when templates stop reading or compiling. 61 of the 62
 // corpus templates compile today.
 const minNameIndexTemplates = 61
 
@@ -169,7 +168,7 @@ func TestBuildNameIndexMatchesReference(t *testing.T) {
 	}
 	var compared int
 	for _, ref := range refs {
-		parsed, err := template.ParseFile(ref.Path)
+		parsed, err := readOPTFile(ref.Path)
 		if err != nil {
 			continue
 		}

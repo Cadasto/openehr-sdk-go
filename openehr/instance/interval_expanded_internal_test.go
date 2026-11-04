@@ -1,11 +1,15 @@
 package instance
 
 import (
+	"errors"
 	"fmt"
+	"strconv"
 	"testing"
 
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 // expandedQuantityNode compiles a DV_INTERVAL<DV_QUANTITY> whose lower
@@ -91,11 +95,10 @@ func TestREQ107_QuantityBoundBuiltPerAttributeFitsItsConstraint(t *testing.T) {
 // TestREQ107_OrdinalBoundBuiltPerAttributeFitsItsConstraint pins the
 // REQ-107 reading of a DV_ORDINAL bound the OPT builds as a
 // C_COMPLEX_OBJECT: a pair fits the side only where the C_INTEGER on its
-// value, the 32 bits of an RM Integer and the C_CODE_PHRASE on its symbol
-// accept it, and the side's extremes are the ends of that C_INTEGER with
-// the side's own symbol.
+// value and the C_CODE_PHRASE on its symbol accept it, and the side's
+// extremes are the ends of that C_INTEGER with the side's own symbol.
 func TestREQ107_OrdinalBoundBuiltPerAttributeFitsItsConstraint(t *testing.T) {
-	node := expandedOrdinalNode(t, IntRange(Closed(5), Closed(3_000_000_000)), "at0001", "at0002")
+	node := expandedOrdinalNode(t, IntRange(Closed(5), Closed(3_000)), "at0001", "at0002")
 	t.Run("fits", func(t *testing.T) {
 		for _, tc := range []struct {
 			name string
@@ -105,7 +108,7 @@ func TestREQ107_OrdinalBoundBuiltPerAttributeFitsItsConstraint(t *testing.T) {
 			{"value and symbol admitted", ordinalKey{value: 7, symbol: localCoded("at0002")}, true},
 			{"value below the range", ordinalKey{value: 4, symbol: localCoded("at0001")}, false},
 			{"symbol code not listed", ordinalKey{value: 7, symbol: localCoded("at0003")}, false},
-			{"value above an RM Integer", ordinalKey{value: 2_999_999_999, symbol: localCoded("at0001")}, false},
+			{"value above the range", ordinalKey{value: 3_001, symbol: localCoded("at0001")}, false},
 		} {
 			if got := ordinalFits(node, tc.key); got != tc.want {
 				t.Errorf("%s: ordinalFits(%d, %s) = %t, want %t", tc.name, tc.key.value, tc.key.symbol.DefiningCode.CodeString, got, tc.want)
@@ -144,3 +147,31 @@ func describeOrdinalKey(k ordinalKey) string {
 
 // intUpToBody is a C_INTEGER body admitting every value up to hi.
 func intUpToBody(hi float64) string { return IntRange(NoEnd, Closed(hi)) }
+
+// TestREQ107_REQ056_OrdinalBoundPastTheIntegerRangeIsRefusedAtRead is the
+// REQ-107 and REQ-056 check that a DV_ORDINAL bound built as a
+// C_COMPLEX_OBJECT whose C_INTEGER on the value reaches past the 32-bit
+// range of an RM Integer never reaches the generator: reading the template
+// is refused with an error wrapping canxml.ErrInvalidShape because the
+// number is out of range, and the same bound up to the greatest Integer is
+// read.
+func TestREQ107_REQ056_OrdinalBoundPastTheIntegerRangeIsRefusedAtRead(t *testing.T) {
+	// The bound's end is written as plain decimal digits: a float64 from
+	// IntRange reads as 3e+09, which is refused for its syntax.
+	read := func(upper string) error {
+		body := "<range><lower_included>true</lower_included><upper_included>true</upper_included>" +
+			"<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded>" +
+			"<lower>5</lower><upper>" + upper + "</upper></range>"
+		bound := ExpandedOrdinalBound(body, "at0001", "at0002")
+		opt := RetargetInterval(t, ReadVendoredOPT(t, CountIntervalOPT), "DV_ORDINAL", bound, bound)
+		_, err := fixtures.ReadOperationalTemplate([]byte(opt))
+		return err
+	}
+	if err := read("2147483647"); err != nil {
+		t.Errorf("ReadOperationalTemplate with the value up to 2147483647: %v, want none", err)
+	}
+	err := read("3000000000")
+	if !errors.Is(err, canxml.ErrInvalidShape) || !errors.Is(err, strconv.ErrRange) {
+		t.Errorf("ReadOperationalTemplate with the value up to 3000000000: %v, want an error wrapping canxml.ErrInvalidShape for a number out of range", err)
+	}
+}

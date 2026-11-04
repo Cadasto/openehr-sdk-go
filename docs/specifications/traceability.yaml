@@ -707,6 +707,11 @@ requirements:
       - openehr/aom/aom14/quantity_item_units_xml_test.go
       - openehr/aom/aom14/schema_names_xml_test.go
       - openehr/aom/aom14/symbol_value_xml_test.go
+      - openehr/instance/integer_draw_window_test.go
+      - openehr/instance/interval_expanded_internal_test.go
+      - openehr/instance/ordinal_integer_test.go
+      - openehr/instance/quantified_rules_test.go
+      - openehr/instance/valuefill_leaves_test.go
       - openehr/internal/xmlschema/names_test.go
       - openehr/internal/xmlschema/omit_test.go
       - openehr/internal/xmlunmatched/document_internal_test.go
@@ -723,6 +728,7 @@ requirements:
       - openehr/serialize/canxml/edgecases_test.go
       - openehr/serialize/canxml/interval_flag_defaults_test.go
       - openehr/serialize/canxml/interval_open_side_test.go
+      - openehr/serialize/canxml/max_depth_test.go
       - openehr/serialize/canxml/missing_test.go
       - openehr/serialize/canxml/names_test.go
       - openehr/serialize/canxml/oneroot_test.go
@@ -1327,6 +1333,7 @@ requirements:
       - internal/templatecompile/compile_generic_test.go
       - internal/templatecompile/flat_conformance_compile_test.go
       - internal/templatecompile/registerpath_test.go
+      - internal/templatecompile/resolve_test.go
       - internal/templatecompile/untyped_test.go
       - internal/templatecompile/webtemplate_oracle_compile_test.go
       - openehr/rm/rminfo/lookup_test.go
@@ -1470,7 +1477,7 @@ requirements:
     canonical: docs/specifications/clinical-modeling.md#req-103--primitive-constraint-introspection
     status: draft
     implementation: landed
-    packages: [openehr/template, openehr/template/constraints, internal/iso8601, internal/templatecompile, testkit/probes/template, openehr/validation, openehr/instance]
+    packages: [openehr/template, openehr/template/constraints, internal/iso8601, internal/templatecompile, testkit/probes/template, openehr/validation, openehr/instance, openehr/template/webtemplate, openehr/serialize/simplified]
     probes: [PROBE-024, PROBE-025, PROBE-074]
     tests:
       - internal/iso8601/magnitude_test.go
@@ -1478,11 +1485,15 @@ requirements:
       - internal/templatecompile/compile_test.go
       - internal/templatecompile/node_primitive_test.go
       - internal/templatecompile/walk/walk_test.go
+      - openehr/instance/coded_group_test.go
+      - openehr/instance/coded_name_code_test.go
       - openehr/instance/placeholder_test.go
       - openehr/instance/sample_test.go
       - openehr/instance/string_leaf_internal_test.go
       - openehr/instance/string_leaf_test.go
+      - openehr/serialize/simplified/coded_name_test.go
       - openehr/template/constraint_ref_test.go
+      - openehr/template/constraints/code_reference_test.go
       - openehr/template/constraints/constraint_ref_test.go
       - openehr/template/constraints/constraints_test.go
       - openehr/template/constraints/example_test.go
@@ -1508,6 +1519,7 @@ requirements:
       - openehr/validation/cstring_list_open_test.go
       - openehr/validation/optional_string_test.go
       - openehr/validation/ordinal_symbol_test.go
+      - openehr/validation/primitive_empty_part_test.go
       - openehr/validation/quantity_property_test.go
       - openehr/validation/temporal_constraint_test.go
       - testkit/probes/template/constraint_fixtures_test.go
@@ -1745,14 +1757,25 @@ requirements:
       - openehr/client/definition
       - openehr/rm/typereg
       - openehr/serialize/canjson
+      - openehr/serialize/canxml
+      - openehr/aom/aom14
+      - openehr/internal/xmlunmatched
+      - internal/templatecompile
     tests:
       - internal/rmjsonwalk/walk_once_budget_internal_test.go
+      - internal/templatecompile/compile_model_test.go
+      - internal/templatecompile/resolve_internal_test.go
+      - internal/templatecompile/resolve_test.go
+      - openehr/aom/aom14/read_test.go
       - openehr/bmm/load_test.go
+      - openehr/internal/xmlunmatched/xml_depth_internal_test.go
       - openehr/rm/typereg/registry_test.go
       - openehr/rm/typereg/streaming_hotpath_test.go
       - openehr/serialize/canjson/edgecases_test.go
+      - openehr/serialize/canxml/max_depth_test.go
       - openehr/template/parse_cap_test.go
       - openehr/template/parse_depth_test.go
+      - openehr/template/slot_assertion_test.go
 
   - id: REQ-109
     title: AQL static lint
@@ -1809,16 +1832,23 @@ requirements:
       - openehr/aql/lint
       - openehr/template
       - internal/templatecompile
+      - openehr/aom/aom14
     probes: []
     tests:
+      - internal/templatecompile/compile_model_test.go
       - internal/templatecompile/compile_nodename_test.go
       - internal/templatecompile/compile_test.go
+      - internal/templatecompile/compiled_golden_test.go
+      - internal/templatecompile/default_value_test.go
+      - internal/templatecompile/resolve_test.go
       - openehr/instance/local_term_text_test.go
       - openehr/template/path_test.go
       - openehr/template/slot_assertion_test.go
       - openehr/templatecompile/compile_test.go
       - openehr/templatecompile/external_test.go
       - openehr/templatecompile/introspect_test.go
+      - openehr/templatecompile/resolve_test.go
+      - testkit/probes/template/probes_test.go
 
   - id: REQ-112
     title: Template-less Reference Model validation floor
@@ -2564,6 +2594,7 @@ requirements:
       - openehr/validation/primitive_empty_part_test.go
       - openehr/validation/prohibited_test.go
       - openehr/validation/registry_roots_test.go
+      - openehr/validation/rm_class_names_internal_test.go
       - openehr/validation/rmfloor_chained_corpus_test.go
       - openehr/validation/rmfloor_chained_internal_test.go
       - openehr/validation/rmfloor_coded_test.go
@@ -2672,6 +2703,7 @@ requirements:
       - openehr/aom/aom14/operational_template_shapes_xml_test.go
       - openehr/aom/aom14/primitive_profile_shapes_xml_test.go
       - openehr/aom/aom14/quantity_item_units_xml_test.go
+      - openehr/aom/aom14/read_test.go
       - openehr/aom/aom14/schema_names_xml_test.go
       - openehr/aom/aom14/symbol_json_test.go
       - openehr/aom/aom14/symbol_value_xml_test.go

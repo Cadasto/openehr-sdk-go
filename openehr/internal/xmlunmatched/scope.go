@@ -85,32 +85,51 @@ var (
 
 // Scope keeps the namespace prefixes declared on the elements a decode opens,
 // so that [LookupPrefix] resolves a prefix written in an attribute value, for a
-// decode that applies no policy for unmatched content and follows no path:
-// one through its decoder behaves as one through a plain encoding/xml decoder
-// does. A Scope serves one decoder, from one goroutine at a time.
+// decode that applies no policy for unmatched content: one through its decoder
+// behaves as one through a plain encoding/xml decoder does, but for depth. It
+// follows the open elements, so that it refuses an element nested deeper than
+// the limit [Scope.LimitDepth] sets, or than encoding/xml's own, with a
+// refusal that names the element's path. A Scope serves one decoder, from one
+// goroutine at a time.
 type Scope struct {
 	reader *trackingReader
+	// maxDepth is the depth limit [Scope.LimitDepth] set; 0 for none.
+	maxDepth int
 }
+
+// LimitDepth makes the decodes through the decoder [Scope.NewDecoder] returns
+// next refuse an element nested deeper than n, as [Tracker.LimitDepth] says,
+// and the refusal comes back on its own. n <= 0 sets no limit, the default.
+func (s *Scope) LimitDepth(n int) { s.maxDepth = max(n, 0) }
 
 // NewDecoder returns a decoder that reads canonical XML from r and keeps the
 // namespace scope of every element it opens in s. Decode values from it with
 // [Scope.Decode].
 func (s *Scope) NewDecoder(r io.Reader) *xml.Decoder {
-	s.reader = &trackingReader{src: xml.NewDecoder(r)}
+	// The reader follows the open elements, for the depth and the path of a
+	// refusal, in a tracker no decoder is registered with: the generated
+	// decoders find no policy, and the decode stays untracked.
+	t := NewTracker(nil, false)
+	t.LimitDepth(s.maxDepth)
+	s.reader = &trackingReader{src: xml.NewDecoder(r), t: t}
 	return xml.NewTokenDecoder(s.reader)
 }
 
 // Decode decodes the next value of dec, a decoder from [Scope.NewDecoder],
 // into v, with dec registered meanwhile, so that [LookupPrefix] finds the
-// prefixes in scope.
+// prefixes in scope. The depth counts from the root of that value, and a
+// depth refusal comes back on its own, outside the dispatch envelopes it
+// passed through.
 func (s *Scope) Decode(dec *xml.Decoder, v any) error {
+	t := s.reader.t
+	t.reset()
 	scoping.Add(1)
 	scoped.Store(dec, s.reader)
 	defer func() {
 		scoped.Delete(dec)
 		scoping.Add(-1)
 	}()
-	return dec.Decode(v)
+	return t.alone(dec.Decode(v))
 }
 
 // DecodeAgain decodes the next value of dec into v as [Scope.Decode] does, as

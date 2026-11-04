@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -23,10 +22,7 @@ func TestCompile_UpstreamFlatConformanceOPT(t *testing.T) {
 		t.Skipf("FLAT conformance corpus absent (run 'make flat-sync'): %v", err)
 	}
 
-	opt, err := template.ParseFile(path)
-	if err != nil {
-		t.Fatalf("ParseFile: %v", err)
-	}
+	opt := mustReadModelFile(t, path)
 
 	c, err := templatecompile.Compile(opt)
 	if err != nil {

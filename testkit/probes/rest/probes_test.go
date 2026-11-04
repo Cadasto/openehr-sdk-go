@@ -721,9 +721,9 @@ func loadProbe108Fixture(t *testing.T) (*webtemplate.WebTemplate, *rm.Compositio
 	if err != nil {
 		t.Fatalf("read OPT: %v", err)
 	}
-	opt, err := fixtures.ParseOPTBytes(optBody)
+	opt, err := fixtures.ReadOperationalTemplate(optBody)
 	if err != nil {
-		t.Fatalf("parse OPT: %v", err)
+		t.Fatalf("read OPT: %v", err)
 	}
 	compiled, err := templatecompile.Compile(opt)
 	if err != nil {

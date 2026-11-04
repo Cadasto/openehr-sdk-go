@@ -14,7 +14,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
@@ -30,9 +29,9 @@ func testComposer() *rm.PartyIdentified {
 
 func compileFixture(t *testing.T, name string) *templatecompile.Compiled {
 	t.Helper()
-	opt, err := template.ParseFile(fixtures.TemplateOptForName(name))
+	opt, err := readOPTFile(fixtures.TemplateOptForName(name))
 	if err != nil {
-		t.Fatalf("ParseFile %s: %v", name, err)
+		t.Fatalf("readOPTFile %s: %v", name, err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
@@ -47,9 +46,9 @@ func compileSyntheticOPT(t *testing.T, xml string) *templatecompile.Compiled {
 	if err := os.WriteFile(path, []byte(xml), 0o600); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
-	opt, err := template.ParseFile(path)
+	opt, err := readOPTFile(path)
 	if err != nil {
-		t.Fatalf("ParseFile synthetic: %v", err)
+		t.Fatalf("readOPTFile synthetic: %v", err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {

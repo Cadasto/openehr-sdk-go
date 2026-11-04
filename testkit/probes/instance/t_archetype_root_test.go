@@ -10,7 +10,6 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
@@ -41,9 +40,9 @@ func TestREQ100_REQ107_TArchetypeRootEntriesPassRMFloor(t *testing.T) {
 	if got, want := bytes.Count(raw, from), 7; got != want {
 		t.Fatalf("social.opt holds %d %s, want %d", got, from, want)
 	}
-	opt, err := template.ParseOPT(bytes.NewReader(bytes.ReplaceAll(raw, from, to)))
+	opt, err := fixtures.ReadOperationalTemplate(bytes.ReplaceAll(raw, from, to))
 	if err != nil {
-		t.Fatalf("ParseOPT(social.opt with T_ARCHETYPE_ROOT): %v", err)
+		t.Fatalf("ReadOperationalTemplate(social.opt with T_ARCHETYPE_ROOT): %v", err)
 	}
 	compiled, err := templatecompile.Compile(opt)
 	if err != nil {

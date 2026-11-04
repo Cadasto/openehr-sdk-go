@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
@@ -99,9 +99,9 @@ func optTemplate(rmType string, attrs ...string) string {
 // leaves out.
 func compileOPTText(t *testing.T, xml string, implicit bool) *templatecompile.Compiled {
 	t.Helper()
-	opt, err := template.ParseOPT(strings.NewReader(xml))
+	opt, err := aom14.ReadOperationalTemplate(strings.NewReader(xml))
 	if err != nil {
-		t.Fatalf("ParseOPT: %v", err)
+		t.Fatalf("ReadOperationalTemplate: %v", err)
 	}
 	var opts []templatecompile.Option
 	if !implicit {

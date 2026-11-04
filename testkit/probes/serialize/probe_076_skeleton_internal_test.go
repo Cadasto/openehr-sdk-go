@@ -5,13 +5,13 @@ package serializeprobes
 // pair and is named, so a decode defect is never confused with a generator one.
 
 import (
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
@@ -23,9 +23,13 @@ import (
 // skeleton with its composer taken away fails, naming the template, the
 // policy and the issue, before any format is tried.
 func TestProbe076SkeletonLegFailsAnInvalidSkeleton(t *testing.T) {
-	opt, err := template.ParseFile(fixtures.TemplateOpt("BMI"))
+	raw, err := os.ReadFile(fixtures.TemplateOpt("BMI"))
 	if err != nil {
-		t.Fatalf("ParseFile(BMI): %v", err)
+		t.Fatalf("ReadFile(BMI): %v", err)
+	}
+	opt, err := fixtures.ReadOperationalTemplate(raw)
+	if err != nil {
+		t.Fatalf("ReadOperationalTemplate(BMI): %v", err)
 	}
 	compiled, err := templatecompile.Compile(opt)
 	if err != nil {

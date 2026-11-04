@@ -114,6 +114,18 @@ func elementValueOPT(rmType string, attrs ...string) string {
 	return optTemplate("ELEMENT", optSingle("value", optNode(rmType, "", attrs...)))
 }
 
+// optCodeReference is a C_CODE_REFERENCE under terminologyID, listing codes,
+// from a reference set of that terminology.
+func optCodeReference(terminologyID string, codes ...string) string {
+	var list strings.Builder
+	for _, code := range codes {
+		list.WriteString(`<code_list>` + code + `</code_list>`)
+	}
+	return `<children xsi:type="C_CODE_REFERENCE"><rm_type_name>CODE_PHRASE</rm_type_name><node_id></node_id>` +
+		`<terminology_id><value>` + terminologyID + `</value></terminology_id>` + list.String() +
+		`<referenceSetUri>terminology:` + terminologyID + `</referenceSetUri></children>`
+}
+
 // optCodePhraseStrings is a CODE_PHRASE whose terminology id and code
 // string the OPT constrains with C_STRING lists, so any listed terminology
 // goes with any listed code.
@@ -163,6 +175,16 @@ func TestREQ107_CodedAttributeKeepsToItsGroupOrCodeSet(t *testing.T) {
 		{
 			name: "COMPOSITION language",
 			opt:  optTemplate("COMPOSITION", optSingle("language", optCodePhrase("ISO_639-1", "xx", "de"))),
+			read: func(t *testing.T, out any) heldCode {
+				return heldCode{code: generatedComposition(t, out).Language}
+			},
+			example: codeIn("ISO_639-1", "de"),
+		},
+		{
+			// REQ-103: a C_CODE_REFERENCE is read as the code phrase
+			// constraint it carries, its reference set left out.
+			name: "COMPOSITION language, a C_CODE_REFERENCE",
+			opt:  optTemplate("COMPOSITION", optSingle("language", optCodeReference("ISO_639-1", "xx", "de"))),
 			read: func(t *testing.T, out any) heldCode {
 				return heldCode{code: generatedComposition(t, out).Language}
 			},

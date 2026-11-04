@@ -4,18 +4,18 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 )
 
 // REQ-100 — registerPath rejects duplicate AQL paths registered under
-// different wire attributes (OPT bug), while admitting legal
+// different model attributes (OPT bug), while admitting legal
 // C_SINGLE_ATTRIBUTE alternatives under the same attribute.
 func TestRegisterPath_DuplicateFromDifferentAttribute(t *testing.T) {
 	c := &Compiled{byPath: make(map[string]*CompiledNode)}
 	w := walker{compiled: c, paths: make(map[string]pathMark)}
 
-	attrA := &template.Attribute{}
-	attrB := &template.Attribute{}
+	attrA := &aom14.CSingleAttribute{}
+	attrB := &aom14.CSingleAttribute{}
 
 	node1 := &CompiledNode{aqlPath: "/name", rmTypeName: "DV_TEXT"}
 	w.currentAttr = attrA
@@ -46,7 +46,7 @@ func TestRegisterPath_AdmitsDescendantsOfSharedPath(t *testing.T) {
 	}
 
 	// First alternative's descendant registers normally.
-	w.currentAttr = &template.Attribute{}
+	w.currentAttr = &aom14.CSingleAttribute{}
 	first := &CompiledNode{aqlPath: "/value/value", rmTypeName: "STRING"}
 	if err := w.registerPath(first); err != nil {
 		t.Fatalf("first descendant: %v", err)
@@ -56,7 +56,7 @@ func TestRegisterPath_AdmitsDescendantsOfSharedPath(t *testing.T) {
 	// object. Outside a shared-path subtree this is the OPT bug the guard
 	// exists for — and the node's own registration always runs at
 	// dupDepth == 0, so it stays guarded.
-	w.currentAttr = &template.Attribute{}
+	w.currentAttr = &aom14.CSingleAttribute{}
 	clash := &CompiledNode{aqlPath: "/value/value", rmTypeName: "STRING"}
 	if err := w.registerPath(clash); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("cross-attribute duplicate outside a shared-path subtree = %v, want ErrInvalidInput", err)

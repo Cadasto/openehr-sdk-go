@@ -17,11 +17,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
@@ -143,9 +143,9 @@ func editValues(t *testing.T, edits ...valuesEdit) editedValues {
 	for _, edit := range edits {
 		opt = edit(t, opt)
 	}
-	parsed, err := template.ParseOPT(strings.NewReader(opt))
+	parsed, err := aom14.ReadOperationalTemplate(strings.NewReader(opt))
 	if err != nil {
-		t.Fatalf("ParseOPT(edited %s): %v", valuesTemplate, err)
+		t.Fatalf("ReadOperationalTemplate(edited %s): %v", valuesTemplate, err)
 	}
 	wt, compiled := compileTemplate(t, valuesTemplate, parsed)
 	composer := "Composer"
@@ -162,8 +162,9 @@ func editValues(t *testing.T, edits ...valuesEdit) editedValues {
 
 // TestREQ053CodedNameRules — REQ-053, REQ-116: decode gives a node a coded
 // name only where the template constrains the name as a DV_CODED_TEXT, through
-// one child or alternatives that agree, whose one C_CODE_PHRASE lists one
-// code, or several of which only one has the pinned text as its term text.
+// one child or alternatives that agree, whose one C_CODE_PHRASE, or the one
+// a C_CODE_REFERENCE carries (REQ-103), lists one code, or several of which
+// only one has the pinned text as its term text.
 // The text is the pinned one, else the code's term text: the node's archetype
 // term for a local code, its rubric for an openehr one. Everywhere else, a
 // code or a text the template leaves open included, the node keeps the DV_TEXT
@@ -238,6 +239,15 @@ func TestREQ053CodedNameRules(t *testing.T) {
 			edits: []valuesEdit{withName(codedText(definingCode(optChild("C_CODE_REFERENCE", "CODE_PHRASE", "1", "1", "",
 				`<referenceSetUri>terminology:example?subset=names</referenceSetUri>`))))},
 			want: textNameJSON("Coded name"),
+		},
+		{
+			// REQ-103: a C_CODE_REFERENCE is read as the code phrase
+			// constraint it carries.
+			name: "a reference set whose code phrase lists one code",
+			edits: []valuesEdit{withName(codedText(definingCode(optChild("C_CODE_REFERENCE", "CODE_PHRASE", "1", "1", "",
+				`<terminology_id><value>local</value></terminology_id><code_list>at0017</code_list>`+
+					`<referenceSetUri>terminology:example?subset=names</referenceSetUri>`))))},
+			want: codedNameJSON("First option", "at0017", "local"),
 		},
 		{
 			name:  "a local code with no term",

@@ -109,9 +109,12 @@ func (e slotExpression) isSupportedSlotMatch() bool {
 		strings.EqualFold(strings.TrimSpace(e.Right.ReferenceType), "constraint")
 }
 
+// extractTextSlotPattern returns the trimmed text between the braces of the
+// first `archetype_id … matches {…}` in raw, the ASCII case of the two words
+// ignored and an escaped brace kept inside, or "" when raw holds none.
 func extractTextSlotPattern(raw string) string {
 	const prefix = "archetype_id"
-	lower := strings.ToLower(raw)
+	lower := asciiLower(raw)
 	i := strings.Index(lower, prefix)
 	if i < 0 {
 		return ""
@@ -146,6 +149,20 @@ func extractTextSlotPattern(raw string) string {
 		}
 	}
 	return ""
+}
+
+// asciiLower returns s with each ASCII capital letter lowercased and every
+// other byte kept, so an offset into the result is the same offset into s.
+// strings.ToLower does not keep offsets: some runes take more bytes
+// lowercased than as written, such as Ⱥ (U+023A) lowercased to ⱥ (U+2C65).
+func asciiLower(s string) string {
+	b := []byte(s)
+	for i, c := range b {
+		if 'A' <= c && c <= 'Z' {
+			b[i] = c + ('a' - 'A')
+		}
+	}
+	return string(b)
 }
 
 func normalizeSlotPattern(p string) string {

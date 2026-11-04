@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -52,6 +51,10 @@ import (
 // and the path of an <annotations>. So "defining_code\n   " is read as
 // defining_code, and an xsi:type that holds only white space reads as an
 // empty one.
+//
+// Deprecated: Read the document with aom14.ReadOperationalTemplate and
+// compile it with templatecompile.Compile. A later release removes
+// ParseOPT.
 func ParseOPT(r io.Reader) (*OperationalTemplate, error) {
 	return parseOPT(r, false)
 }
@@ -86,6 +89,11 @@ func ParseOPT(r io.Reader) (*OperationalTemplate, error) {
 // [constraints.ConstraintRef], with one difference: where the
 // reference is missing or blank, ParseOPT keeps the leaf with an
 // empty Reference and strict mode refuses the template.
+//
+// Deprecated: Read the document with aom14.ReadOperationalTemplate,
+// passing canxml.WithStrict to refuse content the model does not read,
+// and compile it with templatecompile.Compile. A later release removes
+// ParseOPTStrict.
 func ParseOPTStrict(r io.Reader) (*OperationalTemplate, error) {
 	return parseOPT(r, true)
 }
@@ -93,6 +101,10 @@ func ParseOPTStrict(r io.Reader) (*OperationalTemplate, error) {
 // ParseFile reads an .opt file from disk. The path suffix must be
 // .opt (case-insensitive); other extensions return
 // ErrNotOPTFile without opening the file.
+//
+// Deprecated: Open the file and read it with
+// aom14.ReadOperationalTemplate, then compile it with
+// templatecompile.Compile. A later release removes ParseFile.
 func ParseFile(path string) (*OperationalTemplate, error) {
 	return parseFile(path, false)
 }
@@ -100,6 +112,11 @@ func ParseFile(path string) (*OperationalTemplate, error) {
 // ParseFileStrict is the strict-mode counterpart to ParseFile.
 // It is equivalent to ParseFile + ParseOPTStrict; see ParseOPTStrict
 // for the strict-mode contract.
+//
+// Deprecated: Open the file and read it with
+// aom14.ReadOperationalTemplate, passing canxml.WithStrict to refuse
+// content the model does not read, then compile it with
+// templatecompile.Compile. A later release removes ParseFileStrict.
 func ParseFileStrict(path string) (*OperationalTemplate, error) {
 	return parseFile(path, true)
 }
@@ -802,44 +819,14 @@ func intervalToMultiplicity(i *xmlInterval) (*Multiplicity, error) {
 	if err != nil {
 		return nil, err
 	}
-	lowerIncluded := includedFlag(i.LowerIncluded.ptr(), lowerUnbounded)
-	upperIncluded := includedFlag(i.UpperIncluded.ptr(), upperUnbounded)
-	lower, upper := intOrZero(i.Lower), intOrZero(i.Upper)
-	m := &Multiplicity{
-		lower:          lower,
-		upper:          upper,
-		lowerUnbounded: lowerUnbounded,
-		upperUnbounded: upperUnbounded,
-	}
-	// A Multiplicity counts whole items, so an excluded end on a bounded
-	// side becomes the closed end it stands for: ">0" is 1 and "<3" is 2.
-	// An unbounded side has no bound to move, whatever its included flag
-	// says. An int cannot hold the closed end of "> the largest int" or
-	// "< the smallest int", so such an end is refused instead of being
-	// left to wrap around to the other end of the int range.
-	if !lowerUnbounded && !lowerIncluded {
-		if m.lower == math.MaxInt {
-			return nil, fmt.Errorf("closed lower bound overflows int: excluded lower=%d", lower)
-		}
-		m.lower++
-	}
-	if !upperUnbounded && !upperIncluded {
-		if m.upper == math.MinInt {
-			return nil, fmt.Errorf("closed upper bound overflows int: excluded upper=%d", upper)
-		}
-		m.upper--
-	}
-	// Reject inverted intervals at parse time so downstream walkers
-	// can assume `Lower <= Upper` whenever both bounds are present.
-	// The check runs on the closed ends, so an interval that closing
-	// leaves empty, such as ">2..<3", is refused here too; the message
-	// adds the interval as written so the reader recognises it.
-	// Unbounded sides are skipped: they have no concrete value to compare.
-	if !m.lowerUnbounded && !m.upperUnbounded && m.lower > m.upper {
-		return nil, fmt.Errorf("inverted interval lower=%d > upper=%d (written %s)",
-			m.lower, m.upper, writtenBounds(lower, upper, lowerIncluded, upperIncluded))
-	}
-	return m, nil
+	return NewMultiplicity(IntervalBounds{
+		Lower:          intOrZero(i.Lower),
+		Upper:          intOrZero(i.Upper),
+		LowerIncluded:  includedFlag(i.LowerIncluded.ptr(), lowerUnbounded),
+		UpperIncluded:  includedFlag(i.UpperIncluded.ptr(), upperUnbounded),
+		LowerUnbounded: lowerUnbounded,
+		UpperUnbounded: upperUnbounded,
+	})
 }
 
 // intOrZero returns the bound p points to, or 0 for a bound the OPT omits.

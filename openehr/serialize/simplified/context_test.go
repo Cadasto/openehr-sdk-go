@@ -14,7 +14,6 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
@@ -344,9 +343,9 @@ func TestSettingDecodeHalfPairRejected(t *testing.T) {
 // input. An OPT-free decode synthesises nothing, so its re-encode stays
 // byte-identical to the setting-less input.
 func TestSettingWithTemplateDefaultRoundTrip(t *testing.T) {
-	parsed, err := template.ParseFile(minimalObsOPT)
+	parsed, err := readOPTFile(minimalObsOPT)
 	if err != nil {
-		t.Fatalf("ParseFile: %v", err)
+		t.Fatalf("readOPTFile: %v", err)
 	}
 	compiled, err := templatecompile.Compile(parsed)
 	if err != nil {
@@ -1117,9 +1116,9 @@ func TestComposerSelfWithComposerNameRejected(t *testing.T) {
 // The corpus OPT is the target on purpose: its Web Template carries a
 // context/setting node, which is what made the drop reachable at all.
 func TestContextOwnedLeafUnacceptedSpellingRefused(t *testing.T) {
-	parsed, err := template.ParseFile(corpusFlatOPT)
+	parsed, err := readOPTFile(corpusFlatOPT)
 	if err != nil {
-		t.Fatalf("ParseFile: %v", err)
+		t.Fatalf("readOPTFile: %v", err)
 	}
 	compiled, err := templatecompile.Compile(parsed)
 	if err != nil {

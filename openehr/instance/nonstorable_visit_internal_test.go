@@ -54,9 +54,9 @@ const (
 // the attribute, so a case cannot pass because the compiler dropped it.
 func visitAttribute(t *testing.T, opt, name string) (*tcimpl.CompiledNode, *tcimpl.CompiledAttribute) {
 	t.Helper()
-	parsed, err := fixtures.ParseOPTBytes([]byte(opt))
+	parsed, err := fixtures.ReadOperationalTemplate([]byte(opt))
 	if err != nil {
-		t.Fatalf("ParseOPTBytes: %v", err)
+		t.Fatalf("ReadOperationalTemplate: %v", err)
 	}
 	c, err := templatecompile.Compile(parsed)
 	if err != nil {

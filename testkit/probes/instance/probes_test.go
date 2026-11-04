@@ -12,7 +12,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 	instanceprobes "github.com/cadasto/openehr-sdk-go/testkit/probes/instance"
@@ -20,9 +19,13 @@ import (
 
 func compileFixture(t *testing.T, name string) *templatecompile.Compiled {
 	t.Helper()
-	opt, err := template.ParseFile(fixtures.TemplateOptForName(name))
+	raw, err := os.ReadFile(fixtures.TemplateOptForName(name))
 	if err != nil {
-		t.Fatalf("ParseFile %s: %v", name, err)
+		t.Fatalf("ReadFile %s: %v", name, err)
+	}
+	opt, err := fixtures.ReadOperationalTemplate(raw)
+	if err != nil {
+		t.Fatalf("ReadOperationalTemplate %s: %v", name, err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
@@ -142,9 +145,9 @@ func compileRealWorldFixture(t *testing.T, name string) *templatecompile.Compile
 	if err != nil {
 		t.Fatalf("ReadFile %s: %v", name, err)
 	}
-	opt, err := fixtures.ParseOPTBytes(raw)
+	opt, err := fixtures.ReadOperationalTemplate(raw)
 	if err != nil {
-		t.Fatalf("ParseOPTBytes %s: %v", name, err)
+		t.Fatalf("ReadOperationalTemplate %s: %v", name, err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {

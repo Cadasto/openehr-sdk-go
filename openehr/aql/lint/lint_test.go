@@ -1,6 +1,7 @@
 package lint_test
 
 import (
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -10,15 +11,18 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/lint"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 func mustCompile(t *testing.T, fixture string) *templatecompile.Compiled {
 	t.Helper()
-	opt, err := template.ParseFile(fixtures.TemplateOptForName(fixture))
+	b, err := os.ReadFile(fixtures.TemplateOptForName(fixture))
 	if err != nil {
-		t.Fatalf("ParseFile(%s): %v", fixture, err)
+		t.Fatal(err)
+	}
+	opt, err := fixtures.ReadOperationalTemplate(b)
+	if err != nil {
+		t.Fatalf("ReadOperationalTemplate(%s): %v", fixture, err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {

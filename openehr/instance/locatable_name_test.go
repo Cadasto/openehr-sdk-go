@@ -10,7 +10,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
@@ -20,9 +19,9 @@ import (
 // leaves out, or without them.
 func compileFixtureMode(t *testing.T, name string, implicit bool) *templatecompile.Compiled {
 	t.Helper()
-	opt, err := template.ParseFile(fixtures.TemplateOpt(name))
+	opt, err := readOPTFile(fixtures.TemplateOpt(name))
 	if err != nil {
-		t.Fatalf("ParseFile %s: %v", name, err)
+		t.Fatalf("readOPTFile %s: %v", name, err)
 	}
 	var opts []templatecompile.Option
 	if !implicit {

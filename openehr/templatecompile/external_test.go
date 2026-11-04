@@ -16,7 +16,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
@@ -41,10 +40,7 @@ func externalComposer() *rm.PartyIdentified {
 func TestExternalBuildRoundTrip(t *testing.T) {
 	ctx := context.Background()
 
-	opt, err := template.ParseFile(fixtures.TemplateOptForName("vital_signs"))
-	if err != nil {
-		t.Fatalf("ParseFile: %v", err)
-	}
+	opt := mustReadModelFile(t, fixtures.TemplateOptForName("vital_signs"))
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
 		t.Fatalf("Compile: %v", err)
@@ -136,10 +132,7 @@ func TestExternalBuildRoundTrip(t *testing.T) {
 // EHR_STATUS against one correctly surfaces a root rm_type_mismatch —
 // which itself proves the full call path executed end to end.
 func TestExternalValidateEHRStatus(t *testing.T) {
-	opt, err := template.ParseFile(fixtures.TemplateOptForName("vital_signs"))
-	if err != nil {
-		t.Fatalf("ParseFile: %v", err)
-	}
+	opt := mustReadModelFile(t, fixtures.TemplateOptForName("vital_signs"))
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
 		t.Fatalf("Compile: %v", err)
@@ -181,10 +174,7 @@ func TestExternalValidateEHRStatus(t *testing.T) {
 // the composition validator.
 func TestExternalInstanceAndAQL(t *testing.T) {
 	ctx := context.Background()
-	opt, err := template.ParseFile(fixtures.TemplateOptForName("vital_signs"))
-	if err != nil {
-		t.Fatalf("ParseFile: %v", err)
-	}
+	opt := mustReadModelFile(t, fixtures.TemplateOptForName("vital_signs"))
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
 		t.Fatalf("Compile: %v", err)

@@ -7,7 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
 
 const sigOPT = `<?xml version="1.0" encoding="UTF-8"?>
@@ -79,11 +80,11 @@ func TestRenamedOPT_RenamesTheTemplateIDOnly_REQ082(t *testing.T) {
 	if bytes.HasPrefix(b, utf8BOM) {
 		t.Error("renamedOPT kept the byte-order mark")
 	}
-	opt, err := template.ParseOPTStrict(bytes.NewReader(b))
+	opt, err := aom14.ReadOperationalTemplate(bytes.NewReader(b), canxml.WithStrict())
 	if err != nil {
-		t.Fatalf("ParseOPTStrict(renamed) = %v", err)
+		t.Fatalf("ReadOperationalTemplate(renamed, strict) = %v", err)
 	}
-	if got := opt.TemplateID(); got != newID {
+	if got := opt.TemplateID.Value; got != newID {
 		t.Errorf("renamed template id = %q, want %q", got, newID)
 	}
 	if got, want := bytes.Count(b, []byte(newID)), 1; got != want {

@@ -15,9 +15,9 @@ import (
 // intervalNode compiles an OPT text and returns its DV_INTERVAL node.
 func intervalNode(t *testing.T, opt string) *tcimpl.CompiledNode {
 	t.Helper()
-	parsed, err := fixtures.ParseOPTBytes([]byte(opt))
+	parsed, err := fixtures.ReadOperationalTemplate([]byte(opt))
 	if err != nil {
-		t.Fatalf("ParseOPTBytes: %v", err)
+		t.Fatalf("ReadOperationalTemplate: %v", err)
 	}
 	c, err := templatecompile.Compile(parsed)
 	if err != nil {

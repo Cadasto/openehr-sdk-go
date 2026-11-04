@@ -19,7 +19,8 @@ const NSXMI = "http://www.omg.org/XMI"
 
 // DecoderOption configures a decode, through [Unmarshal] or a [Decoder].
 // [WithUnmatched] and [WithStrict] say what happens to content the decode
-// does not read; [WithMissing] reports the members the input leaves out.
+// does not read; [WithMissing] reports the members the input leaves out;
+// [WithMaxDepth] refuses an element nested too deep.
 // [WithRelaxedTypeDispatch] names relaxed polymorphic dispatch; it is
 // accepted but not yet enforced, so dispatch stays strict.
 type DecoderOption func(*decoderConfig)
@@ -27,10 +28,11 @@ type DecoderOption func(*decoderConfig)
 // decoderConfig holds the option-driven state of a decode. Kept unexported so
 // the option list can grow without churning the [Decoder] type.
 type decoderConfig struct {
-	relaxedTypeDispatch bool
 	unmatched           func(path string)
-	strict              bool
 	missing             func(pointer string)
+	maxDepth            int // 0 for no limit
+	relaxedTypeDispatch bool
+	strict              bool
 }
 
 // newDecoderConfig applies opts in order, skipping a nil option.
@@ -59,6 +61,22 @@ func (c decoderConfig) tracker() *xmlunmatched.Tracker {
 	}
 	t := xmlunmatched.NewTracker(c.unmatched, c.strict)
 	t.ReportMissing(c.missing)
+	t.LimitDepth(c.maxDepth)
+	return t
+}
+
+// documentTracker returns the tracker [Unmarshal] decodes a document through:
+// c's tracker, or, under a depth limit alone, one that applies no policy and
+// follows the elements for the limit. Such a tracker decodes a document as a
+// decode with no tracker does, in one pass: that decode names a primitive
+// failure by its path, and resolves a prefix declared around its attribute,
+// by decoding the document again through one.
+func (c decoderConfig) documentTracker() *xmlunmatched.Tracker {
+	if t := c.tracker(); t != nil || c.maxDepth == 0 {
+		return t
+	}
+	t := xmlunmatched.NewTracker(nil, false)
+	t.LimitDepth(c.maxDepth)
 	return t
 }
 
@@ -127,6 +145,42 @@ func WithStrict() DecoderOption {
 	return func(c *decoderConfig) { c.strict = true }
 }
 
+// WithMaxDepth refuses an element nested deeper than n, counted from the root
+// of the value, which is at depth 1: the document's root element for
+// [Unmarshal], the root element of each value a [Decoder] decodes. The decode
+// refuses the element when it reads its start tag, before anything decodes
+// the element, in every mode, with [WithUnmatched], [WithStrict] or
+// [WithMissing] or without. Use it on input from outside the caller's
+// control, whose nesting would otherwise cost the decode memory and time in
+// proportion to its depth.
+//
+// The refusal is a [DecodeError] on its own, outside any slot envelope, that
+// wraps [ErrLimitExceeded]. Its Path is the element's path from the root of
+// the value, in the form [WithUnmatched] uses, with no more than eight
+// segments at each end: a longer path has a `/...` segment in place of those
+// between. Its text names the element's depth and n, and carries none of the
+// element's content. The value v points to is unspecified after the refusal.
+// A [Decoder] that refuses an element returns the same refusal from every
+// later Decode, since its stream stands inside that element.
+//
+// n <= 0 sets no limit, as leaving the option out does, and does not lift a
+// limit another WithMaxDepth gave. Given more than one, the smallest positive
+// n holds, in whatever order they come. Following the elements costs a decode
+// some time, as [WithUnmatched] does; a decode without a limit pays nothing
+// for it.
+//
+// No n lifts the depth encoding/xml decodes, 10 000 nested elements: with n
+// above it, or with no limit, the decode refuses an element nested deeper
+// than that all the same, with a refusal of the same form that names 10 000
+// as the limit (see "Nesting depth" in the package documentation).
+func WithMaxDepth(n int) DecoderOption {
+	return func(c *decoderConfig) {
+		if n > 0 && (c.maxDepth == 0 || n < c.maxDepth) {
+			c.maxDepth = n
+		}
+	}
+}
+
 // WithRelaxedTypeDispatch toggles the polymorphic-dispatch policy
 // for abstract slots from strict (the default: missing `xsi:type` at a
 // polymorphic site is an error) to relaxed (missing `xsi:type` is
@@ -167,10 +221,12 @@ type Decoder struct {
 	// is an io.ByteReader and an io.Seeker, which dec reads directly and the
 	// decoder seeks back in to decode a value again; nil otherwise.
 	seeker io.ReadSeeker
-	// scope keeps the namespace declarations in scope for a decoder given
-	// none of those options once it has decoded a value a second time to
-	// resolve a prefix: it reads the rest of the stream through scope. nil
-	// until then.
+	// scope keeps the namespace declarations in scope, and follows the
+	// elements, for a decoder given none of those options once it has decoded
+	// a value a second time, to resolve a prefix or to name an element nested
+	// past encoding/xml's depth limit: it reads the rest of the stream through
+	// scope. nil until then. For a decoder given none of them but
+	// [WithMaxDepth], scope is there from the start.
 	scope *xmlunmatched.Scope
 }
 
@@ -189,6 +245,14 @@ func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 	cfg := newDecoderConfig(opts)
 	if t := cfg.tracker(); t != nil {
 		return &Decoder{dec: t.NewDecoder(r), cfg: cfg, trk: t}
+	}
+	if cfg.maxDepth > 0 {
+		// The limit needs the decode to follow the elements it reads. A scope
+		// does so and applies no policy, so a value decodes in one pass, and a
+		// primitive failure is named as a decoder given no option names it.
+		s := new(xmlunmatched.Scope)
+		s.LimitDepth(cfg.maxDepth)
+		return &Decoder{dec: s.NewDecoder(r), cfg: cfg, scope: s}
 	}
 	if s, ok := r.(byteSeeker); ok {
 		return &Decoder{dec: xml.NewDecoder(s), cfg: cfg, seeker: s}
@@ -370,27 +434,29 @@ func (f failedReader) Read([]byte) (int, error) { return 0, f.err }
 // Decode reads the next XML element from the stream and stores it
 // in v. Errors follow the same classification as [Unmarshal], with one
 // difference: a Decoder given none of [WithUnmatched], [WithStrict] and
-// [WithMissing] does not follow the path of the elements it reads, so the
+// [WithMissing] does not name the path of the elements it reads, so the
 // [DecodeError] for the text of a primitive element that does not decode as
 // its type names the element alone, such as "/is_queryable", inside the
 // envelope of each polymorphic slot it sits in. A Decoder given any of them
 // returns it on its own, with the element's path from the root of the value,
-// as [Unmarshal] does.
+// as [Unmarshal] does. [WithMaxDepth] does not change that.
 //
 // A prefixed `xsi:type` is resolved against the namespace declarations in
 // scope where the attribute stands (see [XSITypeOf]). A Decoder given any of
-// those options keeps every declaration in scope as it reads. One given none
-// reads an element's own declarations as it goes; when a prefix is declared
-// on an element around the attribute, Decode decodes the value a second time,
-// from where the call began, through a reader that keeps every declaration in
-// scope, into v cleared to its zero value. The Decoder then reads the rest of
-// the stream through that reader. To read the value again, a Decoder whose
-// reader is an io.ByteReader and an io.Seeker, such as a *bytes.Reader, seeks
-// the reader back to where the value began, and a seek that fails is the
-// error Decode returns; a Decoder over any other reader keeps the bytes of
-// the value it is decoding instead. So only a value that needs the second
-// decode pays for it, and over a reader that cannot seek any other pays for
-// keeping its bytes.
+// those options, or [WithMaxDepth], keeps every declaration in scope as it
+// reads. One given none reads an element's own declarations as it goes; when
+// a prefix is declared on an element around the attribute, Decode decodes the
+// value a second time, from where the call began, through a reader that keeps
+// every declaration in scope, into v cleared to its zero value. The Decoder
+// then reads the rest of the stream through that reader. It does the same
+// when the value nests deeper than encoding/xml decodes, 10 000 elements, to
+// name the element refused by its path (see [WithMaxDepth]). To read the value
+// again, a Decoder whose reader is an io.ByteReader and an io.Seeker, such as
+// a *bytes.Reader, seeks the reader back to where the value began, and a seek
+// that fails is the error Decode returns; a Decoder over any other reader
+// keeps the bytes of the value it is decoding instead. So only a value that
+// needs the second decode pays for it, and over a reader that cannot seek any
+// other pays for keeping its bytes.
 //
 // Decode reads no further than the end of that element, so whatever
 // follows it, another element included, is left for the next call. A
@@ -410,7 +476,7 @@ func (d *Decoder) Decode(v any) error {
 		d.rec.from(start)
 	}
 	err := d.dec.Decode(v)
-	if !xmlunmatched.IsUnresolvedPrefix(err) {
+	if !xmlunmatched.IsUnresolvedPrefix(err) && !xmlunmatched.IsXMLDepthError(err) {
 		return err
 	}
 	src, err := d.rewind(start)
@@ -500,9 +566,12 @@ func (d *Decoder) RelaxedTypeDispatch() bool { return d.cfg.relaxedTypeDispatch 
 // [ErrUnknownElement]. A mandatory member the input leaves out is decoded
 // as its zero value by default, and [WithMissing] reports each one, by its
 // JSON Pointer in the canonical-JSON form of the instance; no mode refuses
-// one.
+// one. [WithMaxDepth] refuses an element nested deeper than its limit, and
+// every decode refuses one nested deeper than encoding/xml decodes, 10 000
+// elements, the same way; given no option, Unmarshal finds the path of such
+// an element by decoding data a second time.
 func Unmarshal(data []byte, v any, opts ...DecoderOption) error {
-	return xmlunmatched.Unmarshal(data, v, newDecoderConfig(opts).tracker())
+	return xmlunmatched.Unmarshal(data, v, newDecoderConfig(opts).documentTracker())
 }
 
 // XSITypeOf scans a start element's attribute list and returns the

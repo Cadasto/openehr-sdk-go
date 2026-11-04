@@ -30,7 +30,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rmpath"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
@@ -301,11 +300,11 @@ func TestClassifyOPT(t *testing.T) {
 	}
 }
 
-// buildVendored parses, compiles and builds one OPT. A non-nil refusal names
+// buildVendored reads, compiles and builds one OPT. A non-nil refusal names
 // the step that refused it and why, so the caller can tell an expected refusal
 // (refusedOPTs) from a new one.
 func buildVendored(path string) (*templatecompile.Compiled, *webtemplate.WebTemplate, *refusal) {
-	opt, err := template.ParseFile(path)
+	opt, err := readOPTFile(path)
 	if err != nil {
 		return nil, nil, &refusal{stage: stageParser, err: err}
 	}

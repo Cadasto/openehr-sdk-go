@@ -2,12 +2,12 @@ package templateprobes_test
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile/walk"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -26,7 +26,11 @@ func TestConstraintTemplates_CompiledExampleValues(t *testing.T) {
 			if fixtures.ConstraintExampleValueExcluded(id) {
 				t.Skip("ExampleValue walk skipped (REQ-107 gap)")
 			}
-			opt, err := template.ParseFile(fixtures.TemplateOpt(id))
+			b, err := os.ReadFile(fixtures.TemplateOpt(id))
+			if err != nil {
+				t.Fatal(err)
+			}
+			opt, err := fixtures.ReadOperationalTemplate(b)
 			if err != nil {
 				t.Fatal(err)
 			}

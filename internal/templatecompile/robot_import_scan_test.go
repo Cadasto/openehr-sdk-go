@@ -12,7 +12,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 )
 
 // robotRoot is the tests/robot/_resources/test_data_sets directory of an
@@ -139,10 +138,7 @@ func tryRobotPair(t *testing.T, root string, p robotPair) {
 	t.Helper()
 	optPath := filepath.Join(root, p.optRel)
 	compPath := filepath.Join(root, p.compRel)
-	opt, err := template.ParseFile(optPath)
-	if err != nil {
-		t.Fatalf("parse: %v", err)
-	}
+	opt := mustReadModelFile(t, optPath)
 	if _, err := templatecompile.Compile(opt); err != nil {
 		t.Fatalf("compile: %v", err)
 	}
@@ -163,7 +159,7 @@ func tryRobotPair(t *testing.T, root string, p robotPair) {
 	default:
 		t.Fatalf("unknown ext %s", compPath)
 	}
-	t.Logf("template_id=%q", opt.TemplateID())
+	t.Logf("template_id=%q", opt.TemplateID.Value)
 }
 
 // Set SCAN_ROBOT=1 to decode the Robot RM-only JSON (EHR_STATUS, FOLDER)

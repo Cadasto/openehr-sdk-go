@@ -1,10 +1,8 @@
 package instance_test
 
 import (
-	"errors"
 	"fmt"
 	mrand "math/rand/v2"
-	"strings"
 	"testing"
 
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
@@ -244,31 +242,19 @@ func TestREQ107_RandomFillDrawsRoutedPrimitiveLeaves(t *testing.T) {
 // TestREQ107_IntegerLeafIsNarrowedToTheIntegerRange is the REQ-107
 // Precedence 3 check that an RM type limit narrows a value the OPT leaves
 // open: an RM Integer is 32 bits wide, so a C_INTEGER on an Integer attribute
-// (a DV_QUANTITY's precision) whose range reaches past 32 bits is valued from
-// the part of the range inside the Integer range, under ExampleFill and under
-// RandomFill alike, and Generate does not fail where the OPT admits such a
-// value. Where the range and the Integer range share no value, below or above
-// it, Generate returns an error wrapping ErrConstraintUnsatisfiable that says
-// the constraint is outside the 32-bit Integer range. It holds under every
-// policy and both compile modes.
+// (a DV_QUANTITY's precision) with no upper bound, whose lower bound is
+// close to the greatest Integer, is valued from the part of the range inside
+// the Integer range, under ExampleFill and under RandomFill alike, and
+// Generate does not fail where the OPT admits such a value. It holds under
+// every policy and both compile modes.
 func TestREQ107_IntegerLeafIsNarrowedToTheIntegerRange(t *testing.T) {
-	const (
-		maxInteger = 1<<31 - 1
-		past       = 5_000_000_000
-		above      = 3_000_000_000
-	)
+	const maxInteger = 1<<31 - 1
 	// precision is a DV_QUANTITY whose precision the OPT constrains to
 	// lower..upper, or to lower and above when upper is -1; optInterval
 	// takes any negative upper bound for none.
 	precision := func(lower, upper int) string {
-		interval := optInterval(lower, upper)
-		if upper < -1 {
-			interval = fmt.Sprintf("<lower_included>true</lower_included><lower_unbounded>false</lower_unbounded>"+
-				"<lower>%d</lower><upper_included>true</upper_included><upper_unbounded>false</upper_unbounded>"+
-				"<upper>%d</upper>", lower, upper)
-		}
 		return optNode("DV_QUANTITY", "", optSingle("precision",
-			optPrimitive("INTEGER", "C_INTEGER", "<range>"+interval+"</range>")))
+			optPrimitive("INTEGER", "C_INTEGER", "<range>"+optInterval(lower, upper)+"</range>")))
 	}
 	generate := func(t *testing.T, c *templatecompile.Compiled, policy instance.Policy, fill instance.ValueFill, seed uint64) (any, error) {
 		t.Helper()
@@ -281,7 +267,6 @@ func TestREQ107_IntegerLeafIsNarrowedToTheIntegerRange(t *testing.T) {
 		value        string
 		lower, upper int64 // the values the OPT and the Integer range share
 	}{
-		{"range past the upper end", precision(0, past), 0, maxInteger},
 		{"range with no upper bound near the upper end", precision(maxInteger-20, -1), maxInteger - 20, maxInteger},
 	}
 	for _, tc := range admitted {
@@ -311,35 +296,29 @@ func TestREQ107_IntegerLeafIsNarrowedToTheIntegerRange(t *testing.T) {
 			}
 		}
 	}
+}
 
-	refused := []struct {
-		name  string
-		value string
-	}{
-		{"range above the Integer range", precision(above, past)},
-		{"range below the Integer range", precision(-past, -above)},
+// TestREQ107_REQ056_IntegerLeafRangePastTheIntegerRangeIsRefusedAtRead is the
+// REQ-107 and REQ-056 check that a C_INTEGER on an Integer attribute (a
+// DV_QUANTITY's precision) whose range reaches past the 32-bit range of an
+// RM Integer, whether it ends past it, lies wholly above it or lies wholly
+// below it, never reaches the generator: reading the template is refused
+// with an error wrapping canxml.ErrInvalidShape.
+func TestREQ107_REQ056_IntegerLeafRangePastTheIntegerRangeIsRefusedAtRead(t *testing.T) {
+	precision := func(lower, upper string) string {
+		return optNode("DV_QUANTITY", "", optSingle("precision",
+			optPrimitive("INTEGER", "C_INTEGER", intRangeBody(lower, upper, true))))
 	}
-	for _, tc := range refused {
-		for _, implicit := range []bool{true, false} {
-			c := compileOPTText(t, optTemplate("ELEMENT", optSingle("value", tc.value)), implicit)
-			for _, policy := range everyPolicy {
-				for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
-					t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, policy, fill), func(t *testing.T) {
-						out, err := generate(t, c, policy, fill, 1)
-						if err == nil {
-							t.Fatalf("Generate = %T, nil error, want an error: no value of the range is an Integer", out)
-						}
-						if !errors.Is(err, instance.ErrConstraintUnsatisfiable) {
-							t.Errorf("Generate error = %v, want one wrapping ErrConstraintUnsatisfiable", err)
-						}
-						for _, want := range []string{"DV_QUANTITY.precision", "32-bit Integer range"} {
-							if !strings.Contains(err.Error(), want) {
-								t.Errorf("Generate error = %q, want it to say %q", err, want)
-							}
-						}
-					})
-				}
-			}
-		}
+	for _, tc := range []struct {
+		name  string
+		value string // the ELEMENT's value node
+	}{
+		{"range past the upper end", precision("0", "5000000000")},
+		{"range above the Integer range", precision("3000000000", "5000000000")},
+		{"range below the Integer range", precision("-5000000000", "-3000000000")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			requireReadRefused(t, optTemplate("ELEMENT", optSingle("value", tc.value)))
+		})
 	}
 }
