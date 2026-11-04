@@ -409,6 +409,54 @@ func TestREQ108_XMLRefusesPastEncodingXMLsDepthLimit(t *testing.T) {
 	}
 }
 
+// primitivePastXMLDepth returns an ITEM_TREE whose only element past
+// encoding/xml's own depth limit is the text of a DV_TEXT, a primitive: a
+// first ELEMENT item, then CLUSTER items at depths 2 to xmlDepth-2, the
+// innermost holding an ELEMENT whose DV_TEXT is at xmlDepth and its text one
+// deeper.
+func primitivePastXMLDepth() []byte {
+	const clusters = xmlDepth - 3
+	var b strings.Builder
+	b.WriteString(`<item_tree ` + ucNS + ` archetype_node_id="at0">`)
+	b.WriteString(`<items xsi:type="ELEMENT" archetype_node_id="at1"><value xsi:type="DV_TEXT"><value>first</value></value></items>`)
+	for range clusters {
+		b.WriteString(`<items xsi:type="CLUSTER" archetype_node_id="at2">`)
+	}
+	b.WriteString(`<items xsi:type="ELEMENT" archetype_node_id="at3"><value xsi:type="DV_TEXT"><value>deep</value></value></items>`)
+	for range clusters {
+		b.WriteString(`</items>`)
+	}
+	b.WriteString(`</item_tree>`)
+	return []byte(b.String())
+}
+
+// TestREQ108_XMLUnmarshalDecodesAgainIntoAClearedValue pins Unmarshal given
+// no option on a document whose only element past encoding/xml's own depth
+// limit is a primitive, which encoding/xml refuses and a tracked decode reads
+// itself: Unmarshal decodes the document a second time, tracked, into the
+// value cleared first, and returns what a tracked decode returns, the tree's
+// first item once, not once for each decode.
+//
+// Can-fail control: decode the document again into the value the first decode
+// filled in part, without clearing it, and the tree holds its first item
+// twice.
+func TestREQ108_XMLUnmarshalDecodesAgainIntoAClearedValue(t *testing.T) {
+	in := primitivePastXMLDepth()
+	var plain, tracked rm.ItemTree
+	if err := canxml.Unmarshal(in, &plain); err != nil {
+		t.Fatalf("Unmarshal: err = %.300v; want nil, the tracked decode reading the text itself", err)
+	}
+	if err := canxml.Unmarshal(in, &tracked, canxml.WithMissing(func(string) {})); err != nil {
+		t.Fatalf("Unmarshal WithMissing: err = %.300v; want nil", err)
+	}
+	if len(plain.Items) != 2 {
+		t.Errorf("Unmarshal: the tree holds %d items; want 2, the first item once and the CLUSTER", len(plain.Items))
+	}
+	if !reflect.DeepEqual(plain, tracked) {
+		t.Errorf("Unmarshal decodes a value other than Unmarshal WithMissing: %d items, want %d", len(plain.Items), len(tracked.Items))
+	}
+}
+
 // TestREQ108_XMLDecoderRefusalPastEncodingXMLsLimitStays pins a stream Decoder
 // after it refuses an element nested past encoding/xml's own limit: its
 // stream stands inside that element, so every later Decode returns the same
