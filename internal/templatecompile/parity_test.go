@@ -40,6 +40,12 @@ const readerFixtureDir = "../../openehr/aom/aom14/testdata/reader"
 // new path refuses for a reason the rule allows, one for each reason.
 const parityExceptionDir = "testdata/parity-exceptions"
 
+// parityIntegerBoundDir holds the parity fixtures whose integer bounds the
+// reader reads otherwise than the parser, admitting the same integers. They
+// sit apart from TestREQ111_ParityFixtures' list, which pins each fixture's
+// strict-mode refusals, so they are checked here in the default mode only.
+const parityIntegerBoundDir = "testdata/parity/integer-bounds"
+
 // parityKind is what the parity check makes of one operational template.
 type parityKind int
 
@@ -226,7 +232,7 @@ func (r *parityResult) compare(parsed template.Node, model aom14.CObject, compil
 	if on, ok := parsed.(interface {
 		PrimitiveConstraint() constraints.PrimitiveConstraint
 	}); ok {
-		want = unboundedWhereInfinite(on.PrimitiveConstraint())
+		want = on.PrimitiveConstraint()
 	}
 	if ref, ok := model.(*aom14.CCodeReference); ok {
 		// The parser reads no constraint on a C_CODE_REFERENCE; the
@@ -242,8 +248,8 @@ func (r *parityResult) compare(parsed template.Node, model aom14.CObject, compil
 		}
 	}
 	got := compiled.primitive
-	if g, w := renderPrimitive(got), renderPrimitive(want); g != w {
-		r.mismatches = append(r.mismatches, fmt.Sprintf("%s: compiled %s; the parser reads %s", where, g, w))
+	if m, differs := primitiveMismatch(got, want); differs {
+		r.mismatches = append(r.mismatches, where+": "+m)
 	}
 	if got != nil {
 		r.seen[fmt.Sprintf("%T", got)]++
@@ -274,34 +280,69 @@ func (r *parityResult) compare(parsed template.Node, model aom14.CObject, compil
 	return nil
 }
 
-// unboundedWhereInfinite returns pc, the primitive constraint the parser
-// reads, with each side of an integer range, of a C_INTEGER or of a quantity's
-// precision, whose bound is the infinity that admits every integer there,
-// negative on the lower side or positive on the upper one, read as unbounded,
-// as the reader reads it. The two admit the same integers; only the parser's
-// writes a bound no JSON number holds.
-func unboundedWhereInfinite(pc constraints.PrimitiveConstraint) constraints.PrimitiveConstraint {
-	unbound := func(r constraints.NumericRange) constraints.NumericRange {
-		if !r.LowerUnbounded && math.IsInf(r.Lower, -1) {
-			r.LowerUnbounded, r.Lower = true, 0
-		}
-		if !r.UpperUnbounded && math.IsInf(r.Upper, 1) {
-			r.UpperUnbounded, r.Upper = true, 0
-		}
+// primitiveMismatch reports whether compiled, the compile step's primitive
+// constraint on a node, admits other values than want, the parser's there,
+// and says how. It compares the two as written once want's integer ranges are
+// in the integer form the reader reads them in (integerForm), which admits the
+// same integers.
+func primitiveMismatch(compiled, want constraints.PrimitiveConstraint) (string, bool) {
+	g, w := renderPrimitive(compiled), renderPrimitive(integerForm(want))
+	return fmt.Sprintf("compiled %s; the parser reads %s", g, w), g != w
+}
+
+// integerForm returns pc, the primitive constraint the parser reads, with each
+// integer range, of a C_INTEGER or of a quantity's precision, in the integer
+// form the reader reads it in (integerSide). The parser reads such a bound as
+// a float, so its range can write a bound no integer or no JSON number holds;
+// the two forms admit the same integers.
+func integerForm(pc constraints.PrimitiveConstraint) constraints.PrimitiveConstraint {
+	integer := func(r constraints.NumericRange) constraints.NumericRange {
+		r.LowerUnbounded, r.Lower, r.LowerInclusive = integerSide(r.LowerUnbounded, r.Lower, r.LowerInclusive, true)
+		r.UpperUnbounded, r.Upper, r.UpperInclusive = integerSide(r.UpperUnbounded, r.Upper, r.UpperInclusive, false)
 		return r
 	}
 	switch c := pc.(type) {
 	case constraints.CInteger:
-		c.Range = unbound(c.Range)
+		c.Range = integer(c.Range)
 		return c
 	case constraints.DvQuantity:
 		c.Units = slices.Clone(c.Units)
 		for i := range c.Units {
-			c.Units[i].Precision = unbound(c.Units[i].Precision)
+			c.Units[i].Precision = integer(c.Units[i].Precision)
 		}
 		return c
 	}
 	return pc
+}
+
+// integerSide returns one side of an integer range the parser reads, the
+// lower one where lower, in the integer form that admits the same integers:
+// a bound that is no whole number rounded up on the lower side and down on the
+// upper one, its side included; a NaN bound, which the parser compares no
+// integer with, or the infinity that admits every integer on its side,
+// negative on the lower one or positive on the upper one, as an unbounded
+// side, which keeps its included flag and no bound. An unbounded side, and an
+// infinity that admits no integer, which the reader refuses, stay as they
+// are.
+func integerSide(unbounded bool, bound float64, included, lower bool) (bool, float64, bool) {
+	switch {
+	case unbounded:
+		return unbounded, bound, included
+	case math.IsNaN(bound), math.IsInf(bound, -1) && lower, math.IsInf(bound, 1) && !lower:
+		return true, 0, included
+	case math.IsInf(bound, 0):
+		return unbounded, bound, included
+	}
+	n := math.Floor(bound)
+	if lower {
+		n = math.Ceil(bound)
+	}
+	if n == 0 {
+		// math.Ceil(-0.5) is the float negative zero, which renders as -0;
+		// the reader's bound is the integer zero.
+		n = 0
+	}
+	return false, n, included || n != bound
 }
 
 // TestREQ111_ParityWithDeprecatedParser holds the model's reader and the
@@ -336,7 +377,7 @@ func TestREQ111_ParityWithDeprecatedParser(t *testing.T) {
 		exceptions bool
 	}{
 		{name: "corpus", files: corpus, parserReadsAll: true},
-		{name: "parity", files: glob(parityFixtureDir), parserReadsAll: true},
+		{name: "parity", files: append(glob(parityFixtureDir), glob(parityIntegerBoundDir)...), parserReadsAll: true},
 		{name: "reader", files: glob(readerFixtureDir)},
 		{name: "exception", files: glob(parityExceptionDir), parserReadsAll: true, exceptions: true},
 	}
@@ -477,6 +518,67 @@ func TestREQ111_ParityRefusalsByError(t *testing.T) {
 	for _, tc := range compileCases {
 		if got := compileRefusal(tc.err); got != tc.want {
 			t.Errorf("compileRefusal(%s: %v) = %q; want %q", tc.name, tc.err, got, tc.want)
+		}
+	}
+}
+
+// TestREQ111_ParityComparesAdmittedIntegers pins how the parity check compares
+// a node's primitive constraint with the parser's: an integer range, of a
+// C_INTEGER or of a quantity's precision, by the integers it admits, so that
+// the parser's bound that is no whole number, its NaN bound and its infinite
+// bound that admits every integer match the compile step's integer form, and
+// every other constraint as written. A range that admits other integers, or a
+// whole bound whose side is excluded on one side only, still differs.
+func TestREQ111_ParityComparesAdmittedIntegers(t *testing.T) {
+	nan, inf := math.NaN(), math.Inf(1)
+	closed := func(lower, upper float64) constraints.NumericRange {
+		return constraints.NumericRange{Lower: lower, Upper: upper, LowerInclusive: true, UpperInclusive: true}
+	}
+	open := func(lower, upper float64) constraints.NumericRange {
+		return constraints.NumericRange{Lower: lower, Upper: upper}
+	}
+	upTo := func(upper float64) constraints.NumericRange {
+		return constraints.NumericRange{LowerUnbounded: true, LowerInclusive: true, Upper: upper, UpperInclusive: true}
+	}
+	from := func(lower float64) constraints.NumericRange {
+		return constraints.NumericRange{Lower: lower, LowerInclusive: true, UpperUnbounded: true, UpperInclusive: true}
+	}
+	integer := func(r constraints.NumericRange) constraints.PrimitiveConstraint {
+		return constraints.CInteger{Range: r}
+	}
+	precision := func(r constraints.NumericRange) constraints.PrimitiveConstraint {
+		return constraints.DvQuantity{Units: []constraints.QuantityUnit{{Units: "kg", Magnitude: closed(0, 100), Precision: r}}}
+	}
+	magnitude := func(r constraints.NumericRange) constraints.PrimitiveConstraint {
+		return constraints.DvQuantity{Units: []constraints.QuantityUnit{{Units: "kg", Magnitude: r, Precision: closed(0, 2)}}}
+	}
+	cases := []struct {
+		name     string
+		parsed   constraints.PrimitiveConstraint
+		compiled constraints.PrimitiveConstraint
+		differs  bool
+	}{
+		{name: "C_INTEGER 0.5..9.5 and 1..9", parsed: integer(closed(0.5, 9.5)), compiled: integer(closed(1, 9))},
+		{name: "C_INTEGER 0.5..9.5 and 1..10", parsed: integer(closed(0.5, 9.5)), compiled: integer(closed(1, 10)), differs: true},
+		{name: "C_INTEGER 0.5..9.5 and 0..9", parsed: integer(closed(0.5, 9.5)), compiled: integer(closed(0, 9)), differs: true},
+		{name: "C_INTEGER >-0.5..<3.5 and 0..3", parsed: integer(open(-0.5, 3.5)), compiled: integer(closed(0, 3))},
+		{name: "C_INTEGER >-0.5..<3.5 and >0..<3", parsed: integer(open(-0.5, 3.5)), compiled: integer(open(0, 3)), differs: true},
+		{name: "C_INTEGER >0..<3 and >0..<3", parsed: integer(open(0, 3)), compiled: integer(open(0, 3))},
+		{name: "C_INTEGER >0..<3 and 0..3", parsed: integer(open(0, 3)), compiled: integer(closed(0, 3)), differs: true},
+		{name: "C_INTEGER NaN..10 and ..10", parsed: integer(closed(nan, 10)), compiled: integer(upTo(10))},
+		{name: "C_INTEGER NaN..10 and 0..10", parsed: integer(closed(nan, 10)), compiled: integer(closed(0, 10)), differs: true},
+		{name: "C_INTEGER 1..NaN and 1..", parsed: integer(closed(1, nan)), compiled: integer(from(1))},
+		{name: "C_INTEGER -Inf..+Inf and unbounded", parsed: integer(closed(-inf, inf)), compiled: integer(constraints.NumericRange{LowerUnbounded: true, UpperUnbounded: true, LowerInclusive: true, UpperInclusive: true})},
+		{name: "C_INTEGER -Inf..10 and 0..10", parsed: integer(closed(-inf, 10)), compiled: integer(closed(0, 10)), differs: true},
+		{name: "precision 0.5..2.5 and 1..2", parsed: precision(closed(0.5, 2.5)), compiled: precision(closed(1, 2))},
+		{name: "precision 0.5..2.5 and 1..3", parsed: precision(closed(0.5, 2.5)), compiled: precision(closed(1, 3)), differs: true},
+		{name: "precision NaN..2 and ..2", parsed: precision(closed(nan, 2)), compiled: precision(upTo(2))},
+		{name: "magnitude, a real, 0.5..9.5 and 1..9", parsed: magnitude(closed(0.5, 9.5)), compiled: magnitude(closed(1, 9)), differs: true},
+		{name: "C_REAL 0.5..9.5 and 1..9", parsed: constraints.CReal{Range: closed(0.5, 9.5)}, compiled: constraints.CReal{Range: closed(1, 9)}, differs: true},
+	}
+	for _, tc := range cases {
+		if got, differs := primitiveMismatch(tc.compiled, tc.parsed); differs != tc.differs {
+			t.Errorf("primitiveMismatch(%s) = %q, %t; want differs %t", tc.name, got, differs, tc.differs)
 		}
 	}
 }
