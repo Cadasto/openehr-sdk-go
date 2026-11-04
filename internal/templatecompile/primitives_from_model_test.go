@@ -6,12 +6,16 @@ package templatecompile
 // equal to the parser's over every corpus node.
 
 import (
+	"encoding/json/jsontext"
 	json "encoding/json/v2"
+	"errors"
 	"fmt"
 	"io/fs"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -149,17 +153,28 @@ func modelChildren(a aom14.CAttribute) (string, []aom14.CObject) {
 
 // renderPrimitive renders a primitive constraint as its Go type and its
 // exported fields, which is all two equal constraints share: a CString's
-// compiled pattern is derived from its Pattern.
+// compiled pattern is derived from its Pattern. JSON has no infinity or NaN,
+// so a float that is not finite is written as its Go text in a string; without
+// that, every constraint holding one would fail to marshal and render alike.
 func renderPrimitive(pc constraints.PrimitiveConstraint) string {
 	if pc == nil {
 		return "nil"
 	}
-	b, err := json.Marshal(pc, json.Deterministic(true))
+	b, err := json.Marshal(pc, json.Deterministic(true), json.WithMarshalers(nonFiniteFloats))
 	if err != nil {
 		return fmt.Sprintf("%T<%v>", pc, err)
 	}
 	return fmt.Sprintf("%T%s", pc, b)
 }
+
+// nonFiniteFloats writes a float64 that is not finite as a JSON string of its
+// Go text ("+Inf", "-Inf", "NaN") and leaves every other float to the default.
+var nonFiniteFloats = json.MarshalToFunc(func(enc *jsontext.Encoder, f float64) error {
+	if !math.IsInf(f, 0) && !math.IsNaN(f) {
+		return errors.ErrUnsupported
+	}
+	return enc.WriteToken(jsontext.String(strconv.FormatFloat(f, 'g', -1, 64)))
+})
 
 // TestREQ103_PrimitiveFromModelReadings pins the readings the compile step
 // gives the model's primitive classes beyond what the corpus shows, in both
@@ -520,4 +535,19 @@ func describeModel(o aom14.CObject) string {
 		return fmt.Sprintf("C_PRIMITIVE_OBJECT of %T", p.Item)
 	}
 	return fmt.Sprintf("%T", o)
+}
+
+// TestRenderPrimitiveTellsInfiniteBoundsApart pins that two constraints that
+// hold an infinity and differ elsewhere render differently, so the parity
+// checks that compare rendered constraints see such a difference.
+func TestRenderPrimitiveTellsInfiniteBoundsApart(t *testing.T) {
+	a := constraints.CReal{Range: constraints.NumericRange{Lower: math.Inf(-1), Upper: 5, UpperInclusive: true}}
+	b := constraints.CReal{Range: constraints.NumericRange{Lower: math.Inf(-1), Upper: 9, UpperInclusive: true}}
+	ra, rb := renderPrimitive(a), renderPrimitive(b)
+	if ra == rb {
+		t.Fatalf("renderPrimitive gives %q for both upper bounds 5 and 9, want them apart", ra)
+	}
+	if !strings.Contains(ra, `"-Inf"`) {
+		t.Errorf("renderPrimitive(%+v) = %q, want the lower bound written \"-Inf\"", a, ra)
+	}
 }
