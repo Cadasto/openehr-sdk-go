@@ -51,11 +51,11 @@ const maxDepth = 128
 // Returns an error wrapping ErrInvalidInput when opt is nil, when it has no
 // template_id or no definition, when it holds an interval that closing
 // refuses ([template.NewMultiplicity]), a primitive constraint whose value
-// the constraint cannot carry, a missing constraint object or attribute, or
-// constraint objects nested more than 128 levels below the definition, when
-// two nodes under different attributes have the same AQL path, which is a
-// defect in the template, and when a default value addresses no node
-// ([placeDefaultValues]). Nodes under one attribute that share a path
+// the constraint cannot carry, a missing constraint object, attribute or
+// primitive item, or constraint objects nested more than 128 levels below the
+// definition, when two nodes under different attributes have the same AQL
+// path, which is a defect in the template, and when a default value addresses
+// no node ([placeDefaultValues]). Nodes under one attribute that share a path
 // (alternatives, or siblings with the same node id) and the descendants of
 // such nodes are admitted, and [Compiled.NodeAt] resolves the path to the
 // first one walked. Returns an error that does not wrap ErrInvalidInput when

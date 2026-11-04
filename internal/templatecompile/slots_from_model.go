@@ -160,27 +160,28 @@ func asciiLower(s string) string {
 // is the match the slot rules read, `archetype_id/value matches {pattern}`:
 // a binary matches operator whose left operand is the String attribute
 // archetype_id/value and whose right operand is a constraint whose item is a
-// C_STRING; or "" for any other tree. The right operand's type text is not
-// read: some templates write it as String, others as C_STRING, and the item's
-// own class says what it is.
+// C_STRING; or "" for any other tree, one that holds a nil pointer for one
+// of those parts among them. The right operand's type text is not read: some
+// templates write it as String, others as C_STRING, and the item's own class
+// says what it is.
 func expressionSlotPattern(e aom14.ExprItem) string {
 	op, ok := e.(*aom14.ExprBinaryOperator)
-	if !ok || op.Operator != aom14.OperatorKindMatches {
+	if !ok || op == nil || op.Operator != aom14.OperatorKindMatches {
 		return ""
 	}
 	left, ok := op.LeftOperand.(*aom14.ExprLeaf)
-	if !ok ||
+	if !ok || left == nil ||
 		!strings.EqualFold(strings.TrimSpace(left.Type), "String") ||
 		!strings.EqualFold(strings.TrimSpace(left.ReferenceType), "attribute") ||
 		leafText(left.Item) != "archetype_id/value" {
 		return ""
 	}
 	right, ok := op.RightOperand.(*aom14.ExprLeaf)
-	if !ok || !strings.EqualFold(strings.TrimSpace(right.ReferenceType), "constraint") {
+	if !ok || right == nil || !strings.EqualFold(strings.TrimSpace(right.ReferenceType), "constraint") {
 		return ""
 	}
 	cs, ok := right.Item.(*aom14.CString)
-	if !ok || cs.Pattern == nil {
+	if !ok || cs == nil || cs.Pattern == nil {
 		return ""
 	}
 	return strings.TrimSpace(*cs.Pattern)

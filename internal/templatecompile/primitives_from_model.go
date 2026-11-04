@@ -27,7 +27,8 @@ import (
 // bound that is not ISO 8601 text of its type, a timezone_validity that names
 // no VALIDITY_KIND or is mandatory on a C_DATE, a CONSTRAINT_REF with no
 // reference, an ordinal symbol that is neither a DV_CODED_TEXT nor a
-// CODE_PHRASE, and an item that is no primitive class held by pointer. The
+// CODE_PHRASE, an item that is no primitive class held by pointer, and one
+// that is a nil pointer to one, which a model built in code can hold. The
 // caller wraps it in ErrInvalidInput with the node's place.
 func primitiveFromModel(o aom14.CObject) (constraints.PrimitiveConstraint, error) {
 	switch n := o.(type) {
@@ -67,6 +68,9 @@ func primitiveFromModel(o aom14.CObject) (constraints.PrimitiveConstraint, error
 // primitiveItemFromModel returns the constraint the item of a
 // C_PRIMITIVE_OBJECT states.
 func primitiveItemFromModel(item aom14.CPrimitive) (constraints.PrimitiveConstraint, error) {
+	if isNilPrimitive(item) {
+		return nil, fmt.Errorf("item of C_PRIMITIVE_OBJECT missing (%T)", item)
+	}
 	switch p := item.(type) {
 	case *aom14.CBoolean:
 		c := constraints.CBoolean{TrueValid: p.TrueValid, FalseValid: p.FalseValid}
@@ -130,6 +134,30 @@ func primitiveItemFromModel(item aom14.CPrimitive) (constraints.PrimitiveConstra
 		return constraints.CDuration{Pattern: trimmedOrEmpty(p.Pattern), Range: r}, nil
 	}
 	return nil, fmt.Errorf("item %T of C_PRIMITIVE_OBJECT is not a primitive class held by pointer", item)
+}
+
+// isNilPrimitive reports whether item is a nil pointer to one of the
+// primitive classes [primitiveItemFromModel] reads.
+func isNilPrimitive(item aom14.CPrimitive) bool {
+	switch p := item.(type) {
+	case *aom14.CBoolean:
+		return p == nil
+	case *aom14.CInteger:
+		return p == nil
+	case *aom14.CReal:
+		return p == nil
+	case *aom14.CString:
+		return p == nil
+	case *aom14.CDate:
+		return p == nil
+	case *aom14.CTime:
+		return p == nil
+	case *aom14.CDateTime:
+		return p == nil
+	case *aom14.CDuration:
+		return p == nil
+	}
+	return false
 }
 
 // numericRangeFromModel returns the range of a C_INTEGER, a C_REAL or a
