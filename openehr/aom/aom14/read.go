@@ -9,6 +9,7 @@ import (
 	"io"
 	"slices"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
 
@@ -41,32 +42,40 @@ const readMaxDepth = 2*128 + 64
 // [canxml.WithMaxDepth] among them applies as well as the element limit, and
 // the smaller limit wins: it can lower the limit and never raise it.
 //
-// The input is one document. It may start with a UTF-8 byte-order mark and
-// the XML declaration, and its root element may have any name, so a document
-// whose root is `<OPERATIONAL_TEMPLATE>` reads as one whose root is
-// `<template>`. After the root it may hold comments, processing instructions
-// and whitespace; anything else there is refused with an error that wraps
-// [canxml.ErrInvalidShape] and carries none of it. An input with no root
-// element, empty or holding only a declaration, a comment or whitespace, is
-// refused with an error that wraps [io.ErrUnexpectedEOF], not [io.EOF], and
-// carries none of the input. Any other decode error comes back as the decode
-// returns it.
+// The input is one document, held to the rules [canxml.Unmarshal] holds a
+// document to. Before the root it may hold the XML declaration, comments,
+// processing instructions, whitespace and one document type declaration,
+// after a UTF-8 byte-order mark at the very start; after the root it may hold
+// comments, processing instructions and whitespace. Anything else before or
+// after the root, such as text or an element, is refused with an error that
+// wraps [canxml.ErrInvalidShape] and carries none of it. The root element may
+// have any name, so a document whose root is `<OPERATIONAL_TEMPLATE>` reads as
+// one whose root is `<template>`. An input with no root element, empty or
+// holding only a declaration, comments, whitespace or text, is refused with
+// an error that wraps [io.ErrUnexpectedEOF], not [io.EOF], and carries none
+// of the input. Any other decode error comes back as the decode returns it.
 //
 // A caller that decodes an operational template with [canxml.Unmarshal] or a
 // [canxml.Decoder] itself gets neither limit unless it applies them.
 func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*OperationalTemplate, error) {
 	// lr.N reaches 0 only once r has given a byte past the limit.
 	lr := &io.LimitedReader{R: r, N: readMaxBytes + 1}
-	// The decoder takes no byte past the root element from an io.ByteReader,
-	// so what follows the root is left for afterRoot to read.
 	br := bufio.NewReader(lr)
-	// WithMaxDepth keeps the smallest limit it is given, so the caller's own
-	// limit applies as well, in whatever order the options come.
-	opts = slices.Concat(opts, []canxml.DecoderOption{canxml.WithMaxDepth(readMaxDepth)})
+	// The stream decoder skips what comes before the root, so the prolog is
+	// checked first; the decode then reads the bytes the check read again.
 	ot := new(OperationalTemplate)
-	err := canxml.NewDecoder(br, opts...).Decode(ot)
+	head, err := xmlunmatched.ReadProlog(br)
 	if err == nil {
-		err = afterRoot(br)
+		// The decoder takes no byte past the root element from an
+		// io.ByteReader, so what follows the root is left for afterRoot.
+		src := bufio.NewReader(io.MultiReader(bytes.NewReader(head), br))
+		// WithMaxDepth keeps the smallest limit it is given, so the caller's
+		// own limit applies as well, in whatever order the options come.
+		opts = slices.Concat(opts, []canxml.DecoderOption{canxml.WithMaxDepth(readMaxDepth)})
+		err = canxml.NewDecoder(src, opts...).Decode(ot)
+		if err == nil {
+			err = afterRoot(src)
+		}
 	}
 	// An input past the size limit is refused as such, whatever the decode
 	// made of the bytes it read: the limit may have cut it short.

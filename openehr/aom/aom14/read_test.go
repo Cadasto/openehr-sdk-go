@@ -227,6 +227,63 @@ func TestREQ176_ReadOperationalTemplateRefusesContentAfterTheRoot(t *testing.T) 
 	}
 }
 
+// TestREQ176_ReadOperationalTemplateRefusesContentBeforeTheRoot pins that the
+// reader holds what comes before the root element to the rules
+// canxml.Unmarshal holds it to: the XML declaration, comments, processing
+// instructions, whitespace and one document type declaration pass, and
+// anything else is refused with an error wrapping canxml.ErrInvalidShape that
+// carries none of it, markup encoding/xml cannot read after it among it. An
+// input with only such content and no root is the no-root case
+// (TestREQ108_ReadOperationalTemplateRefusesAnInputWithNoRootElement).
+func TestREQ176_ReadOperationalTemplateRefusesContentBeforeTheRoot(t *testing.T) {
+	t.Parallel()
+	const planted = "PLANTED"
+	refused := map[string]string{
+		"text":                     planted,
+		"text after a declaration": `<?xml version="1.0"?>` + planted,
+		"a CDATA section":          `<![CDATA[` + planted + `]]>`,
+		"a stray end element":      `</` + planted + `>`,
+		"a second document type":   `<!DOCTYPE template><!DOCTYPE ` + planted + `>`,
+		"another declaration":      `<!ENTITY ` + planted + ` "x">`,
+		"text, then bad markup":    planted + `<1>`,
+	}
+	accepted := map[string]string{
+		"nothing":                  "",
+		"whitespace":               " \n\t\r\n",
+		"the XML declaration":      `<?xml version="1.0" encoding="UTF-8"?>` + "\n",
+		"a comment":                `<!-- note -->`,
+		"a processing instruction": `<?pi data?>`,
+		"one document type":        `<!DOCTYPE template>`,
+		"all of them":              `<?xml version="1.0"?><!-- note --><!DOCTYPE template><?pi data?>` + "\n",
+	}
+	for name, head := range refused {
+		t.Run("refused/"+name, func(t *testing.T) {
+			t.Parallel()
+			_, err := aom14.ReadOperationalTemplate(strings.NewReader(head + readTemplate))
+			if !errors.Is(err, canxml.ErrInvalidShape) {
+				t.Fatalf("ReadOperationalTemplate(%s + root) = %v, want an error wrapping canxml.ErrInvalidShape", name, err)
+			}
+			if strings.Contains(err.Error(), planted) {
+				t.Errorf("error %q carries the content before the root", err)
+			}
+		})
+	}
+	for name, head := range accepted {
+		t.Run("accepted/"+name, func(t *testing.T) {
+			t.Parallel()
+			for _, bom := range []string{"", "\ufeff"} {
+				ot, err := aom14.ReadOperationalTemplate(strings.NewReader(bom + head + readTemplate))
+				if err != nil {
+					t.Fatalf("ReadOperationalTemplate(%q + %s + root): %v", bom, name, err)
+				}
+				if ot.TemplateID.Value != "t" {
+					t.Errorf("ReadOperationalTemplate(%q + %s + root): TemplateID.Value = %q, want %q", bom, name, ot.TemplateID.Value, "t")
+				}
+			}
+		})
+	}
+}
+
 // TestREQ108_ReadOperationalTemplateRefusesAnInputPastTheSizeLimit pins the
 // size limit at 32 MiB: an input of that size reads and a larger one is
 // refused with a plain error wrapping canxml.ErrLimitExceeded, whether the

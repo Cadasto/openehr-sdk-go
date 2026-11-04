@@ -1,6 +1,7 @@
 package xmlunmatched
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/xml"
 	"errors"
@@ -138,30 +139,115 @@ func checkProlog(data []byte) error {
 	if rootFirst(data) {
 		return nil
 	}
-	d := xml.NewDecoder(bytes.NewReader(data))
-	doctype := false
+	return prolog(xml.NewDecoder(bytes.NewReader(data)), false)
+}
+
+// ReadProlog reads r up to the end of the start tag of its first element,
+// the root, holding what comes before the root to the rules of [Unmarshal]
+// (see checkProlog), and returns every byte it read, so that a decode reads
+// the document from them and then from the rest of r. It reads on past the
+// first token it refuses, to the root or to the end of r: it refuses that
+// token, with an error that wraps [ErrInvalidShape] and names none of the
+// content, only when a root follows it, and returns [io.EOF] when r ends
+// first, since input with no root element holds no document at all. A token
+// encoding/xml cannot read, and input that holds no element and nothing
+// refused, are left to the decode, which fails on them as it would without
+// this check.
+//
+// It takes a [bufio.Reader] so that it reads no byte past the root's start
+// tag and can look for a byte order mark at the very start.
+func ReadProlog(r *bufio.Reader) ([]byte, error) {
+	rec := &recorder{r: r}
+	if head, _ := r.Peek(len(utf8BOM)); bytes.Equal(head, utf8BOM) {
+		rec.read = append(rec.read, utf8BOM...)
+		_, _ = r.Discard(len(utf8BOM)) // the bytes Peek returned: Discard cannot fail
+	}
+	err := prolog(xml.NewDecoder(rec), true)
+	return rec.read, err
+}
+
+// recorder reads one byte at a time from r and keeps each byte it reads.
+// encoding/xml reads an io.ByteReader one byte at a time, with no buffering
+// of its own, so the bytes it has not used stay in r.
+type recorder struct {
+	r    io.ByteReader
+	read []byte
+}
+
+// ReadByte reads one byte from r and keeps it.
+func (c *recorder) ReadByte() (byte, error) {
+	b, err := c.r.ReadByte()
+	if err == nil {
+		c.read = append(c.read, b)
+	}
+	return b, err
+}
+
+// Read reads one byte into p; encoding/xml calls ReadByte instead.
+func (c *recorder) Read(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
+	b, err := c.ReadByte()
+	if err != nil {
+		return 0, err
+	}
+	p[0] = b
+	return 1, nil
+}
+
+// prolog reads d's tokens up to its first element, the root, by the rules
+// checkProlog describes. Given untilRoot, it reads on past the first token
+// it refuses, as ReadProlog describes; a token encoding/xml cannot read after
+// one it refused is refused as well.
+func prolog(d *xml.Decoder, untilRoot bool) error {
+	doctype, refused := false, false
 	for {
 		tok, err := d.RawToken()
 		if err != nil {
+			if !refused {
+				return nil
+			}
+			if errors.Is(err, io.EOF) {
+				return io.EOF
+			}
+			if _, ok := errors.AsType[*xml.SyntaxError](err); ok {
+				return errBeforeRoot()
+			}
+			return err
+		}
+		if _, ok := tok.(xml.StartElement); ok {
+			if refused {
+				return errBeforeRoot()
+			}
 			return nil
 		}
-		switch t := tok.(type) {
-		case xml.StartElement:
-			return nil
-		case xml.ProcInst, xml.Comment:
+		if refused || beforeRoot(tok, &doctype) {
 			continue
-		case xml.CharData:
-			if isXMLSpace(t) {
-				continue
-			}
-		case xml.Directive:
-			if !doctype && isDoctype(t) {
-				doctype = true
-				continue
-			}
 		}
-		return errBeforeRoot()
+		if !untilRoot {
+			return errBeforeRoot()
+		}
+		refused = true
 	}
+}
+
+// beforeRoot reports whether tok may come before the root element: a
+// processing instruction, a comment, whitespace, or the first document type
+// declaration, which it records in doctype.
+func beforeRoot(tok xml.Token, doctype *bool) bool {
+	switch t := tok.(type) {
+	case xml.ProcInst, xml.Comment:
+		return true
+	case xml.CharData:
+		return isXMLSpace(t)
+	case xml.Directive:
+		if !*doctype && isDoctype(t) {
+			*doctype = true
+			return true
+		}
+	}
+	return false
 }
 
 // rootFirst reports whether data opens with a start element after XML
