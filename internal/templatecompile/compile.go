@@ -31,8 +31,9 @@ type Options struct {
 	// Strict refuses, with an error wrapping ErrInvalidInput, each value
 	// Compile otherwise reads in the weaker form the deprecated parser's
 	// default mode reads it, which its strict mode refuses, and a default
-	// value of the template's <constraints> that addresses no node, which
-	// Compile otherwise skips (see [Compile]).
+	// value of the template's <constraints> that addresses no node or that
+	// Compile cannot hold as canonical JSON, such as a NaN magnitude, each of
+	// which Compile otherwise skips (see [Compile]).
 	Strict bool
 }
 

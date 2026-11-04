@@ -221,8 +221,10 @@ func (n *CompiledNode) PrimitiveConstraint() constraints.PrimitiveConstraint {
 // default_value of a T_COMPLEX_OBJECT, and it is placed on the first child,
 // of that object's RM type, or of the value's own where the object names
 // none, of the attribute that its T_ATTRIBUTE names on the node that the
-// T_ATTRIBUTE's differential_path addresses ([Compile]). Each call returns a
-// new value, which the caller may change.
+// T_ATTRIBUTE's differential_path addresses ([Compile]). A child's generic
+// parameters are set aside when its RM type is matched, so DV_INTERVAL
+// matches a child of RM type DV_INTERVAL<DV_COUNT>. Each call returns a new
+// value, which the caller may change.
 func (n *CompiledNode) DefaultValue() rm.DataValue {
 	if n.defaultValue == nil {
 		return nil

@@ -77,7 +77,9 @@ func WithoutImplicitAttributes() Option {
 // validity that names no validity kind or is mandatory on a date, a temporal
 // range bound that is not ISO 8601 text of its type, and a primitive object
 // with no item. It also refuses a default value of the template's
-// constraints that addresses no node, which Compile otherwise skips.
+// constraints that addresses no node or that Compile cannot hold as
+// canonical JSON, such as a NaN magnitude, each of which Compile otherwise
+// skips.
 func WithStrict() Option {
 	return func(c *config) { c.strict = true }
 }
