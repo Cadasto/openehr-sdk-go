@@ -33,6 +33,24 @@
 // coexist in a single registry. The generator emits typereg_gen.go
 // here for the AOM side.
 //
+// # Reading an operational template
+//
+// [ReadOperationalTemplate] reads an operational template from an
+// untrusted source into the model, within a size and a nesting limit. It
+// has two modes. The default mode reads what the deprecated template
+// parser reads: shapes and values the AM Release-1.4 schemas do not allow,
+// such as a constraint object with no type, a <children> typed with a
+// primitive class, a real number written as Go reads one, a root element in
+// another namespace, or text before the root element, each read as that
+// parser reads it. Given [canxml.WithStrict], the strict mode reads the
+// document as the schemas write it: it refuses each of those shapes and
+// values, and any content the model does not read, keeping only the
+// readings the function lists for every mode, such as the v2 namespace the
+// schemas declare. In both modes it refuses an integer the model's 32-bit
+// Integer cannot hold and a match_negated of true, which the parser ignores
+// and so reads with its meaning inverted. The function's documentation
+// lists each reading.
+//
 // # Hand-written companions
 //
 // Files named *_ext.go are reserved for hand-written method bodies

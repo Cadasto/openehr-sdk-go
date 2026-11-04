@@ -3,11 +3,13 @@ package aom14_test
 // REQ-111 (clinical-modeling.md § REQ-111, Reading the model, "What the
 // reader tolerates"): aom14.ReadOperationalTemplate reads every OPT the
 // deprecated parser reads in its default mode, as the parser reads it, but an
-// integer the model's 32-bit Integer cannot hold, which it refuses in every
-// mode. REQ-100 (§ REQ-100, Strict parse mode): given canxml.WithStrict it
-// refuses the shapes the parser's strict mode refuses. REQ-170 (wire.md
-// § REQ-170): what a tolerance leaves out is unmatched content, which
-// canxml.WithUnmatched reports, once, at the path it has in the input.
+// integer the model's 32-bit Integer cannot hold and a match_negated of true,
+// which it refuses in every mode. REQ-100 (§ REQ-100, Strict parse mode):
+// given canxml.WithStrict it refuses the shapes the parser's strict mode
+// refuses, and the other readings of the parser's default mode. REQ-170
+// (wire.md § REQ-170): what a tolerance leaves out is unmatched content, which
+// canxml.WithUnmatched reports, once, at the path it has in the input, or in
+// the element a reading moves it into.
 //
 // The fixtures under testdata/reader are SDK-authored: each *.read.opt is the
 // reading of the fixture of its name, written as canonical XML decodes it.
@@ -32,6 +34,8 @@ const (
 	nsV1 = "http://schemas.openehr.org/v1"
 	// nsV2 is the namespace the AM Release-1.4 schemas declare.
 	nsV2 = "http://schemas.openehr.org/v2"
+	// nsForeign is a namespace of no openEHR schema.
+	nsForeign = "urn:x-openehr-sdk-go:test:foreign"
 	// definition is the path of the definition of a template.
 	definition = "/template[1]/definition[1]"
 )
@@ -109,6 +113,208 @@ func TestREQ111_ReaderReadsTheNamespaceTheSchemasDeclare(t *testing.T) {
 				t.Parallel()
 				if unmatched := readAs(t, in, want, opts...); len(unmatched) > 0 {
 					t.Errorf("WithUnmatched reported %q, want nothing", unmatched)
+				}
+			})
+		}
+	}
+}
+
+// TestREQ111_ReaderReadsARootInAnotherNamespace pins that the default mode
+// reads a root element in a namespace other than none, the v1 one and the v2
+// one, and every element in that namespace, as in the v1 one, under the
+// default namespace and under a prefix, as the deprecated parser, which reads
+// no namespace, does; strict mode refuses it as a foreign namespace.
+func TestREQ111_ReaderReadsARootInAnotherNamespace(t *testing.T) {
+	t.Parallel()
+	v2 := readerFixture(t, "namespace-v2.opt")
+	foreign := bytes.ReplaceAll(v2, []byte(nsV2), []byte(nsForeign))
+	want := decoded(t, bytes.ReplaceAll(v2, []byte(nsV2), []byte(nsV1)))
+	prefixed := `<f:template xmlns:f="` + nsForeign + `"><f:template_id><f:value>t</f:value></f:template_id></f:template>`
+	cases := map[string]struct {
+		in   []byte
+		want *aom14.OperationalTemplate
+	}{
+		"under the default namespace": {foreign, want},
+		"after a byte-order mark":     {append([]byte{0xEF, 0xBB, 0xBF}, foreign...), want},
+		"under a prefix":              {[]byte(prefixed), decoded(t, []byte(`<template xmlns="`+nsV1+`"><template_id><value>t</value></template_id></template>`))},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if unmatched := readAs(t, tc.in, tc.want); len(unmatched) > 0 {
+				t.Errorf("WithUnmatched reported %q, want nothing", unmatched)
+			}
+			_, err := aom14.ReadOperationalTemplate(bytes.NewReader(tc.in), canxml.WithStrict())
+			if !errors.Is(err, canxml.ErrNamespace) {
+				t.Errorf("ReadOperationalTemplate(WithStrict) = %v, want an error wrapping canxml.ErrNamespace", err)
+			}
+		})
+	}
+}
+
+// TestREQ111_ReaderReadsWhatElseTheParserReads pins the default mode's
+// reading of the other shapes and values the parser's default mode reads: a
+// C_COMPLEX_OBJECT that holds an archetype id, as a C_ARCHETYPE_ROOT; a
+// <children> typed with a primitive class, as a C_PRIMITIVE_OBJECT whose item
+// of that class holds the members but the rm_type_name, occurrences and
+// node_id, a C_BOOLEAN without its true_valid among them; an <item> typed
+// C_CODE_PHRASE, C_DV_QUANTITY, C_DV_ORDINAL or CONSTRAINT_REF, as the object
+// that holds it, of the item's class, and one typed C_PRIMITIVE_OBJECT, whose
+// own item that object then holds; and a value of a C_REAL, or a bound of a
+// quantity's magnitude or precision, that Go reads and XML Schema's double
+// does not, as the number Go reads. WithUnmatched reports what the reading
+// leaves out, each item once: a primitive leaf's attributes, in its item, and
+// the members of an item that its object has, in that object.
+func TestREQ111_ReaderReadsWhatElseTheParserReads(t *testing.T) {
+	t.Parallel()
+	data := readerFixture(t, "parser-readings.opt")
+	want := decoded(t, readerFixture(t, "parser-readings.read.opt"))
+	got := readAs(t, data, want)
+	wantUnmatched := []string{
+		leaf(2) + "/item[1]/attributes[1]",
+		leaf(4) + "/rm_type_name[2]",
+		leaf(8) + "/rm_type_name[2]",
+		leaf(8) + "/occurrences[2]",
+		leaf(8) + "/node_id[2]",
+	}
+	if !slices.Equal(got, wantUnmatched) {
+		t.Errorf("WithUnmatched reported\n%q\nwant\n%q", got, wantUnmatched)
+	}
+}
+
+// TestREQ111_ReaderMovesTheNamespacesOfAnItemItTakesOff pins that a
+// namespace an <item> declares, which the default mode reads as the object
+// that holds it, moves to that object, so that what the item holds keeps its
+// names.
+func TestREQ111_ReaderMovesTheNamespacesOfAnItemItTakesOff(t *testing.T) {
+	t.Parallel()
+	const xsi = "http://www.w3.org/2001/XMLSchema-instance"
+	doc := itemDoc(`<item xmlns:p="` + xsi + `" p:type="C_PRIMITIVE_OBJECT"><item p:type="C_STRING"><list>a</list></item></item>`)
+	want := itemDoc(`<item xsi:type="C_STRING"><list>a</list></item>`)
+	readAs(t, []byte(doc), decoded(t, []byte(want)))
+}
+
+// TestREQ111_ReaderRefusesAnItemWhoseNamespacesItCannotMove pins that the
+// default mode leaves a document as it is, for the decode to refuse, where an
+// <item> it would take off binds a prefix the object that holds it binds
+// otherwise, rather than read a C_CODE_PHRASE the inner item names without
+// the codes the outer item holds.
+func TestREQ111_ReaderRefusesAnItemWhoseNamespacesItCannotMove(t *testing.T) {
+	t.Parallel()
+	doc := definitionDoc(`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>value</rm_attribute_name>` +
+		`<existence><lower>0</lower><upper>1</upper></existence><children xmlns:q="urn:x-q1" xsi:type="C_PRIMITIVE_OBJECT">` +
+		`<rm_type_name>CODE_PHRASE</rm_type_name><occurrences><lower>1</lower><upper>1</upper></occurrences><node_id/>` +
+		`<item xmlns:q="urn:x-q2" xsi:type="C_PRIMITIVE_OBJECT"><item xsi:type="C_CODE_PHRASE"><code_list>at1</code_list></item></item>` +
+		`</children></attributes>`)
+	_, err := aom14.ReadOperationalTemplate(strings.NewReader(doc))
+	if !errors.Is(err, typereg.ErrTypeMismatch) {
+		t.Errorf("ReadOperationalTemplate = %v, want an error wrapping typereg.ErrTypeMismatch", err)
+	}
+}
+
+// TestREQ111_ReaderStrictModeRefusesTheParsersOtherReadings pins that
+// canxml.WithStrict refuses each shape and value
+// TestREQ111_ReaderReadsWhatElseTheParserReads reads, and that the default
+// mode reads it, in a document of the v1 namespace and in one of the v2
+// namespace, which every mode reads a second time.
+func TestREQ111_ReaderStrictModeRefusesTheParsersOtherReadings(t *testing.T) {
+	t.Parallel()
+	const lossy = "0.10000000000000000555111512312578270211815834045410156251"
+	cases := []struct {
+		name string
+		doc  string
+		want error
+	}{
+		{"a C_COMPLEX_OBJECT that holds an archetype id", archetypeIDDoc("C_COMPLEX_OBJECT"), canxml.ErrUnknownElement},
+		{"a <children> of a primitive class", childDoc(` xsi:type="C_STRING"`), canxml.ErrUnknownElement},
+		{"a <children> of a primitive class with no member", childlessDoc(` xsi:type="C_BOOLEAN"`), typereg.ErrTypeMismatch},
+		{"an <item> typed C_CODE_PHRASE", itemDoc(`<item xsi:type="C_CODE_PHRASE"><code_list>at1</code_list></item>`), typereg.ErrTypeMismatch},
+		{"an <item> typed C_DV_QUANTITY", itemDoc(`<item xsi:type="C_DV_QUANTITY"><list><units>kg</units></list></item>`), typereg.ErrTypeMismatch},
+		{"an <item> typed C_DV_ORDINAL", itemDoc(`<item xsi:type="C_DV_ORDINAL"></item>`), typereg.ErrTypeMismatch},
+		{"an <item> typed CONSTRAINT_REF", itemDoc(`<item xsi:type="CONSTRAINT_REF"><reference>ac0001</reference></item>`), typereg.ErrTypeMismatch},
+		{"an <item> typed C_PRIMITIVE_OBJECT", itemDoc(`<item xsi:type="C_PRIMITIVE_OBJECT"><item xsi:type="C_STRING"><list>a</list></item></item>`), typereg.ErrTypeMismatch},
+		{"a C_REAL list entry of an infinity Go reads", itemDoc(`<item xsi:type="C_REAL"><list>Inf</list></item>`), canxml.ErrInvalidShape},
+		{"a C_REAL range bound in hexadecimal", itemDoc(`<item xsi:type="C_REAL"><range><lower>0x1p-2</lower><upper>1</upper></range></item>`), canxml.ErrInvalidShape},
+		{"a C_REAL assumed value of more digits than a double holds", itemDoc(`<item xsi:type="C_REAL"><assumed_value>` + lossy + `</assumed_value></item>`), canxml.ErrInvalidShape},
+		{"a quantity's magnitude bound of an infinity Go reads", quantityDoc(`<magnitude><lower>0</lower><upper>Inf</upper></magnitude>`), canxml.ErrInvalidShape},
+		{"a quantity's precision bound written as a real", quantityDoc(`<precision><lower>0</lower><upper>2.0</upper></precision>`), canxml.ErrInvalidShape},
+	}
+	for _, tc := range cases {
+		for ns, doc := range map[string]string{"v1": tc.doc, "v2": strings.Replace(tc.doc, nsV1, nsV2, 1)} {
+			t.Run(ns+"/"+tc.name, func(t *testing.T) {
+				t.Parallel()
+				if _, err := aom14.ReadOperationalTemplate(strings.NewReader(doc)); err != nil {
+					t.Fatalf("ReadOperationalTemplate: %v, want the default mode to read it", err)
+				}
+				_, err := aom14.ReadOperationalTemplate(strings.NewReader(doc), canxml.WithStrict())
+				if !errors.Is(err, tc.want) {
+					t.Errorf("ReadOperationalTemplate(WithStrict) = %v, want an error wrapping %v", err, tc.want)
+				}
+			})
+		}
+	}
+}
+
+// TestREQ111_ReaderLeavesOutARealBoundOnASideWrittenUnbounded pins that, in
+// every mode, a bound of a C_REAL range or of a quantity's magnitude or
+// precision that Go reads as a number and canonical XML does not is left out
+// on a side the range writes unbounded, whose bound the parser does not read.
+func TestREQ111_ReaderLeavesOutARealBoundOnASideWrittenUnbounded(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct{ doc, want string }{
+		"a C_REAL range": {
+			itemDoc(`<item xsi:type="C_REAL"><range><lower>0</lower><upper_unbounded>true</upper_unbounded><upper>Inf</upper></range></item>`),
+			itemDoc(`<item xsi:type="C_REAL"><range><lower>0</lower><upper_unbounded>true</upper_unbounded></range></item>`),
+		},
+		"a quantity's magnitude": {
+			quantityDoc(`<magnitude><lower_unbounded>true</lower_unbounded><lower>0x1p0</lower><upper>9</upper></magnitude>`),
+			quantityDoc(`<magnitude><lower_unbounded>true</lower_unbounded><upper>9</upper></magnitude>`),
+		},
+		"a quantity's precision": {
+			quantityDoc(`<precision><lower>0</lower><upper_unbounded>true</upper_unbounded><upper>2.0</upper></precision>`),
+			quantityDoc(`<precision><lower>0</lower><upper_unbounded>true</upper_unbounded></precision>`),
+		},
+	}
+	for mode, opts := range modes {
+		for name, tc := range cases {
+			t.Run(mode+"/"+name, func(t *testing.T) {
+				t.Parallel()
+				readAs(t, []byte(tc.doc), decoded(t, []byte(tc.want)), opts...)
+			})
+		}
+	}
+}
+
+// TestREQ111_ReaderRefusesMatchNegatedInEveryMode pins that, in every mode,
+// an attribute whose match_negated is true is refused, which the parser
+// ignores and so reads with its meaning inverted, an attribute the default
+// mode types among them, while one whose match_negated is false reads.
+func TestREQ111_ReaderRefusesMatchNegatedInEveryMode(t *testing.T) {
+	t.Parallel()
+	doc := func(attrs, value string) string {
+		return definitionDoc(`<attributes` + attrs + `><rm_attribute_name>items</rm_attribute_name>` +
+			`<existence><lower>0</lower><upper>1</upper></existence><match_negated>` + value + `</match_negated></attributes>`)
+	}
+	kinds := map[string]string{
+		"a C_SINGLE_ATTRIBUTE":   ` xsi:type="C_SINGLE_ATTRIBUTE"`,
+		"a C_MULTIPLE_ATTRIBUTE": ` xsi:type="C_MULTIPLE_ATTRIBUTE"`,
+		"an untyped attribute":   ``,
+	}
+	for mode, opts := range modes {
+		for kind, attrs := range kinds {
+			if mode == "strict" && attrs == "" {
+				continue // strict mode refuses an attribute with no type
+			}
+			t.Run(mode+"/"+kind, func(t *testing.T) {
+				t.Parallel()
+				for _, value := range []string{"true", "1"} {
+					_, err := aom14.ReadOperationalTemplate(strings.NewReader(doc(attrs, value)), opts...)
+					if !errors.Is(err, canxml.ErrInvalidShape) {
+						t.Errorf("ReadOperationalTemplate(match_negated %s) = %v, want an error wrapping canxml.ErrInvalidShape", value, err)
+					}
+				}
+				if _, err := aom14.ReadOperationalTemplate(strings.NewReader(doc(attrs, "false")), opts...); err != nil {
+					t.Errorf("ReadOperationalTemplate(match_negated false): %v", err)
 				}
 			})
 		}
@@ -206,10 +412,12 @@ func TestREQ111_ReaderReadsValuesInEveryMode(t *testing.T) {
 // otherwise than the parser: a C_BOOLEAN flag left out or empty, which it
 // reads as false; an assumed_value that is empty, which it reads as false or
 // 0, or that is t or f, which it reads as a boolean; an empty list entry or
-// range bound, which it reads as 0; and a bare type attribute, which it reads
-// as the type. Each document holds that one shape, so nothing else makes the
-// reader read it a second time. Strict mode refuses the shapes its default
-// mode alone reads.
+// range bound, which it reads as 0; a bare type attribute, which it reads as
+// the type; and, which the default mode alone reads, a C_COMPLEX_OBJECT that
+// holds an archetype id, which it skips, and a root element in another
+// namespace, whose content it skips. Each document holds that one shape, so
+// nothing else makes the reader read it a second time. Strict mode refuses
+// the shapes its default mode alone reads.
 func TestREQ111_ReaderFindsWhatCanonicalXMLReadsWithoutAFailure(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -268,6 +476,18 @@ func TestREQ111_ReaderFindsWhatCanonicalXMLReadsWithoutAFailure(t *testing.T) {
 			want:          attributeDoc(` xsi:type="C_SINGLE_ATTRIBUTE"`),
 			strictRefuses: true,
 		},
+		{
+			name:          "a C_COMPLEX_OBJECT that holds an archetype id",
+			doc:           archetypeIDDoc("C_COMPLEX_OBJECT"),
+			want:          archetypeIDDoc("C_ARCHETYPE_ROOT"),
+			strictRefuses: true,
+		},
+		{
+			name:          "a root in another namespace",
+			doc:           `<template xmlns="` + nsForeign + `"><template_id><value>t</value></template_id></template>`,
+			want:          `<template xmlns="` + nsV1 + `"><template_id><value>t</value></template_id></template>`,
+			strictRefuses: true,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -294,7 +514,7 @@ func TestREQ111_ReaderFindsWhatCanonicalXMLReadsWithoutAFailure(t *testing.T) {
 // leaves out.
 func TestREQ111_ReaderReportsEachItemOnce(t *testing.T) {
 	t.Parallel()
-	for _, name := range []string{"shapes.opt", "values.opt", "values-every-mode.opt", "namespace-v2.opt"} {
+	for _, name := range []string{"shapes.opt", "values.opt", "values-every-mode.opt", "namespace-v2.opt", "parser-readings.opt"} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			var unmatched, missing []string
@@ -396,6 +616,7 @@ func TestREQ111_ReaderRefusesAnIntegerPastThirtyTwoBits(t *testing.T) {
 			`<occurrences><lower>0</lower><upper>` + big + `</upper></occurrences><node_id>at0001</node_id></children></attributes>`),
 		"an existence lower": definitionDoc(`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>a</rm_attribute_name>` +
 			`<existence><lower>-` + big + `</lower><upper>1</upper></existence></attributes>`),
+		"a quantity's precision bound": quantityDoc(`<precision><lower>0</lower><upper>` + big + `</upper></precision>`),
 	}
 	for mode, opts := range modes {
 		for name, doc := range refused {
@@ -426,7 +647,7 @@ func TestREQ111_ReaderRefusesAnIntegerPastThirtyTwoBits(t *testing.T) {
 // schemas declare.
 func TestREQ111_CanonicalXMLKeepsNoneOfTheReadersReadings(t *testing.T) {
 	t.Parallel()
-	for _, name := range []string{"shapes.opt", "values.opt", "values-every-mode.opt"} {
+	for _, name := range []string{"shapes.opt", "values.opt", "values-every-mode.opt", "parser-readings.opt"} {
 		var ot aom14.OperationalTemplate
 		if err := canxml.Unmarshal(readerFixture(t, name), &ot); err == nil {
 			t.Errorf("canxml.Unmarshal(%s) = nil, want the error the reader's readings lift", name)
@@ -443,7 +664,30 @@ func TestREQ111_CanonicalXMLKeepsNoneOfTheReadersReadings(t *testing.T) {
 
 // item returns the path of the item of the n-th ELEMENT of a values fixture.
 func item(n int) string {
-	return definition + "/attributes[1]/children[" + strconv.Itoa(n) + "]/attributes[1]/children[1]/attributes[1]/children[1]/item[1]"
+	return leaf(n) + "/item[1]"
+}
+
+// leaf returns the path of the leaf of the n-th ELEMENT of a values fixture,
+// the child of the child of its value.
+func leaf(n int) string {
+	return definition + "/attributes[1]/children[" + strconv.Itoa(n) + "]/attributes[1]/children[1]/attributes[1]/children[1]"
+}
+
+// archetypeIDDoc returns a template whose definition holds a <children> of
+// class that holds an archetype id.
+func archetypeIDDoc(class string) string {
+	return definitionDoc(`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>items</rm_attribute_name>` +
+		`<existence><lower>0</lower><upper>1</upper></existence><children xsi:type="` + class + `"><rm_type_name>CLUSTER</rm_type_name>` +
+		`<occurrences><lower>0</lower><upper>1</upper></occurrences><node_id>at0000</node_id>` +
+		`<archetype_id><value>openEHR-EHR-CLUSTER.inner.v0</value></archetype_id></children></attributes>`)
+}
+
+// quantityDoc returns a template whose definition holds a C_DV_QUANTITY
+// whose one list entry holds members.
+func quantityDoc(members string) string {
+	return definitionDoc(`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>value</rm_attribute_name>` +
+		`<existence><lower>0</lower><upper>1</upper></existence><children xsi:type="C_DV_QUANTITY"><rm_type_name>DV_QUANTITY</rm_type_name>` +
+		`<occurrences><lower>1</lower><upper>1</upper></occurrences><node_id/><list>` + members + `<units>kg</units></list></children></attributes>`)
 }
 
 // definitionDoc returns a template whose definition, a CLUSTER, holds
@@ -468,6 +712,13 @@ func childDoc(attrs string) string {
 	return definitionDoc(`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>items</rm_attribute_name>` +
 		`<existence><lower>0</lower><upper>1</upper></existence><children` + attrs + `><rm_type_name>ELEMENT</rm_type_name>` +
 		`<occurrences><lower>0</lower><upper>1</upper></occurrences><node_id>at0001</node_id></children></attributes>`)
+}
+
+// childlessDoc returns a template whose definition holds an empty <children>
+// whose start tag carries attrs.
+func childlessDoc(attrs string) string {
+	return definitionDoc(`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>items</rm_attribute_name>` +
+		`<existence><lower>0</lower><upper>1</upper></existence><children` + attrs + `/></attributes>`)
 }
 
 // itemDoc returns a template whose definition holds item, the <item> of a

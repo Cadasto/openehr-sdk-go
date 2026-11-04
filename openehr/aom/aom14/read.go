@@ -52,12 +52,16 @@ const inputBufferMax = 4 << 20
 // [canxml.WithMaxDepth] among them applies as well as the element limit, and
 // the smaller limit wins: it can lower the limit and never raise it.
 //
-// The input is one document, held to the rules [canxml.Unmarshal] holds a
-// document to. Before the root it may hold the XML declaration, comments,
-// processing instructions, whitespace and one document type declaration,
-// after a UTF-8 byte-order mark at the very start; after the root it may hold
-// comments, processing instructions and whitespace. Anything else before or
-// after the root, such as text or an element, is refused with an error that
+// The input is one document. Given [canxml.WithStrict], it is held to the
+// rules [canxml.Unmarshal] holds a document to: before the root it may hold
+// the XML declaration, comments, processing instructions, whitespace and one
+// document type declaration, after a UTF-8 byte-order mark at the very start;
+// after the root it may hold comments, processing instructions and
+// whitespace. Without it, the reader reads past what the deprecated template
+// parser reads past: before the root, any content encoding/xml reads, such as
+// text, a CDATA section or a second declaration; after the root, a `<!…>`
+// declaration as well. Anything else before or after the root, such as an
+// element after it or a stray end tag before it, is refused with an error that
 // wraps [canxml.ErrInvalidShape] and carries none of it. The root element may
 // have any name, so a document whose root is `<OPERATIONAL_TEMPLATE>` reads as
 // one whose root is `<template>`. An input with no root element, empty or
@@ -79,12 +83,16 @@ const inputBufferMax = 4 << 20
 //     any letter case;
 //   - an empty timezone_validity of a C_DATE, C_TIME or C_DATE_TIME as
 //     absent, which is optional;
-//   - a range bound that holds no number on a side the range writes
-//     unbounded, which the parser does not read, and a bound of the
-//     magnitude or precision of a C_DV_QUANTITY that holds none, as absent,
-//     the side unbounded.
+//   - a range bound on a side the range writes unbounded, which the parser
+//     does not read, that holds no number, or a number of a C_REAL or of a
+//     quantity's magnitude or precision that canonical XML does not read, and
+//     a bound of the magnitude or precision of a C_DV_QUANTITY that holds no
+//     number, as absent, the side unbounded.
 //
-// Without [canxml.WithStrict] it also reads, inside the definition:
+// Without [canxml.WithStrict] it also reads a root element in a namespace
+// other than none and those two, and every element in that namespace, as in
+// the http://schemas.openehr.org/v1 one, since the parser reads no namespace,
+// and, inside the definition:
 //
 //   - an <attributes>, a <children> or the <item> of a C_PRIMITIVE_OBJECT
 //     that names no type in the XML Schema instance namespace, none, an
@@ -95,15 +103,28 @@ const inputBufferMax = 4 << 20
 //     C_COMPLEX_OBJECT otherwise, and such an <item> as no item;
 //   - the type of an <attributes>, a <children> or an <item> without the
 //     white space around it;
+//   - a <children> typed C_COMPLEX_OBJECT that holds an archetype id, as a
+//     C_ARCHETYPE_ROOT;
 //   - a <children> whose type names no class of the AOM 1.4 constraint
 //     model, as a C_COMPLEX_OBJECT with the rm_type_name, node_id and
 //     occurrences it holds and none of its attributes;
-//   - an <item> whose type names neither a C_PRIMITIVE class nor another
-//     class the parser reads a constraint of, such as C_CODE_PHRASE, as no
-//     item;
+//   - a <children> typed with a C_PRIMITIVE class, such as C_STRING, as a
+//     C_PRIMITIVE_OBJECT with the rm_type_name, node_id and occurrences it
+//     holds, whose item, of that class, holds the rest;
+//   - an <item> typed C_CODE_PHRASE, C_DV_QUANTITY, C_DV_ORDINAL or
+//     CONSTRAINT_REF, as the object that holds it, of the item's class, with
+//     the members of the item but an rm_type_name, node_id or occurrences;
+//     and an <item> typed C_PRIMITIVE_OBJECT as the item it holds;
+//   - an <item> whose type names no C_PRIMITIVE class and none of those, as
+//     no item;
 //   - a list entry of a C_INTEGER or C_REAL that holds no number of its
 //     type as absent, and a bound of its range that holds none as absent,
 //     the side unbounded;
+//   - a value of a C_REAL, or a bound of a quantity's magnitude, that Go's
+//     strconv.ParseFloat reads and XML Schema's double does not, such as Inf,
+//     0x1p-2 or a decimal of more digits than a double holds, as the number
+//     it reads, and a bound of a quantity's precision that it reads as an
+//     integer the model's Integer holds, such as 2.0, as that integer;
 //   - a timezone_validity that names no validity kind as absent.
 //
 // A side a bound is read out of keeps the included flag the range gives it;
@@ -111,16 +132,21 @@ const inputBufferMax = 4 << 20
 // is included, as the parser reads it.
 //
 // What a reading leaves out is unmatched content, which
-// [canxml.WithUnmatched] reports at its path. Given [canxml.WithStrict], which
+// [canxml.WithUnmatched] reports at its path: the path it has in the input,
+// or, for content an item a reading writes or takes off holds, its path in
+// the object that holds the content then. Given [canxml.WithStrict], which
 // refuses unmatched content, the readings of every mode leave it out
-// unreported, and the reader refuses each shape of the second list, as it
-// refuses a bare type attribute on such an element, which canonical XML reads
-// as its type, and an empty list entry or range bound of a C_INTEGER or
-// C_REAL, which canonical XML reads as 0. In every mode it refuses an integer that the model's 32-bit
-// Integer cannot hold. A document that needs none of these readings is
-// decoded once; one that needs one is decoded a second time, from the bytes
-// the reader keeps of the input, and so is every document when opts pass
-// what the decode reports to a function, which sees each item once.
+// unreported, and the reader refuses each shape and value the default mode
+// alone reads, as it refuses a bare type attribute on such an element, which
+// canonical XML reads as its type, and an empty list entry or range bound of
+// a C_INTEGER or C_REAL, which canonical XML reads as 0. In every mode it
+// refuses an integer that the model's 32-bit Integer cannot hold, and a
+// match_negated of true, which the parser ignores and so reads with its
+// meaning inverted. A document that needs none of these readings is decoded
+// once; one that needs one is decoded a second time, from the bytes the
+// reader keeps of the input, but for what it reads past before and after the
+// root, and so is every document when opts pass what the decode reports to a
+// function, which sees each item once.
 //
 // A caller that decodes an operational template with [canxml.Unmarshal] or a
 // [canxml.Decoder] itself gets neither limit and none of these readings
@@ -152,7 +178,7 @@ func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*Operat
 			first = []canxml.DecoderOption{canxml.WithStrict()}
 		}
 	}
-	ot, err := readDocument(br, first)
+	ot, err := readDocument(br, first, settings.Strict)
 	// An input past the size limit is refused as such, whatever the decode
 	// made of the bytes it read: the limit may have cut it short.
 	if lr.N == 0 {
@@ -160,7 +186,7 @@ func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*Operat
 	}
 	var tolerant bool
 	if err == nil {
-		tolerant = needsTolerance(in.Bytes(), ot)
+		tolerant = needsTolerance(in.Bytes(), ot, settings.Strict)
 	} else {
 		tolerant = retryable(err, settings.Strict)
 	}
@@ -179,22 +205,24 @@ func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*Operat
 	data := in.Bytes()
 	if tolerant {
 		if read, changed := tolerate(data, settings.Strict); changed {
-			return readResult(readDocument(bufio.NewReader(bytes.NewReader(read)), opts))
+			return readResult(readDocument(bufio.NewReader(bytes.NewReader(read)), opts, settings.Strict))
 		}
 	}
 	if settings.Reports {
-		return readResult(readDocument(bufio.NewReader(bytes.NewReader(data)), opts))
+		return readResult(readDocument(bufio.NewReader(bytes.NewReader(data)), opts, settings.Strict))
 	}
 	return readResult(ot, err)
 }
 
 // readDocument decodes one document from br with opts and the element limit:
-// what comes before the root, the root, and what comes after it.
-func readDocument(br *bufio.Reader, opts []canxml.DecoderOption) (*OperationalTemplate, error) {
+// what comes before the root, the root, and what comes after it. Unless
+// strict, it reads past what the deprecated parser reads past before and
+// after the root.
+func readDocument(br *bufio.Reader, opts []canxml.DecoderOption, strict bool) (*OperationalTemplate, error) {
 	// The stream decoder skips what comes before the root, so the prolog is
 	// checked first; the decode then reads the bytes the check read again.
 	head, err := xmlunmatched.ReadProlog(br)
-	if err != nil {
+	if err != nil && (strict || !errors.Is(err, canxml.ErrInvalidShape) || !readsPastProlog(head)) {
 		return nil, err
 	}
 	// The decoder takes no byte past the root element from an
@@ -207,10 +235,28 @@ func readDocument(br *bufio.Reader, opts []canxml.DecoderOption) (*OperationalTe
 	if err := canxml.NewDecoder(src, opts...).Decode(ot); err != nil {
 		return nil, err
 	}
-	if err := afterRoot(src); err != nil {
+	if err := afterRoot(src, strict); err != nil {
 		return nil, err
 	}
 	return ot, nil
+}
+
+// readsPastProlog reports whether the deprecated parser reads past head, the
+// bytes before the root element and its start tag that the prolog check
+// refused: whether encoding/xml reads each token in it up to that start tag,
+// whatever the token is, as the parser's decode does. A byte-order mark at
+// the very start is the one byte sequence it skips unread.
+func readsPastProlog(head []byte) bool {
+	d := xml.NewDecoder(bytes.NewReader(bytes.TrimPrefix(head, byteOrderMark)))
+	for {
+		tok, err := d.Token()
+		if err != nil {
+			return false
+		}
+		if _, ok := tok.(xml.StartElement); ok {
+			return true
+		}
+	}
 }
 
 // readResult returns what [ReadOperationalTemplate] returns for a decode that
@@ -233,11 +279,12 @@ func errInputTooLarge() error {
 }
 
 // afterRoot reads r, the rest of the input after the root element, to its
-// end. Comments, processing instructions and whitespace pass. Anything else,
-// an element, other text, a declaration or markup encoding/xml cannot read,
-// is refused, with an error that wraps [canxml.ErrInvalidShape] and names
-// none of it, as [canxml.Unmarshal] refuses it.
-func afterRoot(r io.Reader) error {
+// end. Comments, processing instructions and whitespace pass, and unless
+// strict a `<!…>` declaration as well, which the deprecated parser reads
+// past. Anything else, an element, other text or markup encoding/xml cannot
+// read, is refused, with an error that wraps [canxml.ErrInvalidShape] and
+// names none of it, as [canxml.Unmarshal] refuses it.
+func afterRoot(r io.Reader, strict bool) error {
 	dec := xml.NewDecoder(r)
 	for {
 		tok, err := dec.Token()
@@ -253,6 +300,10 @@ func afterRoot(r io.Reader) error {
 		switch t := tok.(type) {
 		case xml.Comment, xml.ProcInst:
 			continue
+		case xml.Directive:
+			if !strict {
+				continue
+			}
 		case xml.CharData:
 			if len(bytes.Trim(t, " \t\r\n")) == 0 {
 				continue

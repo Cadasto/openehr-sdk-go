@@ -179,12 +179,14 @@ func TestREQ176_ReadOperationalTemplateAppliesTheCallersOptions(t *testing.T) {
 	}
 }
 
-// TestREQ176_ReadOperationalTemplateRefusesContentAfterTheRoot pins that the
-// reader holds the input to one document, as canxml.Unmarshal does: after the
-// root, comments, processing instructions and whitespace pass, and anything
-// else is refused with an error wrapping canxml.ErrInvalidShape that carries
-// none of it.
-func TestREQ176_ReadOperationalTemplateRefusesContentAfterTheRoot(t *testing.T) {
+// TestREQ176_REQ111_ReadOperationalTemplateHoldsContentAfterTheRoot pins that
+// the reader holds the input to one document. After the root, in every mode,
+// comments, processing instructions and whitespace pass, and an element,
+// text, a CDATA section or a stray end element is refused with an error
+// wrapping canxml.ErrInvalidShape that carries none of it. A `<!…>`
+// declaration, which the deprecated parser reads past, reads in the default
+// mode and is refused so given canxml.WithStrict.
+func TestREQ176_REQ111_ReadOperationalTemplateHoldsContentAfterTheRoot(t *testing.T) {
 	t.Parallel()
 	const planted = "PLANTED"
 	refused := map[string]string{
@@ -192,8 +194,11 @@ func TestREQ176_ReadOperationalTemplateRefusesContentAfterTheRoot(t *testing.T) 
 		"an empty element":    `<` + planted + `/>`,
 		"text":                planted,
 		"a stray end element": `</` + planted + `>`,
-		"a document type":     `<!DOCTYPE ` + planted + `>`,
 		"a CDATA section":     `<![CDATA[` + planted + `]]>`,
+	}
+	defaultOnly := map[string]string{
+		"a document type":     `<!DOCTYPE ` + planted + `>`,
+		"another declaration": `<!ENTITY ` + planted + ` "x">`,
 	}
 	accepted := map[string]string{
 		"nothing":                  "",
@@ -201,51 +206,55 @@ func TestREQ176_ReadOperationalTemplateRefusesContentAfterTheRoot(t *testing.T) 
 		"a comment":                `<!-- note -->`,
 		"a processing instruction": `<?pi data?>`,
 	}
-	for name, tail := range refused {
-		t.Run("refused/"+name, func(t *testing.T) {
-			t.Parallel()
-			_, err := aom14.ReadOperationalTemplate(strings.NewReader(readTemplate + tail))
-			if !errors.Is(err, canxml.ErrInvalidShape) {
-				t.Fatalf("ReadOperationalTemplate(root + %s) = %v, want an error wrapping canxml.ErrInvalidShape", name, err)
-			}
-			if strings.Contains(err.Error(), planted) {
-				t.Errorf("error %q carries the content after the root", err)
-			}
-		})
-	}
-	for name, tail := range accepted {
-		t.Run("accepted/"+name, func(t *testing.T) {
-			t.Parallel()
-			ot, err := aom14.ReadOperationalTemplate(strings.NewReader(readTemplate + tail))
-			if err != nil {
-				t.Fatalf("ReadOperationalTemplate(root + %s): %v", name, err)
-			}
-			if ot.TemplateID.Value != "t" {
-				t.Errorf("TemplateID.Value = %q, want %q", ot.TemplateID.Value, "t")
-			}
-		})
+	for mode, opts := range readModes {
+		for name, tail := range refused {
+			t.Run(mode+"/refused/"+name, func(t *testing.T) {
+				t.Parallel()
+				refusesContentOutsideTheRoot(t, readTemplate+tail, planted, opts...)
+			})
+		}
+		for name, tail := range defaultOnly {
+			t.Run(mode+"/default mode only/"+name, func(t *testing.T) {
+				t.Parallel()
+				if mode == "strict" {
+					refusesContentOutsideTheRoot(t, readTemplate+tail, planted, opts...)
+					return
+				}
+				readsTemplateT(t, readTemplate+tail, opts...)
+			})
+		}
+		for name, tail := range accepted {
+			t.Run(mode+"/accepted/"+name, func(t *testing.T) {
+				t.Parallel()
+				readsTemplateT(t, readTemplate+tail, opts...)
+			})
+		}
 	}
 }
 
-// TestREQ176_ReadOperationalTemplateRefusesContentBeforeTheRoot pins that the
-// reader holds what comes before the root element to the rules
-// canxml.Unmarshal holds it to: the XML declaration, comments, processing
-// instructions, whitespace and one document type declaration pass, and
-// anything else is refused with an error wrapping canxml.ErrInvalidShape that
-// carries none of it, markup encoding/xml cannot read after it among it. An
-// input with only such content and no root is the no-root case
+// TestREQ176_REQ111_ReadOperationalTemplateHoldsContentBeforeTheRoot pins what
+// the reader reads before the root element. In every mode the XML
+// declaration, comments, processing instructions, whitespace and one document
+// type declaration pass, and a stray end element, or markup encoding/xml
+// cannot read, is refused with an error wrapping canxml.ErrInvalidShape that
+// carries none of it. Text, a CDATA section, a second document type and
+// another declaration, which the deprecated parser reads past, read in the
+// default mode and are refused so given canxml.WithStrict. An input with only
+// such content and no root is the no-root case
 // (TestREQ108_ReadOperationalTemplateRefusesAnInputWithNoRootElement).
-func TestREQ176_ReadOperationalTemplateRefusesContentBeforeTheRoot(t *testing.T) {
+func TestREQ176_REQ111_ReadOperationalTemplateHoldsContentBeforeTheRoot(t *testing.T) {
 	t.Parallel()
 	const planted = "PLANTED"
 	refused := map[string]string{
+		"a stray end element":   `</` + planted + `>`,
+		"text, then bad markup": planted + `<1>`,
+	}
+	defaultOnly := map[string]string{
 		"text":                     planted,
 		"text after a declaration": `<?xml version="1.0"?>` + planted,
 		"a CDATA section":          `<![CDATA[` + planted + `]]>`,
-		"a stray end element":      `</` + planted + `>`,
 		"a second document type":   `<!DOCTYPE template><!DOCTYPE ` + planted + `>`,
 		"another declaration":      `<!ENTITY ` + planted + ` "x">`,
-		"text, then bad markup":    planted + `<1>`,
 	}
 	accepted := map[string]string{
 		"nothing":                  "",
@@ -256,31 +265,66 @@ func TestREQ176_ReadOperationalTemplateRefusesContentBeforeTheRoot(t *testing.T)
 		"one document type":        `<!DOCTYPE template>`,
 		"all of them":              `<?xml version="1.0"?><!-- note --><!DOCTYPE template><?pi data?>` + "\n",
 	}
-	for name, head := range refused {
-		t.Run("refused/"+name, func(t *testing.T) {
-			t.Parallel()
-			_, err := aom14.ReadOperationalTemplate(strings.NewReader(head + readTemplate))
-			if !errors.Is(err, canxml.ErrInvalidShape) {
-				t.Fatalf("ReadOperationalTemplate(%s + root) = %v, want an error wrapping canxml.ErrInvalidShape", name, err)
-			}
-			if strings.Contains(err.Error(), planted) {
-				t.Errorf("error %q carries the content before the root", err)
-			}
-		})
+	for mode, opts := range readModes {
+		for name, head := range refused {
+			t.Run(mode+"/refused/"+name, func(t *testing.T) {
+				t.Parallel()
+				refusesContentOutsideTheRoot(t, head+readTemplate, planted, opts...)
+			})
+		}
+		for name, head := range defaultOnly {
+			t.Run(mode+"/default mode only/"+name, func(t *testing.T) {
+				t.Parallel()
+				for _, bom := range []string{"", "\ufeff"} {
+					if mode == "strict" {
+						refusesContentOutsideTheRoot(t, bom+head+readTemplate, planted, opts...)
+						continue
+					}
+					readsTemplateT(t, bom+head+readTemplate, opts...)
+				}
+			})
+		}
+		for name, head := range accepted {
+			t.Run(mode+"/accepted/"+name, func(t *testing.T) {
+				t.Parallel()
+				for _, bom := range []string{"", "\ufeff"} {
+					readsTemplateT(t, bom+head+readTemplate, opts...)
+				}
+			})
+		}
 	}
-	for name, head := range accepted {
-		t.Run("accepted/"+name, func(t *testing.T) {
-			t.Parallel()
-			for _, bom := range []string{"", "\ufeff"} {
-				ot, err := aom14.ReadOperationalTemplate(strings.NewReader(bom + head + readTemplate))
-				if err != nil {
-					t.Fatalf("ReadOperationalTemplate(%q + %s + root): %v", bom, name, err)
-				}
-				if ot.TemplateID.Value != "t" {
-					t.Errorf("ReadOperationalTemplate(%q + %s + root): TemplateID.Value = %q, want %q", bom, name, ot.TemplateID.Value, "t")
-				}
-			}
-		})
+}
+
+// readModes are the reader's two modes.
+var readModes = map[string][]canxml.DecoderOption{
+	"default": nil,
+	"strict":  {canxml.WithStrict()},
+}
+
+// refusesContentOutsideTheRoot fails the test unless the reader refuses doc
+// with opts with an error that wraps canxml.ErrInvalidShape and does not
+// carry planted.
+func refusesContentOutsideTheRoot(t *testing.T, doc, planted string, opts ...canxml.DecoderOption) {
+	t.Helper()
+	_, err := aom14.ReadOperationalTemplate(strings.NewReader(doc), opts...)
+	if !errors.Is(err, canxml.ErrInvalidShape) {
+		t.Fatalf("ReadOperationalTemplate(%q) = %v, want an error wrapping canxml.ErrInvalidShape", doc, err)
+	}
+	if strings.Contains(err.Error(), planted) {
+		t.Errorf("error %q carries the content outside the root", err)
+	}
+}
+
+// readsTemplateT fails the test unless the reader reads doc with opts into
+// the template whose identifier is "t".
+func readsTemplateT(t *testing.T, doc string, opts ...canxml.DecoderOption) {
+	t.Helper()
+	ot, err := aom14.ReadOperationalTemplate(strings.NewReader(doc), opts...)
+	if err != nil {
+		t.Fatalf("ReadOperationalTemplate(%q): %v", doc, err)
+	}
+	if ot.TemplateID.Value != "t" {
+		t.Errorf("ReadOperationalTemplate(%q): TemplateID.Value = %q, want %q", doc, ot.TemplateID.Value, "t")
 	}
 }
 

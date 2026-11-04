@@ -6,6 +6,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"io"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -19,7 +20,8 @@ import (
 // reads and canonical XML does not, the reader rewrites the document into the
 // one canonical XML decodes as the parser read it, and decodes that. The
 // rewrite keeps every element at its path, so a report of unmatched content
-// names the paths of the input.
+// names the paths of the input, but for what an item it writes or takes off
+// holds, which a report names by its path in the object that holds it then.
 
 // Namespaces the tolerant reading knows beyond canxml's.
 const (
@@ -81,7 +83,21 @@ type element struct {
 	untyped bool
 	// leaf is an object of no class of the AOM 1.4 constraint model, read as
 	// a C_COMPLEX_OBJECT without its attributes.
-	leaf        bool
+	leaf bool
+	// complexTyped is an object typed C_COMPLEX_OBJECT, which the default
+	// mode reads as a C_ARCHETYPE_ROOT where it holds an archetype id.
+	complexTyped bool
+	// wrap is an object typed with a primitive class, read as a
+	// C_PRIMITIVE_OBJECT whose item is of that class and holds its members,
+	// but its rm_type_name, occurrences and node_id.
+	wrap bool
+	// members are the elements in the openEHR namespace a wrap holds.
+	members []*element
+	// unwrap is an item of a class the parser reads a constraint of that is
+	// no primitive, read as the object that holds it: host, of the item's
+	// class unless it is a C_PRIMITIVE_OBJECT, whose own item is then host's.
+	unwrap      bool
+	host        *element
 	cardinality bool         // an attribute that holds a <cardinality>
 	archetypeID bool         // an object that holds an archetype id
 	seen        uint8        // the flags a C_BOOLEAN item holds
@@ -116,6 +132,14 @@ type tolerantReading struct {
 	open     []*element
 	edits    []edit
 	xsiFresh string // a prefix the input does not use, once one is chosen
+	// foreign is the namespace of the root element, when the default mode
+	// reads it as canonical XML's.
+	foreign string
+	// failed is set where the reading cannot write the input as the parser
+	// reads it: an item it would take off declares a namespace it cannot
+	// move, or two edits a rendering makes overlap, which the reading does
+	// not make. The input is then left as it is, for the decode to refuse.
+	failed bool
 }
 
 // tolerate returns data rewritten so that canonical XML decodes it as the
@@ -153,7 +177,7 @@ func tolerate(data []byte, strict bool) ([]byte, bool) {
 			}
 		}
 	}
-	if len(t.edits) == 0 {
+	if len(t.edits) == 0 || t.failed {
 		return data, false
 	}
 	return t.apply()
@@ -177,6 +201,13 @@ func (t *tolerantReading) start(tk xml.StartElement, off, end int) {
 		typeAt: -1,
 		bareAt: -1,
 	}
+	// The parser reads a root element in a namespace of its own, and all in
+	// that namespace, as it reads one in canonical XML's.
+	if parent == nil && !t.strict {
+		if uri := ownNamespace(e.name, e.attrs); isForeignNamespace(uri) {
+			t.foreign = uri
+		}
+	}
 	for i, a := range e.attrs {
 		prefix, ok := declared(a.Name)
 		if !ok {
@@ -184,7 +215,7 @@ func (t *tolerantReading) start(tk xml.StartElement, off, end int) {
 		}
 		// An element in the namespace the AM Release-1.4 schemas declare
 		// reads as the element of that name in canonical XML's.
-		if a.Value == nsOpenEHRv2 {
+		if a.Value == nsOpenEHRv2 || (t.foreign != "" && a.Value == t.foreign) {
 			e.attrs[i].Value = canxml.NSDefault
 			e.dirty = true
 		}
@@ -209,6 +240,9 @@ func (t *tolerantReading) start(tk xml.StartElement, off, end int) {
 	}
 	if parent != nil && t.isOpenEHR(e.name) {
 		e.role = t.roleOf(parent, e)
+		if parent.wrap {
+			parent.members = append(parent.members, e)
+		}
 	} else if parent == nil {
 		e.role = roleRoot
 	}
@@ -227,6 +261,9 @@ func (t *tolerantReading) roleOf(parent, e *element) role {
 		}
 	case roleObject:
 		switch {
+		case parent.unwrap && isObjectMember(local):
+			// The object that holds the item has its own.
+			return roleLeftOut
 		case local == "attributes" && isComplexObject(parent.class):
 			if parent.leaf {
 				return roleLeftOut
@@ -237,14 +274,13 @@ func (t *tolerantReading) roleOf(parent, e *element) role {
 			return t.typeItem(e)
 		case local == "list" && parent.class == "C_DV_QUANTITY":
 			return roleQuantityItem
-		case local == "archetype_id" && parent.untyped:
+		case local == "archetype_id" && (parent.untyped || parent.complexTyped):
 			return roleArchetypeID
 		}
 	case roleAttribute:
 		switch local {
 		case "children":
-			t.typeObject(e)
-			return roleObject
+			return t.typeObject(e)
 		case "cardinality":
 			parent.cardinality = true
 		}
@@ -308,15 +344,16 @@ func (t *tolerantReading) typeAttribute(e *element) {
 	}
 }
 
-// typeObject reads the type of e, a <children> of an attribute.
-func (t *tolerantReading) typeObject(e *element) {
+// typeObject reads the type of e, a <children> of an attribute, and returns
+// its role.
+func (t *tolerantReading) typeObject(e *element) role {
 	written, typed := e.xsiType()
 	name := strings.TrimSpace(written)
 	if !typed || name == "" {
 		t.untypedSlot(e)
 		// Either type it takes is a complex object.
 		e.class = "C_COMPLEX_OBJECT"
-		return
+		return roleObject
 	}
 	switch kindOf(name) {
 	case kindObject:
@@ -327,14 +364,24 @@ func (t *tolerantReading) typeObject(e *element) {
 		if name != written && !t.strict {
 			e.retype = name
 		}
+		e.complexTyped = name == "C_COMPLEX_OBJECT" && !t.strict
 	case kindNone:
 		if !t.strict {
 			e.retype, e.class, e.leaf = "C_COMPLEX_OBJECT", "C_COMPLEX_OBJECT", true
 		}
-	case kindAttribute, kindPrimitive:
+	case kindPrimitive:
+		// The parser reads the object as a leaf that holds a constraint of its
+		// class, which a C_PRIMITIVE_OBJECT holds as its item; strict mode
+		// leaves it to the decode, which refuses it in a C_OBJECT slot.
+		if !t.strict {
+			e.retype, e.class, e.wrap = "C_PRIMITIVE_OBJECT", name, true
+			return roleItem
+		}
+	case kindAttribute:
 		// A class of the constraint model that a C_OBJECT slot does not hold:
 		// the decode refuses it.
 	}
+	return roleObject
 }
 
 // typeItem reads the type of e, the <item> of a C_PRIMITIVE_OBJECT, and
@@ -356,8 +403,16 @@ func (t *tolerantReading) typeItem(e *element) role {
 			e.retype = name
 		}
 		return roleItem
-	case parserItemClass(name), t.strict:
+	case t.strict:
 		return roleNone
+	case parserItemClass(name):
+		// The parser reads the constraint of the item's class from the item,
+		// on the object that holds it.
+		e.class, e.unwrap, e.host = name, true, e.parent
+		if e.parent.unwrap {
+			e.host = e.parent.host
+		}
+		return roleObject
 	}
 	return roleLeftOut
 }
@@ -410,13 +465,21 @@ func (t *tolerantReading) close(off, end int) {
 		}
 		t.closeTag(e)
 	case roleObject:
-		if e.untyped {
+		switch {
+		case e.untyped:
 			e.retype = "C_COMPLEX_OBJECT"
 			if e.archetypeID {
 				e.retype = "C_ARCHETYPE_ROOT"
 			}
+		case e.complexTyped && e.archetypeID:
+			// The parser reads it as the archetype root it names.
+			e.retype = "C_ARCHETYPE_ROOT"
 		}
-		t.closeTag(e)
+		if e.unwrap {
+			t.unwrapItem(e)
+		} else {
+			t.closeTag(e)
+		}
 	case roleLeftOut:
 		t.leaveOut(e)
 	case roleNone, roleRoot, roleQuantityItem, roleArchetypeID:
@@ -502,9 +565,18 @@ func (t *tolerantReading) closeBooleanMember(p, e *element) {
 }
 
 // closeNumberMember reads e, a list entry or the assumed_value of the
-// C_INTEGER or C_REAL item p.
+// C_INTEGER or C_REAL item p. The default mode reads a real number the parser
+// reads and canonical XML does not as the parser's.
 func (t *tolerantReading) closeNumberMember(p, e *element) {
-	if e.nested || parserNumber(p.class, e.text) {
+	if e.nested {
+		t.closeTag(e)
+		return
+	}
+	if parserNumber(p.class, e.text) {
+		if text, ok := boundText(p.class, e.text); ok && text != "" && !t.strict {
+			t.setText(e, text)
+			return
+		}
 		t.closeTag(e)
 		return
 	}
@@ -548,15 +620,33 @@ func (t *tolerantReading) closeTimezoneValidity(e *element) {
 // parser reads leniently in its strict mode too; elsewhere in the default
 // mode, the side included unless the range says otherwise, as a bounded side
 // is. Strict mode refuses the bound of a C_INTEGER or C_REAL on a bounded
-// side, an empty one too, which the decode reads as 0.
+// side, an empty one too, which the decode reads as 0. A number the parser
+// reads and canonical XML does not, of a C_REAL or of a quantity's magnitude
+// or precision, is left out in every mode on a side written unbounded, and
+// read as the parser's number in the default mode on a bounded side.
 func (t *tolerantReading) closeRange(r *element) {
 	for i := range r.sides {
 		s := r.sides[i]
 		b := s.bound
-		if b == nil || b.nested || parserNumber(r.class, b.text) {
+		if b == nil || b.nested {
 			continue
 		}
 		written, open := boundaryFlag(s.unbounded)
+		if parserNumber(r.class, b.text) {
+			kind := r.class
+			if kind == "C_QUANTITY_ITEM" && r.name.Local == "precision" {
+				kind = "precision"
+			}
+			text, ok := boundText(kind, b.text)
+			switch {
+			case !ok:
+			case written && open:
+				t.leaveOut(b)
+			case text != "" && !t.strict:
+				t.setText(b, text)
+			}
+			continue
+		}
 		if written && open {
 			t.leaveOut(b)
 			continue
@@ -600,7 +690,8 @@ func boundaryFlag(e *element) (written, value bool) {
 }
 
 // closeItem adds to the C_BOOLEAN item p the flags it leaves out, each true,
-// and closes its start tag.
+// writes the item a wrap p holds around its members, and closes its start
+// tag.
 func (t *tolerantReading) closeItem(p *element) {
 	if p.class == "C_BOOLEAN" {
 		if p.seen&seenTrueValid == 0 {
@@ -610,7 +701,105 @@ func (t *tolerantReading) closeItem(p *element) {
 			p.insert = appendElement(p.insert, p.name.Space, "false_valid", "true")
 		}
 	}
+	if p.wrap {
+		t.wrapMembers(p)
+	}
 	t.closeTag(p)
+}
+
+// wrapMembers writes, inside p, an object typed with a primitive class, an
+// item of that class that holds what p holds, but p's rm_type_name,
+// occurrences and node_id, which it moves before the item, and the elements
+// the reading adds to p. p's start tag then reads as a C_PRIMITIVE_OBJECT.
+// The members the item holds have their paths in it.
+func (t *tolerantReading) wrapMembers(p *element) {
+	name := qualified(xml.Name{Space: p.name.Space, Local: "item"})
+	open := "<" + name + " " + qualified(p.attrs[p.typeAt].Name) + `="` + p.class + `">`
+	end := "</" + name + ">"
+	if p.self {
+		p.insert = slices.Concat([]byte(open), p.insert, []byte(end))
+		return
+	}
+	var before, inside []byte
+	pos := p.tagEnd
+	for _, m := range p.members {
+		if !isObjectMember(m.name.Local) {
+			continue
+		}
+		inside = append(inside, t.render(pos, m.off)...)
+		before = append(before, t.render(m.off, m.end)...)
+		pos = m.end
+	}
+	inside = append(inside, t.render(pos, p.endTag)...)
+	t.drop(p)
+	t.add(p.tagEnd, p.endTag, string(before)+open+string(inside)+string(p.insert)+end)
+	p.insert = nil
+}
+
+// unwrapItem reads e, an item of a class the parser reads a constraint of
+// that is no primitive, as the object that holds it: it takes off e's start
+// and end tags, so that what e holds is held by e.host, which takes e's class
+// unless that is C_PRIMITIVE_OBJECT. A namespace e declares moves to the
+// host's start tag. Where e declares a prefix bound otherwise around it, or
+// the default namespace, the reading fails. The members e holds have their
+// paths in the host.
+func (t *tolerantReading) unwrapItem(e *element) {
+	var moved []xml.Attr
+	for _, a := range e.attrs {
+		prefix, ok := declared(a.Name)
+		if !ok {
+			continue
+		}
+		uri, bound := lookupIn(t.scope[:e.scope], prefix)
+		if !bound {
+			uri, bound = declaredIn(e.host.attrs, prefix)
+		}
+		switch {
+		case bound && uri == a.Value:
+		case bound, prefix == "":
+			t.failed = true
+			return
+		default:
+			moved = append(moved, a)
+		}
+	}
+	if len(moved) > 0 {
+		e.host.attrs = append(slices.Clone(e.host.attrs), moved...)
+		e.host.dirty = true
+	}
+	if e.class != "C_PRIMITIVE_OBJECT" {
+		e.host.retype = e.class
+	}
+	if e.self {
+		t.add(e.off, e.end, "")
+		return
+	}
+	t.add(e.off, e.tagEnd, "")
+	t.add(e.endTag, e.end, "")
+}
+
+// render returns the input from off to end with the edits made that start
+// there.
+func (t *tolerantReading) render(off, end int) []byte {
+	var edits []edit
+	for _, d := range t.edits {
+		if d.off >= off && d.off < end {
+			edits = append(edits, d)
+		}
+	}
+	slices.SortStableFunc(edits, func(a, b edit) int { return cmp.Compare(a.off, b.off) })
+	var out []byte
+	pos := off
+	for _, d := range edits {
+		if d.off < pos || d.end > end {
+			t.failed = true
+			return t.data[off:end]
+		}
+		out = append(out, t.data[pos:d.off]...)
+		out = append(out, d.text...)
+		pos = d.end
+	}
+	return append(out, t.data[pos:end]...)
 }
 
 // closeTag writes the start tag of e where the reading changed it, and the
@@ -725,12 +914,47 @@ func (t *tolerantReading) xsiPrefix() (string, bool) {
 
 // lookup returns the namespace prefix is bound to where the reading stands.
 func (t *tolerantReading) lookup(prefix string) (string, bool) {
-	for _, b := range slices.Backward(t.scope) {
+	return lookupIn(t.scope, prefix)
+}
+
+// lookupIn returns the namespace prefix is bound to in scope.
+func lookupIn(scope []binding, prefix string) (string, bool) {
+	for _, b := range slices.Backward(scope) {
 		if b.prefix == prefix {
 			return b.uri, true
 		}
 	}
 	return "", false
+}
+
+// declaredIn returns the namespace attrs, the attributes of a start tag,
+// bind prefix to, "" for the default namespace.
+func declaredIn(attrs []xml.Attr, prefix string) (string, bool) {
+	for _, a := range attrs {
+		if p, ok := declared(a.Name); ok && p == prefix {
+			return a.Value, true
+		}
+	}
+	return "", false
+}
+
+// ownNamespace returns the namespace the start tag of an element named name,
+// with attrs, binds its own prefix to, "" where it binds none.
+func ownNamespace(name xml.Name, attrs []xml.Attr) string {
+	uri, _ := declaredIn(attrs, name.Space)
+	return uri
+}
+
+// isForeignNamespace reports whether the default mode reads uri, the
+// namespace of the root element, as canonical XML's: a namespace other than
+// none, canonical XML's, the one the AM Release-1.4 schemas declare and the
+// XSI one, whose xsi:type attributes would otherwise read as none.
+func isForeignNamespace(uri string) bool {
+	switch uri {
+	case "", canxml.NSDefault, nsOpenEHRv2, canxml.NSXSI:
+		return false
+	}
+	return true
 }
 
 // isOpenEHR reports whether an element named name, as written, is in the
@@ -818,6 +1042,12 @@ func isComplexObject(class string) bool {
 	return class == "C_COMPLEX_OBJECT" || class == "C_ARCHETYPE_ROOT"
 }
 
+// isObjectMember reports whether local names a member every constraint
+// object has.
+func isObjectMember(local string) bool {
+	return local == "rm_type_name" || local == "occurrences" || local == "node_id"
+}
+
 // parserNumber reports whether the parser reads text as a number of the
 // class: an integer of 64 bits for a C_INTEGER, and a float of 64 bits for a
 // C_REAL and for the bounds of a quantity, each without the white space
@@ -830,6 +1060,42 @@ func parserNumber(class string, text []byte) bool {
 	}
 	_, err := strconv.ParseFloat(s, 64)
 	return err == nil
+}
+
+// boundText reads text, which the parser reads as a number of kind, and
+// reports whether canonical XML reads it otherwise or not at all; it then
+// returns the text canonical XML reads as the parser's number, or "" where
+// the model holds no such number. kind is C_REAL, C_QUANTITY_ITEM for a
+// quantity's magnitude, read as a Real, or precision for a quantity's
+// precision, read as an Integer; text of any other kind reads alike.
+func boundText(kind string, text []byte) (string, bool) {
+	s := strings.TrimSpace(string(text))
+	switch kind {
+	case "C_REAL", "C_QUANTITY_ITEM":
+		var r Real
+		if r.UnmarshalText(text) == nil {
+			return "", false
+		}
+		f, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return "", false
+		}
+		b, _ := Real(f).MarshalText() // a Real always writes
+		return string(b), true
+	case "precision":
+		if _, err := strconv.ParseInt(s, 10, 32); err == nil {
+			return "", false
+		}
+		f, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return "", false
+		}
+		if f != math.Trunc(f) || f < math.MinInt32 || f > math.MaxInt32 {
+			return "", true
+		}
+		return strconv.FormatInt(int64(f), 10), true
+	}
+	return "", false
 }
 
 // isBlank reports whether text is empty or XML white space only.

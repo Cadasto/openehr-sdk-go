@@ -2,6 +2,7 @@ package aom14
 
 import (
 	"bytes"
+	"encoding/xml"
 	"errors"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
@@ -20,7 +21,10 @@ import (
 // retryable reports whether err, the failure of the first decode, is one a
 // reading of [tolerate] can lift: the text of a value, a type a slot cannot
 // dispatch, which only the default mode reads, or an element in the namespace
-// the AM Release-1.4 schemas declare, which a strict decode refuses.
+// the AM Release-1.4 schemas declare, which a strict decode refuses. A type a
+// slot cannot dispatch covers a <children> of a primitive class and an <item>
+// of a class the parser reads a constraint of; the text of a value covers a
+// real number canonical XML does not read.
 func retryable(err error, strict bool) bool {
 	switch {
 	case xmlunmatched.IsPrimitiveFailure(err), errors.Is(err, canxml.ErrNamespace):
@@ -38,19 +42,42 @@ func retryable(err error, strict bool) bool {
 // may be one the parser reads as none; the namespace the AM Release-1.4
 // schemas declare; a bare type attribute, which the decode reads as an
 // xsi:type; or an empty element a number is read from, which the decode reads
-// as 0. A check may find what tolerate then leaves as it is, which costs a
-// second reading that changes nothing; none misses what it looks for.
-func needsTolerance(data []byte, ot *OperationalTemplate) bool {
-	return booleanAssumes(ot.Definition.Attributes) ||
+// as 0. Unless strict, it also looks for a root element in a namespace the
+// decode does not read, whose content the decode skips, and for an archetype
+// id on a constraint object the decode read as a C_COMPLEX_OBJECT, which it
+// skips: more archetype_id elements than archetype roots that hold one. A
+// check may find what tolerate then leaves as it is, which costs a second
+// reading that changes nothing; none misses what it looks for.
+func needsTolerance(data []byte, ot *OperationalTemplate, strict bool) bool {
+	var m modelFacts
+	m.walk(ot.Definition.Attributes)
+	if m.booleanAssumes ||
 		bytes.Contains(data, []byte(nsOpenEHRv2)) ||
 		hasBareType(data) ||
 		hasEmptyValue(data) ||
-		!booleansHoldFlags(data)
+		!booleansHoldFlags(data) {
+		return true
+	}
+	if strict {
+		return false
+	}
+	if ot.Definition.ArchetypeID.Value != "" {
+		m.roots++
+	}
+	return foreignRoot(data) || archetypeIDs(data) > m.roots
 }
 
-// booleanAssumes reports whether a C_BOOLEAN item of a C_PRIMITIVE_OBJECT
-// under attrs has an assumed value.
-func booleanAssumes(attrs []CAttribute) bool {
+// modelFacts is what [needsTolerance] reads off the model the first decode
+// gave.
+type modelFacts struct {
+	// booleanAssumes is true where a C_BOOLEAN item has an assumed value.
+	booleanAssumes bool
+	// roots counts the archetype roots that hold an archetype id.
+	roots int
+}
+
+// walk reads the constraint objects under attrs into m.
+func (m *modelFacts) walk(attrs []CAttribute) {
 	for _, a := range attrs {
 		var children []CObject
 		switch v := a.(type) {
@@ -66,24 +93,70 @@ func booleanAssumes(attrs []CAttribute) bool {
 		for _, c := range children {
 			switch v := c.(type) {
 			case *CComplexObject:
-				if v != nil && booleanAssumes(v.Attributes) {
-					return true
+				if v != nil {
+					m.walk(v.Attributes)
 				}
 			case *CArchetypeRoot:
-				if v != nil && booleanAssumes(v.Attributes) {
-					return true
+				if v != nil {
+					if v.ArchetypeID.Value != "" {
+						m.roots++
+					}
+					m.walk(v.Attributes)
 				}
 			case *CPrimitiveObject:
 				if v == nil {
 					continue
 				}
 				if b, ok := v.Item.(*CBoolean); ok && b != nil && b.AssumedValue != nil {
-					return true
+					m.booleanAssumes = true
 				}
 			}
 		}
 	}
-	return false
+}
+
+// foreignRoot reports whether the root element of data is in a namespace
+// other than none, the one canonical XML reads, the one the AM Release-1.4
+// schemas declare and the XSI one: a namespace the default mode reads as
+// canonical XML's. It reads data up to the root's start tag.
+func foreignRoot(data []byte) bool {
+	d := xml.NewDecoder(bytes.NewReader(bytes.TrimPrefix(data, byteOrderMark)))
+	for {
+		tok, err := d.RawToken()
+		if err != nil {
+			return false
+		}
+		if start, ok := tok.(xml.StartElement); ok {
+			return isForeignNamespace(ownNamespace(start.Name, start.Attr))
+		}
+	}
+}
+
+// archetypeIDs counts the start tags in data whose local name is
+// archetype_id, with a prefix or without. Text that reads so, in a comment
+// or a CDATA section, counts as well.
+func archetypeIDs(data []byte) int {
+	word := []byte("archetype_id")
+	n := 0
+	for i := 0; ; {
+		j := bytes.Index(data[i:], word)
+		if j < 0 {
+			return n
+		}
+		j += i
+		i = j + len(word)
+		if j == 0 || i >= len(data) || !isTagEnd(data[i]) {
+			continue
+		}
+		switch data[j-1] {
+		case '<':
+			n++
+		case ':':
+			if lt := bytes.LastIndexByte(data[:j], '<'); lt >= 0 && data[lt+1] != '/' && !bytes.ContainsAny(data[lt:j], " \t\r\n>") {
+				n++
+			}
+		}
+	}
 }
 
 // booleansHoldFlags reports whether each C_BOOLEAN in data is the type of an
