@@ -80,14 +80,20 @@ const inputBufferMax = 4 << 20
 //     that flag true;
 //   - the assumed_value of a C_BOOLEAN, C_INTEGER or C_REAL that holds no
 //     value of its type as absent, a boolean being true, false, 1 or 0 in
-//     any letter case;
+//     any letter case, and the assumed_value of a C_DV_QUANTITY that the
+//     model cannot hold, which the parser ignores, as absent;
+//   - a bound of a C_INTEGER range or of a quantity's precision written as a
+//     decimal number, such as 1.0 or 2.5, which the parser reads as a float,
+//     as the integer bound that admits the same integers: a lower bound
+//     rounded up and an upper one down, the side included where the number
+//     is not a whole one;
 //   - an empty timezone_validity of a C_DATE, C_TIME or C_DATE_TIME as
 //     absent, which is optional;
 //   - a range bound on a side the range writes unbounded, which the parser
-//     does not read, that holds no number, or a number of a C_REAL or of a
-//     quantity's magnitude or precision that canonical XML does not read, and
-//     a bound of the magnitude or precision of a C_DV_QUANTITY that holds no
-//     number, as absent, the side unbounded.
+//     does not read, that holds no number, or a number of a C_INTEGER or
+//     C_REAL or of a quantity's magnitude or precision that canonical XML
+//     does not read, and a bound of the magnitude or precision of a
+//     C_DV_QUANTITY that holds no number, as absent, the side unbounded.
 //
 // Without [canxml.WithStrict] it also reads a root element in a namespace
 // other than none and those two, and every element in that namespace, as in
@@ -106,8 +112,9 @@ const inputBufferMax = 4 << 20
 //   - a <children> typed C_COMPLEX_OBJECT that holds an archetype id, as a
 //     C_ARCHETYPE_ROOT;
 //   - a <children> whose type names no class of the AOM 1.4 constraint
-//     model, as a C_COMPLEX_OBJECT with the rm_type_name, node_id and
-//     occurrences it holds and none of its attributes;
+//     model, or a class a <children> cannot hold, such as
+//     C_SINGLE_ATTRIBUTE, as a C_COMPLEX_OBJECT with the rm_type_name,
+//     node_id and occurrences it holds and none of its attributes;
 //   - a <children> typed with a C_PRIMITIVE class, such as C_STRING, as a
 //     C_PRIMITIVE_OBJECT with the rm_type_name, node_id and occurrences it
 //     holds, whose item, of that class, holds the rest;
@@ -123,8 +130,7 @@ const inputBufferMax = 4 << 20
 //   - a value of a C_REAL, or a bound of a quantity's magnitude, that Go's
 //     strconv.ParseFloat reads and XML Schema's double does not, such as Inf,
 //     0x1p-2 or a decimal of more digits than a double holds, as the number
-//     it reads, and a bound of a quantity's precision that it reads as an
-//     integer the model's Integer holds, such as 2.0, as that integer;
+//     it reads;
 //   - a timezone_validity that names no validity kind as absent.
 //
 // A side a bound is read out of keeps the included flag the range gives it;
@@ -140,13 +146,14 @@ const inputBufferMax = 4 << 20
 // alone reads, as it refuses a bare type attribute on such an element, which
 // canonical XML reads as its type, and an empty list entry or range bound of
 // a C_INTEGER or C_REAL, which canonical XML reads as 0. In every mode it
-// refuses an integer that the model's 32-bit Integer cannot hold, and a
-// match_negated of true, which the parser ignores and so reads with its
-// meaning inverted. A document that needs none of these readings is decoded
-// once; one that needs one is decoded a second time, from the bytes the
-// reader keeps of the input, but for what it reads past before and after the
-// root, and so is every document when opts pass what the decode reports to a
-// function, which sees each item once.
+// refuses an integer that the model's 32-bit Integer cannot hold, a bound of
+// a C_INTEGER range or of a quantity's precision that rounds to one or is
+// infinite among them, and a match_negated of true, which the parser ignores
+// and so reads with its meaning inverted. A document that needs none of these
+// readings is decoded once; one that needs one is decoded a second time,
+// from the bytes the reader keeps of the input, but for what it reads past
+// before and after the root, and so is every document when opts pass what
+// the decode reports to a function, which sees each item once.
 //
 // A caller that decodes an operational template with [canxml.Unmarshal] or a
 // [canxml.Decoder] itself gets neither limit and none of these readings

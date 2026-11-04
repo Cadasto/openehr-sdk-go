@@ -182,11 +182,10 @@ func TestREQ111_ReaderReadsWhatElseTheParserReads(t *testing.T) {
 	}
 }
 
-// TestREQ111_ReaderMovesTheNamespacesOfAnItemItTakesOff pins that a
+// TestREQ111_ReaderKeepsTheNamespacesOfAnItemItTakesOff pins that a
 // namespace an <item> declares, which the default mode reads as the object
-// that holds it, moves to that object, so that what the item holds keeps its
-// names.
-func TestREQ111_ReaderMovesTheNamespacesOfAnItemItTakesOff(t *testing.T) {
+// that holds it, still binds what the item holds, so that it keeps its names.
+func TestREQ111_ReaderKeepsTheNamespacesOfAnItemItTakesOff(t *testing.T) {
 	t.Parallel()
 	const xsi = "http://www.w3.org/2001/XMLSchema-instance"
 	doc := itemDoc(`<item xmlns:p="` + xsi + `" p:type="C_PRIMITIVE_OBJECT"><item p:type="C_STRING"><list>a</list></item></item>`)
@@ -194,29 +193,182 @@ func TestREQ111_ReaderMovesTheNamespacesOfAnItemItTakesOff(t *testing.T) {
 	readAs(t, []byte(doc), decoded(t, []byte(want)))
 }
 
-// TestREQ111_ReaderRefusesAnItemWhoseNamespacesItCannotMove pins that the
-// default mode leaves a document as it is, for the decode to refuse, where an
-// <item> it would take off binds a prefix the object that holds it binds
-// otherwise, rather than read a C_CODE_PHRASE the inner item names without
-// the codes the outer item holds.
-func TestREQ111_ReaderRefusesAnItemWhoseNamespacesItCannotMove(t *testing.T) {
+// TestREQ111_ReaderReadsAnItemThatRebindsANamespace pins that the default
+// mode reads an <item> it takes off as the parser reads it where the item
+// declares a namespace that the object that holds it binds otherwise or does
+// not bind: the default namespace, a prefix bound around it to another
+// namespace, or one it binds to the v2 namespace. What the item holds keeps
+// the names the item gives it, and WithUnmatched reports the member of an
+// item that its object has, in that object. Strict mode refuses the items.
+func TestREQ111_ReaderReadsAnItemThatRebindsANamespace(t *testing.T) {
 	t.Parallel()
-	doc := definitionDoc(`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>value</rm_attribute_name>` +
-		`<existence><lower>0</lower><upper>1</upper></existence><children xmlns:q="urn:x-q1" xsi:type="C_PRIMITIVE_OBJECT">` +
-		`<rm_type_name>CODE_PHRASE</rm_type_name><occurrences><lower>1</lower><upper>1</upper></occurrences><node_id/>` +
-		`<item xmlns:q="urn:x-q2" xsi:type="C_PRIMITIVE_OBJECT"><item xsi:type="C_CODE_PHRASE"><code_list>at1</code_list></item></item>` +
-		`</children></attributes>`)
-	_, err := aom14.ReadOperationalTemplate(strings.NewReader(doc))
-	if !errors.Is(err, typereg.ErrTypeMismatch) {
-		t.Errorf("ReadOperationalTemplate = %v, want an error wrapping typereg.ErrTypeMismatch", err)
+	data := readerFixture(t, "item-namespaces.opt")
+	want := decoded(t, readerFixture(t, "item-namespaces.read.opt"))
+	got := readAs(t, data, want)
+	if want := []string{definition + "/attributes[1]/children[2]/attributes[1]/children[1]/rm_type_name[2]"}; !slices.Equal(got, want) {
+		t.Errorf("WithUnmatched reported\n%q\nwant\n%q", got, want)
+	}
+	if _, err := aom14.ReadOperationalTemplate(bytes.NewReader(data), canxml.WithStrict()); !errors.Is(err, typereg.ErrTypeMismatch) {
+		t.Errorf("ReadOperationalTemplate(WithStrict) = %v, want an error wrapping typereg.ErrTypeMismatch", err)
+	}
+
+	// The prefix q, bound to one namespace on the object and to another on
+	// its item, binds nothing the item holds: the inner item's code phrase
+	// keeps its codes.
+	t.Run("a prefix that binds nothing the item holds", func(t *testing.T) {
+		t.Parallel()
+		value := func(children string) string {
+			return definitionDoc(`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>value</rm_attribute_name>` +
+				`<existence><lower>0</lower><upper>1</upper></existence>` + children + `</attributes>`)
+		}
+		doc := value(`<children xmlns:q="urn:x-q1" xsi:type="C_PRIMITIVE_OBJECT">` +
+			`<rm_type_name>CODE_PHRASE</rm_type_name><occurrences><lower>1</lower><upper>1</upper></occurrences><node_id/>` +
+			`<item xmlns:q="urn:x-q2" xsi:type="C_PRIMITIVE_OBJECT"><item xsi:type="C_CODE_PHRASE"><code_list>at1</code_list></item></item></children>`)
+		want := value(`<children xsi:type="C_CODE_PHRASE"><rm_type_name>CODE_PHRASE</rm_type_name>` +
+			`<occurrences><lower>1</lower><upper>1</upper></occurrences><node_id/><code_list>at1</code_list></children>`)
+		readAs(t, []byte(doc), decoded(t, []byte(want)))
+	})
+}
+
+// TestREQ111_ReaderReadsAChildrenOfAnAttributeClassAsALeaf pins that the
+// default mode reads a <children> typed with a class of the constraint model
+// a <children> cannot hold, C_SINGLE_ATTRIBUTE or C_MULTIPLE_ATTRIBUTE, as a
+// C_COMPLEX_OBJECT leaf with the rm_type_name, occurrences and node_id it
+// holds, as the parser reads it. WithUnmatched reports the rest, each item
+// once: the leaf's attributes and the members of an attribute it holds.
+// TestREQ111_ReaderStrictModeRefusesTheParsersOtherReadings pins strict
+// mode's refusal.
+func TestREQ111_ReaderReadsAChildrenOfAnAttributeClassAsALeaf(t *testing.T) {
+	t.Parallel()
+	data := readerFixture(t, "attribute-children.opt")
+	want := decoded(t, readerFixture(t, "attribute-children.read.opt"))
+	got := readAs(t, data, want)
+	value := func(n int) string {
+		return definition + "/attributes[1]/children[" + strconv.Itoa(n) + "]/attributes[1]/children[1]"
+	}
+	wantUnmatched := []string{
+		value(1) + "/rm_attribute_name[1]",
+		value(1) + "/existence[1]",
+		value(1) + "/children[1]",
+		value(2) + "/attributes[1]",
+		value(2) + "/cardinality[1]",
+	}
+	if !slices.Equal(got, wantUnmatched) {
+		t.Errorf("WithUnmatched reported\n%q\nwant\n%q", got, wantUnmatched)
+	}
+}
+
+// TestREQ111_ReaderReadsADecimalIntegerBoundInEveryMode pins that, in every
+// mode, a bound of a C_INTEGER range or of a quantity's precision written as
+// a decimal number, which the parser reads as a float, is read as the integer
+// bound that admits the same integers: a lower bound rounded up and an upper
+// one down, its side included where the rounding changes it, and keeping its
+// flag where the number is a whole one.
+func TestREQ111_ReaderReadsADecimalIntegerBoundInEveryMode(t *testing.T) {
+	t.Parallel()
+	fixture := readerFixture(t, "integer-bounds.opt")
+	fixtureWant := decoded(t, readerFixture(t, "integer-bounds.read.opt"))
+	integer := func(rng string) string {
+		return itemDoc(`<item xsi:type="C_INTEGER"><range>` + rng + `</range></item>`)
+	}
+	cases := map[string]struct{ doc, want string }{
+		"a lower bound, excluded, rounded up": {
+			integer(`<lower_included>false</lower_included><lower>2.5</lower><upper>9</upper>`),
+			integer(`<lower_included>true</lower_included><lower>3</lower><upper>9</upper>`),
+		},
+		"an upper bound rounded down": {
+			integer(`<lower>0</lower><upper>2.5</upper>`),
+			integer(`<lower>0</lower><upper>2</upper><upper_included>true</upper_included>`),
+		},
+		"negative bounds, an upper one excluded": {
+			integer(`<upper_included>false</upper_included><lower>-2.5</lower><upper>-0.5</upper>`),
+			integer(`<upper_included>true</upper_included><lower>-2</lower><upper>-1</upper><lower_included>true</lower_included>`),
+		},
+		"a lower bound rounded up to zero": {
+			integer(`<lower> -0.5 </lower><upper>1e1</upper>`),
+			integer(`<lower>0</lower><upper>10</upper><lower_included>true</lower_included>`),
+		},
+		"a quantity's precision": {
+			quantityDoc(`<precision><lower_included></lower_included><lower>0.5</lower><upper>2.5</upper></precision>`),
+			quantityDoc(`<precision><lower_included>true</lower_included><lower>1</lower><upper>2</upper><upper_included>true</upper_included></precision>`),
+		},
+		"a quantity's precision of whole numbers": {
+			quantityDoc(`<precision><lower>0.0</lower><upper_included>false</upper_included><upper>2.0</upper></precision>`),
+			quantityDoc(`<precision><lower>0</lower><upper_included>false</upper_included><upper>2</upper></precision>`),
+		},
+	}
+	for mode, opts := range modes {
+		t.Run(mode+"/integer-bounds.opt", func(t *testing.T) {
+			t.Parallel()
+			if unmatched := readAs(t, fixture, fixtureWant, opts...); len(unmatched) > 0 {
+				t.Errorf("WithUnmatched reported %q, want nothing", unmatched)
+			}
+		})
+		for name, tc := range cases {
+			t.Run(mode+"/"+name, func(t *testing.T) {
+				t.Parallel()
+				if unmatched := readAs(t, []byte(tc.doc), decoded(t, []byte(tc.want)), opts...); len(unmatched) > 0 {
+					t.Errorf("WithUnmatched reported %q, want nothing", unmatched)
+				}
+			})
+		}
+	}
+}
+
+// TestREQ111_ReaderReadsAQuantityAssumedValueItCannotHoldAsAbsent pins that,
+// in every mode, an assumed_value of a C_DV_QUANTITY that the model cannot
+// hold, which the parser ignores, is read as absent: a magnitude that is no
+// number, a precision that is no integer, or a bound of its normal range of a
+// type that range cannot hold, under a prefix declared around it. An assumed
+// value the model holds is kept. The default mode reports what it leaves out;
+// strict mode leaves it out unreported. Each case alone reads too, so that a
+// failure strict mode alone meets first is read as well, and one whose
+// elements are under a prefix bound around it.
+func TestREQ111_ReaderReadsAQuantityAssumedValueItCannotHoldAsAbsent(t *testing.T) {
+	t.Parallel()
+	data := readerFixture(t, "quantity-assumed-value.opt")
+	want := decoded(t, readerFixture(t, "quantity-assumed-value.read.opt"))
+	assumed := func(n int) string {
+		return definition + "/attributes[1]/children[" + strconv.Itoa(n) + "]/attributes[1]/children[1]/assumed_value[1]"
+	}
+	wantUnmatched := map[string][]string{
+		"default": {assumed(1), assumed(2), assumed(3)},
+		"strict":  nil,
+	}
+	alone := map[string]string{
+		"a magnitude that is no number": `<assumed_value><magnitude>abc</magnitude><units>kg</units></assumed_value>`,
+		"a normal range bound of another type": `<assumed_value><magnitude>1</magnitude><units>kg</units>` +
+			`<normal_range><lower xsi:type="DV_COUNT"><magnitude>0</magnitude></lower></normal_range></assumed_value>`,
+		"a magnitude that is no number, under a prefix bound around it": `<q:assumed_value><q:magnitude>abc</q:magnitude><q:units>kg</q:units></q:assumed_value>`,
+	}
+	quantity := func(assumed string) string {
+		return definitionDoc(`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>value</rm_attribute_name>` +
+			`<existence><lower>0</lower><upper>1</upper></existence><children xmlns:q="` + nsV1 + `" xsi:type="C_DV_QUANTITY">` +
+			`<rm_type_name>DV_QUANTITY</rm_type_name><occurrences><lower>1</lower><upper>1</upper></occurrences><node_id/>` +
+			`<list><units>kg</units></list>` + assumed + `</children></attributes>`)
+	}
+	for mode, opts := range modes {
+		t.Run(mode+"/quantity-assumed-value.opt", func(t *testing.T) {
+			t.Parallel()
+			if got := readAs(t, data, want, opts...); !slices.Equal(got, wantUnmatched[mode]) {
+				t.Errorf("WithUnmatched reported\n%q\nwant\n%q", got, wantUnmatched[mode])
+			}
+		})
+		for name, av := range alone {
+			t.Run(mode+"/"+name, func(t *testing.T) {
+				t.Parallel()
+				readAs(t, []byte(quantity(av)), decoded(t, []byte(quantity(""))), opts...)
+			})
+		}
 	}
 }
 
 // TestREQ111_ReaderStrictModeRefusesTheParsersOtherReadings pins that
 // canxml.WithStrict refuses each shape and value
-// TestREQ111_ReaderReadsWhatElseTheParserReads reads, and that the default
-// mode reads it, in a document of the v1 namespace and in one of the v2
-// namespace, which every mode reads a second time.
+// TestREQ111_ReaderReadsWhatElseTheParserReads reads, and a <children> of an
+// attribute class, and that the default mode reads it, in a document of the
+// v1 namespace and in one of the v2 namespace, which every mode reads a
+// second time.
 func TestREQ111_ReaderStrictModeRefusesTheParsersOtherReadings(t *testing.T) {
 	t.Parallel()
 	const lossy = "0.10000000000000000555111512312578270211815834045410156251"
@@ -237,7 +389,8 @@ func TestREQ111_ReaderStrictModeRefusesTheParsersOtherReadings(t *testing.T) {
 		{"a C_REAL range bound in hexadecimal", itemDoc(`<item xsi:type="C_REAL"><range><lower>0x1p-2</lower><upper>1</upper></range></item>`), canxml.ErrInvalidShape},
 		{"a C_REAL assumed value of more digits than a double holds", itemDoc(`<item xsi:type="C_REAL"><assumed_value>` + lossy + `</assumed_value></item>`), canxml.ErrInvalidShape},
 		{"a quantity's magnitude bound of an infinity Go reads", quantityDoc(`<magnitude><lower>0</lower><upper>Inf</upper></magnitude>`), canxml.ErrInvalidShape},
-		{"a quantity's precision bound written as a real", quantityDoc(`<precision><lower>0</lower><upper>2.0</upper></precision>`), canxml.ErrInvalidShape},
+		{"a <children> of an attribute class", childDoc(` xsi:type="C_SINGLE_ATTRIBUTE"`), canxml.ErrUnknownElement},
+		{"a <children> of an attribute class with no member", childlessDoc(` xsi:type="C_MULTIPLE_ATTRIBUTE"`), typereg.ErrTypeMismatch},
 	}
 	for _, tc := range cases {
 		for ns, doc := range map[string]string{"v1": tc.doc, "v2": strings.Replace(tc.doc, nsV1, nsV2, 1)} {
@@ -256,9 +409,10 @@ func TestREQ111_ReaderStrictModeRefusesTheParsersOtherReadings(t *testing.T) {
 }
 
 // TestREQ111_ReaderLeavesOutARealBoundOnASideWrittenUnbounded pins that, in
-// every mode, a bound of a C_REAL range or of a quantity's magnitude or
-// precision that Go reads as a number and canonical XML does not is left out
-// on a side the range writes unbounded, whose bound the parser does not read.
+// every mode, a bound of a C_INTEGER or C_REAL range or of a quantity's
+// magnitude or precision that Go reads as a number and canonical XML does not
+// is left out on a side the range writes unbounded, whose bound the parser
+// does not read.
 func TestREQ111_ReaderLeavesOutARealBoundOnASideWrittenUnbounded(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct{ doc, want string }{
@@ -273,6 +427,10 @@ func TestREQ111_ReaderLeavesOutARealBoundOnASideWrittenUnbounded(t *testing.T) {
 		"a quantity's precision": {
 			quantityDoc(`<precision><lower>0</lower><upper_unbounded>true</upper_unbounded><upper>2.0</upper></precision>`),
 			quantityDoc(`<precision><lower>0</lower><upper_unbounded>true</upper_unbounded></precision>`),
+		},
+		"a C_INTEGER range of a decimal bound": {
+			itemDoc(`<item xsi:type="C_INTEGER"><range><lower_unbounded>true</lower_unbounded><lower>2.5</lower><upper>9</upper></range></item>`),
+			itemDoc(`<item xsi:type="C_INTEGER"><range><lower_unbounded>true</lower_unbounded><upper>9</upper></range></item>`),
 		},
 	}
 	for mode, opts := range modes {
@@ -514,7 +672,10 @@ func TestREQ111_ReaderFindsWhatCanonicalXMLReadsWithoutAFailure(t *testing.T) {
 // leaves out.
 func TestREQ111_ReaderReportsEachItemOnce(t *testing.T) {
 	t.Parallel()
-	for _, name := range []string{"shapes.opt", "values.opt", "values-every-mode.opt", "namespace-v2.opt", "parser-readings.opt"} {
+	for _, name := range []string{
+		"shapes.opt", "values.opt", "values-every-mode.opt", "namespace-v2.opt", "parser-readings.opt",
+		"integer-bounds.opt", "quantity-assumed-value.opt", "attribute-children.opt", "item-namespaces.opt",
+	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			var unmatched, missing []string
@@ -603,7 +764,8 @@ func TestREQ100_ReaderStrictModeRefusesWhatTheParsersStrictModeRefuses(t *testin
 
 // TestREQ111_ReaderRefusesAnIntegerPastThirtyTwoBits pins that, in every
 // mode, an integer the model's 32-bit Integer cannot hold is refused, which
-// the parser read, while the largest it holds reads.
+// the parser read, and a range or precision bound written as a decimal that
+// rounds to one or as an infinity, while the largest it holds reads.
 func TestREQ111_ReaderRefusesAnIntegerPastThirtyTwoBits(t *testing.T) {
 	t.Parallel()
 	const big = "5000000000"
@@ -617,6 +779,9 @@ func TestREQ111_ReaderRefusesAnIntegerPastThirtyTwoBits(t *testing.T) {
 		"an existence lower": definitionDoc(`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>a</rm_attribute_name>` +
 			`<existence><lower>-` + big + `</lower><upper>1</upper></existence></attributes>`),
 		"a quantity's precision bound": quantityDoc(`<precision><lower>0</lower><upper>` + big + `</upper></precision>`),
+		// A decimal bound past it once rounded is refused as that integer is.
+		"a range bound written as a decimal":     itemDoc(`<item xsi:type="C_INTEGER"><range><lower>0</lower><upper>` + big + `.5</upper></range></item>`),
+		"a precision bound written as a decimal": quantityDoc(`<precision><lower>-` + big + `.5</lower><upper>2</upper></precision>`),
 	}
 	for mode, opts := range modes {
 		for name, doc := range refused {
@@ -631,6 +796,17 @@ func TestREQ111_ReaderRefusesAnIntegerPastThirtyTwoBits(t *testing.T) {
 				}
 			})
 		}
+		t.Run(mode+"/an infinite bound", func(t *testing.T) {
+			t.Parallel()
+			for name, doc := range map[string]string{
+				"of a C_INTEGER range":      itemDoc(`<item xsi:type="C_INTEGER"><range><lower>0</lower><upper>Inf</upper></range></item>`),
+				"of a quantity's precision": quantityDoc(`<precision><lower>-Inf</lower><upper>2</upper></precision>`),
+			} {
+				if _, err := aom14.ReadOperationalTemplate(strings.NewReader(doc), opts...); !errors.Is(err, canxml.ErrInvalidShape) {
+					t.Errorf("ReadOperationalTemplate(%s) = %v, want an error wrapping canxml.ErrInvalidShape", name, err)
+				}
+			}
+		})
 		t.Run(mode+"/the largest integer it holds", func(t *testing.T) {
 			t.Parallel()
 			doc := itemDoc(`<item xsi:type="C_INTEGER"><list>2147483647</list></item>`)
@@ -647,7 +823,10 @@ func TestREQ111_ReaderRefusesAnIntegerPastThirtyTwoBits(t *testing.T) {
 // schemas declare.
 func TestREQ111_CanonicalXMLKeepsNoneOfTheReadersReadings(t *testing.T) {
 	t.Parallel()
-	for _, name := range []string{"shapes.opt", "values.opt", "values-every-mode.opt", "parser-readings.opt"} {
+	for _, name := range []string{
+		"shapes.opt", "values.opt", "values-every-mode.opt", "parser-readings.opt",
+		"integer-bounds.opt", "quantity-assumed-value.opt", "attribute-children.opt", "item-namespaces.opt",
+	} {
 		var ot aom14.OperationalTemplate
 		if err := canxml.Unmarshal(readerFixture(t, name), &ot); err == nil {
 			t.Errorf("canxml.Unmarshal(%s) = nil, want the error the reader's readings lift", name)

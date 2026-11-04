@@ -20,19 +20,47 @@ import (
 
 // retryable reports whether err, the failure of the first decode, is one a
 // reading of [tolerate] can lift: the text of a value, a type a slot cannot
-// dispatch, which only the default mode reads, or an element in the namespace
-// the AM Release-1.4 schemas declare, which a strict decode refuses. A type a
-// slot cannot dispatch covers a <children> of a primitive class and an <item>
-// of a class the parser reads a constraint of; the text of a value covers a
-// real number canonical XML does not read.
+// dispatch, which only the default mode reads but inside a C_DV_QUANTITY,
+// whose assumed value every mode reads as absent where the model cannot hold
+// it, or an element in the namespace the AM Release-1.4 schemas declare,
+// which a strict decode refuses. A type a slot cannot dispatch covers a
+// <children> of a primitive or an attribute class and an <item> of a class
+// the parser reads a constraint of; the text of a value covers a real number
+// canonical XML does not read and an integer bound written as a decimal.
 func retryable(err error, strict bool) bool {
 	switch {
-	case xmlunmatched.IsPrimitiveFailure(err), errors.Is(err, canxml.ErrNamespace):
+	case xmlunmatched.IsPrimitiveFailure(err), errors.Is(err, canxml.ErrNamespace), failsInsideQuantity(err):
 		return true
 	case strict:
 		return false
 	}
+	return isTypeFailure(err)
+}
+
+// isTypeFailure reports whether err is the failure of a type a slot cannot
+// dispatch.
+func isTypeFailure(err error) bool {
 	return errors.Is(err, typereg.ErrMissingType) || errors.Is(err, typereg.ErrUnknownType) || errors.Is(err, typereg.ErrTypeMismatch)
+}
+
+// failsInsideQuantity reports whether err is the failure of a type a slot
+// inside a C_DV_QUANTITY cannot dispatch, such as a bound of the normal range
+// of its assumed value.
+func failsInsideQuantity(err error) bool {
+	if !isTypeFailure(err) {
+		return false
+	}
+	for {
+		de, ok := errors.AsType[*canxml.DecodeError](err)
+		if !ok || de == nil {
+			return false
+		}
+		if de.Type == "C_DV_QUANTITY" {
+			inner, ok := errors.AsType[*canxml.DecodeError](de.Inner)
+			return ok && inner != nil
+		}
+		err = de.Inner
+	}
 }
 
 // needsTolerance reports whether data, which the first decode read into ot

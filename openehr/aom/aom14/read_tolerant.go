@@ -41,16 +41,17 @@ var byteOrderMark = []byte{0xEF, 0xBB, 0xBF}
 type role uint8
 
 const (
-	roleNone         role = iota // an element no tolerance reads
-	roleRoot                     // the root element
-	roleObject                   // a constraint object: the definition, or a <children> of an attribute
-	roleAttribute                // an <attributes> of a complex object
-	roleItem                     // the <item> of a C_PRIMITIVE_OBJECT
-	roleQuantityItem             // a <list> entry of a C_DV_QUANTITY
-	roleRange                    // the range of a C_INTEGER or C_REAL item, or the magnitude or precision of a quantity
-	roleArchetypeID              // the <archetype_id> of a <children> that names no type
-	roleValue                    // an element whose text a tolerance reads
-	roleLeftOut                  // an element a tolerance leaves out, with all it holds
+	roleNone            role = iota // an element no tolerance reads
+	roleRoot                        // the root element
+	roleObject                      // a constraint object: the definition, or a <children> of an attribute
+	roleAttribute                   // an <attributes> of a complex object
+	roleItem                        // the <item> of a C_PRIMITIVE_OBJECT
+	roleQuantityItem                // a <list> entry of a C_DV_QUANTITY
+	roleQuantityAssumed             // the assumed_value of a C_DV_QUANTITY
+	roleRange                       // the range of a C_INTEGER or C_REAL item, or the magnitude or precision of a quantity
+	roleArchetypeID                 // the <archetype_id> of a <children> that names no type
+	roleValue                       // an element whose text a tolerance reads
+	roleLeftOut                     // an element a tolerance leaves out, with all it holds
 )
 
 // The flags of a C_BOOLEAN, as bits of element.seen.
@@ -135,10 +136,9 @@ type tolerantReading struct {
 	// foreign is the namespace of the root element, when the default mode
 	// reads it as canonical XML's.
 	foreign string
-	// failed is set where the reading cannot write the input as the parser
-	// reads it: an item it would take off declares a namespace it cannot
-	// move, or two edits a rendering makes overlap, which the reading does
-	// not make. The input is then left as it is, for the decode to refuse.
+	// failed is set where two edits a rendering makes overlap, which the
+	// reading does not make. The input is then left as it is, for the decode
+	// to refuse.
 	failed bool
 }
 
@@ -238,6 +238,9 @@ func (t *tolerantReading) start(tk xml.StartElement, off, end int) {
 	if e.self {
 		e.endTag = end
 	}
+	if parent != nil && parent.unwrap {
+		inheritDeclarations(e, parent)
+	}
 	if parent != nil && t.isOpenEHR(e.name) {
 		e.role = t.roleOf(parent, e)
 		if parent.wrap {
@@ -274,6 +277,8 @@ func (t *tolerantReading) roleOf(parent, e *element) role {
 			return t.typeItem(e)
 		case local == "list" && parent.class == "C_DV_QUANTITY":
 			return roleQuantityItem
+		case local == "assumed_value" && parent.class == "C_DV_QUANTITY":
+			return roleQuantityAssumed
 		case local == "archetype_id" && (parent.untyped || parent.complexTyped):
 			return roleArchetypeID
 		}
@@ -300,7 +305,7 @@ func (t *tolerantReading) roleOf(parent, e *element) role {
 		if local == "value" {
 			return roleValue
 		}
-	case roleNone, roleValue, roleLeftOut:
+	case roleNone, roleValue, roleLeftOut, roleQuantityAssumed:
 	}
 	return roleNone
 }
@@ -365,7 +370,10 @@ func (t *tolerantReading) typeObject(e *element) role {
 			e.retype = name
 		}
 		e.complexTyped = name == "C_COMPLEX_OBJECT" && !t.strict
-	case kindNone:
+	case kindNone, kindAttribute:
+		// The parser reads an object of no class of the constraint model, or
+		// of an attribute's, which a C_OBJECT slot does not hold, as a leaf;
+		// strict mode leaves it to the decode, which refuses it.
 		if !t.strict {
 			e.retype, e.class, e.leaf = "C_COMPLEX_OBJECT", "C_COMPLEX_OBJECT", true
 		}
@@ -377,9 +385,6 @@ func (t *tolerantReading) typeObject(e *element) role {
 			e.retype, e.class, e.wrap = "C_PRIMITIVE_OBJECT", name, true
 			return roleItem
 		}
-	case kindAttribute:
-		// A class of the constraint model that a C_OBJECT slot does not hold:
-		// the decode refuses it.
 	}
 	return roleObject
 }
@@ -480,6 +485,14 @@ func (t *tolerantReading) close(off, end int) {
 		} else {
 			t.closeTag(e)
 		}
+	case roleQuantityAssumed:
+		// The parser ignores the assumed value of a C_DV_QUANTITY, so one the
+		// model cannot hold reads as absent, in every mode.
+		if t.holdsQuantity(e) {
+			t.closeTag(e)
+		} else {
+			t.leaveOut(e)
+		}
 	case roleLeftOut:
 		t.leaveOut(e)
 	case roleNone, roleRoot, roleQuantityItem, roleArchetypeID:
@@ -519,7 +532,7 @@ func (t *tolerantReading) closeValue(e *element) {
 		if !e.nested && !isBlank(e.text) {
 			p.parent.archetypeID = true
 		}
-	case roleNone, roleRoot, roleObject, roleAttribute, roleQuantityItem, roleValue, roleLeftOut:
+	case roleNone, roleRoot, roleObject, roleAttribute, roleQuantityItem, roleQuantityAssumed, roleValue, roleLeftOut:
 	}
 	t.closeTag(e)
 }
@@ -613,18 +626,54 @@ func (t *tolerantReading) closeTimezoneValidity(e *element) {
 	t.closeTag(e)
 }
 
-// closeRange reads the bounds of the range r. A bound that is not a number of
-// its type is left out, and its side read as unbounded, as the parser reads
-// it: in every mode on a side written unbounded, whose bound the parser does
-// not read, and on a side of a quantity's magnitude or precision, which the
+// holdsQuantity reports whether the model holds e, the assumed_value of a
+// C_DV_QUANTITY: whether canonical XML decodes it, as the reading writes it,
+// inside an element that binds the namespaces bound around it. One nested
+// past the element limit counts as held, for the decode to refuse.
+func (t *tolerantReading) holdsQuantity(e *element) bool {
+	var b bytes.Buffer
+	b.WriteString("<holder")
+	bound := make(map[string]bool)
+	for _, d := range slices.Backward(t.scope[:e.scope]) {
+		if bound[d.prefix] {
+			continue
+		}
+		bound[d.prefix] = true
+		name := xml.Name{Space: "xmlns", Local: d.prefix}
+		if d.prefix == "" {
+			name = xml.Name{Local: "xmlns"}
+		}
+		b.WriteString(" " + qualified(name) + `="`)
+		_ = xml.EscapeText(&b, []byte(d.uri)) // a bytes.Buffer does not fail
+		b.WriteByte('"')
+	}
+	b.WriteString(">" + t.startTag(e))
+	if e.self {
+		b.WriteString("/>")
+	} else {
+		b.WriteByte('>')
+		b.Write(t.render(e.tagEnd, e.endTag))
+		b.WriteString("</" + qualified(e.name) + ">")
+	}
+	b.WriteString("</holder>")
+	err := canxml.Unmarshal(b.Bytes(), new(CDVQuantity), canxml.WithMaxDepth(readMaxDepth))
+	return err == nil || errors.Is(err, canxml.ErrLimitExceeded)
+}
+
+// closeRange reads the bounds of the range r. A bound the parser reads a
+// number from (closeNumberBound) is read as the parser reads it. Any other
+// bound is left out, and its side read as unbounded, as the parser reads it:
+// in every mode on a side written unbounded, whose bound the parser does not
+// read, and on a side of a quantity's magnitude or precision, which the
 // parser reads leniently in its strict mode too; elsewhere in the default
 // mode, the side included unless the range says otherwise, as a bounded side
 // is. Strict mode refuses the bound of a C_INTEGER or C_REAL on a bounded
-// side, an empty one too, which the decode reads as 0. A number the parser
-// reads and canonical XML does not, of a C_REAL or of a quantity's magnitude
-// or precision, is left out in every mode on a side written unbounded, and
-// read as the parser's number in the default mode on a bounded side.
+// side, an empty one too, which the decode reads as 0.
 func (t *tolerantReading) closeRange(r *element) {
+	kind := r.class
+	if kind == "C_QUANTITY_ITEM" && r.name.Local == "precision" {
+		kind = "precision"
+	}
 	for i := range r.sides {
 		s := r.sides[i]
 		b := s.bound
@@ -632,19 +681,7 @@ func (t *tolerantReading) closeRange(r *element) {
 			continue
 		}
 		written, open := boundaryFlag(s.unbounded)
-		if parserNumber(r.class, b.text) {
-			kind := r.class
-			if kind == "C_QUANTITY_ITEM" && r.name.Local == "precision" {
-				kind = "precision"
-			}
-			text, ok := boundText(kind, b.text)
-			switch {
-			case !ok:
-			case written && open:
-				t.leaveOut(b)
-			case text != "" && !t.strict:
-				t.setText(b, text)
-			}
+		if t.closeNumberBound(r, i, kind, written && open) {
 			continue
 		}
 		if written && open {
@@ -665,16 +702,73 @@ func (t *tolerantReading) closeRange(r *element) {
 		if written {
 			t.setText(s.unbounded, "true")
 		}
-		included := "lower_included"
-		if i == 1 {
-			included = "upper_included"
+		t.includeSide(r, i, false)
+	}
+}
+
+// closeNumberBound reads the bound of side i of the range r, a range of kind,
+// as closeRange names it, and reports whether the parser reads a number from
+// it, which it reads with strconv.ParseFloat. A number canonical XML reads as
+// written stays. Any other is left out on a side written unbounded, where
+// openSide, whose bound the parser does not read. On a bounded side, a bound
+// of a C_INTEGER range or of a quantity's precision is read, in every mode,
+// as the integer bound that admits the same integers (integerBound), its side
+// included where the number is not a whole one; and, in the default mode, a
+// bound of a C_REAL range or of a quantity's magnitude as the Real the parser
+// reads. An integer bound past 32 bits is written as that integer, which the
+// decode refuses as such, and an infinite one stays as it is, which the
+// decode refuses too.
+func (t *tolerantReading) closeNumberBound(r *element, i int, kind string, openSide bool) bool {
+	b := r.sides[i].bound
+	integer := kind == "C_INTEGER" || kind == "precision"
+	var (
+		text             string
+		rounded, differs bool
+	)
+	switch {
+	case integer && isInteger32(b.text):
+		return true
+	case integer:
+		var ok bool
+		if text, rounded, ok = integerBound(b.text, i == 0); !ok {
+			return false
 		}
-		switch {
-		case s.included == nil:
-			r.insert = appendElement(r.insert, r.name.Space, included, "true")
-		case !s.included.nested && isBlank(s.included.text):
-			t.setText(s.included, "true")
+		differs = true
+	case !parserNumber(kind, b.text):
+		return false
+	default:
+		text, differs = boundText(kind, b.text)
+	}
+	switch {
+	case !differs:
+	case openSide:
+		t.leaveOut(b)
+	case text == "", t.strict && !integer:
+		// Left as it is, for the decode to refuse.
+	default:
+		t.setText(b, text)
+		if rounded {
+			t.includeSide(r, i, true)
 		}
+	}
+	return true
+}
+
+// includeSide writes side i of the range r included where the range gives it
+// no included flag, or an empty one, and, where force, in place of the flag
+// it gives. It leaves a flag that holds an element as it is.
+func (t *tolerantReading) includeSide(r *element, i int, force bool) {
+	included := r.sides[i].included
+	name := "lower_included"
+	if i == 1 {
+		name = "upper_included"
+	}
+	switch {
+	case included == nil:
+		r.insert = appendElement(r.insert, r.name.Space, name, "true")
+	case included.nested:
+	case force || isBlank(included.text):
+		t.setText(included, "true")
 	}
 }
 
@@ -739,34 +833,10 @@ func (t *tolerantReading) wrapMembers(p *element) {
 // unwrapItem reads e, an item of a class the parser reads a constraint of
 // that is no primitive, as the object that holds it: it takes off e's start
 // and end tags, so that what e holds is held by e.host, which takes e's class
-// unless that is C_PRIMITIVE_OBJECT. A namespace e declares moves to the
-// host's start tag. Where e declares a prefix bound otherwise around it, or
-// the default namespace, the reading fails. The members e holds have their
-// paths in the host.
+// unless that is C_PRIMITIVE_OBJECT. Each element e holds declares the
+// namespaces e declares (inheritDeclarations), so that it keeps its names.
+// The members e holds have their paths in the host.
 func (t *tolerantReading) unwrapItem(e *element) {
-	var moved []xml.Attr
-	for _, a := range e.attrs {
-		prefix, ok := declared(a.Name)
-		if !ok {
-			continue
-		}
-		uri, bound := lookupIn(t.scope[:e.scope], prefix)
-		if !bound {
-			uri, bound = declaredIn(e.host.attrs, prefix)
-		}
-		switch {
-		case bound && uri == a.Value:
-		case bound, prefix == "":
-			t.failed = true
-			return
-		default:
-			moved = append(moved, a)
-		}
-	}
-	if len(moved) > 0 {
-		e.host.attrs = append(slices.Clone(e.host.attrs), moved...)
-		e.host.dirty = true
-	}
 	if e.class != "C_PRIMITIVE_OBJECT" {
 		e.host.retype = e.class
 	}
@@ -776,6 +846,26 @@ func (t *tolerantReading) unwrapItem(e *element) {
 	}
 	t.add(e.off, e.tagEnd, "")
 	t.add(e.endTag, e.end, "")
+}
+
+// inheritDeclarations adds to the start tag of e each namespace declaration
+// of its parent, an item the reading takes off, that e does not make itself
+// for the same prefix. Taking the item's tags off then changes the name of no
+// element: e and what it holds keep the names they had inside the item, and
+// no element outside it sees the item's declarations.
+func inheritDeclarations(e, parent *element) {
+	own := len(e.attrs)
+	for _, a := range parent.attrs {
+		prefix, ok := declared(a.Name)
+		if !ok {
+			continue
+		}
+		if _, declares := declaredIn(e.attrs[:own], prefix); declares {
+			continue
+		}
+		e.attrs = append(e.attrs, a)
+		e.dirty = true
+	}
 }
 
 // render returns the input from off to end with the edits made that start
@@ -1064,38 +1154,54 @@ func parserNumber(class string, text []byte) bool {
 
 // boundText reads text, which the parser reads as a number of kind, and
 // reports whether canonical XML reads it otherwise or not at all; it then
-// returns the text canonical XML reads as the parser's number, or "" where
-// the model holds no such number. kind is C_REAL, C_QUANTITY_ITEM for a
-// quantity's magnitude, read as a Real, or precision for a quantity's
-// precision, read as an Integer; text of any other kind reads alike.
+// returns the text canonical XML reads as the parser's number. kind is C_REAL,
+// or C_QUANTITY_ITEM for a quantity's magnitude, each read as a Real; text of
+// any other kind reads alike.
 func boundText(kind string, text []byte) (string, bool) {
-	s := strings.TrimSpace(string(text))
-	switch kind {
-	case "C_REAL", "C_QUANTITY_ITEM":
-		var r Real
-		if r.UnmarshalText(text) == nil {
-			return "", false
-		}
-		f, err := strconv.ParseFloat(s, 64)
-		if err != nil {
-			return "", false
-		}
-		b, _ := Real(f).MarshalText() // a Real always writes
-		return string(b), true
-	case "precision":
-		if _, err := strconv.ParseInt(s, 10, 32); err == nil {
-			return "", false
-		}
-		f, err := strconv.ParseFloat(s, 64)
-		if err != nil {
-			return "", false
-		}
-		if f != math.Trunc(f) || f < math.MinInt32 || f > math.MaxInt32 {
-			return "", true
-		}
-		return strconv.FormatInt(int64(f), 10), true
+	if kind != "C_REAL" && kind != "C_QUANTITY_ITEM" {
+		return "", false
 	}
-	return "", false
+	var r Real
+	if r.UnmarshalText(text) == nil {
+		return "", false
+	}
+	f, err := strconv.ParseFloat(strings.TrimSpace(string(text)), 64)
+	if err != nil {
+		return "", false
+	}
+	b, _ := Real(f).MarshalText() // a Real always writes
+	return string(b), true
+}
+
+// integerBound reads text, a bound of a C_INTEGER range or of a quantity's
+// precision that is no integer of 32 bits, on the lower side of its range
+// where lower, as the parser does, with strconv.ParseFloat. It reports
+// whether the parser reads a number from it that bounds the integers, which a
+// NaN, compared with no integer, does not, and returns the text of the
+// integer bound that admits the integers that number admits, the number
+// rounded up on the lower side and down on the upper one, and whether
+// rounding changed it. It returns no text for an infinity, which no integer
+// of the model holds.
+func integerBound(text []byte, lower bool) (bound string, rounded, ok bool) {
+	f, err := strconv.ParseFloat(strings.TrimSpace(string(text)), 64)
+	switch {
+	case err != nil, math.IsNaN(f):
+		return "", false, false
+	case math.IsInf(f, 0):
+		return "", false, true
+	}
+	n := math.Floor(f)
+	if lower {
+		n = math.Ceil(f)
+	}
+	return strconv.FormatFloat(n, 'f', -1, 64), n != f, true
+}
+
+// isInteger32 reports whether text, without the white space around it, is an
+// integer of 32 bits, which canonical XML reads as the model's Integer.
+func isInteger32(text []byte) bool {
+	_, err := strconv.ParseInt(strings.TrimSpace(string(text)), 10, 32)
+	return err == nil
 }
 
 // isBlank reports whether text is empty or XML white space only.
