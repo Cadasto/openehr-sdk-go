@@ -85,8 +85,9 @@ type element struct {
 	// untyped is an attribute or object that names no type in the XSI
 	// namespace, which the reading types when it closes.
 	untyped bool
-	// leaf is an object of no class of the AOM 1.4 constraint model, read as
-	// a C_COMPLEX_OBJECT without its attributes.
+	// leaf is an object of no class of the AOM 1.4 constraint model, or of
+	// one it cannot hold, read as a C_COMPLEX_OBJECT with its rm_type_name,
+	// node_id and occurrences alone.
 	leaf bool
 	// itemLevel is, for a definition typed C_PRIMITIVE_OBJECT, 1, and for an
 	// <item> such a definition holds, or such an item, one more than the
@@ -385,10 +386,11 @@ func (t *tolerantReading) roleOf(parent, e *element) role {
 		case parent.unwrap && isObjectMember(local):
 			// The object that holds the item has its own.
 			return roleLeftOut
+		case parent.leaf && !isObjectMember(local):
+			// A leaf has the rm_type_name, node_id and occurrences it holds,
+			// and none of its attributes and other members.
+			return roleLeftOut
 		case local == "attributes" && isComplexObject(parent.class):
-			if parent.leaf {
-				return roleLeftOut
-			}
 			t.typeAttribute(e)
 			return roleAttribute
 		case local == "item" && parent.class == "C_PRIMITIVE_OBJECT":

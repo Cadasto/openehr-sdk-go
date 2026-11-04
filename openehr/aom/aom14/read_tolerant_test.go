@@ -101,8 +101,10 @@ func readAs(t *testing.T, data []byte, want *aom14.OperationalTemplate, opts ...
 // the parser reads as a slot or a constraint
 // (TestREQ111_ReaderRefusesADefinitionTheParserReadsAsASlotOrAConstraint), as
 // the parser does: as a C_COMPLEX_OBJECT leaf with the rm_type_name, node_id
-// and occurrences it holds and none of its attributes, which WithUnmatched
-// reports. Strict mode refuses it with the *canxml.DecodeError of the
+// and occurrences it holds and none of its other members, which
+// WithUnmatched reports: its attributes, archetype id, template id, term
+// definitions and term bindings. Strict mode refuses it with the
+// *canxml.DecodeError of the
 // definition, wrapping typereg.ErrUnknownType for no class and
 // typereg.ErrTypeMismatch for a class it cannot hold, a type with white space
 // around it among the first. A definition typed C_ARCHETYPE_ROOT, its
@@ -111,34 +113,46 @@ func readAs(t *testing.T, data []byte, want *aom14.OperationalTemplate, opts ...
 //
 // Can-fail control: read the definition as a C_ARCHETYPE_ROOT whatever its
 // type, as the reader did before, and the leaf reads with its attributes in
-// every mode.
+// every mode; leave out its attributes alone, as the reader did before, and
+// it reads with its archetype id.
 func TestREQ111_ReaderReadsADefinitionOfAClassItCannotHoldAsALeaf(t *testing.T) {
 	t.Parallel()
+	const archetypeID = `<archetype_id><value>openEHR-EHR-CLUSTER.t.v0</value></archetype_id>`
 	typed := func(class string) string {
 		return strings.Replace(attributeDoc(` xsi:type="C_SINGLE_ATTRIBUTE"`), `<definition>`, `<definition xsi:type="`+class+`">`, 1)
 	}
-	leafDoc := definitionDoc(``)
+	// A definition of no class that holds each member of an archetype root.
+	whole := strings.Replace(typed("FOO"), archetypeID, archetypeID+`<template_id><value>t.v0</value></template_id>`+
+		`<term_definitions code="at0000"><items id="text">Reader</items></term_definitions>`+
+		`<term_bindings terminology="SNOMED-CT"><items code="at0000"><value><terminology_id><value>SNOMED-CT</value></terminology_id>`+
+		`<code_string>1</code_string></value></items></term_bindings>`, 1)
+	leafDoc := strings.Replace(definitionDoc(``), archetypeID, ``, 1)
+	leafMembers := []string{definition + "/attributes[1]", definition + "/archetype_id[1]"}
 	cases := []struct {
 		name      string
 		doc, want []byte
+		unmatched []string
 		strict    error
 	}{
-		{"definition-type.opt", readerFixture(t, "definition-type.opt"), readerFixture(t, "definition-type.read.opt"), typereg.ErrUnknownType},
-		{"a definition of no class", []byte(typed("FOO")), []byte(leafDoc), typereg.ErrUnknownType},
-		{"a definition typed C_SINGLE_ATTRIBUTE", []byte(typed("C_SINGLE_ATTRIBUTE")), []byte(leafDoc), typereg.ErrTypeMismatch},
-		{"a definition typed C_CODE_REFERENCE", []byte(typed("C_CODE_REFERENCE")), []byte(leafDoc), typereg.ErrTypeMismatch},
-		{"a definition typed C_ARCHETYPE_ROOT with white space around it", []byte(typed(" C_ARCHETYPE_ROOT ")), []byte(typed("C_ARCHETYPE_ROOT")), typereg.ErrUnknownType},
+		{
+			"definition-type.opt", readerFixture(t, "definition-type.opt"), readerFixture(t, "definition-type.read.opt"),
+			append(slices.Clone(leafMembers), definition+"/term_definitions[1]"), typereg.ErrUnknownType,
+		},
+		{"a definition of no class", []byte(typed("FOO")), []byte(leafDoc), leafMembers, typereg.ErrUnknownType},
+		{
+			"a definition of no class that holds each member of an archetype root", []byte(whole), []byte(leafDoc),
+			append(slices.Clone(leafMembers), definition+"/template_id[1]", definition+"/term_definitions[1]", definition+"/term_bindings[1]"),
+			typereg.ErrUnknownType,
+		},
+		{"a definition typed C_SINGLE_ATTRIBUTE", []byte(typed("C_SINGLE_ATTRIBUTE")), []byte(leafDoc), leafMembers, typereg.ErrTypeMismatch},
+		{"a definition typed C_CODE_REFERENCE", []byte(typed("C_CODE_REFERENCE")), []byte(leafDoc), leafMembers, typereg.ErrTypeMismatch},
+		{"a definition typed C_ARCHETYPE_ROOT with white space around it", []byte(typed(" C_ARCHETYPE_ROOT ")), []byte(typed("C_ARCHETYPE_ROOT")), nil, typereg.ErrUnknownType},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got := readAs(t, tc.doc, decoded(t, tc.want))
-			want := []string{definition + "/attributes[1]"}
-			if bytes.Contains(tc.want, []byte("<attributes")) {
-				want = nil
-			}
-			if !slices.Equal(got, want) {
-				t.Errorf("WithUnmatched reported %q, want %q", got, want)
+			if got := readAs(t, tc.doc, decoded(t, tc.want)); !slices.Equal(got, tc.unmatched) {
+				t.Errorf("WithUnmatched reported %q, want %q", got, tc.unmatched)
 			}
 			_, err := aom14.ReadOperationalTemplate(bytes.NewReader(tc.doc), canxml.WithStrict())
 			de, ok := errors.AsType[*canxml.DecodeError](err)

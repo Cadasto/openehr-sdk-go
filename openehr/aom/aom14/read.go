@@ -118,8 +118,9 @@ const inputBufferMax = 4 << 20
 // or a class other than C_ARCHETYPE_ROOT and C_COMPLEX_OBJECT, which a
 // definition cannot hold, but those it refuses in every mode (below), as a
 // C_COMPLEX_OBJECT leaf with the rm_type_name, node_id and occurrences it
-// holds and none of its attributes, as it reads such a <children>. And,
-// inside the definition, it reads:
+// holds and none of its other members, such as its attributes, archetype id
+// and term definitions, as it reads such a <children>. And, inside the
+// definition, it reads:
 //
 //   - an <attributes>, a <children> or the <item> of a C_PRIMITIVE_OBJECT
 //     that names no type in the XML Schema instance namespace, none, an
@@ -135,7 +136,7 @@ const inputBufferMax = 4 << 20
 //   - a <children> whose type names no class of the AOM 1.4 constraint
 //     model, or a class a <children> cannot hold, such as
 //     C_SINGLE_ATTRIBUTE, as a C_COMPLEX_OBJECT with the rm_type_name,
-//     node_id and occurrences it holds and none of its attributes;
+//     node_id and occurrences it holds and none of its other members;
 //   - a <children> typed with a C_PRIMITIVE class, such as C_STRING, as a
 //     C_PRIMITIVE_OBJECT with the rm_type_name, node_id and occurrences it
 //     holds, whose item, of that class, holds the rest;
