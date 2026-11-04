@@ -1477,7 +1477,7 @@ requirements:
     canonical: docs/specifications/clinical-modeling.md#req-103--primitive-constraint-introspection
     status: draft
     implementation: landed
-    packages: [openehr/template, openehr/template/constraints, internal/iso8601, internal/templatecompile, testkit/probes/template, openehr/validation, openehr/instance]
+    packages: [openehr/template, openehr/template/constraints, internal/iso8601, internal/templatecompile, testkit/probes/template, openehr/validation, openehr/instance, openehr/template/webtemplate, openehr/serialize/simplified]
     probes: [PROBE-024, PROBE-025, PROBE-074]
     tests:
       - internal/iso8601/magnitude_test.go
@@ -1759,6 +1759,7 @@ requirements:
       - openehr/serialize/canjson
       - openehr/serialize/canxml
       - openehr/aom/aom14
+      - openehr/internal/xmlunmatched
       - internal/templatecompile
     tests:
       - internal/rmjsonwalk/walk_once_budget_internal_test.go
