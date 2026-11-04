@@ -17,6 +17,7 @@ package aom14_test
 
 import (
 	"bytes"
+	"encoding/xml"
 	"errors"
 	"math"
 	"os"
@@ -636,6 +637,76 @@ func TestREQ111_ReaderRefusesMatchNegatedInEveryMode(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// TestREQ111_ReaderRefusesElementsThatDoNotNest pins that, in every mode, a
+// document whose elements do not nest is refused with the *xml.SyntaxError
+// encoding/xml's Token gives for it, the line it names among it, where the
+// malformed element is one a reading leaves out too: an end tag of another
+// name or prefix than the element it closes, and the end of the input inside
+// the root after content a reading leaves out across lines. Content after the
+// root is the decode's to refuse, as content after the root, an element left
+// open there among it.
+//
+// Can-fail control: read the end tags without matching them to the elements
+// they close, as the reader did before, and a malformed element a reading
+// leaves out reads, and the end of the input names the line of the rewritten
+// document.
+func TestREQ111_ReaderRefusesElementsThatDoNotNest(t *testing.T) {
+	t.Parallel()
+	// A C_INTEGER item whose decimal bound every mode reads a second time and
+	// whose assumed value, no integer, every mode leaves out.
+	retried := func(assumed string) string {
+		return itemDoc(`<item xsi:type="C_INTEGER"><range><lower>1.5</lower></range>` + assumed + `</item>`)
+	}
+	truncated := retried("<assumed_value>\nbad\n\n</assumed_value>")
+	truncated = truncated[:strings.Index(truncated, "</item>")]
+	cases := map[string]struct {
+		doc     string
+		message string
+	}{
+		"an end tag of another name":           {retried(`<assumed_value>bad</oops>`), "element <assumed_value> closed by </oops>"},
+		"an end tag of another prefix":         {retried(`<assumed_value>bad</x:assumed_value>`), "element <assumed_value> in space  closed by </assumed_value> in space x"},
+		"the end of the input inside the root": {truncated, "unexpected EOF"},
+	}
+	for mode, opts := range modes {
+		for name, tc := range cases {
+			t.Run(mode+"/"+name, func(t *testing.T) {
+				t.Parallel()
+				want := tokenError(t, tc.doc)
+				if want.Msg != tc.message {
+					t.Fatalf("Token gives %q, want %q: the case is not the one it names", want.Msg, tc.message)
+				}
+				_, err := aom14.ReadOperationalTemplate(strings.NewReader(tc.doc), opts...)
+				got, ok := errors.AsType[*xml.SyntaxError](err)
+				if !ok || got == nil || *got != *want {
+					t.Errorf("ReadOperationalTemplate = %v, want the *xml.SyntaxError %v", err, want)
+				}
+			})
+		}
+		t.Run(mode+"/an element left open after the root", func(t *testing.T) {
+			t.Parallel()
+			refusesContentOutsideTheRoot(t, retried(``)+`<PLANTED>`, "PLANTED", opts...)
+		})
+	}
+}
+
+// tokenError returns the error encoding/xml's Token gives for doc, which the
+// test fails unless it is an *xml.SyntaxError.
+func tokenError(t *testing.T, doc string) *xml.SyntaxError {
+	t.Helper()
+	dec := xml.NewDecoder(strings.NewReader(doc))
+	for {
+		_, err := dec.Token()
+		if err == nil {
+			continue
+		}
+		se, ok := errors.AsType[*xml.SyntaxError](err)
+		if !ok || se == nil {
+			t.Fatalf("Token = %v, want an *xml.SyntaxError", err)
+		}
+		return se
 	}
 }
 

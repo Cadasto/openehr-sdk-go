@@ -71,8 +71,11 @@ const inputBufferMax = 4 << 20
 // an error that wraps [io.ErrUnexpectedEOF], not [io.EOF], and carries none
 // of the input. An error r returns, other than [io.EOF], ends the read and
 // comes back as r returned it, whatever the options and whatever a decode
-// made of the bytes before it. Any other decode error comes back as the
-// decode returns it.
+// made of the bytes before it. An input whose elements do not nest, with an
+// end tag that does not close the element open before it or with its end
+// inside the root element, is refused with the [xml.SyntaxError] that
+// encoding/xml gives for it, inside content a reading below leaves out too.
+// Any other decode error comes back as the decode returns it.
 //
 // Operational templates in use hold shapes and values their schema does not
 // allow, which the deprecated template parser reads. The reader reads them as

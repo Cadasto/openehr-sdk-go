@@ -170,12 +170,16 @@ type tolerantReading struct {
 // Given strict, it keeps only the readings that hold in every mode, and it
 // rewrites the shapes the parser's strict mode refuses, and canonical XML
 // reads, into ones canonical XML refuses as well. It returns data unchanged
-// when data is not well-formed where it reads it: the decode then fails on
-// it as it would have.
+// when encoding/xml cannot read a token of data: the decode then fails on it
+// as it would have. It reads up to the end of the root element, and leaves
+// what follows it to the decode.
 //
 // A reading may leave out content the decode then does not read, so tolerate
 // holds data to maxDepth itself: it reads no further than the first element
-// nested deeper, and returns the refusal of that element (depthRefusal).
+// nested deeper, and returns the refusal of that element (depthRefusal). For
+// the same reason it refuses an end tag that does not close the innermost
+// open element, and the end of data inside the root, with the error
+// encoding/xml gives for it (syntaxRefusal).
 func tolerate(data []byte, strict bool, maxDepth int) ([]byte, bool, error) {
 	t := &tolerantReading{data: data, strict: strict, bound: make(map[string][]string)}
 	base := 0
@@ -183,10 +187,14 @@ func tolerate(data []byte, strict bool, maxDepth int) ([]byte, bool, error) {
 		base = len(byteOrderMark)
 	}
 	dec := xml.NewDecoder(bytes.NewReader(data[base:]))
+read:
 	for {
 		off := base + int(dec.InputOffset())
 		tok, err := dec.RawToken()
 		if errors.Is(err, io.EOF) {
+			if len(t.open) > 0 {
+				return nil, false, syntaxRefusal(data[base:])
+			}
 			break
 		}
 		if err != nil {
@@ -203,7 +211,19 @@ func tolerate(data []byte, strict bool, maxDepth int) ([]byte, bool, error) {
 				return nil, false, t.refusal
 			}
 		case xml.EndElement:
+			n := len(t.open)
+			if n == 0 {
+				// A stray end tag before the root, which the decode refuses.
+				continue
+			}
+			if t.open[n-1].name != tk.Name {
+				return nil, false, syntaxRefusal(data[base:])
+			}
 			t.close(off, end)
+			if n == 1 {
+				// The root element ends here.
+				break read
+			}
 		case xml.CharData:
 			if n := len(t.open); n > 0 && t.open[n-1].role == roleValue {
 				t.open[n-1].text = append(t.open[n-1].text, tk...)
@@ -230,6 +250,25 @@ func depthRefusal(data []byte, limit int) error {
 		return err
 	}
 	return errAfterRoot()
+}
+
+// syntaxRefusal returns the refusal of data, a document whose tokens
+// encoding/xml reads but whose elements do not nest: the error its Token
+// gives at the first end tag that does not close the innermost open element,
+// or at the end of data inside an element, which names the line it stands on
+// in data.
+func syntaxRefusal(data []byte) error {
+	dec := xml.NewDecoder(bytes.NewReader(data))
+	for {
+		if _, err := dec.Token(); err != nil {
+			if errors.Is(err, io.EOF) {
+				// Token refuses what the reading found; this keeps a bare io.EOF,
+				// which a caller would take for the end of its own stream, out.
+				return io.ErrUnexpectedEOF
+			}
+			return err
+		}
+	}
 }
 
 // start opens the element whose start tag tk spans data from off to end.
