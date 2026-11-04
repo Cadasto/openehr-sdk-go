@@ -64,19 +64,21 @@ func failsInsideQuantity(err error) bool {
 
 // needsTolerance reports whether data, which the first decode read into ot
 // without a failure, may hold what [tolerate] reads otherwise than that
-// decode: a C_BOOLEAN item without its true_valid or false_valid, or with an
-// empty one, which the decode reads as false, or with an assumed value, which
+// decode: a C_BOOLEAN item without its true_valid or false_valid, or with
+// one that holds nothing, or only comments, processing instructions or CDATA
+// sections, which the decode reads as false, or with an assumed value, which
 // may be one the parser reads as none; the namespace the AM Release-1.4
 // schemas declare; a bare type attribute, which the decode reads as an
-// xsi:type; an empty element a number is read from, which the decode reads
-// as 0; or a <definition> typed with a class it cannot hold, whose type the
-// decode does not read. Unless strict, it also looks for an element in a
-// namespace the decode does not read, which it skips, and for an archetype id
-// on a constraint object the decode read as a C_COMPLEX_OBJECT, which it
-// skips: more archetype_id elements than archetype roots that hold one. A
-// check may find what tolerate then leaves as it is, which costs a second
-// reading that changes nothing; none misses what it looks for. Each check
-// reads data once, so that what they cost grows with the size of data.
+// xsi:type; an element a number is read from that holds nothing or only such
+// markup, which the decode reads as 0; or a <definition> typed with a class
+// it cannot hold, whose type the decode does not read. Unless strict, it
+// also looks for an element in a namespace the decode does not read, which
+// it skips, and for an archetype id on a constraint object the decode read
+// as a C_COMPLEX_OBJECT, which it skips: more archetype_id elements than
+// archetype roots that hold one. A check may find what tolerate then leaves
+// as it is, which costs a second reading that changes nothing; none misses
+// what it looks for. Each check reads data once, so that what they cost
+// grows with the size of data.
 func needsTolerance(data []byte, ot *OperationalTemplate, strict bool) bool {
 	var m modelFacts
 	m.walk(ot.Definition.Attributes)
@@ -557,14 +559,20 @@ func hasBareType(data []byte) bool {
 }
 
 // hasEmptyValue reports whether data holds an element that holds nothing,
-// `<name/>` or `<name></name>` with attributes or none, whose local name is
-// that of an element a number or a boolean is read from: list, lower, upper,
-// assumed_value, true_valid or false_valid. It looks at each slash: one
-// before `>` ends a start tag that closes its element, and one after `><`
-// opens the end tag of an element that holds nothing. It reads data once: it
-// looks for the last two `<` before a slash in the bytes it has not looked
-// through yet, and keeps them and the name of the start tag each opens, once
-// read, rather than look back to them at each slash.
+// `<name/>` or `<name></name>` with attributes or none, or that may hold
+// nothing but comments, processing instructions and CDATA sections, which
+// canonical XML reads as it reads an element that holds nothing, whose local
+// name is that of an element a number or a boolean is read from: list,
+// lower, upper, assumed_value, true_valid or false_valid. It looks at each
+// slash: one before `>` ends a start tag that closes its element, and one
+// after `><` opens the end tag of an element that holds nothing, or, where
+// that `>` ends a comment, a processing instruction or a CDATA section, of
+// an element that may hold only such markup, which the end tag names. It
+// reads data once: it looks for the last two `<` before a slash in the bytes
+// it has not looked through yet, and keeps them and the name of the start
+// tag each opens, once read, rather than look back to them at each slash;
+// the name of an end tag it reads runs to the `>` of the next such slash at
+// most.
 func hasEmptyValue(data []byte) bool {
 	// last is the last '<' before scanned, and from is where the bytes
 	// looked through for it began; prev is the last '<' before from.
@@ -587,6 +595,9 @@ func hasEmptyValue(data []byte) bool {
 				return true
 			}
 		case j >= 2 && data[j-1] == '<' && data[j-2] == '>':
+			if endsMarkup(data[:j-1]) && isValueName(endTagLocal(data[j+1:])) {
+				return true
+			}
 			// The start tag is the '<' before the last: in the bytes looked
 			// through with it, or else the one before them.
 			before := prev
@@ -598,6 +609,27 @@ func hasEmptyValue(data []byte) bool {
 			}
 		}
 	}
+}
+
+// endsMarkup reports whether data ends with the end of a comment, a
+// processing instruction or a CDATA section, which canonical XML reads no
+// value from. A start tag whose name or attribute ends so counts as well.
+func endsMarkup(data []byte) bool {
+	return bytes.HasSuffix(data, []byte("-->")) || bytes.HasSuffix(data, []byte("?>")) || bytes.HasSuffix(data, []byte("]]>"))
+}
+
+// endTagLocal returns the local name of the end tag whose name data starts
+// with, the bytes after its slash: the name up to XML white space or `>`,
+// without its prefix.
+func endTagLocal(data []byte) []byte {
+	name := data
+	if end := bytes.IndexAny(name, " \t\r\n>"); end >= 0 {
+		name = name[:end]
+	}
+	if _, local, ok := bytes.Cut(name, []byte(":")); ok {
+		name = local
+	}
+	return name
 }
 
 // tagStart is a `<` of the input, at offset at, -1 for none, and the local

@@ -864,6 +864,39 @@ func TestREQ111_ReaderFindsWhatCanonicalXMLReadsWithoutAFailure(t *testing.T) {
 			strictRefuses: true,
 		},
 		{
+			name: "a C_BOOLEAN whose false_valid holds a comment",
+			doc:  itemDoc(`<item xsi:type="C_BOOLEAN"><true_valid>true</true_valid><false_valid><!--x--></false_valid></item>`),
+			want: itemDoc(`<item xsi:type="C_BOOLEAN"><true_valid>true</true_valid><false_valid>true</false_valid></item>`),
+		},
+		{
+			name: "a C_BOOLEAN whose false_valid holds an empty CDATA section",
+			doc:  itemDoc(`<item xsi:type="C_BOOLEAN"><true_valid>true</true_valid><false_valid><![CDATA[]]></false_valid></item>`),
+			want: itemDoc(`<item xsi:type="C_BOOLEAN"><true_valid>true</true_valid><false_valid>true</false_valid></item>`),
+		},
+		{
+			name: "a C_BOOLEAN whose false_valid holds a processing instruction",
+			doc:  itemDoc(`<item xsi:type="C_BOOLEAN"><true_valid>true</true_valid><false_valid><?x y?></false_valid></item>`),
+			want: itemDoc(`<item xsi:type="C_BOOLEAN"><true_valid>true</true_valid><false_valid>true</false_valid></item>`),
+		},
+		{
+			name:          "a C_INTEGER list entry that holds an empty CDATA section",
+			doc:           itemDoc(`<item xsi:type="C_INTEGER"><list>1</list><list><![CDATA[]]></list></item>`),
+			want:          itemDoc(`<item xsi:type="C_INTEGER"><list>1</list></item>`),
+			strictRefuses: true,
+		},
+		{
+			name:          "a C_REAL range bound that holds a comment",
+			doc:           itemDoc(`<item xsi:type="C_REAL"><range><lower>0.5</lower><upper><!--x--></upper></range></item>`),
+			want:          itemDoc(`<item xsi:type="C_REAL"><range><upper_included>true</upper_included><upper_unbounded>true</upper_unbounded><lower>0.5</lower></range></item>`),
+			strictRefuses: true,
+		},
+		{
+			name:          "a C_REAL range bound under a prefix that holds a processing instruction",
+			doc:           itemDoc(`<item xsi:type="C_REAL" xmlns:o="` + nsV1 + `"><range><lower>0.5</lower><o:upper><?x y?></o:upper></range></item>`),
+			want:          itemDoc(`<item xsi:type="C_REAL"><range><upper_included>true</upper_included><upper_unbounded>true</upper_unbounded><lower>0.5</lower></range></item>`),
+			strictRefuses: true,
+		},
+		{
 			name: "an empty bound of a quantity's precision",
 			doc: definitionDoc(`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>value</rm_attribute_name>` +
 				`<existence><lower>0</lower><upper>1</upper></existence><children xsi:type="C_DV_QUANTITY"><rm_type_name>DV_QUANTITY</rm_type_name>` +
