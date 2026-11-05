@@ -67,7 +67,10 @@ func WithHTTPClient(c *http.Client) Option {
 
 // WithTokenSource sets the client-default auth.TokenSource. Per-request
 // overrides via auth.WithTokenSource(ctx, ts) take precedence. Default is auth.AnonymousTokenSource (no Authorization
-// header emitted).
+// header emitted), and a nil ts keeps that default. A ts that is not nil
+// itself but holds a nil pointer, func, map, slice or chan, such as a nil
+// *smart.Source, makes [New] return an error matching [ErrInvalidConfig],
+// because its Token method could panic or block on the first request.
 func WithTokenSource(ts auth.TokenSource) Option {
 	return func(cfg *config) { cfg.tokenSrc = ts }
 }
@@ -186,8 +189,12 @@ func WithMaxResponseBody(n int64) Option {
 // says, and this safety net is consulted only once the policy has given
 // up.
 //
-// When this option is not set, a wire 401 returns ErrUnauthorized
-// immediately.
+// When this option is not set, or r is nil, a wire 401 returns
+// ErrUnauthorized immediately. An r that is not nil itself but holds a nil
+// pointer, func, map, slice or chan, such as a nil *smart.Source or a nil
+// auth.ReautherFunc, makes [New] return an error matching
+// [ErrInvalidConfig], because its Reauth method could panic or block on
+// the first 401.
 //
 // Proactive expiry-based refresh in TokenSource.Token is the primary
 // mechanism; this option is a fallback for tokens that expire anyway.

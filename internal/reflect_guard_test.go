@@ -106,6 +106,11 @@ var reflectReviewed = map[string]struct {
 		[]string{reflectValueComparison},
 		"compares two decoded wire documents",
 	},
+	"transport/typednil.go": {
+		[]string{"Chan", "Func", "Map", "Pointer", "Slice", "ValueOf"},
+		[]string{reflectNilOrZeroCheck},
+		"refuses a token source or reauther that holds a nil pointer, func, map, slice or chan before a method call on it panics",
+	},
 }
 
 // minReflectScanFiles is well below the module's count of non-test Go files
