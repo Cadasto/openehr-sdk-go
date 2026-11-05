@@ -4,9 +4,9 @@ package canxml_test
 // carries one attribute twice. That is not well-formed XML, so every decode
 // refuses it, whatever its options, wherever the decode reads the element or
 // skips it as unmatched content: an error that wraps canxml.ErrInvalidShape,
-// names the attribute, and carries none of the values. A decode with an
-// option also refuses one inside a primitive element's text, which a decode
-// with no option does not look at.
+// names the attribute, and carries none of the values. A decode with any
+// option, WithMaxDepth included, also refuses one inside a primitive
+// element's text, which a decode with no option may read past.
 
 import (
 	"bytes"
@@ -28,13 +28,13 @@ const (
 
 // repeatedAttrCase is one document whose element carries one attribute
 // twice, the attribute the refusal names, and whether a decode with no option
-// refuses it.
+// must refuse it.
 type repeatedAttrCase struct {
 	name    string
 	into    func() any
 	in      string
 	attr    string // the path segment the refusal names, such as "@archetype_node_id"
-	tracked bool   // only a decode given an option refuses it
+	tracked bool   // only a decode given an option must refuse it
 	once    string // the document with the attribute once; "" for in without its second value
 	// unmatchedFirst marks an element inside unmatched content, which strict
 	// refuses as it opens, before it reads what the element holds.
@@ -71,18 +71,29 @@ func repeatedAttrCases() []repeatedAttrCase {
 		{name: "another attribute of a Hash entry", into: func() any { return new(rm.ResourceDescription) }, in: `<description ` + ucNS + `><original_author id="k" ` + twice("x") + `>a</original_author><lifecycle_state>published</lifecycle_state></description>`, attr: "@x"},
 		{name: "a boundary flag", into: func() any { return new(aom14.Cardinality) }, in: `<cardinality ` + ucNS + `><is_ordered>true</is_ordered><is_unique>false</is_unique><interval><lower_included ` + twice("x") + `>true</lower_included><upper_included>false</upper_included><lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>0</lower></interval></cardinality>`, attr: "@x"},
 		{name: "a TERMINOLOGY_CODE terminology_id", into: func() any { return new(rm.TerminologyCode) }, in: `<terminology_code ` + ucNS + `><terminology_id ` + twice("x") + `>snomed_ct</terminology_id><code_string>1</code_string></terminology_code>`, attr: "@x"},
+		{
+			name: "a generic slot holding a primitive pointer", attr: "@x",
+			into: func() any { s := "initial"; return &rm.Interval[any]{Lower: &s} },
+			in:   `<interval ` + ucNS + `><lower ` + twice("x") + `>hello</lower></interval>`,
+		},
+		{
+			name: "inside a generic slot holding a value", attr: "@y",
+			into: func() any { return &rm.Interval[any]{Lower: "initial"} },
+			in:   `<interval ` + ucNS + `><lower><z ` + twice("y") + `/></lower></interval>`,
+		},
 		{name: "inside a primitive element", into: func() any { return new(rm.DVText) }, in: `<value ` + ucNS + `><value>t<z ` + twice("y") + `/></value></value>`, attr: "@y", tracked: true},
 	}
 }
 
 // TestREQ056_XMLRepeatedAttributeIsRefused drives each case through
 // canxml.Unmarshal and a canxml.Decoder, with no option and with each report
-// and strict option: each refuses the document with an error that wraps
-// canxml.ErrInvalidShape and not canxml.ErrUnknownElement, names the
-// attribute and carries neither value. A case only a tracked decode refuses
-// decodes with no option. Strict refuses unmatched content around the
-// element first, as the first problem in document order. The same document
-// with one attribute decodes.
+// and strict option and with WithMaxDepth: each refuses the document with an
+// error that wraps canxml.ErrInvalidShape and not canxml.ErrUnknownElement,
+// names the attribute and carries neither value. A case only a decode given
+// an option must refuse may decode with no option, and a refusal there is
+// the same refusal. Strict refuses unmatched content around the element
+// first, as the first problem in document order. The same document with one
+// attribute decodes.
 func TestREQ056_XMLRepeatedAttributeIsRefused(t *testing.T) {
 	modes := []struct {
 		name    string
@@ -94,6 +105,7 @@ func TestREQ056_XMLRepeatedAttributeIsRefused(t *testing.T) {
 		{name: "WithStrict", opts: []canxml.DecoderOption{canxml.WithStrict()}, tracked: true},
 		{name: "WithMissing", opts: []canxml.DecoderOption{canxml.WithMissing(func(string) {})}, tracked: true},
 		{name: "WithPresence", opts: []canxml.DecoderOption{canxml.WithPresence(func(string, canxml.Presence) {})}, tracked: true},
+		{name: "WithMaxDepth", opts: []canxml.DecoderOption{canxml.WithMaxDepth(64)}, tracked: true},
 	}
 	for _, c := range repeatedAttrCases() {
 		t.Run(c.name, func(t *testing.T) {
@@ -114,11 +126,8 @@ func TestREQ056_XMLRepeatedAttributeIsRefused(t *testing.T) {
 						}
 						return
 					}
-					if !refused {
-						if err != nil {
-							t.Errorf("%s %s = %v; want nil: a decode with no option does not look inside a primitive element", call, m.name, err)
-						}
-						return
+					if !refused && err == nil {
+						return // a decode with no option may read past the element
 					}
 					if !errors.Is(err, canxml.ErrInvalidShape) || errors.Is(err, canxml.ErrUnknownElement) {
 						t.Fatalf("%s %s = %v; want an error that wraps canxml.ErrInvalidShape and not canxml.ErrUnknownElement", call, m.name, err)

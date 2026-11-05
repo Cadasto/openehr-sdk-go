@@ -1299,12 +1299,13 @@ func DecodeParam[T any](dec *xml.Decoder, start *xml.StartElement, v *T, dispatc
 //
 // encoding/xml decodes into such a member only when it holds a non-nil
 // pointer, and skips the element otherwise; the default decode does exactly
-// that. A tracked decode leaves the choice to encoding/xml as well: a pointer
-// to an RM type then checks its own content, and when nothing of the SDK
-// checked the element's content, because encoding/xml skipped it or read it
-// into a primitive, the element is reported or refused as one item once it is
-// read. Text that does not decode as the held primitive's type fails as in
-// [DecodeElement].
+// that, and refuses an element that carries one attribute twice, at any depth
+// of one it skips ([skipUntracked]). A tracked decode leaves the choice to
+// encoding/xml as well: a pointer to an RM type then checks its own content,
+// and when nothing of the SDK checked the element's content, because
+// encoding/xml skipped it or read it into a primitive, the element is
+// reported or refused as one item once it is read. Text that does not decode
+// as the held primitive's type fails as in [DecodeElement].
 func decodeInterface(dec *xml.Decoder, start *xml.StartElement, v, held any) error {
 	target := v
 	if tc, ok := asText(held).(*textConversion); ok {
@@ -1315,6 +1316,12 @@ func decodeInterface(dec *xml.Decoder, start *xml.StartElement, v, held any) err
 	}
 	t := trackerOf(dec)
 	if t == nil {
+		if target == v && !isPointer(held) {
+			return skipUntracked(dec, start)
+		}
+		if err := checkRepeatedAttr(start); err != nil {
+			return err
+		}
 		err := dec.DecodeElement(target, start)
 		if cause := conversionRefusal(err); cause != nil {
 			return primitiveFailure("/"+start.Name.Local, cause)
