@@ -12,6 +12,8 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"os"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -319,10 +321,11 @@ var stringChildren = []struct {
 // TestREQ111_CompileReadsListOpenAndRefusesAFlagThatIsNoBoolean pins, from
 // the XML to the compiled tree in both of the reader's modes, the reading of
 // C_STRING.list_open § REQ-103 gives and § REQ-111 Reading the model keeps:
-// an absent or empty element leaves the list closed, and a written one is
-// read as written. Text that is no boolean in list_open, or in a C_BOOLEAN's
-// true_valid or false_valid, is refused with an error wrapping
-// canxml.ErrInvalidShape.
+// an absent or empty element leaves the list closed, one of white space only
+// among them, and a written one is read as written. A C_BOOLEAN's true_valid
+// or false_valid of white space only reads as an empty one, true. Text that
+// is no boolean in list_open, or in a C_BOOLEAN's true_valid or false_valid,
+// is refused with an error wrapping canxml.ErrInvalidShape.
 func TestREQ111_CompileReadsListOpenAndRefusesAFlagThatIsNoBoolean(t *testing.T) {
 	cases := []struct {
 		name, listOpen string
@@ -333,6 +336,8 @@ func TestREQ111_CompileReadsListOpenAndRefusesAFlagThatIsNoBoolean(t *testing.T)
 		{name: "empty", listOpen: "<list_open></list_open>", want: false},
 		{name: "false", listOpen: "<list_open>false</list_open>", want: false},
 		{name: "padded false", listOpen: "<list_open> false\n</list_open>", want: false},
+		{name: "white space", listOpen: "<list_open> </list_open>", want: false},
+		{name: "white space of every kind", listOpen: "<list_open> \t\r\n </list_open>", want: false},
 		{name: "true", listOpen: "<list_open>true</list_open>", want: true},
 	}
 	for _, mode := range readerModes {
@@ -356,6 +361,21 @@ func TestREQ111_CompileReadsListOpenAndRefusesAFlagThatIsNoBoolean(t *testing.T)
 		}
 	}
 
+	for _, mode := range readerModes {
+		t.Run(mode.name+"/C_BOOLEAN flags of white space", func(t *testing.T) {
+			child := `<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>BOOLEAN</rm_type_name><node_id/>` +
+				"<item xsi:type=\"C_BOOLEAN\"><true_valid> </true_valid><false_valid> \t\r\n </false_valid></item></children>"
+			c, err := readAndCompile(childBody(child, ""), mode.opts...)
+			if err != nil {
+				t.Fatalf("read and compile = %v, want the template", err)
+			}
+			got := c.Root().Attribute("content").Children()[0].PrimitiveConstraint()
+			if want := (constraints.CBoolean{TrueValid: true, FalseValid: true}); got != want {
+				t.Errorf("PrimitiveConstraint() = %#v, want %#v", got, want)
+			}
+		})
+	}
+
 	refused := map[string]string{
 		"list_open":   fmt.Sprintf(stringChildren[1].child, "<list>a</list><list_open>maybe</list_open>"),
 		"true_valid":  `<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>BOOLEAN</rm_type_name><node_id/><item xsi:type="C_BOOLEAN"><true_valid>yes</true_valid><false_valid>true</false_valid></item></children>`,
@@ -370,6 +390,40 @@ func TestREQ111_CompileReadsListOpenAndRefusesAFlagThatIsNoBoolean(t *testing.T)
 				}
 			})
 		}
+	}
+}
+
+// TestREQ103_REQ111_CompileReadsTheCorpusListOpenOfWhiteSpaceAsClosed pins,
+// in both of the reader's modes, the list_open reading on a whole template:
+// sdk_crosscheck_values.v1 with each list_open written as white space only
+// reads and compiles, and the C_STRING that lists alpha and beta, which the
+// corpus opens, stays closed.
+func TestREQ103_REQ111_CompileReadsTheCorpusListOpenOfWhiteSpaceAsClosed(t *testing.T) {
+	raw, err := os.ReadFile(fixtures.TemplateOpt("sdk_crosscheck_values.v1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	listOpen := regexp.MustCompile(`<list_open>[^<]*</list_open>`)
+	if !listOpen.Match(raw) {
+		t.Fatal("sdk_crosscheck_values.v1 writes no list_open")
+	}
+	body := string(listOpen.ReplaceAll(raw, []byte("<list_open> </list_open>")))
+	for _, mode := range readerModes {
+		t.Run(mode.name, func(t *testing.T) {
+			c, err := readAndCompile(body, mode.opts...)
+			if err != nil {
+				t.Fatalf("read and compile = %v, want the template", err)
+			}
+			var listed []constraints.CString
+			for _, n := range c.AllByRMType("STRING") {
+				if cs, ok := n.PrimitiveConstraint().(constraints.CString); ok && slices.Equal(cs.List, []string{"alpha", "beta"}) {
+					listed = append(listed, cs)
+				}
+			}
+			if len(listed) != 1 || listed[0].ListOpen {
+				t.Errorf("the CStrings listing [alpha beta] = %#v, want one with ListOpen false", listed)
+			}
+		})
 	}
 }
 

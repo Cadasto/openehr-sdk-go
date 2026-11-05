@@ -969,6 +969,40 @@ func TestREQ111_ReaderReadsValuesInEveryMode(t *testing.T) {
 	}
 }
 
+// TestREQ103_REQ111_ReaderReadsAFlagOfWhiteSpaceAsAnEmptyOne pins, in every
+// mode, that a C_STRING list_open, or a C_BOOLEAN true_valid or false_valid,
+// whose text is XML white space only reads as the empty element, as XML
+// Schema's boolean type, which collapses white space, reads it: list_open as
+// false, so the list stays closed, and each C_BOOLEAN flag as true. The
+// reading leaves nothing out, so WithUnmatched reports nothing.
+func TestREQ103_REQ111_ReaderReadsAFlagOfWhiteSpaceAsAnEmptyOne(t *testing.T) {
+	t.Parallel()
+	for _, space := range []string{" ", " \t\r\n "} {
+		cases := []struct{ name, doc, want string }{
+			{
+				name: "a C_STRING list_open",
+				doc:  itemDoc(`<item xsi:type="C_STRING"><list>a</list><list_open>` + space + `</list_open></item>`),
+				want: itemDoc(`<item xsi:type="C_STRING"><list>a</list><list_open></list_open></item>`),
+			},
+			{
+				name: "a C_BOOLEAN true_valid and false_valid",
+				doc:  itemDoc(`<item xsi:type="C_BOOLEAN"><true_valid>` + space + `</true_valid><false_valid>` + space + `</false_valid></item>`),
+				want: itemDoc(`<item xsi:type="C_BOOLEAN"><true_valid>true</true_valid><false_valid>true</false_valid></item>`),
+			},
+		}
+		for _, tc := range cases {
+			for mode, opts := range modes {
+				t.Run(mode+"/"+tc.name+"/"+strconv.Quote(space), func(t *testing.T) {
+					t.Parallel()
+					if got := readAs(t, []byte(tc.doc), decoded(t, []byte(tc.want)), opts...); len(got) != 0 {
+						t.Errorf("WithUnmatched reported %q, want nothing", got)
+					}
+				})
+			}
+		}
+	}
+}
+
 // TestREQ111_ReaderFindsWhatCanonicalXMLReadsWithoutAFailure pins the
 // readings of a document that canonical XML decodes without a failure, but
 // otherwise than the reader reads it: a C_BOOLEAN flag left out or empty, or
