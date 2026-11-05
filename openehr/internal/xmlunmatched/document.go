@@ -23,8 +23,8 @@ import (
 // start; comments, processing instructions and whitespace may follow the
 // root, as XML allows. XML reserves the processing instruction target xml,
 // in any letter case, for the XML declaration, which comes first: one
-// elsewhere before or after the root, a second declaration among them, is
-// refused. Anything else before or after the root, such as an element or
+// elsewhere, before, inside or after the root, a second declaration among
+// them, is refused. Anything else before or after the root, such as an element or
 // text other than whitespace, is not well-formed XML, and the decode refuses
 // it whatever t's policy: it is malformed input, not unmatched content. The
 // error wraps [ErrInvalidShape] and carries none of that content. A root that
@@ -57,7 +57,16 @@ func Unmarshal(data []byte, v any, t *Tracker) error {
 			}
 			return err
 		}
-		return end(dec)
+		if err := end(dec); err != nil {
+			return err
+		}
+		if xmlTargetPastStart(data) {
+			// Only a tracked decode sees the processing instructions inside
+			// the root, so a document that may hold one whose target is xml
+			// is decoded again through one, which refuses it.
+			return decodeAgain(data, v, errXMLTargetInside)
+		}
+		return nil
 	}
 	dec := t.NewDecoder(bytes.NewReader(data))
 	if err := t.Decode(dec, v); err != nil {
@@ -69,7 +78,10 @@ func Unmarshal(data []byte, v any, t *Tracker) error {
 // decodeAgain decodes data into v once more after an untracked decode failed
 // with err: a primitive failure that names the element alone, an `xsi:type`
 // whose prefix the decode could not resolve, or encoding/xml's refusal of an
-// element nested past its own depth limit, which names no element. The second
+// element nested past its own depth limit, which names no element; or after
+// one that succeeded on data that may hold a processing instruction whose
+// target is xml inside its root, which err is then [errXMLTargetInside] for,
+// and which the second decode refuses, or reads to the end. The second
 // decode reads through a tracker that follows the open elements and their
 // namespace scope and applies no policy. A primitive failure fails again at
 // the same element, named by its path from the root of the value, and so does
@@ -82,7 +94,7 @@ func Unmarshal(data []byte, v any, t *Tracker) error {
 // not fail again.
 func decodeAgain(data []byte, v any, err error) error {
 	t := NewTracker(nil, false)
-	t.again = IsUnresolvedPrefix(err)
+	t.again = IsUnresolvedPrefix(err) || errors.Is(err, errXMLTargetInside)
 	dec := t.NewDecoder(bytes.NewReader(data))
 	if again := t.Decode(dec, v); again != nil {
 		return again
@@ -279,6 +291,31 @@ func rootFirst(data []byte) bool {
 	head := bytes.TrimLeft(data, " \t\r\n")
 	return len(head) > 1 && head[0] == '<' && head[1] != '?' && head[1] != '!' && head[1] != '/'
 }
+
+// xmlTargetPastStart reports whether data, one document, may hold a
+// processing instruction whose target is xml anywhere but at its very start,
+// after a byte order mark: `<?` and the letters xml in any letter case,
+// followed by XML whitespace or `?`. A comment or a CDATA section can hold
+// those bytes too, which only a decode tells apart. It costs one search of
+// data for `<?`.
+func xmlTargetPastStart(data []byte) bool {
+	data = bytes.TrimPrefix(data, utf8BOM)
+	for at := 0; ; {
+		i := bytes.Index(data[at:], piOpen)
+		if i < 0 {
+			return false
+		}
+		at += i + len(piOpen)
+		rest := data[at:]
+		if at > len(piOpen) && len(rest) > 3 && bytes.EqualFold(rest[:3], xmlTarget) && (rest[3] == '?' || isXMLSpace(rest[3:4])) {
+			return true
+		}
+	}
+}
+
+// piOpen opens a processing instruction, and xmlTarget is the target XML
+// reserves for its declaration ([xmlTargetPastStart]).
+var piOpen, xmlTarget = []byte("<?"), []byte("xml")
 
 // isXMLTarget reports whether target, a processing instruction's, is xml in
 // any letter case, which XML reserves for the XML declaration

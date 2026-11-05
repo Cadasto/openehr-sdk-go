@@ -484,7 +484,10 @@ func (f failedReader) Read([]byte) (int, error) { return 0, f.err }
 // stream may hold many values, one after another, and Decode skips what
 // precedes each one, as encoding/xml does. [Unmarshal], which is given a
 // whole document, is the call that holds it to one root element and checks
-// what comes before and after it.
+// what comes before and after it. Inside the value, a Decoder given any
+// option, [WithMaxDepth] included, refuses a processing instruction whose
+// target is xml, which XML reserves for the declaration at the start of a
+// document, with [ErrInvalidShape]; one given none may read past it.
 func (d *Decoder) Decode(v any) error {
 	switch {
 	case d.trk != nil:
@@ -548,9 +551,9 @@ func (d *Decoder) RelaxedTypeDispatch() bool { return d.cfg.relaxedTypeDispatch 
 // mark at the very start; comments, processing instructions and whitespace
 // may follow the root, as XML allows. XML reserves the processing
 // instruction target xml, in any letter case, for the XML declaration at the
-// start, so one elsewhere before or after the root, such as a second
-// declaration or one after the root's end, is refused; a target that only starts with those letters, such as
-// xml-stylesheet, passes. Anything else before or after the root, such as
+// start, so one elsewhere, before, inside or after the root, such as a
+// second declaration or one inside an element, is refused; a target that
+// only starts with those letters, such as xml-stylesheet, passes. Anything else before or after the root, such as
 // an element or text other than whitespace, is not well-formed XML, and the
 // decode refuses it in every mode, with or without [WithUnmatched],
 // [WithStrict] or [WithMissing]: it is malformed input, not unmatched

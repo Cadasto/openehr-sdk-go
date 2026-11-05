@@ -833,9 +833,19 @@ func (r *trackingReader) Token() (xml.Token, error) {
 		if r.t.checksPresence() && !isXMLSpace(tk) {
 			r.t.open[len(r.t.open)-1].hasText = true
 		}
+	case xml.ProcInst:
+		// XML reserves the target xml for the declaration at the start of
+		// a document, so one inside an element is not well-formed.
+		if len(r.t.open) > 1 && isXMLTarget(tk.Target) {
+			return nil, r.t.fail(r.t.path(), errXMLTargetInside)
+		}
 	}
 	return tok, err
 }
+
+// errXMLTargetInside is the cause of the refusal of a processing instruction
+// whose target is xml inside an element.
+var errXMLTargetInside = errors.New("the element holds a processing instruction whose target is xml, which XML reserves for the declaration at the start of a document")
 
 // withoutNamespaceDecls returns attrs without its namespace declarations. It
 // returns attrs itself when it holds none.

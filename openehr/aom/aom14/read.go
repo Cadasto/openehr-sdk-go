@@ -67,7 +67,8 @@ const inputBufferMax = 4 << 20
 // letters, such as xml-stylesheet, passes. Without it, the reader also reads
 // past, before the root, any content encoding/xml reads, such as text or a
 // CDATA section, and, after the root, a `<!…>` declaration and a processing
-// instruction whose target is xml. Anything else before or after the root,
+// instruction whose target is xml; one inside the root is refused in both
+// modes, as canonical XML refuses it. Anything else before or after the root,
 // such as an element after it or a stray end tag before it, is refused with
 // an error that wraps [canxml.ErrInvalidShape] and carries none of it. The root element may have any name, so a document whose root is
 // `<OPERATIONAL_TEMPLATE>` reads as one whose root is `<template>`. An input

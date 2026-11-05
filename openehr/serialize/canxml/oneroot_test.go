@@ -236,3 +236,77 @@ func TestREQ056_XMLBeforeRoot(t *testing.T) {
 		}
 	})
 }
+
+// TestREQ056_XMLTargetInsideTheRoot pins that XML reserves the processing
+// instruction target xml, in any letter case, for the declaration at the start
+// of a document, inside the root as before and after it (REQ-056):
+// canxml.Unmarshal refuses one inside an element in every mode, and so does a
+// canxml.Decoder given any option, canxml.WithMaxDepth included, with an error
+// that wraps canxml.ErrInvalidShape, is no unmatched content and carries none
+// of the instruction. A target that only starts with xml passes, and so do the
+// same bytes inside a comment or a CDATA section, which are no instruction.
+//
+// Can-fail control: let the tracked token source pass such an instruction and
+// every refused row decodes; let Unmarshal given no option skip its check of
+// the bytes and that mode decodes them.
+func TestREQ056_XMLTargetInsideTheRoot(t *testing.T) {
+	const ns = `xmlns="http://schemas.openehr.org/v1"`
+	refused := map[string]string{
+		"declaration first in the root": `<dv_text ` + ns + `><?xml version="1.0"?><value>a</value></dv_text>`,
+		"inside a primitive's text":     `<dv_text ` + ns + `><value>a<?xml version="1.0"?>b</value></dv_text>`,
+		"after a member":                `<dv_text ` + ns + `><value>a</value><?xml version="1.0"?></dv_text>`,
+		"xml target in capitals":        `<dv_text ` + ns + `><value>a</value><?XML pi data?></dv_text>`,
+		"bare xml target":               `<dv_text ` + ns + `><value>a</value><?xml?></dv_text>`,
+	}
+	accepted := map[string]struct{ in, value string }{
+		"target that starts with xml": {`<dv_text ` + ns + `><?xml-stylesheet href="a.xsl"?><value>a</value></dv_text>`, "a"},
+		"xml target in a comment":     {`<dv_text ` + ns + `><!-- <?xml version="1.0"?> --><value>a</value></dv_text>`, "a"},
+		"xml target in CDATA":         {`<?xml version="1.0"?><dv_text ` + ns + `><value><![CDATA[<?xml version="1.0"?>]]></value></dv_text>`, `<?xml version="1.0"?>`},
+	}
+	modes := map[string]func(in string, v any) error{
+		"Unmarshal": func(in string, v any) error { return canxml.Unmarshal([]byte(in), v) },
+		"Unmarshal WithUnmatched": func(in string, v any) error {
+			return canxml.Unmarshal([]byte(in), v, canxml.WithUnmatched(func(string) {}))
+		},
+		"Unmarshal WithStrict": func(in string, v any) error { return canxml.Unmarshal([]byte(in), v, canxml.WithStrict()) },
+		"Unmarshal WithMissing": func(in string, v any) error {
+			return canxml.Unmarshal([]byte(in), v, canxml.WithMissing(func(string) {}))
+		},
+		"Unmarshal WithMaxDepth": func(in string, v any) error { return canxml.Unmarshal([]byte(in), v, canxml.WithMaxDepth(100)) },
+		"Decoder WithMaxDepth": func(in string, v any) error {
+			return canxml.NewDecoder(strings.NewReader(in), canxml.WithMaxDepth(100)).Decode(v)
+		},
+		"Decoder WithStrict": func(in string, v any) error {
+			return canxml.NewDecoder(strings.NewReader(in), canxml.WithStrict()).Decode(v)
+		},
+		"Decoder WithUnmatched": func(in string, v any) error {
+			return canxml.NewDecoder(strings.NewReader(in), canxml.WithUnmatched(func(string) {})).Decode(v)
+		},
+	}
+	for mode, decode := range modes {
+		for name, in := range refused {
+			t.Run(mode+"/refused/"+name, func(t *testing.T) {
+				err := decode(in, new(rm.DVText))
+				if !errors.Is(err, canxml.ErrInvalidShape) || errors.Is(err, canxml.ErrUnknownElement) {
+					t.Fatalf("%s(%s) = %v; want an error that wraps canxml.ErrInvalidShape and not canxml.ErrUnknownElement", mode, in, err)
+				}
+				for _, leak := range []string{"version", "pi data"} {
+					if strings.Contains(err.Error(), leak) {
+						t.Errorf("%s(%s) err = %q; it echoes the instruction's %q", mode, in, err, leak)
+					}
+				}
+			})
+		}
+		for name, c := range accepted {
+			t.Run(mode+"/accepted/"+name, func(t *testing.T) {
+				var v rm.DVText
+				if err := decode(c.in, &v); err != nil {
+					t.Fatalf("%s(%s) = %v; want nil", mode, c.in, err)
+				}
+				if v.Value != c.value {
+					t.Errorf("%s(%s) decoded value %q; want %q", mode, c.in, v.Value, c.value)
+				}
+			})
+		}
+	}
+}

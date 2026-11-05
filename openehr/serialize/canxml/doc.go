@@ -33,9 +33,11 @@
 //     document type declaration and a UTF-8 byte order mark at the very
 //     start. XML reserves the processing instruction target xml, in any
 //     letter case, for the XML declaration at the start, so [Unmarshal]
-//     refuses one elsewhere before or after the root, such as a second
-//     declaration or one after the root's end, with [ErrInvalidShape]; a target that only starts with those
-//     letters, such as xml-stylesheet, is accepted.
+//     refuses one elsewhere, before, inside or after the root, such as a
+//     second declaration or one inside an element, with [ErrInvalidShape],
+//     and so does a [Decoder] given any option inside the value it decodes;
+//     a target that only starts with those letters, such as xml-stylesheet,
+//     is accepted.
 //   - Default namespace: `http://schemas.openehr.org/v1`.
 //   - `xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"` is
 //     declared on the document root whenever any descendant carries
