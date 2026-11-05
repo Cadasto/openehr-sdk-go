@@ -2056,7 +2056,7 @@ func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g 
 		// reused-sibling refusal, each with its own message.
 		return fmt.Errorf("simplified: %q: %w", g.prefix(), err)
 	}
-	value, err := compositeLeafValue(g, nodeRMType(node))
+	value, ordinalBounds, err := compositeLeafValue(g, nodeRMType(node))
 	if err == nil || errors.Is(err, errNothingMatched) {
 		if dupErr := g.settleDups(); dupErr != nil {
 			return dupErr
@@ -2068,28 +2068,35 @@ func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g 
 	if err != nil {
 		return err
 	}
-	if _, err := placeLeaf(compJSON, node.AQLPath, predIndex, predType, value, budget, tmpl); err != nil {
+	key, err := placeLeaf(compJSON, node.AQLPath, predIndex, predType, value, budget, tmpl)
+	if err != nil {
 		return fmt.Errorf("simplified: place %q: %w", g.prefix(), err)
+	}
+	for _, end := range ordinalBounds {
+		settleOrdinalTerminology(value[end], tmpl.ordinalTerminologies(key+"/"+end))
 	}
 	return nil
 }
 
 // compositeLeafValue decodes a composite leaf's group by its RM type: the party
 // grammar (rmattr_party.go) or the interval grammar (rmattr_value.go), each the
-// same implementation those families use at every other position.
-func compositeLeafValue(g rmattrGroup, rmType string) (map[string]any, error) {
+// same implementation those families use at every other position. It also
+// returns the bounds of a DV_INTERVAL<DV_ORDINAL> leaf that were built from
+// their suffixes, whose symbols a WithTemplate decode settles once the leaf is
+// placed.
+func compositeLeafValue(g rmattrGroup, rmType string) (map[string]any, []string, error) {
 	if anchor, isInterval := intervalLeafAnchor(rmType); isInterval {
 		return intervalLeafSuffixes(g, anchor)
 	}
 	party, populated, err := partyLeafSuffixes(g)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if !populated {
-		return nil, fmt.Errorf("%w: %s carries no party key (PARTY_IDENTIFIED needs at least one of |name, |id or an _identifier)",
+		return nil, nil, fmt.Errorf("%w: %s carries no party key (PARTY_IDENTIFIED needs at least one of |name, |id or an _identifier)",
 			ErrUnsupportedDatatype, g.prefix())
 	}
-	return party, nil
+	return party, nil, nil
 }
 
 // rmattrOwnerAt resolves the owner of an underscore-family group whose base

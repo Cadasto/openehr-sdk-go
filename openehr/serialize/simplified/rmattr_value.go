@@ -543,14 +543,30 @@ func includedOpenSideError(key, end string) error {
 // The group arrives from [compositeLeafGroups] rather than the `_` router, so its
 // family is the leaf's own FLAT segment id and every refusal names the key the
 // payload author wrote.
-func intervalLeafSuffixes(g rmattrGroup, anchor string) (map[string]any, error) {
+//
+// For a DV_ORDINAL anchor it also returns the bounds ("lower", "upper") built
+// from their suffixes rather than given as |raw: their symbols carry no
+// terminology in the formats ([settleOrdinalTerminology]).
+func intervalLeafSuffixes(g rmattrGroup, anchor string) (map[string]any, []string, error) {
 	ts, err := intervalTails(g, anchor, intervalSubTails)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// A DV_INTERVAL at a Web Template leaf is polymorphic: canonical JSON
 	// decodes it as DV_INTERVAL<DV_ORDERED>, an interface bound.
-	return intervalSuffixes(g, ts, anchor, false)
+	iv, err := intervalSuffixes(g, ts, anchor, false)
+	if err != nil || anchor != "DV_ORDINAL" {
+		return iv, nil, err
+	}
+	var ordinalBounds []string
+	for _, end := range []string{"lower", "upper"} {
+		if sfx, bounded := ts.sub[end]; bounded {
+			if _, raw := sfx["raw"]; !raw {
+				ordinalBounds = append(ordinalBounds, end)
+			}
+		}
+	}
+	return iv, ordinalBounds, nil
 }
 
 // intervalTails splits g's tails for the interval grammar, sub being the

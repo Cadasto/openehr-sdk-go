@@ -593,9 +593,12 @@ func TestREQ053WithTemplateOrdinalTerminology(t *testing.T) {
 		`<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>STRING</rm_type_name>`+strings.ReplaceAll(exactlyOne, "existence", "occurrences")+`<node_id/>`+
 		`<item xsi:type="C_STRING"><list>Schmerzgrad</list></item></children></attributes></children></attributes>`, 1)
 	// apart gives the code local at 1 and SNOMED-CT at 2; twice gives it both
-	// at 1.
+	// at 1, in either order.
 	apart := withPairs(string(raw), pair("1", "local"), pair("2", "SNOMED-CT"))
-	twice := withPairs(string(raw), pair("1", "local"), pair("1", "SNOMED-CT"))
+	twice := []string{
+		withPairs(string(raw), pair("1", "local"), pair("1", "SNOMED-CT")),
+		withPairs(string(raw), pair("1", "SNOMED-CT"), pair("1", "local")),
+	}
 
 	compileEdited := func(t *testing.T, opt string) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
 		t.Helper()
@@ -717,9 +720,126 @@ func TestREQ053WithTemplateOrdinalTerminology(t *testing.T) {
 
 			// A code and value the template gives local and SNOMED-CT have no
 			// single terminology, and the symbol stays local.
-			wtTwice, compiledTwice := compileEdited(t, twice)
-			if got := terminologyOf(t, decodeAs(t, format, body, wtTwice, simplified.WithTemplate(compiledTwice))); got != "local" {
-				t.Errorf("WithTemplate decode, one pair in two terminologies: symbol terminology %q, want local", got)
+			for i, opt := range twice {
+				wtTwice, compiledTwice := compileEdited(t, opt)
+				if got := terminologyOf(t, decodeAs(t, format, body, wtTwice, simplified.WithTemplate(compiledTwice))); got != "local" {
+					t.Errorf("WithTemplate decode, one pair in two terminologies (order %d): symbol terminology %q, want local", i, got)
+				}
+			}
+		})
+	}
+}
+
+// TestREQ053WithTemplateOrdinalIntervalTerminology — REQ-053. A bound of a
+// DV_INTERVAL<DV_ORDINAL> leaf carries its code and value but not its
+// terminology, like an ordinal leaf. A WithTemplate decode gives a bound built
+// from its suffixes the terminology of the template's pair for that bound, and
+// a |raw bound keeps its own; decode without the template leaves both local.
+func TestREQ053WithTemplateOrdinalIntervalTerminology(t *testing.T) {
+	const (
+		id         = "Test_dv_interval_dv_count_lower_upper_constraint.v0"
+		countType  = "DV_INTERVAL&lt;DV_COUNT&gt;"
+		boundStart = "<children xsi:type=\"C_COMPLEX_OBJECT\">\n<rm_type_name>DV_COUNT</rm_type_name>"
+		boundEnd   = "</attributes>\n                            </children>"
+		exactlyOne = "<lower_included>true</lower_included><upper_included>true</upper_included>" +
+			"<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>1</lower><upper>1</upper>"
+		// ordinalBound is a C_DV_ORDINAL whose one pair codes 111 in SNOMED-CT.
+		ordinalBound = `<children xsi:type="C_DV_ORDINAL"><rm_type_name>DV_ORDINAL</rm_type_name><occurrences>` + exactlyOne +
+			`</occurrences><node_id></node_id><list><value>1</value><symbol><defining_code><terminology_id><value>SNOMED-CT</value>` +
+			`</terminology_id><code_string>111</code_string></defining_code></symbol></list></children>`
+	)
+	raw, err := os.ReadFile(fixtures.TemplateOpt(id))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Retarget the DV_INTERVAL<DV_COUNT> leaf to DV_INTERVAL<DV_ORDINAL>, each
+	// bound a C_DV_ORDINAL in place of the C_DV_COUNT.
+	opt := string(raw)
+	if strings.Count(opt, countType) != 1 || strings.Count(opt, boundStart) != 2 {
+		t.Fatalf("%s no longer holds one %s with two DV_COUNT bounds", id, countType)
+	}
+	opt = strings.Replace(opt, countType, "DV_INTERVAL&lt;DV_ORDINAL&gt;", 1)
+	for range 2 {
+		start := strings.Index(opt, boundStart)
+		end := strings.Index(opt[start:], boundEnd)
+		if end < 0 {
+			t.Fatalf("%s: a DV_COUNT bound is not closed as expected", id)
+		}
+		opt = opt[:start] + ordinalBound + opt[start+end+len(boundEnd):]
+	}
+	model, err := aom14.ReadOperationalTemplate(strings.NewReader(opt))
+	if err != nil {
+		t.Fatalf("ReadOperationalTemplate: %v", err)
+	}
+	wt, compiled := compileTemplate(t, id, model)
+
+	var leaf *webtemplate.Node
+	var find func(n *webtemplate.Node)
+	find = func(n *webtemplate.Node) {
+		if strings.HasPrefix(n.RMType, "DV_INTERVAL") {
+			leaf = n
+		}
+		for _, ch := range n.Children {
+			find(ch)
+		}
+	}
+	find(wt.Tree)
+	if leaf == nil {
+		t.Fatal("the Web Template has no DV_INTERVAL leaf")
+	}
+	key, ok := flatKeyOf(wt.Tree, leaf.AQLPath, nil)
+	if !ok {
+		t.Fatalf("no FLAT key for %s", leaf.AQLPath)
+	}
+	body, err := json.Marshal(map[string]any{
+		"ctx/language": "en", "ctx/territory": "NL", "ctx/composer_name": "Composer",
+		"ctx/time":          "2026-10-26T09:00:00Z",
+		key + "/lower|code": "111", key + "/lower|value": "mild", key + "/lower|ordinal": 1,
+		key + "/upper|raw": map[string]any{
+			"_type": "DV_ORDINAL", "value": 1,
+			"symbol": map[string]any{
+				"_type": "DV_CODED_TEXT", "value": "mild",
+				"defining_code": map[string]any{
+					"_type": "CODE_PHRASE", "code_string": "111",
+					"terminology_id": map[string]any{"_type": "TERMINOLOGY_ID", "value": "local"},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// terminologyAt returns the terminology of the decoded bound's symbol.
+	terminologyAt := func(t *testing.T, comp *rm.Composition, end string) string {
+		t.Helper()
+		items, err := rmpath.ItemsAtPath(comp, leaf.AQLPath)
+		if err != nil || len(items) != 1 {
+			t.Fatalf("ItemsAtPath(%s) = %d items, %v; want the interval", leaf.AQLPath, len(items), err)
+		}
+		iv, ok := items[0].(*rm.DVInterval[rm.DVOrdered])
+		if !ok {
+			t.Fatalf("%s holds a %T, want *rm.DVInterval[rm.DVOrdered]", leaf.AQLPath, items[0])
+		}
+		bound := iv.Lower
+		if end == "upper" {
+			bound = iv.Upper
+		}
+		ord, ok := bound.(*rm.DVOrdinal)
+		if !ok {
+			t.Fatalf("%s %s bound is a %T, want *rm.DVOrdinal", leaf.AQLPath, end, bound)
+		}
+		return ord.Symbol.DefiningCode.TerminologyID.Value
+	}
+
+	for _, format := range []string{"FLAT", "STRUCTURED"} {
+		t.Run(format, func(t *testing.T) {
+			bare := decodeAs(t, format, body, wt)
+			if lower := terminologyAt(t, bare, "lower"); lower != "local" {
+				t.Errorf("decode without the template: lower bound terminology %q, want local", lower)
+			}
+			got := decodeAs(t, format, body, wt, simplified.WithTemplate(compiled))
+			if lower, upper := terminologyAt(t, got, "lower"), terminologyAt(t, got, "upper"); lower != "SNOMED-CT" || upper != "local" {
+				t.Errorf("WithTemplate decode: bound terminologies lower %q, upper %q; want SNOMED-CT, the template's, and local, the |raw bound's own", lower, upper)
 			}
 		})
 	}
