@@ -23,12 +23,12 @@ import (
 // start; comments, processing instructions and whitespace may follow the
 // root, as XML allows. XML reserves the processing instruction target xml,
 // in any letter case, for the XML declaration, which comes first: one
-// anywhere else, a second declaration among them, is refused. Anything else
-// before or after the root, such as an element or text other than
-// whitespace, is not well-formed XML, and the decode refuses it whatever t's
-// policy: it is malformed input, not unmatched content. The error wraps
-// [ErrInvalidShape] and carries none of that content. A root that fails to
-// decode fails as itself, and the decode does not read on.
+// elsewhere before or after the root, a second declaration among them, is
+// refused. Anything else before or after the root, such as an element or
+// text other than whitespace, is not well-formed XML, and the decode refuses
+// it whatever t's policy: it is malformed input, not unmatched content. The
+// error wraps [ErrInvalidShape] and carries none of that content. A root that
+// fails to decode fails as itself, and the decode does not read on.
 //
 // A primitive failure comes back on its own, naming the element by its path
 // from the root of the value (see "Primitive failures" in the package

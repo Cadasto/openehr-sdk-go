@@ -62,8 +62,8 @@ const inputBufferMax = 4 << 20
 // after the root it may hold comments, processing instructions and
 // whitespace. XML reserves the processing instruction target xml, in any
 // letter case, for the XML declaration at the start, so a processing
-// instruction with that target anywhere else, such as a second declaration
-// or one after the root, is refused; a target that only starts with those
+// instruction with that target elsewhere before or after the root, such as
+// a second declaration or one after the root's end, is refused; a target that only starts with those
 // letters, such as xml-stylesheet, passes. Without it, the reader also reads
 // past, before the root, any content encoding/xml reads, such as text or a
 // CDATA section, and, after the root, a `<!…>` declaration and a processing

@@ -107,8 +107,9 @@ type OpenEHRErrorDetail struct {
 
 // UnmarshalJSON reads the envelope member by member, so one member of the
 // wrong JSON type is left empty or skipped instead of failing the whole
-// envelope. It fails when the body is not a JSON object, is not valid JSON,
-// or repeats a member name, in the envelope or in any value inside it. Member
+// envelope. It fails when a body other than null is not a JSON object, is
+// not valid JSON, or repeats a member name, in the envelope or in any value
+// inside it; a JSON null clears the receiver and returns no error. Member
 // names match exactly: a case variant such as MESSAGE is ignored, as any other
 // unknown member is. A string that holds invalid UTF-8 is read with the
 // Unicode replacement character, U+FFFD, in place of each invalid byte, so it
