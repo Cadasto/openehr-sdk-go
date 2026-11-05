@@ -33,6 +33,13 @@ import (
 // of the member whatever its text, and the members inside a class value are
 // named under the entry's key.
 func DecodeEntry[V any](dec *xml.Decoder, start *xml.StartElement, attr string, m *map[string]V, begun *bool) error {
+	if trackerOf(dec) == nil {
+		// The key attribute comes off before the value is read, so a repeat
+		// of it is refused here.
+		if err := checkRepeatedAttr(start); err != nil {
+			return err
+		}
+	}
 	key, entry, keyed := withoutKey(start, attr)
 	setEntryKey(dec, func() string { return key })
 	t, at := beginEntry(dec, m, begun)

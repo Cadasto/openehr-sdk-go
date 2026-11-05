@@ -763,6 +763,9 @@ func (r *trackingReader) Token() (xml.Token, error) {
 		if r.t.maxDepth > 0 && len(r.t.open)-1 > r.t.maxDepth {
 			return nil, r.t.refuseDepth()
 		}
+		if n, ok := repeatedAttr(tk.Attr); ok {
+			return nil, r.t.fail(r.t.path()+"/"+attrSegment(n), errRepeatedAttr)
+		}
 		if r.t.checksPresence() {
 			n := len(r.t.open)
 			r.t.open[n-1].nilled = r.t.open[n-2].nilled || isNilled(tk.Attr)
@@ -1023,8 +1026,9 @@ func SkipUnmatched(dec *xml.Decoder, start xml.StartElement) error {
 		if err := t.unmatched(t.path(), isForeign(start.Name)); err != nil {
 			return err
 		}
+		return dec.Skip()
 	}
-	return dec.Skip()
+	return skipUntracked(dec, &start)
 }
 
 // SkipUnmodelled skips the element start opens, the element of a member whose
@@ -1040,8 +1044,9 @@ func SkipUnmodelled(dec *xml.Decoder, start xml.StartElement) error {
 		if err := t.unmatched(t.path(), isForeign(start.Name)); err != nil {
 			return err
 		}
+		return dec.Skip()
 	}
-	return dec.Skip()
+	return skipUntracked(dec, &start)
 }
 
 // CheckUnmatchedAttrs applies the decode's policy for unmatched content to
@@ -1061,7 +1066,7 @@ func SkipUnmodelled(dec *xml.Decoder, start xml.StartElement) error {
 func CheckUnmatchedAttrs(dec *xml.Decoder, start xml.StartElement, known ...string) error {
 	t := trackerOf(dec)
 	if t == nil {
-		return nil
+		return checkRepeatedAttr(&start)
 	}
 	return t.attrs(start.Attr, known)
 }
@@ -1144,8 +1149,9 @@ func SkipUnmatchedAfter(dec *xml.Decoder, start xml.StartElement, text []byte, h
 		} else if err := t.unmatched(t.path(), isForeign(start.Name)); err != nil {
 			return err
 		}
+		return dec.Skip()
 	}
-	return dec.Skip()
+	return skipUntracked(dec, &start)
 }
 
 // ApplyHeld applies the decode's policy for unmatched content to the elements
@@ -1196,6 +1202,9 @@ func DecodeElement(dec *xml.Decoder, start *xml.StartElement, v any) error {
 			return dec.DecodeElement(v, start)
 		}
 		return t.decodeText(dec, start, v)
+	}
+	if err := checkRepeatedAttr(start); err != nil {
+		return err
 	}
 	if err := dec.DecodeElement(asText(v), start); err != nil {
 		return untrackedFailure(start, v, err)

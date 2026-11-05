@@ -65,7 +65,7 @@ func Enter(dec *xml.Decoder, start xml.StartElement, c *Class) (fresh bool, err 
 	}
 	t := trackerOf(dec)
 	if t == nil {
-		return againAtRoot(dec), nil
+		return againAtRoot(dec), checkRepeatedAttr(&start)
 	}
 	return t.again && len(t.open) == 2, t.enter(start, c)
 }
