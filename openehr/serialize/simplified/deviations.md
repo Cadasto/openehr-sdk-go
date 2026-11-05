@@ -333,17 +333,21 @@ partially or silently accepted.
   `<root>/_name` as unmatched and named the composition after the template, and encode wrote
   no name at all (the PROBE-105 census recorded it for `consult_record` and `ehrn_abdm`).
 
-- **An ordinal's terminology on `WithTemplate` decode.** A `DV_ORDINAL` leaf carries `\|code`,
-  `\|value` and `\|ordinal` and no terminology, and the reference rebuilds the symbol in `local`
-  whatever the template says (its `DvOrdinalRMUnmarshaller`); decode without the template does
-  the same. With `WithTemplate`, the symbol takes the terminology of the template's
-  `C_DV_ORDINAL` pair with its code and ordinal value, where the pairs at the leaf's path agree
-  on one, so a template whose ordinals
-  are coded outside `local` decodes to the value it lists rather than one its validation refuses
-  as `primitive_not_in_list`. A `\|raw` ordinal keeps its own terminology, encode still writes a
+- **An ordinal's terminology on `WithTemplate` decode.** A `DV_ORDINAL` leaf, and each bound of
+  a `DV_INTERVAL<DV_ORDINAL>` leaf, carries `\|code`, `\|value` and `\|ordinal` and no
+  terminology, and the reference rebuilds the symbol in `local` whatever the template says (its
+  `DvOrdinalRMUnmarshaller`); decode without the template does the same. With `WithTemplate`,
+  the symbol takes the terminology of the template's `C_DV_ORDINAL` pair with its code and
+  ordinal value, where the pairs at its path agree on one, so a template whose ordinals are coded
+  outside `local` decodes to the value it lists rather than one its validation refuses as
+  `primitive_not_in_list`. A `\|raw` ordinal keeps its own terminology, encode still writes a
   non-local ordinal as `\|raw`, since it cannot know the decode will have the template, and a
-  `DV_SCALE` symbol stays `local`: the compiled template holds no pairs for it. No corpus
-  template codes an ordinal outside `local`; `TestREQ053WithTemplateOrdinalTerminology` pins it.
+  `DV_SCALE` symbol stays `local`: the compiled template holds no pairs for it. **Round-trip
+  limit:** encode writes a `local` ordinal in the suffix form, so a `local` symbol where the
+  template's pair for that code and value names another terminology, a value the template
+  refuses, comes back in the template's terminology. No corpus template codes an ordinal outside
+  `local`; `TestREQ053WithTemplateOrdinalTerminology` and
+  `TestREQ053WithTemplateOrdinalIntervalTerminology` pin it.
 
 - **`archetype_details` is rebuilt on decode, not carried.** FLAT has no key for it, because
   the Web Template already holds the archetype id of every archetype root and the template id.
