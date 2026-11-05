@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- A root element in a namespace of no openEHR schema, which the deprecated template parser, reading no namespace, reads as an openEHR one, and every element in it. The reader's default mode reads each as the element of that name in the http://schemas.openehr.org/v1 namespace, and its strict mode refuses them. root-namespace.read.opt is how the reader reads it. SDK-authored. -->
+<!-- A root element in a namespace of no openEHR schema, and every element in it. The reader's default mode reads each, by its local name, as the element of that name in the http://schemas.openehr.org/v1 namespace, and its strict mode refuses them. root-namespace.read.opt is how the reader reads it. SDK-authored. -->
 <template xmlns="urn:x-openehr-sdk-go:test:foreign" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     <language>
         <terminology_id>

@@ -203,7 +203,7 @@ The SDK **MUST** export the same checks as package functions so a caller constru
 - `ValidatePathSegment(s string) error`: one interpolated identifier (a `/` in `s` is a violation);
 - `ValidateRequestPath(path string) error`: the whole decoded `Request.Path`, the same check the transport runs.
 
-(The `Validate*`-returns-`error` spelling follows the repo's own precedent — `template.ValidatePath`, `aql.ValidateIdentifier` — where `Valid*` names return `bool`, as in `rm.TimeDefinitions.ValidDay`.)
+(The `Validate*`-returns-`error` spelling follows the repo's own precedent, `Compiled.ValidatePath` and `aql.ValidateIdentifier`, where `Valid*` names return `bool`, as in `rm.TimeDefinitions.ValidDay`.)
 
 `ValidateRequestPath` splits on `/`, so an interpolated parameter that *contains* `/` produces well-formed segments that segment inspection alone cannot catch. When `Request.Route` is set, the transport **MUST** therefore also refuse a decoded `Request.Path` whose segment count differs from the route template's: a smuggled separator changes the count and moves the request onto a different route. The check runs only when `Route` is set, so every path-interpolating leaf request sets it, and the check reads the `Route` field itself, never a helper that falls back to `Path` (a path's arity compared against itself never fires). A tripwire test holds every `transport.Request` literal under `openehr/client/` to setting `Route`, the field that also names the REQ-090 span.
 

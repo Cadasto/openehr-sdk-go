@@ -7,12 +7,12 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 )
 
-// REQ-100 — an OPT node declared as a generic instantiation
-// (DV_INTERVAL<DV_QUANTITY>) gets the same BMM-derived attribute facts as a
-// node declared by bare class name. Its OPT-declared bounds carry the actual
-// parameter as their RM type, not DV_INTERVAL's formal "T" and not "", and
-// the four boundary flags the RM mandates but the OPT leaves silent are
-// injected as implicit, required attributes.
+// REQ-111 (§ Reading the model) — an OPT node declared as a generic
+// instantiation (DV_INTERVAL<DV_QUANTITY>) gets the same BMM-derived attribute
+// facts as a node declared by bare class name. Its OPT-declared bounds carry
+// the actual parameter as their RM type, not DV_INTERVAL's formal "T" and not
+// "", and the four boundary flags the RM mandates but the OPT leaves silent
+// are injected as implicit, required attributes.
 func TestCompile_GenericIntervalNodeAttributes(t *testing.T) {
 	cases := []struct {
 		fixture, declared, bound string
@@ -62,11 +62,12 @@ func TestCompile_GenericIntervalNodeAttributes(t *testing.T) {
 	}
 }
 
-// REQ-100 — the same holds for every BMM generic class and for the
-// required flag of an OPT-declared attribute. POINT_EVENT<ITEM_TREE> declares
-// data, which the RM mandates and types with EVENT's formal parameter: the
-// compiled attribute is required and typed ITEM_TREE. The event's other
-// RM-mandatory attributes are injected as implicit.
+// REQ-111 (§ Reading the model) — the same holds for every BMM generic
+// class and for the required flag of an OPT-declared attribute.
+// POINT_EVENT<ITEM_TREE> declares data, which the RM mandates and types with
+// EVENT's formal parameter: the compiled attribute is required and typed
+// ITEM_TREE. The event's other RM-mandatory attributes are injected as
+// implicit.
 func TestCompile_GenericEventNodeAttributes(t *testing.T) {
 	const body = `<?xml version="1.0" encoding="UTF-8"?>
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">

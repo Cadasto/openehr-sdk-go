@@ -8,8 +8,8 @@ import (
 
 // TestREQ102_REQ107_MandatoryListChildrenReadsTheAttribute checks the
 // guards of MandatoryListChildren that a parsed template cannot reach or
-// pin alone, on one parsed ELEMENT child at occurrences 1..1. The parser
-// keeps no occurrences for a slot, so the same node is read as a plain
+// pin alone, on one parsed ELEMENT child at occurrences 1..1. The test edits
+// a copy of the compiled node, so the same node is read as a plain
 // child and as a slot: only the plain child is yielded (REQ-107 Visit rule:
 // an allowed child that is not a slot). A list whose items the RM types as
 // octets is a list of primitive values and yields none, while a Hash,

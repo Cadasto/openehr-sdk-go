@@ -13,7 +13,7 @@ import (
 // SECTION.adhoc.v1 siblings (and, one level down, eight reused screening
 // OBSERVATIONs under Symptome) produce repeated AQL paths that only shared-path
 // admission lets through — legal per REQ-116, where registerPath's duplicate
-// rejection is REQ-100. Previously this class was claimed to compile with no
+// rejection is REQ-111. Previously this class was claimed to compile with no
 // in-tree guard.
 //
 // Build outcomes differ between the two and are pinned separately in
@@ -132,7 +132,7 @@ func TestCompile_CoronaSiblingsResolveDistinctly(t *testing.T) {
 	}
 }
 
-// REQ-116 Phase 3 / REQ-100 — name predicates must not turn the shared-path
+// REQ-116 Phase 3 / REQ-111 — name predicates must not turn the shared-path
 // admission into dead code. Genuine AOM 1.4 alternatives still produce
 // repeated paths (a DV_TEXT and a DV_CODED_TEXT alternative both landing on
 // .../value), which only dupDepth admits — and they carry no name, so no

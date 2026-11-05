@@ -59,69 +59,71 @@ const inputBufferMax = 4 << 20
 // the XML declaration, comments, processing instructions, whitespace and one
 // document type declaration, after a UTF-8 byte-order mark at the very start;
 // after the root it may hold comments, processing instructions and
-// whitespace. Without it, the reader reads past what the deprecated template
-// parser reads past: before the root, any content encoding/xml reads, such as
-// text, a CDATA section or a second declaration; after the root, a `<!…>`
-// declaration as well. Anything else before or after the root, such as an
-// element after it or a stray end tag before it, is refused with an error that
-// wraps [canxml.ErrInvalidShape] and carries none of it. The root element may
-// have any name, so a document whose root is `<OPERATIONAL_TEMPLATE>` reads as
-// one whose root is `<template>`. An input with no root element, empty or
-// holding only a declaration, comments, whitespace or text, is refused with
-// an error that wraps [io.ErrUnexpectedEOF], not [io.EOF], and carries none
-// of the input. An error r returns, other than [io.EOF], ends the read and
-// comes back as r returned it, whatever the options and whatever a decode
-// made of the bytes before it. An input whose elements do not nest, with an
-// end tag that does not close the element open before it or with its end
-// inside the root element, is refused with the [xml.SyntaxError] that
-// encoding/xml gives for it, inside content a reading below leaves out too.
-// Any other decode error comes back as the decode returns it.
+// whitespace. Without it, the reader also reads past, before the root, any
+// content encoding/xml reads, such as text or a CDATA section, and, after
+// the root, a `<!…>` declaration. Anything else before
+// or after the root, such as an element after it or a stray end tag before it,
+// is refused with an error that wraps [canxml.ErrInvalidShape] and carries
+// none of it. The root element may have any name, so a document whose root is
+// `<OPERATIONAL_TEMPLATE>` reads as one whose root is `<template>`. An input
+// with no root element, empty or holding only a declaration, comments,
+// whitespace or text, is refused with an error that wraps
+// [io.ErrUnexpectedEOF], not [io.EOF], and carries none of the input. An error
+// r returns, other than [io.EOF], ends the read and comes back as r returned
+// it, whatever the options and whatever a decode made of the bytes before it.
+// An input whose elements do not nest, with an end tag that does not close the
+// element open before it or with its end inside the root element, is refused
+// with the [xml.SyntaxError] that encoding/xml gives for it, inside content a
+// reading below leaves out too. Any other decode error comes back as the
+// decode returns it.
 //
 // Operational templates in use hold shapes and values their schema does not
-// allow, which the deprecated template parser reads. The reader reads them as
-// that parser does. In every mode it reads:
+// allow. The reader reads them in a weaker form, some in every mode and the
+// rest in the default mode alone. In every mode it reads:
 //
 //   - an element in the http://schemas.openehr.org/v2 namespace, which the
 //     AM Release-1.4 schemas declare, as the element of that name in the
 //     http://schemas.openehr.org/v1 namespace canonical XML reads;
 //   - a C_BOOLEAN whose true_valid or false_valid is absent or empty with
 //     that flag true;
+//   - a C_STRING list_open of white space only as an empty one, so false;
 //   - the assumed_value of a C_BOOLEAN, C_INTEGER or C_REAL that holds no
 //     value of its type as absent, a boolean being true, false, 1 or 0 in
 //     any letter case, and the assumed_value of a C_DV_QUANTITY that the
-//     model cannot hold, which the parser ignores, as absent;
+//     model cannot hold as absent;
 //   - a bound of a C_INTEGER range or of a quantity's precision written as a
-//     decimal number, such as 1.0 or 2.5, which the parser reads as a float,
-//     as the integer bound that admits the same integers: a lower bound
-//     rounded up and an upper one down, the side included where the number
-//     is not a whole one; and one written as an infinity that admits every
-//     integer on its side, such as -Inf on the lower side or +Infinity on the
-//     upper one, or as NaN, which the parser compares no integer against, as
-//     that side unbounded, included unless the range says otherwise;
+//     decimal number, such as 1.0 or 2.5, as the integer bound that admits
+//     the same integers: a lower bound rounded up and an upper one down, the
+//     side included where the number is not a whole one; and one written as
+//     an infinity that admits every integer on its side, such as -Inf on the
+//     lower side or +Infinity on the upper one, or as NaN, which bounds no
+//     integer, as that side unbounded, included unless the range says
+//     otherwise;
 //   - an empty timezone_validity of a C_DATE, C_TIME or C_DATE_TIME as
 //     absent, which is optional;
-//   - a range bound on a side the range writes unbounded, which the parser
-//     does not read, that holds no number, or a number of a C_INTEGER or
-//     C_REAL or of a quantity's magnitude or precision that canonical XML
-//     does not read, and a bound of the magnitude or precision of a
-//     C_DV_QUANTITY that holds no number, as absent, the side unbounded.
+//   - a range bound on a side the range writes unbounded that holds no
+//     number, or a number of a C_INTEGER or C_REAL or of a quantity's
+//     magnitude or precision that canonical XML does not read, and a bound of
+//     the magnitude or precision of a C_DV_QUANTITY that holds no number, as
+//     absent, the side unbounded.
 //
 // Without [canxml.WithStrict] it also reads an element in a namespace other
 // than none and those two, the root and the XML Schema instance one among
 // them, as the element of that name in the http://schemas.openehr.org/v1
-// namespace, since the parser reads no namespace: under another default
+// namespace, matching it by its local name: under another default
 // namespace, under a prefix bound to another namespace, the xsi of the
 // xsi:type attributes among them, under the xml prefix, and under a prefix
 // no declaration binds, which encoding/xml reads as a namespace of that
 // name. It reads each such element so on its own, and a prefix keeps the
 // namespace it is bound to, so that an xsi:type reads as one, and a type
-// written with a prefix, such as xsd:string, reads as written. It reads a <definition> whose type names no
-// class of the AOM 1.4 constraint model, or a class other than
-// C_ARCHETYPE_ROOT and C_COMPLEX_OBJECT, which a definition cannot hold, but
-// those it refuses in every mode (below), as a C_COMPLEX_OBJECT leaf with the
-// rm_type_name, node_id and occurrences it holds and none of its other
-// members, such as its attributes, archetype id and term definitions, as it
-// reads such a <children>. And, inside the definition, it reads:
+// written with a prefix, such as xsd:string, reads as written. It reads a
+// <definition> whose type names no class of the AOM 1.4 constraint model,
+// or a class other than C_ARCHETYPE_ROOT and C_COMPLEX_OBJECT, which a
+// definition cannot hold, but those it refuses in every mode (below), as a
+// C_COMPLEX_OBJECT leaf with the rm_type_name, node_id and occurrences it
+// holds and none of its other members, such as its attributes, archetype id
+// and term definitions, as it reads such a <children>. And, inside the
+// definition, it reads:
 //
 //   - an <attributes>, a <children> or the <item> of a C_PRIMITIVE_OBJECT
 //     that names no type in the XML Schema instance namespace, none, an
@@ -158,7 +160,7 @@ const inputBufferMax = 4 << 20
 //
 // A side a bound is read out of keeps the included flag the range gives it;
 // where the range gives none and does not write the side unbounded, the side
-// is included, as the parser reads it.
+// is included.
 //
 // What a reading leaves out is unmatched content, which
 // [canxml.WithUnmatched] reports at its path: the path it has in the input,
@@ -183,17 +185,16 @@ const inputBufferMax = 4 << 20
 // does not write unbounded, which admits no integer, with the error of the
 // decode that reads it as an integer: one that wraps [strconv.ErrSyntax],
 // whose [strconv.NumError] holds the infinity as written. It refuses a
-// match_negated of true, which the parser ignores and so reads with its
-// meaning inverted. And it refuses a <definition> typed ARCHETYPE_SLOT, or
-// with a class the parser reads a primitive constraint from: a C_PRIMITIVE
-// class, such as C_STRING, one of C_CODE_PHRASE, C_DV_QUANTITY, C_DV_ORDINAL
-// and CONSTRAINT_REF, or C_PRIMITIVE_OBJECT where the parser reads such a
-// constraint from the items it holds. The parser reads it as a slot or as a
-// leaf that carries that constraint, and the model's definition, a
-// C_ARCHETYPE_ROOT, holds neither. The refusal is a [canxml.DecodeError] of
-// the definition, whose Type is the type as written, that wraps
-// [typereg.ErrTypeMismatch]. These are the four readings of the parser the
-// reader does not keep.
+// match_negated of true, which AOM 1.4 cannot express: read past, it would
+// have its meaning inverted. And it refuses a <definition> typed
+// ARCHETYPE_SLOT, or with a class that carries a primitive constraint: a
+// C_PRIMITIVE class, such as C_STRING, one of C_CODE_PHRASE, C_DV_QUANTITY,
+// C_DV_ORDINAL and CONSTRAINT_REF, or C_PRIMITIVE_OBJECT where the items it
+// holds carry such a constraint. Such a definition is a slot or a leaf that
+// carries that constraint, and the model's definition, a C_ARCHETYPE_ROOT,
+// holds neither. The refusal is a [canxml.DecodeError] of the definition,
+// whose Type is the type as written, that wraps [typereg.ErrTypeMismatch].
+// These are the four readings the reader refuses in every mode.
 //
 // A document that needs none of these readings is decoded once; one that
 // needs one is decoded a second time, from the bytes the reader keeps of the
@@ -300,8 +301,8 @@ func (s *sourceReader) Read(p []byte) (int, error) {
 
 // readDocument decodes one document from br with opts and the element limit:
 // what comes before the root, the root, and what comes after it. Unless
-// strict, it reads past what the deprecated parser reads past before and
-// after the root.
+// strict, it reads past the content before the root that encoding/xml reads,
+// and a `<!…>` declaration after it.
 func readDocument(br *bufio.Reader, opts []canxml.DecoderOption, strict bool) (*OperationalTemplate, error) {
 	// The stream decoder skips what comes before the root, so the prolog is
 	// checked first; the decode then reads the bytes the check read again.
@@ -325,11 +326,11 @@ func readDocument(br *bufio.Reader, opts []canxml.DecoderOption, strict bool) (*
 	return ot, nil
 }
 
-// readsPastProlog reports whether the deprecated parser reads past head, the
-// bytes before the root element and its start tag that the prolog check
-// refused: whether encoding/xml reads each token in it up to that start tag,
-// whatever the token is, as the parser's decode does. A byte-order mark at
-// the very start is the one byte sequence it skips unread.
+// readsPastProlog reports whether the default mode reads past head, the bytes
+// before the root element and its start tag that the prolog check refused:
+// whether encoding/xml reads each token in it up to that start tag, whatever
+// the token is. A byte-order mark at the very start is the one byte sequence
+// it skips unread.
 func readsPastProlog(head []byte) bool {
 	d := xml.NewDecoder(bytes.NewReader(bytes.TrimPrefix(head, byteOrderMark)))
 	for {
@@ -364,10 +365,10 @@ func errInputTooLarge() error {
 
 // afterRoot reads r, the rest of the input after the root element, to its
 // end. Comments, processing instructions and whitespace pass, and unless
-// strict a `<!…>` declaration as well, which the deprecated parser reads
-// past. Anything else, an element, other text or markup encoding/xml cannot
-// read, is refused, with an error that wraps [canxml.ErrInvalidShape] and
-// names none of it, as [canxml.Unmarshal] refuses it.
+// strict a `<!…>` declaration as well, which encoding/xml reads. Anything
+// else, an element, other text or markup encoding/xml cannot read, is
+// refused, with an error that wraps [canxml.ErrInvalidShape] and names none
+// of it, as [canxml.Unmarshal] refuses it.
 func afterRoot(r io.Reader, strict bool) error {
 	dec := xml.NewDecoder(r)
 	for {

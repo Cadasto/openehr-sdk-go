@@ -1,14 +1,15 @@
 package templatecompile
 
-// model.go: what the walk reads of the operational template model, as the
-// deprecated parser reads an OPT in the respects the corpus needs: each
-// constraint object's kind and identifiers, each attribute's name, kind and
-// intervals, a node's template-level name, and an archetype root's terms and
-// bindings, each trimmed, with blank entries left out.
+// model.go: what the walk reads of the operational template model, in the
+// respects the corpus needs: each constraint object's kind and identifiers,
+// each attribute's name, kind and intervals, a node's template-level name,
+// and an archetype root's terms and bindings, each trimmed, with blank
+// entries left out.
 
 import (
 	"fmt"
 	"maps"
+	"math"
 	"slices"
 	"strings"
 
@@ -289,19 +290,29 @@ func fixedValueString(o aom14.CObject) string {
 
 // multiplicityOf returns the interval iv closed into a Multiplicity, as
 // [template.NewMultiplicity] closes it, or nil when iv is nil or the zero
-// interval.
+// interval. It returns an error for an excluded end on a bounded side whose
+// closed end the model's 32-bit Integer cannot hold, on every platform,
+// where NewMultiplicity refuses only a closed end Go's int cannot hold.
 //
 // The model holds each interval by value, so an interval the template leaves
 // out reads as the zero interval, as an absent definition reads as the zero
-// archetype root. The zero interval is read as absent, as the deprecated
-// parser reads an interval the template leaves out. The decode gives each
+// archetype root. The zero interval is read as absent. The decode gives each
 // flag a written interval leaves out its default, a bounded side's included
 // flag true, so a written interval reads as the zero one only where it writes
-// both bounds 0 and all four flags false, an empty interval the parser
+// both bounds 0 and all four flags false, an empty interval that closing
 // refuses and the model cannot tell from an absent one.
 func multiplicityOf(iv *rm.Interval[aom14.Integer]) (*template.Multiplicity, error) {
 	if iv == nil || *iv == (rm.Interval[aom14.Integer]{}) {
 		return nil, nil
+	}
+	// The closed end of ">2147483647" or "<-2147483648" is outside the
+	// Integer range, so the result would depend on the width of int: kept
+	// on a 64-bit build, refused on a 32-bit one. Refuse it on both.
+	if !iv.LowerUnbounded && !iv.LowerIncluded && iv.Lower == math.MaxInt32 {
+		return nil, fmt.Errorf("closed lower bound overflows the 32-bit Integer: excluded lower=%d", iv.Lower)
+	}
+	if !iv.UpperUnbounded && !iv.UpperIncluded && iv.Upper == math.MinInt32 {
+		return nil, fmt.Errorf("closed upper bound overflows the 32-bit Integer: excluded upper=%d", iv.Upper)
 	}
 	return template.NewMultiplicity(template.IntervalBounds{
 		Lower:          int(iv.Lower),

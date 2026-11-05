@@ -89,7 +89,7 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-097 | First-class `Idempotency-Key` (deprecated) | [retired-requirements.md](retired-requirements.md#req-097--first-class-idempotency-key) | deprecated | retired |
 | REQ-098 | Request-level observer hook | [transport.md](transport.md#req-098--request-level-observer-hook) | draft | landed |
 | REQ-099 | ITS-REST Admin client surface | [module-layout.md](module-layout.md#req-099--its-rest-admin-client-surface) | draft | landed |
-| REQ-100 | ADL 1.4 operational template (OPT) parse and paths | [clinical-modeling.md](clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths) | draft | landed |
+| REQ-100 | ADL 1.4 operational template (OPT) parse and paths (retired) | [retired-requirements.md](retired-requirements.md#req-100--adl-14-operational-template-opt-parse-and-paths) | deprecated | retired |
 | REQ-101 | Generic OPT-driven composition builder | [clinical-modeling.md](clinical-modeling.md#req-101--generic-opt-driven-composition-builder) | draft | landed |
 | REQ-102 | Composition validation | [clinical-modeling.md](clinical-modeling.md#req-102--composition-validation) | draft | landed |
 | REQ-103 | Primitive constraint introspection | [clinical-modeling.md](clinical-modeling.md#req-103--primitive-constraint-introspection) | draft | landed |

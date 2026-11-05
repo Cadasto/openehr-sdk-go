@@ -2,8 +2,7 @@ package templatecompile
 
 // slots_from_model.go: a slot's rules, its archetype-id patterns and the
 // predicate of an unidentified slot's path segment, read from the includes
-// and excludes of an ARCHETYPE_SLOT in the operational template model, as
-// the deprecated parser reads them from an OPT.
+// and excludes of an ARCHETYPE_SLOT in the operational template model.
 
 import (
 	"slices"

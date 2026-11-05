@@ -275,8 +275,9 @@ var ErrConstraintUnsatisfiable = errors.New("instance.Generate: no value satisfi
 // reject it, and the generator does not invent an archetype id to avoid
 // that. A slot is not such an object: the slot-fill rule stamps it with an
 // archetype id, or refuses it with [ErrSlotFillUnsupported]. An archetype
-// id the template carries under an xsi:type the parser does not recognise
-// is dropped by lenient parsing, so this error covers that case too. Such
+// id the template carries under an xsi:type the operational template reader
+// does not recognise is left out in the reader's default mode, so this error
+// covers that case too. Such
 // a template node is content the template does not describe, so the walk
 // meets it only where the template or the RM requires it: under Large and
 // Medium an optional one gets no member and an optional attribute whose

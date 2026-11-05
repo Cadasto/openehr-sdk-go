@@ -285,7 +285,6 @@ requirements:
       - openehr/serialize/simplified/flat_decode_test.go
       - openehr/serialize/simplified/rmattr_encapsulated_test.go
       - openehr/serialize/simplified/rmattr_party_test.go
-      - openehr/template/parse_primitives_test.go
       - openehr/terminology/imports_test.go
       - openehr/terminology/property_units_test.go
       - openehr/terminology/tables_test.go
@@ -1321,41 +1320,10 @@ requirements:
       - testkit/probes/rest/probes_test.go
 
   - id: REQ-100
-    title: ADL 1.4 operational template (OPT) parse and paths
-    canonical: docs/specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths
-    status: draft
-    implementation: landed
-    packages: [openehr/template, internal/templatecompile, openehr/templatecompile, testkit/probes/template]
-    probes: [PROBE-022]
-    tests:
-      - internal/bmmtype/bmmtype_test.go
-      - internal/bmmtype/formal_parameters_test.go
-      - internal/templatecompile/compile_generic_test.go
-      - internal/templatecompile/flat_conformance_compile_test.go
-      - internal/templatecompile/registerpath_test.go
-      - internal/templatecompile/resolve_test.go
-      - internal/templatecompile/untyped_test.go
-      - internal/templatecompile/webtemplate_oracle_compile_test.go
-      - openehr/aom/aom14/read_tolerant_test.go
-      - openehr/rm/rminfo/lookup_test.go
-      - openehr/template/archetype_root_template_id_test.go
-      - openehr/template/constraint_ref_test.go
-      - openehr/template/identifier_whitespace_test.go
-      - openehr/template/imports_test.go
-      - openehr/template/interval_flags_test.go
-      - openehr/template/node_name_test.go
-      - openehr/template/null_flavor_test.go
-      - openehr/template/parse_primitives_test.go
-      - openehr/template/path_test.go
-      - openehr/template/t_archetype_root_test.go
-      - openehr/template/template_test.go
-      - openehr/template/untyped_node_test.go
-      - openehr/templatecompile/not_in_rm_test.go
-      - openehr/validation/attribute_not_in_rm_test.go
-      - testkit/fixtures/corpus_xml_booleans_test.go
-      - testkit/probes/instance/t_archetype_root_test.go
-      - testkit/probes/template/probe_022_opt_path_resolution.go
-      - testkit/probes/template/probes_test.go
+    title: ADL 1.4 operational template (OPT) parse and paths (retired)
+    canonical: docs/specifications/retired-requirements.md#req-100--adl-14-operational-template-opt-parse-and-paths
+    status: deprecated
+    implementation: retired
 
   - id: REQ-101
     title: Generic OPT-driven composition builder
@@ -1422,7 +1390,7 @@ requirements:
       - openehr/instance/skipped_attributes_test.go
       - openehr/internal/rmbind/bind_test.go
       - openehr/internal/rmbind/tier_test.go
-      - openehr/template/identifier_whitespace_test.go
+      - openehr/templatecompile/compile_readings_test.go
       - openehr/validation/aql_test.go
       - openehr/validation/binding_by_name_test.go
       - openehr/validation/binding_trial_test.go
@@ -1485,6 +1453,7 @@ requirements:
       - internal/iso8601/precision_test.go
       - internal/templatecompile/compile_test.go
       - internal/templatecompile/node_primitive_test.go
+      - internal/templatecompile/template_readings_test.go
       - internal/templatecompile/walk/walk_test.go
       - openehr/instance/coded_group_test.go
       - openehr/instance/coded_name_code_test.go
@@ -1493,7 +1462,6 @@ requirements:
       - openehr/instance/string_leaf_internal_test.go
       - openehr/instance/string_leaf_test.go
       - openehr/serialize/simplified/coded_name_test.go
-      - openehr/template/constraint_ref_test.go
       - openehr/template/constraints/code_reference_test.go
       - openehr/template/constraints/constraint_ref_test.go
       - openehr/template/constraints/constraints_test.go
@@ -1508,12 +1476,8 @@ requirements:
       - openehr/template/constraints/temporal_range_precision_test.go
       - openehr/template/constraints/temporal_validate_test.go
       - openehr/template/constraints/value_free_test.go
-      - openehr/template/interval_flags_test.go
-      - openehr/template/parse_primitives_test.go
-      - openehr/template/path_test.go
-      - openehr/template/slot_assertion_test.go
-      - openehr/template/slot_duplicate_test.go
       - openehr/template/webtemplate/inputs_test.go
+      - openehr/templatecompile/compile_readings_test.go
       - openehr/validation/composition_test.go
       - openehr/validation/constraint_fixtures_test.go
       - openehr/validation/constraint_ref_walk_test.go
@@ -1725,7 +1689,7 @@ requirements:
       - openehr/serialize/simplified/structured_test.go
       - openehr/template/constraints/constraint_ref_test.go
       - openehr/template/constraints/example_test.go
-      - openehr/template/identifier_whitespace_test.go
+      - openehr/templatecompile/compile_readings_test.go
       - openehr/validation/binding_by_name_test.go
       - openehr/validation/binding_trial_test.go
       - openehr/validation/constraint_fixtures_test.go
@@ -1774,9 +1738,6 @@ requirements:
       - openehr/rm/typereg/streaming_hotpath_test.go
       - openehr/serialize/canjson/edgecases_test.go
       - openehr/serialize/canxml/max_depth_test.go
-      - openehr/template/parse_cap_test.go
-      - openehr/template/parse_depth_test.go
-      - openehr/template/slot_assertion_test.go
 
   - id: REQ-109
     title: AQL static lint
@@ -1835,24 +1796,38 @@ requirements:
       - internal/templatecompile
       - openehr/aom/aom14
       - openehr/internal/decodeopts
-    probes: []
+    probes: [PROBE-022]
     tests:
+      - internal/bmmtype/bmmtype_test.go
+      - internal/bmmtype/formal_parameters_test.go
+      - internal/templatecompile/compile_generic_test.go
       - internal/templatecompile/compile_model_test.go
       - internal/templatecompile/compile_nodename_test.go
       - internal/templatecompile/compile_test.go
       - internal/templatecompile/compiled_golden_test.go
       - internal/templatecompile/default_value_test.go
+      - internal/templatecompile/flat_conformance_compile_test.go
+      - internal/templatecompile/interval_reading_test.go
+      - internal/templatecompile/parity_exceptions_test.go
       - internal/templatecompile/parity_fixtures_test.go
       - internal/templatecompile/parity_test.go
+      - internal/templatecompile/registerpath_test.go
       - internal/templatecompile/resolve_test.go
+      - internal/templatecompile/template_readings_test.go
+      - internal/templatecompile/untyped_test.go
+      - internal/templatecompile/webtemplate_oracle_compile_test.go
       - openehr/aom/aom14/read_tolerant_test.go
       - openehr/instance/local_term_text_test.go
+      - openehr/rm/rminfo/lookup_test.go
       - openehr/template/path_test.go
-      - openehr/template/slot_assertion_test.go
+      - openehr/templatecompile/compile_readings_test.go
       - openehr/templatecompile/compile_test.go
       - openehr/templatecompile/external_test.go
       - openehr/templatecompile/introspect_test.go
+      - openehr/templatecompile/not_in_rm_test.go
       - openehr/templatecompile/resolve_test.go
+      - openehr/validation/attribute_not_in_rm_test.go
+      - testkit/probes/template/probe_022_opt_path_resolution.go
       - testkit/probes/template/probes_test.go
 
   - id: REQ-112
@@ -2012,6 +1987,7 @@ requirements:
       - internal/templatecompile/namepredicate_test.go
       - internal/templatecompile/pathsnapshot_test.go
       - internal/templatecompile/registerpath_test.go
+      - internal/templatecompile/template_readings_test.go
       - internal/templatecompile/webtemplate_oracle_compile_test.go
       - openehr/composition/named_sibling_test.go
       - openehr/serialize/simplified/coded_name_internal_test.go
@@ -2020,7 +1996,6 @@ requirements:
       - openehr/serialize/simplified/flat_nameindex_test.go
       - openehr/serialize/simplified/flat_pinned_test.go
       - openehr/serialize/simplified/template_roundtrip_test.go
-      - openehr/template/node_name_test.go
       - openehr/template/webtemplate/build_test.go
       - openehr/template/webtemplate/dedupe_test.go
       - openehr/template/webtemplate/inputs_test.go
@@ -2487,6 +2462,7 @@ requirements:
     probes: [PROBE-030, PROBE-105]
     tests:
       - internal/bmmgen/render_interval_bound_test.go
+      - internal/templatecompile/interval_reading_test.go
       - openehr/rm/interval_closed_test.go
       - openehr/rm/missing_members_test.go
       - openehr/serialize/canjson/interval_flag_defaults_test.go
@@ -2500,8 +2476,6 @@ requirements:
       - openehr/serialize/simplified/null_test.go
       - openehr/serialize/simplified/rmattr_repeating_test.go
       - openehr/serialize/simplified/rmattr_value_test.go
-      - openehr/template/interval_flags_test.go
-      - openehr/template/parse_primitives_test.go
       - testkit/expectedform/expectedform_test.go
       - testkit/probes/serialize/probe_030_guard_internal_test.go
   - id: REQ-170
@@ -2723,6 +2697,8 @@ requirements:
       - openehr/rm/resource_hash_xml_test.go
       - openehr/serialize/canxml/names_test.go
       - openehr/serialize/canxml/unmatched_test.go
+      - testkit/fixtures/corpus_xml_booleans_test.go
+      - testkit/probes/instance/t_archetype_root_test.go
       - testkit/probes/template/probe_111_compare_internal_test.go
       - testkit/probes/template/probe_111_guard_internal_test.go
       - testkit/probes/template/probe_111_operational_template_compare.go

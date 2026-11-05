@@ -54,7 +54,7 @@ type PathAssertion struct {
 // change predicate-less first-match outcomes, in which case the
 // assertion list must use explicit at-code or archetype-id
 // predicates to disambiguate.
-func Probe022OPTPathResolution(opt []byte, assertions []PathAssertion) (Result, error) { // PROBE-022 (REQ-100)
+func Probe022OPTPathResolution(opt []byte, assertions []PathAssertion) (Result, error) { // PROBE-022 (REQ-111)
 	r := Result{Probe: "PROBE-022"}
 	if len(opt) == 0 {
 		return r, errors.New("PROBE-022: empty OPT body")
@@ -112,7 +112,7 @@ func checkAssertion(c *templatecompile.Compiled, a PathAssertion) string {
 	n, err := c.Resolve(p)
 	if err != nil {
 		if a.ExpectNotFound {
-			// REQ-100 error taxonomy: negative assertions MUST be
+			// REQ-111 Path lookup: negative assertions MUST be
 			// satisfied by ErrPathNotFound specifically — any other
 			// error indicates a regression worth surfacing.
 			if errors.Is(err, template.ErrPathNotFound) {

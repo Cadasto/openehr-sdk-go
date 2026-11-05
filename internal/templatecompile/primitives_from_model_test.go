@@ -1,155 +1,24 @@
 package templatecompile
 
 // primitives_from_model_test.go: the compile step's primitive constraints,
-// built from the operational template model, and the readings and refusals
-// that part them from the deprecated parser's; parity_test.go holds them
-// equal to the parser's over every corpus node.
+// built from the operational template model, with the readings and refusals
+// of its default and strict modes. TestCompiledGolden holds the constraint
+// of every corpus node.
 
 import (
 	"encoding/json/jsontext"
 	json "encoding/json/v2"
 	"errors"
 	"fmt"
-	"io/fs"
 	"math"
-	"os"
-	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
-	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
-
-// corpusTemplateFloor is the number of operational templates the corpus
-// vendors today. A walk that finds fewer fails, so a corpus that silently
-// empties, or a walk that stops finding a folder, cannot pass as clean.
-const corpusTemplateFloor = 74
-
-// corpusOperationalTemplates returns every operational template under the
-// corpus root, as PROBE-111 walks them: each regular *.opt file, named by its
-// slash-separated path relative to the root, sorted. It walks the corpus
-// itself because an in-package test cannot import testkit/probes/template,
-// which imports this package through the public compile step.
-func corpusOperationalTemplates(t *testing.T) []string {
-	t.Helper()
-	root := fixtures.CorpusRoot()
-	var names []string
-	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if !d.Type().IsRegular() || filepath.Ext(path) != ".opt" {
-			return nil
-		}
-		rel, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
-		}
-		names = append(names, filepath.ToSlash(rel))
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("walk the corpus at %s: %v", root, err)
-	}
-	if len(names) < corpusTemplateFloor {
-		t.Fatalf("the corpus at %s holds %d operational templates, want at least %d", root, len(names), corpusTemplateFloor)
-	}
-	slices.Sort(names)
-	return names
-}
-
-// modelNodePair is one node of a corpus operational template as the parser
-// reads it and as the model's decode reads it, paired by its place: where
-// names the template and the attribute steps that lead to the node, each
-// with the child's index.
-type modelNodePair struct {
-	where  string
-	parsed template.Node
-	model  aom14.CObject
-}
-
-// corpusModelNodePairs reads every corpus operational template, walked as
-// PROBE-111 walks them, with the parser and with the model's decode, and
-// returns their nodes paired in document order. A template the two read into
-// trees of different shapes fails the test.
-func corpusModelNodePairs(t *testing.T) []modelNodePair {
-	t.Helper()
-	root := fixtures.CorpusRoot()
-	var pairs []modelNodePair
-	for _, name := range corpusOperationalTemplates(t) {
-		path := filepath.Join(root, filepath.FromSlash(name))
-		parsed, err := template.ParseFile(path)
-		if err != nil {
-			t.Fatalf("template.ParseFile(%s) = %v", name, err)
-		}
-		raw, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var model aom14.OperationalTemplate
-		if err := canxml.Unmarshal(raw, &model); err != nil {
-			t.Fatalf("canxml.Unmarshal(%s) = %v", name, err)
-		}
-		pairs = pairModelNodes(t, name, parsed.Root(), &model.Definition, pairs)
-	}
-	return pairs
-}
-
-// pairModelNodes appends the pair of parsed and model, then the pairs of
-// their descendants in document order.
-func pairModelNodes(t *testing.T, where string, parsed template.Node, model aom14.CObject, pairs []modelNodePair) []modelNodePair {
-	t.Helper()
-	pairs = append(pairs, modelNodePair{where: where, parsed: parsed, model: model})
-	var parsedAttrs []*template.Attribute
-	if on, ok := parsed.(template.ObjectNode); ok {
-		parsedAttrs = on.Attributes()
-	}
-	modelAttrs := modelAttributes(model)
-	if len(parsedAttrs) != len(modelAttrs) {
-		t.Fatalf("%s: the parser reads %d attributes and the model %d", where, len(parsedAttrs), len(modelAttrs))
-	}
-	for i, pa := range parsedAttrs {
-		name, children := modelChildren(modelAttrs[i])
-		if len(pa.Children()) != len(children) {
-			t.Fatalf("%s/%s: the parser reads %d children and the model %d", where, name, len(pa.Children()), len(children))
-		}
-		for j, pc := range pa.Children() {
-			pairs = pairModelNodes(t, fmt.Sprintf("%s/%s[%d]", where, name, j), pc, children[j], pairs)
-		}
-	}
-	return pairs
-}
-
-// modelAttributes returns the attributes of a model node that has any.
-func modelAttributes(o aom14.CObject) []aom14.CAttribute {
-	switch n := o.(type) {
-	case *aom14.CComplexObject:
-		return n.Attributes
-	case *aom14.CArchetypeRoot:
-		return n.Attributes
-	case *aom14.TComplexObject:
-		return n.Attributes
-	}
-	return nil
-}
-
-// modelChildren returns the name and the children of a model attribute.
-func modelChildren(a aom14.CAttribute) (string, []aom14.CObject) {
-	switch x := a.(type) {
-	case *aom14.CSingleAttribute:
-		return x.RMAttributeName, x.Children
-	case *aom14.CMultipleAttribute:
-		return x.RMAttributeName, x.Children
-	}
-	return fmt.Sprintf("<%T>", a), nil
-}
 
 // renderPrimitive renders a primitive constraint as its Go type and its
 // exported fields, which is all two equal constraints share: a CString's
@@ -342,13 +211,13 @@ func TestREQ103_PrimitiveFromModelReadings(t *testing.T) {
 }
 
 // TestREQ103_REQ111_PrimitiveFromModelReadsWeakValues pins the values the
-// compile step reads, in its default mode, in the weaker form the parser's
-// default mode reads them, and refuses in its strict mode, as ParseOPTStrict
-// does: a temporal range bound that is not ISO 8601 text of its type, read as
-// unbounded on its side; a timezone_validity that names no VALIDITY_KIND, and
-// a mandatory one on a C_DATE, read as optional; a CONSTRAINT_REF with no or a
-// blank reference, read with an empty one; and a C_PRIMITIVE_OBJECT with no
-// item, or with a nil pointer for one, read as no constraint.
+// compile step reads, in its default mode, in a weaker form, and refuses in
+// its strict mode: a temporal range bound that is not ISO 8601 text of its
+// type, read as unbounded on its side; a timezone_validity that names no
+// VALIDITY_KIND, and a mandatory one on a C_DATE, read as optional; a
+// CONSTRAINT_REF with no or a blank reference, read with an empty one; and a
+// C_PRIMITIVE_OBJECT with no item, or with a nil pointer for one, read as no
+// constraint.
 func TestREQ103_REQ111_PrimitiveFromModelReadsWeakValues(t *testing.T) {
 	primitive := func(item aom14.CPrimitive) aom14.CObject {
 		return &aom14.CPrimitiveObject{RMTypeName: "ANY", Item: item}
@@ -538,8 +407,8 @@ func describeModel(o aom14.CObject) string {
 }
 
 // TestRenderPrimitiveTellsInfiniteBoundsApart pins that two constraints that
-// hold an infinity and differ elsewhere render differently, so the parity
-// checks that compare rendered constraints see such a difference.
+// hold an infinity and differ elsewhere render differently, so the tests
+// that compare rendered constraints see such a difference.
 func TestRenderPrimitiveTellsInfiniteBoundsApart(t *testing.T) {
 	a := constraints.CReal{Range: constraints.NumericRange{Lower: math.Inf(-1), Upper: 5, UpperInclusive: true}}
 	b := constraints.CReal{Range: constraints.NumericRange{Lower: math.Inf(-1), Upper: 9, UpperInclusive: true}}

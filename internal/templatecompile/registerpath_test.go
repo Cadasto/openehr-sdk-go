@@ -7,9 +7,9 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 )
 
-// REQ-100 — registerPath rejects duplicate AQL paths registered under
-// different model attributes (OPT bug), while admitting legal
-// C_SINGLE_ATTRIBUTE alternatives under the same attribute.
+// REQ-111 (§ Reading the model) — registerPath rejects duplicate AQL paths
+// registered under different model attributes (OPT bug), while admitting
+// legal C_SINGLE_ATTRIBUTE alternatives under the same attribute.
 func TestRegisterPath_DuplicateFromDifferentAttribute(t *testing.T) {
 	c := &Compiled{byPath: make(map[string]*CompiledNode)}
 	w := walker{compiled: c, paths: make(map[string]pathMark)}

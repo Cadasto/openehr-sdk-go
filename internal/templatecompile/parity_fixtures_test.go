@@ -1,10 +1,10 @@
 package templatecompile
 
-// parity_fixtures_test.go: REQ-111 § Parity with the deprecated parser, over
-// the parity fixtures, OPTs the SDK writes in testdata/parity for each value
-// the compile step tolerates and each default-value placement it names: the
-// default values placed and the strict modes' refusals. parity_test.go holds
-// the fixtures, with the corpus, to the parser's constraints.
+// parity_fixtures_test.go: REQ-111, over the parity fixtures, OPTs the SDK
+// writes in testdata/parity for each value the compile step tolerates and
+// each default-value placement it names: the default values placed and the
+// strict mode's refusals. TestCompiledGolden holds the compiled tree of each
+// fixture.
 
 import (
 	"bytes"
@@ -17,7 +17,6 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 )
 
 // parityFixtureDir holds the parity fixtures.
@@ -25,19 +24,14 @@ const parityFixtureDir = "testdata/parity"
 
 // TestREQ111_ParityFixtures reads each parity fixture with the model's
 // reader and compiles it, both in their default mode: the compile step places
-// the default values the fixture names. In their strict modes ParseOPTStrict
-// refuses a fixture of a tolerated value, and so does the compile step, which
-// also refuses a default value that addresses no node or that it cannot hold
-// as canonical JSON, which the parser does not read. That the parser reads
-// each fixture, and that the compiled nodes carry the primitive constraints
-// it reads, is TestREQ111_ParityWithDeprecatedParser's.
+// the default values the fixture names. In its strict mode the compile step
+// refuses a fixture of a tolerated value, and a default value that addresses
+// no node or that it cannot hold as canonical JSON. The compiled tree of each
+// fixture is TestCompiledGolden's.
 func TestREQ111_ParityFixtures(t *testing.T) {
 	const items = "/context/other_context/items"
 	fixtures := []struct {
 		file string
-		// parserStrictRefuses is true when ParseOPTStrict refuses the
-		// fixture.
-		parserStrictRefuses bool
 		// compileStrictRefuses is true when the compile step refuses it
 		// with Options.Strict.
 		compileStrictRefuses bool
@@ -46,14 +40,14 @@ func TestREQ111_ParityFixtures(t *testing.T) {
 		// RM type of the value.
 		defaults map[string]string
 	}{
-		{file: "constraint_ref_no_reference.opt", parserStrictRefuses: true, compileStrictRefuses: true},
-		{file: "constraint_ref_blank_reference.opt", parserStrictRefuses: true, compileStrictRefuses: true},
-		{file: "date_timezone_mandatory.opt", parserStrictRefuses: true, compileStrictRefuses: true},
-		{file: "temporal_bound_not_iso8601.opt", parserStrictRefuses: true, compileStrictRefuses: true},
-		{file: "duration_bounds_not_iso8601.opt", parserStrictRefuses: true, compileStrictRefuses: true},
-		{file: "primitive_object_no_item.opt", parserStrictRefuses: true, compileStrictRefuses: true},
+		{file: "constraint_ref_no_reference.opt", compileStrictRefuses: true},
+		{file: "constraint_ref_blank_reference.opt", compileStrictRefuses: true},
+		{file: "date_timezone_mandatory.opt", compileStrictRefuses: true},
+		{file: "temporal_bound_not_iso8601.opt", compileStrictRefuses: true},
+		{file: "duration_bounds_not_iso8601.opt", compileStrictRefuses: true},
+		{file: "primitive_object_no_item.opt", compileStrictRefuses: true},
 		// Its decimal and NaN integer bounds are read in every mode, so
-		// neither strict mode refuses it.
+		// the strict mode does not refuse it.
 		{file: "decimal_and_nan_bounds.opt"},
 		{
 			file: "default_value_placement.opt",
@@ -111,7 +105,7 @@ func TestREQ111_ParityFixtures(t *testing.T) {
 
 			c, err := Compile(model)
 			if err != nil {
-				t.Fatalf("Compile = %v; want the fixture read as the parser reads it", err)
+				t.Fatalf("Compile = %v; want the fixture compiled in the default mode", err)
 			}
 			got := map[string]string{}
 			collectDefaultValues(c.root, got)
@@ -119,10 +113,6 @@ func TestREQ111_ParityFixtures(t *testing.T) {
 				t.Errorf("default values placed = %v; want %v", got, f.defaults)
 			}
 
-			_, err = template.ParseOPTStrict(bytes.NewReader(raw))
-			if refused := err != nil; refused != f.parserStrictRefuses {
-				t.Errorf("template.ParseOPTStrict = %v; want refused %t", err, f.parserStrictRefuses)
-			}
 			_, err = Compile(model, Options{Strict: true})
 			if refused := errors.Is(err, ErrInvalidInput); refused != f.compileStrictRefuses {
 				t.Errorf("Compile(Strict) = %v; want refused with ErrInvalidInput %t", err, f.compileStrictRefuses)

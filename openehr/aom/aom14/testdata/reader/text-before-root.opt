@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Text before the root element, after this comment, which the deprecated template parser reads past. The reader's default mode reads past it too, and its strict mode refuses it. text-before-root.read.opt is how the reader reads it. SDK-authored. -->
+<!-- Text before the root element, after this comment, which the reader's default mode reads past and its strict mode refuses. text-before-root.read.opt is how the reader reads it. SDK-authored. -->
 Exported by a template tool.
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     <language>

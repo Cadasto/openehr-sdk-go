@@ -78,6 +78,11 @@ jobs:
           echo "dry_run=$dry_run"   >> "$GITHUB_OUTPUT"
           echo "Resolved tag=$tag version=$version dry_run=$dry_run"
 
+      # make ci runs operational-template-schema-check, which needs xmllint
+      # (libxml2-utils); ci.yml installs it the same way.
+      - name: Install xmllint
+        run: command -v xmllint || { sudo apt-get update && sudo apt-get install -y --no-install-recommends libxml2-utils; }
+
       - name: Re-run CI gate on tagged commit
         run: make ci
 

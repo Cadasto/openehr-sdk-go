@@ -56,8 +56,8 @@ type undescribedPin struct {
 // attribute's cardinality asks for a member. A child's occurrences add no
 // such member, though the generator's existenceOnly reads them: a required
 // child that is not a slot gets a member of its own, so no top-up runs, and
-// the parser does not read a slot's occurrences (REQ-107 Known gap: slot
-// occurrences). A list only its existence requires gets no undescribed
+// the compiled template does not carry a slot's occurrences (REQ-107 Known
+// gap: slot occurrences). A list only its existence requires gets no undescribed
 // member (What a visit writes), so vital_signs' protocols and event states,
 // whose items the template leaves without a child or with slots only at an
 // existence of 1..1 and a cardinality of 0..*, hold none. Medium builds
@@ -661,8 +661,9 @@ func bmmMandatory(node *templatecompile.CompiledNode, attr *templatecompile.Comp
 // than calling it a violation. Unlike the generator's existenceOnly, this
 // does not read a child's occurrences to decide whether the top-up asks
 // beyond the existence, on purpose: a required child that is not a slot
-// gets a member of its own, so no top-up runs for it, and the parser does
-// not read a slot's occurrences (REQ-107 Known gap: slot occurrences).
+// gets a member of its own, so no top-up runs for it, and the compiled
+// template does not carry a slot's occurrences (REQ-107 Known gap: slot
+// occurrences).
 // Reading them would only exempt a node that no top-up builds.
 func topUpLastResort(node *templatecompile.CompiledNode, built map[*templatecompile.CompiledNode]int, held int) bool {
 	attr := parentAttribute(node)
@@ -806,8 +807,8 @@ var censusSubstitutes = map[string]string{
 
 // censusRoom reports whether child, an allowed child of a list that n
 // members are bound to, has room for another: it is a slot, whose
-// occurrences the parser does not read, its occurrences state no upper
-// bound, or n is below it (REQ-102 Structural — binding items).
+// occurrences the compiled template does not carry, its occurrences state
+// no upper bound, or n is below it (REQ-102 Structural — binding items).
 func censusRoom(child *templatecompile.CompiledNode, n int) bool {
 	if child.IsSlot() {
 		return true

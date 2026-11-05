@@ -184,7 +184,7 @@ func TestGenerateIntervalBoundNotBesideOpenFlag(t *testing.T) {
 // generated DV_INTERVAL is a sensible example rather than an empty range
 // such as (0, 0). A bounded side includes its bound unless the OPT
 // constrains `*_included`, and these templates do not; that is the closed
-// endpoint the template parser assumes when an OPT range omits the flag.
+// endpoint the compile step assumes when an OPT range omits the flag.
 // An open side never includes its bound: BASE Interval's
 // Lower_included_valid and Upper_included_valid say
 // `lower_unbounded implies not lower_included`, and likewise for upper.

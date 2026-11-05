@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- SDK-authored parity fixture: a C_INTEGER range bound past the 32-bit range, which the parser reads and the model's Integer cannot hold, an exception the parity rule allows. -->
+<!-- SDK-authored parity fixture: a C_INTEGER range bound past the 32-bit range, which the model's Integer cannot hold: one of the four readings the reader refuses in every mode. -->
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <language>
     <terminology_id><value>ISO_639-1</value></terminology_id>

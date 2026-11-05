@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Items typed with a class the deprecated template parser reads a constraint of, which declare a namespace that the object that holds them binds otherwise or does not bind. The reader's default mode reads them as the parser does, and its strict mode refuses them. item-namespaces.read.opt is how the reader reads it. SDK-authored. -->
+<!-- Items of a C_PRIMITIVE_OBJECT typed C_DV_QUANTITY, C_CODE_PHRASE or C_PRIMITIVE_OBJECT, which declare a namespace that the object that holds them binds otherwise or does not bind. The reader's default mode reads each as the object that holds it, or as the item it holds, the elements it holds keeping their names, and its strict mode refuses them. item-namespaces.read.opt is how the reader reads it. SDK-authored. -->
 <oe:template xmlns:oe="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:p="urn:x-openehr-sdk-go:test:other">
     <oe:language>
         <oe:terminology_id>

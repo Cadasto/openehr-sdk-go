@@ -50,6 +50,11 @@ func TestValidateComposition_ConstraintFixtures_NoPrimitiveViolations(t *testing
 		// one list entry is itself misspelled. Surfaced with the STRING check.
 		// Pinned in TestValidateComposition_ConstraintFixture_ClinicalContentViolations.
 		"clinical_content_validation": "name/value not in the OPT's closed list",
+		// OPT pins the interval bounds to 0..100 while the instance carries
+		// -10 and 200. Pinned in
+		// TestValidateComposition_ConstraintFixture_IntervalBoundViolations.
+		"Test_dv_interval_dv_count_lower_upper_constraint.v0":    "DV_INTERVAL<DV_COUNT> bounds outside the C_INTEGER range",
+		"Test_dv_interval_dv_quantity_lower_upper_constraint.v0": "DV_INTERVAL<DV_QUANTITY> bounds outside the magnitude range",
 	}
 	for _, id := range ids {
 		if _, skip := constraintViolatingFixtures[id]; skip {
@@ -178,10 +183,86 @@ func TestValidateComposition_ConstraintFixture_ClinicalContentViolations(t *test
 	assertFixtureIssues(t, id, want)
 }
 
+// intervalValue is the DV_INTERVAL element both lower_upper interval
+// templates carry; the instance has one event, so the event is written by its
+// position (REQ-102 § Issue paths).
+const intervalValue = "/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[1]/data/items[at0046]/value"
+
+// intervalBoundViolations are the exact issues of the two lower_upper interval
+// templates, each read as "code path". Both OPTs pin the interval bounds to
+// 0..100 while the instance carries -10 and 200, so each bound is reported
+// once.
+var intervalBoundViolations = []struct {
+	id   string
+	want []string
+}{
+	{
+		id: "Test_dv_interval_dv_count_lower_upper_constraint.v0",
+		want: []string{
+			"primitive_out_of_range " + intervalValue + "/lower/magnitude",
+			"primitive_out_of_range " + intervalValue + "/upper/magnitude",
+		},
+	},
+	{
+		id: "Test_dv_interval_dv_quantity_lower_upper_constraint.v0",
+		want: []string{
+			"primitive_out_of_range " + intervalValue + "/lower",
+			"primitive_out_of_range " + intervalValue + "/upper",
+		},
+	},
+}
+
+// REQ-103 and REQ-102: the bounds of a DV_INTERVAL validate against the OPT's
+// constraint on the bound type, DV_COUNT through its INTEGER range and
+// DV_QUANTITY through its magnitude range for the unit.
+func TestValidateComposition_ConstraintFixture_IntervalBoundViolations(t *testing.T) {
+	for _, tc := range intervalBoundViolations {
+		t.Run(tc.id, func(t *testing.T) {
+			assertFixtureIssues(t, tc.id, tc.want)
+		})
+	}
+}
+
+// REQ-103: the exact comparison behind the fixture assertions rejects an
+// expectation that lacks an issue of the report and one that holds an issue
+// the report lacks.
+func TestValidateComposition_ConstraintFixture_ComparisonIsExact(t *testing.T) {
+	for _, tc := range intervalBoundViolations {
+		t.Run(tc.id, func(t *testing.T) {
+			got, _ := fixtureIssues(t, tc.id)
+			if !sameFixtureIssues(got, tc.want) {
+				t.Fatalf("report %q does not match the expectation %q", got, tc.want)
+			}
+			for i := range tc.want {
+				short := slices.Delete(slices.Clone(tc.want), i, i+1)
+				if sameFixtureIssues(got, short) {
+					t.Errorf("expectation without %q still matches the report", tc.want[i])
+				}
+			}
+			extra := append(slices.Clone(tc.want), "primitive_out_of_range /extra")
+			if sameFixtureIssues(got, extra) {
+				t.Errorf("expectation with an extra issue still matches the report")
+			}
+		})
+	}
+}
+
 // assertFixtureIssues validates the vendored composition of template id
 // against its OPT and fails unless the issues, each read as "code path",
 // are exactly want in any order.
 func assertFixtureIssues(t *testing.T, id string, want []string) {
+	t.Helper()
+	got, issues := fixtureIssues(t, id)
+	if !sameFixtureIssues(got, want) {
+		want = slices.Sorted(slices.Values(want))
+		t.Errorf("ValidateComposition(%s) issues (code path):\n got  %q\n want %q\nfull issues: %+v", id, got, want, issues)
+	}
+}
+
+// fixtureIssues validates the vendored composition of template id against its
+// OPT and returns its issues, each read as "code path" and sorted, with the
+// issues as reported.
+func fixtureIssues(t *testing.T, id string) ([]string, []validation.Issue) {
 	t.Helper()
 	c := mustCompile(t, id)
 	raw, err := os.ReadFile(fixtures.CompositionJSON(id))
@@ -198,8 +279,11 @@ func assertFixtureIssues(t *testing.T, id string, want []string) {
 		got = append(got, issue.Code+" "+issue.Path)
 	}
 	slices.Sort(got)
-	want = slices.Sorted(slices.Values(want))
-	if !slices.Equal(got, want) {
-		t.Errorf("ValidateComposition(%s) issues (code path):\n got  %q\n want %q\nfull issues: %+v", id, got, want, r.Issues)
-	}
+	return got, r.Issues
+}
+
+// sameFixtureIssues reports whether got, sorted, holds exactly the issues of
+// want in any order.
+func sameFixtureIssues(got, want []string) bool {
+	return slices.Equal(got, slices.Sorted(slices.Values(want)))
 }

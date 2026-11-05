@@ -171,8 +171,8 @@ func TestREQ103_CStringExampleValue(t *testing.T) {
 }
 
 // REQ-103 — with no Units list, DvQuantity.ExampleValue gives magnitude 0
-// in the first entry of PropertyUnits, the primary unit the parser puts
-// first; a Units list keeps precedence, and with neither the example is
+// in the first entry of PropertyUnits, the primary unit the compile step
+// puts first; a Units list keeps precedence, and with neither the example is
 // {0, "1"}. With a Units list the example is that of the first entry whose
 // magnitude range admits it, or the first entry's when none does.
 func TestREQ103_DvQuantityExampleValue(t *testing.T) {

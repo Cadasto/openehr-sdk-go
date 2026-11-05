@@ -1,14 +1,14 @@
 package aom14_test
 
 // REQ-111 (clinical-modeling.md § REQ-111, Reading the model, "What the
-// reader tolerates"): aom14.ReadOperationalTemplate reads every OPT the
-// deprecated parser reads in its default mode, as the parser reads it, but an
-// integer the model's 32-bit Integer cannot hold, a match_negated of true, an
-// infinite integer bound that admits no integer and a <definition> the parser
-// reads as a slot or a primitive constraint, which it refuses in every mode. REQ-100 (§ REQ-100, Strict parse mode): given canxml.WithStrict it
-// refuses the shapes the parser's strict mode refuses, and the other readings
-// of the parser's default mode. REQ-170
-// (wire.md § REQ-170): what a tolerance leaves out is unmatched content, which
+// reader tolerates"): aom14.ReadOperationalTemplate reads in its default mode
+// the shapes and values that section names, but for the four readings it
+// refuses in every mode: an integer the model's 32-bit Integer cannot hold, a
+// match_negated of true, an infinite integer bound that admits no integer and
+// a <definition> typed as a slot or with the class of a primitive constraint.
+// Given canxml.WithStrict it refuses the shapes and values that section
+// lists, which the default mode reads in a weaker form. REQ-170 (wire.md §
+// REQ-170): what a tolerance leaves out is unmatched content, which
 // canxml.WithUnmatched reports, once, at the path it has in the input, or in
 // the element a reading moves it into.
 //
@@ -98,18 +98,17 @@ func readAs(t *testing.T, data []byte, want *aom14.OperationalTemplate, opts ...
 // TestREQ111_ReaderReadsADefinitionOfAClassItCannotHoldAsALeaf pins that the
 // default mode reads a <definition> whose xsi:type names no class of the AOM
 // 1.4 constraint model, or a class a definition cannot hold other than those
-// the parser reads as a slot or a constraint
-// (TestREQ111_ReaderRefusesADefinitionTheParserReadsAsASlotOrAConstraint), as
-// the parser does: as a C_COMPLEX_OBJECT leaf with the rm_type_name, node_id
-// and occurrences it holds and none of its other members, which
-// WithUnmatched reports: its attributes, archetype id, template id, term
-// definitions and term bindings. Strict mode refuses it with the
-// *canxml.DecodeError of the
-// definition, wrapping typereg.ErrUnknownType for no class and
-// typereg.ErrTypeMismatch for a class it cannot hold, a type with white space
-// around it among the first. A definition typed C_ARCHETYPE_ROOT, its
-// T_ARCHETYPE_ROOT spelling or C_COMPLEX_OBJECT reads whole in every mode, as
-// one with an empty type does.
+// the reader refuses in every mode
+// (TestREQ111_ReaderRefusesADefinitionTypedAsASlotOrAConstraint), as a
+// C_COMPLEX_OBJECT leaf with the rm_type_name, node_id and occurrences it
+// holds and none of its other members, which WithUnmatched reports: its
+// attributes, archetype id, template id, term definitions and term bindings.
+// Strict mode refuses it with the *canxml.DecodeError of the definition,
+// wrapping typereg.ErrUnknownType for no class and typereg.ErrTypeMismatch
+// for a class it cannot hold, a type with white space around it among the
+// first. A definition typed C_ARCHETYPE_ROOT, its T_ARCHETYPE_ROOT spelling
+// or C_COMPLEX_OBJECT reads whole in every mode, as one with an empty type
+// does.
 //
 // Can-fail control: read the definition as a C_ARCHETYPE_ROOT whatever its
 // type, as the reader did before, and the leaf reads with its attributes in
@@ -174,22 +173,21 @@ func TestREQ111_ReaderReadsADefinitionOfAClassItCannotHoldAsALeaf(t *testing.T) 
 	}
 }
 
-// TestREQ111_ReaderRefusesADefinitionTheParserReadsAsASlotOrAConstraint pins
-// that, in every mode, a <definition> typed ARCHETYPE_SLOT, or with a class
-// the parser reads a primitive constraint from, is refused with the
-// *canxml.DecodeError of the definition that wraps typereg.ErrTypeMismatch,
-// its Type the type as written: the parser reads it as a slot or as a leaf
-// that carries that constraint, and the model's definition, a
-// C_ARCHETYPE_ROOT, holds neither. The default mode reads the type without
-// the white space around it, which strict mode refuses as no class. A
-// definition typed C_PRIMITIVE_OBJECT is refused where the parser reads a
-// constraint from the items it holds, which it reads as one item for each
-// level, the last that names a type deciding; otherwise the default mode
-// reads it as it reads a definition of no class, as a leaf.
+// TestREQ111_ReaderRefusesADefinitionTypedAsASlotOrAConstraint pins that, in
+// every mode, a <definition> typed ARCHETYPE_SLOT, or with a class that
+// carries a primitive constraint, is refused with the *canxml.DecodeError of
+// the definition that wraps typereg.ErrTypeMismatch, its Type the type as
+// written: it is a slot or a leaf that carries that constraint, and the
+// model's definition, a C_ARCHETYPE_ROOT, holds neither. The default mode
+// reads the type without the white space around it, which strict mode refuses
+// as no class. A definition typed C_PRIMITIVE_OBJECT is refused where the
+// items it holds carry such a constraint, one item read for each level, the
+// last that names a type deciding; otherwise the default mode reads it as it
+// reads a definition of no class, as a leaf.
 //
 // Can-fail control: read such a definition as a leaf, as the reader did
 // before, and the default mode reads it.
-func TestREQ111_ReaderRefusesADefinitionTheParserReadsAsASlotOrAConstraint(t *testing.T) {
+func TestREQ111_ReaderRefusesADefinitionTypedAsASlotOrAConstraint(t *testing.T) {
 	t.Parallel()
 	typed := func(class, content string) []byte {
 		return []byte(strings.Replace(definitionDoc(content), `<definition>`, `<definition xsi:type="`+class+`">`, 1))
@@ -298,8 +296,8 @@ func TestREQ111_ReaderReadsTheNamespaceTheSchemasDeclare(t *testing.T) {
 // TestREQ111_ReaderReadsARootInAnotherNamespace pins that the default mode
 // reads a root element in a namespace other than none, the v1 one and the v2
 // one, and every element in that namespace, as in the v1 one, under the
-// default namespace and under a prefix, as the deprecated parser, which reads
-// no namespace, does; strict mode refuses it as a foreign namespace.
+// default namespace and under a prefix, whichever namespace it names; strict
+// mode refuses it as a foreign namespace.
 func TestREQ111_ReaderReadsARootInAnotherNamespace(t *testing.T) {
 	t.Parallel()
 	v2 := readerFixture(t, "namespace-v2.opt")
@@ -331,16 +329,15 @@ func TestREQ111_ReaderReadsARootInAnotherNamespace(t *testing.T) {
 // TestREQ111_ReaderReadsAnElementInAnotherNamespace pins that the default
 // mode reads an element below the root in a namespace other than none, the v1
 // one and the v2 one, the XSI one among them, as the element of that name in
-// the v1 namespace, as the deprecated parser, which reads no namespace, does:
-// under another default namespace, the definition's among them, under a
-// prefix bound to another namespace, the xsi prefix of the xsi:type
-// attributes among them, under the xml prefix, and under a prefix no
-// declaration binds, which encoding/xml reads as a namespace of that name.
-// WithUnmatched reports nothing. Strict mode refuses each as an element in a
-// foreign namespace.
-// Every prefix keeps its namespace, so that an xsi:type, and a type written
-// with a prefix, such as the xsd:string of an assertion, read as written,
-// where an element name carries the prefix too.
+// the v1 namespace, whichever namespace it names: under another default
+// namespace, the definition's among them, under a prefix bound to another
+// namespace, the xsi prefix of the xsi:type attributes among them, under the
+// xml prefix, and under a prefix no declaration binds, which encoding/xml
+// reads as a namespace of that name. WithUnmatched reports nothing. Strict
+// mode refuses each as an element in a foreign namespace. Every prefix keeps
+// its namespace, so that an xsi:type, and a type written with a prefix, such
+// as the xsd:string of an assertion, read as written, where an element name
+// carries the prefix too.
 //
 // Can-fail control: read only a root element in another namespace so, and
 // the definition reads as missing and the item as no item; read an element in
@@ -462,13 +459,13 @@ func TestREQ111_ReaderReadsAnElementInAnotherNamespace(t *testing.T) {
 	})
 }
 
-// TestREQ111_ReaderReadsTheParsersDocumentShapes pins the default mode's
-// reading of the fixtures of the document shapes the parser reads: a root
-// element in a namespace of no openEHR schema, text before the root and a
-// declaration after it, each read as its *.read.opt with nothing unmatched.
-// Strict mode refuses the first as an element in a foreign namespace and the
-// others as content outside the root.
-func TestREQ111_ReaderReadsTheParsersDocumentShapes(t *testing.T) {
+// TestREQ111_ReaderReadsTheDocumentShapesOutsideTheSchemas pins the default
+// mode's reading of the fixtures of the document shapes the schemas do not
+// allow: a root element in a namespace of no openEHR schema, text before the
+// root and a declaration after it, each read as its *.read.opt with nothing
+// unmatched. Strict mode refuses the first as an element in a foreign
+// namespace and the others as content outside the root.
+func TestREQ111_ReaderReadsTheDocumentShapesOutsideTheSchemas(t *testing.T) {
 	t.Parallel()
 	for name, strict := range map[string]error{
 		"root-namespace":       canxml.ErrNamespace,
@@ -488,8 +485,8 @@ func TestREQ111_ReaderReadsTheParsersDocumentShapes(t *testing.T) {
 	}
 }
 
-// TestREQ111_ReaderReadsWhatElseTheParserReads pins the default mode's
-// reading of the other shapes and values the parser's default mode reads: a
+// TestREQ111_ReaderReadsTheOtherShapesAndValuesOfTheDefaultMode pins the
+// default mode's reading of the other shapes and values it reads as well: a
 // C_COMPLEX_OBJECT that holds an archetype id, as a C_ARCHETYPE_ROOT; a
 // <children> typed with a primitive class, as a C_PRIMITIVE_OBJECT whose item
 // of that class holds the members but the rm_type_name, occurrences and
@@ -501,10 +498,10 @@ func TestREQ111_ReaderReadsTheParsersDocumentShapes(t *testing.T) {
 // does not, as the number Go reads. WithUnmatched reports what the reading
 // leaves out, each item once: a primitive leaf's attributes, in its item, and
 // the members of an item that its object has, in that object.
-func TestREQ111_ReaderReadsWhatElseTheParserReads(t *testing.T) {
+func TestREQ111_ReaderReadsTheOtherShapesAndValuesOfTheDefaultMode(t *testing.T) {
 	t.Parallel()
-	data := readerFixture(t, "parser-readings.opt")
-	want := decoded(t, readerFixture(t, "parser-readings.read.opt"))
+	data := readerFixture(t, "default-mode-readings.opt")
+	want := decoded(t, readerFixture(t, "default-mode-readings.read.opt"))
 	got := readAs(t, data, want)
 	wantUnmatched := []string{
 		leaf(2) + "/item[1]/attributes[1]",
@@ -530,12 +527,12 @@ func TestREQ111_ReaderKeepsTheNamespacesOfAnItemItTakesOff(t *testing.T) {
 }
 
 // TestREQ111_ReaderReadsAnItemThatRebindsANamespace pins that the default
-// mode reads an <item> it takes off as the parser reads it where the item
-// declares a namespace that the object that holds it binds otherwise or does
-// not bind: the default namespace, a prefix bound around it to another
-// namespace, or one it binds to the v2 namespace. What the item holds keeps
-// the names the item gives it, and WithUnmatched reports the member of an
-// item that its object has, in that object. Strict mode refuses the items.
+// mode reads an <item> it takes off where the item declares a namespace that
+// the object that holds it binds otherwise or does not bind: the default
+// namespace, a prefix bound around it to another namespace, or one it binds
+// to the v2 namespace. What the item holds keeps the names the item gives it,
+// and WithUnmatched reports the member of an item that its object has, in
+// that object. Strict mode refuses the items.
 func TestREQ111_ReaderReadsAnItemThatRebindsANamespace(t *testing.T) {
 	t.Parallel()
 	data := readerFixture(t, "item-namespaces.opt")
@@ -570,10 +567,10 @@ func TestREQ111_ReaderReadsAnItemThatRebindsANamespace(t *testing.T) {
 // default mode reads a <children> typed with a class of the constraint model
 // a <children> cannot hold, C_SINGLE_ATTRIBUTE or C_MULTIPLE_ATTRIBUTE, as a
 // C_COMPLEX_OBJECT leaf with the rm_type_name, occurrences and node_id it
-// holds, as the parser reads it. WithUnmatched reports the rest, each item
-// once: the leaf's attributes and the members of an attribute it holds.
-// TestREQ111_ReaderStrictModeRefusesTheParsersOtherReadings pins strict
-// mode's refusal.
+// holds. WithUnmatched reports the rest, each item once: the leaf's
+// attributes and the members of an attribute it holds.
+// TestREQ111_ReaderStrictModeRefusesTheWeakerReadings pins strict mode's
+// refusal.
 func TestREQ111_ReaderReadsAChildrenOfAnAttributeClassAsALeaf(t *testing.T) {
 	t.Parallel()
 	data := readerFixture(t, "attribute-children.opt")
@@ -596,10 +593,10 @@ func TestREQ111_ReaderReadsAChildrenOfAnAttributeClassAsALeaf(t *testing.T) {
 
 // TestREQ111_ReaderReadsADecimalIntegerBoundInEveryMode pins that, in every
 // mode, a bound of a C_INTEGER range or of a quantity's precision written as
-// a decimal number, which the parser reads as a float, is read as the integer
-// bound that admits the same integers: a lower bound rounded up and an upper
-// one down, its side included where the rounding changes it, and keeping its
-// flag where the number is a whole one.
+// a decimal number is read as the integer bound that admits the same
+// integers: a lower bound rounded up and an upper one down, its side included
+// where the rounding changes it, and keeping its flag where the number is a
+// whole one.
 func TestREQ111_ReaderReadsADecimalIntegerBoundInEveryMode(t *testing.T) {
 	t.Parallel()
 	fixture := readerFixture(t, "integer-bounds.opt")
@@ -653,13 +650,13 @@ func TestREQ111_ReaderReadsADecimalIntegerBoundInEveryMode(t *testing.T) {
 
 // TestREQ111_ReaderReadsAQuantityAssumedValueItCannotHoldAsAbsent pins that,
 // in every mode, an assumed_value of a C_DV_QUANTITY that the model cannot
-// hold, which the parser ignores, is read as absent: a magnitude that is no
-// number, a precision that is no integer, or a bound of its normal range of a
-// type that range cannot hold, under a prefix declared around it. An assumed
-// value the model holds is kept. The default mode reports what it leaves out;
-// strict mode leaves it out unreported. Each case alone reads too, so that a
-// failure strict mode alone meets first is read as well, and one whose
-// elements are under a prefix bound around it.
+// hold is read as absent: a magnitude that is no number, a precision that is
+// no integer, or a bound of its normal range of a type that range cannot
+// hold, under a prefix declared around it. An assumed value the model holds
+// is kept. The default mode reports what it leaves out; strict mode leaves it
+// out unreported. Each case alone reads too, so that a failure strict mode
+// alone meets first is read as well, and one whose elements are under a
+// prefix bound around it.
 func TestREQ111_ReaderReadsAQuantityAssumedValueItCannotHoldAsAbsent(t *testing.T) {
 	t.Parallel()
 	data := readerFixture(t, "quantity-assumed-value.opt")
@@ -699,13 +696,13 @@ func TestREQ111_ReaderReadsAQuantityAssumedValueItCannotHoldAsAbsent(t *testing.
 	}
 }
 
-// TestREQ111_ReaderStrictModeRefusesTheParsersOtherReadings pins that
+// TestREQ111_ReaderStrictModeRefusesTheWeakerReadings pins that
 // canxml.WithStrict refuses each shape and value
-// TestREQ111_ReaderReadsWhatElseTheParserReads reads, and a <children> of an
-// attribute class, and that the default mode reads it, in a document of the
-// v1 namespace and in one of the v2 namespace, which every mode reads a
-// second time.
-func TestREQ111_ReaderStrictModeRefusesTheParsersOtherReadings(t *testing.T) {
+// TestREQ111_ReaderReadsTheOtherShapesAndValuesOfTheDefaultMode reads, and a
+// <children> of an attribute class, and that the default mode reads it, in a
+// document of the v1 namespace and in one of the v2 namespace, which every
+// mode reads a second time.
+func TestREQ111_ReaderStrictModeRefusesTheWeakerReadings(t *testing.T) {
 	t.Parallel()
 	const lossy = "0.10000000000000000555111512312578270211815834045410156251"
 	cases := []struct {
@@ -747,8 +744,8 @@ func TestREQ111_ReaderStrictModeRefusesTheParsersOtherReadings(t *testing.T) {
 // TestREQ111_ReaderLeavesOutARealBoundOnASideWrittenUnbounded pins that, in
 // every mode, a bound of a C_INTEGER or C_REAL range or of a quantity's
 // magnitude or precision that Go reads as a number and canonical XML does not
-// is left out on a side the range writes unbounded, whose bound the parser
-// does not read.
+// is left out on a side the range writes unbounded, whose bound bounds
+// nothing.
 func TestREQ111_ReaderLeavesOutARealBoundOnASideWrittenUnbounded(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct{ doc, want string }{
@@ -780,9 +777,10 @@ func TestREQ111_ReaderLeavesOutARealBoundOnASideWrittenUnbounded(t *testing.T) {
 }
 
 // TestREQ111_ReaderRefusesMatchNegatedInEveryMode pins that, in every mode,
-// an attribute whose match_negated is true is refused, which the parser
-// ignores and so reads with its meaning inverted, an attribute the default
-// mode types among them, while one whose match_negated is false reads.
+// an attribute whose match_negated is true is refused, since AOM 1.4 cannot
+// express it and a reading that left it out would invert the constraint, an
+// attribute the default mode types among them, while one whose match_negated
+// is false reads.
 func TestREQ111_ReaderRefusesMatchNegatedInEveryMode(t *testing.T) {
 	t.Parallel()
 	doc := func(attrs, value string) string {
@@ -885,15 +883,15 @@ func tokenError(t *testing.T, doc string) *xml.SyntaxError {
 	}
 }
 
-// TestREQ111_ReaderReadsTheShapesTheParserReads pins the default mode's
-// reading of the shapes the schemas do not allow inside the definition: an
-// <attributes>, a <children> or an <item> that names no type in the XSI
-// namespace, a type with white space around it, a <children> of no class of
-// the constraint model, read as a leaf, and an <item> of no primitive class.
-// WithUnmatched reports what the reading leaves out, each item once: the
-// leaf's attributes, the items, the bare type attribute and the type under a
-// prefix bound to another namespace.
-func TestREQ111_ReaderReadsTheShapesTheParserReads(t *testing.T) {
+// TestREQ111_ReaderReadsTheDefinitionShapesOutsideTheSchemas pins the default
+// mode's reading of the shapes the schemas do not allow inside the
+// definition: an <attributes>, a <children> or an <item> that names no type
+// in the XSI namespace, a type with white space around it, a <children> of no
+// class of the constraint model, read as a leaf, and an <item> of no
+// primitive class. WithUnmatched reports what the reading leaves out, each
+// item once: the leaf's attributes, the items, the bare type attribute and
+// the type under a prefix bound to another namespace.
+func TestREQ111_ReaderReadsTheDefinitionShapesOutsideTheSchemas(t *testing.T) {
 	t.Parallel()
 	data := readerFixture(t, "shapes.opt")
 	want := decoded(t, readerFixture(t, "shapes.read.opt"))
@@ -911,13 +909,13 @@ func TestREQ111_ReaderReadsTheShapesTheParserReads(t *testing.T) {
 	}
 }
 
-// TestREQ111_ReaderReadsTheValuesTheParserReads pins the default mode's
+// TestREQ111_ReaderReadsTheValuesOutsideTheSchemas pins the default mode's
 // reading of the values the schemas do not allow: a C_INTEGER or C_REAL list
 // entry that is no number of its type is left out, an empty one included; a
 // range bound that is none is left out, its side unbounded and included
 // unless the range says otherwise; a timezone_validity that names no kind is
 // left out. WithUnmatched reports each left-out element once.
-func TestREQ111_ReaderReadsTheValuesTheParserReads(t *testing.T) {
+func TestREQ111_ReaderReadsTheValuesOutsideTheSchemas(t *testing.T) {
 	t.Parallel()
 	data := readerFixture(t, "values.opt")
 	want := decoded(t, readerFixture(t, "values.read.opt"))
@@ -971,19 +969,53 @@ func TestREQ111_ReaderReadsValuesInEveryMode(t *testing.T) {
 	}
 }
 
+// TestREQ103_REQ111_ReaderReadsAFlagOfWhiteSpaceAsAnEmptyOne pins, in every
+// mode, that a C_STRING list_open, or a C_BOOLEAN true_valid or false_valid,
+// whose text is XML white space only reads as the empty element, the
+// reader's own reading rather than XML Schema's: list_open as false, so the
+// list stays closed, and each C_BOOLEAN flag as true. The
+// reading leaves nothing out, so WithUnmatched reports nothing.
+func TestREQ103_REQ111_ReaderReadsAFlagOfWhiteSpaceAsAnEmptyOne(t *testing.T) {
+	t.Parallel()
+	for _, space := range []string{" ", " \t\r\n "} {
+		cases := []struct{ name, doc, want string }{
+			{
+				name: "a C_STRING list_open",
+				doc:  itemDoc(`<item xsi:type="C_STRING"><list>a</list><list_open>` + space + `</list_open></item>`),
+				want: itemDoc(`<item xsi:type="C_STRING"><list>a</list><list_open></list_open></item>`),
+			},
+			{
+				name: "a C_BOOLEAN true_valid and false_valid",
+				doc:  itemDoc(`<item xsi:type="C_BOOLEAN"><true_valid>` + space + `</true_valid><false_valid>` + space + `</false_valid></item>`),
+				want: itemDoc(`<item xsi:type="C_BOOLEAN"><true_valid>true</true_valid><false_valid>true</false_valid></item>`),
+			},
+		}
+		for _, tc := range cases {
+			for mode, opts := range modes {
+				t.Run(mode+"/"+tc.name+"/"+strconv.Quote(space), func(t *testing.T) {
+					t.Parallel()
+					if got := readAs(t, []byte(tc.doc), decoded(t, []byte(tc.want)), opts...); len(got) != 0 {
+						t.Errorf("WithUnmatched reported %q, want nothing", got)
+					}
+				})
+			}
+		}
+	}
+}
+
 // TestREQ111_ReaderFindsWhatCanonicalXMLReadsWithoutAFailure pins the
 // readings of a document that canonical XML decodes without a failure, but
-// otherwise than the parser: a C_BOOLEAN flag left out or empty, or one that
-// stands only in an element the item holds, which it reads as false and the
-// reading as absent, the item typed with a character reference among them; an
-// assumed_value that is empty, which it reads as false or 0, or that is t or
-// f, which it reads as a boolean; an empty list entry or range bound, which it
-// reads as 0; a flag, list entry or bound that holds only a comment, a
-// processing instruction or a CDATA section, which it reads as an empty one; a
-// bare type attribute, which it reads as the type, right after the quote of
-// the attribute before it among them; and, which the default mode alone
-// reads, a C_COMPLEX_OBJECT that holds an archetype id, which it skips, and an
-// element in another namespace, whose content it skips, the root, one
+// otherwise than the reader reads it: a C_BOOLEAN flag left out or empty, or
+// one that stands only in an element the item holds, which it reads as false
+// and the reading as absent, the item typed with a character reference among
+// them; an assumed_value that is empty, which it reads as false or 0, or that
+// is t or f, which it reads as a boolean; an empty list entry or range bound,
+// which it reads as 0; a flag, list entry or bound that holds only a comment,
+// a processing instruction or a CDATA section, which it reads as an empty
+// one; a bare type attribute, which it reads as the type, right after the
+// quote of the attribute before it among them; and, which the default mode
+// alone reads, a C_COMPLEX_OBJECT that holds an archetype id, which it skips,
+// and an element in another namespace, whose content it skips, the root, one
 // declared right after a quote and one in the XSI namespace among them, such
 // as a C_BOOLEAN flag or a range bound, which the reading reads as the
 // element of that name. Each document holds that one shape, so nothing else
@@ -1191,7 +1223,7 @@ func TestREQ111_ReaderFindsWhatCanonicalXMLReadsWithoutAFailure(t *testing.T) {
 func TestREQ111_ReaderReportsEachItemOnce(t *testing.T) {
 	t.Parallel()
 	for _, name := range []string{
-		"shapes.opt", "values.opt", "values-every-mode.opt", "namespace-v2.opt", "parser-readings.opt",
+		"shapes.opt", "values.opt", "values-every-mode.opt", "namespace-v2.opt", "default-mode-readings.opt",
 		"integer-bounds.opt", "quantity-assumed-value.opt", "attribute-children.opt", "item-namespaces.opt",
 		"infinite-integer-bounds.opt", "foreign-namespaces.opt", "definition-type.opt", "nan-integer-bounds.opt",
 		"root-namespace.opt", "text-before-root.opt", "directive-after-root.opt", "xsi-element.opt",
@@ -1238,12 +1270,12 @@ func TestREQ111_ReaderReportsEachItemOnce(t *testing.T) {
 	})
 }
 
-// TestREQ100_ReaderStrictModeRefusesWhatTheParsersStrictModeRefuses pins
+// TestREQ111_ReaderStrictModeRefusesWhatTheDefaultModeReadsWeakly pins
 // that canxml.WithStrict refuses each shape and value the default mode reads
 // in a weaker form, and that the default mode reads it. A bare type attribute
 // is no type in the XSI namespace, and an empty list entry or range bound no
 // number, which canonical XML reads as its type and as 0.
-func TestREQ100_ReaderStrictModeRefusesWhatTheParsersStrictModeRefuses(t *testing.T) {
+func TestREQ111_ReaderStrictModeRefusesWhatTheDefaultModeReadsWeakly(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name string
@@ -1283,9 +1315,9 @@ func TestREQ100_ReaderStrictModeRefusesWhatTheParsersStrictModeRefuses(t *testin
 }
 
 // TestREQ111_ReaderRefusesAnIntegerPastThirtyTwoBits pins that, in every
-// mode, an integer the model's 32-bit Integer cannot hold is refused, which
-// the parser read, and a range or precision bound written as a decimal that
-// rounds to one, while the largest it holds reads.
+// mode, an integer the model's 32-bit Integer cannot hold is refused, and so
+// is a range or precision bound written as a decimal that rounds to one,
+// while the largest it holds reads.
 func TestREQ111_ReaderRefusesAnIntegerPastThirtyTwoBits(t *testing.T) {
 	t.Parallel()
 	const big = "5000000000"
@@ -1414,12 +1446,12 @@ func TestREQ111_ReaderReadsAnInfiniteIntegerBoundThatAdmitsEveryInteger(t *testi
 
 // TestREQ111_ReaderReadsANaNIntegerBoundAsUnbounded pins that, in every mode,
 // a bound of a C_INTEGER range or of a quantity's precision written as NaN,
-// in any letter case, which the parser compares no integer against, is read
-// as that side unbounded: the bound is left out, an unbounded flag the range
-// writes reads true, and the side is included unless the range says
-// otherwise. The default mode reports each bound it leaves out; strict mode
-// leaves it out unreported. A NaN on a side written unbounded is left out as
-// any bound there is.
+// in any letter case, which bounds no integer, is read as that side
+// unbounded: the bound is left out, an unbounded flag the range writes reads
+// true, and the side is included unless the range says otherwise. The default
+// mode reports each bound it leaves out; strict mode leaves it out
+// unreported. A NaN on a side written unbounded is left out as any bound
+// there is.
 //
 // Can-fail control: leave a NaN to the decode, as the reader did in strict
 // mode, and strict mode refuses each.
@@ -1543,7 +1575,7 @@ func TestREQ111_ReaderRefusesAnInfiniteIntegerBoundThatAdmitsNoInteger(t *testin
 func TestREQ111_CanonicalXMLKeepsNoneOfTheReadersReadings(t *testing.T) {
 	t.Parallel()
 	for _, name := range []string{
-		"shapes.opt", "values.opt", "values-every-mode.opt", "parser-readings.opt",
+		"shapes.opt", "values.opt", "values-every-mode.opt", "default-mode-readings.opt",
 		"integer-bounds.opt", "quantity-assumed-value.opt", "attribute-children.opt", "item-namespaces.opt",
 		"infinite-integer-bounds.opt", "nan-integer-bounds.opt",
 	} {

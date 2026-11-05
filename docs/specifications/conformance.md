@@ -409,7 +409,7 @@ The HL7 Inferno **SMART App Launch Test Kit STU2.2 _Client_** suite serves as an
 - **Wire assertion:** In-repo property: `aom14.ReadOperationalTemplate`, `templatecompile.Compile`, `template.ParsePath` and `Compiled.Resolve` against the fixture body match every assertion in the list, and each negative assertion (`ExpectNotFound`) surfaces `ErrPathNotFound`, wrapped.
 - **Modes:** In-repo (path-resolution property against a fixture OPT; no backend).
 - **Status:** Implemented (inline).
-- **Satisfies:** REQ-100.
+- **Satisfies:** REQ-111.
 
 #### PROBE-023 — Composition builder round-trip
 

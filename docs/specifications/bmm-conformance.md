@@ -221,7 +221,7 @@ How each P_BMM construct becomes Go code.
 | `openehr_lang_1.1.0` | would target `openehr/bmm/` (BMM meta-classes), but v1 hand-writes that loader against the P_BMM persistence shape — generation deferred | deferred |
 | `openehr_term_3.1.0` | would target `openehr/rm/terminology/` (terminology service interface) | deferred |
 
-**Why AOM is a sibling of RM, not a sub-package of template.** Archetypes and templates are distinct openEHR knowledge artefacts: archetypes define reusable clinical content (parsed from ADL into AOM); templates compose and constrain archetypes for a use case (parsed from OET into OPT). AOM is the in-memory form of an *archetype*; the operational template (OPT) parser in `openehr/template/` will *consume* AOM types but does not own them. Placing AOM at `openehr/aom/` keeps the parallel with `openehr/rm/`: both are top-level openEHR information models that the rest of the SDK depends on.
+**Why AOM is a sibling of RM, not a sub-package of template.** Archetypes and templates are distinct openEHR knowledge artefacts: archetypes define reusable clinical content (parsed from ADL into AOM); templates compose and constrain archetypes for a use case (parsed from OET into OPT). AOM is the in-memory form of an *archetype*; the compile step in `openehr/templatecompile` *consumes* AOM types but does not own them. Placing AOM at `openehr/aom/` keeps the parallel with `openehr/rm/`: both are top-level openEHR information models that the rest of the SDK depends on.
 
 ### Class → Go type
 

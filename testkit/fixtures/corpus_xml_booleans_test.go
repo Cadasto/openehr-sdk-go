@@ -89,7 +89,7 @@ func booleanFindings(r io.Reader) ([]string, error) {
 	}
 }
 
-// TestCorpusOPTBooleansAreLexicallyValid guards REQ-100 fixture hygiene: no
+// TestCorpusOPTBooleansAreLexicallyValid guards REQ-176 fixture hygiene: no
 // vendored OPT may spell an xs:boolean element as an empty element.
 func TestCorpusOPTBooleansAreLexicallyValid(t *testing.T) {
 	var files []string
@@ -134,7 +134,7 @@ func TestCorpusOPTBooleansAreLexicallyValid(t *testing.T) {
 	}
 }
 
-// TestBooleanFindingsDetectsEmptyForms is the can-fail control for REQ-100:
+// TestBooleanFindingsDetectsEmptyForms is the can-fail control for REQ-176:
 // the scanner must flag exactly the empty or non-boolean listed elements and
 // leave unlisted elements and valid values alone.
 func TestBooleanFindingsDetectsEmptyForms(t *testing.T) {

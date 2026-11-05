@@ -103,8 +103,8 @@ failure, not a deviation.
   `constrain_test` carries **0** because it pins **no** name anywhere — that, not an
   absence of collision, is why PROBE-075 holds 104/104 without implementing any of this.
   Both path builders emit the predicates (Phase 3) and `idOf` prefers the pinned
-  name (Phase 4), so all four layers are closed: parse + expose the OPT node name
-  (REQ-100), carry it through the compiled tree (REQ-111), emit name predicates in
+  name (Phase 4), so all four layers are closed: read + expose the OPT node name
+  (REQ-116), carry it through the compiled tree (REQ-111), emit name predicates in
   AQL paths (consumed by REQ-102 validation and REQ-053 FLAT paths), and derive `id`
   from it (REQ-106). Because the trigger is the pinned name, the path change reached
   **every** vendored OPT that pins one — 9 of the 58, i.e. 7 beyond the two oracles,
