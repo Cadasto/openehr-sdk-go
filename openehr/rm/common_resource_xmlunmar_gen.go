@@ -30,6 +30,8 @@ var xmlClassResourceDescription = xmlunmatched.Class{
 // are read from _start.Attr.
 // A Hash member reads each element of its name as one entry, into a
 // map that starts empty at the first entry.
+// A single-valued member keeps its first child element; a second one is
+// unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (r *ResourceDescription) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -38,6 +40,8 @@ func (r *ResourceDescription) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEl
 	} else if _fresh {
 		*r = ResourceDescription{}
 	}
+	// A bit per single-valued member that has had a child element.
+	var _got uint64
 	// Whether the element has had an entry of each Hash member.
 	var _begunOriginalAuthor, _begunOtherDetails, _begunDetails bool
 	for {
@@ -59,15 +63,44 @@ func (r *ResourceDescription) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEl
 				}
 				r.OtherContributors = append(r.OtherContributors, _v)
 			case "lifecycle_state":
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &r.LifecycleState); _err != nil {
+				if _got&(1<<0) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&r.LifecycleState)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &r.LifecycleState); _err != nil {
 					return _err
 				}
 			case "resource_package_uri":
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
-					return _err
+				if _got&(1<<1) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
 				}
-				r.ResourcePackageURI = &_v
+				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					r.ResourcePackageURI = nil
+					break
+				}
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					r.ResourcePackageURI = &_v
+				} else {
+					r.ResourcePackageURI = nil
+				}
 			case "other_details":
 				if r.OtherDetails == nil {
 					r.OtherDetails = new(map[string]string)
@@ -76,6 +109,19 @@ func (r *ResourceDescription) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEl
 					return _err
 				}
 			case "parent_resource":
+				if _got&(1<<2) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 2
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&r.ParentResource)
+					break
+				}
 				_v, _err := canxml.DecodeAs[AuthoredResource](_dec, _t)
 				if _err != nil {
 					return _err
@@ -116,6 +162,8 @@ var xmlClassResourceDescriptionItem = xmlunmatched.Class{
 // are read from _start.Attr.
 // A Hash member reads each element of its name as one entry, into a
 // map that starts empty at the first entry.
+// A single-valued member keeps its first child element; a second one is
+// unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (r *ResourceDescriptionItem) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -124,6 +172,8 @@ func (r *ResourceDescriptionItem) UnmarshalXML(_dec *xml.Decoder, _start xml.Sta
 	} else if _fresh {
 		*r = ResourceDescriptionItem{}
 	}
+	// A bit per single-valued member that has had a child element.
+	var _got uint64
 	// Whether the element has had an entry of each Hash member.
 	var _begunOriginalResourceURI, _begunOtherDetails bool
 	for {
@@ -135,11 +185,37 @@ func (r *ResourceDescriptionItem) UnmarshalXML(_dec *xml.Decoder, _start xml.Sta
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "language":
+				if _got&(1<<0) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&r.Language)
+					break
+				}
 				if _err := _dec.DecodeElement(&r.Language, &_t); _err != nil {
 					return _err
 				}
 			case "purpose":
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &r.Purpose); _err != nil {
+				if _got&(1<<1) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&r.Purpose)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &r.Purpose); _err != nil {
 					return _err
 				}
 			case "keywords":
@@ -149,23 +225,71 @@ func (r *ResourceDescriptionItem) UnmarshalXML(_dec *xml.Decoder, _start xml.Sta
 				}
 				r.Keywords = append(r.Keywords, _v)
 			case "use":
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
-					return _err
+				if _got&(1<<2) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
 				}
-				r.Use = &_v
+				_got |= 1 << 2
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					r.Use = nil
+					break
+				}
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					r.Use = &_v
+				} else {
+					r.Use = nil
+				}
 			case "misuse":
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
-					return _err
+				if _got&(1<<3) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
 				}
-				r.Misuse = &_v
+				_got |= 1 << 3
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					r.Misuse = nil
+					break
+				}
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					r.Misuse = &_v
+				} else {
+					r.Misuse = nil
+				}
 			case "copyright":
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
-					return _err
+				if _got&(1<<4) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
 				}
-				r.Copyright = &_v
+				_got |= 1 << 4
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					r.Copyright = nil
+					break
+				}
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					r.Copyright = &_v
+				} else {
+					r.Copyright = nil
+				}
 			case "original_resource_uri":
 				if r.OriginalResourceURI == nil {
 					r.OriginalResourceURI = new(map[string]string)
@@ -210,6 +334,8 @@ var xmlClassTranslationDetails = xmlunmatched.Class{
 // are read from _start.Attr.
 // A Hash member reads each element of its name as one entry, into a
 // map that starts empty at the first entry.
+// A single-valued member keeps its first child element; a second one is
+// unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TranslationDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -218,6 +344,8 @@ func (t *TranslationDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 	} else if _fresh {
 		*t = TranslationDetails{}
 	}
+	// A bit per single-valued member that has had a child element.
+	var _got uint64
 	// Whether the element has had an entry of each Hash member.
 	var _begunAuthor, _begunOtherDetails bool
 	for {
@@ -229,6 +357,19 @@ func (t *TranslationDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "language":
+				if _got&(1<<0) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&t.Language)
+					break
+				}
 				if _err := _dec.DecodeElement(&t.Language, &_t); _err != nil {
 					return _err
 				}
@@ -237,11 +378,27 @@ func (t *TranslationDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 					return _err
 				}
 			case "accreditation":
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
-					return _err
+				if _got&(1<<1) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
 				}
-				t.Accreditation = &_v
+				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					t.Accreditation = nil
+					break
+				}
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					t.Accreditation = &_v
+				} else {
+					t.Accreditation = nil
+				}
 			case "other_details":
 				if t.OtherDetails == nil {
 					t.OtherDetails = new(map[string]string)

@@ -45,7 +45,7 @@ func (r *ResourceAnnotations) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEl
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "documentation":
 				// Canonical XML does not model a Hash of these values — see canxml/doc.go.
-				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := xmlunmatched.SkipUnmodelled(_dec, _t); _err != nil {
 					return _err
 				}
 			default:

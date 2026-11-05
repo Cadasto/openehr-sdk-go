@@ -3,6 +3,7 @@ package bmmgen
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -32,7 +33,13 @@ import (
 // primitive class or by a generic parameter, would otherwise read nothing and
 // report nothing. A member typed by a generic parameter goes through
 // xmlunmatched.DecodeParam. No decoder skips an element itself, so none drops
-// content unreported.
+// content unreported. Each single-valued member's arm, and no other, opens
+// with the guard that hands a second child element of the member to
+// xmlunmatched.SkipUnmatched, each member of a class with a bit of its own
+// (REQ-170). Each optional member whose field can hold nil, and no other,
+// then hands a nilled element to xmlunmatched.SkipNil and sets the field to
+// nil, and an optional primitive decodes through xmlunmatched.DecodeOptional
+// (REQ-056). The other checks read the arm without its guards.
 func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 	const (
 		attrs        = "\tif _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClass"
@@ -64,7 +71,7 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 
 	for _, target := range []Target{TargetRM, TargetAOM14} {
 		plan := plans[target.GoPackage]
-		hashes, anys, params, octets, lists, choices := 0, 0, 0, 0, 0, 0
+		hashes, anys, params, octets, lists, choices, singles, nils, zeroed, optionals := 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 		for _, f := range plan.Files {
 			classes, err := codecClassesIn(plan, f)
 			if err != nil {
@@ -89,9 +96,60 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 						t.Errorf("%s XML decoder still uses %q: content it does not read must go through xmlunmatched:\n%s", pc.BMMName, banned, src)
 					}
 				}
+				bits := map[string]string{}
 				for _, ef := range fields {
 					prop := ef.Prop.PropertyName()
 					arm := xmlCaseArm(src, prop)
+					guard := repeatGuard.FindStringSubmatch(arm)
+					single, err := xmlSingleValued(plan, ef)
+					if err != nil {
+						t.Fatalf("xmlSingleValued(%s.%s): %v", pc.BMMName, prop, err)
+					}
+					switch {
+					case single && guard == nil:
+						t.Errorf("%s.%s is single-valued; its arm must open with the repeat guard:\n%s", pc.BMMName, prop, arm)
+					case !single && guard != nil:
+						t.Errorf("%s.%s is multi-valued or a Hash member, whose child elements are its items or entries; its arm must not guard against a repeat:\n%s", pc.BMMName, prop, arm)
+					case guard != nil:
+						singles++
+						if guard[1] != guard[2] {
+							t.Errorf("%s.%s tests bit %s of _got and sets bit %s; want one bit:\n%s", pc.BMMName, prop, guard[1], guard[2], arm)
+						}
+						if other, ok := bits[guard[1]]; ok {
+							t.Errorf("%s.%s and %s share bit %s of _got; want a bit per member", pc.BMMName, prop, other, guard[1])
+						}
+						bits[guard[1]] = prop
+						arm = strings.Replace(arm, guard[0], "", 1)
+					}
+					nilable, err := xmlNilable(plan, ef)
+					if err != nil {
+						t.Fatalf("xmlNilable(%s.%s): %v", pc.BMMName, prop, err)
+					}
+					nilGuard := nilGuardOf(FieldName(prop)).FindStringSubmatch(arm)
+					switch {
+					case nilable && nilGuard == nil:
+						t.Errorf("%s.%s is single-valued; its arm must hand a nilled element to xmlunmatched.SkipNil and give the member no value:\n%s", pc.BMMName, prop, arm)
+					case !nilable && nilGuard != nil:
+						t.Errorf("%s.%s is multi-valued, a Hash, a boundary flag or typed by a generic parameter; its arm must not skip a nilled element:\n%s", pc.BMMName, prop, arm)
+					case nilGuard != nil:
+						nils++
+						// A mandatory member gets its zero value, as a missing one
+						// does (REQ-175); an optional one is left nil (REQ-056).
+						if zeroes := nilGuard[1] == ""; zeroes != mandatoryProperty(ef.Prop) {
+							t.Errorf("%s.%s: mandatory is %t, yet its nil guard zeroes it is %t; want a mandatory member zeroed and an optional one set to nil:\n%s", pc.BMMName, prop, mandatoryProperty(ef.Prop), zeroes, arm)
+						}
+						if nilGuard[1] == "" {
+							zeroed++
+						}
+						arm = strings.Replace(arm, nilGuard[0], "", 1)
+					}
+					if p, ok := ef.Prop.(*bmm.SingleProperty); ok && !p.IsMandatory && isPrimitive(p.TypeName) && !isOpenParam(ef.Owner, p.TypeName) {
+						optionals++
+						if !strings.Contains(arm, "xmlunmatched.DecodeOptional(_dec, &_t, &_v)") {
+							t.Errorf("%s.%s is an optional primitive; its arm must decode through xmlunmatched.DecodeOptional, which leaves it absent when its element has no text:\n%s", pc.BMMName, prop, arm)
+						}
+						continue
+					}
 					if isGenericListProperty(ef.Prop) {
 						lists++
 						if !strings.Contains(arm, "append(") {
@@ -115,8 +173,8 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 							t.Fatalf("xmlHashOf(%s.%s): %v", pc.BMMName, prop, err)
 						}
 						if shape == nil {
-							if !strings.Contains(arm, "xmlunmatched.SkipUnmatched(_dec, _t)") {
-								t.Errorf("%s.%s is a Hash canonical XML does not model; its arm must hand the element to xmlunmatched.SkipUnmatched:\n%s", pc.BMMName, prop, arm)
+							if !strings.Contains(arm, "xmlunmatched.SkipUnmodelled(_dec, _t)") {
+								t.Errorf("%s.%s is a Hash canonical XML does not model; its arm must hand the element to xmlunmatched.SkipUnmodelled, which keeps the member present:\n%s", pc.BMMName, prop, arm)
 							}
 							continue
 						}
@@ -153,6 +211,9 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 				}
 			}
 		}
+		if singles == 0 || nils == 0 || zeroed == 0 || nils == zeroed || optionals == 0 {
+			t.Errorf("the %s target rendered %d repeat guards, %d nil guards (%d zeroing) and %d optional primitives; want each covered", target.GoPackage, singles, nils, zeroed, optionals)
+		}
 		if target.GoPackage == TargetRM.GoPackage && (hashes == 0 || params == 0 || octets == 0) {
 			t.Errorf("the RM target rendered %d Hash arms, %d generic-parameter arms and %d Octet arms; want the resource-metadata Hash members, VERSION<T>.data and DV_MULTIMEDIA.data covered", hashes, params, octets)
 		}
@@ -160,6 +221,18 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 			t.Errorf("the AOM 1.4 target rendered %d Any arms, %d generic-list arms and %d choice arms; want `EXPR_LEAF.item`, C_CODE_PHRASE's `code_list` and ORDINAL's `symbol` covered", anys, lists, choices)
 		}
 	}
+}
+
+// repeatGuard matches the repeat guard at the head of a single-valued
+// member's arm ([withRepeatGuard]): the bit it tests and the bit it sets.
+var repeatGuard = regexp.MustCompile(`\t\t\t\tif _got&\(1<<(\d+)\) != 0 \{\n\t\t\t\t\tif _err := xmlunmatched\.SkipUnmatched\(_dec, _t\); _err != nil \{\n\t\t\t\t\t\treturn _err\n\t\t\t\t\t\}\n\t\t\t\t\tbreak\n\t\t\t\t\}\n\t\t\t\t_got \|= 1 << (\d+)\n`)
+
+// nilGuardOf matches the nil guard of the member held in the Go field field
+// ([withNilGuard]); its first group holds " = nil" when the guard sets the
+// field to nil, and is empty when it zeroes the field.
+func nilGuardOf(field string) *regexp.Regexp {
+	f := regexp.QuoteMeta(field)
+	return regexp.MustCompile(`\t\t\t\tif _nil, _err := xmlunmatched\.SkipNil\(_dec, _t\); _err != nil \{\n\t\t\t\t\treturn _err\n\t\t\t\t\} else if _nil \{\n\t\t\t\t\t(?:[a-z]+\.` + f + `( = nil)|xmlunmatched\.Zero\(&[a-z]+\.` + f + `\))\n\t\t\t\t\tbreak\n\t\t\t\t\}\n`)
 }
 
 // xmlCaseArm returns the case arm of a rendered UnmarshalXML that matches the

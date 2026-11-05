@@ -6,7 +6,9 @@ package canxml
 // `xsi:type` names, or else the type the RM declares where it sits, as
 // [WithUnmatched] reads it, and the element carries no value for it: it has
 // no child element of that name, and no XML attribute of it where the
-// ITS-XML schema carries the attribute as one (`archetype_node_id`); the
+// ITS-XML schema carries the attribute as one (`archetype_node_id`), a child
+// that is unmatched content, one in a foreign namespace or a repeat of an
+// earlier child, counting for none; the
 // child it has carries `xsi:nil="true"` (or `1`), whatever it holds; or the
 // child is a primitive element whose text is empty or XML whitespace only.
 // The value the decode returns cannot always show that: a member held by
@@ -37,8 +39,8 @@ package canxml
 // value, such as "/content/0/data/events/0/data/items/0/value/magnitude":
 // the attribute's name under the pointer of the element that lacks it, each
 // child element of a multi-valued attribute by its position among its
-// same-named siblings, counted from 0, and each entry of a `Hash` member by
-// its key, as canonical JSON writes the map, such as
+// same-named siblings, counted from 0, one in a foreign namespace counting
+// for none, and each entry of a `Hash` member by its key, as canonical JSON writes the map, such as
 // "/description/details/en/purpose". That is not the element path
 // [WithUnmatched] reports: a missing member is a member of the instance,
 // not an item of the document, so both codecs name it one way and a

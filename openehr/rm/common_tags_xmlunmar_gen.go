@@ -27,6 +27,8 @@ var xmlClassItemTag = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A single-valued member keeps its first child element; a second one is
+// unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (i *ItemTag) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -35,6 +37,8 @@ func (i *ItemTag) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 	} else if _fresh {
 		*i = ItemTag{}
 	}
+	// A bit per single-valued member that has had a child element.
+	var _got uint64
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -44,28 +48,99 @@ func (i *ItemTag) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "key":
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &i.Key); _err != nil {
+				if _got&(1<<0) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&i.Key)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &i.Key); _err != nil {
 					return _err
 				}
 			case "value":
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
-					return _err
+				if _got&(1<<1) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
 				}
-				i.Value = &_v
+				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					i.Value = nil
+					break
+				}
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					i.Value = &_v
+				} else {
+					i.Value = nil
+				}
 			case "target":
+				if _got&(1<<2) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 2
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&i.Target)
+					break
+				}
 				_v, _err := canxml.DecodeAs[UIDBasedID](_dec, _t)
 				if _err != nil {
 					return _err
 				}
 				i.Target = _v
 			case "target_path":
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
-					return _err
+				if _got&(1<<3) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
 				}
-				i.TargetPath = &_v
+				_got |= 1 << 3
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					i.TargetPath = nil
+					break
+				}
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					i.TargetPath = &_v
+				} else {
+					i.TargetPath = nil
+				}
 			case "owner_id":
+				if _got&(1<<4) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 4
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&i.OwnerID)
+					break
+				}
 				_v, _err := canxml.DecodeAsOrDefault[ObjectRefLike](_dec, _t, func() any { return new(ObjectRef) })
 				if _err != nil {
 					return _err

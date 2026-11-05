@@ -10,8 +10,9 @@ package decodeopts
 type Settings struct {
 	// Strict is true when the options refuse unmatched content.
 	Strict bool
-	// Reports is true when the options pass unmatched content, or the
-	// mandatory members the input leaves out, to a function of the caller's.
+	// Reports is true when the options pass unmatched content, the mandatory
+	// members the input leaves out, or the members it sends without a value,
+	// to a function of the caller's.
 	Reports bool
 	// MaxDepth is the depth limit the options set, the smallest positive one
 	// they give, or 0 when they set none.

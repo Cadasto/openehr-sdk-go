@@ -68,6 +68,17 @@ import (
 //     - Slice of primitive/struct → append per occurrence
 //     - Slice of polymorphic → append result of `canxml.DecodeAs[Iface]`
 //
+//     A single-valued member's case first checks one bit of `_got`, which
+//     the method keeps for its single-valued members ([xmlSingleValued]):
+//     a second child element of the member goes to
+//     `xmlunmatched.SkipUnmatched`, so the method keeps the first child's
+//     value and the repeat is unmatched content ([withRepeatGuard]).
+//     An optional member whose field can hold nil then hands a nilled
+//     element to `xmlunmatched.SkipNil` and leaves the member absent
+//     ([withNilGuard]); an optional primitive decodes through
+//     `xmlunmatched.DecodeOptional`, which leaves it absent when its element
+//     has no text.
+//
 //  4. A member whose element the target's root schemas give a choice of
 //     shapes, in their schema_forms, goes to `xmlunmatched.DecodeChoice`
 //     with the list of its shapes, a package-level `xmlChoice<GoName><Field>`
@@ -243,9 +254,17 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	if err != nil {
 		return "", err
 	}
+	once, err := xmlSingleValuedMembers(plan, pc, fields)
+	if err != nil {
+		return "", err
+	}
 	if len(marks) > 0 {
 		b.WriteString("// A Hash member reads each element of its name as one entry, into a\n")
 		b.WriteString("// map that starts empty at the first entry.\n")
+	}
+	if len(once) > 0 {
+		b.WriteString("// A single-valued member keeps its first child element; a second one is\n")
+		b.WriteString("// unmatched content.\n")
 	}
 	b.WriteString("// Content the method does not read is unmatched: it is skipped, or\n")
 	b.WriteString("// reported or refused under canxml.WithUnmatched and canxml.WithStrict.\n")
@@ -273,6 +292,10 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	// Read the attribute members from _start.Attr.
 	for _, name := range desc.attrs {
 		b.WriteString(unmarshalXMLAttribute(recv, FieldName(name), name))
+	}
+	if len(once) > 0 {
+		b.WriteString("\t// A bit per single-valued member that has had a child element.\n")
+		b.WriteString("\tvar _got uint64\n")
 	}
 	if len(marks) > 0 {
 		b.WriteString("\t// Whether the element has had an entry of each Hash member.\n")
@@ -306,6 +329,22 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 			// The bound's presence decides its side's absent `*_unbounded`
 			// (REQ-169).
 			caseBody += unmarshalXMLIntervalBoundSeen(prop)
+		}
+		nilable, err := xmlNilable(plan, ef)
+		if err != nil {
+			return "", fmt.Errorf("%s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
+		}
+		if nilable {
+			caseBody, err = withNilGuard(caseBody, recv, FieldName(ef.Prop.PropertyName()), isMandatoryMember(ef.Prop))
+			if err != nil {
+				return "", fmt.Errorf("render UnmarshalXML field %s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
+			}
+		}
+		if bit, ok := once[ef.Prop.PropertyName()]; ok {
+			caseBody, err = withRepeatGuard(caseBody, bit)
+			if err != nil {
+				return "", fmt.Errorf("render UnmarshalXML field %s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
+			}
 		}
 		if legacy {
 			caseBody = withLegacyElementName(caseBody, ef.Prop.PropertyName())
@@ -426,6 +465,11 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 		if isClass {
 			return unmarshalXMLStructOptionalLit(recv, goField, elemName, goType), nil
 		}
+		if !isPrimitive(p.TypeName) {
+			// An enumeration is a class: an empty element is no value of it,
+			// and its decode refuses it.
+			return unmarshalXMLEnumerationOptionalLit(recv, goField, elemName, goType), nil
+		}
 		return unmarshalXMLPrimitiveOptionalLit(recv, goField, elemName, goType), nil
 
 	case *bmm.SinglePropertyOpen:
@@ -518,16 +562,33 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 // its text and ignores any attribute or child element on it, and the helper
 // hands those to the decode's policy for unmatched content.
 
+// unmarshalXMLPrimitiveMandatory emits the case of a mandatory member of a
+// primitive type, through xmlunmatched.DecodeMandatory, which gives a string
+// element of whitespace only the empty string, as an absent one has
+// (REQ-175).
 func unmarshalXMLPrimitiveMandatory(recv, field, elem string) string {
 	return fmt.Sprintf(
-		"\t\t\tcase %q:\n\t\t\t\tif _err := xmlunmatched.DecodeElement(_dec, &_t, &%s.%s); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
+		"\t\t\tcase %q:\n\t\t\t\tif _err := xmlunmatched.DecodeMandatory(_dec, &_t, &%s.%s); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
 		elem, recv, field)
 }
 
-func unmarshalXMLPrimitiveOptionalLit(recv, field, elem, goType string) string {
+// unmarshalXMLEnumerationOptionalLit emits the case of an optional member
+// typed by an enumeration, which decodes from the element's text like a
+// primitive, through xmlunmatched.DecodeElement.
+func unmarshalXMLEnumerationOptionalLit(recv, field, elem, goType string) string {
 	return fmt.Sprintf(
 		"\t\t\tcase %q:\n\t\t\t\tvar _v %s\n\t\t\t\tif _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s.%s = &_v\n",
 		elem, goType, recv, field)
+}
+
+// unmarshalXMLPrimitiveOptionalLit emits the case of an optional member of a
+// primitive type, through xmlunmatched.DecodeOptional, which leaves the member
+// absent when its element has no text, or whitespace only for a string
+// (REQ-056).
+func unmarshalXMLPrimitiveOptionalLit(recv, field, elem, goType string) string {
+	return fmt.Sprintf(
+		"\t\t\tcase %q:\n\t\t\t\tvar _v %s\n\t\t\t\tif _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t} else if _ok {\n\t\t\t\t\t%s.%s = &_v\n\t\t\t\t} else {\n\t\t\t\t\t%s.%s = nil\n\t\t\t\t}\n",
+		elem, goType, recv, field, recv, field)
 }
 
 // unmarshalXMLOpenParam emits the decode case of a field typed by the open
@@ -592,12 +653,12 @@ var handWrittenXMLCodecs = map[string]bool{
 // unmarshalXMLNoDecoder emits the case of a property whose class has no
 // canonical-XML decoder of its own, such as a BMM primitive class like
 // TERMINOLOGY_CODE: encoding/xml would read nothing from it and report
-// nothing either. The element is handed to xmlunmatched.SkipUnmatched as one
-// item, like an Any member's: skipped by default, reported or refused on
-// request, and the field is left at its zero value.
+// nothing either. The element is handed to xmlunmatched.SkipUnmodelled as one
+// item: skipped by default, reported or refused on request, and the field is
+// left at its zero value, while the member counts as present.
 func unmarshalXMLNoDecoder(elem, bmmType string) string {
 	return fmt.Sprintf(
-		"\t\t\tcase %q:\n\t\t\t\t// Canonical XML has no decoder for %s — see canxml/doc.go.\n\t\t\t\tif _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
+		"\t\t\tcase %q:\n\t\t\t\t// Canonical XML has no decoder for %s — see canxml/doc.go.\n\t\t\t\tif _err := xmlunmatched.SkipUnmodelled(_dec, _t); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
 		elem, bmmType)
 }
 
@@ -892,13 +953,157 @@ func xmlClassDescriptor(plan *Plan, pc *PlannedClass, fields []emittedField) (xm
 	return d, nil
 }
 
+// maxXMLSingleValued is the most single-valued members a generated
+// canonical-XML decoder guards against a repeat: it keeps a bit per member
+// in one uint64.
+const maxXMLSingleValued = 64
+
+// xmlSingleValuedMembers returns the single-valued members among fields, each
+// with its bit in the decoder's `_got`, numbered in the order of fields. A
+// class with more of them than [maxXMLSingleValued] is refused.
+func xmlSingleValuedMembers(plan *Plan, pc *PlannedClass, fields []emittedField) (map[string]int, error) {
+	once := map[string]int{}
+	for _, ef := range fields {
+		single, err := xmlSingleValued(plan, ef)
+		if err != nil {
+			return nil, err
+		}
+		if single {
+			once[ef.Prop.PropertyName()] = len(once)
+		}
+	}
+	if len(once) > maxXMLSingleValued {
+		return nil, fmt.Errorf("%s has %d single-valued members; a generated canonical-XML decoder guards at most %d", pc.BMMName, len(once), maxXMLSingleValued)
+	}
+	return once, nil
+}
+
+// xmlSingleValued reports whether ef is a single-valued member, whose value
+// canonical XML writes as one child element: neither a multi-valued member
+// ([xmlMultiValued]), whose child elements are its items, nor a Hash member,
+// whose child elements are its entries. A second child element of a
+// single-valued member is a repeat (REQ-170).
+func xmlSingleValued(plan *Plan, ef emittedField) (bool, error) {
+	shape, isHash, err := xmlHashOf(plan, ef)
+	if err != nil || shape != nil || isHash {
+		return false, err
+	}
+	return !xmlMultiValued(ef.Prop), nil
+}
+
+// withRepeatGuard puts at the head of caseBody, the case branch of a
+// single-valued member whose bit in `_got` is bit, the check that hands a
+// second child element of the member to xmlunmatched.SkipUnmatched and
+// leaves the branch, so the decoder keeps the first child's value and the
+// repeat is skipped, reported or refused as unmatched content (REQ-170).
+// caseBody's first line is its case label.
+func withRepeatGuard(caseBody string, bit int) (string, error) {
+	label, body, ok := strings.Cut(caseBody, "\n")
+	if !ok || !strings.HasPrefix(label, "\t\t\tcase ") {
+		return "", fmt.Errorf("the case branch does not open with its case label: %q", label)
+	}
+	var b strings.Builder
+	b.WriteString(label + "\n")
+	fmt.Fprintf(&b, "\t\t\t\tif _got&(1<<%d) != 0 {\n", bit)
+	b.WriteString("\t\t\t\t\tif _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {\n")
+	b.WriteString("\t\t\t\t\t\treturn _err\n")
+	b.WriteString("\t\t\t\t\t}\n")
+	b.WriteString("\t\t\t\t\tbreak\n")
+	b.WriteString("\t\t\t\t}\n")
+	fmt.Fprintf(&b, "\t\t\t\t_got |= 1 << %d\n", bit)
+	b.WriteString(body)
+	return b.String(), nil
+}
+
+// xmlNilable reports whether ef is a single-valued member that a nilled
+// element gives no value: an optional one, whose Go field holds a pointer, an
+// interface or an Octet list, is left absent (REQ-056), and a mandatory one
+// gets its zero value, as a missing member does (REQ-175). Not a multi-valued
+// member or a Hash, not a boundary flag, not a member typed by the owner's
+// generic parameter, which the field holds by value, and not one whose class
+// has no decoder, which the decoder skips.
+func xmlNilable(plan *Plan, ef emittedField) (bool, error) {
+	if isIntervalFlag(ef.Prop.PropertyName()) {
+		return false, nil
+	}
+	shape, isHash, err := xmlHashOf(plan, ef)
+	if err != nil || shape != nil || isHash {
+		return false, err
+	}
+	switch p := ef.Prop.(type) {
+	case *bmm.SingleProperty:
+		if isOpenParam(ef.Owner, p.TypeName) {
+			return false, nil
+		}
+		if isPrimitive(p.TypeName) || p.TypeName == bmmAnyType || isInterfaceTypeRef(plan, p.TypeName) {
+			return true, nil
+		}
+		decoding, err := xmlClassDecoding(plan, p.TypeName)
+		return decoding != xmlNoDecoder, err
+	case *bmm.GenericProperty:
+		if p.TypeDef == nil || containerKinds[p.TypeDef.RootType] {
+			return false, nil
+		}
+		decoding, err := xmlClassDecoding(plan, p.TypeDef.RootType)
+		return decoding == xmlOwnDecoder, err
+	case *bmm.ContainerProperty:
+		return isOctetContainer(p.TypeDef), nil
+	}
+	return false, nil
+}
+
+// isMandatoryMember reports whether prop is a mandatory member, whatever its
+// kind.
+func isMandatoryMember(prop bmm.Property) bool {
+	switch p := prop.(type) {
+	case *bmm.SingleProperty:
+		return p.IsMandatory
+	case *bmm.SinglePropertyOpen:
+		return p.IsMandatory
+	case *bmm.GenericProperty:
+		return p.IsMandatory
+	case *bmm.ContainerProperty:
+		return containerRequired(p.Cardinality, p.IsMandatory)
+	}
+	return false
+}
+
+// withNilGuard puts at the head of caseBody, the case branch of a member held
+// in the field field of recv, the check that hands a nilled element to
+// xmlunmatched.SkipNil, gives the member no value, nil when it is optional
+// and its zero value when it is mandatory, and leaves the branch (REQ-056,
+// REQ-175). caseBody's first line is its case label.
+func withNilGuard(caseBody, recv, field string, mandatory bool) (string, error) {
+	label, body, ok := strings.Cut(caseBody, "\n")
+	if !ok || !strings.HasPrefix(label, "\t\t\tcase ") {
+		return "", fmt.Errorf("the case branch does not open with its case label: %q", label)
+	}
+	var b strings.Builder
+	b.WriteString(label + "\n")
+	b.WriteString("\t\t\t\tif _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {\n")
+	b.WriteString("\t\t\t\t\treturn _err\n")
+	b.WriteString("\t\t\t\t} else if _nil {\n")
+	if mandatory {
+		fmt.Fprintf(&b, "\t\t\t\t\txmlunmatched.Zero(&%s.%s)\n", recv, field)
+	} else {
+		fmt.Fprintf(&b, "\t\t\t\t\t%s.%s = nil\n", recv, field)
+	}
+	b.WriteString("\t\t\t\t\tbreak\n")
+	b.WriteString("\t\t\t\t}\n")
+	b.WriteString(body)
+	return b.String(), nil
+}
+
 // xmlMultiValued reports whether prop is a multi-valued member, whose items
 // canonical XML writes as one element each: a container property, or a
-// property typed by a generic List, Set or Array.
+// property typed by a generic List, Set or Array. An Octet list, such as
+// DV_MULTIMEDIA `data`, is one element whose text is the base64 of its bytes,
+// and canonical JSON one string, so it is single-valued: its JSON Pointer
+// takes no index (REQ-175).
 func xmlMultiValued(prop bmm.Property) bool {
 	switch p := prop.(type) {
 	case *bmm.ContainerProperty:
-		return true
+		return !isOctetContainer(p.TypeDef)
 	case *bmm.GenericProperty:
 		return p.TypeDef != nil && containerKinds[p.TypeDef.RootType] && p.TypeDef.RootType != "Hash"
 	}

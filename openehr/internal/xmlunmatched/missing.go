@@ -30,8 +30,10 @@ type Class struct {
 	// generator checks, and [Enter] refuses a description past it.
 	Required []string
 	// Items names the multi-valued members, whose child elements are the
-	// items of one list: the n-th child element of such a name is the item
-	// at position n-1 in the canonical-JSON form of the instance.
+	// items of one list: the n-th child element of such a name that the
+	// decoder reads is the item at position n-1 in the canonical-JSON form of
+	// the instance. A child of that local name the decoder skips, one in a
+	// foreign namespace, is no item.
 	Items []string
 }
 
@@ -65,7 +67,7 @@ func Enter(dec *xml.Decoder, start xml.StartElement, c *Class) (fresh bool, err 
 	}
 	t := trackerOf(dec)
 	if t == nil {
-		return againAtRoot(dec), nil
+		return againAtRoot(dec), checkRepeatedAttr(&start)
 	}
 	return t.again && len(t.open) == 2, t.enter(start, c)
 }
@@ -111,27 +113,71 @@ func (t *Tracker) ReportMissing(fn func(pointer string)) {
 	t.missing = fn
 }
 
+// ReportPresence makes the decodes of t pass every member a document sends
+// without a value to fn, once each, as the member's element closes, so in
+// document order: a member of a class whose element carries `xsi:nil="true"`
+// (or `1`), nilled set, or is a primitive element whose text is empty or XML
+// whitespace only, mandatory or optional alike. Each is named by its JSON
+// Pointer, as [Tracker.ReportMissing] names a member, such as
+// `/content/0/data/events/0/data/items/0/value/precision`. Nothing inside a
+// nilled element is reported. An element the decoder skips or drops, such as
+// unmatched content, a repeat of a single-valued member or an element in a
+// foreign namespace, is no member, and neither is the root. A struct element
+// with no content is a value, and so is an entry of a Hash member, whatever
+// its text, unless it is nilled. The report is the whole policy: nothing
+// refuses the decode, strict or not. A nil fn asks for nothing.
+func (t *Tracker) ReportPresence(fn func(pointer string, nilled bool)) {
+	t.presence = fn
+}
+
+// checksPresence reports whether the decode follows what each element
+// carries: it reports the mandatory members a document leaves out, or the
+// members it sends without a value.
+func (t *Tracker) checksPresence() bool {
+	return t.missing != nil || t.presence != nil
+}
+
+// skipping marks the innermost open element, which the decoder is about to
+// skip or drop, as no member of its parent: it gives no member a value
+// ([Tracker.closing]) and is not a member sent without one.
+func (t *Tracker) skipping() {
+	t.open[len(t.open)-1].unread = true
+}
+
 // closing reports, when the decode asked, the mandatory members the element
-// whose frame is t.open[n-1] carried no value for, and then marks the
-// element as a value of its parent's member of that name when it carried
-// one. It runs as the element closes, before its frame is dropped.
+// whose frame is t.open[n-1] carried no value for, and then, when the
+// element is a member of its parent's class, reports it when it carries no
+// value and the decode asked, or marks it as a value of its parent's member
+// of that name. It runs as the element closes, before its frame is dropped.
 func (t *Tracker) closing(n int) {
 	f := &t.open[n-1]
-	if f.class != nil && !f.nilled {
-		var b strings.Builder
+	if t.missing != nil && f.class != nil && !f.nilled {
 		for i, name := range f.class.Required {
 			if f.seen&(1<<i) != 0 || slices.Contains(f.optional, name) {
 				continue
 			}
-			b.Reset()
-			t.writePointer(&b, n)
-			b.WriteByte('/')
-			b.WriteString(name)
-			t.missingMember(b.String())
+			t.missingMember(n, name)
 		}
 	}
 	p := &t.open[n-2]
-	if p.class == nil || f.nilled || (f.primitive && !f.hasText) {
+	if p.class == nil {
+		return
+	}
+	if f.unread {
+		// A skipped child named like a list member is no item of it, so it
+		// moves the positions of the items after it ([Tracker.token]).
+		if i := slices.Index(p.class.Items, f.name); i >= 0 {
+			p.skip(i, len(p.class.Items))
+		}
+		return
+	}
+	if f.nilled || (f.primitive && !f.hasText) {
+		// Only the outermost nilled element is sent without a value. An
+		// entry of a Hash member is a value whatever its text: its decoder
+		// does not read it as a primitive ([decodeEntryValue]).
+		if t.presence != nil && !p.nilled {
+			t.sentMember(n, "", f.nilled)
+		}
 		return
 	}
 	if i := slices.Index(p.class.Required, f.name); i >= 0 {
@@ -139,37 +185,115 @@ func (t *Tracker) closing(n int) {
 	}
 }
 
-// missingMember passes the pointer of a mandatory member the document leaves
-// out to the decode's hook, or holds it while a Hash entry's key is unknown
-// ([Tracker.holdEntry]).
-func (t *Tracker) missingMember(pointer string) {
+// sentMember passes to the decode's hook the pointer of a member the document
+// sends without a value: the element whose frame is t.open[n-1], or its
+// member name when name is not empty. While a Hash entry's key is unknown it
+// holds the pointer instead ([Tracker.holdEntry]).
+func (t *Tracker) sentMember(n int, name string, nilled bool) {
 	if t.held != nil {
-		*t.held = append(*t.held, heldItem{path: pointer, missing: true})
+		*t.held = append(*t.held, heldItem{pointer: t.heldPointer(n, name), sent: true, nilled: nilled})
 		return
 	}
-	t.missing(pointer)
+	t.presence(t.pointer(n, name), nilled)
 }
 
-// writePointer writes the JSON Pointer of the element whose frame is
-// t.open[n-1] in the canonical-JSON form of the value: nothing for the root
-// element, and for each element below it `/` and its local name, followed by
-// `/` and its key, escaped as RFC 6901 asks, when it is one entry of a Hash
-// member, or by `/` and its 0-based position among its same-named siblings
-// when the parent's class lists the name among its multi-valued members.
-func (t *Tracker) writePointer(b *strings.Builder, n int) {
+// missingMember passes to the decode's hook the pointer of the mandatory
+// member name that the element whose frame is t.open[n-1] leaves out. While a
+// Hash entry's key is unknown it holds the pointer instead
+// ([Tracker.holdEntry]).
+func (t *Tracker) missingMember(n int, name string) {
+	if t.held != nil {
+		*t.held = append(*t.held, heldItem{pointer: t.heldPointer(n, name), missing: true})
+		return
+	}
+	t.missing(t.pointer(n, name))
+}
+
+// pointer returns the JSON Pointer, in the canonical-JSON form of the value,
+// of the element whose frame is t.open[n-1], followed by `/` and name when
+// name is not empty: nothing for the root element, and a token per element
+// below it ([Tracker.token]).
+func (t *Tracker) pointer(n int, name string) string {
+	var b strings.Builder
 	for k := 2; k < n; k++ {
-		f := &t.open[k]
+		t.token(k).write(&b)
+	}
+	if name != "" {
 		b.WriteByte('/')
-		b.WriteString(f.name)
-		if f.key != nil {
-			b.WriteByte('/')
-			_, _ = pointerKey.WriteString(b, f.key()) // a strings.Builder never fails
-			continue
+		b.WriteString(name)
+	}
+	return b.String()
+}
+
+// heldPointer returns what [Tracker.pointer] returns, kept as its tokens, so
+// that it is written only when the decode passes it to its hook. A member of
+// a Hash entry whose key lies inside the entry's value can close before the
+// element that carries the key, such as an empty `use` before the `language`
+// of a RESOURCE_DESCRIPTION_ITEM; the entry's token reads its key when it is
+// written, once the entry has closed.
+func (t *Tracker) heldPointer(n int, name string) heldPointer {
+	p := heldPointer{tokens: make([]pointerToken, 0, n-2), name: name}
+	for k := 2; k < n; k++ {
+		p.tokens = append(p.tokens, t.token(k))
+	}
+	return p
+}
+
+// heldPointer is a JSON Pointer a held Hash entry holds ([Tracker.heldPointer]).
+type heldPointer struct {
+	tokens []pointerToken
+	name   string // a last member name, or ""
+}
+
+// String writes the pointer.
+func (p heldPointer) String() string {
+	var b strings.Builder
+	for _, tk := range p.tokens {
+		tk.write(&b)
+	}
+	if p.name != "" {
+		b.WriteByte('/')
+		b.WriteString(p.name)
+	}
+	return b.String()
+}
+
+// pointerToken is the part of a JSON Pointer one element below the root
+// gives: its local name, then its key when it is one entry of a Hash member,
+// or else its 0-based position among the same-named siblings the decoder
+// read when it is one item of a multi-valued member.
+type pointerToken struct {
+	name  string
+	key   func() string // the entry's key, read when the token is written; nil for no entry
+	index int           // the item's position; -1 for no item
+}
+
+// token returns the token of the element whose frame is t.open[k], k >= 2.
+// An item's position is its position in the document less the earlier
+// siblings of its name the decoder skipped, every one of which has closed.
+func (t *Tracker) token(k int) pointerToken {
+	f := &t.open[k]
+	tk := pointerToken{name: f.name, key: f.key, index: -1}
+	if p := &t.open[k-1]; f.key == nil && p.class != nil {
+		if i := slices.Index(p.class.Items, f.name); i >= 0 {
+			tk.index = f.pos - 1 - p.skippedAt(i)
 		}
-		if p := &t.open[k-1]; p.class != nil && slices.Contains(p.class.Items, f.name) {
-			b.WriteByte('/')
-			b.WriteString(strconv.Itoa(f.pos - 1))
-		}
+	}
+	return tk
+}
+
+// write writes tk to b: `/` and the name, then `/` and the key, escaped as
+// RFC 6901 asks, or `/` and the position.
+func (tk pointerToken) write(b *strings.Builder) {
+	b.WriteByte('/')
+	b.WriteString(tk.name)
+	switch {
+	case tk.key != nil:
+		b.WriteByte('/')
+		_, _ = pointerKey.WriteString(b, tk.key()) // a strings.Builder never fails
+	case tk.index >= 0:
+		b.WriteByte('/')
+		b.WriteString(strconv.Itoa(tk.index))
 	}
 }
 

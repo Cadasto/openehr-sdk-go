@@ -3,7 +3,7 @@ package xmlunmatched
 import "reflect"
 
 // The reflection in this file never chooses a Go type from the document. It
-// tells a typed-nil pointer from a value, and it allocates the pointer a
+// tells a pointer, nil or not, from a value, and it allocates the pointer a
 // pointer to a pointer leaves nil, as encoding/xml does before it decodes, so
 // that the pointer-receiver UnmarshalText method of what it points to can be
 // reached and its refusal marked.
@@ -13,6 +13,11 @@ import "reflect"
 func isNilPointer(v any) bool {
 	rv := reflect.ValueOf(v)
 	return rv.Kind() == reflect.Pointer && rv.IsNil()
+}
+
+// isPointer reports whether v holds a pointer of some type, nil or not.
+func isPointer(v any) bool {
+	return reflect.ValueOf(v).Kind() == reflect.Pointer
 }
 
 // pointee returns *v when v is a non-nil pointer to a pointer, after

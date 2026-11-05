@@ -33,6 +33,13 @@ import (
 // of the member whatever its text, and the members inside a class value are
 // named under the entry's key.
 func DecodeEntry[V any](dec *xml.Decoder, start *xml.StartElement, attr string, m *map[string]V, begun *bool) error {
+	if trackerOf(dec) == nil {
+		// The key attribute comes off before the value is read, so a repeat
+		// of it is refused here.
+		if err := checkRepeatedAttr(start); err != nil {
+			return err
+		}
+	}
 	key, entry, keyed := withoutKey(start, attr)
 	setEntryKey(dec, func() string { return key })
 	t, at := beginEntry(dec, m, begun)
@@ -60,13 +67,14 @@ func DecodeEntry[V any](dec *xml.Decoder, start *xml.StartElement, attr string, 
 // repeat's element as one item, and a strict one refuses it. The key lies
 // inside the value, so the value is read to find it, and a value that fails
 // to decode fails the decode, repeat or not. Meanwhile a tracked decode holds
-// back the unmatched content and the missing members the value holds, and
-// applies its policy to them, in document order, only once the key shows that
+// back the unmatched content, the missing members and the members sent
+// without a value the value holds, and applies its policy to them, in document order, only once the key shows that
 // the entry repeats none.
 //
-// For the missing-member report ([Tracker.ReportMissing]), the members inside
-// the value are named under the key keyOf reads from the value as decoded so
-// far, which holds the key once the element that carries it has been read.
+// For the missing-member and presence reports ([Tracker.ReportMissing],
+// [Tracker.ReportPresence]), the members inside the value are named under the
+// key keyOf reads from the value as decoded so far, which holds the key once
+// the element that carries it has been read.
 func DecodeEntryKeyedBy[V any](dec *xml.Decoder, start *xml.StartElement, keyOf func(*V) string, m *map[string]V, begun *bool) error {
 	var v V
 	setEntryKey(dec, func() string { return keyOf(&v) })
@@ -96,12 +104,12 @@ func DecodeEntryKeyedBy[V any](dec *xml.Decoder, start *xml.StartElement, keyOf 
 }
 
 // holdEntry runs read, which reads the value of a Hash entry whose key lies
-// inside the value, with the unmatched items and the missing members the
-// value holds held back, in document order, and returns them with read's
-// error: only the key, known once the entry has closed, tells whether the
-// entry repeats an earlier one, whose element is then one unmatched item and
-// whose content counts for nothing. A hold inside another adds what it
-// releases to the outer one.
+// inside the value, with the unmatched items, the missing members and the
+// members sent without a value the value holds held back, in document order,
+// and returns them with read's error: only the key, known once the entry has
+// closed, tells whether the entry repeats an earlier one, whose element is
+// then one unmatched item and whose content counts for nothing. A hold inside
+// another adds what it releases to the outer one.
 func (t *Tracker) holdEntry(read func() error) ([]heldItem, error) {
 	outer := t.held
 	var held []heldItem
@@ -113,16 +121,22 @@ func (t *Tracker) holdEntry(read func() error) ([]heldItem, error) {
 
 // release applies the decode's policy to what [Tracker.holdEntry] held, in
 // document order: to an unmatched item as [Tracker.unmatched] does, so a
-// strict decode refuses the first, and to a missing member as the
-// missing-member report does.
+// strict decode refuses the first, and passes a missing member or a member
+// sent without a value to its report, its pointer written now that the
+// entry's key is known. Inside another hold, it adds them to that hold.
 func (t *Tracker) release(held []heldItem) error {
 	for _, it := range held {
-		if it.missing {
-			t.missingMember(it.path)
-			continue
-		}
-		if err := t.unmatched(it.path, it.foreign); err != nil {
-			return err
+		switch {
+		case (it.missing || it.sent) && t.held != nil:
+			*t.held = append(*t.held, it)
+		case it.missing:
+			t.missing(it.pointer.String())
+		case it.sent:
+			t.presence(it.pointer.String(), it.nilled)
+		default:
+			if err := t.unmatched(it.path, it.foreign); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -161,10 +175,10 @@ func beginEntry[V any](dec *xml.Decoder, m *map[string]V, begun *bool) (*Tracker
 }
 
 // setEntryKey records key as the way to read the key of the entry the decoder
-// read last, when the decode reports missing members: the members inside the
-// entry are then named under it.
+// read last, when the decode reports missing members or members sent without
+// a value: the members inside the entry are then named under it.
 func setEntryKey(dec *xml.Decoder, key func() string) {
-	if t := trackerOf(dec); t != nil && t.missing != nil {
+	if t := trackerOf(dec); t != nil && t.checksPresence() {
 		t.open[len(t.open)-1].key = key
 	}
 }

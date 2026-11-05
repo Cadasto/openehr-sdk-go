@@ -99,6 +99,8 @@ var xmlClassArchetypeTerm = xmlunmatched.Class{
 // are read from _start.Attr.
 // A Hash member reads each element of its name as one entry, into a
 // map that starts empty at the first entry.
+// A single-valued member keeps its first child element; a second one is
+// unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *ArchetypeTerm) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -113,6 +115,8 @@ func (a *ArchetypeTerm) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 			break
 		}
 	}
+	// A bit per single-valued member that has had a child element.
+	var _got uint64
 	// Whether the element has had an entry of each Hash member.
 	var _begunItems bool
 	for {
@@ -124,7 +128,20 @@ func (a *ArchetypeTerm) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "code":
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &a.Code); _err != nil {
+				if _got&(1<<0) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.Code)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &a.Code); _err != nil {
 					return _err
 				}
 			case "items":
@@ -161,6 +178,8 @@ var xmlClassCodeDefinitionSet = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A single-valued member keeps its first child element; a second one is
+// unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CodeDefinitionSet) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -175,6 +194,8 @@ func (c *CodeDefinitionSet) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 			break
 		}
 	}
+	// A bit per single-valued member that has had a child element.
+	var _got uint64
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -184,7 +205,20 @@ func (c *CodeDefinitionSet) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "language":
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.Language); _err != nil {
+				if _got&(1<<0) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.Language)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &c.Language); _err != nil {
 					return _err
 				}
 			case "items":
@@ -222,6 +256,8 @@ var xmlClassConstraintBindingItem = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A single-valued member keeps its first child element; a second one is
+// unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *ConstraintBindingItem) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -236,6 +272,8 @@ func (c *ConstraintBindingItem) UnmarshalXML(_dec *xml.Decoder, _start xml.Start
 			break
 		}
 	}
+	// A bit per single-valued member that has had a child element.
+	var _got uint64
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -245,11 +283,37 @@ func (c *ConstraintBindingItem) UnmarshalXML(_dec *xml.Decoder, _start xml.Start
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "code":
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.Code); _err != nil {
+				if _got&(1<<0) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.Code)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &c.Code); _err != nil {
 					return _err
 				}
 			case "value":
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.Value); _err != nil {
+				if _got&(1<<1) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.Value)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &c.Value); _err != nil {
 					return _err
 				}
 			default:
@@ -282,6 +346,8 @@ var xmlClassConstraintBindingSet = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A single-valued member keeps its first child element; a second one is
+// unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *ConstraintBindingSet) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -296,6 +362,8 @@ func (c *ConstraintBindingSet) UnmarshalXML(_dec *xml.Decoder, _start xml.StartE
 			break
 		}
 	}
+	// A bit per single-valued member that has had a child element.
+	var _got uint64
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -305,7 +373,20 @@ func (c *ConstraintBindingSet) UnmarshalXML(_dec *xml.Decoder, _start xml.StartE
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "terminology":
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.Terminology); _err != nil {
+				if _got&(1<<0) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.Terminology)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &c.Terminology); _err != nil {
 					return _err
 				}
 			case "items":
@@ -343,6 +424,8 @@ var xmlClassTermBindingItem = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A single-valued member keeps its first child element; a second one is
+// unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TermBindingItem) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -357,6 +440,8 @@ func (t *TermBindingItem) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElemen
 			break
 		}
 	}
+	// A bit per single-valued member that has had a child element.
+	var _got uint64
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -366,10 +451,36 @@ func (t *TermBindingItem) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElemen
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "code":
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &t.Code); _err != nil {
+				if _got&(1<<0) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&t.Code)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &t.Code); _err != nil {
 					return _err
 				}
 			case "value":
+				if _got&(1<<1) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&t.Value)
+					break
+				}
 				if _err := _dec.DecodeElement(&t.Value, &_t); _err != nil {
 					return _err
 				}
@@ -403,6 +514,8 @@ var xmlClassTermBindingSet = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A single-valued member keeps its first child element; a second one is
+// unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TermBindingSet) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -417,6 +530,8 @@ func (t *TermBindingSet) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement
 			break
 		}
 	}
+	// A bit per single-valued member that has had a child element.
+	var _got uint64
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -426,7 +541,20 @@ func (t *TermBindingSet) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "terminology":
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &t.Terminology); _err != nil {
+				if _got&(1<<0) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&t.Terminology)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &t.Terminology); _err != nil {
 					return _err
 				}
 			case "items":
