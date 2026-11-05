@@ -182,6 +182,9 @@ func TestREQ111_CompileClosesTheIntervalsTheReaderReads(t *testing.T) {
 		{name: "a written false beside an empty included flag", ivXML: `<lower_included>false</lower_included><upper_included/>` + bothBounded, want: closedBounds{lower: 2, upper: 3}},
 		{name: "whitespace-only unbounded flags", ivXML: "<lower_unbounded> </lower_unbounded><upper_unbounded>  </upper_unbounded><lower>1</lower><upper>3</upper>", want: closedBounds{lower: 1, upper: 3}},
 		{name: "a written true beside a whitespace-only unbounded flag", ivXML: "<lower_unbounded> </lower_unbounded><upper_unbounded>true</upper_unbounded><lower>1</lower>", want: closedBounds{lower: 1, upperUnbounded: true}},
+		{name: ">2147483646..* closes to the largest Integer", ivXML: writtenInterval{lowerIncluded: "false", lowerUnbounded: "false", upperUnbounded: "true", lower: "2147483646"}.xml(), want: closedBounds{lower: 2147483647, upperUnbounded: true}},
+		{name: "*..<-2147483647 closes to the smallest Integer", ivXML: writtenInterval{upperIncluded: "false", lowerUnbounded: "true", upperUnbounded: "false", upper: "-2147483647"}.xml(), want: closedBounds{upper: -2147483648, lowerUnbounded: true}},
+		{name: "an excluded largest Integer on an open lower side moves no bound", ivXML: writtenInterval{lowerIncluded: "false", lowerUnbounded: "true", upperUnbounded: "true", lower: "2147483647"}.xml(), want: closedBounds{lower: 2147483647, lowerUnbounded: true, upperUnbounded: true}},
 	}
 	for _, mode := range readerModes {
 		for _, site := range multiplicitySites {
@@ -206,9 +209,10 @@ func TestREQ111_CompileClosesTheIntervalsTheReaderReads(t *testing.T) {
 
 // TestREQ111_CompileRefusesAnIntervalClosingLeavesEmpty pins the refusals of
 // § REQ-111 Reading the model on each Multiplicity an OPT writes, in both of
-// the reader's modes: an inverted interval, and one that closing its
-// excluded ends leaves empty, are refused with an error wrapping
-// ErrInvalidInput.
+// the reader's modes: an inverted interval, one that closing its excluded
+// ends leaves empty, and one with an excluded end whose closed end the
+// model's 32-bit Integer cannot hold, whatever the width of Go's int, are
+// refused with an error wrapping ErrInvalidInput.
 func TestREQ111_CompileRefusesAnIntervalClosingLeavesEmpty(t *testing.T) {
 	cases := []struct {
 		name string
@@ -218,6 +222,8 @@ func TestREQ111_CompileRefusesAnIntervalClosingLeavesEmpty(t *testing.T) {
 		{name: ">2..<3", iv: writtenInterval{lowerIncluded: "false", upperIncluded: "false", lowerUnbounded: "false", upperUnbounded: "false", lower: "2", upper: "3"}},
 		{name: ">2..2", iv: writtenInterval{lowerIncluded: "false", upperIncluded: "true", lowerUnbounded: "false", upperUnbounded: "false", lower: "2", upper: "2"}},
 		{name: "2..<2", iv: writtenInterval{lowerIncluded: "true", upperIncluded: "false", lowerUnbounded: "false", upperUnbounded: "false", lower: "2", upper: "2"}},
+		{name: ">2147483647..*", iv: writtenInterval{lowerIncluded: "false", lowerUnbounded: "false", upperUnbounded: "true", lower: "2147483647"}},
+		{name: "*..<-2147483648", iv: writtenInterval{upperIncluded: "false", lowerUnbounded: "true", upperUnbounded: "false", upper: "-2147483648"}},
 	}
 	for _, mode := range readerModes {
 		for _, site := range multiplicitySites {
