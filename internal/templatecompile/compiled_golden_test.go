@@ -1,6 +1,6 @@
 package templatecompile_test
 
-// REQ-111 — the compiled-tree golden, the parity check ADR 0035 names.
+// REQ-111 § Recorded compiled trees — the compiled-tree golden.
 //
 // For every operational template the corpus vendors, walked as PROBE-111
 // walks them, for every parity fixture (testdata/parity) and for every
@@ -64,13 +64,12 @@ func TestCompiledGolden(t *testing.T) {
 		t.Fatal("Probe111OperationalTemplates found no operational template: corpus layout changed?")
 	}
 	// The goldens of the parity fixtures and of the reader's fixtures were
-	// recorded on the v0.45.0 code, in the commit that added them, while
-	// TestREQ111_ParityWithDeprecatedParser held each of these fixtures, and
-	// each corpus template, to the deprecated parser's reading; that run left
-	// the corpus goldens unchanged. Once the parser is gone they stand for its
-	// reading, so a diff on them changes what the compile step makes of a
-	// template the parser read: regenerate them only for a reason the change
-	// under review gives.
+	// recorded on the v0.45.0 code, in the commit that added them, when
+	// template.ParseOPT, removed in 0.46.0, read each of these fixtures and
+	// each corpus template as the compile step read it; that run left the
+	// corpus goldens unchanged. They stand for that reading, so a diff on
+	// them changes what the compile step makes of a template: regenerate them
+	// only for a reason the change under review gives.
 	sources := []goldenSource{
 		{root: fixtures.CorpusRoot(), label: "<corpus>", names: names},
 		fixtureGoldenSource(t, "testdata", "parity"),

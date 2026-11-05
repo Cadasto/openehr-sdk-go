@@ -2,7 +2,8 @@ package templatecompile_test
 
 // parity_test.go: REQ-111, the exception fixtures: how
 // TestREQ111_ParityExceptionsRefused tells the refusal of each reading the
-// new path does not keep from another refusal, by its error alone.
+// reader or the compile step refuses on its own ground from another refusal,
+// by its error alone.
 
 import (
 	"errors"
@@ -16,7 +17,7 @@ import (
 )
 
 // TestREQ111_ParityRefusalsByError pins how the parity-exceptions check tells
-// a refusal the rule allows from one it does not, by its error: an integer
+// a refusal the fixtures name from one they do not, by its error: an integer
 // past the 32-bit range is the reader's ParseInt range refusal, a
 // match_negated of true is the reader's refusal of that element, an infinite
 // integer bound that admits no integer is the reader's ParseInt syntax

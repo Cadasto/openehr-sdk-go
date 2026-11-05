@@ -5,9 +5,9 @@ package aom14_test
 // deprecated parser reads in its default mode, as the parser reads it, but an
 // integer the model's 32-bit Integer cannot hold, a match_negated of true, an
 // infinite integer bound that admits no integer and a <definition> the parser
-// reads as a slot or a primitive constraint, which it refuses in every mode. REQ-100 (§ REQ-100, Strict parse mode): given canxml.WithStrict it
-// refuses the shapes the parser's strict mode refuses, and the other readings
-// of the parser's default mode. REQ-170
+// reads as a slot or a primitive constraint, which it refuses in every mode.
+// Given canxml.WithStrict it refuses the shapes and values that section lists,
+// which the default mode reads in a weaker form. REQ-170
 // (wire.md § REQ-170): what a tolerance leaves out is unmatched content, which
 // canxml.WithUnmatched reports, once, at the path it has in the input, or in
 // the element a reading moves it into.
@@ -1238,12 +1238,12 @@ func TestREQ111_ReaderReportsEachItemOnce(t *testing.T) {
 	})
 }
 
-// TestREQ100_ReaderStrictModeRefusesWhatTheParsersStrictModeRefuses pins
+// TestREQ111_ReaderStrictModeRefusesWhatTheDefaultModeReadsWeakly pins
 // that canxml.WithStrict refuses each shape and value the default mode reads
 // in a weaker form, and that the default mode reads it. A bare type attribute
 // is no type in the XSI namespace, and an empty list entry or range bound no
 // number, which canonical XML reads as its type and as 0.
-func TestREQ100_ReaderStrictModeRefusesWhatTheParsersStrictModeRefuses(t *testing.T) {
+func TestREQ111_ReaderStrictModeRefusesWhatTheDefaultModeReadsWeakly(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name string

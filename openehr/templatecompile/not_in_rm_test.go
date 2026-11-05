@@ -42,14 +42,14 @@ func compileOneAttribute(t *testing.T, rmType, attr string, opts ...templatecomp
 	return c.Root()
 }
 
-// TestREQ100_CompileMarksAttributeNotInRM pins § REQ-100 Node taxonomy: the
-// compile marks a declared attribute whose name is neither a property nor a
-// function, in the pinned BMM, of its node's RM class read without generic
-// parameters, of an ancestor, or of a descendant. A property or a function
-// of the class, of an ancestor or of a descendant, and an attribute of a
-// class the lookup does not know stay unmarked, and so does every attribute
-// the compile injects.
-func TestREQ100_CompileMarksAttributeNotInRM(t *testing.T) {
+// TestREQ111_CompileMarksAttributeNotInRM pins § REQ-111 Attributes the RM
+// does not have: the compile marks a declared attribute whose name is neither
+// a property nor a function, in the pinned BMM, of its node's RM class read
+// without generic parameters, of an ancestor, or of a descendant. A property
+// or a function of the class, of an ancestor or of a descendant, and an
+// attribute of a class the lookup does not know stay unmarked, and so does
+// every attribute the compile injects.
+func TestREQ111_CompileMarksAttributeNotInRM(t *testing.T) {
 	tests := []struct {
 		rmType, attr string
 		want         bool
@@ -101,12 +101,12 @@ func TestREQ100_CompileMarksAttributeNotInRM(t *testing.T) {
 	}
 }
 
-// TestREQ100_CompileMarksAttributeNotInRMByItsLookup pins that the mark comes
+// TestREQ111_CompileMarksAttributeNotInRMByItsLookup pins that the mark comes
 // from the lookup the compile uses: a class the lookup knows is judged by
 // the properties the lookup gives it and its descendants, a class it does
 // not know is not judged at all, whatever the pinned RM says of either, and
 // a lookup that gives no class hierarchy, so no descendants, judges none.
-func TestREQ100_CompileMarksAttributeNotInRMByItsLookup(t *testing.T) {
+func TestREQ111_CompileMarksAttributeNotInRMByItsLookup(t *testing.T) {
 	data := map[string]rminfo.ClassMeta{
 		"ISM_TRANSITION": {
 			Attributes: map[string]rminfo.AttrMeta{"name": {TypeName: "DV_TEXT", DeclaredIn: "ISM_TRANSITION"}},

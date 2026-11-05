@@ -1,10 +1,11 @@
 package templatecompile_test
 
-// parity_exceptions_test.go: REQ-111 § Parity with the deprecated parser,
-// its exceptions, with no parser. Each operational template of
-// testdata/parity-exceptions holds one reading the new path does not keep,
-// and the model's reader or the compile step, each in its default mode,
-// refuses it with the error of that reading, told apart by the error alone.
+// parity_exceptions_test.go: REQ-111 § Recorded compiled trees, the exception
+// fixtures. Each operational template of testdata/parity-exceptions holds
+// one of the readings the model's reader refuses, or one of the compile
+// step's own grounds, and the reader or the compile step, each in its default
+// mode, refuses it with the error of that reading, told apart by the error
+// alone.
 
 import (
 	"bytes"
@@ -25,11 +26,12 @@ import (
 )
 
 // parityExceptionsDir holds one operational template for each reading the
-// new path does not keep.
+// reader refuses and each ground the compile step refuses on its own.
 const parityExceptionsDir = "testdata/parity-exceptions"
 
-// exceptionRefusal is what the new path makes of an operational template:
-// one of the refusals the parity rule allows, another refusal, or none.
+// exceptionRefusal is what the reader and the compile step make of an
+// operational template: one of the refusals the exception fixtures name,
+// another refusal, or none.
 type exceptionRefusal string
 
 const (
@@ -43,7 +45,7 @@ const (
 	notRefused               exceptionRefusal = "no refusal: the new path reads and compiles it"
 )
 
-// allowedRefusals are the refusals the parity rule allows.
+// allowedRefusals are the refusals the exception fixtures name.
 var allowedRefusals = []exceptionRefusal{
 	refusedLargeInteger, refusedMatchNegated, refusedInfiniteBound,
 	refusedDefinitionNotKept, refusedSharedPath, refusedNoRMType,
@@ -53,7 +55,7 @@ var allowedRefusals = []exceptionRefusal{
 // testdata/parity-exceptions to the refusal of the reading it holds: the
 // model's reader and the compile step, each in its default mode, refuse it
 // with that reading's error. The table lists every file of the folder, and
-// each refusal the rule allows has a file.
+// each refusal the exception fixtures name has a file.
 func TestREQ111_ParityExceptionsRefused(t *testing.T) {
 	want := map[string]exceptionRefusal{
 		"definition_archetype_slot.opt":       refusedDefinitionNotKept,

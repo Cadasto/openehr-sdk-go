@@ -26,12 +26,12 @@ var socialContentArchetypeIDs = []string{
 	"openEHR-EHR-EVALUATION.education_summary.v1",
 }
 
-// TestREQ100_REQ107_TArchetypeRootEntriesPassRMFloor regenerates social.opt
+// TestREQ176_REQ107_TArchetypeRootEntriesPassRMFloor regenerates social.opt
 // with its archetype roots spelled T_ARCHETYPE_ROOT, as the original export
-// wrote them. REQ-100 reads that spelling as an archetype root, so every
+// wrote them. REQ-176 reads that spelling as an archetype root, so every
 // generated entry carries archetype_details and the body passes the REQ-107
 // RM floor (validation.ValidateRM).
-func TestREQ100_REQ107_TArchetypeRootEntriesPassRMFloor(t *testing.T) {
+func TestREQ176_REQ107_TArchetypeRootEntriesPassRMFloor(t *testing.T) {
 	raw, err := os.ReadFile(fixtures.TemplateOptForName("social"))
 	if err != nil {
 		t.Fatalf("ReadFile(social.opt): %v", err)

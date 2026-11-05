@@ -174,9 +174,8 @@ func TestREQ111_CompileRefusesModel(t *testing.T) {
 
 // TestREQ111_CompileReadsWeakValuesUnlessStrict pins § REQ-111 What the
 // compile step tolerates on whole models: in its default mode Compile reads a
-// value the model holds in the weaker form the parser's default mode reads
-// it, and with Options.Strict it refuses it with an error wrapping
-// ErrInvalidInput.
+// value the model holds in a weaker form, and with Options.Strict it refuses
+// it with an error wrapping ErrInvalidInput.
 func TestREQ111_CompileReadsWeakValuesUnlessStrict(t *testing.T) {
 	// leaf is a model whose definition holds o at /context/start_time/value.
 	leaf := func(o aom14.CObject) *aom14.OperationalTemplate {
@@ -368,8 +367,7 @@ func equalCodePhrase(got constraints.PrimitiveConstraint, want constraints.CodeP
 
 // TestREQ111_CompileReadsZeroIntervalAsAbsent pins how Compile reads an
 // interval the model leaves at its zero value, which is how the model holds
-// an interval the template leaves out: as no interval, as the deprecated
-// parser reads one the template leaves out.
+// an interval the template leaves out: as no interval.
 func TestREQ111_CompileReadsZeroIntervalAsAbsent(t *testing.T) {
 	section := &aom14.CComplexObject{RMTypeName: "SECTION", NodeID: "at0001"}
 	model := modelOf(&aom14.CMultipleAttribute{RMAttributeName: "content", Children: []aom14.CObject{section}})

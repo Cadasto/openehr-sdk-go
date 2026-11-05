@@ -1,10 +1,10 @@
 package templatecompile
 
-// model.go: what the walk reads of the operational template model, as the
-// deprecated parser reads an OPT in the respects the corpus needs: each
-// constraint object's kind and identifiers, each attribute's name, kind and
-// intervals, a node's template-level name, and an archetype root's terms and
-// bindings, each trimmed, with blank entries left out.
+// model.go: what the walk reads of the operational template model, in the
+// respects the corpus needs: each constraint object's kind and identifiers,
+// each attribute's name, kind and intervals, a node's template-level name,
+// and an archetype root's terms and bindings, each trimmed, with blank
+// entries left out.
 
 import (
 	"fmt"
@@ -293,11 +293,10 @@ func fixedValueString(o aom14.CObject) string {
 //
 // The model holds each interval by value, so an interval the template leaves
 // out reads as the zero interval, as an absent definition reads as the zero
-// archetype root. The zero interval is read as absent, as the deprecated
-// parser reads an interval the template leaves out. The decode gives each
+// archetype root. The zero interval is read as absent. The decode gives each
 // flag a written interval leaves out its default, a bounded side's included
 // flag true, so a written interval reads as the zero one only where it writes
-// both bounds 0 and all four flags false, an empty interval the parser
+// both bounds 0 and all four flags false, an empty interval that closing
 // refuses and the model cannot tell from an absent one.
 func multiplicityOf(iv *rm.Interval[aom14.Integer]) (*template.Multiplicity, error) {
 	if iv == nil || *iv == (rm.Interval[aom14.Integer]{}) {

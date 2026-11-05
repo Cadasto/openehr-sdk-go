@@ -64,8 +64,7 @@ func resolveModelWithSlot() *aom14.OperationalTemplate {
 // or archetype id, a segment without a predicate takes the first child, and
 // a segment that matches nothing, an implicit attribute among them, a node
 // that has no such attribute and a slot, which does not descend, gives an
-// error that matches both not-found sentinels (REQ-100 § Resolution
-// semantics).
+// error that matches both not-found sentinels.
 func TestREQ111_ResolveFollowsResolutionRules(t *testing.T) {
 	c, err := templatecompile.Compile(resolveModelWithSlot())
 	if err != nil {
@@ -221,12 +220,10 @@ func TestREQ111_ResolveReachesLaterAlternative(t *testing.T) {
 // rules of § REQ-111 Path lookup on every corpus template: for every node,
 // the path built from the node ids and archetype ids above it resolves, in
 // the default and the strict mode, to the node resolveByRules reaches on the
-// compiled tree's attributes and children, or both refuse it alike. These
-// are the paths on which Resolve agreed with the deprecated parser's NodeAt
-// while the parser was in the tree. The corpus holds paths on which the
-// first match is another node than the one the path was built from, and
-// paths the strict mode refuses as ambiguous, so the walk exercises both
-// rules.
+// compiled tree's attributes and children, or both refuse it alike. The
+// corpus holds paths on which the first match is another node than the one
+// the path was built from, and paths the strict mode refuses as ambiguous, so
+// the walk exercises both rules.
 func TestREQ111_ResolveFollowsResolutionRulesOverCorpus(t *testing.T) {
 	names, err := templateprobes.Probe111OperationalTemplates()
 	if err != nil {

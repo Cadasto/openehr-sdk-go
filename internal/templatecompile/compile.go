@@ -30,11 +30,10 @@ type Options struct {
 	SkipImplicitAttributes bool
 
 	// Strict refuses, with an error wrapping ErrInvalidInput, each value
-	// Compile otherwise reads in the weaker form the deprecated parser's
-	// default mode reads it, which its strict mode refuses, and a default
-	// value of the template's <constraints> that addresses no node or that
-	// Compile cannot hold as canonical JSON, such as a NaN magnitude, each of
-	// which Compile otherwise skips (see [Compile]).
+	// Compile otherwise reads in a weaker form, and a default value of the
+	// template's <constraints> that addresses no node or that Compile cannot
+	// hold as canonical JSON, such as a NaN magnitude, each of which Compile
+	// otherwise skips (see [Compile]).
 	Strict bool
 }
 
@@ -68,14 +67,13 @@ const maxDepth = 128
 // ([CompiledNode.NodeName]) it is, each run of white space in the predicate
 // read as one space. Compile skips a default value that addresses no node.
 //
-// In its default mode Compile reads a value the model holds in the weaker
-// form the deprecated parser's default mode reads it: a CONSTRAINT_REF with
-// no reference, with an empty one; a timezone_validity that names no
-// VALIDITY_KIND, or is mandatory on a C_DATE, as optional; a temporal range
-// bound that is not ISO 8601 text of its type as unbounded on its side; and
-// a C_PRIMITIVE_OBJECT with no item as no constraint. With [Options.Strict]
-// it refuses each of these, as the parser's strict mode does, and a default
-// value that addresses no node.
+// In its default mode Compile reads a value the model holds in a weaker form:
+// a CONSTRAINT_REF with no reference, with an empty one; a timezone_validity
+// that names no VALIDITY_KIND, or is mandatory on a C_DATE, as optional; a
+// temporal range bound that is not ISO 8601 text of its type as unbounded on
+// its side; and a C_PRIMITIVE_OBJECT with no item as no constraint. With
+// [Options.Strict] it refuses each of these, and a default value that
+// addresses no node.
 //
 // Returns an error wrapping ErrInvalidInput when opt is nil, when it has no
 // template_id, no definition or a definition that names no RM type, each
@@ -169,7 +167,7 @@ func holdsNothing(d *aom14.CArchetypeRoot) bool {
 // that names no RM type, one holding a value the compiled form cannot carry
 // or nesting past the depth limit, one in which two nodes under different
 // attributes have the same AQL path, and, with [Options.Strict], one holding
-// a value the deprecated parser's strict mode refuses or a default value that
+// a value it otherwise reads in a weaker form or a default value that
 // addresses no node.
 var ErrInvalidInput = errors.New("templatecompile: invalid input")
 
@@ -549,13 +547,13 @@ func (w *walker) attributeType(owner, class, attr string) (string, bool) {
 
 // absentFrom reports whether attr, which the lookup does not give the bare
 // class class as a property, is a name no class in class's hierarchy has
-// (REQ-100, [CompiledAttribute.NotInRM]): it is not one of the functions
-// [rminfo.IsNonStorableAttr] names for class, which a template may
-// constrain as if it were an attribute, and it is neither a property nor
-// such a function of any class descending from class, such as ITEM_TREE's
-// items under an ITEM_STRUCTURE, or DV_QUANTITY's magnitude under a
-// DV_AMOUNT, a function there that the predicate leaves out because its
-// descendant stores it. The lookup's properties of class already
+// (REQ-111 § Attributes the RM does not have, [CompiledAttribute.NotInRM]):
+// it is not one of the functions [rminfo.IsNonStorableAttr] names for class,
+// which a template may constrain as if it were an attribute, and it is
+// neither a property nor such a function of any class descending from class,
+// such as ITEM_TREE's items under an ITEM_STRUCTURE, or DV_QUANTITY's
+// magnitude under a DV_AMOUNT, a function there that the predicate leaves out
+// because its descendant stores it. The lookup's properties of class already
 // hold those of its ancestors. A class the lookup does not know, and any
 // class when the lookup gives no class hierarchy, gives no verdict, so its
 // attributes are not marked.

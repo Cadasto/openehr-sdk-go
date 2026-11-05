@@ -57,12 +57,12 @@ const nullFlavorElementOPT = `<?xml version="1.0" encoding="UTF-8"?>
   </definition>
 </template>`
 
-// TestREQ100_NullFlavorConstraintApplies pins § REQ-100 Node taxonomy end to
-// end: an OPT that spells an ELEMENT's null_flavour null_flavor compiles to an
-// attribute named null_flavour, of the RM type the BMM gives it, and the
-// validator applies its code list to the ELEMENT's null_flavour, exactly as
-// for the RM spelling.
-func TestREQ100_NullFlavorConstraintApplies(t *testing.T) {
+// TestREQ111_NullFlavorConstraintApplies pins § REQ-111 Reading the model end
+// to end: an OPT that spells an ELEMENT's null_flavour null_flavor compiles
+// to an attribute named null_flavour, of the RM type the BMM gives it, and
+// the validator applies its code list to the ELEMENT's null_flavour, exactly
+// as for the RM spelling.
+func TestREQ111_NullFlavorConstraintApplies(t *testing.T) {
 	element := func(code string) *rm.Element {
 		return &rm.Element{
 			ArchetypeNodeID: "at0001",
@@ -221,8 +221,8 @@ const itemStructureItemsOPT = `<?xml version="1.0" encoding="UTF-8"?>
 // One walk's exception: an attribute an instance can carry is visited. Here
 // the OPT declares items on an ITEM_STRUCTURE, which has no property of that
 // name while its descendants ITEM_TREE and ITEM_LIST do, so the compile does
-// not mark it (§ REQ-100 Node taxonomy); the value is an ITEM_TREE, so the
-// walk visits items and reports a missing member.
+// not mark it (§ REQ-111 Attributes the RM does not have); the value is an
+// ITEM_TREE, so the walk visits items and reports a missing member.
 func TestREQ171_AttributeTheValueClassHasIsVisited(t *testing.T) {
 	c := compileStrictOPT(t, itemStructureItemsOPT)
 	if a := c.Root().Attribute("items"); a == nil || a.NotInRM() {
@@ -267,7 +267,7 @@ const elementIsNullOPT = `<?xml version="1.0" encoding="UTF-8"?>
 // ELEMENT.is_null at existence 1..1, constrains nothing an instance holds.
 // The walk leaves it out as an attribute no serialization carries, so it
 // draws no issue, and lists it nowhere in Coverage, since the compile does
-// not mark a function (§ REQ-100 Node taxonomy).
+// not mark a function (§ REQ-111 Attributes the RM does not have).
 func TestREQ171_FunctionConstraintIsLeftOut(t *testing.T) {
 	c := compileStrictOPT(t, elementIsNullOPT)
 	if a := c.Root().Attribute("is_null"); a == nil || a.NotInRM() {
@@ -283,12 +283,12 @@ func TestREQ171_FunctionConstraintIsLeftOut(t *testing.T) {
 	}
 }
 
-// TestREQ100_NullFlavorBesideNullFlavour pins § REQ-100 Node taxonomy end to
-// end for an ELEMENT that declares both spellings: the template compiles,
+// TestREQ111_NullFlavorBesideNullFlavour pins § REQ-111 Reading the model end
+// to end for an ELEMENT that declares both spellings: the template compiles,
 // the null_flavour constraint applies to the ELEMENT's null_flavour, and
 // null_flavor, kept as written and marked by the compile, is left out of the
 // walk and listed in Coverage.NotInRM (§ REQ-171 Coverage).
-func TestREQ100_NullFlavorBesideNullFlavour(t *testing.T) {
+func TestREQ111_NullFlavorBesideNullFlavour(t *testing.T) {
 	// The null_flavour declaration lists 253, a valid null flavour the
 	// null_flavor declaration, which lists 271, does not.
 	const flavour = `<rm_attribute_name>null_flavor</rm_attribute_name>`
