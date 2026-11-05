@@ -20,8 +20,9 @@ const NSXMI = "http://www.omg.org/XMI"
 
 // DecoderOption configures a decode, through [Unmarshal] or a [Decoder].
 // [WithUnmatched] and [WithStrict] say what happens to content the decode
-// does not read; [WithMissing] reports the members the input leaves out;
-// [WithMaxDepth] refuses an element nested too deep.
+// does not read; [WithMissing] reports the members the input leaves out, and
+// [WithPresence] those it sends without a value; [WithMaxDepth] refuses an
+// element nested too deep.
 // [WithRelaxedTypeDispatch] names relaxed polymorphic dispatch; it is
 // accepted but not yet enforced, so dispatch stays strict.
 type DecoderOption func(*decoderConfig)
@@ -31,6 +32,7 @@ type DecoderOption func(*decoderConfig)
 type decoderConfig struct {
 	unmatched           func(path string)
 	missing             func(pointer string)
+	presence            func(pointer string, p Presence)
 	maxDepth            int // 0 for no limit
 	relaxedTypeDispatch bool
 	strict              bool
@@ -57,15 +59,15 @@ func init() {
 	decodeopts.Register(func(opts any) decodeopts.Settings {
 		list, _ := opts.([]DecoderOption)
 		c := newDecoderConfig(list)
-		return decodeopts.Settings{Strict: c.strict, Reports: c.unmatched != nil || c.missing != nil, MaxDepth: c.maxDepth}
+		return decodeopts.Settings{Strict: c.strict, Reports: c.unmatched != nil || c.missing != nil || c.presence != nil, MaxDepth: c.maxDepth}
 	})
 }
 
 // tracked reports whether the decode reports or refuses unmatched content,
-// or reports missing members: each needs the decode to follow the elements
-// it reads.
+// or reports missing members or members sent without a value: each needs the
+// decode to follow the elements it reads.
 func (c decoderConfig) tracked() bool {
-	return c.unmatched != nil || c.strict || c.missing != nil
+	return c.unmatched != nil || c.strict || c.missing != nil || c.presence != nil
 }
 
 // tracker returns the tracker of a decode with c's options, and nil for a
@@ -76,6 +78,7 @@ func (c decoderConfig) tracker() *xmlunmatched.Tracker {
 	}
 	t := xmlunmatched.NewTracker(c.unmatched, c.strict)
 	t.ReportMissing(c.missing)
+	t.ReportPresence(reportPresence(c.presence))
 	t.LimitDepth(c.maxDepth)
 	return t
 }
@@ -103,10 +106,13 @@ func (c decoderConfig) documentTracker() *xmlunmatched.Tracker {
 // …); an element in a namespace other than the openEHR one (see
 // [ErrNamespace]), the root element aside; text other than XML whitespace
 // directly inside an element whose content is elements, such as an RM
-// object's, a CDATA section included; and an element whose content this
-// codec does not model: a `Hash` whose values are `Hash`es
-// (RESOURCE_ANNOTATIONS `documentation`) and a member whose Go type has no
-// decoder of its own (see the package documentation). A bare `type`
+// object's, a CDATA section included; a child element that repeats an
+// earlier child of the same name under a single-valued attribute, such as a
+// second `language` in a COMPOSITION, whose first child gives the member its
+// value in every mode; and an element whose content this codec does not
+// model: a `Hash` whose values are `Hash`es (RESOURCE_ANNOTATIONS
+// `documentation`) and a member whose Go type has no decoder of its own (see
+// the package documentation). A bare `type`
 // attribute is unmatched except where dispatch reads it as the
 // discriminator. It applies at any depth: inside a polymorphic slot, an
 // interval bound, a primitive element or an AOM 1.4 value too. The text of

@@ -125,9 +125,13 @@
 // element in a namespace other than the openEHR one ([ErrNamespace]); text
 // other than XML whitespace directly inside an element whose content is
 // elements, such as an RM object's, a CDATA section included; the element
-// of a `Hash` of `Hash`es; and a `Hash` entry whose key an earlier entry of
-// the member holds (see below). The key attribute of a `Hash` entry is read,
-// not unmatched. The text of a primitive element is its value, and
+// of a `Hash` of `Hash`es; a `Hash` entry whose key an earlier entry of
+// the member holds (see below); and a child element that repeats an earlier
+// child of the same name under a single-valued attribute, such as a second
+// `language` in a COMPOSITION, whose first child gives the member its value
+// in every mode. The child elements of a multi-valued attribute are its
+// items, never a repeat. The key attribute of a `Hash` entry is read, not
+// unmatched. The text of a primitive element is its value, and
 // whitespace between elements is never unmatched, so an indented document
 // decodes as a compact one does.
 // Two kinds of attribute are never unmatched: a namespace declaration,
@@ -147,9 +151,11 @@
 // rest of the input and none of it. [WithUnmatched] passes each item, in
 // document order, to a caller function as its path from the root of the
 // value, such as "/composition[1]/content[2]/x-note[1]",
-// "/composition[1]/@x-flag" or "/ehr_status[1]/subject[1]/text()", the last
-// naming the text of an element, one item however many runs of text it
-// holds; the path names the item and carries none of its value. [WithStrict] refuses the decode at the first item with an
+// "/composition[1]/language[2]", "/composition[1]/@x-flag" or
+// "/ehr_status[1]/subject[1]/text()", the last naming the text of an
+// element, one item however many runs of text it holds; the path names the
+// item and carries none of its value. [WithStrict] refuses the decode at the
+// first item with an
 // error wrapping [ErrUnknownElement] (and [ErrNamespace] for a foreign
 // element). Strict never refuses an absent element: a mandatory one is a
 // missing member, which [WithMissing] reports (see below).
@@ -163,7 +169,8 @@
 //
 // The options reach the generated UnmarshalXML methods, which encoding/xml
 // calls with nothing but the *xml.Decoder, through the decoder itself: a
-// decode given [WithUnmatched], [WithStrict] or [WithMissing] reads its
+// decode given [WithUnmatched], [WithStrict], [WithMissing] or
+// [WithPresence] reads its
 // input through a token source that tracks the open elements, and registers
 // its decoder with its own policy while it runs. Concurrent decodes each
 // have their own decoder and so their own policy. The generated methods
@@ -245,6 +252,25 @@
 // The option changes nothing about what the decoder reads, and it is not
 // available on REST reads through the transport and client packages, which
 // decode with the default.
+//
+// # Members sent without a value
+//
+// An input can send a member and give it no value: an element that carries
+// `xsi:nil="true"` (or `1`), or a primitive element whose text is empty, or
+// XML whitespace only for a string. An optional member sent so decodes as an
+// absent one does, to its zero value, and [WithMissing] reports mandatory
+// members only, so neither the value nor that option says the input sent
+// it. [WithPresence] passes each such member, mandatory or optional, to a
+// function, once, as its element closes, by the JSON Pointer [WithMissing]
+// uses and with its form, [PresenceNil] or [PresenceEmpty]; nothing inside a
+// nilled element is reported. A member that carries a value, as "Missing
+// members" above reads it, and an element that is no member, unmatched
+// content among them, are not reported. The option shares the pass that
+// serves [WithUnmatched] and [WithMissing], reports only, and returns the
+// same value as the default; a mandatory member sent without a value is
+// reported by both [WithPresence] and [WithMissing]. Canonical JSON offers
+// no counterpart: a `null` member there is missing when mandatory and absent
+// otherwise, and an empty string is a value.
 //
 // # Primitive failures
 //

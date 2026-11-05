@@ -195,6 +195,9 @@ type Tracker struct {
 	// leaves out, set by [Tracker.ReportMissing]; nil when none asked, and
 	// then no element is checked for them.
 	missing func(pointer string)
+	// presence is the caller's hook for the members a document sends without
+	// a value, set by [Tracker.ReportPresence]; nil when none asked.
+	presence func(pointer string, nilled bool)
 	// open holds one frame per element opened and not yet closed, after a
 	// first frame for the document itself, which counts the top-level
 	// elements of the value being decoded.
@@ -231,11 +234,12 @@ type Tracker struct {
 // earlier siblings of the same name plus one, the children it has opened so
 // far, counted by local name, whether dispatch read its bare `type`
 // attribute as the discriminator, and whether its text was found unmatched
-// already. For the missing-member report it also keeps the description of
-// its class, once its decoder has entered, which of the class's mandatory
+// already. For the missing-member and presence reports it also keeps the
+// description of its class, once its decoder has entered, which of the class's mandatory
 // members it has a value for, what the element carries: `xsi:nil`, text
 // other than whitespace, and whether a decoder read it as a primitive, and,
-// for one entry of a Hash member, how to read its key.
+// for one entry of a Hash member, how to read its key. It also marks an
+// element the decoder skipped or dropped, which is no member.
 //
 // The child counts sit in a short slice while the element has opened children
 // of few names, which is the canonical shape and costs no map. Once it opens
@@ -254,6 +258,7 @@ type frame struct {
 	nilled        bool   // the start element, or one around it, carried xsi:nil="true"
 	hasText       bool   // the element holds text other than XML whitespace
 	primitive     bool   // a decoder read the element's text as its value
+	unread        bool   // the decoder skipped or dropped the element: it is no member of its parent
 	// key reads the key of the element when it is one entry of a Hash member,
 	// so the members inside it are named under the key; nil otherwise.
 	key func() string
@@ -363,13 +368,14 @@ func (t *Tracker) push(local string) {
 }
 
 // pop records that the decoder closed the innermost open element, after
-// reporting the mandatory members it left out when the decode asked.
+// reporting the mandatory members it left out, and whether it is a member
+// sent without a value, when the decode asked.
 func (t *Tracker) pop() {
 	n := len(t.open)
 	if n <= 1 {
 		return
 	}
-	if t.missing != nil {
+	if t.checksPresence() {
 		t.closing(n)
 	}
 	t.open = t.open[:n-1]
@@ -757,7 +763,7 @@ func (r *trackingReader) Token() (xml.Token, error) {
 		if r.t.maxDepth > 0 && len(r.t.open)-1 > r.t.maxDepth {
 			return nil, r.t.refuseDepth()
 		}
-		if r.t.missing != nil {
+		if r.t.checksPresence() {
 			n := len(r.t.open)
 			r.t.open[n-1].nilled = r.t.open[n-2].nilled || isNilled(tk.Attr)
 		}
@@ -767,7 +773,7 @@ func (r *trackingReader) Token() (xml.Token, error) {
 		r.t.pop()
 		r.scope.close()
 	case xml.CharData:
-		if r.t.missing != nil && !isXMLSpace(tk) {
+		if r.t.checksPresence() && !isXMLSpace(tk) {
 			r.t.open[len(r.t.open)-1].hasText = true
 		}
 	}
@@ -1013,6 +1019,7 @@ func LocalName(name xml.Name) string {
 // namespace.
 func SkipUnmatched(dec *xml.Decoder, start xml.StartElement) error {
 	if t := trackerOf(dec); t != nil {
+		t.skipping()
 		if err := t.unmatched(t.path(), isForeign(start.Name)); err != nil {
 			return err
 		}
@@ -1090,11 +1097,15 @@ type Held struct {
 // heldItem is one unmatched element a [Held] holds, or one item a held Hash
 // entry holds ([Tracker.holdEntry]): its path from the root of the value, and
 // whether it lies in a foreign namespace; or, when missing is set, the JSON
-// Pointer of a mandatory member the entry leaves out.
+// Pointer of a mandatory member the entry leaves out; or, when sent is set,
+// the JSON Pointer of a member the entry sends without a value, and whether
+// it was nilled.
 type heldItem struct {
 	path    string
 	foreign bool
 	missing bool
+	sent    bool
+	nilled  bool
 }
 
 // SkipUnmatchedAfter skips the element start opens, which the decoder does
@@ -1110,6 +1121,7 @@ type heldItem struct {
 // the element is reported or refused at once, as by [SkipUnmatched].
 func SkipUnmatchedAfter(dec *xml.Decoder, start xml.StartElement, text []byte, h *Held) error {
 	if t := trackerOf(dec); t != nil {
+		t.skipping()
 		if !isXMLSpace(text) {
 			h.items = append(h.items, heldItem{path: t.path(), foreign: isForeign(start.Name)})
 		} else if err := t.unmatched(t.path(), isForeign(start.Name)); err != nil {
@@ -1340,6 +1352,9 @@ func dropXMLSpace(r rune) rune {
 // and whose text carries none of the element's. A tracked decode reports an
 // attribute or child element on the element, as for any primitive.
 func DropElement(dec *xml.Decoder, start *xml.StartElement, wants ...string) error {
+	if t := trackerOf(dec); t != nil {
+		t.skipping()
+	}
 	return DecodeText(dec, start, func(text string) error {
 		if !slices.Contains(wants, strings.Trim(text, xmlSpace)) {
 			return errDroppedValue

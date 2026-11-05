@@ -111,13 +111,45 @@ func (t *Tracker) ReportMissing(fn func(pointer string)) {
 	t.missing = fn
 }
 
+// ReportPresence makes the decodes of t pass every member a document sends
+// without a value to fn, once each, as the member's element closes, so in
+// document order: a member of a class whose element carries `xsi:nil="true"`
+// (or `1`), nilled set, or is a primitive element whose text is empty or XML
+// whitespace only, mandatory or optional alike. Each is named by its JSON
+// Pointer, as [Tracker.ReportMissing] names a member, such as
+// `/content/0/data/events/0/data/items/0/value/precision`. Nothing inside a
+// nilled element is reported. An element the decoder skips or drops, such as
+// unmatched content, a repeat of a single-valued member or an element in a
+// foreign namespace, is no member, and neither is the root. A struct element
+// with no content is a value, and so is an entry of a Hash member, whatever
+// its text, unless it is nilled. The report is the whole policy: nothing
+// refuses the decode, strict or not. A nil fn asks for nothing.
+func (t *Tracker) ReportPresence(fn func(pointer string, nilled bool)) {
+	t.presence = fn
+}
+
+// checksPresence reports whether the decode follows what each element
+// carries: it reports the mandatory members a document leaves out, or the
+// members it sends without a value.
+func (t *Tracker) checksPresence() bool {
+	return t.missing != nil || t.presence != nil
+}
+
+// skipping marks the innermost open element, which the decoder is about to
+// skip or drop, as no member of its parent: it gives no member a value
+// ([Tracker.closing]) and is not a member sent without one.
+func (t *Tracker) skipping() {
+	t.open[len(t.open)-1].unread = true
+}
+
 // closing reports, when the decode asked, the mandatory members the element
-// whose frame is t.open[n-1] carried no value for, and then marks the
-// element as a value of its parent's member of that name when it carried
-// one. It runs as the element closes, before its frame is dropped.
+// whose frame is t.open[n-1] carried no value for, and then, when the
+// element is a member of its parent's class, reports it when it carries no
+// value and the decode asked, or marks it as a value of its parent's member
+// of that name. It runs as the element closes, before its frame is dropped.
 func (t *Tracker) closing(n int) {
 	f := &t.open[n-1]
-	if f.class != nil && !f.nilled {
+	if t.missing != nil && f.class != nil && !f.nilled {
 		var b strings.Builder
 		for i, name := range f.class.Required {
 			if f.seen&(1<<i) != 0 || slices.Contains(f.optional, name) {
@@ -131,12 +163,34 @@ func (t *Tracker) closing(n int) {
 		}
 	}
 	p := &t.open[n-2]
-	if p.class == nil || f.nilled || (f.primitive && !f.hasText) {
+	if p.class == nil || f.unread {
+		return
+	}
+	if f.nilled || (f.primitive && !f.hasText) {
+		// Only the outermost nilled element is sent without a value. An
+		// entry of a Hash member is a value whatever its text: its decoder
+		// does not read it as a primitive ([decodeEntryValue]).
+		if t.presence != nil && !p.nilled {
+			var b strings.Builder
+			t.writePointer(&b, n)
+			t.sentMember(b.String(), f.nilled)
+		}
 		return
 	}
 	if i := slices.Index(p.class.Required, f.name); i >= 0 {
 		p.seen |= 1 << i
 	}
+}
+
+// sentMember passes the pointer of a member the document sends without a
+// value to the decode's hook, or holds it while a Hash entry's key is
+// unknown ([Tracker.holdEntry]).
+func (t *Tracker) sentMember(pointer string, nilled bool) {
+	if t.held != nil {
+		*t.held = append(*t.held, heldItem{path: pointer, sent: true, nilled: nilled})
+		return
+	}
+	t.presence(pointer, nilled)
 }
 
 // missingMember passes the pointer of a mandatory member the document leaves
