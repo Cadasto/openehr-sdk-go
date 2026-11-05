@@ -159,15 +159,18 @@ func TestREQ056_XMLBeforeRoot(t *testing.T) {
 		"xml target in capitals":           `<?XML pi data?>`,
 	}
 	accepted := map[string]string{
-		"nothing":                     "",
-		"XML declaration":             `<?xml version="1.0" encoding="UTF-8"?>`,
-		"whitespace":                  " \n\t\r\n",
-		"comment":                     `<!-- note -->`,
-		"processing instruction":      `<?pi data?>`,
-		"document type":               `<!DOCTYPE dv_count>`,
-		"document type with subset":   `<!DOCTYPE dv_count [<!ENTITY e "v">]>`,
-		"byte order mark":             bom,
-		"target that starts with xml": `<?xml version="1.0"?><?xml-stylesheet href="a.xsl"?>`,
+		"nothing":         "",
+		"XML declaration": `<?xml version="1.0" encoding="UTF-8"?>`,
+		// XML 1.0 puts the declaration at the very start; the codec also
+		// reads it where only whitespace comes before it (wire.md § REQ-056).
+		"XML declaration after whitespace": "\n " + `<?xml version="1.0"?>`,
+		"whitespace":                       " \n\t\r\n",
+		"comment":                          `<!-- note -->`,
+		"processing instruction":           `<?pi data?>`,
+		"document type":                    `<!DOCTYPE dv_count>`,
+		"document type with subset":        `<!DOCTYPE dv_count [<!ENTITY e "v">]>`,
+		"byte order mark":                  bom,
+		"target that starts with xml":      `<?xml version="1.0"?><?xml-stylesheet href="a.xsl"?>`,
 		"the whole prolog": bom + `<?xml version="1.0"?>` + "\n<!-- a -->\n" + `<!DOCTYPE dv_count SYSTEM "x.dtd">` +
 			"\n<?pi x?>\n<!-- b -->\n",
 	}
