@@ -14,30 +14,30 @@ Forty-fifth `v0.x` minor: the ADL 1.4 operational template model, a compile step
 
 ### Added
 
-- **The `aom14` package models the ADL 1.4 operational template: `ReadOperationalTemplate` reads an OPT within bounds, both canonical codecs write it back with nothing dropped, and `CQuantityItem` carries its units system and display name (REQ-176, PROBE-111).**
-- **The compiled template carries the template's default values (`CompiledNode.DefaultValue`) and a `C_CODE_REFERENCE` as `constraints.CodeReference`, which validation, generation, FLAT and the Web Template read as its code phrase constraint (REQ-111, REQ-103).**
-- **The operational template reader and compile step read every OPT `template.ParseOPT` read, as it read it, and refuse its weaker readings given `canxml.WithStrict` or the new `templatecompile.WithStrict` (REQ-111).**
-- **`canxml.WithMaxDepth` bounds a decode's element depth, and a document past it, or past encoding/xml's own limit, fails with a short error wrapping `canxml.ErrLimitExceeded` (REQ-108).**
-- **`contribution.UnmarshalSubmission` decodes a canonical-JSON Contribution_create body into a `Submission`, and a composition save or update the format cannot carry fails before any request with a typed `*composition.EncodeError` (REQ-130, REQ-173).**
+- **The `aom14` package** models the ADL 1.4 operational template: `ReadOperationalTemplate` reads an OPT within bounds, both canonical codecs write it back with nothing dropped, and `CQuantityItem` carries its units system and display name (REQ-176, PROBE-111).
+- **The compiled template** carries the template's default values (`CompiledNode.DefaultValue`) and a `C_CODE_REFERENCE` as `constraints.CodeReference`, which validation, generation, FLAT and the Web Template read as its code phrase constraint (REQ-111, REQ-103).
+- **The operational template reader and compile step** read every OPT `template.ParseOPT` read, as it read it, and refuse its weaker readings given `canxml.WithStrict` or the new `templatecompile.WithStrict` (REQ-111).
+- **`canxml.WithMaxDepth`** bounds a decode's element depth, and a document past it, or past encoding/xml's own limit, fails with a short error wrapping `canxml.ErrLimitExceeded` (REQ-108).
+- **`contribution.UnmarshalSubmission`** decodes a canonical-JSON Contribution_create body into a `Submission`, and a composition save or update the format cannot carry fails before any request with a typed `*composition.EncodeError` (REQ-130, REQ-173).
 
 ### Changed
 
-- **Breaking: `templatecompile.Compile` takes an `*aom14.OperationalTemplate`, path lookup runs on the compiled template through `Compiled.Resolve`, and `template.NewMultiplicity` takes interval bounds (REQ-111, REQ-100).**
-- **Breaking: `CompiledNode.SlotIncludes` and `SlotExcludes`, and a slot's AQL path predicate, give each assertion's archetype-id pattern rather than its raw text (REQ-111).**
-- **Breaking: an OPT holding an integer past 32 bits, a `match_negated` of true, an infinite bound no integer meets, or a definition typed as a slot or constraint, or with no RM type, no longer compiles (REQ-111).**
-- **Breaking: the `aom14` types follow the AOM 1.4 schema: `CCodedText`, `COrdinal` and `CQuantity` take the schema's class names, an archetype's definition and ontology become interfaces, and a quantity item's magnitude a pointer (REQ-176).**
-- **Breaking: canonical XML reads `Real` text in the `xs:double` lexical space, keeps a repeated `Hash` key's first entry, refuses an `xsi:type` prefix other than XML Schema's, and writes archetype term codes as attributes (REQ-056, REQ-170).**
-- **Breaking: `rm.TranslationDetails.Accreditaton` is renamed `Accreditation`, which canonical XML now writes before `other_details`, in ITS-XML order (REQ-041).**
-- **Canonical JSON writes a present empty `ITEM_LIST.items`, `ITEM_TREE.items` or `ITEM_TABLE.rows` as `[]`, the instance generator writes one the template requires by existence, and template validation reports it required when absent (REQ-052, REQ-102, REQ-107).**
-- **`CDate`, `CTime` and `CDateTime` compare a value and a range bound at the precision both share, as do the RM floor's interval check and the generator's interval ordering (REQ-103, REQ-112, REQ-107).**
-- **`template.ParseOPT` reads `timezone_validity` as a `VALIDITY_KIND` word, which strict mode refused and lenient mode misread for two words, or as the code 1001 to 1003 (REQ-103).**
-- **A stored query's `Location` decodes each name and version segment once, so a name holding a literal `%` comes back as stored (REQ-057).**
-- **`bmm.LoadAll` settles a class that several includes reach whatever their order, the schema descending from the others winning, and otherwise returns `ErrSchemaConflict` (REQ-045).**
-- **The minimum `go-jose/v4` moves to v4.1.7, which fixes five security advisories, among them denial of service and panics on crafted JOSE input.**
+- **Breaking: `templatecompile.Compile`** takes an `*aom14.OperationalTemplate`, path lookup runs on the compiled template through `Compiled.Resolve`, and `template.NewMultiplicity` takes interval bounds (REQ-111, REQ-100).
+- **Breaking: `CompiledNode.SlotIncludes` and `SlotExcludes`**, and a slot's AQL path predicate, give each assertion's archetype-id pattern rather than its raw text (REQ-111).
+- **Breaking:** an OPT holding an integer past 32 bits, a `match_negated` of true, an infinite bound no integer meets, or a definition typed as a slot or constraint, or with no RM type, no longer compiles (REQ-111).
+- **Breaking: the `aom14` types** follow the AOM 1.4 schema: `CCodedText`, `COrdinal` and `CQuantity` take the schema's class names, an archetype's definition and ontology become interfaces, and a quantity item's magnitude a pointer (REQ-176).
+- **Breaking: canonical XML** reads `Real` text in the `xs:double` lexical space, keeps a repeated `Hash` key's first entry, refuses an `xsi:type` prefix other than XML Schema's, and writes archetype term codes as attributes (REQ-056, REQ-170).
+- **Breaking: `rm.TranslationDetails.Accreditaton`** is renamed `Accreditation`, which canonical XML now writes before `other_details`, in ITS-XML order (REQ-041).
+- **Canonical JSON** writes a present empty `ITEM_LIST.items`, `ITEM_TREE.items` or `ITEM_TABLE.rows` as `[]`, the instance generator writes one the template requires by existence, and template validation reports it required when absent (REQ-052, REQ-102, REQ-107).
+- **`CDate`, `CTime` and `CDateTime`** compare a value and a range bound at the precision both share, as do the RM floor's interval check and the generator's interval ordering (REQ-103, REQ-112, REQ-107).
+- **`template.ParseOPT`** reads `timezone_validity` as a `VALIDITY_KIND` word, which strict mode refused and lenient mode misread for two words, or as the code 1001 to 1003 (REQ-103).
+- **A stored query's `Location`** decodes each name and version segment once, so a name holding a literal `%` comes back as stored (REQ-057).
+- **`bmm.LoadAll`** settles a class that several includes reach whatever their order, the schema descending from the others winning, and otherwise returns `ErrSchemaConflict` (REQ-045).
+- **The minimum `go-jose/v4`** moves to v4.1.7, which fixes five security advisories, among them denial of service and panics on crafted JOSE input.
 
 ### Deprecated
 
-- **`template.ParseOPT` and its tree: read an OPT with `aom14.ReadOperationalTemplate` and compile it with `templatecompile.Compile`; a later release removes them (REQ-100, REQ-111).**
+- **`template.ParseOPT` and its tree:** read an OPT with `aom14.ReadOperationalTemplate` and compile it with `templatecompile.Compile`; a later release removes them (REQ-100, REQ-111).
 
 ## [0.44.0] - 2026-10-30
 
@@ -45,15 +45,15 @@ Forty-fourth `v0.x` minor: failed health probes carry their HTTP status, a parse
 
 ### Added
 
-- **`admin.StatusError` carries a failed probe's path and HTTP status, and `admin.ErrUnexpectedStatus` matches the statuses no `transport` sentinel covers, 600 to 999 included (REQ-083).**
-- **`parse.Query.Spans` gives the byte offsets of each clause, and of the WHERE expression, in the source text (REQ-113).**
-- **The openEHR error envelope reads the coded `errors` list beside `coded_text`, keeps the code when a member has the wrong JSON type, and fills `CodedTextItem.Value` under `WithRawErrorBodies(true)` (REQ-093).**
+- **`admin.StatusError`** carries a failed probe's path and HTTP status, and `admin.ErrUnexpectedStatus` matches the statuses no `transport` sentinel covers, 600 to 999 included (REQ-083).
+- **`parse.Query.Spans`** gives the byte offsets of each clause, and of the WHERE expression, in the source text (REQ-113).
+- **The openEHR error envelope** reads the coded `errors` list beside `coded_text`, keeps the code when a member has the wrong JSON type, and fills `CodedTextItem.Value` under `WithRawErrorBodies(true)` (REQ-093).
 
 ### Changed
 
-- **Breaking: the VERSIONED_PARTY version reads return `ErrInvalidShape` on an empty or `null` 2xx body, 204 included, as the composition and EHR_STATUS reads do (REQ-174).**
-- **Error text names no requirement id, FLAT refusals name keys instead of composition values, and a `cadasto/admin` probe's request failure leaves out net/http's text (REQ-093, REQ-053).**
-- **Canonical JSON decode, the `WithMissing`, `WithStrict` and `ValidateJSON` reports, and AQL lint do less work per call, with identical results (REQ-052, REQ-108, REQ-175).**
+- **Breaking: the VERSIONED_PARTY version reads** return `ErrInvalidShape` on an empty or `null` 2xx body, 204 included, as the composition and EHR_STATUS reads do (REQ-174).
+- **Error text** names no requirement id, FLAT refusals name keys instead of composition values, and a `cadasto/admin` probe's request failure leaves out net/http's text (REQ-093, REQ-053).
+- **Canonical JSON decode**, the `WithMissing`, `WithStrict` and `ValidateJSON` reports, and AQL lint do less work per call, with identical results (REQ-052, REQ-108, REQ-175).
 
 ## [0.43.0] - 2026-10-29
 
@@ -61,18 +61,18 @@ Forty-third `v0.x` minor: the instance generator builds the template shapes it u
 
 ### Added
 
-- **`smart.JWKS.MinRefreshInterval` limits how often a verification miss refetches the key set, 30 s from `NewJWKS`, and `smart.TokenResponse.HasExpiresIn` tells a missing `expires_in` from a zero one (REQ-062, REQ-063).**
+- **`smart.JWKS.MinRefreshInterval`** limits how often a verification miss refetches the key set, 30 s from `NewJWKS`, and `smart.TokenResponse.HasExpiresIn` tells a missing `expires_in` from a zero one (REQ-062, REQ-063).
 
 ### Changed
 
 - **Breaking: `rm.Real` decode refuses a lossy literal, one a float64 cannot hold at its written precision, replacing the 17-digit budget (REQ-052, REQ-056).** Canonical JSON and XML refuse `9007199254740993` and accept `18446744073709551616`.
 - **Breaking: SMART auth verifies an ID token only with a signing key for its `alg`, reads JOSE member names case-sensitively, and takes `expires_in` 0 as a zero lifetime (REQ-062, REQ-063).** `jwtbearer` refuses a negative lifetime.
-- **Breaking: zoned `DV_DATE_TIME` values compare and order as UTC instants, so the interval checks on them change, and the `DV_URI` and `DV_EHR_URI` functions answer instead of panicking (REQ-120, REQ-123).**
-- **Breaking: `rmpath` refuses the predicates outside its grammar it used to misread, and `composition.Builder` builds a path through a class held by value, such as `ism_transition/current_state` (REQ-121, REQ-101).**
-- **Breaking: `aql.Compare` refuses a literal or parameter as its left operand, and the AQL linter accepts `content[<archetype id>]` paths it warned on (REQ-119, REQ-109).**
-- **`instance.Generate` and `composition.NewSkeleton` build untyped and abstract children and intervals over abstract ordered types they used to refuse, and a list topped up to its lower bound takes the first child with room (REQ-107).**
-- **Canonical JSON decode, FLAT decode with a template, AQL parsing and template validation do less work per call, with identical results (REQ-052, REQ-053, REQ-171).**
-- **`cmd/cdrcheck` redacts percent-encoded credentials and refuses a template rename onto another input's id (REQ-082).**
+- **Breaking: zoned `DV_DATE_TIME` values** compare and order as UTC instants, so the interval checks on them change, and the `DV_URI` and `DV_EHR_URI` functions answer instead of panicking (REQ-120, REQ-123).
+- **Breaking: `rmpath`** refuses the predicates outside its grammar it used to misread, and `composition.Builder` builds a path through a class held by value, such as `ism_transition/current_state` (REQ-121, REQ-101).
+- **Breaking: `aql.Compare`** refuses a literal or parameter as its left operand, and the AQL linter accepts `content[<archetype id>]` paths it warned on (REQ-119, REQ-109).
+- **`instance.Generate` and `composition.NewSkeleton`** build untyped and abstract children and intervals over abstract ordered types they used to refuse, and a list topped up to its lower bound takes the first child with room (REQ-107).
+- **Canonical JSON decode**, FLAT decode with a template, AQL parsing and template validation do less work per call, with identical results (REQ-052, REQ-053, REQ-171).
+- **`cmd/cdrcheck`** redacts percent-encoded credentials and refuses a template rename onto another input's id (REQ-082).
 
 ## [0.42.0] - 2026-10-27
 
@@ -81,25 +81,25 @@ Forty-second `v0.x` minor: the canonical decoders report the mandatory members a
 ### Added
 
 - **The canonical JSON and XML decoders report the mandatory members a document leaves out with `WithMissing`, and `validation.ValidateJSON`, `ValidateXML` and `WithMissing` read that report (REQ-175, ADR 0033).** The default decode is unchanged.
-- **`parse.FunctionCall.Raw` keeps an AQL function call's source text, as paths and literals already do (REQ-113).**
-- **The ITS-XML schemas are vendored under `resources/its-xml/`, and every vendored upstream resource has a sha256 manifest that `make ci` checks offline (REQ-041).**
-- **Replay recordings of error envelopes and composition updates from EHRbase and FerroEHR, with two new `make probe-record` scenarios (REQ-082).**
+- **`parse.FunctionCall.Raw`** keeps an AQL function call's source text, as paths and literals already do (REQ-113).
+- **The ITS-XML schemas** are vendored under `resources/its-xml/`, and every vendored upstream resource has a sha256 manifest that `make ci` checks offline (REQ-041).
+- **Replay recordings** of error envelopes and composition updates from EHRbase and FerroEHR, with two new `make probe-record` scenarios (REQ-082).
 
 ### Changed
 
-- **Breaking: `validation.Validate`, `Validator.Validate` and `ValidateRM` take variadic options, so a caller that stores one in a function value of the old type no longer compiles (REQ-175).**
-- **Breaking: the RM floor, and so template validation, refuses an empty `links` or `location` and a `DV_EHR_URI` without the `ehr` scheme (REQ-112).**
+- **Breaking: `validation.Validate`, `Validator.Validate` and `ValidateRM`** take variadic options, so a caller that stores one in a function value of the old type no longer compiles (REQ-175).
+- **Breaking: the RM floor**, and so template validation, refuses an empty `links` or `location` and a `DV_EHR_URI` without the `ehr` scheme (REQ-112).
 - **Breaking: canonical XML writes children in the ITS-XML schema order, and refuses text before the root and, under `WithStrict`, stray text inside elements (REQ-056).** A primitive that does not decode fails with a value-free `*canxml.DecodeError`.
 - **Breaking: `transport` retries PUT and DELETE only under `RetryNonIdempotent` (REQ-091).** `WireError.Error` quotes the openEHR code.
 - **`simplified.WithTemplate` decodes what `MarshalFlat` and `MarshalStructured` wrote to a composition that validates against the template, with members in template order (REQ-053).** An ACTION with no archetyped transition writes its `current_state` terminology.
 - **Auth, SMART, discovery and transport values print and log without their credentials (REQ-060).** Two `StaticTokenSource` values from equal tokens no longer compare equal.
-- **A SMART refresh outlives the call that started it, and on a transient renewal failure the token sources serve the still-valid token, with backoff (REQ-063).**
-- **Service discovery honours the cache lifetime a response declares, so `max-age=0`, `no-store` and `no-cache` refetch on the next use (REQ-071).**
-- **Contribution bodies leave a typed-nil RM slot out instead of writing `null`, and `definition.UploadTemplate` strips a leading UTF-8 byte-order mark (REQ-052, REQ-130).**
+- **A SMART refresh** outlives the call that started it, and on a transient renewal failure the token sources serve the still-valid token, with backoff (REQ-063).
+- **Service discovery** honours the cache lifetime a response declares, so `max-age=0`, `no-store` and `no-cache` refetch on the next use (REQ-071).
+- **Contribution bodies** leave a typed-nil RM slot out instead of writing `null`, and `definition.UploadTemplate` strips a leading UTF-8 byte-order mark (REQ-052, REQ-130).
 
 ### Deprecated
 
-- **`validation.ValidateRMEHRStatusBytes`, which `ValidateJSON` now covers (REQ-175).**
+- **`validation.ValidateRMEHRStatusBytes`**, which `ValidateJSON` now covers (REQ-175).
 
 ## [0.41.0] - 2026-10-26
 
@@ -109,7 +109,7 @@ Forty-first `v0.x` minor: template validation and the OPT parser check what a li
 
 - **`composition` and `ehrstatus` read a record's version history: the versioned object, its revision history, and a version, latest, at a time or by id (REQ-174, PROBE-109).** A logically deleted version reads with no payload.
 - **The OPT parser reads open string lists, quantity property units and ADL 1.4 temporal patterns and ranges (REQ-100, REQ-103, REQ-034).** `terminology.QuantityPropertyByCode` and `QuantityProperties` look up the openEHR property-unit table.
-- **`make cdr-crosscheck` checks generated documents and the CDRs' own examples against live CDRs, opt-in through environment variables (REQ-082).**
+- **`make cdr-crosscheck`** checks generated documents and the CDRs' own examples against live CDRs, opt-in through environment variables (REQ-082).
 
 ### Changed
 
@@ -174,9 +174,9 @@ Thirty-seventh `v0.x` minor: the instance generator builds at three levels named
 ### Changed
 
 - **Breaking: with no policy, `Generate` and `NewSkeleton` build `Medium`, v0.35's `Minimal`, and `instance.Minimal` now names `Required`, which builds only what the template makes mandatory (REQ-107, REQ-101).** A vital_signs skeleton holds 189 values where v0.36 gave 519; pass `instance.Large` for v0.36's tree.
-- **Breaking: `composition.NewBuilder` builds on `Large` and refuses `Medium` and `Required`, and every entry point refuses an undefined level with an error matching `instance.ErrUnsupportedPolicy` (REQ-101, REQ-107).**
+- **Breaking: `composition.NewBuilder`** builds on `Large` and refuses `Medium` and `Required`, and every entry point refuses an undefined level with an error matching `instance.ErrUnsupportedPolicy` (REQ-101, REQ-107).
 - **Breaking: `DVCount.Magnitude` is an `rm.Integer64`, which reads `2.0`, `2e0` or `"2"` as 2 in canonical JSON, FLAT and STRUCTURED, as `Integer` does (REQ-052, REQ-053).** A non-zero fraction is refused with `strconv.ErrSyntax`, and a number outside `int64` with `strconv.ErrRange`.
-- **A generated `PARTY_RELATED` carries a `relationship`, `openehr 253|unknown|` unless the template sets one, and a pinned openEHR code takes its rubric only where the template's text constraint admits it (REQ-107).**
+- **A generated `PARTY_RELATED`** carries a `relationship`, `openehr 253|unknown|` unless the template sets one, and a pinned openEHR code takes its rubric only where the template's text constraint admits it (REQ-107).
 
 ### Removed
 
@@ -197,12 +197,12 @@ Thirty-sixth `v0.x` minor: canonical JSON, validation and the template-driven pa
 - **Breaking: the `Minimal` policy builds a member for each optional archetype under an attribute, and generated locatables are named by their node's term (REQ-107).** A vital_signs skeleton now holds all four observations, and both compile modes give the same instance.
 - **Breaking: the template's date, time, date-time and duration validators accept exactly the ISO 8601 forms the RM accepts (REQ-103, REQ-123).** Offsets such as `+0100` and `-P1D` now pass; `10:30:00.+01` and `P1DT` are refused.
 - **Breaking: `composition.Builder.Set` writes to the sibling a name predicate picks, and refuses a name no sibling pins (REQ-101, REQ-116).** It used to write into the first same-id sibling; a zero-value `Builder` returns an error instead of panicking.
-- **`DvQuantity.Validate` admits a value any same-units range admits, and a slot lists each include pattern once (REQ-103, REQ-104).**
+- **`DvQuantity.Validate`** admits a value any same-units range admits, and a slot lists each include pattern once (REQ-103, REQ-104).
 - **Canonical JSON, validation and the template-driven paths are faster with identical results (REQ-052, REQ-171, REQ-107).** Decoding is 44% and encoding 25% faster, validation 51% faster with 76% less memory, and `Generate` and `NewBuilder` about 77% faster.
 - **The AQL containment relation reaches a composition version through a FOLDER (REQ-160).** `FOLDER CONTAINS VERSION` draws `aql_containment_by_reference` instead of `aql_impossible_containment`; `EVENT_CONTEXT` as an operand stays an engine extension.
 - **A token refresh or key-set fetch that callers share no longer fails or hangs the others when the caller running it gives up or panics (REQ-062, REQ-063).** This holds in `auth/smart`, `auth/clientcreds`, `auth/jwtbearer` and `smart/discovery`.
 - **A failed reauth keeps the 401 in the error chain, a request that cannot be built is not retried, and the observer sees a call refused before any attempt (REQ-063, REQ-091, REQ-098).** Error texts no longer cite requirement ids.
-- **The zero `discovery.MemoryCache` and a `JWKS` literal no longer panic, and a negative refresh threshold counts as 0 (REQ-025, REQ-063).**
+- **The zero `discovery.MemoryCache` and a `JWKS` literal** no longer panic, and a negative refresh threshold counts as 0 (REQ-025, REQ-063).
 
 ## [0.35.0] - 2026-10-16
 
