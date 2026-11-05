@@ -445,6 +445,10 @@ func itemMemberRole(p, e *element) role {
 		if local == "true_valid" || local == "false_valid" || local == "assumed_value" {
 			return roleValue
 		}
+	case "C_STRING":
+		if local == "list_open" {
+			return roleValue
+		}
 	case "C_INTEGER", "C_REAL":
 		switch local {
 		case "list", "assumed_value":
@@ -727,6 +731,8 @@ func (t *tolerantReading) closeValue(e *element) {
 		switch p.class {
 		case "C_BOOLEAN":
 			t.closeBooleanMember(p, e)
+		case "C_STRING":
+			t.closeListOpen(e)
 		case "C_INTEGER", "C_REAL":
 			t.closeNumberMember(p, e)
 		default:
@@ -791,6 +797,18 @@ func (t *tolerantReading) closeBooleanMember(p, e *element) {
 			t.setText(e, strconv.FormatBool(want))
 			return
 		}
+	}
+	t.closeTag(e)
+}
+
+// closeListOpen reads e, the list_open of a C_STRING item. One of white
+// space only reads as an empty one, which the decode reads as false, in every
+// mode: XML Schema's boolean type collapses white space, so the list stays
+// closed.
+func (t *tolerantReading) closeListOpen(e *element) {
+	if !e.nested && len(e.text) > 0 && isBlank(e.text) {
+		t.setText(e, "")
+		return
 	}
 	t.closeTag(e)
 }
