@@ -2,6 +2,7 @@ package xmlunmatched
 
 import (
 	"encoding/xml"
+	"io"
 	"slices"
 )
 
@@ -51,33 +52,66 @@ func DecodeChoice(dec *xml.Decoder, start xml.StartElement, shapes []Shape) (any
 		v := shape.New()
 		return v, dec.DecodeElement(v, &start)
 	}
-	// An untracked decoder cannot read ahead: the tokens up to the first
-	// child are read, then handed to the shape's decoder again, before the
-	// rest, through a decoder of their own.
-	start = start.Copy()
-	toks := []xml.Token{start}
-	var first xml.Name
-	for {
-		tok, err := dec.Token()
-		if err != nil {
-			return nil, err
-		}
-		tok = xml.CopyToken(tok)
-		toks = append(toks, tok)
-		if tk, ok := tok.(xml.StartElement); ok {
-			first = tk.Name
-			break
-		}
-		if _, ok := tok.(xml.EndElement); ok {
-			break
-		}
+	// An untracked decoder cannot read ahead. The element is read whole
+	// first, through dec, one element at a time ([subtree]), so encoding/xml
+	// counts the depth of each element below from the root, as it does
+	// everywhere else; then its tokens are handed to the shape's decoder
+	// through a decoder of their own, which reads nothing else.
+	toks := make([]xml.Token, 0, 32) // a symbol's tokens, in the canonical shape
+	if err := dec.DecodeElement(&subtree{toks: &toks}, &start); err != nil {
+		return nil, err
 	}
-	replay := xml.NewTokenDecoder(&replayReader{toks: toks, src: dec})
+	replay := xml.NewTokenDecoder(&replayReader{toks: toks})
 	if _, err := replay.Token(); err != nil { // start, so the replay decoder holds it open
 		return nil, err
 	}
-	v := chooseShape(shapes, first).New()
+	v := chooseShape(shapes, firstChild(toks)).New()
 	return v, replay.DecodeElement(v, &start)
+}
+
+// subtree is an encoding/xml Unmarshaler that copies the tokens of the
+// element it decodes, its start and end included, into toks. It hands each
+// child element back to the decoder, through DecodeElement, so the decoder
+// applies its own depth limit to every element of the subtree, counted from
+// the root of the document. The copy holds the whole element.
+type subtree struct {
+	toks *[]xml.Token
+}
+
+// UnmarshalXML copies the element start opens, and every element inside it.
+func (s *subtree) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	*s.toks = append(*s.toks, start.Copy())
+	for {
+		tok, err := d.Token()
+		if err != nil {
+			return err
+		}
+		switch tk := tok.(type) {
+		case xml.StartElement:
+			if err := d.DecodeElement(s, &tk); err != nil {
+				return err
+			}
+		case xml.EndElement:
+			*s.toks = append(*s.toks, tk)
+			return nil
+		default:
+			*s.toks = append(*s.toks, xml.CopyToken(tok))
+		}
+	}
+}
+
+// firstChild returns the name of the first child element of the element
+// whose tokens are toks, its start first, or the zero name when it has none.
+func firstChild(toks []xml.Token) xml.Name {
+	for _, tok := range toks[1:] {
+		switch tk := tok.(type) {
+		case xml.StartElement:
+			return tk.Name
+		case xml.EndElement:
+			return xml.Name{}
+		}
+	}
+	return xml.Name{}
 }
 
 // chooseShape returns the first of shapes whose elements name first, the
@@ -125,18 +159,17 @@ func (r *trackingReader) peekChild() (xml.Name, error) {
 }
 
 // replayReader is a token source that returns a fixed list of tokens, then
-// the tokens of src.
+// io.EOF.
 type replayReader struct {
 	toks []xml.Token
-	src  *xml.Decoder
 }
 
-// Token returns the next token of the list, or of src once the list is done.
+// Token returns the next token of the list, or io.EOF once the list is done.
 func (r *replayReader) Token() (xml.Token, error) {
-	if len(r.toks) > 0 {
-		tok := r.toks[0]
-		r.toks = r.toks[1:]
-		return tok, nil
+	if len(r.toks) == 0 {
+		return nil, io.EOF
 	}
-	return r.src.Token()
+	tok := r.toks[0]
+	r.toks = r.toks[1:]
+	return tok, nil
 }
