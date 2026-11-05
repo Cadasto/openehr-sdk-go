@@ -112,8 +112,8 @@ type engine struct {
 	depthStopped bool
 	depthCuts    int
 	// external holds, in walk order, the path of each node bound to a
-	// CONSTRAINT_REF, whose value set is outside the SDK
-	// ([Coverage.External]). Nil until one is met.
+	// constraint whose value set is outside the SDK ([boundOutside],
+	// [Coverage.External]). Nil until one is met.
 	external []string
 	// notInRM holds, in walk order, the path of each attribute a bound
 	// template node declares that the node's RM class does not have, which
@@ -601,7 +601,9 @@ func (e *engine) checkIdentityAndType(n engineNode) (scalar bool) {
 // walk holds until it has visited the node's attributes, and nil otherwise.
 // A CONSTRAINT_REF names a value set outside the SDK and checks nothing
 // locally: its path is listed in [Coverage.External], and the bound value's
-// attributes are visited against the node as at any other.
+// attributes are visited against the node as at any other. A
+// C_CODE_REFERENCE that names a reference set and lists no code is listed
+// there too ([boundOutside]), and is judged by its code phrase as any other.
 func (e *engine) checkLeaf(n engineNode, scalar bool, class string) (*tcimpl.CompiledNode, *heldJudgement) {
 	if n.bound.IsSlot() {
 		return nil, nil
@@ -611,12 +613,13 @@ func (e *engine) checkLeaf(n engineNode, scalar bool, class string) (*tcimpl.Com
 		return n.bound, nil
 	}
 	held := e.judgeLeaf(n, class, pc)
-	if !isConstraintRef(pc) {
-		return nil, held
+	if boundOutside(pc) {
+		e.external = append(e.external, n.path.String())
 	}
-	e.external = append(e.external, n.path.String())
-	if scalar {
-		return nil, held // a scalar has no attributes to visit
+	if !isConstraintRef(pc) || scalar {
+		// Only a CONSTRAINT_REF's value has its attributes visited against
+		// the node, and a scalar has no attributes to visit.
+		return nil, held
 	}
 	return n.bound, held
 }
