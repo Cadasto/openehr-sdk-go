@@ -309,7 +309,9 @@ func (e *engine) bindItems(n *engineNode, a *engineAttr, children []*tcimpl.Comp
 	items := r.items
 	bound = make([]*tcimpl.CompiledNode, len(items))
 	byNodeID = make([]bool, len(items))
-	parent := n.bound.RMTypeName()
+	// The type the compile reads the bound node as, so an untyped one is
+	// read as the type of the attribute that holds it (REQ-111).
+	parent := tcimpl.ReadAsRMType(n.bound)
 	var buf [8]*tcimpl.CompiledNode
 	ranked := false
 	for i, item := range items {

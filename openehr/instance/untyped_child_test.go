@@ -233,6 +233,16 @@ func TestREQ107_UntypedChildIsReadAsTheTypeItIsBuiltAs(t *testing.T) {
 			},
 		},
 		{
+			// The template validator reads the untyped event as an EVENT,
+			// whose offset no serialization carries, as the generator does.
+			name:  "a POINT_EVENT whose offset the template requires",
+			typed: "POINT_EVENT",
+			opt: func(rmType string) string {
+				return historyOf(optNode(rmType, "at0002",
+					optSingle("offset", optNode("DV_DURATION", "")), optSingle("data", emptyTree)))
+			},
+		},
+		{
 			name:  "a POINT_EVENT whose mandatory data the template makes optional",
 			typed: "POINT_EVENT",
 			opt: func(rmType string) string {
