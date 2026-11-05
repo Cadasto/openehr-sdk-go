@@ -17,9 +17,11 @@ import (
 // [Unmarshal], for content before the root element other than the XML
 // declaration, comments, processing instructions, whitespace and one
 // document type declaration, and after it other than comments, processing
-// instructions and whitespace; and for an interval side written bounded
-// with no bound where the bound is held by value. Encode returns it for a
-// nil value or a value that does not implement xml.Marshaler. Other XML
+// instructions and whitespace, and for a processing instruction whose
+// target is xml in any letter case anywhere but the XML declaration at the
+// start; and for an interval side written bounded with no bound where the
+// bound is held by value. Encode returns it for a nil value or a value that
+// does not implement xml.Marshaler. Other XML
 // syntax errors come back unchanged from encoding/xml, so an errors.Is
 // against this sentinel does not match a truncated root or a syntax error
 // inside it.

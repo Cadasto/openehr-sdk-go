@@ -190,8 +190,10 @@ func TestREQ176_ReadOperationalTemplateAppliesTheCallersOptions(t *testing.T) {
 // comments, processing instructions and whitespace pass, and an element,
 // text, a CDATA section or a stray end element is refused with an error
 // wrapping canxml.ErrInvalidShape that carries none of it. A `<!…>`
-// declaration, which encoding/xml reads, is read past in the default mode and
-// refused so given canxml.WithStrict.
+// declaration, and a processing instruction whose target is xml in any
+// letter case, which XML reserves for the XML declaration at the start, are
+// read past in the default mode and refused so given canxml.WithStrict. A
+// target that only starts with xml passes in every mode.
 func TestREQ176_REQ111_ReadOperationalTemplateHoldsContentAfterTheRoot(t *testing.T) {
 	t.Parallel()
 	const planted = "PLANTED"
@@ -203,14 +205,17 @@ func TestREQ176_REQ111_ReadOperationalTemplateHoldsContentAfterTheRoot(t *testin
 		"a CDATA section":     `<![CDATA[` + planted + `]]>`,
 	}
 	defaultOnly := map[string]string{
-		"a document type":     `<!DOCTYPE ` + planted + `>`,
-		"another declaration": `<!ENTITY ` + planted + ` "x">`,
+		"a document type":           `<!DOCTYPE ` + planted + `>`,
+		"another declaration":       `<!ENTITY ` + planted + ` "x">`,
+		"an XML declaration":        `<?xml version="1.0" extra="` + planted + `"?>`,
+		"an xml target in capitals": `<?XML ` + planted + `?>`,
 	}
 	accepted := map[string]string{
-		"nothing":                  "",
-		"whitespace":               " \n\t\r\n",
-		"a comment":                `<!-- note -->`,
-		"a processing instruction": `<?pi data?>`,
+		"nothing":                       "",
+		"whitespace":                    " \n\t\r\n",
+		"a comment":                     `<!-- note -->`,
+		"a processing instruction":      `<?pi data?>`,
+		"a target that starts with xml": `<?xml-stylesheet href="a.xsl"?>`,
 	}
 	for mode, opts := range readModes {
 		for name, tail := range refused {
