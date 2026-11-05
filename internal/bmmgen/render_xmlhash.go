@@ -264,6 +264,6 @@ func unmarshalXMLHash(recv, field, elem string, h *xmlHash) string {
 // refused on request, and the field is left at its zero value.
 func unmarshalXMLHashUnmodelled(elem string) string {
 	return fmt.Sprintf(
-		"\t\t\tcase %q:\n\t\t\t\t// Canonical XML does not model a Hash of these values — see canxml/doc.go.\n\t\t\t\tif _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
+		"\t\t\tcase %q:\n\t\t\t\t// Canonical XML does not model a Hash of these values — see canxml/doc.go.\n\t\t\t\tif _err := xmlunmatched.SkipUnmodelled(_dec, _t); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
 		elem)
 }

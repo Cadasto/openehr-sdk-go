@@ -141,8 +141,8 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 							t.Fatalf("xmlHashOf(%s.%s): %v", pc.BMMName, prop, err)
 						}
 						if shape == nil {
-							if !strings.Contains(arm, "xmlunmatched.SkipUnmatched(_dec, _t)") {
-								t.Errorf("%s.%s is a Hash canonical XML does not model; its arm must hand the element to xmlunmatched.SkipUnmatched:\n%s", pc.BMMName, prop, arm)
+							if !strings.Contains(arm, "xmlunmatched.SkipUnmodelled(_dec, _t)") {
+								t.Errorf("%s.%s is a Hash canonical XML does not model; its arm must hand the element to xmlunmatched.SkipUnmodelled, which keeps the member present:\n%s", pc.BMMName, prop, arm)
 							}
 							continue
 						}

@@ -477,3 +477,32 @@ func TestREQ175_XMLNilMissingIsNoOption(t *testing.T) {
 		t.Errorf("Decoder(WithMissing).Decode err = %v; want a DecodeError on \"/dv_quantity[1]/magnitude[1]\": the decode is tracked", err)
 	}
 }
+
+// TestREQ175_XMLUnmodelledMemberIsPresent pins that the element of a member
+// the codec does not model, RESOURCE_ANNOTATIONS `documentation`, a Hash of
+// Hashes, gives the member a value though the decode skips it as unmatched
+// content: WithMissing reports the member only when the document leaves it
+// out, with WithUnmatched beside it or not.
+func TestREQ175_XMLUnmodelledMemberIsPresent(t *testing.T) {
+	into := func() any { return new(rm.ResourceAnnotations) }
+	for _, c := range []struct {
+		name string
+		in   string
+		want []string
+	}{
+		{name: "carried", in: `<annotations ` + ucNS + `><documentation id="ui"><item id="a"><item id="b">c</item></item></documentation></annotations>`},
+		{name: "left out", in: `<annotations ` + ucNS + `/>`, want: []string{"/documentation"}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			for _, opts := range [][]canxml.DecoderOption{nil, {canxml.WithUnmatched(func(string) {})}} {
+				_, got, err := decodeXMLMissing(into, []byte(c.in), opts...)
+				if err != nil {
+					t.Fatalf("canxml.Unmarshal(WithMissing) = %v; want nil", err)
+				}
+				if !slices.Equal(got, c.want) {
+					t.Errorf("WithMissing (%d other options) reported %q; want %q", len(opts), got, c.want)
+				}
+			}
+		})
+	}
+}

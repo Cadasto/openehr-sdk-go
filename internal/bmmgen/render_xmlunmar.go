@@ -616,12 +616,12 @@ var handWrittenXMLCodecs = map[string]bool{
 // unmarshalXMLNoDecoder emits the case of a property whose class has no
 // canonical-XML decoder of its own, such as a BMM primitive class like
 // TERMINOLOGY_CODE: encoding/xml would read nothing from it and report
-// nothing either. The element is handed to xmlunmatched.SkipUnmatched as one
-// item, like an Any member's: skipped by default, reported or refused on
-// request, and the field is left at its zero value.
+// nothing either. The element is handed to xmlunmatched.SkipUnmodelled as one
+// item: skipped by default, reported or refused on request, and the field is
+// left at its zero value, while the member counts as present.
 func unmarshalXMLNoDecoder(elem, bmmType string) string {
 	return fmt.Sprintf(
-		"\t\t\tcase %q:\n\t\t\t\t// Canonical XML has no decoder for %s — see canxml/doc.go.\n\t\t\t\tif _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
+		"\t\t\tcase %q:\n\t\t\t\t// Canonical XML has no decoder for %s — see canxml/doc.go.\n\t\t\t\tif _err := xmlunmatched.SkipUnmodelled(_dec, _t); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
 		elem, bmmType)
 }
 

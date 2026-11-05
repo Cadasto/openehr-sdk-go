@@ -1027,6 +1027,23 @@ func SkipUnmatched(dec *xml.Decoder, start xml.StartElement) error {
 	return dec.Skip()
 }
 
+// SkipUnmodelled skips the element start opens, the element of a member whose
+// content the codec does not model, a `Hash` of `Hash`es or a member whose Go
+// type has no decoder of its own, as [SkipUnmatched] skips an element: it is
+// one item of unmatched content, skipped by default, reported or refused on
+// request. Unlike an element SkipUnmatched skips, it is the member's own
+// element, so it gives the member a value for the missing-member report, and
+// a nilled one is a member sent without a value. start must be the token the
+// decoder read last.
+func SkipUnmodelled(dec *xml.Decoder, start xml.StartElement) error {
+	if t := trackerOf(dec); t != nil {
+		if err := t.unmatched(t.path(), isForeign(start.Name)); err != nil {
+			return err
+		}
+	}
+	return dec.Skip()
+}
+
 // CheckUnmatchedAttrs applies the decode's policy for unmatched content to
 // the attributes of start that the decoder does not read: every attribute
 // but those in the XML Schema instance namespace (the `xsi:type`
