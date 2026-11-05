@@ -111,8 +111,23 @@ type funcSource func() uint64
 
 func (f funcSource) Uint64() uint64 { return f() }
 
+// sliceSource, mapSource and chanSource are math/rand/v2.Sources of slice,
+// map and chan kind whose Uint64 panics when the value is nil: indexing a
+// nil slice, writing to a nil map and closing a nil chan all panic.
+type (
+	sliceSource []uint64
+	mapSource   map[int]uint64
+	chanSource  chan uint64
+)
+
+func (s sliceSource) Uint64() uint64 { return s[0] }
+
+func (m mapSource) Uint64() uint64 { m[0]++; return m[0] }
+
+func (c chanSource) Uint64() uint64 { close(c); return 0 }
+
 // typedNilSources are sources that are not nil themselves but hold a nil
-// pointer or func, so a plain nil check passes them and their first draw
+// pointer, func, slice, map or chan, so a plain nil check passes them and their first draw
 // panics.
 var typedNilSources = []struct {
 	name string
@@ -122,6 +137,9 @@ var typedNilSources = []struct {
 	{name: "nil *rand.ChaCha8", src: (*mrand.ChaCha8)(nil)},
 	{name: "nil *rand.Rand", src: (*mrand.Rand)(nil)},
 	{name: "nil func source", src: funcSource(nil)},
+	{name: "nil slice source", src: sliceSource(nil)},
+	{name: "nil map source", src: mapSource(nil)},
+	{name: "nil chan source", src: chanSource(nil)},
 }
 
 // TestUIDsFromTypedNilSourceIsNil is the idiom.md § No panics check that a
