@@ -7,7 +7,20 @@
 # canonical sources in one shot and states the PROBE-driven definition of done.
 #
 # Usage: scripts/spec-context.sh REQ-094     (also accepts: 094, req-094)
+#
+# Two optional modes keep a read small (`make spec-context REQ=107 OUTLINE=1`):
+#   OUTLINE=1      the canonical section's outline in place of its text: each
+#                  heading with its line range, word count, RULE name and first
+#                  sentence.
+#   RULE=<name>    only one rule of the canonical section, by its heading's
+#                  anchor or text, looked up inside that section; nothing else.
 set -euo pipefail
+
+OUTLINE="${OUTLINE:-}"
+RULE="${RULE:-}"
+# Rule mode prints the rule alone: the bundle's other sections go nowhere.
+exec 3>&1
+[[ -z "$RULE" ]] || exec 1>/dev/null
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SPECS="${ROOT}/docs/specifications"
@@ -82,7 +95,67 @@ if [[ -n "$canon" ]]; then
       }
     ' "$specfile")"
     [[ -n "$start" ]] || start="$(grep -nE "^#+ .*${REQ}([^0-9]|$)" "$specfile" | head -1 | cut -d: -f1 || true)"
-    if [[ -n "$start" ]]; then
+    if [[ -n "$start" && ( -n "$RULE" || -n "$OUTLINE" ) ]]; then
+      # The section's headings: from the REQ's heading to the next heading of
+      # the same or a higher level, a line inside a fenced code block never
+      # being one. Each heading's span runs to the next heading of the same or
+      # a higher level, inside the section. RULE matches a heading's GitHub
+      # anchor (without the -1, -2 a repeat elsewhere gets) or its text.
+      LC_ALL=C awk -v s="$start" -v rule="$RULE" -v src="docs/specifications/${file}" '
+        function slug(x,   t) { t = tolower(x); gsub(/[^a-z0-9 _-]/, "", t); gsub(/ /, "-", t); return t }
+        function first(a, b,   i, t) {
+          for (i = a; i < b; i++) {
+            t = L[i]; sub(/^[ \t]+/, "", t)
+            if (t == "" || t ~ /^#+[ \t]/) continue
+            if (t ~ /^\|/) return "(a table)"
+            if (length(t) > 180) t = substr(t, 1, 177) "..."
+            return t
+          }
+          return ""
+        }
+        { L[NR] = $0 }
+        END {
+          fence = 0; n = 0; end = NR + 1
+          for (i = s; i <= NR; i++) {
+            t = L[i]; sub(/^[ \t]+/, "", t)
+            if (t ~ /^(```|~~~)/) { fence = !fence; continue }
+            if (fence || !match(L[i], /^#+[ \t]/)) continue
+            lv = RLENGTH - 1
+            if (n && lv <= HL[1]) { end = i; break }
+            n++; H[n] = i; HL[n] = lv; x = L[i]; sub(/^#+[ \t]+/, "", x); HT[n] = x
+          }
+          for (k = 1; k <= n; k++) {
+            E[k] = end; N1[k] = end
+            for (j = k + 1; j <= n; j++) if (HL[j] <= HL[k]) { E[k] = H[j]; break }
+            if (k < n) N1[k] = H[k + 1]
+            w = 0; for (i = H[k] + 1; i < E[k]; i++) w += split(L[i], tmp, /[ \t]+/)
+            W[k] = w
+          }
+          if (rule != "") {
+            want = slug(rule); hit = 0
+            for (k = 1; k <= n; k++) if (slug(HT[k]) == want || tolower(HT[k]) == tolower(rule)) { hit = k; break }
+            if (!hit) { print "no heading \"" rule "\" in the section; OUTLINE=1 lists them" > "/dev/stderr"; exit 1 }
+            path = HT[hit]; lvl = HL[hit]
+            for (j = hit - 1; j >= 1; j--) if (HL[j] < lvl) { path = HT[j] " > " path; lvl = HL[j] }
+            last = E[hit] - 1; while (last > H[hit] && L[last] ~ /^[ \t]*$/) last--
+            print "# " path
+            print ""
+            print "Source: `" src ":" H[hit] "-" last "`"
+            print ""
+            for (i = H[hit]; i <= last; i++) print L[i]
+            exit 0
+          }
+          print "Outline of `" src ":" s "-" (end - 1) "`, " W[1] " words. Read one part with `make spec-context REQ=<n> RULE=<name>`."
+          print ""
+          for (k = 1; k <= n; k++) {
+            pad = ""; for (j = HL[1]; j < HL[k]; j++) pad = pad "  "
+            f = first(H[k] + 1, N1[k])
+            printf "%s- %s (lines %d-%d, %d words; RULE=%s)%s\n", pad, HT[k], H[k], E[k] - 1, W[k], slug(HT[k]), (f == "" ? "" : ": " f)
+          }
+        }
+      ' "$specfile" >&3 || exit 1
+      [[ -z "$RULE" ]] || exit 0
+    elif [[ -n "$start" ]]; then
       # The excerpt is the span `sdd-check.py context` prints: from the REQ's
       # heading to the next heading of the same or a higher level, so its
       # deeper subsections stay in. A line inside a fenced code block is never
@@ -127,6 +200,8 @@ else
   echo "_no canonical link in the registry row_"
 fi
 echo
+
+[[ -z "$RULE" ]] || { echo "error: ${REQ}'s canonical section was not found, so RULE=${RULE} cannot be read" >&2; exit 1; }
 
 # --- 4) Plans and ADRs that name this REQ ---------------------------------
 # The map carries no plans or ADRs. An ADR names its REQs in the bullet list

@@ -82,7 +82,7 @@ Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev
 | Spec traceability | `make spec-check` |
 | Full gate report | `make sdd-check` — the SDD gate with every warning (`make spec-check` prints only the verdict) |
 | Regenerate spec indexes | `make spec-generate`: the map's `tests:` lists from the tests' REQ citations, the REQ.md registry from `traceability.yaml` |
-| Spec context bundle | `make spec-context REQ=NNN` — registry row + traceability + canonical excerpt + strands |
+| Spec context bundle | `make spec-context REQ=NNN` — registry row + traceability + canonical excerpt + strands; `OUTLINE=1` puts the section's outline in place of its text, `RULE=<name>` prints one rule of it alone |
 | Probe status | `make probe-status` — each PROBE's status and whether its test file exists |
 | Live CDR (opt-in, not in `make ci`) | `make probe-record ARGS=…` records a cassette; `make cdr-crosscheck` checks generated documents against live CDRs. Environment variables are in [ci.md](docs/ci.md) |
 | FLAT corpus integrity | `make flat-check` — offline `sha256` of the vendored EHRbase FLAT corpus (PROBE-086's input); `make flat-drift` adds a network drift report (dev helper, not a gate). `make corpus-pins-check` holds every EHRbase corpus to the one commit per repository in `testkit/corpus/UPSTREAM_PINS.txt` |

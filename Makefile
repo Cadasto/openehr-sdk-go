@@ -76,6 +76,8 @@ HELP_TOOLCHAIN = $(if $(HOST_GO_OK),host Go 1.27 (fast path),Docker fallback (ru
 HELP_FOOTER    = Before a pull request: make ci · docs site: make docs-serve (http://127.0.0.1:8000)
 
 ##= REQ=094 | the requirement spec-context bundles
+##= OUTLINE=1 | spec-context: the section's outline in place of its text
+##= RULE=<name> | spec-context: only that rule of the section, by its anchor or heading
 ##= ARGS='-base URL -deployment NAME ...' | probe-record flags
 ##= BMM_REF= ITS_XML_REF= ... | pin a Vendor sync (ITS_REST_REF, TERMINOLOGY_REF too; EHRbase pins: testkit/corpus/UPSTREAM_PINS.txt)
 ##= DOCS_SYNC=docs-sync-offline | build the docs site from the cached brand files
@@ -315,8 +317,8 @@ sdd-check: ## Print the SDD gate's full report, warnings included
 
 ##@ Run
 
-spec-context: ## Print the SDD context bundle of one REQ (REQ=094)
-	@bash scripts/spec-context.sh $(REQ)
+spec-context: ## Print the SDD context bundle of one REQ (REQ=094; OUTLINE=1 or RULE=<name> to read less)
+	@OUTLINE="$(OUTLINE)" RULE="$(RULE)" bash scripts/spec-context.sh $(REQ)
 
 probe-status: ## Show each PROBE's status and whether its test exists
 	@bash scripts/probe-status.sh
