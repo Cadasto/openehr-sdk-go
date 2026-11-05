@@ -574,3 +574,92 @@ func TestREQ093OpenEHRErrorDetailUnmarshalJSONRefusesRepeatedNames(t *testing.T)
 		t.Errorf("UnmarshalJSON(code and CODE): Code = %q, want %q", d.Code, "A")
 	}
 }
+
+// TestREQ093ErrorEnvelopeInvalidUTF8KeepsTheEnvelope pins REQ-093's
+// best-effort decode of a body whose strings hold invalid UTF-8: the envelope
+// is kept, member by member, and each invalid byte reads as U+FFFD, as
+// encoding/json v1 read it, in the message, the code, a validationErrors
+// entry and a coded entry's terminology, code string and value, and in a
+// member the envelope does not read. A repeated member name still leaves the
+// envelope undecoded, and so does UnmarshalJSON called directly.
+func TestREQ093ErrorEnvelopeInvalidUTF8KeepsTheEnvelope(t *testing.T) {
+	// invalidUTF8 is a byte that starts no UTF-8 sequence.
+	const invalidUTF8 = "\xff"
+	tests := []struct {
+		name        string
+		body        string
+		wantMessage string
+		wantCode    string
+		want        []transport.CodedTextItem
+		wantVE      []string
+	}{
+		{name: "message", body: `{"code":"C","message":"` + invalidUTF8 + `"}`, wantMessage: "\uFFFD", wantCode: "C"},
+		{name: "code", body: `{"code":"C` + invalidUTF8 + `"}`, wantCode: "C\uFFFD"},
+		{name: "validationErrors entry", body: `{"validationErrors":["a` + invalidUTF8 + `b"]}`, wantVE: []string{"a\uFFFDb"}},
+		{
+			name:     "coded_text entry",
+			body:     `{"code":"X","coded_text":[{"terminology_id":{"value":"openehr` + invalidUTF8 + `"},"code_string":"K` + invalidUTF8 + `","value":"v` + invalidUTF8 + `"}]}`,
+			wantCode: "X",
+			want:     []transport.CodedTextItem{codedItem("openehr\uFFFD", "K\uFFFD", "v\uFFFD")},
+		},
+		{
+			name:     "errors entry",
+			body:     `{"code":"X","errors":[{"value":"v` + invalidUTF8 + `","defining_code":{"terminology_id":{"value":"local"},"code_string":"9000` + invalidUTF8 + `"}}]}`,
+			wantCode: "X",
+			want:     []transport.CodedTextItem{codedItem("local", "9000\uFFFD", "v\uFFFD")},
+		},
+		{name: "member the envelope does not read", body: `{"code":"X","details":"` + invalidUTF8 + `"}`, wantCode: "X"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := newDecodeClient(t, http.StatusUnprocessableEntity, tt.body, nil, transport.WithRawErrorBodies(true))
+			_, err := c.Do(t.Context(), &transport.Request{Route: "/x", Path: "/x"})
+			we, ok := errors.AsType[*transport.WireError](err)
+			if !ok || we == nil {
+				t.Fatalf("Do() error = %T (%v), want *transport.WireError", err, err)
+			}
+			if we.OpenEHR == nil {
+				t.Fatalf("OpenEHR = nil for %q, want the envelope with U+FFFD for each invalid byte", tt.body)
+			}
+			if we.OpenEHR.Message != tt.wantMessage {
+				t.Errorf("Message = %q, want %q", we.OpenEHR.Message, tt.wantMessage)
+			}
+			if we.OpenEHR.Code != tt.wantCode {
+				t.Errorf("Code = %q, want %q", we.OpenEHR.Code, tt.wantCode)
+			}
+			if !slices.Equal(we.OpenEHR.CodedText, tt.want) {
+				t.Errorf("CodedText = %+v, want %+v", we.OpenEHR.CodedText, tt.want)
+			}
+			if !slices.Equal(we.OpenEHR.ValidationErrors, tt.wantVE) {
+				t.Errorf("ValidationErrors = %q, want %q", we.OpenEHR.ValidationErrors, tt.wantVE)
+			}
+		})
+	}
+
+	t.Run("a repeated member is still no envelope", func(t *testing.T) {
+		body := `{"code":"A","code":"B","message":"` + invalidUTF8 + `"}`
+		c := newDecodeClient(t, http.StatusUnprocessableEntity, body, nil, transport.WithRawErrorBodies(true))
+		_, err := c.Do(t.Context(), &transport.Request{Route: "/x", Path: "/x"})
+		we, ok := errors.AsType[*transport.WireError](err)
+		if !ok || we == nil {
+			t.Fatalf("Do() error = %T (%v), want *transport.WireError", err, err)
+		}
+		if we.OpenEHR != nil {
+			t.Errorf("OpenEHR = %+v for %q, want nil for a body that repeats a member name", we.OpenEHR, body)
+		}
+	})
+
+	t.Run("UnmarshalJSON reads the same way", func(t *testing.T) {
+		var d transport.OpenEHRErrorDetail
+		if err := d.UnmarshalJSON([]byte(`{"code":"C","message":"` + invalidUTF8 + `"}`)); err != nil {
+			t.Fatalf("UnmarshalJSON(invalid UTF-8 message) = %v, want nil", err)
+		}
+		if d.Code != "C" || d.Message != "\uFFFD" {
+			t.Errorf("UnmarshalJSON(invalid UTF-8 message): Code %q, Message %q; want %q, %q", d.Code, d.Message, "C", "\uFFFD")
+		}
+		d = transport.OpenEHRErrorDetail{}
+		if err := d.UnmarshalJSON([]byte(`{"code":"A","code":"B","message":"` + invalidUTF8 + `"}`)); err == nil {
+			t.Errorf("UnmarshalJSON(repeated code, invalid UTF-8 message) = nil error, Code %q; want an error", d.Code)
+		}
+	})
+}

@@ -110,7 +110,9 @@ type OpenEHRErrorDetail struct {
 // envelope. It fails when the body is not a JSON object, is not valid JSON,
 // or repeats a member name, in the envelope or in any value inside it. Member
 // names match exactly: a case variant such as MESSAGE is ignored, as any other
-// unknown member is.
+// unknown member is. A string that holds invalid UTF-8 is read with the
+// Unicode replacement character, U+FFFD, in place of each invalid byte, so it
+// does not fail the envelope.
 //
 // Code accepts a string or a number; a code of any other JSON type is left
 // empty. Message is read only when it is a string. ValidationErrors keeps the
@@ -138,7 +140,7 @@ func (d *OpenEHRErrorDetail) UnmarshalJSON(data []byte) error {
 	// REQ-093: the v2 defaults refuse a repeated member name at any depth
 	// and match member names exactly, so neither a repeat nor a case variant
 	// can replace the member the envelope names.
-	if err := json.Unmarshal(data, &raw); err != nil {
+	if err := json.Unmarshal(data, &raw, envelopeUTF8); err != nil {
 		return err
 	}
 	message, _ := jsonString(raw.Message)
@@ -150,6 +152,13 @@ func (d *OpenEHRErrorDetail) UnmarshalJSON(data []byte) error {
 	}
 	return nil
 }
+
+// envelopeUTF8 is the one option every decode of the envelope and its
+// entries takes beside the json/v2 defaults: a string that holds invalid
+// UTF-8 is read with U+FFFD in place of each invalid byte, as encoding/json
+// v1 read it, instead of failing the decode (REQ-093, best-effort). The
+// other defaults, such as refusing a repeated member name, hold.
+var envelopeUTF8 = jsontext.AllowInvalidUTF8(true)
 
 // codePhrase is the terminology and code string of a coded entry: the
 // members of a coded_text entry, or the defining_code of an errors entry.
@@ -168,7 +177,7 @@ func (p codePhrase) codedItem(value jsontext.Value) (CodedTextItem, bool) {
 	var terminology struct {
 		Value jsontext.Value `json:"value"`
 	}
-	if len(p.TerminologyID) > 0 && (!isJSONObject(p.TerminologyID) || json.Unmarshal(p.TerminologyID, &terminology) != nil) {
+	if len(p.TerminologyID) > 0 && (!isJSONObject(p.TerminologyID) || json.Unmarshal(p.TerminologyID, &terminology, envelopeUTF8) != nil) {
 		return CodedTextItem{}, false
 	}
 	var item CodedTextItem
@@ -193,7 +202,7 @@ func envelopeCodedText(raw jsontext.Value) []CodedTextItem {
 			codePhrase
 			Value jsontext.Value `json:"value"`
 		}
-		if !isJSONObject(entry) || json.Unmarshal(entry, &e) != nil {
+		if !isJSONObject(entry) || json.Unmarshal(entry, &e, envelopeUTF8) != nil {
 			continue
 		}
 		if item, ok := e.codedItem(e.Value); ok {
@@ -217,7 +226,7 @@ func envelopeErrors(raw jsontext.Value) []CodedTextItem {
 			Value        jsontext.Value `json:"value"`
 			DefiningCode *codePhrase    `json:"defining_code"`
 		}
-		if json.Unmarshal(entry, &dv) != nil || dv.DefiningCode == nil {
+		if json.Unmarshal(entry, &dv, envelopeUTF8) != nil || dv.DefiningCode == nil {
 			continue
 		}
 		if item, ok := dv.DefiningCode.codedItem(dv.Value); ok {
@@ -244,7 +253,7 @@ func envelopeStrings(raw jsontext.Value) []string {
 // value, null or any other JSON type.
 func jsonList(raw jsontext.Value) []jsontext.Value {
 	var entries []jsontext.Value
-	if len(raw) == 0 || json.Unmarshal(raw, &entries) != nil {
+	if len(raw) == 0 || json.Unmarshal(raw, &entries, envelopeUTF8) != nil {
 		return nil
 	}
 	return entries
@@ -266,7 +275,7 @@ func jsonString(raw jsontext.Value) (string, bool) {
 		return "", false
 	}
 	var s string
-	if json.Unmarshal(raw, &s) != nil {
+	if json.Unmarshal(raw, &s, envelopeUTF8) != nil {
 		return "", false
 	}
 	return s, true
@@ -289,7 +298,7 @@ func envelopeCode(raw jsontext.Value) string {
 	switch raw[0] {
 	case '"':
 		var s string
-		if json.Unmarshal(raw, &s) != nil {
+		if json.Unmarshal(raw, &s, envelopeUTF8) != nil {
 			return ""
 		}
 		return s
