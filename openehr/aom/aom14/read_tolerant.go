@@ -803,8 +803,8 @@ func (t *tolerantReading) closeBooleanMember(p, e *element) {
 
 // closeListOpen reads e, the list_open of a C_STRING item. One of white
 // space only reads as an empty one, which the decode reads as false, in every
-// mode: XML Schema's boolean type collapses white space, so the list stays
-// closed.
+// mode, so the list stays closed: the reader's own reading, the one it gives
+// an empty C_BOOLEAN flag, not XML Schema's, which refuses an empty boolean.
 func (t *tolerantReading) closeListOpen(e *element) {
 	if !e.nested && len(e.text) > 0 && isBlank(e.text) {
 		t.setText(e, "")

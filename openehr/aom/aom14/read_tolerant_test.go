@@ -971,9 +971,9 @@ func TestREQ111_ReaderReadsValuesInEveryMode(t *testing.T) {
 
 // TestREQ103_REQ111_ReaderReadsAFlagOfWhiteSpaceAsAnEmptyOne pins, in every
 // mode, that a C_STRING list_open, or a C_BOOLEAN true_valid or false_valid,
-// whose text is XML white space only reads as the empty element, as XML
-// Schema's boolean type, which collapses white space, reads it: list_open as
-// false, so the list stays closed, and each C_BOOLEAN flag as true. The
+// whose text is XML white space only reads as the empty element, the
+// reader's own reading rather than XML Schema's: list_open as false, so the
+// list stays closed, and each C_BOOLEAN flag as true. The
 // reading leaves nothing out, so WithUnmatched reports nothing.
 func TestREQ103_REQ111_ReaderReadsAFlagOfWhiteSpaceAsAnEmptyOne(t *testing.T) {
 	t.Parallel()

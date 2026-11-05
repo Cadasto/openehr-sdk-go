@@ -35,8 +35,8 @@ import (
 // TimezoneValidity is the timezone_validity the ITS-XML C_DATE carries. A
 // date has no zone, so ValidityOptional and ValidityDisallowed admit every
 // date, and ValidityMandatory, which no date can meet, is a CodeInvalidValue
-// on every value; the operational template reader and the compile step
-// refuse it in strict mode and read it as optional otherwise.
+// on every value; the compile step refuses it in strict mode and reads it
+// as optional otherwise.
 type CDate struct {
 	Pattern          string
 	Range            TemporalRange

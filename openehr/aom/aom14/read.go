@@ -60,8 +60,8 @@ const inputBufferMax = 4 << 20
 // document type declaration, after a UTF-8 byte-order mark at the very start;
 // after the root it may hold comments, processing instructions and
 // whitespace. Without it, the reader also reads past, before the root, any
-// content encoding/xml reads, such as text, a CDATA section or a second
-// declaration, and, after the root, a `<!…>` declaration. Anything else before
+// content encoding/xml reads, such as text or a CDATA section, and, after
+// the root, a `<!…>` declaration. Anything else before
 // or after the root, such as an element after it or a stray end tag before it,
 // is refused with an error that wraps [canxml.ErrInvalidShape] and carries
 // none of it. The root element may have any name, so a document whose root is
@@ -86,6 +86,7 @@ const inputBufferMax = 4 << 20
 //     http://schemas.openehr.org/v1 namespace canonical XML reads;
 //   - a C_BOOLEAN whose true_valid or false_valid is absent or empty with
 //     that flag true;
+//   - a C_STRING list_open of white space only as an empty one, so false;
 //   - the assumed_value of a C_BOOLEAN, C_INTEGER or C_REAL that holds no
 //     value of its type as absent, a boolean being true, false, 1 or 0 in
 //     any letter case, and the assumed_value of a C_DV_QUANTITY that the
