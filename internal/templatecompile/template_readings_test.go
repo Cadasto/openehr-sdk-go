@@ -179,14 +179,14 @@ func nameAttribute(children ...string) string {
     </attributes>`
 }
 
-// TestREQ111_CompileReadsTheTemplateLevelNodeName pins the node name the
-// compile step carries (§ REQ-111, the reading § REQ-116 gives): the one
+// TestREQ116_REQ111_CompileReadsTheTemplateLevelNodeName pins the node name
+// the compile step carries (§ REQ-111, the reading § REQ-116 gives): the one
 // non-blank entry, trimmed, of a closed C_STRING list on the name's value,
 // judged on the list as the OPT writes it, the first alternative that pins
 // one winning. A choice, a blank entry, an open list, a pattern and an absent
 // name pin none, and the template concept is never substituted. A <children>
 // typed C_STRING is a shape the reader's default mode alone reads.
-func TestREQ111_CompileReadsTheTemplateLevelNodeName(t *testing.T) {
+func TestREQ116_REQ111_CompileReadsTheTemplateLevelNodeName(t *testing.T) {
 	cases := []struct {
 		name, attrs, want string
 		defaultOnly       bool
@@ -318,15 +318,15 @@ var stringChildren = []struct {
 	{name: "C_PRIMITIVE_OBJECT", child: `<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>STRING</rm_type_name><node_id/><item xsi:type="C_STRING">%s</item></children>`},
 }
 
-// TestREQ111_CompileReadsListOpenAndRefusesAFlagThatIsNoBoolean pins, from
-// the XML to the compiled tree in both of the reader's modes, the reading of
-// C_STRING.list_open § REQ-103 gives and § REQ-111 Reading the model keeps:
+// TestREQ103_REQ111_CompileReadsListOpenAndRefusesAFlagThatIsNoBoolean pins,
+// from the XML to the compiled tree in both of the reader's modes, the reading
+// of C_STRING.list_open § REQ-103 gives and § REQ-111 Reading the model keeps:
 // an absent or empty element leaves the list closed, one of white space only
 // among them, and a written one is read as written. A C_BOOLEAN's true_valid
 // or false_valid of white space only reads as an empty one, true. Text that
 // is no boolean in list_open, or in a C_BOOLEAN's true_valid or false_valid,
 // is refused with an error wrapping canxml.ErrInvalidShape.
-func TestREQ111_CompileReadsListOpenAndRefusesAFlagThatIsNoBoolean(t *testing.T) {
+func TestREQ103_REQ111_CompileReadsListOpenAndRefusesAFlagThatIsNoBoolean(t *testing.T) {
 	cases := []struct {
 		name, listOpen string
 		want           bool
@@ -459,12 +459,12 @@ func unitsOfProperty(t *testing.T, code string) []string {
 	return slices.Concat(primary, other)
 }
 
-// TestREQ111_CompileFillsPropertyUnitsForAListedOpenEHRCodeOnly pins, from
-// the XML to the compiled tree, the property units § REQ-103 has the compile
+// TestREQ103_REQ111_CompileFillsPropertyUnitsForAListedOpenEHRCodeOnly pins,
+// from the XML to the compiled tree, the property units § REQ-103 has the compile
 // step fill: for an openehr code the pinned table lists, its units with the
 // primary ones first, whether or not the constraint lists units, and none for
 // another terminology, matched exactly, or a code the table does not list.
-func TestREQ111_CompileFillsPropertyUnitsForAListedOpenEHRCodeOnly(t *testing.T) {
+func TestREQ103_REQ111_CompileFillsPropertyUnitsForAListedOpenEHRCodeOnly(t *testing.T) {
 	quantity := func(t *testing.T, child string) constraints.DvQuantity {
 		t.Helper()
 		c, err := readAndCompile(childBody(child, ""))
