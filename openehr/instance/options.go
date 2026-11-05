@@ -177,8 +177,9 @@ type Options struct {
 	Territory string
 
 	// Composer is the COMPOSITION's composer, required for a COMPOSITION
-	// root: nil there returns ErrComposerRequired. It is written as given,
-	// whatever the OPT constrains on composer. Any other root ignores it.
+	// root: nil there, or a nil pointer such as a nil *rm.PartyIdentified,
+	// returns ErrComposerRequired. It is written as given, whatever the OPT
+	// constrains on composer. Any other root ignores it.
 	Composer rm.PartyProxy
 
 	// Now is the clock for unconstrained date-times: every DV_DATE_TIME

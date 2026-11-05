@@ -89,9 +89,10 @@ func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (a
 	}
 
 	// COMPOSITION roots require Composer + Territory; fail fast
-	// before constructing any RM tree.
+	// before constructing any RM tree. A composer that holds a nil
+	// pointer is no composer (idiom.md § No panics).
 	if rootType == "COMPOSITION" {
-		if opts.Composer == nil {
+		if opts.Composer == nil || rm.IsTypedNil(opts.Composer) {
 			return nil, ErrComposerRequired
 		}
 		if opts.Territory == "" {
