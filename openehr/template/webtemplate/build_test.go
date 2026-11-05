@@ -332,7 +332,8 @@ func dropRootTerm(t *testing.T, opt []byte, archetypeID, code string) []byte {
 // nearest enclosing archetype root alone, as the reference reads them. Where
 // that archetype does not define the code, the term an enclosing archetype
 // defines under the same code names another concept: the node falls back as a
-// node with no term does, and the entry gets no label.
+// node with no term does, and a local code is left out of the coded list, as
+// the reference leaves it out.
 func TestNamesComeFromTheNearestArchetypeRoot(t *testing.T) {
 	raw, err := os.ReadFile(referenceDir + "/Corona_Anamnese.opt")
 	if err != nil {
@@ -378,11 +379,13 @@ func TestNamesComeFromTheNearestArchetypeRoot(t *testing.T) {
 	if len(coded.Inputs) != 1 {
 		t.Fatalf("coded %s inputs = %+v, want one", codedPath, coded.Inputs)
 	}
-	i := slices.IndexFunc(coded.Inputs[0].List, func(item webtemplate.InputListItem) bool { return item.Value == "at0005" })
-	if i < 0 {
-		t.Fatalf("coded %s list %+v has no at0005", codedPath, coded.Inputs[0].List)
+	list := coded.Inputs[0].List
+	if slices.ContainsFunc(list, func(item webtemplate.InputListItem) bool { return item.Value == "at0005" }) {
+		t.Errorf("coded %s list %+v holds at0005, which its archetype no longer defines", codedPath, list)
 	}
-	if label := coded.Inputs[0].List[i].Label; label != "" {
-		t.Errorf("coded %s entry at0005 label = %q, want none", codedPath, label)
+	if !slices.ContainsFunc(list, func(item webtemplate.InputListItem) bool {
+		return item.Value == "at0006" && item.Label == "Ja - national"
+	}) {
+		t.Errorf("coded %s list %+v lacks at0006 'Ja - national', which its archetype defines", codedPath, list)
 	}
 }

@@ -65,7 +65,9 @@ func textInputs(v *templatecompile.CompiledNode) []Input {
 // the value node's defining_code child; an absent or code-less constraint
 // leaves the list open. Local (archetype-internal) terminology is implied
 // and omitted, mirroring the reference, which carries `terminology` only
-// for external bindings.
+// for external bindings. A local code the value's own archetype defines no
+// term for is left out of the list, as the reference leaves it out, and a
+// list left with no code is open, as a code-less one is.
 func codedTextInputs(v *templatecompile.CompiledNode) []Input {
 	in := Input{Suffix: "code", Type: "CODED_TEXT"}
 	cp, _ := constraints.CodePhraseOf(childConstraint[constraints.PrimitiveConstraint](v, "defining_code"))
@@ -73,7 +75,11 @@ func codedTextInputs(v *templatecompile.CompiledNode) []Input {
 		in.Terminology = cp.Terminology
 	}
 	for _, code := range cp.CodeList {
-		in.List = append(in.List, listItem(v, code))
+		item, defined := listItem(v, code)
+		if !defined && cp.Terminology == localTerminology {
+			continue
+		}
+		in.List = append(in.List, item)
 	}
 	in.ListOpen = len(in.List) == 0
 	return []Input{in}
@@ -104,7 +110,7 @@ func ordinalInputs(v *templatecompile.CompiledNode) []Input {
 	in := Input{Type: "CODED_TEXT"}
 	if ord, ok := v.PrimitiveConstraint().(constraints.CDvOrdinal); ok {
 		for _, sym := range ord.Values {
-			item := listItem(v, sym.Symbol.CodeString)
+			item, _ := listItem(v, sym.Symbol.CodeString)
 			ordinal := sym.Value
 			item.Ordinal = &ordinal
 			in.List = append(in.List, item)
@@ -252,11 +258,11 @@ func partyProxyInputs() []Input {
 
 // listItem builds a coded list entry, its label the text of the code's term
 // in the value node's nearest enclosing archetype root, as [termText] reads a
-// node's own, and none where that root does not define the code.
-func listItem(v *templatecompile.CompiledNode, code string) InputListItem {
-	item := InputListItem{Value: code}
-	item.Label, _ = impl.RootTermItem(v, code, "text")
-	return item
+// node's own, and none where that root does not define the code; the second
+// result reports whether it does.
+func listItem(v *templatecompile.CompiledNode, code string) (InputListItem, bool) {
+	label, defined := impl.RootTermItem(v, code, "text")
+	return InputListItem{Value: code, Label: label}, defined
 }
 
 // childNode returns the first child of v reached through attribute attr.
