@@ -752,3 +752,116 @@ func TestREQ107_WrongTypeLeafOnARoutedAttributeFailsGenerate(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ107_PrimitiveAttributeWithNoChildIsWritten is the REQ-107 What a
+// visit writes check that a visited attribute of a BMM primitive type that
+// the OPT names with no child takes a value built from its BMM type, the
+// zero value a mandatory one holds, so that a root whose OPT requires it
+// carries it (§ Contract Output): a DV_COUNT's and a DV_DURATION's accuracy
+// and a DV_COUNT's accuracy_is_percent, a DV_QUANTITY's and a
+// DV_PROPORTION's precision, which the RM leaves optional, under every
+// policy where the OPT requires them, and an accuracy the OPT leaves
+// optional under Large, which visits it. A primitive the value already
+// holds, as a DV_BOOLEAN holds its value, keeps it. Each root passes both
+// validators, with and without the implicit attributes and under both
+// value fills; INTERVAL_EVENT's sample_count, the one primitive attribute
+// of a locatable the RM leaves optional, is checked the same way.
+func TestREQ107_PrimitiveAttributeWithNoChildIsWritten(t *testing.T) {
+	checkHeld := func(t *testing.T, what string, got *rm.Real) {
+		t.Helper()
+		if got == nil || *got != 0 {
+			t.Errorf("%s = %v, want 0 written", what, got)
+		}
+	}
+	runDataValueCases(t, []dvCase{
+		{
+			name:  "DV_COUNT accuracy the OPT requires",
+			value: optNode("DV_COUNT", "", optSingle("accuracy")),
+			check: func(t *testing.T, out any) {
+				t.Helper()
+				checkHeld(t, "DV_COUNT.accuracy", dvValue[*rm.DVCount](t, out).Accuracy)
+			},
+		},
+		{
+			name:  "DV_DURATION accuracy the OPT requires",
+			value: optNode("DV_DURATION", "", optSingle("accuracy")),
+			check: func(t *testing.T, out any) {
+				t.Helper()
+				checkHeld(t, "DV_DURATION.accuracy", dvValue[*rm.DVDuration](t, out).Accuracy)
+			},
+		},
+		{
+			name:  "DV_COUNT accuracy_is_percent the OPT requires",
+			value: optNode("DV_COUNT", "", optSingle("accuracy_is_percent")),
+			check: func(t *testing.T, out any) {
+				t.Helper()
+				if got := dvValue[*rm.DVCount](t, out).AccuracyIsPercent; got == nil || *got {
+					t.Errorf("DV_COUNT.accuracy_is_percent = %v, want false written", got)
+				}
+			},
+		},
+		{
+			name:  "DV_QUANTITY precision the OPT requires",
+			value: optNode("DV_QUANTITY", "", optSingle("precision")),
+			check: func(t *testing.T, out any) {
+				t.Helper()
+				if got := dvValue[*rm.DVQuantity](t, out).Precision; got == nil || *got != 0 {
+					t.Errorf("DV_QUANTITY.precision = %v, want 0 written", got)
+				}
+			},
+		},
+		{
+			name:  "DV_PROPORTION precision the OPT requires",
+			value: optNode("DV_PROPORTION", "", optSingle("precision")),
+			check: func(t *testing.T, out any) {
+				t.Helper()
+				if got := dvValue[*rm.DVProportion](t, out).Precision; got == nil || *got != 0 {
+					t.Errorf("DV_PROPORTION.precision = %v, want 0 written", got)
+				}
+			},
+		},
+		{
+			name:     "DV_COUNT accuracy the OPT leaves optional",
+			value:    optNode("DV_COUNT", "", optOptionalSingleOver("accuracy")),
+			policies: []instance.Policy{instance.Large},
+			check: func(t *testing.T, out any) {
+				t.Helper()
+				checkHeld(t, "DV_COUNT.accuracy", dvValue[*rm.DVCount](t, out).Accuracy)
+			},
+		},
+		{
+			name:  "DV_BOOLEAN value the OPT names with no child",
+			value: optNode("DV_BOOLEAN", "", optSingle("value")),
+			check: func(t *testing.T, out any) {
+				t.Helper()
+				if !dvValue[*rm.DVBoolean](t, out).Value {
+					t.Error("DV_BOOLEAN.value = false, want the true the walk wrote kept")
+				}
+			},
+		},
+	})
+	opt := historyOf(optNode("INTERVAL_EVENT", "at0002", optSingle("sample_count"), optSingle("data", emptyTree)))
+	for _, implicit := range []bool{true, false} {
+		c := compileOPTText(t, opt, implicit)
+		for _, opts := range defaultsOptions() {
+			t.Run(fmt.Sprintf("INTERVAL_EVENT sample_count the OPT requires/implicit=%t/%v/%v", implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+				out, err := instance.Generate(t.Context(), c, opts)
+				if err != nil {
+					t.Fatalf("Generate: %v, want a root", err)
+				}
+				h, ok := out.(*rm.History[rm.ItemStructure])
+				if !ok || len(h.Events) != 1 {
+					t.Fatalf("generated root is %T, want a HISTORY with one event", out)
+				}
+				e, ok := h.Events[0].(*rm.IntervalEvent[rm.ItemStructure])
+				if !ok {
+					t.Fatalf("event is %T, want an INTERVAL_EVENT", h.Events[0])
+				}
+				if e.SampleCount == nil || *e.SampleCount != 0 {
+					t.Errorf("INTERVAL_EVENT.sample_count = %v, want 0 written", e.SampleCount)
+				}
+				checkValid(t, out, c)
+			})
+		}
+	}
+}
