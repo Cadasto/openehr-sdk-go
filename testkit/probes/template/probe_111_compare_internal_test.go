@@ -102,6 +102,40 @@ func TestProbe111CompareDocuments(t *testing.T) {
 			want:      `/template[1]/magnitude[1]: text "1.0", re-encoded as "true"`,
 		},
 		{
+			name:      "a string that reads as a number keeps its text",
+			input:     probe111Doc("", `<concept>1.0</concept>`),
+			reEncoded: probe111Doc("", `<concept>1</concept>`),
+			want:      `/template[1]/concept[1]: text "1.0", re-encoded as "1"`,
+		},
+		{
+			name:      "a string that reads as a boolean keeps its text",
+			input:     probe111Doc("", `<concept>1</concept>`),
+			reEncoded: probe111Doc("", `<concept>true</concept>`),
+			want:      `/template[1]/concept[1]: text "1", re-encoded as "true"`,
+		},
+		{
+			name:      "a bound of a C_INTEGER range compares by its value",
+			input:     probe111Doc("", `<item xsi:type="C_INTEGER"><range><lower_included>true</lower_included><upper_included>true</upper_included><lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>1.0</lower><upper>05</upper></range></item>`),
+			reEncoded: probe111Doc("", `<item xsi:type="C_INTEGER"><range><lower_included>true</lower_included><upper_included>true</upper_included><lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>1</lower><upper>5</upper></range></item>`),
+		},
+		{
+			name:      "a bound of a C_DATE range keeps its text",
+			input:     probe111Doc("", `<item xsi:type="C_DATE"><range><lower_included>true</lower_included><upper_included>true</upper_included><lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>2020</lower><upper>2021</upper></range></item>`),
+			reEncoded: probe111Doc("", `<item xsi:type="C_DATE"><range><lower_included>true</lower_included><upper_included>true</upper_included><lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>2020.0</lower><upper>2021</upper></range></item>`),
+			want:      `/template[1]/item[1]/range[1]/lower[1]: text "2020", re-encoded as "2020.0"`,
+		},
+		{
+			name:      "an ORDINAL's value compares by its value",
+			input:     probe111Doc("", `<item xsi:type="C_DV_ORDINAL"><list><value>01</value></list></item>`),
+			reEncoded: probe111Doc("", `<item xsi:type="C_DV_ORDINAL"><list><value>1</value></list></item>`),
+		},
+		{
+			name:      "a C_STRING list item keeps its text",
+			input:     probe111Doc("", `<item xsi:type="C_STRING"><list>1.0</list></item>`),
+			reEncoded: probe111Doc("", `<item xsi:type="C_STRING"><list>1</list></item>`),
+			want:      `/template[1]/item[1]/list[1]: text "1.0", re-encoded as "1"`,
+		},
+		{
 			name:      "an absent included flag compares as its default: closed on a bounded side, open on an unbounded one",
 			input:     probe111Doc("", `<occurrences><lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>1</lower></occurrences>`),
 			reEncoded: probe111Doc("", `<occurrences><lower_included>true</lower_included><upper_included>false</upper_included><lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>1</lower></occurrences>`),
