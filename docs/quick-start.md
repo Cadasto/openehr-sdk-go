@@ -41,7 +41,8 @@ Building blocks (no HTTP)          REST client path
 ─────────────────────────          ─────────────────
 openehr/rm                         smart/discovery  →  service catalog
 openehr/serialize/canjson          transport        →  injected *http.Client + auth
-openehr/template                   openehr/client/* →  typed REST methods
+openehr/aom/aom14                  openehr/client/* →  typed REST methods
+openehr/templatecompile
 openehr/validation
 openehr/instance
 ```

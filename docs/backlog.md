@@ -4,7 +4,7 @@ harvested_through: 2026-11-05T11:01:20Z
 ---
 # Backlog
 
-Leftovers of merged branches: defects the branch that found them did not fix, and suggestions. Each line is a lead, not a finding: verify it before acting. Lines are grouped by theme so one delivery can take a whole group; the sentence under each heading says what such a delivery is. A delivery whose `Files` touch a line's path verifies it, and fixes it or finds it stale; the next `/sdd-triage --backlog` deletes what is settled. `sdd-pr harvest` and `sdd-pr flip --carry` add new lines under `## Unsorted`, defects first; the next `/sdd-triage --backlog` sorts them into a group. The file is kept at about 80 lines ([ai-workflow.md § Review](ai-workflow.md#review)). Edit freely.
+Leftovers of merged branches: defects the branch that found them did not fix, and suggestions. Each line is a lead, not a finding: verify it before acting. Lines are grouped by theme so one delivery can take a whole group; the sentence under each heading says what such a delivery is. A delivery whose `Files` touch a line's path verifies it, and fixes it or finds it stale; the next `/sdd-triage --backlog` deletes what is settled. `sdd-pr harvest` and `sdd-pr flip --carry` add new lines under `## Unsorted`, defects first; the next `/sdd-triage --backlog` sorts them into a group. The file is kept at about 80 entries ([ai-workflow.md § Review](ai-workflow.md#review)). Edit freely.
 
 ## Unsorted
 

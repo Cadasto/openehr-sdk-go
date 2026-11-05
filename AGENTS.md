@@ -37,11 +37,11 @@ The sdd plugin carries the method. This repository's form of it is in [developme
 - Normative text lives once, in its canonical topic spec. `REQ.md` and each map row's `tests:` list are generated (`make spec-generate`), `traceability.yaml` is a pure index, and tests and maintainer comments cite `REQ-NNN` / `PROBE-NNN`.
 - **Godoc is for SDK users.** Package docs and doc comments on exported identifiers carry no spec-process identifiers (REQ, ADR, STRAND, plan or spec paths) and no RFC-2119 capitals; a probe's own `PROBE-NNN` and public openEHR specification citations are fine. Error text an SDK user sees carries no spec-process identifiers either; maintainer comments may cite them.
 - No `SDK-GAP` identifier: a gap is worked under a REQ with a PROBE ([ADR 0012](docs/adr/0012-retire-sdk-gap-identifier.md)).
-- Keep [`cmd/examples/`](cmd/examples/) docs in sync **in the same PR** as the program ([ai-workflow.md § Examples](docs/ai-workflow.md#examples)).
+- Keep [`cmd/examples/`](cmd/examples/) docs in sync **in the same PR** as the program ([ai-workflow.md § Examples](docs/ai-workflow.md#examples)). Tests in `cmd/examples/` hold the outputs shown in `docs/examples.md`, the README and `pages/examples.md` to real runs, and a new program fails `TestExampleDirectoryCensus` until it is classified in `transcripts_test.go`.
 - Plans go in [`docs/plans/`](docs/plans/), never superpowers' default `docs/superpowers/` tree ([development-process.md § superpowers + SDD](docs/development-process.md#superpowers--sdd)).
-- **Backlog size.** [`docs/backlog.md`](docs/backlog.md) is kept at about 80 lines ([ai-workflow.md § Review](docs/ai-workflow.md#review)), which outranks the 40 built into the sdd plugin's hook and its `/sdd-triage --backlog` consolidation: the hook's session-start line "over the 40 it should hold" is informational until the count passes 80.
+- **Backlog size.** [`docs/backlog.md`](docs/backlog.md) is kept at about 80 entries, the `- ` lines the sdd plugin's session-start hook counts ([ai-workflow.md § Review](docs/ai-workflow.md#review)), which outranks the 40 built into that hook and its `/sdd-triage --backlog` consolidation: the hook's line "over the 40 it should hold" is informational until its count passes 80.
 - **Retiring a requirement.** Its entry moves to [retired-requirements.md](docs/specifications/retired-requirements.md) and the map row's `canonical` points there ([specifications/README.md § Editing rules](docs/specifications/README.md#editing-rules)). This outranks the sdd plugin's default, which `/sdd-specify` otherwise follows, of keeping the section in its topic spec.
-- **Write short.** Lead with the result; a finding is one sentence of about 30 words, a PR body about 450 words; quote only the output that proves a claim.
+- **Write short.** Lead with the result; a finding is one sentence of about 30 words, a PR body about 450 words; quote only the output that proves a claim. A specification sentence over about 60 words that a change touches is split in that change: a chain of conditions becomes a list of condition and behaviour, or a small table, saying no more and no less than before.
 
 ## Module layout & boundaries
 
@@ -93,6 +93,8 @@ Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev
 
 - **Never hand-edit a vendored fixture** under `resources/` or `testkit/corpus/` — being byte-identical to upstream is its whole value. Re-sync instead.
 - `make probe-status` prints `MISSING` for any probe covered inline or in a sibling's file. That is the filename heuristic, **not** drift — `make spec-check` is the real gate.
+- A new test file that cites a `REQ-NNN` makes `make spec-check` fail with "tests list is stale" until `make spec-generate` rewrites the map's `tests:` list; commit what it writes.
+- A non-test file that imports `reflect` fails `TestREQ024ReflectOnlyForReviewedUses` until it is added to the reviewed list in [`internal/reflect_guard_test.go`](internal/reflect_guard_test.go), for a use [idiom.md § API conventions](docs/specifications/idiom.md#api-conventions) allows, such as a typed-nil check.
 - **`make ci` cannot complete without Docker:** `test` → `aqlgen-check` → `build-antlr` always needs it; everything else falls back to Docker only when a host tool is missing or unsuitable (routing in [ci.md](docs/ci.md)).
   Without Docker, run `fmt-check`, `vet`, `spec-check`, `flat-check`, `build` and `go test ./... -count=1`, and let PR CI be the gate.
 - Worktrees go under the gitignored `.worktrees/`. After `git worktree remove`, run `golangci-lint cache clean`; otherwise lint reports phantom issues under the removed `.worktrees/` path.
@@ -103,10 +105,10 @@ Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev
 
 | Dependency | Scope |
 |---|---|
-| **OpenTelemetry** | tracing, confined to `transport/` |
+| **OpenTelemetry** | tracing, confined to `transport/` and the conformance probes that test it |
 | **antlr4-go** | the AQL parser, `openehr/aql/parse` |
 | **`golang.org/x/oauth2`**, **`github.com/coreos/go-oidc/v3`** | SMART/auth crypto correctness ([ADR 0009](docs/adr/0009-smart-auth-library-scope.md)) — scoped to `auth/` and `smart/` |
-| **`go-jose/v4`** | required transitively by go-oidc; `auth/jwtbearer` + `smart` also import it directly for JWS signing |
+| **`go-jose/v4`** | required transitively by go-oidc; `auth/jwtbearer` and `auth/smart` also import it directly for JWS signing |
 
 Rationale and the wider picture: [architecture.md § Dependencies](docs/architecture.md#dependencies). Conformance probes (`testkit/probes/…`) run via `make test`; inventory in [conformance.md](docs/specifications/conformance.md).
 
@@ -125,6 +127,7 @@ The openehr-assistant plugin and its MCP tools answer RM paths, class definition
 - **Wire semantics:** the conformance probe suite ([conformance.md](docs/specifications/conformance.md)).
 - **REST:** the vendored OpenAPI pin in [`resources/its-rest/`](resources/its-rest/README.md) (`*-validation.openapi.yaml`) for every path, body, header and status code.
 - **XML:** the pinned ITS-XML schemas in [`resources/its-xml/`](resources/its-xml/README.md), which the generator reads for child-element order; they declare the `v2` namespace where the SDK writes `v1`.
+- **Web Template and FLAT:** the EHRbase `openEHR_SDK` reference ([ADR 0014](docs/adr/0014-webtemplate-reference-implementation-lock.md)), read at the commit [`testkit/corpus/UPSTREAM_PINS.txt`](testkit/corpus/UPSTREAM_PINS.txt) pins.
 - **Classes and invariants:** the openEHR specifications, as the pinned BMM schemas in [`resources/bmm/`](resources/bmm/) the generator reads.
 
 ## Do not touch (yet)

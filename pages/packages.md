@@ -31,6 +31,7 @@ None of these import `transport/` or `auth/`. That independence is REQ-013 in
 | [`openehr/serialize/canjson`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson) | Canonical JSON |
 | [`openehr/serialize/canxml`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml) | Canonical XML |
 | [`openehr/serialize/simplified`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified) | FLAT and STRUCTURED |
+| [`openehr/aom/aom14`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/aom/aom14) | Archetype Object Model 1.4 and the ADL 1.4 operational template model: `ReadOperationalTemplate` reads an OPT, and both canonical codecs write it back |
 | [`openehr/template`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/template) | ADL 1.4 operational template path grammar and the small types a compiled template shares |
 | [`openehr/templatecompile`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/templatecompile) | Compile an OPT for the builder, validator, and AQL lint |
 | [`openehr/template/webtemplate`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate) | Web Template JSON export from a compiled OPT, EHRbase v2.3 ids |
@@ -42,7 +43,6 @@ None of these import `transport/` or `auth/`. That independence is REQ-013 in
 | [`openehr/aql/lint`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/aql/lint) | Static lint |
 | [`openehr/aql/contain`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/aql/contain) | Containment admissibility |
 | [`openehr/bmm`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/bmm) | BMM loader |
-| [`openehr/aom/aom14`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/aom/aom14) | Archetype Object Model 1.4 |
 
 ## REST client
 
@@ -56,7 +56,7 @@ been run against.
 | [`smart/discovery`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/smart/discovery) | Service catalog |
 | [`smart`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/smart) | SMART launch context and ID-token claims after the `auth/smart` exchange (**partial**: app registration is open) |
 | [`openehr/client/ehr`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/client/ehr) | EHR identity and version metadata |
-| [`openehr/client/ehr/composition`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition) | Composition CRUD, revision history and version reads |
+| [`openehr/client/ehr/composition`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition) | Composition CRUD in canonical JSON, canonical XML, FLAT or STRUCTURED, revision history and version reads |
 | [`openehr/client/ehr/contribution`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/client/ehr/contribution) | Multi-version commits |
 | [`openehr/client/ehr/directory`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/client/ehr/directory) | Directory / folder |
 | [`openehr/client/ehr/ehrstatus`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/client/ehr/ehrstatus) | EHR_STATUS, its revision history and version reads |
