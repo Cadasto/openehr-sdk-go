@@ -62,6 +62,15 @@ func reusedListRows() []reusedListRow {
 			fresh: func() any { return new(aom14.CCodePhrase) },
 		},
 		{
+			// The bytes of an xml processing instruction in a comment make a
+			// decode given no option decode the document again, which keeps
+			// what the document leaves out, as the first decode does.
+			name:  "control: xml instruction bytes in a comment",
+			in:    `<value ` + ucNS + `><!-- <?xml version="1.0"?> --><value>new</value></value>`,
+			stale: func() any { return stalePlain() },
+			fresh: func() any { return new(rm.DVText) },
+		},
+		{
 			// A list member the document leaves out keeps the value's items.
 			name:  "control: a list the document leaves out",
 			in:    `<description ` + ucNS + `><original_author id="name">a</original_author><lifecycle_state>published</lifecycle_state></description>`,

@@ -35,9 +35,10 @@
 //     letter case, for the XML declaration at the start, so [Unmarshal]
 //     refuses one elsewhere, before, inside or after the root, such as a
 //     second declaration or one inside an element, with [ErrInvalidShape],
-//     and so does a [Decoder] given any option inside the value it decodes;
-//     a target that only starts with those letters, such as xml-stylesheet,
-//     is accepted.
+//     and so does a [Decoder] given [WithUnmatched], [WithStrict],
+//     [WithMissing], [WithPresence] or a positive [WithMaxDepth] inside the
+//     value it decodes; a target that only starts with those letters, such
+//     as xml-stylesheet, is accepted.
 //   - Default namespace: `http://schemas.openehr.org/v1`.
 //   - `xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"` is
 //     declared on the document root whenever any descendant carries
@@ -97,9 +98,10 @@
 //     as namespaces resolve it, is not well-formed XML: every decode refuses
 //     it with [ErrInvalidShape], naming the attribute and none of its values,
 //     wherever the decode reads the element or skips it as unmatched content.
-//     Inside a primitive element's text, which a decode with no option reads
-//     past without looking at it, such a decode may accept it; a decode
-//     given any option refuses it.
+//     Inside a primitive element's text, which a decode given none of
+//     [WithUnmatched], [WithStrict], [WithMissing], [WithPresence] and a
+//     positive [WithMaxDepth] reads past without looking at it, such a
+//     decode may accept it; a decode given one of them refuses it.
 //   - ISO 8601 dates/times/durations are passed through as element
 //     text content; the codec does not parse them.
 //   - Numeric magnitudes use IEEE 754 double-precision (same as

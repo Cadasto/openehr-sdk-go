@@ -487,10 +487,11 @@ func (f failedReader) Read([]byte) (int, error) { return 0, f.err }
 // stream may hold many values, one after another, and Decode skips what
 // precedes each one, as encoding/xml does. [Unmarshal], which is given a
 // whole document, is the call that holds it to one root element and checks
-// what comes before and after it. Inside the value, a Decoder given any
-// option, [WithMaxDepth] included, refuses a processing instruction whose
-// target is xml, which XML reserves for the declaration at the start of a
-// document, with [ErrInvalidShape]; one given none may read past it.
+// what comes before and after it. Inside the value, a Decoder given
+// [WithUnmatched], [WithStrict], [WithMissing], [WithPresence] or a positive
+// [WithMaxDepth] refuses a processing instruction whose target is xml, which
+// XML reserves for the declaration at the start of a document, with
+// [ErrInvalidShape]; one given none of them may read past it.
 func (d *Decoder) Decode(v any) error {
 	switch {
 	case d.trk != nil:

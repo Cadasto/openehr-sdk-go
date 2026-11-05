@@ -81,7 +81,10 @@ func Unmarshal(data []byte, v any, t *Tracker) error {
 // element nested past its own depth limit, which names no element; or after
 // one that succeeded on data that may hold a processing instruction whose
 // target is xml inside its root, which err is then [errXMLTargetInside] for,
-// and which the second decode refuses, or reads to the end. The second
+// and which the second decode refuses, or reads to the end into v as the
+// first left it: each member it decodes replaces what v held, a list from its
+// first item, so v keeps what the document leaves out, as after the first
+// decode. The second
 // decode reads through a tracker that follows the open elements and their
 // namespace scope and applies no policy. A primitive failure fails again at
 // the same element, named by its path from the root of the value, and so does
@@ -94,7 +97,7 @@ func Unmarshal(data []byte, v any, t *Tracker) error {
 // not fail again.
 func decodeAgain(data []byte, v any, err error) error {
 	t := NewTracker(nil, false)
-	t.again = IsUnresolvedPrefix(err) || errors.Is(err, errXMLTargetInside)
+	t.again = IsUnresolvedPrefix(err)
 	dec := t.NewDecoder(bytes.NewReader(data))
 	if again := t.Decode(dec, v); again != nil {
 		return again
