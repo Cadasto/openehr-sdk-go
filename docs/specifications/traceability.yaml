@@ -1321,12 +1321,10 @@ requirements:
       - testkit/probes/rest/probes_test.go
 
   - id: REQ-100
-    title: ADL 1.4 operational template (OPT) parse and paths
-    canonical: docs/specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths
-    status: draft
-    implementation: landed
-    packages: [openehr/template, internal/templatecompile, openehr/templatecompile, testkit/probes/template]
-    probes: [PROBE-022]
+    title: ADL 1.4 operational template (OPT) parse and paths (retired)
+    canonical: docs/specifications/retired-requirements.md#req-100--adl-14-operational-template-opt-parse-and-paths
+    status: deprecated
+    implementation: retired
     tests:
       - internal/bmmtype/bmmtype_test.go
       - internal/bmmtype/formal_parameters_test.go
@@ -1835,7 +1833,7 @@ requirements:
       - internal/templatecompile
       - openehr/aom/aom14
       - openehr/internal/decodeopts
-    probes: []
+    probes: [PROBE-022]
     tests:
       - internal/templatecompile/compile_model_test.go
       - internal/templatecompile/compile_nodename_test.go
