@@ -421,3 +421,156 @@ func TestErrorEnvelopeEmptyCodedListsAreNoEnvelope(t *testing.T) {
 		})
 	}
 }
+
+// TestREQ093ErrorEnvelopeRepeatedMemberIsNoEnvelope pins REQ-093's member
+// names: a body that repeats a member name, in the envelope itself or inside
+// one of its entries, leaves the envelope undecoded, so WireError.OpenEHR stays
+// nil and the status alone classifies the failure. No member wins over its
+// repeat.
+func TestREQ093ErrorEnvelopeRepeatedMemberIsNoEnvelope(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+	}{
+		{name: "repeated message", body: `{"message":"a","message":"b","code":"C"}`},
+		{name: "repeated code", body: `{"code":"A","code":"B"}`},
+		{name: "repeated validationErrors", body: `{"validationErrors":["a"],"validationErrors":["b"]}`},
+		{
+			name: "repeated code_string inside a coded_text entry",
+			body: `{"code":"X","coded_text":[{"terminology_id":{"value":"openehr"},"code_string":"A","code_string":"B"}]}`,
+		},
+		{
+			name: "repeated code_string inside an errors entry's defining_code",
+			body: `{"code":"X","errors":[{"value":"v","defining_code":{"terminology_id":{"value":"local"},"code_string":"9000","code_string":"8000"}}]}`,
+		},
+		{
+			name: "repeated name inside a member the envelope does not read",
+			body: `{"code":"X","details":{"a":1,"a":2}}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := newDecodeClient(t, http.StatusUnprocessableEntity, tt.body, nil, transport.WithRawErrorBodies(true))
+			_, err := c.Do(t.Context(), &transport.Request{Route: "/x", Path: "/x"})
+			we, ok := errors.AsType[*transport.WireError](err)
+			if !ok || we == nil {
+				t.Fatalf("Do() error = %T (%v), want *transport.WireError", err, err)
+			}
+			if we.OpenEHR != nil {
+				t.Errorf("OpenEHR = %+v for %s, want nil for a body that repeats a member name", we.OpenEHR, tt.body)
+			}
+			if !errors.Is(err, transport.ErrUnprocessable) {
+				t.Errorf("Do() error = %v, want it to match ErrUnprocessable", err)
+			}
+		})
+	}
+}
+
+// TestREQ093ErrorEnvelopeMemberNamesMatchExactly pins REQ-093's member names:
+// only a member spelled exactly as the envelope names it is read, so a case
+// variant such as MESSAGE or Code is ignored like any other unknown member,
+// whichever side of the exact name it sits on.
+func TestREQ093ErrorEnvelopeMemberNamesMatchExactly(t *testing.T) {
+	tests := []struct {
+		name         string
+		body         string
+		wantEnvelope bool
+		wantMessage  string
+		wantCode     string
+		want         []transport.CodedTextItem
+		wantVE       []string
+	}{
+		{
+			name:         "a case variant after the exact name does not replace it",
+			body:         `{"message":"y","MESSAGE":"x","code":"C"}`,
+			wantEnvelope: true,
+			wantMessage:  "y",
+			wantCode:     "C",
+		},
+		{
+			name:         "a case variant before the exact name does not replace it",
+			body:         `{"MESSAGE":"x","message":"y","code":"C"}`,
+			wantEnvelope: true,
+			wantMessage:  "y",
+			wantCode:     "C",
+		},
+		{
+			name:         "case variants alone are ignored, the exact members are kept",
+			body:         `{"MESSAGE":"x","Code":"Y","code":"C","ValidationErrors":["v"]}`,
+			wantEnvelope: true,
+			wantCode:     "C",
+		},
+		{
+			name: "a body with case variants only is no envelope",
+			body: `{"Message":"m","Code":"C","VALIDATIONERRORS":["v"]}`,
+		},
+		{
+			name:         "a case variant inside a coded_text entry is ignored",
+			body:         `{"code":"X","coded_text":[{"Terminology_ID":{"value":"openehr"},"code_string":"K","Value":"v"}]}`,
+			wantEnvelope: true,
+			wantCode:     "X",
+			want:         []transport.CodedTextItem{codedItem("", "K", "")},
+		},
+		{
+			name:         "a case variant of defining_code leaves the errors entry without one",
+			body:         `{"code":"X","errors":[{"value":"v","Defining_Code":{"terminology_id":{"value":"local"},"code_string":"9000"}},{"value":"w","defining_code":{"terminology_id":{"VALUE":"local"},"code_string":"8000"}}]}`,
+			wantEnvelope: true,
+			wantCode:     "X",
+			want:         []transport.CodedTextItem{codedItem("", "8000", "w")},
+		},
+		{
+			name:         "the exact validationErrors is kept beside a case variant",
+			body:         `{"validationErrors":["a"],"validationerrors":["b"]}`,
+			wantEnvelope: true,
+			wantVE:       []string{"a"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := newDecodeClient(t, http.StatusUnprocessableEntity, tt.body, nil, transport.WithRawErrorBodies(true))
+			_, err := c.Do(t.Context(), &transport.Request{Route: "/x", Path: "/x"})
+			we, ok := errors.AsType[*transport.WireError](err)
+			if !ok || we == nil {
+				t.Fatalf("Do() error = %T (%v), want *transport.WireError", err, err)
+			}
+			if !tt.wantEnvelope {
+				if we.OpenEHR != nil {
+					t.Errorf("OpenEHR = %+v for %s, want nil for a body with no exactly named member", we.OpenEHR, tt.body)
+				}
+				return
+			}
+			if we.OpenEHR == nil {
+				t.Fatalf("OpenEHR = nil for %s, want the decoded envelope", tt.body)
+			}
+			if we.OpenEHR.Message != tt.wantMessage {
+				t.Errorf("Message = %q, want %q", we.OpenEHR.Message, tt.wantMessage)
+			}
+			if we.OpenEHR.Code != tt.wantCode {
+				t.Errorf("Code = %q, want %q", we.OpenEHR.Code, tt.wantCode)
+			}
+			if !slices.Equal(we.OpenEHR.CodedText, tt.want) {
+				t.Errorf("CodedText = %+v, want %+v", we.OpenEHR.CodedText, tt.want)
+			}
+			if !slices.Equal(we.OpenEHR.ValidationErrors, tt.wantVE) {
+				t.Errorf("ValidationErrors = %q, want %q", we.OpenEHR.ValidationErrors, tt.wantVE)
+			}
+		})
+	}
+}
+
+// TestREQ093OpenEHRErrorDetailUnmarshalJSONRefusesRepeatedNames pins the
+// exported decode method to the same reading as the transport: it fails on a
+// repeated member name and ignores a case variant.
+func TestREQ093OpenEHRErrorDetailUnmarshalJSONRefusesRepeatedNames(t *testing.T) {
+	var d transport.OpenEHRErrorDetail
+	if err := d.UnmarshalJSON([]byte(`{"code":"A","code":"B"}`)); err == nil {
+		t.Errorf("UnmarshalJSON(repeated code) = nil error, Code %q; want an error", d.Code)
+	}
+	d = transport.OpenEHRErrorDetail{}
+	if err := d.UnmarshalJSON([]byte(`{"code":"A","CODE":"B"}`)); err != nil {
+		t.Fatalf("UnmarshalJSON(code and CODE) = %v, want nil", err)
+	}
+	if d.Code != "A" {
+		t.Errorf("UnmarshalJSON(code and CODE): Code = %q, want %q", d.Code, "A")
+	}
+}

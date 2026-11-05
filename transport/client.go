@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"cmp"
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"
@@ -714,9 +714,10 @@ func statusToSentinel(s int) error {
 }
 
 // decodeOpenEHRError attempts to parse the openEHR error envelope
-// (REQ-093). Returns ok=false when the body is empty, non-JSON, or
-// missing message, code, validation errors and coded entries from the
-// coded_text or errors list (the envelope is best-effort).
+// (REQ-093). Returns ok=false when the body is empty, non-JSON, repeats a
+// member name (json/v2 refuses one), or is missing message, code,
+// validation errors and coded entries from the coded_text or errors list
+// (the envelope is best-effort).
 func decodeOpenEHRError(body []byte) (*OpenEHRErrorDetail, bool) {
 	if len(body) == 0 {
 		return nil, false
