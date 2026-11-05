@@ -1646,28 +1646,39 @@ var bmmPrimitiveZero = map[string]any{
 	"Real":      0.0,
 }
 
+// noPrecisionLimit is the precision of a DV_QUANTITY or a DV_PROPORTION
+// that writeBMMPrimitive writes: -1, which the RM reads as no limit on
+// decimal places, as the generator's own quantities carry. A precision of
+// 0 would claim a whole-number value, which DV_PROPORTION
+// Precision_validity holds the numerator and denominator to.
+const noPrecisionLimit = -1
+
 // writeBMMPrimitive writes the attribute attr of parent, of the BMM
 // primitive type rmType, which the OPT names under optNode with no allowed
 // child, where parent does not hold it yet: a primitive the RM leaves
 // optional, which parent holds behind a pointer, such as a DV_COUNT's
 // accuracy or a DV_QUANTITY's precision. It takes the value built from its
 // BMM type, the one a mandatory primitive holds where the walk writes
-// nothing (bmmPrimitiveZero), so a DV_COUNT whose OPT requires accuracy
-// carries an accuracy of 0, which settleAccuracy narrows where
-// accuracy_is_percent is true. An attribute parent holds, every mandatory
-// one among them, keeps its value, and a type bmmPrimitiveZero does not
-// name is left unwritten. An attribute rmwrite does not address
-// (rmwrite.ErrUnknownAttribute) is one the pinned RM does not have, and is
-// left for the template validator to report; any other error is returned.
+// nothing (bmmPrimitiveZero), except a precision, which takes
+// noPrecisionLimit. So a DV_COUNT whose OPT requires accuracy carries an
+// accuracy of 0, which settleAccuracy narrows where accuracy_is_percent is
+// true. An attribute parent holds, every mandatory one among them, keeps
+// its value, and a type bmmPrimitiveZero does not name is left unwritten.
+// An attribute rmwrite does not address (rmwrite.ErrUnknownAttribute) is
+// one the pinned RM does not have, and is left for the template validator
+// to report; any other error is returned.
 func writeBMMPrimitive(optNode *tcimpl.CompiledNode, parent any, attr, rmType string) error {
 	if _, present, _ := rmaccess.Peek(parent, attr); present {
 		return nil
 	}
-	zero, ok := bmmPrimitiveZero[rmType]
+	value, ok := bmmPrimitiveZero[rmType]
 	if !ok {
 		return nil
 	}
-	err := rmwrite.EnsureSingle(parent, attr, zero)
+	if attr == "precision" {
+		value = noPrecisionLimit
+	}
+	err := rmwrite.EnsureSingle(parent, attr, value)
 	if err == nil || errors.Is(err, rmwrite.ErrUnknownAttribute) {
 		return nil
 	}

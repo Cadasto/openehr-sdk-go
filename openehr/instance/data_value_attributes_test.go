@@ -753,25 +753,56 @@ func TestREQ107_WrongTypeLeafOnARoutedAttributeFailsGenerate(t *testing.T) {
 	}
 }
 
+// held is the value p points to, for a failure message, or "absent" where p
+// is nil.
+func held[T any](p *T) string {
+	if p == nil {
+		return "absent"
+	}
+	return fmt.Sprint(*p)
+}
+
 // TestREQ107_PrimitiveAttributeWithNoChildIsWritten is the REQ-107 What a
 // visit writes check that a visited attribute of a BMM primitive type that
-// the OPT names with no child takes a value built from its BMM type, the
-// zero value a mandatory one holds, so that a root whose OPT requires it
-// carries it (§ Contract Output): a DV_COUNT's and a DV_DURATION's accuracy
-// and a DV_COUNT's accuracy_is_percent, a DV_QUANTITY's and a
-// DV_PROPORTION's precision, which the RM leaves optional, under every
-// policy where the OPT requires them, and an accuracy the OPT leaves
-// optional under Large, which visits it. A primitive the value already
-// holds, as a DV_BOOLEAN holds its value, keeps it. Each root passes both
-// validators, with and without the implicit attributes and under both
-// value fills; INTERVAL_EVENT's sample_count, the one primitive attribute
-// of a locatable the RM leaves optional, is checked the same way.
+// the OPT names with no child takes a value built from its BMM type, so
+// that a root whose OPT requires it carries it (§ Contract Output): a
+// DV_COUNT's and a DV_DURATION's accuracy, 0, and a DV_COUNT's
+// accuracy_is_percent, false, the zero value a mandatory one holds, and a
+// DV_QUANTITY's and a DV_PROPORTION's precision, -1, the RM's no limit,
+// which the RM leaves optional, under every policy where the OPT requires
+// them, and an accuracy and a precision the OPT leaves optional under
+// Large, which visits them. A precision of 0 would claim whole numbers,
+// which a DV_PROPORTION whose numerator the OPT keeps fractional cannot
+// meet (RM Precision_validity). A primitive the value already holds, as a
+// DV_BOOLEAN holds its value, keeps it. Each root passes both validators,
+// with and without the implicit attributes and under both value fills;
+// INTERVAL_EVENT's sample_count, the one primitive attribute of a locatable
+// the RM leaves optional, is checked the same way.
 func TestREQ107_PrimitiveAttributeWithNoChildIsWritten(t *testing.T) {
-	checkHeld := func(t *testing.T, what string, got *rm.Real) {
+	checkAccuracy := func(t *testing.T, what string, got *rm.Real) {
 		t.Helper()
 		if got == nil || *got != 0 {
-			t.Errorf("%s = %v, want 0 written", what, got)
+			t.Errorf("%s = %s, want 0 written", what, held(got))
 		}
+	}
+	checkPrecision := func(t *testing.T, what string, got *rm.Integer) {
+		t.Helper()
+		if got == nil || *got != -1 {
+			t.Errorf("%s = %s, want -1 written", what, held(got))
+		}
+	}
+	// fractionalUnitary is a unitary DV_PROPORTION whose numerator the OPT
+	// keeps between 0.1 and 0.9, so no whole number meets it, with attrs.
+	fractionalUnitary := func(attrs ...string) string {
+		return optNode("DV_PROPORTION", "", append([]string{
+			optSingle("numerator", realRange("0.1", "0.9")),
+			optSingle("denominator", dvReal("1")),
+			optSingle("type", dvInteger("1")),
+		}, attrs...)...)
+	}
+	proportionPrecision := func(t *testing.T, out any) {
+		t.Helper()
+		checkPrecision(t, "DV_PROPORTION.precision", dvValue[*rm.DVProportion](t, out).Precision)
 	}
 	runDataValueCases(t, []dvCase{
 		{
@@ -779,7 +810,7 @@ func TestREQ107_PrimitiveAttributeWithNoChildIsWritten(t *testing.T) {
 			value: optNode("DV_COUNT", "", optSingle("accuracy")),
 			check: func(t *testing.T, out any) {
 				t.Helper()
-				checkHeld(t, "DV_COUNT.accuracy", dvValue[*rm.DVCount](t, out).Accuracy)
+				checkAccuracy(t, "DV_COUNT.accuracy", dvValue[*rm.DVCount](t, out).Accuracy)
 			},
 		},
 		{
@@ -787,7 +818,7 @@ func TestREQ107_PrimitiveAttributeWithNoChildIsWritten(t *testing.T) {
 			value: optNode("DV_DURATION", "", optSingle("accuracy")),
 			check: func(t *testing.T, out any) {
 				t.Helper()
-				checkHeld(t, "DV_DURATION.accuracy", dvValue[*rm.DVDuration](t, out).Accuracy)
+				checkAccuracy(t, "DV_DURATION.accuracy", dvValue[*rm.DVDuration](t, out).Accuracy)
 			},
 		},
 		{
@@ -796,7 +827,7 @@ func TestREQ107_PrimitiveAttributeWithNoChildIsWritten(t *testing.T) {
 			check: func(t *testing.T, out any) {
 				t.Helper()
 				if got := dvValue[*rm.DVCount](t, out).AccuracyIsPercent; got == nil || *got {
-					t.Errorf("DV_COUNT.accuracy_is_percent = %v, want false written", got)
+					t.Errorf("DV_COUNT.accuracy_is_percent = %s, want false written", held(got))
 				}
 			},
 		},
@@ -805,20 +836,24 @@ func TestREQ107_PrimitiveAttributeWithNoChildIsWritten(t *testing.T) {
 			value: optNode("DV_QUANTITY", "", optSingle("precision")),
 			check: func(t *testing.T, out any) {
 				t.Helper()
-				if got := dvValue[*rm.DVQuantity](t, out).Precision; got == nil || *got != 0 {
-					t.Errorf("DV_QUANTITY.precision = %v, want 0 written", got)
-				}
+				checkPrecision(t, "DV_QUANTITY.precision", dvValue[*rm.DVQuantity](t, out).Precision)
 			},
 		},
 		{
 			name:  "DV_PROPORTION precision the OPT requires",
 			value: optNode("DV_PROPORTION", "", optSingle("precision")),
-			check: func(t *testing.T, out any) {
-				t.Helper()
-				if got := dvValue[*rm.DVProportion](t, out).Precision; got == nil || *got != 0 {
-					t.Errorf("DV_PROPORTION.precision = %v, want 0 written", got)
-				}
-			},
+			check: proportionPrecision,
+		},
+		{
+			name:  "fractional DV_PROPORTION precision the OPT requires",
+			value: fractionalUnitary(optSingle("precision")),
+			check: proportionPrecision,
+		},
+		{
+			name:     "fractional DV_PROPORTION precision the OPT leaves optional",
+			value:    fractionalUnitary(optOptionalSingleOver("precision")),
+			policies: []instance.Policy{instance.Large},
+			check:    proportionPrecision,
 		},
 		{
 			name:     "DV_COUNT accuracy the OPT leaves optional",
@@ -826,7 +861,7 @@ func TestREQ107_PrimitiveAttributeWithNoChildIsWritten(t *testing.T) {
 			policies: []instance.Policy{instance.Large},
 			check: func(t *testing.T, out any) {
 				t.Helper()
-				checkHeld(t, "DV_COUNT.accuracy", dvValue[*rm.DVCount](t, out).Accuracy)
+				checkAccuracy(t, "DV_COUNT.accuracy", dvValue[*rm.DVCount](t, out).Accuracy)
 			},
 		},
 		{
@@ -858,7 +893,7 @@ func TestREQ107_PrimitiveAttributeWithNoChildIsWritten(t *testing.T) {
 					t.Fatalf("event is %T, want an INTERVAL_EVENT", h.Events[0])
 				}
 				if e.SampleCount == nil || *e.SampleCount != 0 {
-					t.Errorf("INTERVAL_EVENT.sample_count = %v, want 0 written", e.SampleCount)
+					t.Errorf("INTERVAL_EVENT.sample_count = %s, want 0 written", held(e.SampleCount))
 				}
 				checkValid(t, out, c)
 			})
