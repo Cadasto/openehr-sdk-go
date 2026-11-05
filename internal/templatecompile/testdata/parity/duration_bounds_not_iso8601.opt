@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- SDK-authored parity fixture: a C_DURATION range whose bounds, P and P, are not durations, which the parser's default mode reads as unbounded on both sides and its strict mode refuses. -->
+<!-- SDK-authored parity fixture: a C_DURATION range whose bounds, P and P, are not durations, which the compile step's default mode reads as unbounded on both sides and its strict mode refuses. -->
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <language>
     <terminology_id><value>ISO_639-1</value></terminology_id>

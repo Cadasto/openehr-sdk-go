@@ -2,7 +2,7 @@ package discovery
 
 import (
 	"context"
-	"encoding/json"
+	jsonv2 "encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"
@@ -587,8 +587,11 @@ func (r *Resolver) fetch(ctx context.Context, baseURL string, cached *ServiceCat
 	if len(body) > maxDocumentBytes {
 		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonParseError, Inner: fmt.Errorf("SMART configuration exceeds %d bytes", maxDocumentBytes)}
 	}
+	// Member names are read exactly as SMART App Launch and RFC 8414 spell
+	// them, and a repeated name refuses the document, so a member such as
+	// "ISSUER" that follows the real issuer never stands in for it.
 	var wire smartConfigWire
-	if err := json.Unmarshal(body, &wire); err != nil {
+	if err := jsonv2.Unmarshal(body, &wire); err != nil {
 		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonParseError, Inner: err}
 	}
 	cat, err := r.parse(baseURL, &wire)
@@ -734,11 +737,14 @@ func (r *Resolver) checkOpenIDConfiguration(ctx context.Context, cat *ServiceCat
 	if len(body) > maxDocumentBytes {
 		return fail(ReasonFetchFailed, fmt.Errorf("openid-configuration exceeds %d bytes", maxDocumentBytes))
 	}
+	// Member names are read exactly as OpenID Connect Discovery spells them,
+	// and a repeated name refuses the document, so an "ISSUER" or "JWKS_URI"
+	// member never stands in for the issuer or jwks_uri checked below.
 	var doc struct {
 		Issuer  string `json:"issuer"`
 		JWKSURI string `json:"jwks_uri"`
 	}
-	if err := json.Unmarshal(body, &doc); err != nil {
+	if err := jsonv2.Unmarshal(body, &doc); err != nil {
 		return fail(ReasonFetchFailed, fmt.Errorf("openid-configuration: %w", err))
 	}
 	// Every OpenID configuration names its issuer. Without one the body is

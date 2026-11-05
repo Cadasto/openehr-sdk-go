@@ -104,6 +104,10 @@ The rule that tells "no retries" apart from "use the package default" moved to [
 
 Cadasto openEHR services no longer accept the `Idempotency-Key` header, so the SDK does not send it.
 
+## REQ-100 — ADL 1.4 operational template (OPT) parse and paths
+
+The OPT parser, `template.ParseOPT` and its tree, was removed in 0.46.0 ([ADR 0035](../adr/0035-compile-step-reads-operational-template-model.md)); its path grammar, resolution rules and path errors moved to [clinical-modeling.md § REQ-111](clinical-modeling.md#req-111--public-compiled-template-bridge) *Path lookup*, and the readings the operational template reader and the compile step keep to *Reading the model* there.
+
 ## REQ-104 — Slot assertion grammar
 
 Its rules moved to [clinical-modeling.md § REQ-103](clinical-modeling.md#req-103--primitive-constraint-introspection) *Slot assertions*.

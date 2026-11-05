@@ -190,8 +190,8 @@ func TestREQ176_ReadOperationalTemplateAppliesTheCallersOptions(t *testing.T) {
 // comments, processing instructions and whitespace pass, and an element,
 // text, a CDATA section or a stray end element is refused with an error
 // wrapping canxml.ErrInvalidShape that carries none of it. A `<!…>`
-// declaration, which the deprecated parser reads past, reads in the default
-// mode and is refused so given canxml.WithStrict.
+// declaration, which encoding/xml reads, is read past in the default mode and
+// refused so given canxml.WithStrict.
 func TestREQ176_REQ111_ReadOperationalTemplateHoldsContentAfterTheRoot(t *testing.T) {
 	t.Parallel()
 	const planted = "PLANTED"
@@ -238,15 +238,15 @@ func TestREQ176_REQ111_ReadOperationalTemplateHoldsContentAfterTheRoot(t *testin
 	}
 }
 
-// TestREQ176_REQ111_ReadOperationalTemplateHoldsContentBeforeTheRoot pins what
-// the reader reads before the root element. In every mode the XML
+// TestREQ176_REQ111_ReadOperationalTemplateHoldsContentBeforeTheRoot pins
+// what the reader reads before the root element. In every mode the XML
 // declaration, comments, processing instructions, whitespace and one document
 // type declaration pass, and a stray end element, or markup encoding/xml
 // cannot read, is refused with an error wrapping canxml.ErrInvalidShape that
 // carries none of it. Text, a CDATA section, a second document type and
-// another declaration, which the deprecated parser reads past, read in the
-// default mode and are refused so given canxml.WithStrict. An input with only
-// such content and no root is the no-root case
+// another declaration, which encoding/xml reads, are read past in the default
+// mode and refused so given canxml.WithStrict. An input with only such
+// content and no root is the no-root case
 // (TestREQ108_ReadOperationalTemplateRefusesAnInputWithNoRootElement).
 func TestREQ176_REQ111_ReadOperationalTemplateHoldsContentBeforeTheRoot(t *testing.T) {
 	t.Parallel()

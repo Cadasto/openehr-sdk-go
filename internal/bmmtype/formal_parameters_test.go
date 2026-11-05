@@ -22,10 +22,10 @@ func loadPinnedBMM(t *testing.T) *bmm.Schema {
 	return schema
 }
 
-// REQ-100 — the compiler substitutes formal parameters from this table, so
-// it must name exactly the generic classes of the rminfo class universe, each
-// with the parameter names the vendored BMM declares. A schema bump that adds
-// a generic class, or renames a parameter, fails here.
+// REQ-111 (§ Reading the model) — the compiler substitutes formal parameters
+// from this table, so it must name exactly the generic classes of the rminfo
+// class universe, each with the parameter names the vendored BMM declares. A
+// schema bump that adds a generic class, or renames a parameter, fails here.
 func TestFormalParametersMatchBMM(t *testing.T) {
 	schema := loadPinnedBMM(t)
 	want := map[string][]string{}
@@ -72,12 +72,12 @@ func TestFormalParametersMatchBMM(t *testing.T) {
 	}
 }
 
-// REQ-100 — the other direction: every attribute type rminfo records that
-// names no class or primitive type of the BMM is a formal parameter of the
-// attribute's class, and the table lists it for that class. Otherwise
-// Substitute would leave it in place on a parameterised owner. Today these are
-// the "T" of DV_INTERVAL's and the BASE intervals' bounds, of the EVENT
-// family's data, and of ORIGINAL_VERSION's data.
+// REQ-111 (§ Reading the model) — the other direction: every attribute type
+// rminfo records that names no class or primitive type of the BMM is a formal
+// parameter of the attribute's class, and the table lists it for that class.
+// Otherwise Substitute would leave it in place on a parameterised owner.
+// Today these are the "T" of DV_INTERVAL's and the BASE intervals' bounds, of
+// the EVENT family's data, and of ORIGINAL_VERSION's data.
 func TestFormalParametersCoverRMInfoTypes(t *testing.T) {
 	schema := loadPinnedBMM(t)
 	lister, ok := rminfo.Default.(rminfo.AttributeLister)

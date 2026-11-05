@@ -79,7 +79,6 @@ HELP_FOOTER    = Before a pull request: make ci · docs site: make docs-serve (h
 ##= ARGS='-base URL -deployment NAME ...' | probe-record flags
 ##= BMM_REF= ITS_XML_REF= ... | pin a Vendor sync (ITS_REST_REF, TERMINOLOGY_REF too; EHRbase pins: testkit/corpus/UPSTREAM_PINS.txt)
 ##= DOCS_SYNC=docs-sync-offline | build the docs site from the cached brand files
-##= DIR=/path/to/opts | the folder of OPTs template-parity walks
 
 .PHONY: help doctor go-version build-dev build-antlr \
         build clean \
@@ -91,7 +90,7 @@ HELP_FOOTER    = Before a pull request: make ci · docs site: make docs-serve (h
         mod-tidy-check codegen-check termgen-check aqlgen-check bmm-check its-xml-check flat-check crossformat-check corpus-pins-check terminology-check \
         operational-template-schema-check \
         spec-check sdd-check ci \
-        spec-context probe-status probe-record cdr-crosscheck template-parity \
+        spec-context probe-status probe-record cdr-crosscheck \
         docs-sync docs-sync-offline docs-build docs-check docs-serve docs-clean
 
 ##@ Setup
@@ -263,11 +262,14 @@ terminology-check: ## Verify the vendored terminology (offline sha256)
 # xmllint validates those documents, and every corpus OPT as written, against
 # AM/Release-1.4/Template.xsd. It fails on a re-encoded document the schemas
 # refuse, on an OPT they refuse as written that the ratchet does not list, and
-# on a ratchet entry they now accept.
+# on a ratchet entry they now accept. mktemp makes the folder private to the
+# host user; it is opened to all so that the dev container's user, whose uid
+# need not be the host's, can read it.
 operational-template-schema-check: ## Validate the corpus OPTs, as written and re-encoded, against the pinned AM 1.4 schemas (xmllint)
 	@set -e; mkdir -p .tmp; \
 	dir="$$(mktemp -d .tmp/operational-template-schema-check.XXXXXX)"; \
 	trap '[ -n "$$dir" ] && rm -rf "$$dir"' EXIT; \
+	chmod 755 "$$dir"; \
 	(cd resources/its-xml && find components -name '*.xsd') | while IFS= read -r f; do \
 	  mkdir -p "$$dir/schemas/$$(dirname "$$f")"; \
 	  sed 's|http://schemas.openehr.org/v2|http://schemas.openehr.org/v1|g' "resources/its-xml/$$f" > "$$dir/schemas/$$f"; \
@@ -328,17 +330,6 @@ cdr-crosscheck: ## Cross-check generated documents and CDR examples against live
 	@rev="$$(git rev-parse HEAD 2>/dev/null)"; \
 	 if [ -n "$$(git status --porcelain 2>/dev/null)" ]; then rev="$$rev-dirty"; fi; \
 	 $(GO) run ./cmd/cdrcheck -sdk-commit "$$rev" $(ARGS)
-
-# The folder is read where it is: the Docker fallback mounts it read-only at
-# the same path, so the file names the check prints are the host's. Make's
-# abspath splits its argument on white space, so a folder name that contains
-# a space would be two paths. Resolve DIR as one path.
-PARITY_DIR = $(shell python3 -c 'import os,sys; print(os.path.abspath(sys.argv[1]))' '$(DIR)')
-PARITY_GO  = $(if $(HOST_GO_OK),TEMPLATE_PARITY_DIR="$(PARITY_DIR)" go,$(DOCKER_RUN) -v "$(PARITY_DIR):$(PARITY_DIR):ro" -e TEMPLATE_PARITY_DIR="$(PARITY_DIR)" go go)
-
-template-parity: ## Deprecated-parser parity over the OPTs under DIR (opt-in)
-	@test -n "$(DIR)" || { echo 'usage: make template-parity DIR=<folder of OPTs>' >&2; exit 2; }
-	@$(PARITY_GO) test ./internal/templatecompile/ -run '^TestREQ111_ParityOverFolder$$' -count=1 -v -timeout 30m
 
 ##@ Docs
 

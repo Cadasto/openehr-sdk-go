@@ -5,10 +5,10 @@ kind: plan
 # Plan — OPT author validator + CLI
 
 **Date:** 2026-07-16
-**Status:** Draft — not started. Re-checked at `aad783b7` (after v0.34.0): what exists stops at the first problem and serves the SDK, not an author. `template.ParseOPTStrict` / `ParseFileStrict` refuse an unknown node type that carries nested attributes and a `CONSTRAINT_REF` with no reference ([§ REQ-100 *Strict parse mode*](../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths)); `templatecompile.Compile` refuses input it cannot compile; `webtemplate.Build` refuses an id collision; each returns one error. `openehr/validation` checks instances and AQL against a compiled template, not the template itself. Nothing collects author-facing issues with codes, checks term definitions or the lifecycle state, or ships a CLI. REQ-114 stays reserved.
+**Status:** Draft — not started. Re-checked at `aad783b7` (after v0.34.0): what exists stops at the first problem and serves the SDK, not an author. `aom14.ReadOperationalTemplate` with `canxml.WithStrict` refuses an unknown node type that carries nested attributes, and `templatecompile.Compile` with `templatecompile.WithStrict` refuses a `CONSTRAINT_REF` with no reference ([§ REQ-111 *Reading the model*](../specifications/clinical-modeling.md#reading-the-model)); `templatecompile.Compile` refuses any input it cannot compile; `webtemplate.Build` refuses an id collision; each returns one error. `openehr/validation` checks instances and AQL against a compiled template, not the template itself. Nothing collects author-facing issues with codes, checks term definitions or the lifecycle state, or ships a CLI. REQ-114 stays reserved.
 **Owner:** SDK maintainers
 **Covers:** **REQ-114** (OPT author validator) — proposed; canonical home to be authored at `clinical-modeling.md` § REQ-114 in Phase 0. The number is reserved in [REQ.md § Numbering policy](../specifications/REQ.md#numbering-policy).
-**Builds on:** landed [REQ-100](../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths) (OPT parse), [REQ-104](../specifications/retired-requirements.md#req-104--slot-assertion-grammar) (slot assertions), [REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export) (Web Template export), [REQ-108](../specifications/clinical-modeling.md#req-108--untrusted-document-bounds) (document bounds); complementary to [REQ-102](../specifications/clinical-modeling.md#req-102--composition-validation) (composition validation)
+**Builds on:** landed [REQ-176](../specifications/clinical-modeling.md#req-176--adl-14-operational-template-model) (operational template model), [REQ-111](../specifications/clinical-modeling.md#req-111--public-compiled-template-bridge) (the compile step's reading), [REQ-104](../specifications/retired-requirements.md#req-104--slot-assertion-grammar) (slot assertions), [REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export) (Web Template export), [REQ-108](../specifications/clinical-modeling.md#req-108--untrusted-document-bounds) (document bounds); complementary to [REQ-102](../specifications/clinical-modeling.md#req-102--composition-validation) (composition validation)
 **Probes:** **PROBE-085** (OPT author validator corpus)
 **Implementation:** planned
 **Depends on:** landed `openehr/template/`, `openehr/templatecompile/`, `openehr/template/webtemplate/`
@@ -16,7 +16,7 @@ kind: plan
 
 ## Goal
 
-Validate **authored** OPT 1.4 files before CDR upload — complementary to `ParseOPT` / `ParseOPTStrict` (structural parse) and composition validation (REQ-102). Surfaces **actionable issue codes** for template authors and CI, including FLAT-path-impact analysis via Web Template export. It follows the lint/issue model already landed for AQL (REQ-109); motivation: peer openEHR SDKs ship an OPT validator and this SDK did not.
+Validate **authored** OPT 1.4 files before CDR upload — complementary to the structural read (`aom14.ReadOperationalTemplate` with `canxml.WithStrict`), the compile (`templatecompile.Compile` with `templatecompile.WithStrict`) and composition validation (REQ-102). Surfaces **actionable issue codes** for template authors and CI, including FLAT-path-impact analysis via Web Template export. It follows the lint/issue model already landed for AQL (REQ-109); motivation: peer openEHR SDKs ship an OPT validator and this SDK did not.
 
 ## Architecture
 
@@ -38,7 +38,7 @@ validate.Result { Issues[] }   ← mirror the lint/issue pattern from REQ-109 (A
 cmd/examples/validate-opt/     ← CLI (-format json, -strict)
 ```
 
-- **Reuse** `template.ParseFile` / `ParseOPTStrict` — the validator wraps parse and adds author rules, does not fork the parser.
+- **Reuse** `aom14.ReadOperationalTemplate` with `canxml.WithStrict` and `templatecompile.Compile` with `templatecompile.WithStrict` — the validator wraps the read and the compile and adds author rules, and does not fork either.
 - **Issue model:** `Code`, `Severity` (error|warning|info), `Category`, optional `Path`, `Suggestion` — the shape REQ-109 established.
 - **Bounds:** REQ-108 document size / node count limits enforced before deep walks.
 
@@ -46,7 +46,7 @@ cmd/examples/validate-opt/     ← CLI (-format json, -strict)
 
 Implementation (Phase 1+) may start once **Phase 0 has landed REQ-114**:
 
-- `Covers:` names the REQ this plan implements (REQ-114) and the landed REQs it builds on (REQ-100/104/106/108) + the complementary REQ-102.
+- `Covers:` names the REQ this plan implements (REQ-114) and the landed REQs it builds on (REQ-111/176/104/106/108) + the complementary REQ-102.
 - Canonical normative prose for REQ-114 exists — a `clinical-modeling.md § REQ-114` section + a `traceability.yaml` entry — authored via `sdd-specify` (Phase 0). Until then this DoR item is **pending**, not satisfied.
 - The issue-category taxonomy and the stable `opt.` code catalogue are defined **once**, in REQ-114 (not duplicated in this plan).
 - PROBE-085 fixture list chosen from `testkit/corpus/templates/`.
@@ -108,7 +108,7 @@ Author the canonical contract first, so Phases 1–3 cite an existing REQ. The t
    - `validate.go` — `ValidateFile(path string, opts ...Option) (Result, error)`
    - `validate_string.go` — `ValidateString(adl string, opts ...)`
    - `wellformed.go` — XML + template identity
-   - `semantic.go` — walk `template.OperationalTemplate` + `rminfo.Default.KnownRMTypes()`
+   - `semantic.go` — walk `aom14.OperationalTemplate` + `rminfo.Default.KnownRMTypes()`
    - `structural.go` — lifecycle, slot-assertion reuse from the REQ-104 parser
    - `flat_impact.go` — `templatecompile.Compile` + `webtemplate.Build`, detect duplicate flat ids
 2. Options: `WithStrict(bool)` (warnings → errors), `WithMaxBytes(int)` (REQ-108).
@@ -143,7 +143,7 @@ Author the canonical contract first, so Phases 1–3 cite an existing REQ. The t
 1. `testkit/probes/template/probe_085_opt_author_validator.go`:
    - Run the validator on the full fixture template set; expect 0 errors on known-good OPTs.
    - One deliberately broken fixture must emit `opt.missing_template_id`.
-2. Optional (deferred — not v1 unless trivial): hook `template.ParseFileStrict` to call the validator under an `OPT_VALIDATE=1` env toggle. **If adopted, that toggle is normative behaviour and must be specified in REQ-114**, not left as a plan-only task.
+2. Optional (deferred — not v1 unless trivial): hook the strict read, `aom14.ReadOperationalTemplate` with `canxml.WithStrict`, and `templatecompile.Compile` with `templatecompile.WithStrict` to call the validator under an `OPT_VALIDATE=1` env toggle. **If adopted, that toggle is normative behaviour and must be specified in REQ-114**, not left as a plan-only task.
 3. Update `traceability.yaml` (REQ-114 `landed`), run `make spec-gen`, set plan **Status:** `Done`.
 
 **Definition of done:** PROBE-085 in `make test`; REQ-114 **Impl.** = `landed`; `make spec-check` green.
@@ -152,7 +152,7 @@ Author the canonical contract first, so Phases 1–3 cite an existing REQ. The t
 
 - [REQ-114, reserved](../specifications/REQ.md#numbering-policy) — the requirement this plan implements (registry row: [REQ.md](../specifications/REQ.md))
 - [clinical-modeling.md § REQ-109](../specifications/clinical-modeling.md#req-109--aql-static-lint) — the lint/issue-model precedent this mirrors
-- [clinical-modeling.md § REQ-100](../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths) — parse foundation
+- [clinical-modeling.md § REQ-176](../specifications/clinical-modeling.md#req-176--adl-14-operational-template-model) and [§ REQ-111](../specifications/clinical-modeling.md#req-111--public-compiled-template-bridge) *Reading the model* — read and compile foundation
 - [clinical-modeling.md § REQ-104](../specifications/retired-requirements.md#req-104--slot-assertion-grammar) — slot-assertion reuse
 - [clinical-modeling.md § REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export) — flat-impact analysis source
 - [clinical-modeling.md § REQ-108](../specifications/clinical-modeling.md#req-108--untrusted-document-bounds) — size limits

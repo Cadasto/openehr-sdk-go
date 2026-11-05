@@ -60,7 +60,14 @@ type Client struct {
 // HTTP client must be injected with WithHTTPClient.
 //
 // A nil catalog or a missing HTTP client returns ErrInvalidConfig
-// (wrapped).
+// (wrapped). So does a token source given to WithTokenSource, a reauther
+// given to WithReauthOn401, or a tracer provider given to
+// WithTracerProvider, that is not nil itself but holds a nil pointer, func,
+// map, slice or chan, such as a nil *smart.Source or a nil
+// auth.ReautherFunc. Such a value is usually a constructor's result kept
+// without its error, and calling its methods on the first request would
+// typically panic or block. A plain nil for any of them is the same as
+// leaving the option out.
 func New(catalog *discovery.ServiceCatalog, opts ...Option) (*Client, error) {
 	cfg := config{
 		callerAttributionHeader: DefaultCallerAttributionHeader,
@@ -77,6 +84,17 @@ func New(catalog *discovery.ServiceCatalog, opts ...Option) (*Client, error) {
 	}
 	if cfg.httpClient == nil {
 		return nil, fmt.Errorf("%w: WithHTTPClient is required", ErrInvalidConfig)
+	}
+	// REQ-025: a typed nil passes the nil check below and would panic on
+	// the first Do, so it is refused here, naming only its type.
+	if isTypedNil(cfg.tokenSrc) {
+		return nil, fmt.Errorf("%w: WithTokenSource holds a nil %T", ErrInvalidConfig, cfg.tokenSrc)
+	}
+	if isTypedNil(cfg.reauther) {
+		return nil, fmt.Errorf("%w: WithReauthOn401 holds a nil %T", ErrInvalidConfig, cfg.reauther)
+	}
+	if isTypedNil(cfg.tracerProvider) {
+		return nil, fmt.Errorf("%w: WithTracerProvider holds a nil %T", ErrInvalidConfig, cfg.tracerProvider)
 	}
 	if cfg.tokenSrc == nil {
 		cfg.tokenSrc = auth.AnonymousTokenSource()
@@ -597,6 +615,13 @@ func (c *Client) plumbHeaders(ctx context.Context, req *Request, httpReq *http.R
 
 	if !req.NoAuth {
 		ts := c.tokenSourceFor(ctx)
+		// REQ-025: New refuses a typed-nil client default, so only a
+		// per-request override can be one here. It fails the request rather
+		// than falling back to the client default, which would send the
+		// Client's own credential on a request meant to carry the caller's.
+		if isTypedNil(ts) {
+			return fmt.Errorf("transport.Do: %w: auth.WithTokenSource holds a nil %T", ErrInvalidConfig, ts)
+		}
 		tok, err := ts.Token(ctx)
 		if err != nil {
 			return fmt.Errorf("transport: acquire token: %w", err)
@@ -797,6 +822,11 @@ func (c *Client) shouldRetry(ctx context.Context, req *Request, resp *Response, 
 		// it) will fail identically on every attempt — retrying only burns the
 		// budget and re-invokes Token(). Treat them as non-retriable.
 		if errors.Is(err, auth.ErrReauthRequired) || errors.Is(err, auth.ErrInvalidConfig) {
+			return false
+		}
+		// REQ-025: a typed-nil per-request token source is refused before
+		// the request is sent, the same way on every attempt.
+		if errors.Is(err, ErrInvalidConfig) {
 			return false
 		}
 		// REQ-092: a refused https to non-https redirect is decided by the

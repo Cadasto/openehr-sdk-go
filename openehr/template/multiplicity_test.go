@@ -10,8 +10,10 @@ import (
 
 // TestREQ111_NewMultiplicityClosesAndRefuses pins NewMultiplicity, the
 // constructor the compile step closes the model's occurrences, existence and
-// cardinality intervals with: each bounded side closed as the parser closes
-// it, and the intervals the parser refuses refused.
+// cardinality intervals with: an excluded end on a bounded side closed into
+// the end it denotes, an unbounded side left as it is, and an interval that
+// is inverted, that closing leaves empty or whose closed end an int cannot
+// hold refused.
 func TestREQ111_NewMultiplicityClosesAndRefuses(t *testing.T) {
 	type bounds = template.IntervalBounds
 	closed := []struct {

@@ -7,7 +7,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 )
 
-// REQ-100 follow-up Phase 4-bis — Default must report the
+// REQ-111 (§ Reading the model), Phase 4-bis — Default must report the
 // well-known RM-mandatory composition attributes: category, language,
 // territory, composer. The OPT typically omits these — downstream
 // compiled-template logic relies on Default.RequiredAttributes to

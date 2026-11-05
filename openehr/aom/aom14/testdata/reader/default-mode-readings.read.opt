@@ -1,0 +1,412 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- How the reader reads default-mode-readings.opt, written as canonical XML decodes it. SDK-authored. -->
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <language>
+        <terminology_id>
+            <value>ISO_639-1</value>
+        </terminology_id>
+        <code_string>en</code_string>
+    </language>
+    <template_id>
+        <value>sdk.reader_default_mode.v0</value>
+    </template_id>
+    <concept>sdk.reader_default_mode.v0</concept>
+    <definition>
+        <rm_type_name>CLUSTER</rm_type_name>
+        <occurrences>
+            <lower>1</lower>
+            <upper>1</upper>
+        </occurrences>
+        <node_id>at0000</node_id>
+        <attributes xsi:type="C_MULTIPLE_ATTRIBUTE">
+            <rm_attribute_name>items</rm_attribute_name>
+            <existence>
+                <lower>0</lower>
+                <upper>1</upper>
+            </existence>
+            <!-- Typed C_COMPLEX_OBJECT, an archetype id: a C_ARCHETYPE_ROOT. -->
+            <children xsi:type="C_ARCHETYPE_ROOT">
+                <rm_type_name>CLUSTER</rm_type_name>
+                <occurrences>
+                    <lower>0</lower>
+                    <upper>1</upper>
+                </occurrences>
+                <node_id>at0000</node_id>
+                <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                    <rm_attribute_name>items</rm_attribute_name>
+                    <existence>
+                        <lower>0</lower>
+                        <upper>1</upper>
+                    </existence>
+                </attributes>
+                <archetype_id>
+                    <value>openEHR-EHR-CLUSTER.sdk_reader_inner.v0</value>
+                </archetype_id>
+            </children>
+            <!-- A <children> typed with a primitive class, its node_id after a list entry: a C_PRIMITIVE_OBJECT whose item holds the entries. -->
+            <children xsi:type="C_COMPLEX_OBJECT">
+                <rm_type_name>ELEMENT</rm_type_name>
+                <occurrences>
+                    <lower>0</lower>
+                    <upper>1</upper>
+                </occurrences>
+                <node_id>at0001</node_id>
+                <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                    <rm_attribute_name>value</rm_attribute_name>
+                    <existence>
+                        <lower>0</lower>
+                        <upper>1</upper>
+                    </existence>
+                    <children xsi:type="C_COMPLEX_OBJECT">
+                        <rm_type_name>DV_TEXT</rm_type_name>
+                        <occurrences>
+                            <lower>1</lower>
+                            <upper>1</upper>
+                        </occurrences>
+                        <node_id/>
+                        <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                            <rm_attribute_name>value</rm_attribute_name>
+                            <existence>
+                                <lower>1</lower>
+                                <upper>1</upper>
+                            </existence>
+                            <children xsi:type="C_PRIMITIVE_OBJECT">
+                                <rm_type_name>STRING</rm_type_name>
+                                <occurrences>
+                                    <lower>1</lower>
+                                    <upper>1</upper>
+                                </occurrences>
+                                <node_id/>
+                                <item xsi:type="C_STRING">
+                                    <list>a</list>
+                                    <list>b</list>
+                                </item>
+                            </children>
+                        </attributes>
+                    </children>
+                </attributes>
+            </children>
+            <!-- A C_BOOLEAN <children> without its true_valid: a C_PRIMITIVE_OBJECT whose item has it true. -->
+            <children xsi:type="C_COMPLEX_OBJECT">
+                <rm_type_name>ELEMENT</rm_type_name>
+                <occurrences>
+                    <lower>0</lower>
+                    <upper>1</upper>
+                </occurrences>
+                <node_id>at0002</node_id>
+                <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                    <rm_attribute_name>value</rm_attribute_name>
+                    <existence>
+                        <lower>0</lower>
+                        <upper>1</upper>
+                    </existence>
+                    <children xsi:type="C_COMPLEX_OBJECT">
+                        <rm_type_name>DV_BOOLEAN</rm_type_name>
+                        <occurrences>
+                            <lower>1</lower>
+                            <upper>1</upper>
+                        </occurrences>
+                        <node_id/>
+                        <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                            <rm_attribute_name>value</rm_attribute_name>
+                            <existence>
+                                <lower>1</lower>
+                                <upper>1</upper>
+                            </existence>
+                            <children xsi:type="C_PRIMITIVE_OBJECT">
+                                <rm_type_name>BOOLEAN</rm_type_name>
+                                <occurrences>
+                                    <lower>1</lower>
+                                    <upper>1</upper>
+                                </occurrences>
+                                <node_id/>
+                                <item xsi:type="C_BOOLEAN">
+                                    <true_valid>true</true_valid>
+                                    <false_valid>false</false_valid>
+                                </item>
+                            </children>
+                        </attributes>
+                    </children>
+                </attributes>
+            </children>
+            <!-- An item typed C_CODE_PHRASE, with an rm_type_name of its own: the object a C_CODE_PHRASE. -->
+            <children xsi:type="C_COMPLEX_OBJECT">
+                <rm_type_name>ELEMENT</rm_type_name>
+                <occurrences>
+                    <lower>0</lower>
+                    <upper>1</upper>
+                </occurrences>
+                <node_id>at0003</node_id>
+                <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                    <rm_attribute_name>value</rm_attribute_name>
+                    <existence>
+                        <lower>0</lower>
+                        <upper>1</upper>
+                    </existence>
+                    <children xsi:type="C_COMPLEX_OBJECT">
+                        <rm_type_name>DV_CODED_TEXT</rm_type_name>
+                        <occurrences>
+                            <lower>1</lower>
+                            <upper>1</upper>
+                        </occurrences>
+                        <node_id/>
+                        <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                            <rm_attribute_name>defining_code</rm_attribute_name>
+                            <existence>
+                                <lower>1</lower>
+                                <upper>1</upper>
+                            </existence>
+                            <children xsi:type="C_CODE_PHRASE">
+                                <rm_type_name>CODE_PHRASE</rm_type_name>
+                                <occurrences>
+                                    <lower>1</lower>
+                                    <upper>1</upper>
+                                </occurrences>
+                                <node_id/>
+                                <terminology_id>
+                                    <value>local</value>
+                                </terminology_id>
+                                <code_list>at0010</code_list>
+                                <code_list>at0011</code_list>
+                            </children>
+                        </attributes>
+                    </children>
+                </attributes>
+            </children>
+            <!-- An item typed C_DV_QUANTITY, a magnitude and a precision bound written as only Go reads them: a C_DV_QUANTITY of those bounds. -->
+            <children xsi:type="C_COMPLEX_OBJECT">
+                <rm_type_name>ELEMENT</rm_type_name>
+                <occurrences>
+                    <lower>0</lower>
+                    <upper>1</upper>
+                </occurrences>
+                <node_id>at0004</node_id>
+                <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                    <rm_attribute_name>value</rm_attribute_name>
+                    <existence>
+                        <lower>0</lower>
+                        <upper>1</upper>
+                    </existence>
+                    <children xsi:type="C_DV_QUANTITY">
+                        <rm_type_name>DV_QUANTITY</rm_type_name>
+                        <occurrences>
+                            <lower>1</lower>
+                            <upper>1</upper>
+                        </occurrences>
+                        <node_id/>
+                        <property>
+                            <terminology_id>
+                                <value>openehr</value>
+                            </terminology_id>
+                            <code_string>124</code_string>
+                        </property>
+                        <list>
+                            <magnitude>
+                                <lower>0</lower>
+                                <upper>16</upper>
+                            </magnitude>
+                            <precision>
+                                <lower>0</lower>
+                                <upper>2</upper>
+                            </precision>
+                            <units>kg</units>
+                        </list>
+                    </children>
+                </attributes>
+            </children>
+            <!-- An item typed C_DV_ORDINAL: the object a C_DV_ORDINAL. -->
+            <children xsi:type="C_COMPLEX_OBJECT">
+                <rm_type_name>ELEMENT</rm_type_name>
+                <occurrences>
+                    <lower>0</lower>
+                    <upper>1</upper>
+                </occurrences>
+                <node_id>at0005</node_id>
+                <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                    <rm_attribute_name>value</rm_attribute_name>
+                    <existence>
+                        <lower>0</lower>
+                        <upper>1</upper>
+                    </existence>
+                    <children xsi:type="C_DV_ORDINAL">
+                        <rm_type_name>DV_ORDINAL</rm_type_name>
+                        <occurrences>
+                            <lower>1</lower>
+                            <upper>1</upper>
+                        </occurrences>
+                        <node_id/>
+                        <list>
+                            <value>1</value>
+                            <symbol>
+                                <value/>
+                                <defining_code>
+                                    <terminology_id>
+                                        <value>local</value>
+                                    </terminology_id>
+                                    <code_string>at0020</code_string>
+                                </defining_code>
+                            </symbol>
+                        </list>
+                        <list>
+                            <value>2</value>
+                            <symbol>
+                                <value/>
+                                <defining_code>
+                                    <terminology_id>
+                                        <value>local</value>
+                                    </terminology_id>
+                                    <code_string>at0021</code_string>
+                                </defining_code>
+                            </symbol>
+                        </list>
+                    </children>
+                </attributes>
+            </children>
+            <!-- An item typed CONSTRAINT_REF: the object a CONSTRAINT_REF. -->
+            <children xsi:type="C_COMPLEX_OBJECT">
+                <rm_type_name>ELEMENT</rm_type_name>
+                <occurrences>
+                    <lower>0</lower>
+                    <upper>1</upper>
+                </occurrences>
+                <node_id>at0006</node_id>
+                <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                    <rm_attribute_name>value</rm_attribute_name>
+                    <existence>
+                        <lower>0</lower>
+                        <upper>1</upper>
+                    </existence>
+                    <children xsi:type="C_COMPLEX_OBJECT">
+                        <rm_type_name>DV_CODED_TEXT</rm_type_name>
+                        <occurrences>
+                            <lower>1</lower>
+                            <upper>1</upper>
+                        </occurrences>
+                        <node_id/>
+                        <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                            <rm_attribute_name>defining_code</rm_attribute_name>
+                            <existence>
+                                <lower>1</lower>
+                                <upper>1</upper>
+                            </existence>
+                            <children xsi:type="CONSTRAINT_REF">
+                                <rm_type_name>CODE_PHRASE</rm_type_name>
+                                <occurrences>
+                                    <lower>1</lower>
+                                    <upper>1</upper>
+                                </occurrences>
+                                <node_id/>
+                                <reference>ac0001</reference>
+                            </children>
+                        </attributes>
+                    </children>
+                </attributes>
+            </children>
+            <!-- An item typed C_PRIMITIVE_OBJECT, with members of its own: its own item is the object's. -->
+            <children xsi:type="C_COMPLEX_OBJECT">
+                <rm_type_name>ELEMENT</rm_type_name>
+                <occurrences>
+                    <lower>0</lower>
+                    <upper>1</upper>
+                </occurrences>
+                <node_id>at0007</node_id>
+                <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                    <rm_attribute_name>value</rm_attribute_name>
+                    <existence>
+                        <lower>0</lower>
+                        <upper>1</upper>
+                    </existence>
+                    <children xsi:type="C_COMPLEX_OBJECT">
+                        <rm_type_name>DV_TEXT</rm_type_name>
+                        <occurrences>
+                            <lower>1</lower>
+                            <upper>1</upper>
+                        </occurrences>
+                        <node_id/>
+                        <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                            <rm_attribute_name>value</rm_attribute_name>
+                            <existence>
+                                <lower>1</lower>
+                                <upper>1</upper>
+                            </existence>
+                            <children xsi:type="C_PRIMITIVE_OBJECT">
+                                <rm_type_name>STRING</rm_type_name>
+                                <occurrences>
+                                    <lower>1</lower>
+                                    <upper>1</upper>
+                                </occurrences>
+                                <node_id/>
+                                <item xsi:type="C_STRING">
+                                    <list>x</list>
+                                </item>
+                            </children>
+                        </attributes>
+                    </children>
+                </attributes>
+            </children>
+            <!-- C_REAL values Go reads and XML Schema's double does not: the doubles Go reads. -->
+            <children xsi:type="C_COMPLEX_OBJECT">
+                <rm_type_name>ELEMENT</rm_type_name>
+                <occurrences>
+                    <lower>0</lower>
+                    <upper>1</upper>
+                </occurrences>
+                <node_id>at0008</node_id>
+                <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                    <rm_attribute_name>value</rm_attribute_name>
+                    <existence>
+                        <lower>0</lower>
+                        <upper>1</upper>
+                    </existence>
+                    <children xsi:type="C_COMPLEX_OBJECT">
+                        <rm_type_name>DV_PROPORTION</rm_type_name>
+                        <occurrences>
+                            <lower>1</lower>
+                            <upper>1</upper>
+                        </occurrences>
+                        <node_id/>
+                        <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                            <rm_attribute_name>numerator</rm_attribute_name>
+                            <existence>
+                                <lower>1</lower>
+                                <upper>1</upper>
+                            </existence>
+                            <children xsi:type="C_PRIMITIVE_OBJECT">
+                                <rm_type_name>REAL</rm_type_name>
+                                <occurrences>
+                                    <lower>1</lower>
+                                    <upper>1</upper>
+                                </occurrences>
+                                <node_id/>
+                                <item xsi:type="C_REAL">
+                                    <list>INF</list>
+                                    <list>0.25</list>
+                                    <list>0.1</list>
+                                    <range>
+                                        <lower>-INF</lower>
+                                        <upper>0</upper>
+                                    </range>
+                                    <assumed_value>NaN</assumed_value>
+                                </item>
+                            </children>
+                        </attributes>
+                    </children>
+                </attributes>
+            </children>
+            <cardinality>
+                <is_ordered>false</is_ordered>
+                <is_unique>false</is_unique>
+                <interval>
+                    <lower>0</lower>
+                    <upper_unbounded>true</upper_unbounded>
+                </interval>
+            </cardinality>
+        </attributes>
+        <archetype_id>
+            <value>openEHR-EHR-CLUSTER.sdk_reader_default_mode.v0</value>
+        </archetype_id>
+        <term_definitions code="at0000">
+            <items id="text">Reader</items>
+        </term_definitions>
+    </definition>
+</template>

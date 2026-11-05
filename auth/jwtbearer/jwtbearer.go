@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	jsonv2 "encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"
@@ -517,8 +518,11 @@ func (s *Source) fetch(ctx context.Context) (auth.Token, error) {
 			Inner:      fmt.Errorf("token endpoint returned %d", resp.StatusCode),
 		}
 	}
+	// RFC 6749 §5.1 spells each member name, so names are read exactly and
+	// a repeated name refuses the response: an "ACCESS_TOKEN" member that
+	// follows the real access_token never stands in for it.
 	var tr tokenResponse
-	if err := json.Unmarshal(body, &tr); err != nil {
+	if err := jsonv2.Unmarshal(body, &tr); err != nil {
 		return auth.Token{}, &auth.ExchangeError{
 			Sentinel:   auth.ErrTokenExchangeFailed,
 			StatusCode: resp.StatusCode,

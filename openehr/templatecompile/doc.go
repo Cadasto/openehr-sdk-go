@@ -29,13 +29,10 @@
 // ValidateComposition checks the template constraints and the Reference
 // Model floor in one call, reporting a defect both find once.
 //
-// By default Compile reads every template the deprecated
-// [github.com/cadasto/openehr-sdk-go/openehr/template.ParseOPT] reads, a
-// value the template's schema does not allow in the weaker form the parser
-// reads it, and skips a default value that addresses no node. [WithStrict]
-// refuses those values, as
-// [github.com/cadasto/openehr-sdk-go/openehr/template.ParseOPTStrict] does,
-// and the default value, with an error wrapping [ErrInvalidInput].
+// By default Compile reads a value the template's schema does not allow in a
+// weaker form, and skips a default value that addresses no node.
+// [WithStrict] refuses those values and that default value, with an error
+// wrapping [ErrInvalidInput].
 //
 // # Public surface
 //

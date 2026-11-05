@@ -5,9 +5,9 @@
 //
 // The model is a faithful decode of the template's XML; this package reads
 // it as the compiled form needs it, values trimmed and intervals closed, a
-// value the template's schema does not allow in the weaker form the
-// deprecated parser's default mode reads it unless [Options.Strict] refuses
-// it, and adds what downstream consumers repeatedly need:
+// value the template's schema does not allow in a weaker form unless
+// [Options.Strict] refuses it, and adds what downstream consumers repeatedly
+// need:
 //
 //   - Stable AQL paths for every node (computed once, cached).
 //   - Implicit RM attributes the OPT omits but the BMM declares

@@ -46,8 +46,8 @@ func heldList(name string, children ...string) string {
 		openAboveInterval(1) + `</interval></cardinality></attributes>`
 }
 
-// TestREQ100_UntypedNodeReadsItsAttributesOnItsHoldingType pins § REQ-100
-// Node taxonomy for a node the template gives no RM type: the compile reads
+// TestREQ111_UntypedNodeReadsItsAttributesOnItsHoldingType pins § REQ-111
+// Reading the model for a node that names no RM type: the compile reads
 // its attributes on the type the BMM declares for the attribute that holds
 // it, read on the holding node's own type, or, for a holding node the
 // template gives no type either, on the type the compile reads that node as.
@@ -58,7 +58,7 @@ func heldList(name string, children ...string) string {
 // attributes the template leaves out, as on a node of that type. The node's
 // own RMTypeName stays empty. A definition that names no type is no
 // definition, which Compile refuses (TestREQ111_CompileRefusesModel).
-func TestREQ100_UntypedNodeReadsItsAttributesOnItsHoldingType(t *testing.T) {
+func TestREQ111_UntypedNodeReadsItsAttributesOnItsHoldingType(t *testing.T) {
 	cases := []struct {
 		name string
 		opt  string

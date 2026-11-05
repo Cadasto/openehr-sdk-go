@@ -10,8 +10,8 @@ import (
 )
 
 // read_detect.go: when [ReadOperationalTemplate] reads a document a second
-// time, through [tolerate]. A document the parser and canonical XML read
-// alike, which most are, pays for the checks below and for no second reading.
+// time, through [tolerate]. A document canonical XML reads as the reader
+// does, which most are, pays for the checks below and for no second reading.
 // Each reading tolerate makes applies to a document only where the first
 // decode failed in a way this file names, or where the checks below find
 // what the reading changes, so the result never depends on whether the
@@ -24,8 +24,9 @@ import (
 // it, or an element in the namespace the AM Release-1.4 schemas declare,
 // which a strict decode refuses. A type a slot cannot dispatch covers a
 // <children> of a primitive or an attribute class and an <item> of a class
-// the parser reads a constraint of; the text of a value covers a real number
-// canonical XML does not read and an integer bound written as a decimal.
+// the default mode unwraps (isUnwrapClass); the text of a value covers a real
+// number canonical XML does not read and an integer bound written as a
+// decimal.
 func retryable(err error, strict bool) bool {
 	switch {
 	case xmlunmatched.IsPrimitiveFailure(err), errors.Is(err, canxml.ErrNamespace), failsInsideQuantity(err):
@@ -67,7 +68,7 @@ func failsInsideQuantity(err error) bool {
 // decode: a C_BOOLEAN item without its true_valid or false_valid, or with
 // one that holds nothing, or only comments, processing instructions or CDATA
 // sections, which the decode reads as false, or with an assumed value, which
-// may be one the parser reads as none; the namespace the AM Release-1.4
+// may be one the reader reads as none; the namespace the AM Release-1.4
 // schemas declare; a bare type attribute, which the decode reads as an
 // xsi:type; an element a number is read from that holds nothing or only such
 // markup, which the decode reads as 0; or a <definition> typed with a class

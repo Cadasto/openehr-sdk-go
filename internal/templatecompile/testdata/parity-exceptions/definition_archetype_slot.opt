@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- SDK-authored parity fixture: a definition typed ARCHETYPE_SLOT, which the parser reads as a slot and the model's reader refuses, since the model's definition, an archetype root, cannot hold one, an exception the parity rule allows. -->
+<!-- SDK-authored parity fixture: a definition typed ARCHETYPE_SLOT, one of the four readings the reader refuses in every mode, since the model's definition, an archetype root, cannot hold a slot. -->
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <language>
     <terminology_id><value>ISO_639-1</value></terminology_id>

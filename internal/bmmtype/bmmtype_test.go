@@ -8,9 +8,10 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 )
 
-// REQ-100 — the compiler reads OPT-declared generic names through this
-// helper. Split reads the class and the top-level actual parameters, keeps a
-// nested parameter whole, and refuses every malformed spelling.
+// REQ-111 (§ Reading the model) — the compiler reads OPT-declared generic
+// names through this helper. Split reads the class and the top-level actual
+// parameters, keeps a nested parameter whole, and refuses every malformed
+// spelling.
 func TestSplit(t *testing.T) {
 	cases := []struct {
 		name   string

@@ -485,9 +485,9 @@ func TestCompile_ThreadsPrimitiveConstraint(t *testing.T) {
 }
 
 // Phase 0 (REQ-102 v2) — C_MULTIPLE_ATTRIBUTE carries an AOM 1.4
-// CARDINALITY block in addition to existence. The parser must lift
-// its <interval> to a Multiplicity and the compile step must
-// surface it via CompiledAttribute.ChildMultiplicity. C_SINGLE_ATTRIBUTE
+// CARDINALITY block in addition to existence. The compile step must lift
+// its <interval> to a Multiplicity and surface it via
+// CompiledAttribute.ChildMultiplicity. C_SINGLE_ATTRIBUTE
 // has no cardinality block — accessor stays nil.
 func TestCompile_ChildMultiplicity(t *testing.T) {
 	const body = `<?xml version="1.0"?>

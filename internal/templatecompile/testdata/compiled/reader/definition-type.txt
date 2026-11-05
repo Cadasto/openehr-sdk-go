@@ -1,0 +1,11 @@
+# compiled tree of reader/definition-type.opt
+template_id="sdk.reader_definition_type.v0" concept="sdk.reader_definition_type.v0" language="en" uid="" num_nodes=1
+
+node /
+  rm_type="CLUSTER" node_id="at0000" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0000" none
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "items" rm_type="ITEM" cardinality=multiple existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+# walked nodes=1

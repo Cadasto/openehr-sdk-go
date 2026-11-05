@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- A declaration after the root element, which the deprecated template parser reads past. The reader's default mode reads past it too, and its strict mode refuses it. directive-after-root.read.opt is how the reader reads it. SDK-authored. -->
+<!-- A declaration after the root element, which the reader's default mode reads past and its strict mode refuses. directive-after-root.read.opt is how the reader reads it. SDK-authored. -->
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     <language>
         <terminology_id>

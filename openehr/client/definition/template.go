@@ -303,9 +303,9 @@ func UploadTemplate(ctx context.Context, c *transport.Client, format TemplateFor
 }
 
 // GetTemplate fetches the raw OPT bytes for templateID under the
-// given format. It returns the bytes verbatim; consumers are expected
-// to parse the XML themselves (or pass it to a template parser
-// downstream).
+// given format. It returns the bytes verbatim; consumers read the XML
+// themselves, for example with aom14.ReadOperationalTemplate followed by
+// templatecompile.Compile.
 //
 // Wire: GET /definition/template/{format}/{template_id}. Accept
 // header is set to `application/xml` to request the OPT body (some

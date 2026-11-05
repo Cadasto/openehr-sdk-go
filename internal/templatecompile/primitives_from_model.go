@@ -2,10 +2,9 @@ package templatecompile
 
 // primitives_from_model.go: the primitive constraint of a node, built from
 // the primitive classes of the operational template model. The builders read
-// the model as the deprecated parser reads an OPT, white space trimmed and
-// blank entries left out. Where the parser's default mode reads a value in a
-// weaker form, so do the builders, and when strict they refuse it, as the
-// parser's strict mode does.
+// the model with white space trimmed and blank entries left out. Where a
+// value cannot be held as written, they read it in a weaker form, and when
+// strict they refuse it.
 
 import (
 	"errors"
@@ -23,14 +22,13 @@ import (
 // C_DV_QUANTITY, C_DV_ORDINAL or CONSTRAINT_REF states, or nil for any other
 // node. A C_CODE_REFERENCE's code phrase is read as a C_CODE_PHRASE's.
 //
-// Unless strict, it reads a value the constraint cannot carry in the weaker
-// form the parser's default mode reads it: a C_PRIMITIVE_OBJECT with no item,
-// or with a nil pointer for one, as no constraint, which allows any value; a
-// CONSTRAINT_REF with no reference as one with an empty reference; a temporal
-// range bound that is not ISO 8601 text of its type as unbounded on its side;
-// and a timezone_validity that names no VALIDITY_KIND, or is mandatory on a
-// C_DATE, as optional. When strict, each is an error, as the parser's strict
-// mode refuses it.
+// Unless strict, it reads a value the constraint cannot carry in a weaker
+// form: a C_PRIMITIVE_OBJECT with no item, or with a nil pointer for one, as
+// no constraint, which allows any value; a CONSTRAINT_REF with no reference
+// as one with an empty reference; a temporal range bound that is not ISO 8601
+// text of its type as unbounded on its side; and a timezone_validity that
+// names no VALIDITY_KIND, or is mandatory on a C_DATE, as optional. When
+// strict, each is an error.
 //
 // In both modes an error reports an ordinal symbol that is neither a
 // DV_CODED_TEXT nor a CODE_PHRASE and an item that is no primitive class held
@@ -62,8 +60,8 @@ func primitiveFromModel(o aom14.CObject, strict bool) (constraints.PrimitiveCons
 		}
 		return c, nil
 	case *aom14.ConstraintRef:
-		// A reference is required. The parser's default mode keeps a leaf
-		// with an empty one, and its strict mode refuses it.
+		// A reference is required. The default mode keeps a leaf with an
+		// empty one, and the strict mode refuses it.
 		ref := strings.TrimSpace(n.Reference)
 		if ref == "" && strict {
 			return nil, fmt.Errorf("CONSTRAINT_REF for %q has no reference", strings.TrimSpace(n.RMTypeName))
@@ -193,9 +191,7 @@ func numericRangeFromModel[T aom14.Integer | aom14.Real](iv *rm.Interval[T]) con
 // or C_DURATION named class, or the zero range, which constrains nothing,
 // when the model gives none. validate is the zero constraint of the type,
 // which admits exactly the ISO 8601 text of the type. A bound it refuses
-// leaves its side unbounded, and not inclusive, as the parser's default mode
-// reads it, or, when strict, is an error, as the parser's strict mode
-// refuses it.
+// leaves its side unbounded, and not inclusive, or, when strict, is an error.
 func temporalRangeFromModel(iv *rm.Interval[string], class string, validate func(any) []constraints.Violation, strict bool) (constraints.TemporalRange, error) {
 	if iv == nil {
 		return constraints.TemporalRange{}, nil
@@ -247,8 +243,7 @@ func clockPartsFromModel(iv *rm.Interval[string], tz *aom14.TimezoneValidityKind
 // or C_DATE_TIME named class: optional when the model gives none. A mandatory
 // one on a C_DATE, which no date meets, and a kind that names no
 // VALIDITY_KIND, which only a model built in code can hold, read as optional,
-// as the parser's default mode reads them, or, when strict, are an error, as
-// the parser's strict mode refuses them.
+// or, when strict, are an error.
 func timezoneValidityFromModel(tz *aom14.TimezoneValidityKind, class string, strict bool) (constraints.ValidityKind, error) {
 	if tz == nil {
 		return constraints.ValidityOptional, nil

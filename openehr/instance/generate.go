@@ -1149,15 +1149,15 @@ func (g *generator) materialiseSingle(
 	// parent is itself the DV wrapper; populatePrimitiveDefault has
 	// already stamped its primary value channel. A nested DV
 	// materialised via makeChild would be attached to .value (a
-	// String slot) and fail. When the leaf carries a parsed
-	// primitive constraint (the REQ-107 + C_PRIMITIVE_OBJECT
-	// wire-parser happy path), use its ExampleValue to override the
-	// default sentinel on the parent. When the constraint is absent
-	// (a C_PRIMITIVE_OBJECT wrapper whose inner item the OPT author
-	// omitted, or an unknown xsi:type the parser admitted leniently),
-	// the populatePrimitiveDefault sentinel holds. Under an attribute
-	// an RM class types (ELEMENT.value) the short name is built below
-	// as its DV wrapper, which concreteFor names.
+	// String slot) and fail. When the leaf carries a compiled
+	// primitive constraint (the REQ-107 C_PRIMITIVE_OBJECT happy
+	// path), use its ExampleValue to override the default sentinel on
+	// the parent. When the constraint is absent (a C_PRIMITIVE_OBJECT
+	// wrapper whose inner item the OPT author omitted, or an item whose
+	// type the reader's default mode reads as no constraint), the
+	// populatePrimitiveDefault sentinel holds. Under an attribute an RM
+	// class types (ELEMENT.value) the short name is built below as its
+	// DV wrapper, which concreteFor names.
 	if first := children[0]; tcimpl.IsAOMPrimitiveShortName(first.RMTypeName()) && !attrTypedByRMClass(optNode, attr) {
 		if pc := first.PrimitiveConstraint(); pc != nil {
 			return g.applyPrimitiveExample(first, parentRM, attr.Name(), pc)
@@ -2021,8 +2021,8 @@ func settleIntervalEndpoints(optNode *tcimpl.CompiledNode, rmValue any) {
 // lower_included or upper_included: the example value of its first
 // C_BOOLEAN the OPT does not prohibit, which is true whenever the
 // constraint admits true. Without a constraint
-// it returns true, the closed endpoint the template parser also assumes
-// when an OPT range omits the flag. It uses the example value under
+// it returns true, the closed endpoint the reader also assumes when an
+// OPT range omits the flag. It uses the example value under
 // RandomFill too, on purpose: a constraint that admits both values then
 // still gives a closed endpoint, so the interval stays a sensible minimal
 // example rather than a randomly half-open one.
@@ -2233,7 +2233,7 @@ func builtPerChild(children, own []*tcimpl.CompiledNode) []int {
 // hasRoom reports whether child, an allowed child of a list, has room for
 // another member once built of its members are built: its occurrences
 // state no upper bound, or built is below it. A slot always has room, as the
-// parser does not read its occurrences (REQ-107 Known gap: slot
+// compiled template does not carry its occurrences (REQ-107 Known gap: slot
 // occurrences). The template validator binds an item to a child by the same
 // room (REQ-102 Structural — binding items).
 func hasRoom(child *tcimpl.CompiledNode, built int) bool {
@@ -2251,8 +2251,9 @@ func hasRoom(child *tcimpl.CompiledNode, built int) bool {
 // occurrences lower bounds (ADL 1.4 VCOC, AOM 2 VACMCO). Only a bounded
 // lower bound of 1 or more counts: a child that states no occurrences, or
 // whose lower bound is unbounded, asks the list for no member, nor does a
-// slot, whose occurrences the parser does not read. The bound read is the
-// OPT's, not memberCap's, which a mandatory BMM attribute lifts to 1.
+// slot, whose occurrences the compiled template does not carry. The bound
+// read is the OPT's, not memberCap's, which a mandatory BMM attribute lifts
+// to 1.
 func checkCardinalityRoom(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute, children []*tcimpl.CompiledNode) error {
 	cm := attr.ChildMultiplicity()
 	if cm == nil || cm.UpperUnbounded() {
@@ -2280,8 +2281,8 @@ func askedMembers(children []*tcimpl.CompiledNode) int {
 }
 
 // asksMember reports whether child asks its list for members: it is not a
-// slot, whose occurrences the parser does not read, and its occurrences
-// lower bound is bounded and at least 1. A child that states no
+// slot, whose occurrences the compiled template does not carry, and its
+// occurrences lower bound is bounded and at least 1. A child that states no
 // occurrences, or whose lower bound is unbounded, asks for none, although
 // materialiseMultiple gives it one member where there is room.
 func asksMember(child *tcimpl.CompiledNode) bool {
@@ -2504,7 +2505,7 @@ func remainingLowerNeeded(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAtt
 // nor the occurrences lower bound of an allowed child is bounded and at
 // least 1, and it is no list the RM makes non-empty once present
 // (rmNonEmptyList). A child with no occurrences does not count, nor does a
-// slot, whose occurrences the parser does not read. A multi-valued
+// slot, whose occurrences the compiled template does not carry. A multi-valued
 // attribute with no member meets such an existence, since existence asks
 // for the container and the counts for its members. The template validator
 // reads a list's existence the same way, and asks a list the RM makes

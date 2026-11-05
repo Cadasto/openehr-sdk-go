@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- SDK-authored parity fixture: a definition that holds an attribute but names no RM type, which the parser reads as a node of no type and the compile step refuses on its own ground, an exception the parity rule allows. -->
+<!-- SDK-authored parity fixture: a definition that holds an attribute but names no RM type, which the compile step refuses on its own ground. -->
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <language>
     <terminology_id><value>ISO_639-1</value></terminology_id>

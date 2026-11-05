@@ -2,6 +2,7 @@ package smart
 
 import (
 	"encoding/json"
+	jsonv2 "encoding/json/v2"
 	"fmt"
 	"io"
 	"log/slog"
@@ -207,13 +208,19 @@ func (tr TokenResponse) LogValue() slog.Value {
 
 // ParseTokenResponse decodes a token-endpoint JSON body into
 // TokenResponse. Used by tests and by the exchange path in Source.
+// Member names are matched exactly, and a body that repeats one is an
+// error.
 func ParseTokenResponse(body []byte) (TokenResponse, error) {
+	// RFC 6749 §5.1, OpenID Connect and SMART App Launch spell each member
+	// name, so names are read exactly and a repeated name refuses the body:
+	// an "ACCESS_TOKEN" or "ID_TOKEN" member that follows the real one never
+	// stands in for it, and Raw keeps it under its own name.
 	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(body, &raw); err != nil {
+	if err := jsonv2.Unmarshal(body, &raw); err != nil {
 		return TokenResponse{}, fmt.Errorf("token response: %w", err)
 	}
 	var tr tokenResponse
-	if err := json.Unmarshal(body, &tr); err != nil {
+	if err := jsonv2.Unmarshal(body, &tr); err != nil {
 		return TokenResponse{}, fmt.Errorf("token response: %w", err)
 	}
 	out := TokenResponse{
@@ -344,6 +351,9 @@ func cloneJSONValue(v any) any {
 	}
 }
 
+// rawJSONToAny decodes each member of raw, a token response's members, into
+// a value for Raw. It decodes as ParseTokenResponse does, so a nested object
+// keeps its member names exactly as the authorization server sent them.
 func rawJSONToAny(raw map[string]json.RawMessage) map[string]any {
 	if len(raw) == 0 {
 		return nil
@@ -351,7 +361,7 @@ func rawJSONToAny(raw map[string]json.RawMessage) map[string]any {
 	out := make(map[string]any, len(raw))
 	for k, v := range raw {
 		var anyVal any
-		if err := json.Unmarshal(v, &anyVal); err == nil {
+		if err := jsonv2.Unmarshal(v, &anyVal); err == nil {
 			out[k] = anyVal
 		} else {
 			out[k] = string(v)

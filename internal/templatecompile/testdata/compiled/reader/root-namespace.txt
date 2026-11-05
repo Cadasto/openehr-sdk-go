@@ -1,0 +1,17 @@
+# compiled tree of reader/root-namespace.opt
+template_id="sdk.reader_root_namespace.v0" concept="sdk.reader_root_namespace.v0" language="en" uid="" num_nodes=2
+
+node /
+  rm_type="CLUSTER" node_id="at0000" archetype_id="openEHR-EHR-CLUSTER.sdk_reader.v0" node_name="" occurrences=1..1 slot=false
+  term[en] "at0000" code="at0000" text="Reader"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /items[at0001]
+  rm_type="ELEMENT" node_id="at0001" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0001" none
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+# walked nodes=2

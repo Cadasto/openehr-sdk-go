@@ -26,8 +26,7 @@ func TestProbe022OPTPathResolution_VitalSigns(t *testing.T) {
 		},
 		// At-code predicate — every OBSERVATION archetype root in
 		// vital_signs.opt carries at0000 as its own node id. Exercises
-		// the node-id match of a predicate (REQ-100 § Resolution
-		// semantics, REQ-111 § Path lookup).
+		// the node-id match of a predicate (REQ-111 § Path lookup).
 		{Path: "/content[at0000]", WantRMType: "OBSERVATION", WantNodeID: "at0000"},
 		{Path: "/no_such_attribute", ExpectNotFound: true},
 		{Path: "/content[at9999]", ExpectNotFound: true},

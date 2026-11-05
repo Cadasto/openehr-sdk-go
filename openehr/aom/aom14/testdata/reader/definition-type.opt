@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- A definition whose xsi:type names no class of the AOM 1.4 constraint model. The deprecated template parser reads it as a C_COMPLEX_OBJECT leaf with the rm_type_name, node_id and occurrences it holds and none of its attributes, and so does the reader's default mode; its strict mode refuses it. definition-type.read.opt is how the reader reads it. SDK-authored. -->
+<!-- A definition whose xsi:type names no class of the AOM 1.4 constraint model, which the reader's default mode reads as a C_COMPLEX_OBJECT leaf with the rm_type_name, node_id and occurrences it holds and none of its attributes, and its strict mode refuses. definition-type.read.opt is how the reader reads it. SDK-authored. -->
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     <language>
         <terminology_id>

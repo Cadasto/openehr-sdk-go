@@ -9,7 +9,8 @@ import (
 
 // REQ-116 (Phase 2) / REQ-111 — the template-level node name survives
 // compile on the plain-ComplexObject path. The root here carries no
-// archetype id, so descend takes the *template.ComplexObject case.
+// archetype id, so descend takes the C_COMPLEX_OBJECT case, not the
+// archetype root's.
 func TestCompile_NodeNameCarriedComplexObject(t *testing.T) {
 	const opt = `<?xml version="1.0" encoding="UTF-8"?>
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">

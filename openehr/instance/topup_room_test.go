@@ -116,8 +116,8 @@ func TestREQ107_TopUpTakesAChildWithRoom(t *testing.T) {
 		},
 		{
 			// at0001 is full and the only other child is a slot, whose
-			// occurrences the parser does not read, so it has room: the
-			// top-up fills it.
+			// occurrences the compiled template does not carry, so it has
+			// room: the top-up fills it.
 			name:     "a slot after a full child",
 			lower:    2,
 			children: []string{element("at0001", 1, 1, "DV_TEXT"), optSlot("ELEMENT", "at0002")},

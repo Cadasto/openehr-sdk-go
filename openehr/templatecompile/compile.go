@@ -71,15 +71,13 @@ func WithoutImplicitAttributes() Option {
 }
 
 // WithStrict makes [Compile] refuse, with an error wrapping
-// [ErrInvalidInput], each value it otherwise reads in a weaker form, as
-// [github.com/cadasto/openehr-sdk-go/openehr/template.ParseOPTStrict]
-// refuses them: a constraint reference with no reference, a timezone
-// validity that names no validity kind or is mandatory on a date, a temporal
-// range bound that is not ISO 8601 text of its type, and a primitive object
-// with no item. It also refuses a default value of the template's
-// constraints that addresses no node or that Compile cannot hold as
-// canonical JSON, such as a NaN magnitude, each of which Compile otherwise
-// skips.
+// [ErrInvalidInput], each value it otherwise reads in a weaker form: a
+// constraint reference with no reference, a timezone validity that names no
+// validity kind or is mandatory on a date, a temporal range bound that is not
+// ISO 8601 text of its type, and a primitive object with no item. It also
+// refuses a default value of the template's constraints that addresses no
+// node or that Compile cannot hold as canonical JSON, such as a NaN
+// magnitude, each of which Compile otherwise skips.
 func WithStrict() Option {
 	return func(c *config) { c.strict = true }
 }
@@ -112,12 +110,11 @@ func WithStrict() Option {
 // ([CompiledNode.NodeName]) it is, each run of white space in the predicate
 // read as one space. A default value that addresses no node is skipped.
 //
-// By default Compile reads a value the model holds in the weaker form the
-// deprecated [github.com/cadasto/openehr-sdk-go/openehr/template.ParseOPT]
-// reads it: a constraint reference with no reference, with an empty one; a
-// timezone validity that names no validity kind, or is mandatory on a date,
-// as optional; a temporal range bound that is not ISO 8601 text of its type
-// as unbounded on its side; and a primitive object with no item as no
+// By default Compile reads a value the model holds in a weaker form: a
+// constraint reference with no reference, with an empty one; a timezone
+// validity that names no validity kind, or is mandatory on a date, as
+// optional; a temporal range bound that is not ISO 8601 text of its type as
+// unbounded on its side; and a primitive object with no item as no
 // constraint. [WithStrict] refuses each of these, and a default value that
 // addresses no node.
 //

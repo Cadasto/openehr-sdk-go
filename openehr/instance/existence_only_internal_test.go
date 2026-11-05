@@ -43,8 +43,8 @@ func existenceOnlyOccurrences(lower, upper int) string {
 // lower bound of a child it allows is bounded and at least 1, and it is no
 // list the RM makes non-empty once present, such as a SECTION's items.
 // A child the OPT gives no occurrences does not count, and neither does a
-// slot's, which the parser does not read (REQ-107 Known gap: slot
-// occurrences). The rule is read off the compiled attribute: a required
+// slot's, which the compiled template does not carry (REQ-107 Known gap:
+// slot occurrences). The rule is read off the compiled attribute: a required
 // child that is not a slot gets a member of its own, so no generated root
 // shows the occurrences condition.
 func TestREQ107_ExistenceOnly(t *testing.T) {
@@ -66,8 +66,8 @@ func TestREQ107_ExistenceOnly(t *testing.T) {
 		},
 		{name: "a required child", rmType: "ITEM_TREE", items: existenceOnlyItems(1, 1, 0, element(existenceOnlyOccurrences(1, 1)))},
 		{
-			// The parser does not read a slot's occurrences, so a slot at
-			// 1..1 counts as one with none.
+			// The compiled template does not carry a slot's occurrences, so
+			// a slot at 1..1 counts as one with none.
 			name: "a slot at occurrences 1..1", rmType: "ITEM_TREE",
 			items: existenceOnlyItems(1, 1, 0, existenceOnlyChild("ARCHETYPE_SLOT", "CLUSTER", existenceOnlyOccurrences(1, 1))),
 			want:  true,

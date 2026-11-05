@@ -116,7 +116,7 @@ Identifiers are stable once published — they are referenced from outside the f
 | [wire.md](wire.md) | openEHR REST 1.1.0 pin, AQL wire, canonical JSON / FLAT / STRUCTURED |
 | [service-discovery.md](service-discovery.md) | Service catalog resolution and refresh |
 | [conformance.md](conformance.md) | openEHR wire-conformance probe catalog |
-| [clinical-modeling.md](clinical-modeling.md) | Clinical-modeling artefacts — OPT parse and paths, primitive constraints, validation, the instance generator and composition builder, the Web Template export, AQL parse, lint, containment and builders |
+| [clinical-modeling.md](clinical-modeling.md) | Clinical-modeling artefacts — the operational template model, the compiled template and its paths, primitive constraints, validation, the instance generator and composition builder, the Web Template export, AQL parse, lint, containment and builders |
 | [use-cases.md](use-cases.md) | Primary use cases, building-block use cases, delivery sequence |
 | [research-strands.md](research-strands.md) | Open strands awaiting resolution (each becomes an ADR) |
 | [retired-requirements.md](retired-requirements.md) | Lookup of retired `REQ-NNN`: where each rule went (binds nothing, so the gate's keyword rules skip it) |
