@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- C_INTEGER range bounds and quantity precision bounds written as NaN, in any letter case, which the reader reads in every mode as unbounded on that side: the deprecated template parser reads such a bound as a float it compares no integer against. nan-integer-bounds.read.opt is how the reader reads it. SDK-authored. -->
+<!-- C_INTEGER range bounds and quantity precision bounds written as NaN, in any letter case, which bounds no integer and which the reader reads in every mode as unbounded on that side. nan-integer-bounds.read.opt is how the reader reads it. SDK-authored. -->
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     <language>
         <terminology_id>

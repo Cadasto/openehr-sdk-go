@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Elements in the XML Schema instance namespace, under the prefix xsi the root binds to it for its xsi:type attributes, which the deprecated template parser, reading no namespace, reads by their local names: the true_valid of a C_BOOLEAN and the upper bound of a C_INTEGER range. The reader's default mode reads each as the element of that name in the http://schemas.openehr.org/v1 namespace, every xsi:type keeping its namespace, and its strict mode refuses them. xsi-element.read.opt is how the reader reads it. SDK-authored. -->
+<!-- Elements in the XML Schema instance namespace, under the prefix xsi the root binds to it for its xsi:type attributes: the true_valid of a C_BOOLEAN and the upper bound of a C_INTEGER range. The reader's default mode reads each, by its local name, as the element of that name in the http://schemas.openehr.org/v1 namespace, every xsi:type keeping its namespace, and its strict mode refuses them. xsi-element.read.opt is how the reader reads it. SDK-authored. -->
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     <language>
         <terminology_id>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- C_DV_QUANTITY assumed values the model cannot hold, which the reader reads in every mode as absent, as the deprecated template parser, which ignores them, reads none. quantity-assumed-value.read.opt is how the reader reads it. SDK-authored. -->
+<!-- C_DV_QUANTITY assumed values the model cannot hold, which the reader reads in every mode as absent. quantity-assumed-value.read.opt is how the reader reads it. SDK-authored. -->
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     <language>
         <terminology_id>

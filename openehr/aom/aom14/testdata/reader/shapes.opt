@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Shapes the AM Release-1.4 schemas do not allow inside a definition, which the
-     reader's default mode reads as the deprecated template parser does, and its
-     strict mode refuses. shapes.read.opt is how the reader reads it. SDK-authored. -->
+     reader's default mode reads and its strict mode refuses. shapes.read.opt is how
+     the reader reads it. SDK-authored. -->
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     <language>
         <terminology_id>

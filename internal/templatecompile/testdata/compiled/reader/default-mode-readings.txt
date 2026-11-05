@@ -1,8 +1,8 @@
 # compiled tree of reader/default-mode-readings.opt
-template_id="sdk.reader_parser.v0" concept="sdk.reader_parser.v0" language="en" uid="" num_nodes=24
+template_id="sdk.reader_default_mode.v0" concept="sdk.reader_default_mode.v0" language="en" uid="" num_nodes=24
 
 node /
-  rm_type="CLUSTER" node_id="at0000" archetype_id="openEHR-EHR-CLUSTER.sdk_reader_parser.v0" node_name="" occurrences=1..1 slot=false
+  rm_type="CLUSTER" node_id="at0000" archetype_id="openEHR-EHR-CLUSTER.sdk_reader_default_mode.v0" node_name="" occurrences=1..1 slot=false
   term[en] "at0000" code="at0000" text="Reader"
   attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=true children=9
   attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0

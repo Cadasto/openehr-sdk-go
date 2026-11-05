@@ -8,9 +8,9 @@
         <code_string>en</code_string>
     </language>
     <template_id>
-        <value>sdk.reader_parser.v0</value>
+        <value>sdk.reader_default_mode.v0</value>
     </template_id>
-    <concept>sdk.reader_parser.v0</concept>
+    <concept>sdk.reader_default_mode.v0</concept>
     <definition>
         <rm_type_name>CLUSTER</rm_type_name>
         <occurrences>
@@ -423,7 +423,7 @@
             </cardinality>
         </attributes>
         <archetype_id>
-            <value>openEHR-EHR-CLUSTER.sdk_reader_parser.v0</value>
+            <value>openEHR-EHR-CLUSTER.sdk_reader_default_mode.v0</value>
         </archetype_id>
         <term_definitions code="at0000">
             <items id="text">Reader</items>
