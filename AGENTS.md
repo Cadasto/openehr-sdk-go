@@ -41,7 +41,7 @@ The sdd plugin carries the method. This repository's form of it is in [developme
 - Plans go in [`docs/plans/`](docs/plans/), never superpowers' default `docs/superpowers/` tree ([development-process.md § superpowers + SDD](docs/development-process.md#superpowers--sdd)).
 - **Backlog size.** [`docs/backlog.md`](docs/backlog.md) is kept at about 80 entries, the `- ` lines the sdd plugin's session-start hook counts ([ai-workflow.md § Review](docs/ai-workflow.md#review)), which outranks the 40 built into that hook and its `/sdd-triage --backlog` consolidation: the hook's line "over the 40 it should hold" is informational until its count passes 80.
 - **Retiring a requirement.** Its entry moves to [retired-requirements.md](docs/specifications/retired-requirements.md) and the map row's `canonical` points there ([specifications/README.md § Editing rules](docs/specifications/README.md#editing-rules)). This outranks the sdd plugin's default, which `/sdd-specify` otherwise follows, of keeping the section in its topic spec.
-- **Write short.** Lead with the result; a finding is one sentence of about 30 words, a PR body about 450 words; quote only the output that proves a claim.
+- **Write short.** Lead with the result; a finding is one sentence of about 30 words, a PR body about 450 words; quote only the output that proves a claim. A specification sentence over about 60 words that a change touches is split in that change: a chain of conditions becomes a list of condition and behaviour, or a small table, saying no more and no less than before.
 
 ## Module layout & boundaries
 
