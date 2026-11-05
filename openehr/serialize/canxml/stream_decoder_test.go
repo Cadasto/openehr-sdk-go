@@ -90,6 +90,33 @@ var (
 	streamAgain = streamValue{parent: ` xmlns:xs="` + xsdNamespace + `"`, item: ` xsi:type="xs:string"`, content: "archetype_id/value"}
 )
 
+// TestREQ056_UnmarshalDecodesAgainIntoAClearedValue pins Unmarshal given no
+// option on a slot whose second include's item declares its `xs` prefix on
+// its parent: the first decode reads the first include, then stops at that
+// item, and Unmarshal decodes the document a second time, tracked, into the
+// value cleared first, so the slot holds the two includes it was written
+// with, as a tracked decode reads it, not three.
+//
+// Can-fail control: decode the document again into the value the first decode
+// filled in part, without clearing it, and the slot holds three includes.
+func TestREQ056_UnmarshalDecodesAgainIntoAClearedValue(t *testing.T) {
+	in := []byte(streamAgain.slot())
+	var plain, tracked aom14.ArchetypeSlot
+	if err := canxml.Unmarshal(in, &plain); err != nil {
+		t.Fatalf("Unmarshal: err = %v; want nil, the second decode resolving the prefix", err)
+	}
+	if err := canxml.Unmarshal(in, &tracked, canxml.WithMissing(func(string) {})); err != nil {
+		t.Fatalf("Unmarshal WithMissing: err = %v; want nil", err)
+	}
+	want := &aom14.TypedString{Value: "archetype_id/value", Type: "xs:string"}
+	if got := secondItem(t, &plain); !reflect.DeepEqual(got, want) {
+		t.Errorf("Unmarshal: the second include's item = %#v; want %#v", got, want)
+	}
+	if !reflect.DeepEqual(plain, tracked) {
+		t.Errorf("Unmarshal decodes a slot other than Unmarshal WithMissing: %d includes, want %d", len(plain.Includes), len(tracked.Includes))
+	}
+}
+
 // TestREQ056_DecoderDecodesAValueAgainWhenItsPrefixIsOutOfSight pins a stream
 // of four values, decoded one after another by a Decoder given no option. The
 // first resolves every prefix on the element that uses it. The second, after

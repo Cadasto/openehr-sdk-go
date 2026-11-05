@@ -382,13 +382,23 @@ func nestedConstraints(levels int) []byte {
 // none of its content, as a WithMaxDepth refusal does, rather than one slot
 // envelope per level around an error no sentinel matches. An RM tree of
 // CLUSTER items and an operational template's constraint objects nest that
-// deep.
+// deep, and so does a tree whose only element past the limit is the text of a
+// DV_TEXT, a primitive element, which a tracked decode converts through a
+// decoder of its own.
 //
 // Can-fail control: let a decode return encoding/xml's error as it comes, and
 // the error wraps no sentinel and names every slot it passed through, 330 044
-// bytes for the items and 469 950 for the template.
+// bytes for the items and 469 950 for the template; let a tracked decode
+// convert a primitive element's text without checking its depth, and the
+// modes that track the decode, and Unmarshal given no option, which decodes
+// the document again through a tracker, decode the primitive tree.
 func TestREQ108_XMLRefusesPastEncodingXMLsDepthLimit(t *testing.T) {
 	items := nestedClusters(xmlDepth+8, "")
+	// The DV_TEXT is at depth 10 000 and its text, the first element past the
+	// limit, one deeper.
+	primitive := primitivePastXMLDepth()
+	primitiveCut := "/item_tree[1]/items[2]" + strings.Repeat("/items[1]", 6) +
+		"/..." + strings.Repeat("/items[1]", 6) + "/value[1]/value[1]"
 	// The attribute of level 4999 is at depth 9 999 and its object at
 	// 10 000; the attribute of level 5000 is the first element past the limit.
 	template := nestedConstraints(5008)
@@ -405,6 +415,7 @@ func TestREQ108_XMLRefusesPastEncodingXMLsDepthLimit(t *testing.T) {
 			mode = mode + ", " + limit.name
 			checkDepthRefusal(t, mode+", items", decode(items, new(rm.ItemTree)), cutClusterPath, xmlDepth+1, xmlDepth)
 			checkDepthRefusal(t, mode+", template", decode(template, new(aom14.OperationalTemplate)), templateCut, xmlDepth+1, xmlDepth)
+			checkDepthRefusal(t, mode+", primitive", decode(primitive, new(rm.ItemTree)), primitiveCut, xmlDepth+1, xmlDepth)
 		}
 	}
 }
@@ -428,33 +439,6 @@ func primitivePastXMLDepth() []byte {
 	}
 	b.WriteString(`</item_tree>`)
 	return []byte(b.String())
-}
-
-// TestREQ108_XMLUnmarshalDecodesAgainIntoAClearedValue pins Unmarshal given
-// no option on a document whose only element past encoding/xml's own depth
-// limit is a primitive, which encoding/xml refuses and a tracked decode reads
-// itself: Unmarshal decodes the document a second time, tracked, into the
-// value cleared first, and returns what a tracked decode returns, the tree's
-// first item once, not once for each decode.
-//
-// Can-fail control: decode the document again into the value the first decode
-// filled in part, without clearing it, and the tree holds its first item
-// twice.
-func TestREQ108_XMLUnmarshalDecodesAgainIntoAClearedValue(t *testing.T) {
-	in := primitivePastXMLDepth()
-	var plain, tracked rm.ItemTree
-	if err := canxml.Unmarshal(in, &plain); err != nil {
-		t.Fatalf("Unmarshal: err = %.300v; want nil, the tracked decode reading the text itself", err)
-	}
-	if err := canxml.Unmarshal(in, &tracked, canxml.WithMissing(func(string) {})); err != nil {
-		t.Fatalf("Unmarshal WithMissing: err = %.300v; want nil", err)
-	}
-	if len(plain.Items) != 2 {
-		t.Errorf("Unmarshal: the tree holds %d items; want 2, the first item once and the CLUSTER", len(plain.Items))
-	}
-	if !reflect.DeepEqual(plain, tracked) {
-		t.Errorf("Unmarshal decodes a value other than Unmarshal WithMissing: %d items, want %d", len(plain.Items), len(tracked.Items))
-	}
 }
 
 // TestREQ108_XMLDecoderRefusalPastEncodingXMLsLimitStays pins a stream Decoder

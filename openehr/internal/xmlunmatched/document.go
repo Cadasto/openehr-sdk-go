@@ -70,15 +70,16 @@ func Unmarshal(data []byte, v any, t *Tracker) error {
 // decode reads through a tracker that follows the open elements and their
 // namespace scope and applies no policy. A primitive failure fails again at
 // the same element, named by its path from the root of the value, and so does
-// a depth refusal. A prefix resolves, and the decode reads on to the end: so
-// that it does not add to what the first decode left in v, such as the items
-// of a list, the root's decoder clears v before it reads ([Enter]), as it does
-// after a depth refusal, should the tracked decode read on where the first
-// did not. It returns what the second decode returns, or err should a
-// primitive failure not fail again.
+// a depth refusal, since a tracked decode refuses every element an untracked
+// one hands to encoding/xml past its limit, a primitive element too
+// ([Tracker.decodeText]). A prefix resolves, and the decode reads on to the
+// end: so that it does not add to what the first decode left in v, such as the
+// items of a list, the root's decoder clears v before it reads ([Enter]). It
+// returns what the second decode returns, or err should a primitive failure
+// not fail again.
 func decodeAgain(data []byte, v any, err error) error {
 	t := NewTracker(nil, false)
-	t.again = IsUnresolvedPrefix(err) || IsXMLDepthError(err)
+	t.again = IsUnresolvedPrefix(err)
 	dec := t.NewDecoder(bytes.NewReader(data))
 	if again := t.Decode(dec, v); again != nil {
 		return again

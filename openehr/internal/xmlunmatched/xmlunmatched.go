@@ -101,7 +101,11 @@
 // through on its way out. A tracked or scoped decode turns that error into a
 // refusal of the same form, which names encoding/xml's limit
 // ([IsXMLDepthError]); after an untracked decode, the value is decoded again
-// through a tracker to find the element's path.
+// through a tracker to find the element's path. A tracked decode converts the
+// text of a primitive element through a decoder that sees that element alone,
+// and so refuses a primitive element past encoding/xml's limit itself, with
+// the same refusal: it refuses the primitive elements an untracked decode
+// refuses.
 //
 // # Whole documents
 //
@@ -613,7 +617,10 @@ func isXMLSpace(text []byte) bool {
 // element is kept, as encoding/xml keeps it. The text then decodes into v
 // through encoding/xml itself ([Tracker.convert]), so the conversion is the
 // one an untracked decode applies. Text that does not convert is a primitive
-// failure, which names the element by its path from the root of the value.
+// failure, which names the element by its path from the root of the value. An
+// element nested deeper than encoding/xml's own depth limit is refused before
+// anything of it is read, as an untracked decode refuses it
+// ([Tracker.refuseXMLDepth]).
 func (t *Tracker) decodeText(dec *xml.Decoder, start *xml.StartElement, v any) error {
 	t.open[len(t.open)-1].primitive = true
 	return t.readText(dec, start, v)
@@ -623,6 +630,11 @@ func (t *Tracker) decodeText(dec *xml.Decoder, start *xml.StartElement, v any) e
 // does, but leaves the element unmarked as a primitive: an entry of a Hash
 // member, which is a value of the member whatever its text.
 func (t *Tracker) readText(dec *xml.Decoder, start *xml.StartElement, v any) error {
+	// The element is the innermost open one, at the depth encoding/xml counts
+	// for it: the tracker follows every element from the start of the input.
+	if len(t.open)-1 > xmlMaxDepth() {
+		return t.refuseXMLDepth()
+	}
 	at := t.here()
 	if err := t.attrs(start.Attr, nil); err != nil {
 		return err
