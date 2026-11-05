@@ -1,17 +1,15 @@
 package templatecompile
 
 // slots_from_model_test.go: the compile step's slot rules, built from the
-// operational template model's includes and excludes, held equal to the
-// deprecated parser's over every corpus slot, and the archetype-id patterns
-// and path predicate read from the same assertions.
+// operational template model's includes and excludes, and the archetype-id
+// patterns and path predicate read from the same assertions. TestCompiledGolden
+// holds the rules and patterns of every corpus slot.
 
 import (
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
 
@@ -22,58 +20,6 @@ func slotAssertionPatterns(as []constraints.SlotAssertion) []string {
 		out = append(out, a.Pattern())
 	}
 	return out
-}
-
-func TestREQ111_SlotRulesFromModelMatchParserOverCorpus(t *testing.T) {
-	var slots, includes, excludes int
-	for _, p := range corpusModelNodePairs(t) {
-		parsed, ok := p.parsed.(*template.Slot)
-		if !ok {
-			continue
-		}
-		model, ok := p.model.(*aom14.ArchetypeSlot)
-		if !ok {
-			t.Errorf("%s: the parser reads a slot where the model holds a %T", p.where, p.model)
-			continue
-		}
-		slots++
-		want, got := parsed.SlotRules(), slotRulesFromModel(model)
-		includes += len(got.Includes)
-		excludes += len(got.Excludes)
-		if got.RMTypeName != want.RMTypeName {
-			t.Errorf("%s: slot rules RMTypeName = %q; want the parser's %q", p.where, got.RMTypeName, want.RMTypeName)
-		}
-		if g, w := slotAssertionPatterns(got.Includes), slotAssertionPatterns(want.Includes); !slices.Equal(g, w) {
-			t.Errorf("%s: slot rules include patterns = %q; want the parser's %q", p.where, g, w)
-		}
-		if g, w := slotAssertionPatterns(got.Excludes), slotAssertionPatterns(want.Excludes); !slices.Equal(g, w) {
-			t.Errorf("%s: slot rules exclude patterns = %q; want the parser's %q", p.where, g, w)
-		}
-		if got.RawIncludeCount != want.RawIncludeCount {
-			t.Errorf("%s: slot rules RawIncludeCount = %d; want the parser's %d", p.where, got.RawIncludeCount, want.RawIncludeCount)
-		}
-
-		// Each corpus assertion gives one pattern, and every one compiles,
-		// so the patterns of the includes and excludes are those of the
-		// rules, and the predicate is the first include's pattern with its
-		// backslashes stripped.
-		if g, w := slotPatterns(model.Includes), slotAssertionPatterns(want.Includes); !slices.Equal(g, w) {
-			t.Errorf("%s: slotPatterns(includes) = %q; want the parser's rule patterns %q", p.where, g, w)
-		}
-		if g, w := slotPatterns(model.Excludes), slotAssertionPatterns(want.Excludes); !slices.Equal(g, w) {
-			t.Errorf("%s: slotPatterns(excludes) = %q; want the parser's rule patterns %q", p.where, g, w)
-		}
-		wantPredicate := ""
-		if len(want.Includes) > 0 {
-			wantPredicate = strings.ReplaceAll(want.Includes[0].Pattern(), `\`, "")
-		}
-		if got := slotPathPredicateFromModel(model); got != wantPredicate {
-			t.Errorf("%s: slotPathPredicateFromModel = %q; want %q", p.where, got, wantPredicate)
-		}
-	}
-	if slots == 0 || includes == 0 || excludes == 0 {
-		t.Errorf("the corpus walk compared %d slots, %d includes and %d excludes; want some of each", slots, includes, excludes)
-	}
 }
 
 // matchesAssertion returns an include or exclude as the corpus writes one:

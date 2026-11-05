@@ -1,15 +1,14 @@
 package templatecompile_test
 
 // resolve_test.go: Compiled.Resolve and Compiled.ValidatePath, the path
-// lookup that walks the compiled tree by the rules the deprecated parser's
-// NodeAt applies to its own.
+// lookup that walks the compiled tree by the rules of § REQ-111 Path lookup.
 
 import (
-	"bytes"
 	"cmp"
 	"errors"
-	"os"
+	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -101,6 +100,7 @@ func TestREQ111_ResolveFollowsResolutionRules(t *testing.T) {
 
 	notFound := []string{
 		"/no_such_attribute",
+		"/Content", // a name matched as written, case and all
 		"/content[at9999]",
 		"/content[openEHR-EHR-OBSERVATION.other.v1]",
 		"/content[at0001]/items",                // a node with no such attribute
@@ -217,115 +217,129 @@ func TestREQ111_ResolveReachesLaterAlternative(t *testing.T) {
 	}
 }
 
-// TestREQ111_ResolveMatchesParserNodeAt holds Resolve to the deprecated
-// parser's NodeAt on every corpus template: for every node, the path built
-// from the node ids and archetype ids above it resolves, in the default and
-// the strict mode, to a compiled node of the RM type, node id and archetype
-// id of the parser's NodeAt node, the one that stands where that node stands
-// and so carries its AQL path, or both refuse it alike.
-func TestREQ111_ResolveMatchesParserNodeAt(t *testing.T) {
+// TestREQ111_ResolveFollowsResolutionRulesOverCorpus holds Resolve to the
+// rules of § REQ-111 Path lookup on every corpus template: for every node,
+// the path built from the node ids and archetype ids above it resolves, in
+// the default and the strict mode, to the node resolveByRules reaches on the
+// compiled tree's attributes and children, or both refuse it alike. These
+// are the paths on which Resolve agreed with the deprecated parser's NodeAt
+// while the parser was in the tree. The corpus holds paths on which the
+// first match is another node than the one the path was built from, and
+// paths the strict mode refuses as ambiguous, so the walk exercises both
+// rules.
+func TestREQ111_ResolveFollowsResolutionRulesOverCorpus(t *testing.T) {
 	names, err := templateprobes.Probe111OperationalTemplates()
 	if err != nil {
 		t.Fatalf("Probe111OperationalTemplates: %v", err)
 	}
 	root := fixtures.CorpusRoot()
-	var checked int
+	var checked, elsewhere, ambiguous int
 	for _, name := range names {
 		t.Run(name, func(t *testing.T) {
-			path := filepath.Join(root, filepath.FromSlash(name))
-			c, err := templatecompile.Compile(mustReadModelFile(t, path))
+			c, err := templatecompile.Compile(mustReadModelFile(t, filepath.Join(root, filepath.FromSlash(name))))
 			if err != nil {
 				t.Skipf("does not compile: %v", err)
 			}
-			b, err := os.ReadFile(path)
-			if err != nil {
-				t.Fatal(err)
-			}
-			parsed, err := template.ParseOPT(bytes.NewReader(b))
-			if err != nil {
-				t.Skipf("the parser does not read it: %v", err)
-			}
-			counterpart := map[template.Node]*templatecompile.CompiledNode{}
-			pairNodes(t, parsed.Root(), c.Root(), counterpart)
-
-			var walkNodes func(n *templatecompile.CompiledNode, path string)
-			walkNodes = func(n *templatecompile.CompiledNode, path string) {
+			var walkNodes func(n *templatecompile.CompiledNode, steps []pathStep)
+			walkNodes = func(n *templatecompile.CompiledNode, steps []pathStep) {
 				checked++
-				p := mustParsePath(t, cmp.Or(path, "/"))
-				for _, opts := range [][]template.ResolveOption{nil, {template.WithStrictPaths()}} {
-					var compiledOpts []templatecompile.ResolveOption
-					if opts != nil {
-						compiledOpts = append(compiledOpts, templatecompile.WithStrictPaths())
+				p := mustParsePath(t, pathText(steps))
+				for _, strict := range []bool{false, true} {
+					var opts []templatecompile.ResolveOption
+					if strict {
+						opts = append(opts, templatecompile.WithStrictPaths())
 					}
-					want, wantErr := parsed.NodeAt(p, opts...)
-					got, gotErr := c.Resolve(p, compiledOpts...)
-					if !sameOutcome(wantErr, gotErr) {
-						t.Errorf("%s (strict %t): NodeAt = %v, Resolve = %v", p, opts != nil, wantErr, gotErr)
-						continue
+					want, wantErr := resolveByRules(c.Root(), steps, strict)
+					got, gotErr := c.Resolve(p, opts...)
+					if !sameOutcome(wantErr, gotErr) || got != want {
+						t.Errorf("Resolve(%s) strict %t = %s, %v; the rules reach %s, %v",
+							p, strict, placeOf(got), gotErr, placeOf(want), wantErr)
 					}
-					if wantErr != nil {
-						continue
+					if want != nil && want != n {
+						elsewhere++
 					}
-					if got.RMTypeName() != want.RMTypeName() || got.NodeID() != want.NodeID() || got.ArchetypeID() != archetypeIDOf(want) {
-						t.Errorf("%s (strict %t): NodeAt reached %s %q %q, Resolve reached %s %q %q at %s",
-							p, opts != nil, want.RMTypeName(), want.NodeID(), archetypeIDOf(want),
-							got.RMTypeName(), got.NodeID(), got.ArchetypeID(), got.AQLPath())
-						continue
-					}
-					if counterpart[want] != got {
-						t.Errorf("%s (strict %t): NodeAt reached %s %q %q, Resolve reached %s %q %q at %s, not its counterpart at %s",
-							p, opts != nil, want.RMTypeName(), want.NodeID(), archetypeIDOf(want),
-							got.RMTypeName(), got.NodeID(), got.ArchetypeID(), got.AQLPath(), aqlPathOf(counterpart[want]))
+					if errors.Is(wantErr, template.ErrAmbiguousPath) {
+						ambiguous++
 					}
 				}
 				for _, a := range n.Attributes() {
 					for _, child := range a.Children() {
-						walkNodes(child, path+"/"+a.Name()+predicateOf(child))
+						step := pathStep{name: a.Name(), predicate: cmp.Or(child.ArchetypeID(), child.NodeID())}
+						walkNodes(child, append(slices.Clip(steps), step))
 					}
 				}
 			}
-			walkNodes(c.Root(), "")
+			walkNodes(c.Root(), nil)
 		})
 	}
-	if checked == 0 {
-		t.Fatal("no corpus node was checked")
+	if checked == 0 || elsewhere == 0 || ambiguous == 0 {
+		t.Errorf("the corpus walk checked %d nodes, %d lookups that reach another node and %d refused as ambiguous; want some of each",
+			checked, elsewhere, ambiguous)
 	}
 }
 
-// pairNodes records in counterpart the compiled node that stands where each
-// node of the parser's tree stands: the same declared attribute, in the
-// same order, and the same child. The compiled tree lists the declared
-// attributes first, in document order, and the injected ones after them.
-func pairNodes(t *testing.T, parsed template.Node, compiled *templatecompile.CompiledNode, counterpart map[template.Node]*templatecompile.CompiledNode) {
-	t.Helper()
-	counterpart[parsed] = compiled
-	on, ok := parsed.(template.ObjectNode)
-	if !ok {
-		return
+// pathStep is one segment of a path the corpus walk builds: an attribute
+// name and the predicate that selects a child, "" when it has none.
+type pathStep struct {
+	name, predicate string
+}
+
+// pathText returns the path of steps as template.ParsePath reads it.
+func pathText(steps []pathStep) string {
+	if len(steps) == 0 {
+		return "/"
 	}
-	attrs := compiled.Attributes()
-	for i, a := range on.Attributes() {
-		if i >= len(attrs) || attrs[i].Name() != a.Name() || len(attrs[i].Children()) != len(a.Children()) {
-			t.Fatalf("at %s, the parser's attribute %d (%s) has no counterpart in the compiled tree", compiled.AQLPath(), i+1, a.Name())
+	var b strings.Builder
+	for _, s := range steps {
+		b.WriteString("/" + s.name)
+		if s.predicate != "" {
+			b.WriteString("[" + s.predicate + "]")
+		}
+	}
+	return b.String()
+}
+
+// resolveByRules walks root along steps by the resolution rules, read on the
+// compiled tree's exported view: a step names an attribute of the node
+// reached by its exact name, its predicate takes the first child whose node
+// id or archetype id it is, and a step without one takes the first child,
+// or in the strict mode refuses an attribute with more than one child as
+// ambiguous. A slot does not descend. It returns the node reached, or the
+// sentinel of the refusal.
+func resolveByRules(root *templatecompile.CompiledNode, steps []pathStep, strict bool) (*templatecompile.CompiledNode, error) {
+	n := root
+	for _, s := range steps {
+		if n.IsSlot() {
+			return nil, template.ErrPathNotFound
+		}
+		attrs := n.Attributes()
+		i := slices.IndexFunc(attrs, func(a *templatecompile.CompiledAttribute) bool { return a.Name() == s.name })
+		if i < 0 {
+			return nil, template.ErrPathNotFound
 		}
 		children := attrs[i].Children()
-		for j, child := range a.Children() {
-			pairNodes(t, child, children[j], counterpart)
+		switch {
+		case len(children) == 0:
+			return nil, template.ErrPathNotFound
+		case s.predicate == "" && strict && len(children) > 1:
+			return nil, template.ErrAmbiguousPath
+		case s.predicate == "":
+			n = children[0]
+		default:
+			j := slices.IndexFunc(children, func(c *templatecompile.CompiledNode) bool {
+				return c.NodeID() == s.predicate || c.ArchetypeID() == s.predicate
+			})
+			if j < 0 {
+				return nil, template.ErrPathNotFound
+			}
+			n = children[j]
 		}
 	}
+	return n, nil
 }
 
-// predicateOf returns the predicate of the path segment that reaches n from
-// its holding attribute: n's archetype id, else its node id, else none.
-func predicateOf(n *templatecompile.CompiledNode) string {
-	if id := cmp.Or(n.ArchetypeID(), n.NodeID()); id != "" {
-		return "[" + id + "]"
-	}
-	return ""
-}
-
-// sameOutcome reports whether the parser's error want and Resolve's error
-// got are the same outcome: both nil, both not found, or both ambiguous.
+// sameOutcome reports whether the errors want and got are the same outcome
+// of a lookup: both nil, both not found, or both ambiguous.
 func sameOutcome(want, got error) bool {
 	for _, sentinel := range []error{template.ErrPathNotFound, template.ErrAmbiguousPath} {
 		if errors.Is(want, sentinel) != errors.Is(got, sentinel) {
@@ -335,19 +349,18 @@ func sameOutcome(want, got error) bool {
 	return (want == nil) == (got == nil)
 }
 
-// archetypeIDOf returns the archetype id of a parser node that is an
-// archetype root, else "".
-func archetypeIDOf(n template.Node) string {
-	if ar, ok := n.(*template.ArchetypeRoot); ok {
-		return ar.ArchetypeID()
-	}
-	return ""
-}
-
-// aqlPathOf returns the AQL path of n, or "<none>" when n is nil.
-func aqlPathOf(n *templatecompile.CompiledNode) string {
+// placeOf names n by its AQL path and, as siblings can share one, by its
+// place among the children of its attribute; "<none>" when n is nil.
+func placeOf(n *templatecompile.CompiledNode) string {
 	if n == nil {
 		return "<none>"
+	}
+	if parent := n.Parent(); parent != nil {
+		for _, a := range parent.Attributes() {
+			if i := slices.Index(a.Children(), n); i >= 0 {
+				return fmt.Sprintf("%s (child %d of %s)", n.AQLPath(), i+1, a.Name())
+			}
+		}
 	}
 	return n.AQLPath()
 }
