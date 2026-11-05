@@ -96,25 +96,22 @@ const (
 	shapeDeref
 )
 
-// accessShapes keeps, for four attributes of four classes, the shape the
+// accessShapes keeps, for three attributes of three classes, the shape the
 // validation walks and the composition builder read, where it differs from
 // the field's own: ITEM_SINGLE item and REFERENCE_RANGE range come back as a
 // pointer into the parent, as every other class held by value does
 // ([rmaccessGen.writeSingle]), and are listed so a change of their field
-// fails generation;
-// DV_PROPORTION precision comes back as its Integer, the one optional
-// primitive handed back dereferenced: the others come back as the pointer,
-// which the primitive binding reads as the value it points to, so the binding
-// does not need the dereference; ORIGINAL_VERSION data comes back as the
-// value its pointer holds, the payload of a version built in Go. That field
-// is a pointer to the type parameter, which the one instantiation the
-// registry recognises binds to any, and no walk can enter a *any. Presence is
-// read from the field either way, so a pointer that is not nil and holds a
-// nil interface comes back as nil and present.
+// fails generation; ORIGINAL_VERSION data comes back as the value its
+// pointer holds, the payload of a version built in Go. That field is a
+// pointer to the type parameter, which the one instantiation the registry
+// recognises binds to any, and no walk can enter a *any. Presence is read
+// from the field either way, so a pointer that is not nil and holds a nil
+// interface comes back as nil and present. An optional primitive comes back
+// as the pointer the field holds, which the primitive binding reads as the
+// value it points to.
 var accessShapes = map[string]map[string]accessShape{
 	"ITEM_SINGLE":      {"item": shapeAddress},
 	"REFERENCE_RANGE":  {"range": shapeAddress},
-	"DV_PROPORTION":    {"precision": shapeDeref},
 	"ORIGINAL_VERSION": {"data": shapeDeref},
 }
 

@@ -517,10 +517,12 @@ func TestPresence_REQ171_ReferencesHeldByValue(t *testing.T) {
 // ACTION ism_transition among them, as a pointer to the parent's own field,
 // so a walk goes below it and a write through it reaches the parent;
 // ISM_TRANSITION careflow_step and transition as the pointer the field holds,
-// for the same reason; the two attributes handed back dereferenced; and the
-// boxing of list items, a list of values as pointers into its backing array,
-// a list of interfaces as it is. Hand a class held by value, or the careflow
-// step, back as a copy and the pointer rows fail.
+// for the same reason; an optional primitive, DV_PROPORTION precision as
+// DV_QUANTITY's, as the pointer the field holds too; ORIGINAL_VERSION data,
+// handed back dereferenced; and the boxing of list items, a list of values
+// as pointers into its backing array, a list of interfaces as it is. Hand a
+// class held by value, or the careflow step, back as a copy, or a precision
+// back as its Integer, and the pointer rows fail.
 func TestAccess_REQ171_Shapes(t *testing.T) {
 	precision := rm.Integer(2)
 	step := rm.DVCodedText{Value: "step"}
@@ -538,8 +540,13 @@ func TestAccess_REQ171_Shapes(t *testing.T) {
 			t.Errorf("Single(ISM_TRANSITION, %s) = %#v, want the pointer the field holds", attr, v)
 		}
 	}
-	if v, _ := Single(&rm.DVProportion{Precision: &precision}, "precision"); v != any(precision) {
-		t.Errorf("Single(DV_PROPORTION, precision) = %#v, want the Integer it points to", v)
+	for _, parent := range []any{&rm.DVProportion{Precision: &precision}, &rm.DVQuantity{Precision: &precision}} {
+		if v, present := Single(parent, "precision"); v != any(&precision) || !present {
+			t.Errorf("Single(%T, precision) = (%#v, %t), want the pointer its field holds, present", parent, v, present)
+		}
+	}
+	if v, present := Single(&rm.DVProportion{}, "precision"); v != nil || present {
+		t.Errorf("Single(DV_PROPORTION without precision, precision) = (%#v, %t), want (nil, false)", v, present)
 	}
 
 	// ORIGINAL_VERSION data, a pointer to the type parameter, comes back as
