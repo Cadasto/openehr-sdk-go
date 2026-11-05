@@ -1,10 +1,11 @@
 package transport_test
 
 // typed_nil_test.go — REQ-025 § No panics, on the typed-nil axis of the
-// token source and reauther a caller hands the transport. An interface that
-// holds a nil pointer, func, map, slice or chan is not == nil, so it passes
-// a plain nil check and then panics, or blocks, on its first method call.
-// New refuses one given to WithTokenSource or WithReauthOn401, and Do
+// token source, reauther and tracer provider a caller hands the transport.
+// An interface that holds a nil pointer, func, map, slice or chan is not
+// == nil, so it passes a plain nil check and then panics, or blocks, on its
+// first method call. New refuses one given to WithTokenSource,
+// WithReauthOn401 or WithTracerProvider, and Do
 // refuses one attached with auth.WithTokenSource before any request leaves
 // the process, without falling back to the client-default token source.
 
@@ -18,6 +19,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"go.opentelemetry.io/otel/trace/noop"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
 	"github.com/cadasto/openehr-sdk-go/auth/smart"
@@ -67,6 +70,11 @@ func (r *ptrReauther) Reauth(context.Context) error {
 	r.calls++
 	return nil
 }
+
+// ptrTracerProvider reaches its embedded provider through its receiver, as
+// the OpenTelemetry SDK's *TracerProvider reads its own fields, so a nil one
+// panics in Tracer.
+type ptrTracerProvider struct{ noop.TracerProvider }
 
 // attemptsObserver records the Attempts of the last observation.
 type attemptsObserver struct {
@@ -131,11 +139,11 @@ func noPanic(f func() error) (err error) {
 	return f()
 }
 
-// TestREQ025_NewRefusesATypedNilTokenSourceOrReauther — REQ-025: New returns
-// an error matching ErrInvalidConfig for a token source or reauther that
-// holds a nil pointer, func, map, slice or chan, instead of building a Client
-// whose first Do panics on it.
-func TestREQ025_NewRefusesATypedNilTokenSourceOrReauther(t *testing.T) {
+// TestREQ025_NewRefusesATypedNilProvider — REQ-025: New returns an error
+// matching ErrInvalidConfig for a token source, reauther or tracer provider
+// that holds a nil pointer, func, map, slice or chan, instead of building a
+// Client whose first Do panics on it.
+func TestREQ025_NewRefusesATypedNilProvider(t *testing.T) {
 	t.Parallel()
 	srv, _, _ := countingServer(t, http.StatusOK)
 	tests := []struct {
@@ -151,6 +159,7 @@ func TestREQ025_NewRefusesATypedNilTokenSourceOrReauther(t *testing.T) {
 		{"reauther nil *smart.Source", transport.WithReauthOn401((*smart.Source)(nil))},
 		{"reauther nil pointer", transport.WithReauthOn401((*ptrReauther)(nil))},
 		{"reauther nil auth.ReautherFunc", transport.WithReauthOn401(auth.ReautherFunc(nil))},
+		{"tracer provider nil pointer", transport.WithTracerProvider((*ptrTracerProvider)(nil))},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

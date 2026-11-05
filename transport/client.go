@@ -60,12 +60,14 @@ type Client struct {
 // HTTP client must be injected with WithHTTPClient.
 //
 // A nil catalog or a missing HTTP client returns ErrInvalidConfig
-// (wrapped). So does a token source given to WithTokenSource, or a
-// reauther given to WithReauthOn401, that is not nil itself but holds a
-// nil pointer, func, map, slice or chan, such as a nil *smart.Source or a
-// nil auth.ReautherFunc, because its methods could panic or block on the
-// first request. A plain nil for either is the same as leaving the option
-// out.
+// (wrapped). So does a token source given to WithTokenSource, a reauther
+// given to WithReauthOn401, or a tracer provider given to
+// WithTracerProvider, that is not nil itself but holds a nil pointer, func,
+// map, slice or chan, such as a nil *smart.Source or a nil
+// auth.ReautherFunc. Such a value is usually a constructor's result kept
+// without its error, and calling its methods on the first request would
+// typically panic or block. A plain nil for any of them is the same as
+// leaving the option out.
 func New(catalog *discovery.ServiceCatalog, opts ...Option) (*Client, error) {
 	cfg := config{
 		callerAttributionHeader: DefaultCallerAttributionHeader,
@@ -90,6 +92,9 @@ func New(catalog *discovery.ServiceCatalog, opts ...Option) (*Client, error) {
 	}
 	if isTypedNil(cfg.reauther) {
 		return nil, fmt.Errorf("%w: WithReauthOn401 holds a nil %T", ErrInvalidConfig, cfg.reauther)
+	}
+	if isTypedNil(cfg.tracerProvider) {
+		return nil, fmt.Errorf("%w: WithTracerProvider holds a nil %T", ErrInvalidConfig, cfg.tracerProvider)
 	}
 	if cfg.tokenSrc == nil {
 		cfg.tokenSrc = auth.AnonymousTokenSource()

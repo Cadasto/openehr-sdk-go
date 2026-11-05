@@ -222,6 +222,11 @@ func WithReauthOn401(r auth.Reauther) Option {
 // Injecting a provider is preferred in tests (avoids mutating the
 // global) and in multi-tenant binaries that route spans to different
 // exporters per-client.
+//
+// A nil tp is the same as not setting the option. A tp that is not nil
+// itself but holds a nil pointer, such as a nil
+// *sdktrace.TracerProvider, makes [New] return an error matching
+// [ErrInvalidConfig].
 func WithTracerProvider(tp trace.TracerProvider) Option {
 	return func(cfg *config) { cfg.tracerProvider = tp }
 }
