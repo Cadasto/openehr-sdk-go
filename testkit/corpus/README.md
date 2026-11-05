@@ -181,7 +181,7 @@ The Corona pair is the largest fixture in the repo. That size is the cost of gua
 
 **Persistent:** `persistent_minimal.en.v1` (OPT + JSON + XML, round-trip).
 
-**Constraint templates:** `clinical_content_validation` (OPT + JSON, round-trip; its OPT has the `ITEM_TABLE.rotated` constraint removed here, an attribute RM 1.2.0 does not define, and an ELEMENT `at0005` removed with its term definition: hand-added upstream directly under the `ITEM_SINGLE` with no `item` attribute, it was read by no parser and kept the OPT from validating against openEHR `Template.xsd`); `Test_dv_*` (28 OPT+JSON pairs, all round-trip in PROBE-030; the two `Test_dv_interval_*_open_constraint` samples have the RM floor held out for inverted bounds, and all four `Test_dv_interval_*` stay out of the constraint-fixture axis). Not vendored: `cardinality_of_section`, `composition_evaluation_test` (duplicate AQL on compile).
+**Constraint templates:** `clinical_content_validation` (OPT + JSON, round-trip; its OPT has the `ITEM_TABLE.rotated` constraint removed here, an attribute RM 1.2.0 does not define, and an ELEMENT `at0005` removed with its term definition: hand-added upstream directly under the `ITEM_SINGLE` with no `item` attribute, it was read by no parser and kept the OPT from validating against openEHR `Template.xsd`); `Test_dv_*` (28 OPT+JSON pairs, all round-trip in PROBE-030; the two `Test_dv_interval_*_open_constraint` samples have the RM floor held out for inverted bounds). Not vendored: `cardinality_of_section`, `composition_evaluation_test` (duplicate AQL on compile).
 
 **Added at the `b4625fc` pin** (valid OPT + canonical JSON only): `family_history.v.1.2.3`, `my_spanish_template_v0`, `terminology_test.ehrbase.org.v1`, `terminology_test2.ehrbase.org.v1`.
 
