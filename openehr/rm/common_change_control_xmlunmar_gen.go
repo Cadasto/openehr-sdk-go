@@ -28,6 +28,8 @@ var xmlClassContribution = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
@@ -40,6 +42,8 @@ func (c *Contribution) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunVersions bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -69,6 +73,10 @@ func (c *Contribution) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 				_v, _err := canxml.DecodeAs[ObjectRefLike](_dec, _t)
 				if _err != nil {
 					return _err
+				}
+				if !_begunVersions {
+					_begunVersions = true
+					c.Versions = nil
 				}
 				c.Versions = append(c.Versions, _v)
 			case "audit":
@@ -244,6 +252,8 @@ var xmlClassOriginalVersion = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
@@ -256,6 +266,8 @@ func (o *OriginalVersion[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunOtherInputVersionUids, _begunAttestations bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -365,6 +377,10 @@ func (o *OriginalVersion[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
 				}
+				if !_begunOtherInputVersionUids {
+					_begunOtherInputVersionUids = true
+					o.OtherInputVersionUids = nil
+				}
 				o.OtherInputVersionUids = append(o.OtherInputVersionUids, _v)
 			case "lifecycle_state":
 				if _got&(1<<5) != 0 {
@@ -387,6 +403,10 @@ func (o *OriginalVersion[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 				var _v Attestation
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
+				}
+				if !_begunAttestations {
+					_begunAttestations = true
+					o.Attestations = nil
 				}
 				o.Attestations = append(o.Attestations, _v)
 			case "data":

@@ -144,6 +144,8 @@ var xmlClassArchetypeSlot = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
@@ -156,6 +158,8 @@ func (a *ArchetypeSlot) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunIncludes, _begunExcludes bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -220,11 +224,19 @@ func (a *ArchetypeSlot) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
 				}
+				if !_begunIncludes {
+					_begunIncludes = true
+					a.Includes = nil
+				}
 				a.Includes = append(a.Includes, _v)
 			case "excludes":
 				var _v Assertion
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
+				}
+				if !_begunExcludes {
+					_begunExcludes = true
+					a.Excludes = nil
 				}
 				a.Excludes = append(a.Excludes, _v)
 			default:
@@ -256,6 +268,8 @@ var xmlClassCComplexObject = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
@@ -268,6 +282,8 @@ func (c *CComplexObject) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunAttributes bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -332,6 +348,10 @@ func (c *CComplexObject) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement
 				if _err != nil {
 					return _err
 				}
+				if !_begunAttributes {
+					_begunAttributes = true
+					c.Attributes = nil
+				}
 				c.Attributes = append(c.Attributes, _v)
 			default:
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
@@ -362,6 +382,8 @@ var xmlClassCMultipleAttribute = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
@@ -374,6 +396,8 @@ func (c *CMultipleAttribute) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunChildren bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -420,6 +444,10 @@ func (c *CMultipleAttribute) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 				_v, _err := canxml.DecodeAs[CObject](_dec, _t)
 				if _err != nil {
 					return _err
+				}
+				if !_begunChildren {
+					_begunChildren = true
+					c.Children = nil
 				}
 				c.Children = append(c.Children, _v)
 			case "cardinality":
@@ -591,6 +619,8 @@ var xmlClassCSingleAttribute = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
@@ -603,6 +633,8 @@ func (c *CSingleAttribute) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunChildren bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -649,6 +681,10 @@ func (c *CSingleAttribute) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 				_v, _err := canxml.DecodeAs[CObject](_dec, _t)
 				if _err != nil {
 					return _err
+				}
+				if !_begunChildren {
+					_begunChildren = true
+					c.Children = nil
 				}
 				c.Children = append(c.Children, _v)
 			case "match_negated":

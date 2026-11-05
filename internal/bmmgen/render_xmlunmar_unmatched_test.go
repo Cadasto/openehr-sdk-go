@@ -71,7 +71,7 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 
 	for _, target := range []Target{TargetRM, TargetAOM14} {
 		plan := plans[target.GoPackage]
-		hashes, anys, params, octets, lists, choices, singles, nils, zeroed, optionals := 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+		hashes, anys, params, octets, lists, choices, singles, nils, zeroed, optionals, resets := 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 		for _, f := range plan.Files {
 			classes, err := codecClassesIn(plan, f)
 			if err != nil {
@@ -143,6 +143,20 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 						}
 						arm = strings.Replace(arm, nilGuard[0], "", 1)
 					}
+					// An arm that appends each element as one item starts the
+					// list empty at the element's first item, as canonical JSON
+					// replaces an array (REQ-056).
+					if at := strings.Index(arm, "= append("); at >= 0 {
+						reset := listResetOf(FieldName(prop)).FindStringIndex(arm)
+						switch {
+						case reset == nil:
+							t.Errorf("%s.%s appends each element as one item; its arm must start the list empty at the element's first item:\n%s", pc.BMMName, prop, arm)
+						case reset[0] > at:
+							t.Errorf("%s.%s starts its list empty after appending an item; want the reset first:\n%s", pc.BMMName, prop, arm)
+						default:
+							resets++
+						}
+					}
 					if p, ok := ef.Prop.(*bmm.SingleProperty); ok && !p.IsMandatory && isPrimitive(p.TypeName) && !isOpenParam(ef.Owner, p.TypeName) {
 						optionals++
 						if !strings.Contains(arm, "xmlunmatched.DecodeOptional(_dec, &_t, &_v)") {
@@ -211,8 +225,8 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 				}
 			}
 		}
-		if singles == 0 || nils == 0 || zeroed == 0 || nils == zeroed || optionals == 0 {
-			t.Errorf("the %s target rendered %d repeat guards, %d nil guards (%d zeroing) and %d optional primitives; want each covered", target.GoPackage, singles, nils, zeroed, optionals)
+		if singles == 0 || nils == 0 || zeroed == 0 || nils == zeroed || optionals == 0 || resets == 0 {
+			t.Errorf("the %s target rendered %d repeat guards, %d nil guards (%d zeroing), %d optional primitives and %d list resets; want each covered", target.GoPackage, singles, nils, zeroed, optionals, resets)
 		}
 		if target.GoPackage == TargetRM.GoPackage && (hashes == 0 || params == 0 || octets == 0) {
 			t.Errorf("the RM target rendered %d Hash arms, %d generic-parameter arms and %d Octet arms; want the resource-metadata Hash members, VERSION<T>.data and DV_MULTIMEDIA.data covered", hashes, params, octets)
@@ -233,6 +247,13 @@ var repeatGuard = regexp.MustCompile(`\t\t\t\tif _got&\(1<<(\d+)\) != 0 \{\n\t\t
 func nilGuardOf(field string) *regexp.Regexp {
 	f := regexp.QuoteMeta(field)
 	return regexp.MustCompile(`\t\t\t\tif _nil, _err := xmlunmatched\.SkipNil\(_dec, _t\); _err != nil \{\n\t\t\t\t\treturn _err\n\t\t\t\t\} else if _nil \{\n\t\t\t\t\t(?:[a-z]+\.` + f + `( = nil)|xmlunmatched\.Zero\(&[a-z]+\.` + f + `\))\n\t\t\t\t\tbreak\n\t\t\t\t\}\n`)
+}
+
+// listResetOf matches the lines that start the list held in the Go field
+// field empty at the element's first item ([withListReset]).
+func listResetOf(field string) *regexp.Regexp {
+	f := regexp.QuoteMeta(field)
+	return regexp.MustCompile(`\t\t\t\tif !_begun` + f + ` \{\n\t\t\t\t\t_begun` + f + ` = true\n\t\t\t\t\t[a-z]+\.` + f + ` = nil\n\t\t\t\t\}\n`)
 }
 
 // xmlCaseArm returns the case arm of a rendered UnmarshalXML that matches the

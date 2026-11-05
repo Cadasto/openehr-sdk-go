@@ -132,6 +132,8 @@ var xmlClassDVCodedText = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
@@ -144,6 +146,8 @@ func (d *DVCodedText) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunMappings bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -214,6 +218,10 @@ func (d *DVCodedText) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 				var _v TermMapping
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
+				}
+				if !_begunMappings {
+					_begunMappings = true
+					d.Mappings = nil
 				}
 				d.Mappings = append(d.Mappings, _v)
 			case "language":
@@ -300,6 +308,8 @@ var xmlClassDVParagraph = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVParagraph) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -308,6 +318,8 @@ func (d *DVParagraph) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 	} else if _fresh {
 		*d = DVParagraph{}
 	}
+	// Whether the element has had an item of each list member.
+	var _begunItems bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -320,6 +332,10 @@ func (d *DVParagraph) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 				_v, _err := canxml.DecodeAs[DVTextLike](_dec, _t)
 				if _err != nil {
 					return _err
+				}
+				if !_begunItems {
+					_begunItems = true
+					d.Items = nil
 				}
 				d.Items = append(d.Items, _v)
 			default:
@@ -351,6 +367,8 @@ var xmlClassDVText = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
@@ -363,6 +381,8 @@ func (d *DVText) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunMappings bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -433,6 +453,10 @@ func (d *DVText) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 				var _v TermMapping
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
+				}
+				if !_begunMappings {
+					_begunMappings = true
+					d.Mappings = nil
 				}
 				d.Mappings = append(d.Mappings, _v)
 			case "language":

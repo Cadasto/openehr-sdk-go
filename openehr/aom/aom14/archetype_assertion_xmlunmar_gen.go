@@ -29,6 +29,8 @@ var xmlClassAssertion = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
@@ -41,6 +43,8 @@ func (a *Assertion) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunVariables bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -116,6 +120,10 @@ func (a *Assertion) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 				var _v AssertionVariable
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
+				}
+				if !_begunVariables {
+					_begunVariables = true
+					a.Variables = nil
 				}
 				a.Variables = append(a.Variables, _v)
 			default:

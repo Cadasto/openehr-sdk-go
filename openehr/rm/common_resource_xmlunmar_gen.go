@@ -30,6 +30,8 @@ var xmlClassResourceDescription = xmlunmatched.Class{
 // are read from _start.Attr.
 // A Hash member reads each element of its name as one entry, into a
 // map that starts empty at the first entry.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
@@ -42,6 +44,8 @@ func (r *ResourceDescription) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEl
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunOtherContributors bool
 	// Whether the element has had an entry of each Hash member.
 	var _begunOriginalAuthor, _begunOtherDetails, _begunDetails bool
 	for {
@@ -60,6 +64,10 @@ func (r *ResourceDescription) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEl
 				var _v string
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
+				}
+				if !_begunOtherContributors {
+					_begunOtherContributors = true
+					r.OtherContributors = nil
 				}
 				r.OtherContributors = append(r.OtherContributors, _v)
 			case "lifecycle_state":
@@ -162,6 +170,8 @@ var xmlClassResourceDescriptionItem = xmlunmatched.Class{
 // are read from _start.Attr.
 // A Hash member reads each element of its name as one entry, into a
 // map that starts empty at the first entry.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
@@ -174,6 +184,8 @@ func (r *ResourceDescriptionItem) UnmarshalXML(_dec *xml.Decoder, _start xml.Sta
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunKeywords bool
 	// Whether the element has had an entry of each Hash member.
 	var _begunOriginalResourceURI, _begunOtherDetails bool
 	for {
@@ -222,6 +234,10 @@ func (r *ResourceDescriptionItem) UnmarshalXML(_dec *xml.Decoder, _start xml.Sta
 				var _v string
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
+				}
+				if !_begunKeywords {
+					_begunKeywords = true
+					r.Keywords = nil
 				}
 				r.Keywords = append(r.Keywords, _v)
 			case "use":

@@ -29,6 +29,8 @@ var xmlClassCCodePhrase = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
@@ -41,6 +43,8 @@ func (c *CCodePhrase) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunCodeList bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -143,6 +147,10 @@ func (c *CCodePhrase) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
+				if !_begunCodeList {
+					_begunCodeList = true
+					c.CodeList = nil
+				}
 				if c.CodeList == nil {
 					c.CodeList = new([]string)
 				}
@@ -176,6 +184,8 @@ var xmlClassCDVOrdinal = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
@@ -188,6 +198,8 @@ func (c *CDVOrdinal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunList bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -271,6 +283,10 @@ func (c *CDVOrdinal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
 				}
+				if !_begunList {
+					_begunList = true
+					c.List = nil
+				}
 				c.List = append(c.List, _v)
 			default:
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
@@ -301,6 +317,8 @@ var xmlClassCDVQuantity = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
@@ -313,6 +331,8 @@ func (c *CDVQuantity) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunList bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -415,6 +435,10 @@ func (c *CDVQuantity) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
 				}
+				if !_begunList {
+					_begunList = true
+					c.List = nil
+				}
 				c.List = append(c.List, _v)
 			default:
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
@@ -445,6 +469,8 @@ var xmlClassCDVScale = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
@@ -457,6 +483,8 @@ func (c *CDVScale) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunList bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -539,6 +567,10 @@ func (c *CDVScale) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 				var _v Scale
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
+				}
+				if !_begunList {
+					_begunList = true
+					c.List = nil
 				}
 				c.List = append(c.List, _v)
 			default:
@@ -852,6 +884,8 @@ var xmlClassNonTerminalState = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
@@ -864,6 +898,8 @@ func (n *NonTerminalState) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunTransitions bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -893,6 +929,10 @@ func (n *NonTerminalState) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 				var _v Transition
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
+				}
+				if !_begunTransitions {
+					_begunTransitions = true
+					n.Transitions = nil
 				}
 				n.Transitions = append(n.Transitions, _v)
 			default:
@@ -930,6 +970,8 @@ var xmlChoiceOrdinalSymbol = []xmlunmatched.Shape{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
@@ -942,6 +984,8 @@ func (o *Ordinal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunOtherReferenceRanges bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -973,6 +1017,10 @@ func (o *Ordinal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 				var _v rm.ReferenceRange[rm.DVOrdered]
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
+				}
+				if !_begunOtherReferenceRanges {
+					_begunOtherReferenceRanges = true
+					o.OtherReferenceRanges = nil
 				}
 				o.OtherReferenceRanges = append(o.OtherReferenceRanges, _v)
 			case "normal_status":
@@ -1065,6 +1113,8 @@ var xmlChoiceScaleSymbol = []xmlunmatched.Shape{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
@@ -1077,6 +1127,8 @@ func (s *Scale) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunOtherReferenceRanges bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -1108,6 +1160,10 @@ func (s *Scale) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 				var _v rm.ReferenceRange[rm.DVOrdered]
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
+				}
+				if !_begunOtherReferenceRanges {
+					_begunOtherReferenceRanges = true
+					s.OtherReferenceRanges = nil
 				}
 				s.OtherReferenceRanges = append(s.OtherReferenceRanges, _v)
 			case "normal_status":
@@ -1194,6 +1250,8 @@ var xmlClassStateMachine = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (s *StateMachine) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -1202,6 +1260,8 @@ func (s *StateMachine) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 	} else if _fresh {
 		*s = StateMachine{}
 	}
+	// Whether the element has had an item of each list member.
+	var _begunStates bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -1214,6 +1274,10 @@ func (s *StateMachine) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 				_v, _err := canxml.DecodeAs[State](_dec, _t)
 				if _err != nil {
 					return _err
+				}
+				if !_begunStates {
+					_begunStates = true
+					s.States = nil
 				}
 				s.States = append(s.States, _v)
 			default:

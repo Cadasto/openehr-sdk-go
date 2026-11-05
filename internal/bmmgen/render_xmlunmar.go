@@ -250,6 +250,14 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	b.WriteString("// sentinels inside *canxml.DecodeError for errors.Is / errors.As.\n")
 	b.WriteString("// Members the class's ITS-XML schema type declares as XML attributes\n")
 	b.WriteString("// are read from _start.Attr.\n")
+	legacy := sc.IsAbstract() && hasIntervalShape(fields)
+	// A class that carries the four boundary flags records which of them and
+	// of its two bounds the document carried, and gives the absent flags their
+	// defaults at the closing tag, once every child has been read (REQ-169).
+	flagged, err := intervalFlagged(fields)
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", pc.BMMName, err)
+	}
 	marks, err := xmlHashMarks(plan, fields)
 	if err != nil {
 		return "", err
@@ -258,9 +266,19 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	if err != nil {
 		return "", err
 	}
+	// The cases come before the method's head, which declares the marks of
+	// the list members they append to.
+	cases, lists, err := renderUnmarshalXMLCases(plan, pc, sc, recv, elemFields, xmlCaseContext{choices: choices, once: once, flagged: flagged, legacy: legacy})
+	if err != nil {
+		return "", err
+	}
 	if len(marks) > 0 {
 		b.WriteString("// A Hash member reads each element of its name as one entry, into a\n")
 		b.WriteString("// map that starts empty at the first entry.\n")
+	}
+	if len(lists) > 0 {
+		b.WriteString("// A list member reads each element of its name as one item, into a\n")
+		b.WriteString("// list that starts empty at the first item.\n")
 	}
 	if len(once) > 0 {
 		b.WriteString("// A single-valued member keeps its first child element; a second one is\n")
@@ -268,17 +286,9 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	}
 	b.WriteString("// Content the method does not read is unmatched: it is skipped, or\n")
 	b.WriteString("// reported or refused under canxml.WithUnmatched and canxml.WithStrict.\n")
-	legacy := sc.IsAbstract() && hasIntervalShape(fields)
 	if legacy {
 		b.WriteString("//\n")
 		b.WriteString(legacyIntervalXMLDoc)
-	}
-	// A class that carries the four boundary flags records which of them and
-	// of its two bounds the document carried, and gives the absent flags their
-	// defaults at the closing tag, once every child has been read (REQ-169).
-	flagged, err := intervalFlagged(fields)
-	if err != nil {
-		return "", fmt.Errorf("%s: %w", pc.BMMName, err)
 	}
 	if flagged {
 		b.WriteString("//\n")
@@ -297,6 +307,10 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 		b.WriteString("\t// A bit per single-valued member that has had a child element.\n")
 		b.WriteString("\tvar _got uint64\n")
 	}
+	if len(lists) > 0 {
+		b.WriteString("\t// Whether the element has had an item of each list member.\n")
+		fmt.Fprintf(&b, "\tvar %s bool\n", strings.Join(lists, ", "))
+	}
 	if len(marks) > 0 {
 		b.WriteString("\t// Whether the element has had an entry of each Hash member.\n")
 		fmt.Fprintf(&b, "\tvar %s bool\n", strings.Join(marks, ", "))
@@ -313,44 +327,7 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	b.WriteString("\t\tcase xml.StartElement:\n")
 	b.WriteString("\t\t\tswitch xmlunmatched.LocalName(_t.Name) {\n")
 
-	for _, ef := range elemFields {
-		var caseBody string
-		if prop := ef.Prop.PropertyName(); flagged && isIntervalFlag(prop) {
-			caseBody = unmarshalXMLIntervalFlag(recv, prop)
-		} else if c := choices[prop]; c != nil {
-			caseBody = unmarshalXMLChoice(recv, FieldName(prop), prop, c, isMandatoryProperty(ef.Prop))
-		} else {
-			caseBody, err = renderUnmarshalXMLField(plan, recv, sc, ef)
-			if err != nil {
-				return "", fmt.Errorf("render UnmarshalXML field %s.%s: %w", pc.BMMName, prop, err)
-			}
-		}
-		if prop := ef.Prop.PropertyName(); flagged && isIntervalBound(prop) {
-			// The bound's presence decides its side's absent `*_unbounded`
-			// (REQ-169).
-			caseBody += unmarshalXMLIntervalBoundSeen(prop)
-		}
-		nilable, err := xmlNilable(plan, ef)
-		if err != nil {
-			return "", fmt.Errorf("%s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
-		}
-		if nilable {
-			caseBody, err = withNilGuard(caseBody, recv, FieldName(ef.Prop.PropertyName()), isMandatoryMember(ef.Prop))
-			if err != nil {
-				return "", fmt.Errorf("render UnmarshalXML field %s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
-			}
-		}
-		if bit, ok := once[ef.Prop.PropertyName()]; ok {
-			caseBody, err = withRepeatGuard(caseBody, bit)
-			if err != nil {
-				return "", fmt.Errorf("render UnmarshalXML field %s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
-			}
-		}
-		if legacy {
-			caseBody = withLegacyElementName(caseBody, ef.Prop.PropertyName())
-		}
-		b.WriteString(caseBody)
-	}
+	b.WriteString(cases)
 	for _, d := range dropped {
 		b.WriteString(unmarshalXMLDroppedElement(d.element, d.texts))
 	}
@@ -373,6 +350,98 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	b.WriteString("\t}\n")   // close for
 	b.WriteString("}\n")
 	return b.String(), nil
+}
+
+// xmlCaseContext is what the cases of a class's UnmarshalXML read beside the
+// member itself ([renderUnmarshalXMLCases]).
+type xmlCaseContext struct {
+	choices map[string]*xmlChoice // the members whose element takes a choice of shapes
+	once    map[string]int        // the bit of each single-valued member
+	flagged bool                  // the class carries the four interval boundary flags
+	legacy  bool                  // the class is the abstract legacy interval
+}
+
+// renderUnmarshalXMLCases returns the case of each member in fields, in
+// order, for the switch on a child element's local name in the UnmarshalXML
+// of pc, and the names of the marks the cases of the list members read
+// ([withListReset]), which the method declares.
+func renderUnmarshalXMLCases(plan *Plan, pc *PlannedClass, sc *bmm.SimpleClass, recv string, fields []emittedField, c xmlCaseContext) (string, []string, error) {
+	var (
+		b     strings.Builder
+		lists []string
+		err   error
+	)
+	for _, ef := range fields {
+		var caseBody string
+		if prop := ef.Prop.PropertyName(); c.flagged && isIntervalFlag(prop) {
+			caseBody = unmarshalXMLIntervalFlag(recv, prop)
+		} else if c := c.choices[prop]; c != nil {
+			caseBody = unmarshalXMLChoice(recv, FieldName(prop), prop, c, isMandatoryProperty(ef.Prop))
+		} else {
+			caseBody, err = renderUnmarshalXMLField(plan, recv, sc, ef)
+			if err != nil {
+				return "", nil, fmt.Errorf("render UnmarshalXML field %s.%s: %w", pc.BMMName, prop, err)
+			}
+		}
+		if prop := ef.Prop.PropertyName(); c.flagged && isIntervalBound(prop) {
+			// The bound's presence decides its side's absent `*_unbounded`
+			// (REQ-169).
+			caseBody += unmarshalXMLIntervalBoundSeen(prop)
+		}
+		nilable, err := xmlNilable(plan, ef)
+		if err != nil {
+			return "", nil, fmt.Errorf("%s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
+		}
+		if nilable {
+			caseBody, err = withNilGuard(caseBody, recv, FieldName(ef.Prop.PropertyName()), isMandatoryMember(ef.Prop))
+			if err != nil {
+				return "", nil, fmt.Errorf("render UnmarshalXML field %s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
+			}
+		}
+		if bit, ok := c.once[ef.Prop.PropertyName()]; ok {
+			caseBody, err = withRepeatGuard(caseBody, bit)
+			if err != nil {
+				return "", nil, fmt.Errorf("render UnmarshalXML field %s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
+			}
+		}
+		var listed bool
+		if caseBody, listed = withListReset(caseBody, recv, FieldName(ef.Prop.PropertyName())); listed {
+			lists = append(lists, xmlListMark(FieldName(ef.Prop.PropertyName())))
+		}
+		if c.legacy {
+			caseBody = withLegacyElementName(caseBody, ef.Prop.PropertyName())
+		}
+		b.WriteString(caseBody)
+	}
+	return b.String(), lists, nil
+}
+
+// withListReset inserts into caseBody, the case of a member held in recv's
+// Go field field, the lines that start the member's list empty at the
+// element's first item of it, before the item is appended, and reports
+// whether caseBody appends an item: the list then holds the items of this
+// element alone, whatever the value held before, as canonical JSON replaces
+// an array. A case that appends no item, a single-valued member's or one
+// that skips the member's elements, comes back unchanged. A list held as
+// *[]T is set to nil, and the case allocates it again.
+func withListReset(caseBody, recv, field string) (string, bool) {
+	at := strings.Index(caseBody, fmt.Sprintf("\t\t\t\t%s.%s = append(%s.%s, _v)\n", recv, field, recv, field))
+	if at < 0 {
+		at = strings.Index(caseBody, fmt.Sprintf("\t\t\t\tif %s.%s == nil {\n\t\t\t\t\t%s.%s = new([]", recv, field, recv, field))
+	}
+	if at < 0 {
+		return caseBody, false
+	}
+	mark := xmlListMark(field)
+	reset := fmt.Sprintf("\t\t\t\tif !%s {\n\t\t\t\t\t%s = true\n\t\t\t\t\t%s.%s = nil\n\t\t\t\t}\n", mark, mark, recv, field)
+	return caseBody[:at] + reset + caseBody[at:], true
+}
+
+// xmlListMark returns the name of the local variable that marks the list
+// member held in the Go field field ([withListReset]). A member is a list or
+// a Hash, never both, so it shares the prefix of [xmlHashMark].
+func xmlListMark(field string) string {
+	return "_begun" + field
 }
 
 // renderUnmarshalXMLField returns the case branch source for one

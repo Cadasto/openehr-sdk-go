@@ -738,6 +738,7 @@ requirements:
       - openehr/serialize/canxml/real_precision_test.go
       - openehr/serialize/canxml/real_xsd_text_test.go
       - openehr/serialize/canxml/repeated_attr_test.go
+      - openehr/serialize/canxml/reused_list_test.go
       - openehr/serialize/canxml/roundtrip_test.go
       - openehr/serialize/canxml/stream_decoder_test.go
       - openehr/serialize/canxml/unmatched_test.go
