@@ -215,6 +215,7 @@ requirements:
       - transport/diagnostics_internal_test.go
       - transport/nilwiredereference_internal_test.go
       - transport/nilwireerror_test.go
+      - transport/typed_nil_test.go
 
   - id: REQ-026
     title: Goroutine-safe clients
@@ -858,6 +859,7 @@ requirements:
       - auth/smart/jwks_min_refresh_test.go
       - auth/smart/jwks_refresh_internal_test.go
       - auth/smart/jwks_ttl_test.go
+      - auth/smart/member_names_test.go
       - auth/smart/redact_test.go
       - auth/smart/shared_refresh_test.go
       - auth/smart/smart_test.go
@@ -876,6 +878,7 @@ requirements:
     probes: [PROBE-007]
     tests:
       - auth/clientcreds/expires_in_test.go
+      - auth/clientcreds/member_names_test.go
       - auth/clientcreds/reauth_test.go
       - auth/clientcreds/refresh_threshold_test.go
       - auth/clientcreds/renewal_backoff_test.go
@@ -883,13 +886,16 @@ requirements:
       - auth/clientcreds/zero_lifetime_test.go
       - auth/errors_test.go
       - auth/jwtbearer/expires_in_test.go
+      - auth/jwtbearer/member_names_test.go
       - auth/jwtbearer/reauth_test.go
       - auth/jwtbearer/refresh_threshold_test.go
       - auth/jwtbearer/renewal_backoff_test.go
       - auth/jwtbearer/shared_exchange_test.go
       - auth/jwtbearer/zero_lifetime_test.go
+      - auth/oauth2_test.go
       - auth/smart/detached_refresh_test.go
       - auth/smart/expires_in_test.go
+      - auth/smart/member_names_test.go
       - auth/smart/reauth_test.go
       - auth/smart/redact_test.go
       - auth/smart/redirect_test.go
@@ -1042,6 +1048,7 @@ requirements:
       - smart/discovery/coalesce_cancel_test.go
       - smart/discovery/coalesce_panic_test.go
       - smart/discovery/issuer_test.go
+      - smart/discovery/member_names_test.go
       - smart/discovery/not_modified_test.go
       - smart/discovery/redact_test.go
       - testkit/probes/discovery/probe_041_catalog_refresh_on_401.go
