@@ -190,7 +190,9 @@ failure, not a deviation.
   multi-unit magnitude. Proportion kinds other than percent (e.g. unitary) derive
   no denominator bound — the fixture does not pin them.
 - **Coded/ordinal list labels** — `value` and `ordinal` match; `label` is resolved from
-  archetype at-code terms where present, but is **empty for external-terminology codes**
+  the at-code terms of the value's own archetype, its nearest enclosing archetype root, as
+  the reference reads them (a code only an enclosing archetype defines gets no label; node
+  names and descriptions are read the same way), but is **empty for external-terminology codes**
   (e.g. `openehr::433`), and `localizedLabels` / `localizedDescriptions` / per-item
   `termBindings` are not emitted.
 - **`terminology`** — emitted for external bindings only (e.g. `openehr`). The
