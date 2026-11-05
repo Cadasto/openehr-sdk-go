@@ -471,8 +471,8 @@ func (f failedReader) Read([]byte) (int, error) { return 0, f.err }
 // reads. One given none reads an element's own declarations as it goes; when
 // a prefix is declared on an element around the attribute, Decode decodes the
 // value a second time, from where the call began, through a reader that keeps
-// every declaration in scope, into v cleared to its zero value. The Decoder
-// then reads the rest of the stream through that reader. It does the same
+// every declaration in scope, into v as the first decode left it, so v keeps
+// what the value leaves out, as after one decode. The Decoder then reads the rest of the stream through that reader. It does the same
 // when the value nests deeper than encoding/xml decodes, 10 000 elements, to
 // name the element refused by its path (see [WithMaxDepth]). To read the value
 // again, a Decoder whose reader is an io.ByteReader and an io.Seeker, such as
@@ -514,7 +514,7 @@ func (d *Decoder) Decode(v any) error {
 	d.scope = new(xmlunmatched.Scope)
 	d.dec = d.scope.NewDecoder(src)
 	d.rec, d.seeker = nil, nil
-	return d.scope.DecodeAgain(d.dec, v)
+	return d.scope.Decode(d.dec, v)
 }
 
 // rewind returns a reader of the stream from start, the input offset of d.dec
@@ -589,9 +589,9 @@ func (d *Decoder) RelaxedTypeDispatch() bool { return d.cfg.relaxedTypeDispatch 
 // scope where the attribute stands (see [XSITypeOf]). Given no option,
 // Unmarshal reads an element's own declarations as it goes; when the prefix
 // is declared on an element around it, Unmarshal decodes data a second time,
-// through a decoder that keeps every declaration in scope, into v cleared to
-// its zero value, so only a document with such a value pays for the second
-// decode.
+// through a decoder that keeps every declaration in scope, into v as the
+// first decode left it, so v keeps what the document leaves out, as after one
+// decode. Only a document with such a value pays for the second decode.
 //
 // Content the decode does not read is ignored by default. [WithUnmatched]
 // reports each such item and [WithStrict] refuses the first, wrapping

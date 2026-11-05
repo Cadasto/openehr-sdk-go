@@ -37,10 +37,8 @@ var xmlClassResourceDescription = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (r *ResourceDescription) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassResourceDescription); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassResourceDescription); _err != nil {
 		return _err
-	} else if _fresh {
-		*r = ResourceDescription{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -177,10 +175,8 @@ var xmlClassResourceDescriptionItem = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (r *ResourceDescriptionItem) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassResourceDescriptionItem); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassResourceDescriptionItem); _err != nil {
 		return _err
-	} else if _fresh {
-		*r = ResourceDescriptionItem{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -355,10 +351,8 @@ var xmlClassTranslationDetails = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TranslationDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassTranslationDetails); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassTranslationDetails); _err != nil {
 		return _err
-	} else if _fresh {
-		*t = TranslationDetails{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64

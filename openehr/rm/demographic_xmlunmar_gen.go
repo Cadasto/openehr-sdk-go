@@ -36,10 +36,8 @@ var xmlClassAddress = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *Address) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassAddress); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassAddress); _err != nil {
 		return _err
-	} else if _fresh {
-		*a = Address{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "archetype_node_id" && _a.Name.Space == "" {
@@ -218,10 +216,8 @@ var xmlClassAgent = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *Agent) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassAgent); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassAgent); _err != nil {
 		return _err
-	} else if _fresh {
-		*a = Agent{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "archetype_node_id" && _a.Name.Space == "" {
@@ -450,10 +446,8 @@ var xmlClassCapability = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *Capability) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassCapability); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCapability); _err != nil {
 		return _err
-	} else if _fresh {
-		*c = Capability{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "archetype_node_id" && _a.Name.Space == "" {
@@ -651,10 +645,8 @@ var xmlClassContact = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *Contact) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassContact); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassContact); _err != nil {
 		return _err
-	} else if _fresh {
-		*c = Contact{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "archetype_node_id" && _a.Name.Space == "" {
@@ -843,10 +835,8 @@ var xmlClassGroup = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (g *Group) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassGroup); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassGroup); _err != nil {
 		return _err
-	} else if _fresh {
-		*g = Group{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "archetype_node_id" && _a.Name.Space == "" {
@@ -1075,10 +1065,8 @@ var xmlClassOrganisation = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (o *Organisation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassOrganisation); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassOrganisation); _err != nil {
 		return _err
-	} else if _fresh {
-		*o = Organisation{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "archetype_node_id" && _a.Name.Space == "" {
@@ -1307,10 +1295,8 @@ var xmlClassPartyIdentity = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (p *PartyIdentity) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassPartyIdentity); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassPartyIdentity); _err != nil {
 		return _err
-	} else if _fresh {
-		*p = PartyIdentity{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "archetype_node_id" && _a.Name.Space == "" {
@@ -1489,10 +1475,8 @@ var xmlClassPartyRelationship = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (p *PartyRelationship) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassPartyRelationship); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassPartyRelationship); _err != nil {
 		return _err
-	} else if _fresh {
-		*p = PartyRelationship{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "archetype_node_id" && _a.Name.Space == "" {
@@ -1724,10 +1708,8 @@ var xmlClassPerson = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (p *Person) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassPerson); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassPerson); _err != nil {
 		return _err
-	} else if _fresh {
-		*p = Person{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "archetype_node_id" && _a.Name.Space == "" {
@@ -1956,10 +1938,8 @@ var xmlClassRole = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (r *Role) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassRole); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassRole); _err != nil {
 		return _err
-	} else if _fresh {
-		*r = Role{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "archetype_node_id" && _a.Name.Space == "" {
@@ -2210,10 +2190,8 @@ var xmlClassVersionedParty = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (v *VersionedParty) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassVersionedParty); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassVersionedParty); _err != nil {
 		return _err
-	} else if _fresh {
-		*v = VersionedParty{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64

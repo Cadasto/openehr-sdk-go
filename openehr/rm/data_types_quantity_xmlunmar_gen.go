@@ -35,10 +35,8 @@ var xmlClassDVCount = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVCount) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVCount); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVCount); _err != nil {
 		return _err
-	} else if _fresh {
-		*d = DVCount{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -227,10 +225,8 @@ var xmlClassDVInterval = xmlunmatched.Class{
 // An empty or whitespace-only flag element carries no boolean and reads as
 // a flag the document leaves out.
 func (d *DVInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVInterval); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVInterval); _err != nil {
 		return _err
-	} else if _fresh {
-		*d = DVInterval[T]{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -366,10 +362,8 @@ var xmlClassDVOrdinal = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVOrdinal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVOrdinal); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVOrdinal); _err != nil {
 		return _err
-	} else if _fresh {
-		*d = DVOrdinal{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -501,10 +495,8 @@ var xmlClassDVProportion = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVProportion) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVProportion); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVProportion); _err != nil {
 		return _err
-	} else if _fresh {
-		*d = DVProportion{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -741,10 +733,8 @@ var xmlClassDVQuantity = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVQuantity) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVQuantity); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVQuantity); _err != nil {
 		return _err
-	} else if _fresh {
-		*d = DVQuantity{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -1008,10 +998,8 @@ var xmlClassDVScale = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVScale) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVScale); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVScale); _err != nil {
 		return _err
-	} else if _fresh {
-		*d = DVScale{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -1140,10 +1128,8 @@ var xmlClassReferenceRange = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (r *ReferenceRange[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassReferenceRange); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassReferenceRange); _err != nil {
 		return _err
-	} else if _fresh {
-		*r = ReferenceRange[T]{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64

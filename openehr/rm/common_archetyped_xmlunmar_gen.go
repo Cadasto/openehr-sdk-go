@@ -32,10 +32,8 @@ var xmlClassArchetyped = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *Archetyped) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassArchetyped); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassArchetyped); _err != nil {
 		return _err
-	} else if _fresh {
-		*a = Archetyped{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -136,10 +134,8 @@ var xmlClassFeederAudit = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (f *FeederAudit) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassFeederAudit); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassFeederAudit); _err != nil {
 		return _err
-	} else if _fresh {
-		*f = FeederAudit{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -261,10 +257,8 @@ var xmlClassFeederAuditDetails = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (f *FeederAuditDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassFeederAuditDetails); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassFeederAuditDetails); _err != nil {
 		return _err
-	} else if _fresh {
-		*f = FeederAuditDetails{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -443,10 +437,8 @@ var xmlClassLink = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (l *Link) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassLink); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassLink); _err != nil {
 		return _err
-	} else if _fresh {
-		*l = Link{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64

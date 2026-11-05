@@ -298,7 +298,7 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	fmt.Fprintf(&b, "func (%s *%s%s) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {\n", recv, pc.GoName, typeArgs)
 	// The runtime learns the class, and every attribute the class does not
 	// read is unmatched content.
-	b.WriteString(enterXMLClass(recv, pc.GoName, typeArgs))
+	b.WriteString(enterXMLClass(pc.GoName))
 	// Read the attribute members from _start.Attr.
 	for _, name := range desc.attrs {
 		b.WriteString(unmarshalXMLAttribute(recv, FieldName(name), name))
@@ -975,13 +975,11 @@ func unmarshalXMLDroppedElement(elem string, texts []string) string {
 }
 
 // enterXMLClass emits the call that hands the start element and the class's
-// description to xmlunmatched.Enter at the head of UnmarshalXML, and clears
-// the receiver when Enter says the decode starts the document over: the root
-// of a second decode into a value the first decode filled in part.
-func enterXMLClass(recv, goName, typeArgs string) string {
+// description to xmlunmatched.Enter at the head of UnmarshalXML.
+func enterXMLClass(goName string) string {
 	return fmt.Sprintf(
-		"\tif _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClass%s); _err != nil {\n\t\treturn _err\n\t} else if _fresh {\n\t\t*%s = %s%s{}\n\t}\n",
-		goName, recv, goName, typeArgs)
+		"\tif _err := xmlunmatched.Enter(_dec, _start, &xmlClass%s); _err != nil {\n\t\treturn _err\n\t}\n",
+		goName)
 }
 
 // maxXMLRequired is the most presence-checked members a class may have: the

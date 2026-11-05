@@ -32,10 +32,8 @@ var xmlClassCodePhrase = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CodePhrase) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassCodePhrase); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCodePhrase); _err != nil {
 		return _err
-	} else if _fresh {
-		*c = CodePhrase{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -139,10 +137,8 @@ var xmlClassDVCodedText = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVCodedText) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVCodedText); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVCodedText); _err != nil {
 		return _err
-	} else if _fresh {
-		*d = DVCodedText{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -313,10 +309,8 @@ var xmlClassDVParagraph = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVParagraph) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVParagraph); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVParagraph); _err != nil {
 		return _err
-	} else if _fresh {
-		*d = DVParagraph{}
 	}
 	// Whether the element has had an item of each list member.
 	var _begunItems bool
@@ -374,10 +368,8 @@ var xmlClassDVText = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVText) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVText); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVText); _err != nil {
 		return _err
-	} else if _fresh {
-		*d = DVText{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -530,10 +522,8 @@ var xmlClassTermMapping = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TermMapping) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassTermMapping); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassTermMapping); _err != nil {
 		return _err
-	} else if _fresh {
-		*t = TermMapping{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64

@@ -120,3 +120,41 @@ func TestREQ056_XMLListReplacesAReusedValue(t *testing.T) {
 		})
 	}
 }
+
+// TestREQ056_XMLSecondDecodeKeepsAReusedValue decodes a slot whose second
+// include's item declares its `xs` prefix on the item's parent, which a decode
+// given no option reads twice, into a value that holds an include and an
+// exclude. Through canxml.Unmarshal and a canxml.Decoder given no option, the
+// value is the one a decode that reads the document once gives,
+// canxml.WithMissing's: the two includes the document carries, and the
+// exclude it leaves out kept.
+//
+// Can-fail control: clear the value before the second decode, and the exclude
+// is lost; let the second decode add to the includes the first began, and the
+// slot holds three.
+func TestREQ056_XMLSecondDecodeKeepsAReusedValue(t *testing.T) {
+	in := streamAgain.slot()
+	stale := func() *aom14.ArchetypeSlot {
+		return &aom14.ArchetypeSlot{Includes: []aom14.Assertion{{Tag: new("old")}}, Excludes: []aom14.Assertion{{Tag: new("kept")}}}
+	}
+	once := stale()
+	if err := canxml.Unmarshal([]byte(in), once, canxml.WithMissing(func(string) {})); err != nil {
+		t.Fatalf("canxml.Unmarshal WithMissing into the stale value = %v; want nil", err)
+	}
+	if len(once.Includes) != 2 || len(once.Excludes) != 1 || *once.Excludes[0].Tag != "kept" {
+		t.Fatalf("canxml.Unmarshal WithMissing into the stale value gave %d includes and %d excludes; want the document's 2 and the 1 kept", len(once.Includes), len(once.Excludes))
+	}
+	viaUnmarshal := stale()
+	if err := canxml.Unmarshal([]byte(in), viaUnmarshal); err != nil {
+		t.Fatalf("canxml.Unmarshal into the stale value = %v; want nil", err)
+	}
+	viaDecoder := stale()
+	if err := canxml.NewDecoder(strings.NewReader(in)).Decode(viaDecoder); err != nil {
+		t.Fatalf("Decoder.Decode into the stale value = %v; want nil", err)
+	}
+	for name, got := range map[string]*aom14.ArchetypeSlot{"canxml.Unmarshal": viaUnmarshal, "Decoder.Decode": viaDecoder} {
+		if !reflect.DeepEqual(got, once) {
+			t.Errorf("%s into the stale value gave %d includes and %d excludes\n%#v\nwant what one decode gives\n%#v", name, len(got.Includes), len(got.Excludes), got, once)
+		}
+	}
+}

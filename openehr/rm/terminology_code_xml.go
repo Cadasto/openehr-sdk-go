@@ -76,10 +76,8 @@ func (t *TerminologyCode) MarshalXML(e *xml.Encoder, start xml.StartElement) err
 // a mandatory one gets the empty string, an optional one stays nil, and what
 // the element holds is unmatched content.
 func (t *TerminologyCode) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error {
-	if fresh, err := xmlunmatched.Enter(dec, start, &xmlClassTerminologyCode); err != nil {
+	if err := xmlunmatched.Enter(dec, start, &xmlClassTerminologyCode); err != nil {
 		return err
-	} else if fresh {
-		*t = TerminologyCode{}
 	}
 	// Which members have had a child element.
 	var got [len(terminologyCodeMembers)]bool

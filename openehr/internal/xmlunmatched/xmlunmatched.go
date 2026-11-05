@@ -211,10 +211,6 @@ type Tracker struct {
 	// textDec converts the text of each primitive element ([Tracker.convert]);
 	// nil until the first, and after a conversion that failed.
 	textDec *textDecoder
-	// again marks the second decode [Unmarshal] runs of a document into the
-	// value its first decode filled in part, whose root decoder [Enter] tells
-	// to clear its receiver first.
-	again bool
 	// maxDepth is the deepest an element may nest below the root of the value,
 	// the root at depth 1, set by [Tracker.LimitDepth]; 0 sets no limit.
 	maxDepth int
@@ -784,10 +780,6 @@ type trackingReader struct {
 	t *Tracker
 	// scope holds the prefixes the open elements declare, for [LookupPrefix].
 	scope scope
-	// again marks a scoped decode of a value a second time
-	// ([Scope.DecodeAgain]), whose root decoder [Enter] tells to clear its
-	// receiver first.
-	again bool
 	// pending holds the tokens [trackingReader.peekChild] read ahead of the
 	// decoder, which Token returns, and records, before it reads src again.
 	pending []xml.Token

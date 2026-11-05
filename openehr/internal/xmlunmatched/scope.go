@@ -77,10 +77,6 @@ var (
 	// scoping counts the scoped decodes in progress. While it is zero no
 	// decoder is registered, and [LookupPrefix] skips the lookup.
 	scoping atomic.Int64
-	// rereading counts the scoped decodes in progress that decode a value a
-	// second time ([Scope.DecodeAgain]). While it is zero, [Enter] looks no
-	// decoder up for one.
-	rereading atomic.Int64
 )
 
 // Scope keeps the namespace prefixes declared on the elements a decode opens,
@@ -130,33 +126,6 @@ func (s *Scope) Decode(dec *xml.Decoder, v any) error {
 		scoping.Add(-1)
 	}()
 	return t.alone(dec.Decode(v))
-}
-
-// DecodeAgain decodes the next value of dec into v as [Scope.Decode] does, as
-// the second decode of a value that a decode through a plain encoding/xml
-// decoder filled in part before it stopped at a prefix it could not resolve
-// ([IsUnresolvedPrefix]). The decoder of the value's root element clears its
-// receiver before it reads, as [Enter] tells it to, so that the second decode
-// does not add to what the first left in v, such as the items of a list.
-func (s *Scope) DecodeAgain(dec *xml.Decoder, v any) error {
-	s.reader.again = true
-	rereading.Add(1)
-	defer func() {
-		rereading.Add(-1)
-		s.reader.again = false
-	}()
-	return s.Decode(dec, v)
-}
-
-// againAtRoot reports whether dec is the decoder of a value a [Scope] decodes
-// a second time ([Scope.DecodeAgain]) and the element it read last opens the
-// root of that value.
-func againAtRoot(dec *xml.Decoder) bool {
-	if rereading.Load() == 0 {
-		return false
-	}
-	r := readerOf(dec)
-	return r != nil && r.again && len(r.scope.marks) == 1
 }
 
 // LookupPrefix returns the namespace prefix is bound to where the attributes

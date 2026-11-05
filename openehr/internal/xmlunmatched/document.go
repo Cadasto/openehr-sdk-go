@@ -42,8 +42,10 @@ import (
 // element, which an `xsi:type` written with a prefix needs ([LookupPrefix]).
 // An untracked one sees only those its element declares itself; when an
 // `xsi:type` needs another ([UnresolvedPrefix]), it decodes data a second
-// time, through a decoder that sees them all, into v cleared to its zero
-// value, so that only a document with such a value pays for the second
+// time, through a decoder that sees them all, so that only a document with
+// such a value pays for the second decode. The second decode reads into v as
+// the first left it: each member it decodes replaces what v held, a list from
+// its first item, so v keeps what the document leaves out, as after one
 // decode.
 func Unmarshal(data []byte, v any, t *Tracker) error {
 	if err := checkProlog(data); err != nil {
@@ -80,24 +82,21 @@ func Unmarshal(data []byte, v any, t *Tracker) error {
 // whose prefix the decode could not resolve, or encoding/xml's refusal of an
 // element nested past its own depth limit, which names no element; or after
 // one that succeeded on data that may hold a processing instruction whose
-// target is xml inside its root, which err is then [errXMLTargetInside] for,
-// and which the second decode refuses, or reads to the end into v as the
-// first left it: each member it decodes replaces what v held, a list from its
-// first item, so v keeps what the document leaves out, as after the first
-// decode. The second
-// decode reads through a tracker that follows the open elements and their
-// namespace scope and applies no policy. A primitive failure fails again at
-// the same element, named by its path from the root of the value, and so does
-// a depth refusal, since a tracked decode refuses every element an untracked
-// one hands to encoding/xml past its limit, a primitive element too
-// ([Tracker.decodeText]). A prefix resolves, and the decode reads on to the
-// end: so that it does not add to what the first decode left in v, such as the
-// items of a list, the root's decoder clears v before it reads ([Enter]). It
-// returns what the second decode returns, or err should a primitive failure
-// not fail again.
+// target is xml inside its root, which err is then [errXMLTargetInside] for.
+// The second decode reads through a tracker that follows the open elements
+// and their namespace scope and applies no policy, into v as the first left
+// it: each member it decodes replaces what v held, a list from its first
+// item, so v keeps what the document leaves out, as after one decode. A
+// primitive failure fails again at the same element, named by its path from
+// the root of the value, and so does a depth refusal, since a tracked decode
+// refuses every element an untracked one hands to encoding/xml past its
+// limit, a primitive element too ([Tracker.decodeText]). A prefix resolves,
+// and the decode reads on to the end, as it does past a processing
+// instruction it finds to be no such one, or refuses one that is. It returns
+// what the second decode returns, or err should a primitive failure not fail
+// again.
 func decodeAgain(data []byte, v any, err error) error {
 	t := NewTracker(nil, false)
-	t.again = IsUnresolvedPrefix(err)
 	dec := t.NewDecoder(bytes.NewReader(data))
 	if again := t.Decode(dec, v); again != nil {
 		return again

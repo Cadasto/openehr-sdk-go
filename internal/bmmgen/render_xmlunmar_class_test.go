@@ -40,10 +40,7 @@ func TestREQ175_RenderUnmarshalXMLClassDescriptor(t *testing.T) {
 				}
 				for _, want := range []string{
 					fmt.Sprintf("\nvar xmlClass%s = xmlunmatched.Class{\n\tName: %q,\n", pc.GoName, pc.BMMName),
-					fmt.Sprintf("\tif _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClass%s); _err != nil {\n", pc.GoName),
-					// The root of a second decode into a value filled in part
-					// starts from a cleared receiver.
-					fmt.Sprintf("\t} else if _fresh {\n\t\t*%s = %s", jsonmarReceiverName(pc.GoName), pc.GoName),
+					fmt.Sprintf("\tif _err := xmlunmatched.Enter(_dec, _start, &xmlClass%s); _err != nil {\n", pc.GoName),
 				} {
 					if !strings.Contains(src, want) {
 						t.Errorf("%s XML decoder lacks %q:\n%s", pc.BMMName, want, src)

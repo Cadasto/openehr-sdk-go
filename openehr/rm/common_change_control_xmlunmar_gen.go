@@ -35,10 +35,8 @@ var xmlClassContribution = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *Contribution) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassContribution); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassContribution); _err != nil {
 		return _err
-	} else if _fresh {
-		*c = Contribution{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -131,10 +129,8 @@ var xmlClassImportedVersion = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (i *ImportedVersion[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassImportedVersion); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassImportedVersion); _err != nil {
 		return _err
-	} else if _fresh {
-		*i = ImportedVersion[T]{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -259,10 +255,8 @@ var xmlClassOriginalVersion = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (o *OriginalVersion[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassOriginalVersion); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassOriginalVersion); _err != nil {
 		return _err
-	} else if _fresh {
-		*o = OriginalVersion[T]{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -455,10 +449,8 @@ var xmlClassVersionedObject = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (v *VersionedObject[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassVersionedObject); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassVersionedObject); _err != nil {
 		return _err
-	} else if _fresh {
-		*v = VersionedObject[T]{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64

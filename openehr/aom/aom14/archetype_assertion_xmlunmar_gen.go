@@ -36,10 +36,8 @@ var xmlClassAssertion = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *Assertion) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassAssertion); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassAssertion); _err != nil {
 		return _err
-	} else if _fresh {
-		*a = Assertion{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -159,10 +157,8 @@ var xmlClassAssertionVariable = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *AssertionVariable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassAssertionVariable); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassAssertionVariable); _err != nil {
 		return _err
-	} else if _fresh {
-		*a = AssertionVariable{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -241,10 +237,8 @@ var xmlClassExprBinaryOperator = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (e *ExprBinaryOperator) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassExprBinaryOperator); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassExprBinaryOperator); _err != nil {
 		return _err
-	} else if _fresh {
-		*e = ExprBinaryOperator{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -378,10 +372,8 @@ var xmlClassExprLeaf = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (e *ExprLeaf) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassExprLeaf); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassExprLeaf); _err != nil {
 		return _err
-	} else if _fresh {
-		*e = ExprLeaf{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -479,10 +471,8 @@ var xmlClassExprUnaryOperator = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (e *ExprUnaryOperator) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassExprUnaryOperator); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassExprUnaryOperator); _err != nil {
 		return _err
-	} else if _fresh {
-		*e = ExprUnaryOperator{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64

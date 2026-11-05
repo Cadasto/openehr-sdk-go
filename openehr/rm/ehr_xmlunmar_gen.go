@@ -35,10 +35,8 @@ var xmlClassEHR = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (e *EHR) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassEHR); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassEHR); _err != nil {
 		return _err
-	} else if _fresh {
-		*e = EHR{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -237,10 +235,8 @@ var xmlClassEHRAccess = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (e *EHRAccess) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassEHRAccess); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassEHRAccess); _err != nil {
 		return _err
-	} else if _fresh {
-		*e = EHRAccess{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "archetype_node_id" && _a.Name.Space == "" {
@@ -419,10 +415,8 @@ var xmlClassEHRStatus = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (e *EHRStatus) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassEHRStatus); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassEHRStatus); _err != nil {
 		return _err
-	} else if _fresh {
-		*e = EHRStatus{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "archetype_node_id" && _a.Name.Space == "" {
@@ -648,10 +642,8 @@ var xmlClassVersionedComposition = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (v *VersionedComposition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassVersionedComposition); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassVersionedComposition); _err != nil {
 		return _err
-	} else if _fresh {
-		*v = VersionedComposition{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -749,10 +741,8 @@ var xmlClassVersionedEHRAccess = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (v *VersionedEHRAccess) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassVersionedEHRAccess); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassVersionedEHRAccess); _err != nil {
 		return _err
-	} else if _fresh {
-		*v = VersionedEHRAccess{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -850,10 +840,8 @@ var xmlClassVersionedEHRStatus = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (v *VersionedEHRStatus) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassVersionedEHRStatus); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassVersionedEHRStatus); _err != nil {
 		return _err
-	} else if _fresh {
-		*v = VersionedEHRStatus{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64

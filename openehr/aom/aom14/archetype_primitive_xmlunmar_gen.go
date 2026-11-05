@@ -33,10 +33,8 @@ var xmlClassCBoolean = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CBoolean) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassCBoolean); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCBoolean); _err != nil {
 		return _err
-	} else if _fresh {
-		*c = CBoolean{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -136,10 +134,8 @@ var xmlClassCDate = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassCDate); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCDate); _err != nil {
 		return _err
-	} else if _fresh {
-		*c = CDate{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -265,10 +261,8 @@ var xmlClassCDateTime = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassCDateTime); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCDateTime); _err != nil {
 		return _err
-	} else if _fresh {
-		*c = CDateTime{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -394,10 +388,8 @@ var xmlClassCDuration = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassCDuration); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCDuration); _err != nil {
 		return _err
-	} else if _fresh {
-		*c = CDuration{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -507,10 +499,8 @@ var xmlClassCInteger = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CInteger) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassCInteger); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCInteger); _err != nil {
 		return _err
-	} else if _fresh {
-		*c = CInteger{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -610,10 +600,8 @@ var xmlClassCReal = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CReal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassCReal); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCReal); _err != nil {
 		return _err
-	} else if _fresh {
-		*c = CReal{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -713,10 +701,8 @@ var xmlClassCString = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CString) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassCString); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCString); _err != nil {
 		return _err
-	} else if _fresh {
-		*c = CString{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -838,10 +824,8 @@ var xmlClassCTime = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassCTime); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCTime); _err != nil {
 		return _err
-	} else if _fresh {
-		*c = CTime{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64

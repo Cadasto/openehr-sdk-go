@@ -36,10 +36,8 @@ var xmlClassSection = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (s *Section) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassSection); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassSection); _err != nil {
 		return _err
-	} else if _fresh {
-		*s = Section{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "archetype_node_id" && _a.Name.Space == "" {

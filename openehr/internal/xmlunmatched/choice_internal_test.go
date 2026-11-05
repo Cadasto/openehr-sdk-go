@@ -22,7 +22,7 @@ type codeShape struct{ terminology, code string }
 var codeShapeClass = &Class{Name: "CODE", Required: []string{"terminology_id", "code_string"}}
 
 func (c *codeShape) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error {
-	if _, err := Enter(dec, start, codeShapeClass); err != nil {
+	if err := Enter(dec, start, codeShapeClass); err != nil {
 		return err
 	}
 	for {
@@ -63,7 +63,7 @@ type textShape struct {
 var textShapeClass = &Class{Name: "TEXT", Required: []string{"defining_code"}}
 
 func (x *textShape) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error {
-	if _, err := Enter(dec, start, textShapeClass); err != nil {
+	if err := Enter(dec, start, textShapeClass); err != nil {
 		return err
 	}
 	for {
@@ -110,7 +110,7 @@ type holder struct {
 var holderClass = &Class{Name: "HOLDER", Required: []string{"n", "symbol"}}
 
 func (h *holder) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error {
-	if _, err := Enter(dec, start, holderClass); err != nil {
+	if err := Enter(dec, start, holderClass); err != nil {
 		return err
 	}
 	for {
