@@ -122,3 +122,34 @@ func encodedComposition(b *testing.B) []byte {
 	}
 	return body
 }
+
+// BenchmarkUnmarshalCorpusTracked pins the cost of a tracked decode against a
+// plain one on two corpus compositions, BMI.xml and Demonstration.v1.xml:
+// Unmarshal given no option, and given WithMissing, which reads every element
+// through the tracker and converts the text of each primitive element there.
+func BenchmarkUnmarshalCorpusTracked(b *testing.B) {
+	for _, id := range []string{"BMI", "Demonstration.v1"} {
+		path := fixtures.CompositionXML(id)
+		body, err := os.ReadFile(path)
+		if err != nil {
+			b.Fatalf("read fixture %q: %v", path, err)
+		}
+		for _, mode := range []struct {
+			name string
+			opts []canxml.DecoderOption
+		}{
+			{name: "plain"},
+			{name: "WithMissing", opts: []canxml.DecoderOption{canxml.WithMissing(func(string) {})}},
+		} {
+			b.Run(id+"/"+mode.name, func(b *testing.B) {
+				b.ReportAllocs()
+				for b.Loop() {
+					var into rm.Composition
+					if err := canxml.Unmarshal(body, &into, mode.opts...); err != nil {
+						b.Fatal(err)
+					}
+				}
+			})
+		}
+	}
+}
