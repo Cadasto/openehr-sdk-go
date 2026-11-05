@@ -1,0 +1,146 @@
+# compiled tree of reader/parser-readings.opt
+template_id="sdk.reader_parser.v0" concept="sdk.reader_parser.v0" language="en" uid="" num_nodes=24
+
+node /
+  rm_type="CLUSTER" node_id="at0000" archetype_id="openEHR-EHR-CLUSTER.sdk_reader_parser.v0" node_name="" occurrences=1..1 slot=false
+  term[en] "at0000" code="at0000" text="Reader"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=true children=9
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /items[openEHR-EHR-CLUSTER.sdk_reader_inner.v0]
+  rm_type="CLUSTER" node_id="at0000" archetype_id="openEHR-EHR-CLUSTER.sdk_reader_inner.v0" node_name="" occurrences=0..1 slot=false
+  term[en] "at0000" code="at0000" text="Reader"
+  attr "items" rm_type="ITEM" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=0
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /items[at0001]
+  rm_type="ELEMENT" node_id="at0001" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0001" none
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /items[at0001]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /items[at0001]/value/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["a" "b"] ListOpen:false Default:""}
+
+node /items[at0002]
+  rm_type="ELEMENT" node_id="at0002" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0002" none
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /items[at0002]/value
+  rm_type="DV_BOOLEAN" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="Boolean" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /items[at0002]/value/value
+  rm_type="BOOLEAN" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CBoolean{TrueValid:true FalseValid:false Default:nil}
+
+node /items[at0003]
+  rm_type="ELEMENT" node_id="at0003" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0003" none
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /items[at0003]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /items[at0003]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0010" "at0011"]}
+  code_term[en] "at0010" none
+  code_term[en] "at0011" none
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /items[at0004]
+  rm_type="ELEMENT" node_id="at0004" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0004" none
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /items[at0004]/value
+  rm_type="DV_QUANTITY" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.DvQuantity{Units:[constraints.QuantityUnit{Units:"kg" Magnitude:constraints.NumericRange{Lower:0 Upper:16 LowerInclusive:true UpperInclusive:true LowerUnbounded:false UpperUnbounded:false} Precision:constraints.NumericRange{Lower:0 Upper:2 LowerInclusive:true UpperInclusive:true LowerUnbounded:false UpperUnbounded:false}}] Property:constraints.CodedTermRef{Terminology:"openehr" CodeString:"124"} PropertyUnits:["kg" "AU" "cg" "dg" "[dr_av]" "fg" "g" "[gr]" "[lb_av]" "mg" "[m_p]" "[m_e]" "ng" "[oz_av]" "[oz_tr]" "pg" "t" "[ston_av]" "AMU" "ug"]}
+  attr "magnitude" rm_type="Real" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "units" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /items[at0005]
+  rm_type="ELEMENT" node_id="at0005" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0005" none
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /items[at0005]/value
+  rm_type="DV_ORDINAL" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CDvOrdinal{Values:[constraints.OrdinalSymbol{Value:1 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0020"}} constraints.OrdinalSymbol{Value:2 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0021"}}]}
+  code_term[en] "at0020" none
+  code_term[en] "at0021" none
+  attr "symbol" rm_type="DV_CODED_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "value" rm_type="Integer" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /items[at0006]
+  rm_type="ELEMENT" node_id="at0006" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0006" none
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /items[at0006]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /items[at0006]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.ConstraintRef{Reference:"ac0001"}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /items[at0007]
+  rm_type="ELEMENT" node_id="at0007" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0007" none
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /items[at0007]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /items[at0007]/value/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["x"] ListOpen:false Default:""}
+
+node /items[at0008]
+  rm_type="ELEMENT" node_id="at0008" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0008" none
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /items[at0008]/value
+  rm_type="DV_PROPORTION" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "numerator" rm_type="Real" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "denominator" rm_type="Real" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "type" rm_type="Integer" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /items[at0008]/value/numerator
+  rm_type="REAL" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CReal{Range:constraints.NumericRange{Lower:-Inf Upper:0 LowerInclusive:true UpperInclusive:true LowerUnbounded:false UpperUnbounded:false} List:[+Inf 0.25 0.1] Default:NaN}
+
+# walked nodes=24

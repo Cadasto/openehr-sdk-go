@@ -3,15 +3,17 @@ package templatecompile_test
 // REQ-111 — the compiled-tree golden, the parity check ADR 0035 names.
 //
 // For every operational template the corpus vendors, walked as PROBE-111
-// walks them, the test renders the compiled tree as line-oriented text and
-// holds it equal to testdata/compiled/<corpus path>.txt. Each node is one
-// block in walk order: its path, RM type, node id, archetype id, node name,
-// occurrences, slot marks and rules, primitive constraint, default value,
-// terms and bindings, then one line per attribute. A primitive constraint
-// renders as its Go type and exported fields, a default value as its Go
-// type and canonical JSON. A change to the compile step that moves any of
-// it shows as a diff on the golden, reviewed rather than assumed.
-// Regenerate with:
+// walks them, for every parity fixture (testdata/parity) and for every
+// fixture of the model's reader (openehr/aom/aom14/testdata/reader), the
+// test renders the compiled tree as line-oriented text and holds it equal
+// to testdata/compiled/<corpus path>.txt, parity/<fixture>.txt or
+// reader/<fixture>.txt. Each node is one block in walk order: its path, RM
+// type, node id, archetype id, node name, occurrences, slot marks and
+// rules, primitive constraint, default value, terms and bindings, then one
+// line per attribute. A primitive constraint renders as its Go type and
+// exported fields, a default value as its Go type and canonical JSON. A
+// change to the compile step that moves any of it shows as a diff on the
+// golden, reviewed rather than assumed. Regenerate with:
 //
 //	go test ./internal/templatecompile/ -run TestCompiledGolden -update
 
@@ -41,6 +43,18 @@ import (
 
 const compiledGoldenDir = "testdata/compiled"
 
+// readerFixturesRoot holds the folder of the model reader's fixtures.
+const readerFixturesRoot = "../../openehr/aom/aom14/testdata"
+
+// goldenSource is a folder of operational templates TestCompiledGolden
+// holds to goldens. Each name is a slash-separated path below root, whose
+// golden is that path below compiledGoldenDir with .txt for .opt; label
+// stands for root in the text of a refusal.
+type goldenSource struct {
+	root, label string
+	names       []string
+}
+
 func TestCompiledGolden(t *testing.T) {
 	names, err := templateprobes.Probe111OperationalTemplates()
 	if err != nil {
@@ -49,36 +63,53 @@ func TestCompiledGolden(t *testing.T) {
 	if len(names) == 0 {
 		t.Fatal("Probe111OperationalTemplates found no operational template: corpus layout changed?")
 	}
-	root := fixtures.CorpusRoot()
-
-	expected := make(map[string]bool, len(names))
-	for _, name := range names {
-		golden := filepath.Join(compiledGoldenDir, filepath.FromSlash(strings.TrimSuffix(name, ".opt")+".txt"))
-		expected[golden] = true
-		t.Run(name, func(t *testing.T) {
-			got := dumpCompiledTemplate(root, name)
-			if *updateSnapshot {
-				if err := os.MkdirAll(filepath.Dir(golden), 0o755); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.WriteFile(golden, got, 0o644); err != nil {
-					t.Fatal(err)
-				}
-				return
-			}
-			want, err := os.ReadFile(golden)
-			if err != nil {
-				t.Fatalf("read golden (run with -update): %v", err)
-			}
-			if line, g, w, differ := firstDifference(got, want); differ {
-				t.Errorf("compiled tree of %s differs from %s at line %d:\n got: %s\nwant: %s\n"+
-					"Regenerate with: go test ./internal/templatecompile/ -run TestCompiledGolden -update",
-					name, golden, line, g, w)
-			}
-		})
+	// The goldens of the parity fixtures and of the reader's fixtures were
+	// recorded on the v0.45.0 code, in the commit that added them, while
+	// TestREQ111_ParityWithDeprecatedParser held each of these fixtures, and
+	// each corpus template, to the deprecated parser's reading; that run left
+	// the corpus goldens unchanged. Once the parser is gone they stand for its
+	// reading, so a diff on them changes what the compile step makes of a
+	// template the parser read: regenerate them only for a reason the change
+	// under review gives.
+	sources := []goldenSource{
+		{root: fixtures.CorpusRoot(), label: "<corpus>", names: names},
+		fixtureGoldenSource(t, "testdata", "parity"),
+		fixtureGoldenSource(t, readerFixturesRoot, "reader"),
 	}
 
-	// A golden left behind by a template the corpus no longer vendors is
+	expected := map[string]bool{}
+	for _, src := range sources {
+		for _, name := range src.names {
+			golden := filepath.Join(compiledGoldenDir, filepath.FromSlash(strings.TrimSuffix(name, ".opt")+".txt"))
+			if expected[golden] {
+				t.Fatalf("%s is the golden of two operational templates named %s", golden, name)
+			}
+			expected[golden] = true
+			t.Run(name, func(t *testing.T) {
+				got := dumpCompiledTemplate(src.root, src.label, name)
+				if *updateSnapshot {
+					if err := os.MkdirAll(filepath.Dir(golden), 0o755); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.WriteFile(golden, got, 0o644); err != nil {
+						t.Fatal(err)
+					}
+					return
+				}
+				want, err := os.ReadFile(golden)
+				if err != nil {
+					t.Fatalf("read golden (run with -update): %v", err)
+				}
+				if line, g, w, differ := firstDifference(got, want); differ {
+					t.Errorf("compiled tree of %s differs from %s at line %d:\n got: %s\nwant: %s\n"+
+						"Regenerate with: go test ./internal/templatecompile/ -run TestCompiledGolden -update",
+						name, golden, line, g, w)
+				}
+			})
+		}
+	}
+
+	// A golden left behind by a template no source holds any more is
 	// removed by -update and refused otherwise.
 	err = filepath.WalkDir(compiledGoldenDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -90,12 +121,40 @@ func TestCompiledGolden(t *testing.T) {
 		if *updateSnapshot {
 			return os.Remove(path)
 		}
-		t.Errorf("%s matches no corpus operational template; regenerate with -update", path)
+		t.Errorf("%s matches no operational template the test walks; regenerate with -update", path)
 		return nil
 	})
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		t.Fatalf("walk %s: %v", compiledGoldenDir, err)
 	}
+}
+
+// fixtureGoldenSource returns the operational templates of the folder dir
+// below root, each named dir/<file>. A *.read.opt file is the reading a
+// reader fixture is compared with, not a template to compile, and is left
+// out. A folder that holds no template stops the test, so that a fixture
+// folder that moves or empties cannot pass unseen.
+func fixtureGoldenSource(t *testing.T, root, dir string) goldenSource {
+	t.Helper()
+	abs, err := filepath.Abs(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	files, err := filepath.Glob(filepath.Join(abs, dir, "*.opt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := goldenSource{root: abs, label: "<" + filepath.ToSlash(root) + ">"}
+	for _, f := range files {
+		if strings.HasSuffix(f, ".read.opt") {
+			continue
+		}
+		src.names = append(src.names, dir+"/"+filepath.Base(f))
+	}
+	if len(src.names) == 0 {
+		t.Fatalf("%s holds no operational template", filepath.Join(root, dir))
+	}
+	return src
 }
 
 // firstDifference reports the first line, counted from 1, at which got and
@@ -121,21 +180,22 @@ func firstDifference(got, want []byte) (line int, g, w string, differ bool) {
 	return 0, "", "", false
 }
 
-// dumpCompiledTemplate reads the corpus operational template name into the
-// model, compiles it and renders the result. A template that does not read
-// or compile renders as that error, so a change in which templates compile
-// shows on the golden too.
-func dumpCompiledTemplate(root, name string) []byte {
+// dumpCompiledTemplate reads the operational template name, a
+// slash-separated path below root, into the model, compiles it and renders
+// the result. A template that does not read or compile renders as that
+// error, label standing for root in it, so a change in which templates
+// compile shows on the golden too.
+func dumpCompiledTemplate(root, label, name string) []byte {
 	var b bytes.Buffer
 	fmt.Fprintf(&b, "# compiled tree of %s\n", name)
 	model, err := readModelFile(filepath.Join(root, filepath.FromSlash(name)))
 	if err != nil {
-		fmt.Fprintf(&b, "!! does not read: %s\n", strings.ReplaceAll(err.Error(), root, "<corpus>"))
+		fmt.Fprintf(&b, "!! does not read: %s\n", strings.ReplaceAll(err.Error(), root, label))
 		return b.Bytes()
 	}
 	c, err := templatecompile.Compile(model)
 	if err != nil {
-		fmt.Fprintf(&b, "!! does not compile: %s\n", strings.ReplaceAll(err.Error(), root, "<corpus>"))
+		fmt.Fprintf(&b, "!! does not compile: %s\n", strings.ReplaceAll(err.Error(), root, label))
 		return b.Bytes()
 	}
 	lang := c.Language()
