@@ -420,7 +420,9 @@ A list's own `cardinality` is also reported, where it fails, while the list hold
 Validators **MUST NOT** report it while the list is absent, nor while the list is present and empty and the template leaves it optional by its existence (*A mandatory child under an optional list* below).
 A list the template requires by its existence, its existence lower bound bounded and at least 1, that the instance does not carry, absent as [§ REQ-171 *Structural access*](#req-171--validation-engine) reads presence, fails existence alone: there is no container to count, so the `occurrences` of its children **MUST NOT** be reported either.
 
-**An existence lower bound alone asks for no member.** On a multi-valued attribute, existence says whether the container exists and cardinality how many members it holds (ADL 1.4, *Attribute constraints*, *Existence*), so a container with no member meets an existence lower bound of 1 where the counts allow none (AOM 1.4, `C_MULTIPLE_ATTRIBUTE`: existence "says whether the container object will be there (at all)", cardinality "how many items" the container holds).
+#### An existence lower bound alone asks for no member
+
+On a multi-valued attribute, existence says whether the container exists and cardinality how many members it holds (ADL 1.4, *Attribute constraints*, *Existence*), so a container with no member meets an existence lower bound of 1 where the counts allow none (AOM 1.4, `C_MULTIPLE_ATTRIBUTE`: existence "says whether the container object will be there (at all)", cardinality "how many items" the container holds).
 A list the instance does not carry is no container, so it fails that existence whatever its counts ask: validators **MUST** report `required` on the template layer, rule `existence`, at the path of a multi-valued attribute whose existence lower bound is bounded and at least 1 and whose list is absent, as [§ REQ-171 *Structural access*](#req-171--validation-engine) reads presence, and nothing for its children's `occurrences` or its own `cardinality` (above).
 Canonical JSON can carry such a list with no member: it writes `ITEM_LIST.items`, `ITEM_TREE.items` and `ITEM_TABLE.rows` present and empty ([bmm-conformance.md § Property → Go field](bmm-conformance.md#property--go-field)).
 Two readings cannot carry it: canonical XML writes no element for an empty list ([wire.md § REQ-056](wire.md#req-056)), and a FLAT or STRUCTURED decode without the template has no key for a structure with no member ([wire.md § REQ-053](wire.md#req-053)), so a document read from either with such a list holding no member draws `required` there.
@@ -436,7 +438,9 @@ On a list the floor holds non-empty once present, where its existence lower boun
 An absent list draws `required` alone, whatever asks for a member, as the paragraph above says; the RM layer still reports an RM-mandatory container where the template reports nothing ([§ REQ-171](#req-171--validation-engine) *One finding per defect*).
 So an `ITEM_LIST` or `ITEM_TREE` whose `items` carry existence `1..1`, cardinality `0..*` and no allowed child validates with its `items` present and empty, and draws `required` at them where they are left out.
 
-**A mandatory child under an optional list.** On an object the instance carries, validators **MUST** count against its occurrences each allowed child, not a slot, of an attribute the OPT declares multi-valued, both words as [§ REQ-107](#req-107--template-driven-rm-instance-example-generator) *Visit rule* defines them, whether the list holds items, is present and empty, or is absent, with three exceptions.
+#### A mandatory child under an optional list
+
+On an object the instance carries, validators **MUST** count against its occurrences each allowed child, not a slot, of an attribute the OPT declares multi-valued, both words as [§ REQ-107](#req-107--template-driven-rm-instance-example-generator) *Visit rule* defines them, whether the list holds items, is present and empty, or is absent, with three exceptions.
 An absent list the template requires by its existence fails existence alone (above).
 A list whose items are primitive values, such as a DV_MULTIMEDIA's `data`, has items the walk counts but binds to no child, so its children are counted neither when it holds items nor when it holds none.
 A list the template prohibits (*Structural — prohibited attributes* above) leaves its children nothing to count: holding an item, it draws `prohibited` alone and is not entered, and holding none, absent or present and empty, it draws nothing from its children, so that an instance that leaves it out validates, unless its existence lower bound is at least 1, which asks for the container (*An existence lower bound alone asks for no member*).
@@ -573,19 +577,27 @@ func AsObservation(v any) (*rm.Observation, error)
 // … and AsEvaluation, AsInstruction, AsAction, AsAdminEntry, AsCluster, AsSection, AsGenericEntry, AsElement
 ```
 
-**Levels and names.** `Medium` is the zero value, so `Options` with no `Policy` builds the medium level.
+#### Levels and names
+
+`Medium` is the zero value, so `Options` with no `Policy` builds the medium level.
 `Minimal` and `Complete` are aliases, the same values as `Required` and `Large`, so every rule here for `Required` and `Large` holds for them, and `Policy.String` **MUST** return `required` for `Required`, `medium` for `Medium` and `large` for `Large`, so an alias prints its target's name, and `unknown` for any other value.
 `ParsePolicy` **MUST** map the names `required`, `minimal`, `medium`, `large` and `complete`, compared without regard to case, to those values, and return an error wrapping `ErrUnsupportedPolicy` for any other text, the empty string included.
 
-**Output.** Under each policy above (`Large`, `Medium` and `Required`) and both `ValueFill` values, every root `Generate` returns, and so every skeleton `composition.NewSkeleton` returns and `composition.NewBuilder` seeds, **MUST** satisfy the OPT's structural rules and REQ-103 primitive constraints, which the template validator (REQ-102) checks, pass the RM floor (`validation.ValidateRM`, [REQ-112](#req-112--template-less-reference-model-validation-floor)), and satisfy every RM invariant the floor does not evaluate, such as ELEMENT `Inv_null_reason_valid` (a `null_reason` only on an ELEMENT with no `value`).
+#### Output
+
+Under each policy above (`Large`, `Medium` and `Required`) and both `ValueFill` values, every root `Generate` returns, and so every skeleton `composition.NewSkeleton` returns and `composition.NewBuilder` seeds, **MUST** satisfy the OPT's structural rules and REQ-103 primitive constraints, which the template validator (REQ-102) checks, pass the RM floor (`validation.ValidateRM`, [REQ-112](#req-112--template-less-reference-model-validation-floor)), and satisfy every RM invariant the floor does not evaluate, such as ELEMENT `Inv_null_reason_valid` (a `null_reason` only on an ELEMENT with no `value`).
 The cases § [Exceptions and known gaps](#exceptions-and-known-gaps) lists are the only ones outside this rule.
 Two rows of the floor's catalogue need generator work: every ELEMENT carries exactly one of `value` and `null_flavour` (`Inv_null_flavour_indicated`), and no primitive leaf holds a placeholder its RM type rejects, so an ISO 8601 temporal `value` is always a valid date, time, date-time or duration (`Value_valid`).
 
-**Inputs.** `Generate` **MUST** return an error wrapping `ErrUnsupportedPolicy`, and no root, for an `Options.Policy` that is none of `Large`, `Medium` and `Required`, before it builds anything, at every root type and either `ValueFill`, and, for a `COMPOSITION` root, `ErrComposerRequired` when `Options.Composer` is nil or holds a nil pointer, such as a nil `*rm.PartyIdentified`, and `ErrTerritoryRequired` when `Options.Territory` is empty.
+#### Inputs
+
+`Generate` **MUST** return an error wrapping `ErrUnsupportedPolicy`, and no root, for an `Options.Policy` that is none of `Large`, `Medium` and `Required`, before it builds anything, at every root type and either `ValueFill`, and, for a `COMPOSITION` root, `ErrComposerRequired` when `Options.Composer` is nil or holds a nil pointer, such as a nil `*rm.PartyIdentified`, and `ErrTerritoryRequired` when `Options.Territory` is empty.
 For a `COMPOSITION` root it **MUST** write `Options.Composer` as the root's `composer`, as given, whatever the OPT constrains there.
 An empty `Options.Language` **SHOULD** be read as `Compiled.Language()`, and as `en` when that is empty too, and a zero `Options.Now` as the current time, so that a caller who sets neither gets a root in the template's own language, stamped with the time it was built.
 
-**Visit rule.** Under every policy, `Generate` does not visit an attribute that no serialization carries, a BMM function among them, the set `rminfo.IsNonStorableAttr` names and [§ REQ-112 *Driver*](#driver) lists; an attribute the compile marks as one the node's RM class does not have (`CompiledAttribute.NotInRM`, [§ REQ-111](#req-111--public-compiled-template-bridge) *Attributes the RM does not have*), such as `ISM_TRANSITION.name`, whatever existence the OPT gives it, since no instance can carry it and the template validator leaves it out and lists its path in its coverage ([§ REQ-171 *One walk*](#req-171--validation-engine)); a DV_MULTIMEDIA's `data`, whose octets bind to no OPT child ([§ REQ-102](#req-102--composition-validation) *A mandatory child under an optional list*) and which *RM defaults* below write instead; or a locatable's `uid`, which *Identity* below governs.
+#### Visit rule
+
+Under every policy, `Generate` does not visit an attribute that no serialization carries, a BMM function among them, the set `rminfo.IsNonStorableAttr` names and [§ REQ-112 *Driver*](#driver) lists; an attribute the compile marks as one the node's RM class does not have (`CompiledAttribute.NotInRM`, [§ REQ-111](#req-111--public-compiled-template-bridge) *Attributes the RM does not have*), such as `ISM_TRANSITION.name`, whatever existence the OPT gives it, since no instance can carry it and the template validator leaves it out and lists its path in its coverage ([§ REQ-171 *One walk*](#req-171--validation-engine)); a DV_MULTIMEDIA's `data`, whose octets bind to no OPT child ([§ REQ-102](#req-102--composition-validation) *A mandatory child under an optional list*) and which *RM defaults* below write instead; or a locatable's `uid`, which *Identity* below governs.
 Under every policy, `Generate` does not visit an attribute the generator has no writer for (§ [Exceptions and known gaps](#exceptions-and-known-gaps), *Known gap: attributes the generator cannot write*) unless it is required, as defined below, by more than its cardinality lower bound alone, which does not ask for the container (below), and is not a list that only its existence asks a member of (*What a visit writes*), which is left out (*Known gap: required lists canonical JSON cannot carry empty*); where the walk would visit one, `Generate` returns the error § [Errors](#errors) names for it, since a root without it would fail the template validator.
 An OPT child is *allowed* unless its occurrences upper bound is 0, and the OPT *prohibits* an attribute whose existence upper bound is 0, or that has at least one OPT child and allows none of them; `Generate` does not visit an attribute the OPT prohibits unless an RM rule needs it (§ [Precedence](#precedence)), though it writes such a list present and empty where its existence asks for it (*What a visit writes*).
 Wherever this requirement says the BMM marks an attribute mandatory, it reads the BMM on the class the walk builds for the attribute's node: a concrete descendant for a node that names an abstract class (*What a visit writes*), and the type *Generic and untyped types* gives an untyped one.
@@ -611,7 +623,9 @@ So `Required` leaves out an optional list that only its cardinality asks a membe
 The three follow the levels of the ITS-REST template example's `detail_level` ([`definition-validation.openapi.yaml`](../../resources/its-rest/definition-validation.openapi.yaml)): `Required` builds its `required` level, the data points the template makes mandatory and a composition's `context`; `Medium` its `medium` level, with at most one optional archetype under an attribute (*What a visit writes*); and `Large` a member of every optional archetype the template names that needs no undescribed content (§ [Slot fills](#slot-fills)), and of every use of one, named or not, short of the `complete` level; until that level lands, `Complete` is another name for `Large` (§ [Primitive-leaf value fill](#primitive-leaf-value-fill), *Deferred*).
 An attribute the BMM marks mandatory that a compiled node does not carry, as under `templatecompile.WithoutImplicitAttributes`, is visited as if the node carried it with no OPT child.
 
-**What a visit writes.** A visited single-valued attribute takes the RM type its first allowed OPT child names, or, where that child names an abstract RM class or an AOM 1.4 primitive short name, the concrete type the generator builds for it (a concrete descendant of the abstract class, the *RM defaults* below where one applies; for a short name, its canonical DV wrapper, § REQ-102 *RM type match*), built under the constraints of the child the binding tiers of [§ REQ-102](#req-102--composition-validation) *Structural — alternatives* bind a value of that type to: the first child, unless a later one names that type exactly or is the AOM 1.4 short name that type wraps.
+#### What a visit writes
+
+A visited single-valued attribute takes the RM type its first allowed OPT child names, or, where that child names an abstract RM class or an AOM 1.4 primitive short name, the concrete type the generator builds for it (a concrete descendant of the abstract class, the *RM defaults* below where one applies; for a short name, its canonical DV wrapper, § REQ-102 *RM type match*), built under the constraints of the child the binding tiers of [§ REQ-102](#req-102--composition-validation) *Structural — alternatives* bind a value of that type to: the first child, unless a later one names that type exactly or is the AOM 1.4 short name that type wraps.
 That child is the first of its tier and the value built under it validates under it, so the validator, which tries the children of the tier in OPT order, binds what the generator built to the child whose constraints built it.
 When the attribute has no allowed OPT child, it takes a value built from its BMM type.
 A visited multi-valued attribute gets, in OPT order, `max(occurrences.lower, 1)` members of each allowed OPT child that is not a slot under `Large` and `Medium`, except an optional child (occurrences lower bound 0) that needs undescribed content (§ [Slot fills](#slot-fills)), and `occurrences.lower` members under `Required`, so that an optional child (occurrences lower bound 0) gets none of its own there; a child the OPT gives no occurrences, or occurrences with an unbounded lower bound, is not optional and gets one member under every policy; it gets no more members in all than its `cardinality.upper` when that is bounded, and within that bound the room goes first to the members asked for by the children whose occurrences lower bound is bounded and at least 1, which fit wherever § [Errors](#errors) does not refuse the list: any other child, before or after them, gets only the room they leave, and the members still stand in OPT order, so `CLUSTER.items` at cardinality `0..1` over an optional `at0001` and a required `at0002` holds the `at0002` member alone; under `Medium`, where one optional archetype per attribute is the rule, an optional child (occurrences lower bound 0) whose identity a required sibling, before or after it, or an earlier optional sibling carries gets no member of its own (the top-up below can still build one).
@@ -636,14 +650,22 @@ With no allowed child, where the BMM does not mark it mandatory and it is not a 
 An optional multi-valued attribute with no allowed OPT child gets no member, so nothing archetype-rooted appears without its `archetype_details`.
 The generator never builds an archetype root from a BMM type: where it would, an optional attribute gets nothing, and a required one makes `Generate` return `ErrArchetypeIDMissing` (§ [Errors](#errors)).
 
-**Leaf values.** Under every policy, a primitive leaf the generator writes for an OPT primitive constraint is valued as the `ValueFill` in force says (§ [Primitive-leaf value fill](#primitive-leaf-value-fill)), unless an RM rule narrows it or keeps it within a set (§ [Precedence](#precedence) 3 and 4) or the constraint lists no code or ordinal to choose from, where *Placeholders* below decides.
+#### Leaf values
 
-**Clock.** Every `DV_DATE_TIME` the generator writes whose OPT node carries no primitive constraint and gets no OPT value, `HISTORY.origin`, `EVENT.time`, `ACTION.time` and `EVENT_CONTEXT.start_time` included, **MUST** take its value from `Options.Now`, written in UTC as RFC 3339.
+Under every policy, a primitive leaf the generator writes for an OPT primitive constraint is valued as the `ValueFill` in force says (§ [Primitive-leaf value fill](#primitive-leaf-value-fill)), unless an RM rule narrows it or keeps it within a set (§ [Precedence](#precedence) 3 and 4) or the constraint lists no code or ordinal to choose from, where *Placeholders* below decides.
 
-**Placeholders.** Where neither the OPT nor an RM default below gives a value, the generator **SHOULD** write the node id `at0000` on a locatable, the code `at0000` on a coded text, a code phrase, or an ordinal or scale symbol, and the URI `ehr://example` on a `DV_EHR_URI`, that code in the terminology the OPT names for it where the OPT names one and lists no code (a `C_CODE_PHRASE` with an empty code list), under either `ValueFill`, and in `local` otherwise: fixed values a reader recognises as placeholders, in the terminology the OPT asks for.
+#### Clock
+
+Every `DV_DATE_TIME` the generator writes whose OPT node carries no primitive constraint and gets no OPT value, `HISTORY.origin`, `EVENT.time`, `ACTION.time` and `EVENT_CONTEXT.start_time` included, **MUST** take its value from `Options.Now`, written in UTC as RFC 3339.
+
+#### Placeholders
+
+Where neither the OPT nor an RM default below gives a value, the generator **SHOULD** write the node id `at0000` on a locatable, the code `at0000` on a coded text, a code phrase, or an ordinal or scale symbol, and the URI `ehr://example` on a `DV_EHR_URI`, that code in the terminology the OPT names for it where the OPT names one and lists no code (a `C_CODE_PHRASE` with an empty code list), under either `ValueFill`, and in `local` otherwise: fixed values a reader recognises as placeholders, in the terminology the OPT asks for.
 Any other value the generator writes without a constraint, a placeholder or a default here is the implementation's choice, within § Contract *Output*.
 
-**RM defaults.** Where the generator writes one of the attributes below, because the visit rule or § [Precedence](#precedence) 2 has it written, and the OPT gives it no value, because it leaves the attribute silent or names it with no code (or only `at0000`) to choose, the generator **SHOULD** write the default given here, subject to § [Precedence](#precedence) 1, a coded default with the openEHR rubric of its code as its text, since each is a value the RM rules accept where the OPT leaves the choice open (§ Contract *Output*).
+#### RM defaults
+
+Where the generator writes one of the attributes below, because the visit rule or § [Precedence](#precedence) 2 has it written, and the OPT gives it no value, because it leaves the attribute silent or names it with no code (or only `at0000`) to choose, the generator **SHOULD** write the default given here, subject to § [Precedence](#precedence) 1, a coded default with the openEHR rubric of its code as its text, since each is a value the RM rules accept where the OPT leaves the choice open (§ Contract *Output*).
 A `COMPOSITION`'s `context` is written under every policy, `Required` included, as its item says:
 
 - an abstract `PARTY_PROXY` other than a `COMPOSITION`'s `composer`, such as an ENTRY's `subject` or a `PARTICIPATION`'s `performer`: a `PARTY_SELF`, never an empty `PARTY_IDENTIFIED`, which would break `Basic_validity`;
@@ -672,20 +694,26 @@ The archetype is the coded text's nearest enclosing archetype root, whose term d
 A code that archetype does not define keeps the text the walk wrote, even where an enclosing archetype defines the same code.
 A locatable's `name` coded so, whose `value` a `C_STRING` constrains and whose `defining_code` a `C_CODE_PHRASE` constrains to a list of codes, takes, where the code the walk wrote has a term whose text the `C_STRING` rejects, the first code of that list whose term text, read as above, the `C_STRING` admits, with that text as its `value`; where the `C_STRING` admits the term text of no listed code, it keeps the code and the text the walk wrote.
 
-**Identity.** Under every policy, the generator **SHOULD** give a `uid`, from `Options.UIDSource` or from its random fallback when `UIDSource` is nil, to a locatable it writes only where the OPT requires its `uid` (an existence lower bound of at least 1), and to no other locatable, a `COMPOSITION`, an ENTRY, a `GENERIC_ENTRY`, a `PARTY` and a `PARTY_RELATIONSHIP` included, as a slot fill and a locatable built from a BMM type are: the server that stores a top-level object gives it its version id, and the RM recommends that a top-level object's `uid` copy that id, while paths, not uids, identify the nodes inside it, so the `uid` "will usually be empty in most EHR data" (RM Common IM, *Unique Node Identification*).
+#### Identity
+
+Under every policy, the generator **SHOULD** give a `uid`, from `Options.UIDSource` or from its random fallback when `UIDSource` is nil, to a locatable it writes only where the OPT requires its `uid` (an existence lower bound of at least 1), and to no other locatable, a `COMPOSITION`, an ENTRY, a `GENERIC_ENTRY`, a `PARTY` and a `PARTY_RELATIONSHIP` included, as a slot fill and a locatable built from a BMM type are: the server that stores a top-level object gives it its version id, and the RM recommends that a top-level object's `uid` copy that id, while paths, not uids, identify the nodes inside it, so the `uid` "will usually be empty in most EHR data" (RM Common IM, *Unique Node Identification*).
 That a `PARTY` and a `PARTY_RELATIONSHIP` are left without a `uid`, as a `COMPOSITION` and an ENTRY are, is the reading this specification chooses, so that the server that stores a generated object assigns its id; a `PARTY` then breaks `Uid_mandatory` until it does (§ [Exceptions and known gaps](#exceptions-and-known-gaps)).
 When an `OBJECT_REF` the generator writes, a `PARTY_RELATIONSHIP`'s `source` and `target` included, carries no id value, the generator **SHOULD** give the id a value in its class's form, so that the reference's mandatory id holds a well-formed value: the value of a uid drawn the same way for a HIER_OBJECT_ID, a GENERIC_ID, a TEMPLATE_ID or a TERMINOLOGY_ID; that value followed by `::example::1`, a creating system `example` and the first trunk version, for an OBJECT_VERSION_ID; and `openEHR-EHR-CLUSTER.example.v1` for an ARCHETYPE_ID.
 Every `ARCHETYPED` the generator writes **MUST** carry `rm.Release`, the RM release the SDK is generated from, as its `rm_version` ([bmm-conformance.md § Generator output conventions](bmm-conformance.md#generator-output-conventions)).
 The template root's `ARCHETYPED`, when it has one, **MUST** carry the template id, and the generator **MUST NOT** write the template id in any other.
 
-**Reproducible uids.** `UIDsFrom(src)` **MUST** return a uid source that draws each uid from `src` as an RFC 9562 version-4 UUID, its version and variant bits set and its other 122 bits taken from `src` ([RFC 9562 §5.4](https://www.rfc-editor.org/rfc/rfc9562.html#section-5.4)), so two sources in the same state give the same uids in the same order, and a nil source for a nil or typed-nil `src`, so the random fallback applies.
+#### Reproducible uids
+
+`UIDsFrom(src)` **MUST** return a uid source that draws each uid from `src` as an RFC 9562 version-4 UUID, its version and variant bits set and its other 122 bits taken from `src` ([RFC 9562 §5.4](https://www.rfc-editor.org/rfc/rfc9562.html#section-5.4)), so two sources in the same state give the same uids in the same order, and a nil source for a nil or typed-nil `src`, so the random fallback applies.
 Two `Generate` calls on one compiled OPT, neither with its context done, under any policy and either `ValueFill`, whose options are the same, a non-zero `Now` included, except that each call's `UIDSource`, from `UIDsFrom`, and, under `RandomFill`, its `ValueSource` are built on sources in the same state, **MUST** either both return a root, the two equal value for value, or both return no root and an error wrapping the same one of the errors *Inputs* above and § [Errors](#errors) name.
 The generator **MUST NOT** draw a uid from `ValueSource`: with `UIDSource` nil, every uid comes from the random fallback, whatever `ValueSource` holds.
 A source shared between `ValueSource` and `UIDsFrom` stays reproducible, but each uid drawn from it shifts the leaf values drawn after it; a separate source keeps the leaf values those of a run with no `UIDSource`.
 The source `UIDsFrom` returns is not safe for concurrent use, as a `Source` is not, so each concurrent `Generate` takes its own.
 The composition builder surfaces it as `composition.WithUIDSource` ([§ REQ-101](#req-101--generic-opt-driven-composition-builder)).
 
-**Generic and untyped types.** An OPT-declared `DV_INTERVAL` instantiation (e.g. `DV_INTERVAL<DV_QUANTITY>`) is built as that typed interval, and `DV_INTERVAL<DV_ORDERED>` as an interval whose bounds can be any ordered value.
+#### Generic and untyped types
+
+An OPT-declared `DV_INTERVAL` instantiation (e.g. `DV_INTERVAL<DV_QUANTITY>`) is built as that typed interval, and `DV_INTERVAL<DV_ORDERED>` as an interval whose bounds can be any ordered value.
 One over another abstract `DV_ORDERED` class, such as `DV_INTERVAL<DV_QUANTIFIED>`, is built over the first of these types that descends from that parameter, that the generator builds an interval over, and that is, or descends from, the class each bound names: the concrete class the OPT names for its lower bound, then the one it names for its upper bound; the concrete type the generator builds for the class the OPT names for its lower bound, then for its upper bound (*What a visit writes*); and each concrete descendant of the parameter in name order.
 Each bound is built as that type.
 So `DV_INTERVAL<DV_QUANTIFIED>` with no bound is built as `DV_INTERVAL<DV_COUNT>`, which the template validator admits, and a `DV_INTERVAL<DV_TEMPORAL>` with a `DV_TEMPORAL` lower bound and a `DV_DATE_TIME` upper bound as `DV_INTERVAL<DV_DATE_TIME>`.
@@ -693,7 +721,9 @@ Where no such type exists, as for a `DV_DATE` lower bound and a `DV_DATE_TIME` u
 An untyped OPT child, one with no `rm_type_name`, is built as the type the compile reads it as ([§ REQ-111](#req-111--public-compiled-template-bridge) *Reading the model*), with a formal parameter of the attribute that holds it taken as the actual type the walk builds for the holding node, as the `T` of a `DV_INTERVAL<DV_COUNT>`'s `lower` is a `DV_COUNT`, or as the concrete type the generator builds for that type, so an untyped child of an `ELEMENT`'s `value` is built as a `DV_TEXT`, and every rule here reads it as that type, its attributes as the BMM declares them there, as for a child that names the type.
 Another generic `rm_type_name` is a known gap (below).
 
-**Intervals.** When both sides of an interval are bounded and its two bounds are two DV_QUANTITY, or two DV_PROPORTION, the generator, before it orders them, gives them one unit, or one type, that both sides admit, where there is one, so that the two are strictly comparable (RM `DV_INTERVAL.Limits_consistent`); the same holds in a `DV_INTERVAL<DV_ORDERED>` whose two bounds are both of one of those types.
+#### Intervals
+
+When both sides of an interval are bounded and its two bounds are two DV_QUANTITY, or two DV_PROPORTION, the generator, before it orders them, gives them one unit, or one type, that both sides admit, where there is one, so that the two are strictly comparable (RM `DV_INTERVAL.Limits_consistent`); the same holds in a `DV_INTERVAL<DV_ORDERED>` whose two bounds are both of one of those types.
 The generator tries the lower bound's units, then the upper bound's, then the units the lower side lists, and then those the upper side lists.
 Of these, it takes the first that both sides admit and in which an ordered pair fits both sides' OPT constraints, as the next paragraph puts a pair in order, and, where no unit both sides admit has such a pair, the first that both sides admit.
 So two bounds that share their units keep them, unless an ordered pair fits both sides only in another unit.
@@ -781,19 +811,27 @@ A root `Generate` returns can break § Contract's output rule in these cases, an
 
 The known gaps below describe the generator as it is; they are informative.
 
-**Known gap: attributes the generator cannot write.** The generator has no writer for a LOCATABLE's `links` and `feeder_audit`, for an EHR_ACCESS's `settings`, whose RM type ACCESS_CONTROL_SETTINGS has no concrete class, or for a list whose items the RM types as primitive values other than a DV_MULTIMEDIA's `data`, such as its `integrity_check`; the RM requires none of them.
+#### Known gap: attributes the generator cannot write
+
+The generator has no writer for a LOCATABLE's `links` and `feeder_audit`, for an EHR_ACCESS's `settings`, whose RM type ACCESS_CONTROL_SETTINGS has no concrete class, or for a list whose items the RM types as primitive values other than a DV_MULTIMEDIA's `data`, such as its `integrity_check`; the RM requires none of them.
 So `Generate` leaves such an attribute unwritten where it is not required as § Contract *Visit rule* defines it, whatever the OPT puts under it, and where it is a list only its existence requires, which is left out because canonical JSON cannot carry one of these empty (*Known gap: required lists canonical JSON cannot carry empty*).
 Where it is required otherwise, as an optional `links` that holds a mandatory LINK is, the node that holds it needs undescribed content (§ [Slot fills](#slot-fills)), so no policy gives such a node a member of its own where the OPT leaves it optional, and `Generate` returns `ErrConstraintUnsatisfiable` and no root only where the walk builds that node all the same: where the OPT or the RM requires it, or where it is the member a top-up takes (§ Contract *Visit rule*, § [Errors](#errors)).
 A DV_MULTIMEDIA's `data` is an array of octets that no OPT child describes, so the walk does not visit it, and the inline `data` § Contract gives a DV_MULTIMEDIA is written instead.
 
-**Known gap: required lists canonical JSON cannot carry empty.** A list the OPT requires by its existence that the walk gives no member is left out where canonical JSON cannot carry it empty, which is any list but those [bmm-conformance.md § Property → Go field](bmm-conformance.md#property--go-field) names (§ Contract *What a visit writes*).
+#### Known gap: required lists canonical JSON cannot carry empty
+
+A list the OPT requires by its existence that the walk gives no member is left out where canonical JSON cannot carry it empty, which is any list but those [bmm-conformance.md § Property → Go field](bmm-conformance.md#property--go-field) names (§ Contract *What a visit writes*).
 Among the lists that cannot is a list the RM keeps non-empty once present other than those [§ REQ-112 *Non-empty lists*](#req-112--template-less-reference-model-validation-floor) evaluates, such as `PARTY.contacts`, `ACTOR.roles` or `ENTRY.other_participations`.
 Validators report such a list `required` ([§ REQ-102](#req-102--composition-validation)), so a root that leaves one out is outside § Contract *Output*.
 
-**Known gap: other generic types.** An OPT node whose `rm_type_name` is a generic type other than a `DV_INTERVAL` instantiation, such as `POINT_EVENT<ITEM_TREE>` or `REFERENCE_RANGE<DV_QUANTITY>`, cannot be built, and `Generate` returns an error.
+#### Known gap: other generic types
+
+An OPT node whose `rm_type_name` is a generic type other than a `DV_INTERVAL` instantiation, such as `POINT_EVENT<ITEM_TREE>` or `REFERENCE_RANGE<DV_QUANTITY>`, cannot be built, and `Generate` returns an error.
 Nor can a `DV_INTERVAL` over a type that is no `DV_ORDERED` class, such as `DV_INTERVAL<DV_TEXT>`, which the RM does not admit as its parameter; a `DV_INTERVAL` over an abstract `DV_ORDERED` class is built as *Generic and untyped types* above says.
 
-**Known gap: slot occurrences.** The compiled template does not carry an `ARCHETYPE_SLOT`'s occurrences, which the model of [§ REQ-176](#req-176--adl-14-operational-template-model) reads ([§ REQ-111](#req-111--public-compiled-template-bridge)), so the generator cannot tell a slot the OPT prohibits (an occurrences upper bound of 0) or requires (a lower bound of at least 1) from an optional one: a top-up can fill a prohibited one where its only allowed children are slots, or where every allowed child that is not a slot is full or one `Generate` refuses (§ Contract *What a visit writes*), and a required slot is not filled where it sits beside a non-slot child, or under a list that only its existence otherwise requires (§ Contract *What a visit writes*).
+#### Known gap: slot occurrences
+
+The compiled template does not carry an `ARCHETYPE_SLOT`'s occurrences, which the model of [§ REQ-176](#req-176--adl-14-operational-template-model) reads ([§ REQ-111](#req-111--public-compiled-template-bridge)), so the generator cannot tell a slot the OPT prohibits (an occurrences upper bound of 0) or requires (a lower bound of at least 1) from an optional one: a top-up can fill a prohibited one where its only allowed children are slots, or where every allowed child that is not a slot is full or one `Generate` refuses (§ Contract *What a visit writes*), and a required slot is not filled where it sits beside a non-slot child, or under a list that only its existence otherwise requires (§ Contract *What a visit writes*).
 The template validator reads the same compiled tree, so it cannot count a slot's occurrences either and reports neither case.
 
 ### Primitive-leaf value fill
@@ -805,7 +843,9 @@ The SDK **MUST** offer two fills, and read a `ValueFill` other than `RandomFill`
 A `Source` is not safe for concurrent use, so each concurrent `Generate` takes its own source, or leaves it `nil` for the concurrency-safe global.
 The composition builder surfaces the seam as `composition.WithValueFill` / `composition.WithValueSource`.
 
-**Deferred.** `Complete` is an alias of `Large`.
+#### Deferred
+
+`Complete` is an alias of `Large`.
 A complete level of its own, the ITS-REST `detail_level=complete` (every data point the template allows, as reference guidance, not expected to be committable), is planned but not delivered and not a priority; when it lands, `Complete` becomes its own value.
 That level is **not** part of the v1 `Policy` contract.
 Tracked in the roadmap.
@@ -924,7 +964,9 @@ The lint runs three layers and **MUST** be collect-all (return every issue, not 
 The parse layer **MUST** validate against the **SDK-maintained grammar profile**, not a live pull from specifications.openehr.org: foundation openEHR AQL (QUERY Release-1.1.0) plus the documented `SDK-AQL-NNN` deltas in [`resources/aql/grammar/DIVERGENCES.md`](../../resources/aql/grammar/DIVERGENCES.md) (ADR [0007](../adr/0007-aql-antlr-grammar-profile.md)).
 Deltas are classed **relaxation** (admits more than official AQL, e.g. `SELECT *`) or **correction** (fixes a foundation weak spot).
 
-**Lint-clean is not spec-conformance, and not execute-success.** Because the profile deliberately admits relaxations and the CDR is the path authority, a query the SDK lints clean can still be rejected on execution; conversely the lint targets only the contract below.
+#### Lint-clean is not spec-conformance, and not execute-success
+
+Because the profile deliberately admits relaxations and the CDR is the path authority, a query the SDK lints clean can still be rejected on execution; conversely the lint targets only the contract below.
 
 The profile **MUST** admit every query the foundation grammar admits.
 A query that a conformant engine answers and the profile refuses therefore lies outside foundation AQL, as an engine grammar extension, and [PROBE-107](conformance.md#probe-107--upstream-aql-suite-admissibility-corpus) records it by name, with that reason, as a decline; an unexplained refusal is a defect in the profile.
@@ -1089,18 +1131,24 @@ The reader's strict decode refuses as well what canonical XML's strict decode re
 An interval the model holds at its zero value, as it holds one the template leaves out, is read as absent.
 The model's decode reads `T_ARCHETYPE_ROOT` ([§ REQ-176](#req-176--adl-14-operational-template-model) *Shapes the pinned BMM lacks*) and the interval flags an OPT leaves out ([wire.md § REQ-169](wire.md#req-169--interval-boundary-flag-defaults)).
 
-**A node that names no RM type.** The compile step reads the class of a node with no `rm_type_name` as the type of the attribute that holds the node, or, where that attribute is typed by a generic parameter the holding node leaves open, as the type the BMM constrains that parameter to (`ITEM_STRUCTURE` for a `POINT_EVENT`'s `data`).
+#### A node that names no RM type
+
+The compile step reads the class of a node with no `rm_type_name` as the type of the attribute that holds the node, or, where that attribute is typed by a generic parameter the holding node leaves open, as the type the BMM constrains that parameter to (`ITEM_STRUCTURE` for a `POINT_EVENT`'s `data`).
 So it marks, types, flags as mandatory (`CompiledAttribute.Required`) and injects the attributes of such a node as it does those of a node that names that type, and the node's own RM type stays empty.
 A definition that names no type is no definition, which the compile step refuses (above).
 
-**What the reader tolerates.** In every mode, `aom14.ReadOperationalTemplate` reads a document that starts with a UTF-8 byte-order mark; an element in the `http://schemas.openehr.org/v2` namespace, which the pinned AM Release-1.4 schemas declare, as the element of that name in the `http://schemas.openehr.org/v1` namespace canonical XML reads ([wire.md § REQ-056](wire.md#req-056)); a `C_BOOLEAN` whose `true_valid` or `false_valid` is absent or empty, with that flag true; an `assumed_value` of a `C_BOOLEAN`, `C_INTEGER` or `C_REAL` that is not a value of its type, and one of a `C_DV_QUANTITY` that the model cannot hold, as absent, an assumed boolean written `t` or `f` among them, and one written in another case, such as `tRuE`, as its value; a `C_DV_QUANTITY` magnitude or precision bound that is not a number, as unbounded on its side; a `C_INTEGER` range bound or a precision bound written as a decimal number, as the integer bound that admits the same integers, a lower bound rounded up and an upper one down, and a lower bound of negative infinity, an upper one of positive infinity, or one that is not a number (`NaN`), which bounds no integer, as unbounded on its side; a bound written on a side marked unbounded, which it leaves out; and an empty `timezone_validity`, as absent.
+#### What the reader tolerates
+
+In every mode, `aom14.ReadOperationalTemplate` reads a document that starts with a UTF-8 byte-order mark; an element in the `http://schemas.openehr.org/v2` namespace, which the pinned AM Release-1.4 schemas declare, as the element of that name in the `http://schemas.openehr.org/v1` namespace canonical XML reads ([wire.md § REQ-056](wire.md#req-056)); a `C_BOOLEAN` whose `true_valid` or `false_valid` is absent or empty, with that flag true; an `assumed_value` of a `C_BOOLEAN`, `C_INTEGER` or `C_REAL` that is not a value of its type, and one of a `C_DV_QUANTITY` that the model cannot hold, as absent, an assumed boolean written `t` or `f` among them, and one written in another case, such as `tRuE`, as its value; a `C_DV_QUANTITY` magnitude or precision bound that is not a number, as unbounded on its side; a `C_INTEGER` range bound or a precision bound written as a decimal number, as the integer bound that admits the same integers, a lower bound rounded up and an upper one down, and a lower bound of negative infinity, an upper one of positive infinity, or one that is not a number (`NaN`), which bounds no integer, as unbounded on its side; a bound written on a side marked unbounded, which it leaves out; and an empty `timezone_validity`, as absent.
 In its default mode it also reads these shapes, which its strict mode refuses: an `<attributes>`, `<children>` or `<item>` inside `<definition>` with no type in the XSI namespace, such an `<attributes>` as `C_MULTIPLE_ATTRIBUTE` with its cardinality where it carries a `<cardinality>` and as `C_SINGLE_ATTRIBUTE` otherwise, such a `<children>` as `C_ARCHETYPE_ROOT` where it carries an archetype id and as `C_COMPLEX_OBJECT` otherwise, and such an `<item>` as no constraint, losing any constraint its type would have carried; a `<children>` or the `<definition>` whose `xsi:type` names no AOM 1.4 class, or a class it cannot hold such as `C_SINGLE_ATTRIBUTE` other than the classes of a `<definition>` it refuses in every mode (below), as a `C_COMPLEX_OBJECT` leaf with the `rm_type_name`, `node_id` and `occurrences` it carries and none of its attributes; a `C_INTEGER` or `C_REAL` list entry or range bound that is not a number of its type, an empty one among them, the entry left out and the bound read as unbounded on its side; and a `timezone_validity` that names no `VALIDITY_KIND`, as absent.
 It reads as well, in its default mode: an `xsi:type` inside `<definition>` with white space around it, as the name without it; an `<item>` of a `C_PRIMITIVE_OBJECT` whose type names no `C_PRIMITIVE` class and none of `C_CODE_PHRASE`, `C_DV_QUANTITY`, `C_DV_ORDINAL`, `CONSTRAINT_REF` and `C_PRIMITIVE_OBJECT`, as no constraint; an element in a namespace other than none, v1 and v2, the root and the XSI namespace among them, as the v1 one, a type attribute keeping its XSI namespace; a `<children>` typed `C_COMPLEX_OBJECT` that carries an archetype id, as `C_ARCHETYPE_ROOT`; a `<children>` typed with a `C_PRIMITIVE` class, as a `C_PRIMITIVE_OBJECT` leaf that carries it; an `<item>` typed `C_CODE_PHRASE`, `C_DV_QUANTITY`, `C_DV_ORDINAL` or `CONSTRAINT_REF`, as the object that holds it, of the item's class, and one typed `C_PRIMITIVE_OBJECT` as the item it holds; a `C_REAL` value, or a `C_DV_QUANTITY` magnitude bound, that Go's float parse reads and XML Schema's `double` does not, such as `Inf`, `0x1p-2` or more digits than a `double` holds, as the number Go reads; and content before the root element that `encoding/xml` reads, such as text or a CDATA section, and a directive (`<!…>`) or a processing instruction whose target is `xml`, in any letter case, after it, each of which it reads past.
 What a tolerance leaves out, such as the attributes of that leaf, is unmatched content, which the report option of [wire.md § REQ-170](wire.md#req-170--unmatched-content-on-decode) reports.
 The reader refuses, in every mode, four readings: an integer that the model's `Integer`, 32 bits as openEHR's is, cannot hold; a `match_negated` of true, which AOM 1.4 cannot express ([§ REQ-176](#req-176--adl-14-operational-template-model) *Shapes the pinned BMM lacks*); and an integer bound of positive infinity on a lower side or negative infinity on an upper one, which admits no integer, each with an error wrapping `canxml.ErrInvalidShape`; and a `<definition>` typed `ARCHETYPE_SLOT`, or with a class that carries a primitive constraint ([§ REQ-103](#req-103--primitive-constraint-introspection)), a `C_PRIMITIVE` class such as `C_STRING`, one of `C_CODE_PHRASE`, `C_DV_QUANTITY`, `C_DV_ORDINAL` and `CONSTRAINT_REF`, or a `C_PRIMITIVE_OBJECT` whose items carry such a constraint, which the model's definition, a `C_ARCHETYPE_ROOT`, cannot hold, with a `*canxml.DecodeError` of the definition that wraps `typereg.ErrTypeMismatch`.
 A `canxml` decode called directly has none of these tolerances.
 
-**What the compile step tolerates.** In its default mode `Compile` reads these values the model holds in a weaker form: a `CONSTRAINT_REF` with no or a blank `reference`, with an empty `Reference`; a `timezone_validity` that names no `VALIDITY_KIND`, which only a model built in code holds since the reader leaves one out (above), a mandatory one on a `C_DATE`, and a temporal range bound that is not ISO 8601 text of its type, each as [§ REQ-103](#req-103--primitive-constraint-introspection) *Validate contract* says; and a `C_PRIMITIVE_OBJECT` with no `item`, as no constraint.
+#### What the compile step tolerates
+
+In its default mode `Compile` reads these values the model holds in a weaker form: a `CONSTRAINT_REF` with no or a blank `reference`, with an empty `Reference`; a `timezone_validity` that names no `VALIDITY_KIND`, which only a model built in code holds since the reader leaves one out (above), a mandatory one on a `C_DATE`, and a temporal range bound that is not ISO 8601 text of its type, each as [§ REQ-103](#req-103--primitive-constraint-introspection) *Validate contract* says; and a `C_PRIMITIVE_OBJECT` with no `item`, as no constraint.
 With `templatecompile.WithStrict` it refuses each, and a default value that addresses no node (below), with an error wrapping `ErrInvalidInput`.
 In every mode it refuses a model whose constraint objects nest deeper than the depth limit of [§ REQ-108](#req-108--untrusted-document-bounds), which only a model built in code, or decoded with `canxml` directly, can reach.
 
@@ -1459,10 +1507,14 @@ Beside the structural required-set walk above, the entries cover the node-level 
   A PARTICIPATION and a PARTY_RELATED are nodes of the walk wherever they sit (the PARTICIPATION and PARTY_PROXY entries above), a participation's `performer` and a root included, so their rows apply there as on any other node: at `…/other_participations[i]/mode/defining_code`, say, or `…/performer/relationship/defining_code`.
   The RM's other coded invariants are not in this entry (*What the floor does not evaluate* below).
 
-**Known gap — a bound beside its own open flag.** A bound present on a side whose `*_unbounded` flag is set contradicts BASE `Interval`'s open-boundary meaning.
+#### Known gap — a bound beside its own open flag
+
+A bound present on a side whose `*_unbounded` flag is set contradicts BASE `Interval`'s open-boundary meaning.
 The floor walks it as a bound but does not report the contradiction.
 
-**What the floor does not evaluate.** Every invariant of the pinned RM and BASE BMMs that the floor does not evaluate is an entry of the inventory of [§ REQ-171 *Where the RM rules come from*](#req-171--validation-engine), with its reason: among them BASE `Interval.Limits_comparable`, which `DV_INTERVAL.Limits_consistent` restates and the floor evaluates on a DV_INTERVAL as the *DV_INTERVAL* entry says, but on no BASE `Proper_interval` or `Point_interval`, whose bounds the SDK leaves untyped; and the coded invariants of the change-control and resource-description classes, which the *Coded invariants* table leaves out.
+#### What the floor does not evaluate
+
+Every invariant of the pinned RM and BASE BMMs that the floor does not evaluate is an entry of the inventory of [§ REQ-171 *Where the RM rules come from*](#req-171--validation-engine), with its reason: among them BASE `Interval.Limits_comparable`, which `DV_INTERVAL.Limits_consistent` restates and the floor evaluates on a DV_INTERVAL as the *DV_INTERVAL* entry says, but on no BASE `Proper_interval` or `Point_interval`, whose bounds the SDK leaves untyped; and the coded invariants of the change-control and resource-description classes, which the *Coded invariants* table leaves out.
 A result lists those of the classes it visited in `Coverage.Unevaluated`.
 The inventory classifies `DV_INTERVAL.Limits_consistent` as evaluated, but the floor leaves parts of it unchecked: the `units_system` of two DV_QUANTITY; the comparability of two DV_ORDINAL or DV_SCALE, which the RM leaves undefined; and the order of a pair it reads as strictly comparable but cannot order, one that holds a DV_PROPORTION with a zero denominator or a temporal value the REQ-123 parse refuses, or a zoned DV_TIME or DV_DATE_TIME against one without a zone.
 
@@ -1669,10 +1721,14 @@ At each attribute, in this order:
 3. **Counts.** The cardinality of the attribute and the occurrences of each child, as § REQ-102 defines them, on the template layer.
 4. **Each admitted item.** Identity and type conformance against its bound child (§ REQ-102); the RM rules of its class (§ REQ-112's catalogue); the template's value constraint where the child is a leaf ([§ REQ-103](#req-103--primitive-constraint-introspection)); then its own attributes by the same steps.
 
-**Refused content.** Content the admission step refuses **MUST** draw its one admission finding and no other: the engine evaluates no RM rule on it and reports no issue from inside it.
+#### Refused content
+
+Content the admission step refuses **MUST** draw its one admission finding and no other: the engine evaluates no RM rule on it and reports no issue from inside it.
 A rule of an admitted node is still evaluated on that node and reads the node's attributes as the instance holds them, a refused one included, and its finding at the node's own path **MUST** be reported; what it would report at or below the refused content is from inside it.
 
-**One finding per defect.** A defect two checks find **MUST** be reported once, by the check named here:
+#### One finding per defect
+
+A defect two checks find **MUST** be reported once, by the check named here:
 
 - an attribute the instance lacks, by `required` on the template layer where the template requires it, and on the RM layer where only the RM mandates it, since a template requirement already implies the RM's;
 - an RM-mandatory container that is present and empty, by the template's finding where the template reports that container at the same path, not by the RM layer's `cardinality`;
@@ -1688,7 +1744,9 @@ A Go value reached from two places **MUST** be validated at each place, against 
 A value that contains itself is a cycle, reported where it recurs and not entered, as § REQ-112 *Driver* says; the engine detects it on the active ancestry alone and keeps no record of values it has finished.
 At the depth limit the engine **MUST** stop descending and report `max_depth` once per walk, at the first path where it stopped, and at the visit limit stop and report `max_nodes` once, at the path where it stopped; *Coverage* lists both.
 
-**Trials.** Binding a value among the children of one tier, or an item among those of one rank (§ REQ-102 *Structural — alternatives*, *Structural — binding items*), walks it under each child it tries, in OPT order, until one validates it.
+#### Trials
+
+Binding a value among the children of one tier, or an item among those of one rank (§ REQ-102 *Structural — alternatives*, *Structural — binding items*), walks it under each child it tries, in OPT order, until one validates it.
 That trial is part of the walk, and the order of the steps and the union rule do not change inside it.
 A trial **MUST** obey three rules: its visits count toward the visit limit and the depth limit applies inside it; a trial in which the depth limit stops the walk never counts as one under which the value validates, whether or not the walk reports that stop there, since the walk reports `max_depth` once, so a stop an earlier part of the walk reported leaves none to report inside the trial, and the binding would otherwise turn on what came before it; and nothing a trial under a child the value does not bind to found reaches the result: no issue, `max_depth` included, no `Coverage` entry and no class for `Unevaluated`.
 A value of a single-valued attribute under k children of one tier so costs at most k walks of its subtree, since the walk keeps the findings of the first child while it tries the others, and an item of a list at most k + 1, since its path waits on the binding of the items beside it, so the walk walks it once more under the child it binds to.
@@ -1968,7 +2026,9 @@ A consumer comparing that text against a compiled-OPT node id or a name would ha
 The path-segment predicate is therefore exposed as structure beside its text.
 **`Raw` is the spelling and stays authoritative for emission; the structured model is the value and is authoritative for comparison.** The model carries what `Raw` does not: where each component begins and ends.
 
-**The bracket is three productions, not one.** A bracketed path predicate is `pathPredicate : SYM_LEFT_BRACKET (standardPredicate | archetypePredicate | nodePredicate) SYM_RIGHT_BRACKET`, and the three alternatives overlap:
+#### The bracket is three productions, not one
+
+A bracketed path predicate is `pathPredicate : SYM_LEFT_BRACKET (standardPredicate | archetypePredicate | nodePredicate) SYM_RIGHT_BRACKET`, and the three alternatives overlap:
 
 | Production | Admits |
 |---|---|
@@ -1980,24 +2040,36 @@ A comparison, a bare HRID and a bare `$param` are therefore each spelled by two 
 The structured kind **MUST** be a property of the form, not of the production that carried it: a form yields the same kind at the top of a bracket and as a junction operand.
 The kind set is derived from the vendored grammar and checked against it mechanically ([PROBE-095](conformance.md#probe-095--aql-predicate-structuring)), never from a hand-written list of what the position is believed to admit.
 
-**The structured kinds.** The model **MUST** be a sealed sum in `openehr/aql`, in the package's `aql.Value` / `parse.SelectExpr` style, covering these forms: a node id (`[at0001]`, `[id3]`); a node id with a name (`[at0001, 'Systolic']`); an archetype HRID; an archetype HRID with a name; a parameter (`[$param]`); a comparison, carrying `aql.Comparison`, so a WHERE comparison and a predicate comparison share one vocabulary; a regex match (`objectPath MATCHES CONTAINED_REGEX`, whose token also admits an optional `; 'label'` tail the model carries as its own component); and an `AND` / `OR` junction over two structured predicates, with its operator and both operands.
+#### The structured kinds
 
-**The name slot.** The grammar admits `SYM_COMMA (STRING | PARAMETER | TERM_CODE | AT_CODE | ID_CODE)` after both the node-id and the archetype-HRID alternatives.
+The model **MUST** be a sealed sum in `openehr/aql`, in the package's `aql.Value` / `parse.SelectExpr` style, covering these forms: a node id (`[at0001]`, `[id3]`); a node id with a name (`[at0001, 'Systolic']`); an archetype HRID; an archetype HRID with a name; a parameter (`[$param]`); a comparison, carrying `aql.Comparison`, so a WHERE comparison and a predicate comparison share one vocabulary; a regex match (`objectPath MATCHES CONTAINED_REGEX`, whose token also admits an optional `; 'label'` tail the model carries as its own component); and an `AND` / `OR` junction over two structured predicates, with its operator and both operands.
+
+#### The name slot
+
+The grammar admits `SYM_COMMA (STRING | PARAMETER | TERM_CODE | AT_CODE | ID_CODE)` after both the node-id and the archetype-HRID alternatives.
 The name carrier **MUST** discriminate all five spellings, on both alternatives, so a consumer resolving names against a template can tell a name deferred to bind time (`PARAMETER`) from a name it can resolve now.
 
-**Components are values, not spellings.** Every component **MUST** be the value a reader compares or displays: delimiters removed (an at-code without its brackets, a name without its quotes), escapes resolved, and trivia (whitespace and `--` comments) absent, while `Raw` keeps the spelling verbatim.
+#### Components are values, not spellings
+
+Every component **MUST** be the value a reader compares or displays: delimiters removed (an at-code without its brackets, a name without its quotes), escapes resolved, and trivia (whitespace and `--` comments) absent, while `Raw` keeps the spelling verbatim.
 A path-valued component follows the comparison vocabulary it reuses: the as-written `Path` beside the structured `ParsedPath`, whose `Segments` are the trivia-free form.
 A regex component decomposes the `CONTAINED_REGEX` token: the braces, the interior whitespace, the `/` delimiters and the `;` are delimiters, so the model carries the pattern (with only the `\/` spelling resolved, which exists because `/` is the delimiter) and the optional label (unquoted, escapes resolved) as separate values; every other backslash sequence is regex syntax and stays as written.
 
-**An unstructured predicate is a statement, not a gap.** A predicate the SDK does not structure **MUST** report itself as unstructured, a nil structured carrier beside a populated `Raw`, and never as a partial structure, which a consumer could not tell from a complete one at the type level.
+#### An unstructured predicate is a statement, not a gap
+
+A predicate the SDK does not structure **MUST** report itself as unstructured, a nil structured carrier beside a populated `Raw`, and never as a partial structure, which a consumer could not tell from a complete one at the type level.
 The unstructured forms at the path-segment position are exactly: a comparison whose right-hand operand the shared value vocabulary does not carry (an `objectPath` operand, a node-code `ID_CODE` / `AT_CODE` operand, or a numeric literal in the residual of § Catalogue and residual), and a junction with an unstructured operand.
 Every other alternative of every production the position admits is structured, so a reader can fail closed on exactly these forms.
 Shrinking the set (a `PathValue` carrier for the path operand, a node-code value kind) widens the sealed value vocabulary and is its own change.
 
-**The class position keeps its carrier.** `parse.ClassExpr`'s own fields (`Archetype`, `ParamArchetype`, `Predicate`, `PredicateComparison`) stay the only carrier of the class-position predicate: its three admissible top-level forms already map onto them, and a second carrier derived from the same source node would drift.
+#### The class position keeps its carrier
+
+`parse.ClassExpr`'s own fields (`Archetype`, `ParamArchetype`, `Predicate`, `PredicateComparison`) stay the only carrier of the class-position predicate: its three admissible top-level forms already map onto them, and a second carrier derived from the same source node would drift.
 The structured model sits at the path-segment position only.
 
-**Emission ignores the structured model.** `Emit` **MUST NOT** read it: § REQ-119's round trip renders `Raw`, so a consumer mutating the model cannot change what is emitted.
+#### Emission ignores the structured model
+
+`Emit` **MUST NOT** read it: § REQ-119's round trip renders `Raw`, so a consumer mutating the model cannot change what is emitted.
 
 **Out of scope.** A carrier for the `VERSION` class predicate keywords (`LATEST_VERSION` / `ALL_VERSIONS`): `versionPredicate` is a different production with a different accept set.
 Validating the predicate sub-grammar ([§ REQ-119 § Out of scope](#req-119--re-parseable-canonical-aql-emission)), since structuring what the parser accepted is not deciding what to accept.
@@ -2021,7 +2093,9 @@ The drop channel names the offending construct by quoting its source text into `
 A consumer whose refusal reasons may name structure (an operator, a clause, a path shape) but never a value, because an AQL literal can be a payload value no quoting masks, would otherwise discard the diagnostics wholesale, and its clients would get a generic refusal where the SDK knew what was wrong and where.
 The field rule below is stated once, here, and binds both surfaces.
 
-**The two field classes.** Each field of a diagnostic surface **MUST** be in exactly one of two classes, and the godoc of the type a consumer holds names each field's class:
+#### The two field classes
+
+Each field of a diagnostic surface **MUST** be in exactly one of two classes, and the godoc of the type a consumer holds names each field's class:
 
 | Class | Rule |
 |---|---|
@@ -2031,19 +2105,27 @@ The field rule below is stated once, here, and binds both surfaces.
 For the drop record, the construct kind, the clause and the source span are all value-free; it has no value-bearing field.
 [§ REQ-109 § Value-free lint diagnostics](#value-free-lint-diagnostics) classes the lint issue's fields against this same table: one rule, two surfaces.
 
-**The drop record.** Every construct the extractor drops **MUST** be recorded as a value-free `{kind, clause, span}`, reachable from the `Document` in source order through an accessor that runs the same lazy, once-only extraction as `Query()` / `QueryErr()`, so a `Document` nobody extracted never reads as "nothing dropped", and that returns a copy, so a caller cannot corrupt the shared `Document`.
+#### The drop record
+
+Every construct the extractor drops **MUST** be recorded as a value-free `{kind, clause, span}`, reachable from the `Document` in source order through an accessor that runs the same lazy, once-only extraction as `Query()` / `QueryErr()`, so a `Document` nobody extracted never reads as "nothing dropped", and that returns a copy, so a caller cannot corrupt the shared `Document`.
 `QueryErr()` keeps its text and its `aql.ErrIncompleteAST` sentinel.
 
-**The kind.** The kind **MUST** be a closed enumeration of drop classes whose zero value means unclassified, so a reader can switch over it exhaustively and fail closed; adding a member is a consumer-visible change.
+#### The kind
+
+The kind **MUST** be a closed enumeration of drop classes whose zero value means unclassified, so a reader can switch over it exhaustively and fail closed; adding a member is a consumer-visible change.
 Its members are classes, not extractor call sites.
 A reachable class, a legal query the profile admits carrying a construct the value vocabulary cannot represent (today the one residual of § Catalogue and residual), has its own member, which the corpus reaches.
 The defensive arms, unreachable while the catalogue and the profile agree, share one member meaning "a construct the catalogue does not model", and their unreachability is asserted at the unit level, since no corpus can reach a site no legal query reaches.
 A sweep derived from the extractor source holds every site that sets the incomplete flag to recording a kind, so a drop with no record is a testable defect.
 
-**The clause.** The clause **MUST** be the existing `parse.Clause`, extended append-only: its existing members keep their numeric values, since a consumer may have persisted or compared them, and `String()` gains an arm for each new member.
+#### The clause
+
+The clause **MUST** be the existing `parse.Clause`, extended append-only: its existing members keep their numeric values, since a consumer may have persisted or compared them, and `String()` gains an arm for each new member.
 An existing exhaustive switch over `Clause` meets each new member as a case it does not handle.
 
-**The span.** The span **MUST** be a start and an end `parse.Position` (`{Line, Col}`, the package's one positional vocabulary, already on `SyntaxError` and every AST node) over the exact input handed to the parser, pointing at the offending construct rather than at its enclosing clause, and zero when the construct cannot be attributed.
+#### The span
+
+The span **MUST** be a start and an end `parse.Position` (`{Line, Col}`, the package's one positional vocabulary, already on `SyntaxError` and every AST node) over the exact input handed to the parser, pointing at the offending construct rather than at its enclosing clause, and zero when the construct cannot be attributed.
 A caller holding the input can then quote the construct under its own policy.
 
 Structured diagnostics for the simplified-format codecs ([§ REQ-053](wire.md#req-053)) are a separate surface and out of scope here, and so is redaction policy: what counts as a value is the consumer's decision, and this section guarantees only that the value-free fields carry none.
@@ -2113,7 +2195,9 @@ Each is derived from the vendored grammar profile (`resources/aql/grammar/active
   The check follows the token's own decomposition (`URI : URI_SCHEME ':' URI_HIER_PART ( '?' URI_QUERY )? ( '#' URI_FRAGMENT )?`), not a flat union of the delimiter sets, which is broader than any single position admits: `%` leads `URI_PCT_ENCODED` and needs two hex digits, `[` / `]` occur only in an `URI_IP_LITERAL` host, and `#` separates the fragment once and appears nowhere inside it.
   It is not an RFC 3986 parser: a spellable but structurally odd URI (an empty host, a dotted quad out of range) reaches the wire, where the backend stays the authority (PROBE-021).
 
-**Verbatim text on the read side.** `aql.IdentifiedPath.Raw`, `aql.PathSegment.Predicate` and `parse.ClassExpr.Predicate` report what was written, trivia included.
+#### Verbatim text on the read side
+
+`aql.IdentifiedPath.Raw`, `aql.PathSegment.Predicate` and `parse.ClassExpr.Predicate` report what was written, trivia included.
 The SDK **MUST** expose its own trivia model as `aql.StripPredicateTrivia`, for a consumer that compares that text rather than re-emitting it, so that the consumer does not model the lexer's skipped trivia a second time; the structured predicates of [§ REQ-113 § Structured node predicates](#req-113--execution-oriented-parsed-aql-ast) let most consumers compare components instead.
 
 ### Single-token identifier positions
@@ -2149,12 +2233,16 @@ One field feeds both `classExprOperand` alternatives, whose accept sets differ:
 A write path **MUST** hold the field to the grammar of the position it renders, not to one accept set: validating it uniformly would both emit `VERSION v[at0001]`, which the parser rejects, and refuse `VERSION v[LATEST_VERSION]`, which the extractor produces.
 `aql.ValidatePathPredicate` and `aql.ValidateVersionPredicate` expose the two accept sets.
 
-**The `VERSION` position is decided whole.** `versionPredicate` is a fixed three-way choice that does not recurse into the position, so its shape is decidable in one pass, and the guard **MUST** accept exactly that shape: one of the two keywords, matched case-insensitively once every trivia rule the lexer skips is removed (whitespace, a `--` comment, a `UNICODE_BOM` wherever it stands), or one `standardPredicate`, with exactly one top-level comparison operator (`<=` and `>=` count as one operator each) and a non-blank operand on each side.
+#### The `VERSION` position is decided whole
+
+`versionPredicate` is a fixed three-way choice that does not recurse into the position, so its shape is decidable in one pass, and the guard **MUST** accept exactly that shape: one of the two keywords, matched case-insensitively once every trivia rule the lexer skips is removed (whitespace, a `--` comment, a `UNICODE_BOM` wherever it stands), or one `standardPredicate`, with exactly one top-level comparison operator (`<=` and `>=` count as one operator each) and a non-blank operand on each side.
 A top-level `AND`, `OR` or `MATCHES` is therefore refused here, where `versionPredicate` has no junction alternative, though the same text is lawful `nodePredicate` at a class; the keyword counts only as a whole word outside literals, comments and nested brackets, so `a/brand > 1` and `a/b_and_c = 1` are untouched.
 The operands are left to the parser: `objectPath` recurses (`pathPart : IDENTIFIER pathPredicate?` reaches `nodePredicate`, which reaches `objectPath`), and judging them would take the sub-grammar validator this requirement does not build.
 The position's shape is decided; its operands are not.
 
-**The class position is guarded on bracket escape.** Emission writes `"[" + Predicate + "]"`, so the text can change the query's structure only by ending that bracket early.
+#### The class position is guarded on bracket escape
+
+Emission writes `"[" + Predicate + "]"`, so the text can change the query's structure only by ending that bracket early.
 The guard **MUST** refuse exactly the text that escapes its bracket, and nothing else: a malformation that stays inside the bracket is the parser's to reject (`Emit` surfaces that verdict, § Emission verified after emission), while a conservative `nodePredicate` approximation would refuse predicates `ParseQuery` accepts, since a node predicate lawfully carries `AND`, `OR`, quotes and spaces.
 Escape is decided over the regions in which a bracket character is not a delimiter, each recognised as the lexer recognises its token:
 
@@ -2226,7 +2314,9 @@ Whether the specification requires an engine to *reject* an RM-impossible contai
 
 ### Nil and zero relations
 
-**A nil relation is the default relation, on the receiver too.** Every seam that *takes* a relation reads nil as the default ([REQ-161 § Relation supply](#relation-supply) states that half, for the entry points that run the semantic group).
+#### A nil relation is the default relation, on the receiver too
+
+Every seam that *takes* a relation reads nil as the default ([REQ-161 § Relation supply](#relation-supply) states that half, for the entry points that run the semantic group).
 The relation's own **methods MUST read a nil receiver the same way**, returning what the default relation would return rather than dereferencing it: nil is caller-constructible and documented, so panicking on it is what [idiom.md § No panics](idiom.md#errors-req-025) forbids, and a nil that means "the default" when passed but panics when used would be one spelling with two meanings.
 This holds for the extension method as much as for the verdict methods: a consumer that conditionally extends a relation it might not hold (`var rel *TypeRelation; …; rel = rel.WithOverlay(e)`) writes the shape the nil convention invites.
 A nil relation is therefore **not** the *zero* relation: the zero value is a real relation that knows no classes and answers UnknownClass for every one (§ Verdicts), a different answer rather than the same one reached differently.
@@ -2239,7 +2329,9 @@ Beside the two verdict questions the relation answers one reachability query tha
 It is computed over the same overlaid graph as the verdicts, so a consumer overlay changes its answer, and like every other method it reads a nil receiver as the default relation.
 Its consumer is [REQ-164](#req-164--aql-path-shape-and-paging-lint)'s `aql_contains_redundant_step`.
 
-**Admissible is route-existence, not a claim of RM truth.** A verdict is derived from the pinned BMM's by-value graph plus the overlay edges; on the RM-faithful subgraph an Admissible verdict *is* genuine RM nesting, but where the default relation is deliberately loose (the family-agnostic `VERSION` hub, § Overlay edges) it **MAY** report Admissible for a pair that cannot actually nest.
+#### Admissible is route-existence, not a claim of RM truth
+
+A verdict is derived from the pinned BMM's by-value graph plus the overlay edges; on the RM-faithful subgraph an Admissible verdict *is* genuine RM nesting, but where the default relation is deliberately loose (the family-agnostic `VERSION` hub, § Overlay edges) it **MAY** report Admissible for a pair that cannot actually nest.
 That looseness is a documented missed defect, never a false Error (§ REQ-161 § Flagging policy); consumers needing RM-exact verdicts use a stricter profile once one ships (§ Out of scope).
 
 | Verdict | Meaning |
@@ -2503,7 +2595,9 @@ The rules that already govern a projected item bind the builder unchanged ([§ R
 
 `Build()` **MUST** refuse, with an error wrapping `aql.ErrInvalidQuery`, a typed construction the grammar does not admit at the position it renders: a call-shaped `Lit` (`literalColumn` is `columnExpr`'s `primitive` alternative, `Fn` being the call route), an aggregate-shaped argument inside `Fn` (aggregates are admitted as a top-level `columnExpr` alone), a function-shaped comparison operand in either bracket carrier (`pathPredicateOperand : primitive | objectPath | PARAMETER | ID_CODE | AT_CODE` has no `functionCall`), and a `VersionPredicate` shape outside the three § The version-predicate carrier seals, reachable by embedding the exported interface, which is refused rather than panicking ([idiom.md § No panics](idiom.md#errors-req-025)).
 
-**Read-side mirror duty.** For **every** construct this requirement adds, `Build()` → `parse.ParseQuery` → `(*parse.Query).Emit` **MUST** be **byte-identity**, not merely re-parseable.
+#### Read-side mirror duty
+
+For **every** construct this requirement adds, `Build()` → `parse.ParseQuery` → `(*parse.Query).Emit` **MUST** be **byte-identity**, not merely re-parseable.
 Identity is the right bar: the read side re-emits a class bracket verbatim and normalises a projected function name, so anything weaker would let the two sides disagree about the canonical spelling of a construct they both model, a disagreement invisible to a parseability check.
 § Canonical spellings for the new constructs is what makes identity reachable.
 
