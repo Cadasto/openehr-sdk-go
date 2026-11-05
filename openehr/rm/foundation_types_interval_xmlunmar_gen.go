@@ -72,6 +72,12 @@ func (i *Interval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&i.Lower)
+					break
+				}
 				if _err := xmlunmatched.DecodeParam(_dec, &_t, &i.Lower, canxml.DecodeAs[T]); _err != nil {
 					return _err
 				}
@@ -84,6 +90,12 @@ func (i *Interval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&i.Upper)
+					break
+				}
 				if _err := xmlunmatched.DecodeParam(_dec, &_t, &i.Upper, canxml.DecodeAs[T]); _err != nil {
 					return _err
 				}
@@ -203,6 +215,12 @@ func (p *PointInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&p.Lower)
+					break
+				}
 				if _err := xmlunmatched.DecodeParam(_dec, &_t, &p.Lower, canxml.DecodeAs[T]); _err != nil {
 					return _err
 				}
@@ -215,6 +233,12 @@ func (p *PointInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&p.Upper)
+					break
+				}
 				if _err := xmlunmatched.DecodeParam(_dec, &_t, &p.Upper, canxml.DecodeAs[T]); _err != nil {
 					return _err
 				}
@@ -334,6 +358,12 @@ func (p *ProperInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&p.Lower)
+					break
+				}
 				if _err := xmlunmatched.DecodeParam(_dec, &_t, &p.Lower, canxml.DecodeAs[T]); _err != nil {
 					return _err
 				}
@@ -346,6 +376,12 @@ func (p *ProperInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&p.Upper)
+					break
+				}
 				if _err := xmlunmatched.DecodeParam(_dec, &_t, &p.Upper, canxml.DecodeAs[T]); _err != nil {
 					return _err
 				}

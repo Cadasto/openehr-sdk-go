@@ -727,6 +727,7 @@ requirements:
       - openehr/serialize/canxml/decode_test.go
       - openehr/serialize/canxml/edgecases_test.go
       - openehr/serialize/canxml/interval_flag_defaults_test.go
+      - openehr/serialize/canxml/interval_nil_bound_test.go
       - openehr/serialize/canxml/interval_open_side_test.go
       - openehr/serialize/canxml/max_depth_test.go
       - openehr/serialize/canxml/missing_test.go
@@ -2473,6 +2474,7 @@ requirements:
     probes: [PROBE-030, PROBE-105]
     tests:
       - internal/bmmgen/render_interval_bound_test.go
+      - internal/bmmgen/render_xmlunmar_unmatched_test.go
       - internal/templatecompile/interval_reading_test.go
       - openehr/rm/interval_closed_test.go
       - openehr/rm/missing_members_test.go
@@ -2481,6 +2483,7 @@ requirements:
       - openehr/serialize/canjson/roundtrip_test.go
       - openehr/serialize/canjson/unmatched_test.go
       - openehr/serialize/canxml/interval_flag_defaults_test.go
+      - openehr/serialize/canxml/interval_nil_bound_test.go
       - openehr/serialize/canxml/interval_unbounded_bound_test.go
       - openehr/serialize/canxml/repeated_test.go
       - openehr/serialize/canxml/unmatched_test.go

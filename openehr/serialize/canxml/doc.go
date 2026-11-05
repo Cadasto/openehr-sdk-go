@@ -76,7 +76,8 @@
 //     `cardinality.lower == 0` are emitted as absent (no element).
 //     Both absent and an empty self-closing element are accepted on
 //     decode, for optionals and containers; an interface-typed member
-//     (below) needs its `xsi:type` even when empty or nilled.
+//     (below) needs its `xsi:type` even when empty or nilled, unless it is
+//     a nilled interval bound.
 //   - A single-valued member whose element carries `xsi:nil="true"` (or
 //     `1`), whatever it holds, or, for a member of a primitive type, has no
 //     text, or XML whitespace only for a string, has no value in every mode:
@@ -84,10 +85,12 @@
 //     as a `null` member does in canonical JSON, and a mandatory one to its
 //     zero value, the empty string for a string of whitespace only, as a
 //     missing member does. What a nilled element holds is unmatched content,
-//     and a nilled polymorphic member needs no `xsi:type`. A list item, a
-//     member typed by a generic parameter, which needs its `xsi:type` even
-//     when nilled, an optional enumeration sent empty and an empty struct
-//     element decode as before.
+//     and a nilled polymorphic member needs no `xsi:type`. A nilled
+//     interval bound is a null bound: it holds its zero value, and its side
+//     has no bound when absent boundary flags take their defaults. A list
+//     item, any other member typed by a generic parameter, which needs its
+//     `xsi:type` even when nilled, an optional enumeration sent empty and an
+//     empty struct element decode as before.
 //   - An element that carries one attribute twice, by its name as written or
 //     as namespaces resolve it, is not well-formed XML: every decode refuses
 //     it with [ErrInvalidShape], naming the attribute and none of its values,

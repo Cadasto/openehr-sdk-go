@@ -251,6 +251,12 @@ func (d *DVInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&d.Lower)
+					break
+				}
 				_v, _err := canxml.DecodeAs[T](_dec, _t)
 				if _err != nil {
 					return _err
@@ -265,6 +271,12 @@ func (d *DVInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&d.Upper)
+					break
+				}
 				_v, _err := canxml.DecodeAs[T](_dec, _t)
 				if _err != nil {
 					return _err

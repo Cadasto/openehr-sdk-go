@@ -392,8 +392,16 @@ func renderUnmarshalXMLCases(plan *Plan, pc *PlannedClass, sc *bmm.SimpleClass, 
 		if err != nil {
 			return "", nil, fmt.Errorf("%s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
 		}
+		zeroed := isMandatoryMember(ef.Prop)
+		if c.flagged && isIntervalBound(ef.Prop.PropertyName()) {
+			// A nilled bound is a null one: its side carries no bound, so the
+			// side's absent flags take the defaults of a side with none
+			// (REQ-169). A bound may be held by value, so it takes its zero
+			// value, nil where it is held by pointer or as an interface.
+			nilable, zeroed = true, true
+		}
 		if nilable {
-			caseBody, err = withNilGuard(caseBody, recv, FieldName(ef.Prop.PropertyName()), isMandatoryMember(ef.Prop))
+			caseBody, err = withNilGuard(caseBody, recv, FieldName(ef.Prop.PropertyName()), zeroed)
 			if err != nil {
 				return "", nil, fmt.Errorf("render UnmarshalXML field %s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
 			}
