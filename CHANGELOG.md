@@ -8,6 +8,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking: auth discovery and token documents** (SMART and OpenID configurations, token responses, RFC 6749 errors) decode with `encoding/json/v2`, so a case-variant or repeated member now fails instead of replacing the real one (REQ-062, REQ-063, REQ-071).
+- **`transport.New` and `Do`** refuse a typed-nil token source, reauthentication hook or tracer provider, where they panicked at first use (REQ-025).
+- **Breaking: canonical XML** refuses, in every mode, a primitive element nested past `encoding/xml`'s 10 000-element limit, as a plain `canxml.Decoder` already did, and a tracked decode allocates less (REQ-108, REQ-056).
+- **The operational template reader** reads a `C_STRING` `list_open` of white space only as empty, a reading 0.45.0 refused and the removed parser kept (REQ-103, REQ-111).
+- **Breaking: `templatecompile.Compile`** refuses an interval whose excluded end closes past the 32-bit `Integer`, which 64-bit builds accepted (REQ-111).
+
+### Removed
+
+- **The deprecated OPT parser**, `template.ParseOPT` with its node tree and path walk, and `fixtures.ParseOPTBytes`: read an OPT with `aom14.ReadOperationalTemplate` and compile it with `templatecompile.Compile` (REQ-111).
+
 ## [0.45.0] - 2026-11-05
 
 Forty-fifth `v0.x` minor: the ADL 1.4 operational template model, a compile step that reads it in place of the deprecated OPT parser and reads every template the parser read, and typed failures for contribution and composition writes. **Breaking:** `templatecompile.Compile` takes the model, the `aom14` types follow the AOM 1.4 schema, canonical XML reads `Real` text and a repeated `Hash` key differently, `Accreditaton` is renamed, slot includes give patterns, and five template shapes no longer compile.

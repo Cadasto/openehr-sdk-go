@@ -201,6 +201,8 @@ failure, not a deviation.
   beyond the enumerated codes), mirroring the reference (pinned by `TestInputParity`).
 - **Oracle input deltas** — a constrained DV_TEXT's TEXT input carries the C_STRING
   `list` and `listOpen` as the reference does, which closed 19 of Corona's 20 deltas.
+  It also carries a C_STRING `pattern` that is not blank as `validation.pattern`, as
+  the reference does; no vendored golden holds one.
   **Corona 1 delta, GECCO 1** remain: Corona's `medication_use` node `at0027` (golden
   `code:TEXT` + `value:TEXT`, ours `code:CODED_TEXT` open) and GECCO's
   `problem_diagnosis…/items[at0002]/value` (golden 2 inputs vs 1); `constrain_test`

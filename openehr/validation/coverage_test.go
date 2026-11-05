@@ -3,7 +3,8 @@ package validation_test
 // coverage_test.go: REQ-171 § Coverage — a result says what it does not
 // prove. Stopped lists the path of each max_depth and max_nodes issue, at most
 // one per limit; External lists, in walk order, the path of each leaf the
-// template binds to a CONSTRAINT_REF; Complete is true exactly when both are
+// template binds to a CONSTRAINT_REF, or to a C_CODE_REFERENCE that names a
+// reference set and lists no code; Complete is true exactly when both are
 // empty. The zero Coverage, which a guard and ValidateAQL return, is
 // complete.
 
@@ -103,13 +104,40 @@ const constraintRefStringChild = `
         </attributes>
       </children>`
 
+// codeReferenceValueChild returns an ELEMENT value child DV_CODED_TEXT whose
+// defining_code is a SNOMED-CT C_CODE_REFERENCE that names the reference set
+// uri, none when uri is empty, and lists codes.
+func codeReferenceValueChild(uri string, codes ...string) string {
+	var list strings.Builder
+	for _, code := range codes {
+		list.WriteString("\n            <code_list>" + code + "</code_list>")
+	}
+	return `
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>DV_CODED_TEXT</rm_type_name>
+        <node_id></node_id>
+        <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+          <rm_attribute_name>defining_code</rm_attribute_name>
+          <children xsi:type="C_CODE_REFERENCE">
+            <rm_type_name>CODE_PHRASE</rm_type_name>
+            <node_id></node_id>
+            <terminology_id><value>SNOMED-CT</value></terminology_id>` + list.String() + `
+            <referenceSetUri>` + uri + `</referenceSetUri>
+          </children>
+        </attributes>
+      </children>`
+}
+
 // REQ-171 § Coverage — a leaf the template binds to a CONSTRAINT_REF is listed
 // in Coverage.External at its issue path, and the result is not complete. The
 // same value under a C_CODE_PHRASE, which the validator checks locally, is
 // listed nowhere. A CONSTRAINT_REF on a primitive short name is listed
-// too. In the Demonstration.v1 corpus composition the leaf the
-// CONSTRAINT_REF walk test breaks is among those listed. The floor alone
-// binds no template, so it lists nothing external.
+// too, and so is a C_CODE_REFERENCE that names a reference set and lists no
+// code, whose value set the validator cannot consult either; one that lists
+// codes, or names no reference set, is checked locally and is not listed.
+// In the Demonstration.v1 corpus composition the leaf the CONSTRAINT_REF walk
+// test breaks is among those listed. The floor alone binds no template, so it
+// lists nothing external.
 func TestValidator_REQ171_ExternalListsConstraintRefLeaves(t *testing.T) {
 	coded := rm.DVCodedText{
 		Value:        "coded",
@@ -123,6 +151,9 @@ func TestValidator_REQ171_ExternalListsConstraintRefLeaves(t *testing.T) {
 		{name: "CONSTRAINT_REF", opt: elementValueOPT(constraintRefValueChild), want: []string{"/value/defining_code"}},
 		{name: "C_CODE_PHRASE", opt: elementValueOPT(externalCodeChild)},
 		{name: "CONSTRAINT_REF on STRING", opt: elementValueOPT(constraintRefStringChild), want: []string{"/value/value"}},
+		{name: "C_CODE_REFERENCE without codes", opt: elementValueOPT(codeReferenceValueChild("terminology:SNOMED-CT?subset=findings")), want: []string{"/value/defining_code"}},
+		{name: "C_CODE_REFERENCE listing codes", opt: elementValueOPT(codeReferenceValueChild("terminology:SNOMED-CT?subset=findings", "271649006"))},
+		{name: "C_CODE_REFERENCE naming no reference set", opt: elementValueOPT(codeReferenceValueChild(""))},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -150,19 +181,36 @@ func TestValidator_REQ171_ExternalListsConstraintRefLeaves(t *testing.T) {
 }
 
 // corpusExternal is, for each corpus document whose OPT holds a
-// CONSTRAINT_REF, the path of each leaf the document binds to one, in walk
-// order. Each was checked against the OPT and the document: Demonstration.v1
-// constrains ELEMENT at0011 and at0025 that way in each of its four events,
-// and the document holds a coded at0011 in the one cluster of the first three
-// events and in both clusters of the fourth, but at0025 only as a
-// DV_QUANTITY, which binds to another alternative. Address.v2 constrains
-// at0009, which the document holds coded. TestPerson.v2 constrains at0012,
-// at0034 and the address's at0009; the document holds at0012 and the
-// address's at0009 coded, and at0034 as a DV_TEXT, which binds to no
-// CONSTRAINT_REF.
+// CONSTRAINT_REF or a C_CODE_REFERENCE that lists no code, the path of each
+// leaf the document binds to one, in walk order. Each was checked against the
+// OPT and the document: Demonstration.v1 constrains ELEMENT at0011 and at0025
+// with a CONSTRAINT_REF in each of its four events, and the document holds a
+// coded at0011 in the one cluster of the first three events and in both
+// clusters of the fourth, but at0025 only as a DV_QUANTITY, which binds to
+// another alternative. Address.v2 constrains at0009 with a CONSTRAINT_REF and
+// the at2403 of its at0002 cluster with a C_CODE_REFERENCE; the document
+// holds at0009 coded and two at0002 clusters, each with a coded at2403.
+// TestPerson.v2 constrains at0012, at0034 and the address's at0009 with a
+// CONSTRAINT_REF; the document holds at0012 and the address's at0009 coded,
+// and at0034 as a DV_TEXT, which binds to no CONSTRAINT_REF. It constrains
+// eight leaves with a C_CODE_REFERENCE, which the document holds coded: at0033,
+// at2402 and at2403 of the details, at0002 and at0005 of the identifier
+// cluster, the name of the annotation cluster's at0001, the name identity's
+// at2410 and the address's at2403. Episode.v2 constrains at0015, at0016 and
+// at0017 with a C_CODE_REFERENCE, family_history.v.1.2.3 the at0009 of its
+// at0008 cluster, and terminology_test.ehrbase.org.v1 and its "2" sibling the
+// at0004 of each event; each document holds each of them coded, the latter
+// two in three events.
 var corpusExternal = func() map[string][]string {
 	const demo = "/content[openEHR-EHR-OBSERVATION.demo.v1]/data/events"
 	const code = "/items[at0011]/value/defining_code"
+	const terminologyTest = "/content[openEHR-EHR-OBSERVATION.terminology_test.v0]/data/events"
+	const episode = "/content[openEHR-EHR-ADMIN_ENTRY.episode.v2]/data/items"
+	terminologyEvents := []string{
+		terminologyTest + "[1]/data/items[at0004]/value/defining_code",
+		terminologyTest + "[2]/data/items[at0004]/value/defining_code",
+		terminologyTest + "[3]/data/items[at0004]/value/defining_code",
+	}
 	return map[string][]string{
 		"Demonstration.v1": {
 			demo + "[at0002]/data/items[at0004]" + code,
@@ -171,11 +219,31 @@ var corpusExternal = func() map[string][]string {
 			demo + "[at0035]/data/items[2]" + code,
 			demo + "[at0035]/data/items[3]" + code,
 		},
-		"Address.v2": {"/details/items[at0009]/value/defining_code"},
+		"Address.v2": {
+			"/details/items[1]/items[at2403]/value/defining_code",
+			"/details/items[2]/items[at2403]/value/defining_code",
+			"/details/items[at0009]/value/defining_code",
+		},
 		"TestPerson.v2": {
 			"/details/items[at0001]/items[at0012]/value/defining_code",
+			"/details/items[at0033]/value/defining_code",
+			"/details/items[at2402]/value/defining_code",
+			"/details/items[at2403]/value/defining_code",
+			"/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0002]/value/defining_code",
+			"/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0005]/value/defining_code",
+			"/details/items[openEHR-DEMOGRAPHIC-CLUSTER.annotations.v1]/items[at0001]/name/defining_code",
+			"/identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2]/details/items[at2410]/value/defining_code",
+			"/contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/details/items[at0002]/items[at2403]/value/defining_code",
 			"/contacts[at0003]/addresses[openEHR-DEMOGRAPHIC-ADDRESS.address.v2]/details/items[at0009]/value/defining_code",
 		},
+		"Episode.v2": {
+			episode + "[at0015]/value/defining_code",
+			episode + "[at0016]/value/defining_code",
+			episode + "[at0017]/value/defining_code",
+		},
+		"family_history.v.1.2.3":           {"/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0008]/items[at0009]/value/defining_code"},
+		"terminology_test.ehrbase.org.v1":  terminologyEvents,
+		"terminology_test2.ehrbase.org.v1": terminologyEvents,
 	}
 }()
 
@@ -227,9 +295,10 @@ func corpusDocuments(t *testing.T) []corpusDocument {
 }
 
 // REQ-171 Acceptance — every vendored corpus document validated against its
-// OPT stops at no limit, and lists in External exactly the CONSTRAINT_REF
-// leaves it binds (corpusExternal), so Complete is true for each document
-// that binds none, the BMI composition among them.
+// OPT stops at no limit, and lists in External exactly the leaves it binds to
+// a CONSTRAINT_REF or to a C_CODE_REFERENCE that lists no code
+// (corpusExternal), so Complete is true for each document that binds none,
+// the BMI composition among them.
 func TestValidator_REQ171_CorpusCoverage(t *testing.T) {
 	v := validation.New()
 	complete := map[string]bool{}
@@ -252,7 +321,7 @@ func TestValidator_REQ171_CorpusCoverage(t *testing.T) {
 	}
 	for id := range corpusExternal {
 		if _, seen := complete[id]; !seen {
-			t.Errorf("corpus document %s was not validated against its OPT; the CONSTRAINT_REF cases have gone blind", id)
+			t.Errorf("corpus document %s was not validated against its OPT; the cases bound outside the template have gone blind", id)
 		}
 	}
 	if !complete["BMI"] {

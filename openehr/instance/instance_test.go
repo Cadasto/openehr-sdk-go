@@ -75,6 +75,27 @@ func TestGenerateCompositionRequiresOptions(t *testing.T) {
 	}
 }
 
+// TestREQ107_GenerateReadsATypedNilComposerAsAbsent pins that a Composer
+// that holds a nil pointer, such as a nil *rm.PartyIdentified, is no
+// composer: for a COMPOSITION root Generate returns no root and an error
+// wrapping ErrComposerRequired, as it does for a nil Composer, with the
+// territory set.
+func TestREQ107_GenerateReadsATypedNilComposerAsAbsent(t *testing.T) {
+	c := compileFixture(t, "vital_signs")
+	for name, composer := range map[string]rm.PartyProxy{
+		"PARTY_IDENTIFIED": (*rm.PartyIdentified)(nil),
+		"PARTY_RELATED":    (*rm.PartyRelated)(nil),
+		"PARTY_SELF":       (*rm.PartySelf)(nil),
+	} {
+		t.Run(name, func(t *testing.T) {
+			out, err := instance.Generate(t.Context(), c, instance.Options{Territory: "NL", Composer: composer})
+			if out != nil || !errors.Is(err, instance.ErrComposerRequired) {
+				t.Errorf("Generate(Composer: nil %T) = %T, %v; want no root and ErrComposerRequired", composer, out, err)
+			}
+		})
+	}
+}
+
 func TestGenerateVitalSignsMedium(t *testing.T) {
 	c := compileFixture(t, "vital_signs")
 	out, err := instance.Generate(context.Background(), c, instance.Options{

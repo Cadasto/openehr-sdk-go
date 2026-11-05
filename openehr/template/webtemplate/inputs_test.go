@@ -203,9 +203,12 @@ var inputDeviationCounts = map[string]int{
 // REQ-106, REQ-103 — a DV_TEXT whose value C_STRING carries a list emits
 // that list on its TEXT input, each entry's label the list string, and
 // listOpen read from the C_STRING list_open flag, with a list or without
-// one. The vendored fixture sets no list_open, so its list is closed; the
-// open cases add the element to the same C_STRING, the last one in place
-// of its list.
+// one. A pattern that is not blank becomes the input's validation pattern,
+// as the reference's InputHandler sets it, beside a list or in its place; a
+// blank one sets no validation. The vendored fixture sets no list_open and
+// no pattern, so its list is closed and its input has no validation; the
+// other cases add the element to the same C_STRING, some in place of its
+// list.
 func TestTextInput_REQ106_REQ103_CStringList(t *testing.T) {
 	t.Parallel()
 	const fixture = "../../../testkit/corpus/templates/Test_dv_text_list_constraint.v0.opt"
@@ -217,6 +220,7 @@ func TestTextInput_REQ106_REQ103_CStringList(t *testing.T) {
 		lastEntry  = "<list>OPQ</list>"
 		allEntries = "<list>XYZ</list>\n    " + lastEntry
 		openFlag   = "<list_open>true</list_open>"
+		pattern    = "<pattern>[A-Z]{3}</pattern>"
 	)
 	for _, s := range []string{lastEntry, allEntries} {
 		if bytes.Count(raw, []byte(s)) != 1 {
@@ -225,7 +229,11 @@ func TestTextInput_REQ106_REQ103_CStringList(t *testing.T) {
 	}
 	open := bytes.Replace(raw, []byte(lastEntry), []byte(lastEntry+openFlag), 1)
 	openNoList := bytes.Replace(raw, []byte(allEntries), []byte(openFlag), 1)
+	patterned := bytes.Replace(raw, []byte(allEntries), []byte(pattern+allEntries), 1)
+	patternNoList := bytes.Replace(raw, []byte(allEntries), []byte(pattern), 1)
+	blankPattern := bytes.Replace(raw, []byte(allEntries), []byte("<pattern> </pattern>"), 1)
 	list := []webtemplate.InputListItem{{Value: "XYZ", Label: "XYZ"}, {Value: "OPQ", Label: "OPQ"}}
+	threeCapitals := &webtemplate.Validation{Pattern: "[A-Z]{3}"}
 	tests := []struct {
 		name string
 		opt  []byte
@@ -234,6 +242,9 @@ func TestTextInput_REQ106_REQ103_CStringList(t *testing.T) {
 		{name: "closed", opt: raw, want: []webtemplate.Input{{Type: "TEXT", List: list}}},
 		{name: "open", opt: open, want: []webtemplate.Input{{Type: "TEXT", List: list, ListOpen: true}}},
 		{name: "open, no list", opt: openNoList, want: []webtemplate.Input{{Type: "TEXT", ListOpen: true}}},
+		{name: "pattern", opt: patterned, want: []webtemplate.Input{{Type: "TEXT", List: list, Validation: threeCapitals}}},
+		{name: "pattern, no list", opt: patternNoList, want: []webtemplate.Input{{Type: "TEXT", Validation: threeCapitals}}},
+		{name: "blank pattern, no list", opt: blankPattern, want: []webtemplate.Input{{Type: "TEXT"}}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -260,7 +271,7 @@ func TestTextInput_REQ106_REQ103_CStringList(t *testing.T) {
 				t.Fatal("no DV_TEXT leaf at0031 in the built tree")
 			}
 			if !reflect.DeepEqual(got.Inputs, tc.want) {
-				t.Errorf("DV_TEXT at0031 inputs = %+v, want %+v", got.Inputs, tc.want)
+				t.Errorf("DV_TEXT at0031 inputs = [%s] %+v, want [%s] %+v", inputSig(got.Inputs), got.Inputs, inputSig(tc.want), tc.want)
 			}
 		})
 	}

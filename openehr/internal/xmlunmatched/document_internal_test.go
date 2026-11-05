@@ -9,6 +9,7 @@ package xmlunmatched
 // through canxml.Unmarshal; this file pins the entry point itself.
 
 import (
+	"bufio"
 	"encoding/xml"
 	"errors"
 	"slices"
@@ -78,7 +79,10 @@ func documentModes() map[string]func() *Tracker {
 // pass before the root, and comments, processing instructions and
 // whitespace after it; anything else on either side is refused with an error
 // that wraps ErrInvalidShape, names which side, and carries none of the
-// content. The root's value is decoded either way.
+// content. A processing instruction whose target is xml, in any letter case,
+// is refused on either side unless it is the XML declaration at the start;
+// a target that only starts with those letters passes. The root's value is
+// decoded either way.
 func TestREQ056_UnmarshalOneRoot(t *testing.T) {
 	const root = `<counted xmlns="http://schemas.openehr.org/v1"><n>1</n></counted>`
 	const planted = "planted-secret-value"
@@ -86,6 +90,8 @@ func TestREQ056_UnmarshalOneRoot(t *testing.T) {
 		"root alone":  root,
 		"full prolog": "\ufeff" + `<?xml version="1.0"?>` + "\n<!-- a -->\n<!DOCTYPE counted>\n<?pi x?>\n" + root,
 		"tail":        root + "\n<!-- b -->\n<?pi y?>\n ",
+		"targets that only start with xml": `<?xml version="1.0"?><?xml-stylesheet href="a.xsl"?><?xmlfoo x?>` + root +
+			`<?xml-stylesheet href="b.xsl"?><?XMLbar y?>`,
 	}
 	refused := map[string]struct{ in, side string }{
 		"text before the root":             {planted + root, "content before the root element"},
@@ -94,6 +100,11 @@ func TestREQ056_UnmarshalOneRoot(t *testing.T) {
 		"second root":                      {root + `<extra>` + planted + `</extra>`, "content after the root element"},
 		"text after the root":              {root + planted, "content after the root element"},
 		"document type after the root":     {root + `<!DOCTYPE extra>`, "content after the root element"},
+		"second XML declaration":           {`<?xml version="1.0"?><?xml version="1.0" extra="` + planted + `"?>` + root, "content before the root element"},
+		"XML declaration after a comment":  {`<!-- a --><?xml version="1.0"?>` + root, "content before the root element"},
+		"xml target in capitals before":    {`<?XML ` + planted + `?>` + root, "content before the root element"},
+		"XML declaration after the root":   {root + `<?xml version="1.0"?>`, "content after the root element"},
+		"xml target in mixed case after":   {root + `<?XmL ` + planted + `?>`, "content after the root element"},
 	}
 	for mode, tracker := range documentModes() {
 		for name, in := range accepted {
@@ -123,6 +134,45 @@ func TestREQ056_UnmarshalOneRoot(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// TestREQ056_ReadPrologXMLTarget pins that ReadProlog holds a processing
+// instruction whose target is xml to the rule Unmarshal holds it to: the XML
+// declaration passes as the first token, after a byte order mark too, and
+// one anywhere else before the root, or one whose target is xml in another
+// letter case, is refused with an error that wraps ErrInvalidShape and
+// carries none of it.
+func TestREQ056_ReadPrologXMLTarget(t *testing.T) {
+	const root = `<counted><n>1</n></counted>`
+	const planted = "planted-secret-value"
+	accepted := map[string]string{
+		"XML declaration":             `<?xml version="1.0"?>` + root,
+		"after a byte order mark":     "\ufeff" + `<?xml version="1.0"?>` + root,
+		"target that starts with xml": `<?xml version="1.0"?><?xml-stylesheet href="a.xsl"?>` + root,
+	}
+	refused := map[string]string{
+		"second XML declaration":          `<?xml version="1.0"?><?xml version="1.0" extra="` + planted + `"?>` + root,
+		"XML declaration after a comment": `<!-- a --><?xml version="1.0"?>` + root,
+		"xml target in capitals":          `<?XML ` + planted + `?>` + root,
+	}
+	for name, in := range accepted {
+		t.Run("accepted/"+name, func(t *testing.T) {
+			if _, err := ReadProlog(bufio.NewReader(strings.NewReader(in))); err != nil {
+				t.Errorf("ReadProlog(%q) = %v; want nil", in, err)
+			}
+		})
+	}
+	for name, in := range refused {
+		t.Run("refused/"+name, func(t *testing.T) {
+			_, err := ReadProlog(bufio.NewReader(strings.NewReader(in)))
+			if !errors.Is(err, ErrInvalidShape) {
+				t.Fatalf("ReadProlog(%q) err = %v; want errors.Is(_, ErrInvalidShape)", in, err)
+			}
+			if strings.Contains(err.Error(), planted) {
+				t.Errorf("ReadProlog(%q) err = %q; it echoes the content", in, err)
+			}
+		})
 	}
 }
 

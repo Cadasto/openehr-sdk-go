@@ -44,6 +44,18 @@ func isConstraintRef(pc constraints.PrimitiveConstraint) bool {
 	return isRef
 }
 
+// boundOutside reports whether pc binds its value set outside the template,
+// which the SDK cannot consult ([Coverage.External]): a CONSTRAINT_REF, or a
+// C_CODE_REFERENCE that names a reference set and lists no code. A
+// C_CODE_REFERENCE that lists codes, or names no reference set, is checked
+// locally by the code phrase constraint it carries, as a C_CODE_PHRASE is.
+func boundOutside(pc constraints.PrimitiveConstraint) bool {
+	if ref, ok := pc.(constraints.CodeReference); ok {
+		return ref.ReferenceSetURI != "" && len(ref.CodeList) == 0
+	}
+	return isConstraintRef(pc)
+}
+
 // slotRefusal returns the `slot_fill` issue that refuses val, the value of
 // the single-valued attribute attr at attrPath, under the slot child slot,
 // with refused set, when the value's archetype id is empty or does not

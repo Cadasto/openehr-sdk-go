@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 )
 
@@ -551,6 +552,45 @@ func TestRMAttrMappingMatchValidated(t *testing.T) {
 	text.Mappings[0].Match = "~"
 	if _, err := MarshalFlat(comp, wt); !errors.Is(err, ErrUnsupportedDatatype) {
 		t.Errorf("MarshalFlat with match %q err = %v, want ErrUnsupportedDatatype", "~", err)
+	}
+}
+
+// TestREQ140MappingMatchLengthRefusedOnEncode pins which check refuses, on
+// encode, a TERM_MAPPING.match that is not one character, "<>" among them,
+// though each of its characters is a match code. Through MarshalFlat the
+// leaf's canonical JSON refuses it first, so the error wraps
+// canjson.ErrInvalidValue and not ErrUnsupportedDatatype; mappingsRMAttr
+// refuses it on its own as well, with ErrUnsupportedDatatype, so that its
+// refusal does not depend on the canonical JSON running first.
+func TestREQ140MappingMatchLengthRefusedOnEncode(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	target := rm.CodePhrase{CodeString: "21794005", TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}}
+	for name, match := range map[string]rm.Character{
+		"two match codes": "<>",
+		"empty":           "",
+		"repeated code":   "==",
+	} {
+		t.Run(name, func(t *testing.T) {
+			comp := decodeRMAttr(t, wt, rmattrBody(map[string]any{
+				rmattrText:                                    "DV_TEXT value",
+				rmattrText + "/_mapping:0|match":              "=",
+				rmattrText + "/_mapping:0/target|code":        "21794005",
+				rmattrText + "/_mapping:0/target|terminology": "SNOMED-CT",
+			}))
+			text, ok := elementText(t, comp).(*rm.DVText)
+			if !ok {
+				t.Fatalf("dv_text leaf decoded as %T", elementText(t, comp))
+			}
+			text.Mappings[0].Match = match
+			_, err := MarshalFlat(comp, wt)
+			if !errors.Is(err, canjson.ErrInvalidValue) || errors.Is(err, ErrUnsupportedDatatype) {
+				t.Errorf("MarshalFlat with match %q err = %v, want canjson.ErrInvalidValue and not ErrUnsupportedDatatype", match, err)
+			}
+			err = mappingsRMAttr(map[string]any{}, "x", []rm.TermMapping{{Match: match, Target: target}})
+			if !errors.Is(err, ErrUnsupportedDatatype) {
+				t.Errorf("mappingsRMAttr with match %q err = %v, want ErrUnsupportedDatatype", match, err)
+			}
+		})
 	}
 }
 

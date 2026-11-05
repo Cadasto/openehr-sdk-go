@@ -209,8 +209,10 @@ func TestRenderRMAccessFile_REQ171_CoversTheRegistry(t *testing.T) {
 // reading the generator chooses for one attribute of each kind: the reading
 // by Go kind, a content rule by declared type at a mandatory attribute and the
 // reading by Go kind at an optional one, the zero test of an object reference
-// and of any other class held by value, the three fixed readings, the six
-// attributes handed back in another shape, and the entries of a hash.
+// and of any other class held by value, the three fixed readings, the five
+// attributes handed back in another shape, DV_PROPORTION precision handed
+// back as the pointer its field holds, as every optional primitive is, and
+// the entries of a hash.
 func TestRenderRMAccessFile_REQ171_Readings(t *testing.T) {
 	_, _, file := rmAccessOutput(t)
 	cases := []struct {
@@ -239,7 +241,7 @@ func TestRenderRMAccessFile_REQ171_Readings(t *testing.T) {
 		{"singleItemSingle", "item", "return &x.Item, !isZeroElement(x.Item), true"},
 		{"singleReferenceRangeDVQuantity", "range", "return &x.Range, !isZeroDVIntervalDVOrdered(x.Range), true"},
 		{"singleIsmTransition", "careflow_step", "return x.CareflowStep, x.CareflowStep != nil, true"},
-		{"singleDVProportion", "precision", "if x.Precision == nil {\n\treturn nil, false, true\n}\nreturn leafValue(peek, *x.Precision), true, true"},
+		{"singleDVProportion", "precision", "return x.Precision, x.Precision != nil, true"},
 		{"singleOriginalVersionAny", "data", "if x.Data == nil {\n\treturn nil, false, true\n}\nreturn *x.Data, true, true"},
 		{"singleCodePhrase", "terminology_id", "return &x.TerminologyID, !isZeroTerminologyID(x.TerminologyID), true"},
 		{"multipleComposition", "content", "return boxValues(box, x.Content), len(x.Content), x.Content != nil, true"},

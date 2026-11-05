@@ -18,10 +18,13 @@ type sampler struct {
 	quantityUnit string
 }
 
-// newSampler builds a sampler from an optional source. A nil source
-// yields a sampler backed by the global generator.
+// newSampler builds a sampler from an optional source. A nil source, or
+// one that holds a nil pointer such as a nil *rand.PCG, yields a sampler
+// backed by the global generator.
 func newSampler(src mrand.Source) sampler {
-	if src == nil {
+	// idiom.md § No panics: a typed-nil source would panic on its first
+	// draw, so it is read as nil.
+	if isNilSource(src) {
 		return sampler{}
 	}
 	return sampler{rng: mrand.New(src)}

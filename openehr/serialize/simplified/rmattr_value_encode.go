@@ -453,8 +453,13 @@ func mappingsRMAttr(out map[string]any, base string, mappings []rm.TermMapping) 
 	for i, tm := range mappings {
 		prefix := base + "/_mapping:" + strconv.Itoa(i)
 		matchStr := string(tm.Match)
-		// strings.Contains(s, "") is always true, so the length check comes first —
-		// otherwise a zero-value (empty) Character would slip through as "valid".
+		// strings.Contains holds for "" and for any run of the codes, such as
+		// "<>", so the length check comes first and keeps this function safe on
+		// its own. Through MarshalFlat and MarshalStructured an empty or
+		// multi-character match never reaches it: emitLeafValue's canonicalMap
+		// refuses the leaf first, in rm.Character.MarshalJSON, with an error
+		// that wraps canjson.ErrInvalidValue, not ErrUnsupportedDatatype. A
+		// single character outside the codes is refused here.
 		if utf8.RuneCountInString(matchStr) != 1 || !strings.Contains(matchCodes, matchStr) {
 			// REQ-093: name the field and the allowed set, not the caller-supplied
 			// value — tm.Match is a bare Character with no length invariant, so

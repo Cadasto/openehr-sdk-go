@@ -11,8 +11,9 @@ import (
 // UIDsFrom returns a source for [Options.UIDSource] that draws each uid
 // from src as an RFC 9562 version-4 UUID: two Uint64 draws give its 128
 // bits, of which it sets the version and variant bits, so two sources in
-// the same state give the same uids in the same order. A nil src gives a
-// nil func, so UIDSource stays nil and the random fallback applies.
+// the same state give the same uids in the same order. A nil src, or one
+// that holds a nil pointer such as a nil *rand.PCG, gives a nil func, so
+// UIDSource stays nil and the random fallback applies.
 //
 // The returned func draws from src, so, like a math/rand/v2.Source, it is
 // not safe for concurrent use: give each concurrent Generate its own. A
@@ -20,7 +21,9 @@ import (
 // drawn from it shifts the leaf values drawn after it; a separate source
 // keeps the leaf values those of a run with no UIDSource.
 func UIDsFrom(src mrand.Source) func() *rm.HierObjectID {
-	if src == nil {
+	// idiom.md § No panics: a typed-nil source would panic on the first
+	// uid drawn, so it is read as nil.
+	if isNilSource(src) {
 		return nil
 	}
 	return func() *rm.HierObjectID {

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"cmp"
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"
@@ -714,15 +714,17 @@ func statusToSentinel(s int) error {
 }
 
 // decodeOpenEHRError attempts to parse the openEHR error envelope
-// (REQ-093). Returns ok=false when the body is empty, non-JSON, or
-// missing message, code, validation errors and coded entries from the
-// coded_text or errors list (the envelope is best-effort).
+// (REQ-093). Returns ok=false when the body is empty, non-JSON, repeats a
+// member name (json/v2 refuses one), or is missing message, code,
+// validation errors and coded entries from the coded_text or errors list
+// (the envelope is best-effort). Invalid UTF-8 in a string reads as U+FFFD
+// (envelopeUTF8), as it did under encoding/json v1, and keeps the envelope.
 func decodeOpenEHRError(body []byte) (*OpenEHRErrorDetail, bool) {
 	if len(body) == 0 {
 		return nil, false
 	}
 	var d OpenEHRErrorDetail
-	if err := json.Unmarshal(body, &d); err != nil {
+	if err := json.Unmarshal(body, &d, envelopeUTF8); err != nil {
 		return nil, false
 	}
 	if d.Message == "" && d.Code == "" && len(d.ValidationErrors) == 0 && len(d.CodedText) == 0 {

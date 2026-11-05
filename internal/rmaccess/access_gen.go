@@ -2084,10 +2084,7 @@ func singleDVProportion(x *rm.DVProportion, attr string, peek bool) (any, bool, 
 	case "numerator":
 		return leafValue(peek, x.Numerator), true, true
 	case "precision":
-		if x.Precision == nil {
-			return nil, false, true
-		}
-		return leafValue(peek, *x.Precision), true, true
+		return x.Precision, x.Precision != nil, true
 	case "type":
 		return leafValue(peek, x.Type), true, true
 	}

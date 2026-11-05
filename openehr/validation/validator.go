@@ -137,7 +137,7 @@ func (v *Validator) limitsOrDefault() Limits {
 // in one call.
 //
 // [Result.Coverage] lists each path where a limit stopped the walk, with a
-// template each node the template binds to a CONSTRAINT_REF, and the
+// template each node the template binds to a value set outside it, and the
 // Reference Model invariants of the classes the walk visited that the
 // validator does not evaluate.
 func (v *Validator) Validate(root any, c *templatecompile.Compiled, opts ...ValidateOption) Result {

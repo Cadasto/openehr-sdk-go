@@ -14,10 +14,9 @@ import (
 // value: a valid one validates, and one outside the constraint is the
 // constraint's own finding, never an rm_type_mismatch. The pointers are those
 // the generated access hands over for the optional attributes of the
-// quantified types and of INTERVAL_EVENT: an *rm.Integer precision and
-// sample_count, an *rm.Real accuracy and a *bool accuracy_is_percent. The
-// DV_PROPORTION precision rows are the control: the generated access hands
-// that pointer over dereferenced.
+// quantified types and of INTERVAL_EVENT: an *rm.Integer precision, that of
+// a DV_PROPORTION among them, and sample_count, an *rm.Real accuracy and a
+// *bool accuracy_is_percent.
 
 // primitiveAttrChild returns an OPT child of RM type rmType whose attribute
 // attr holds the AOM 1.4 short-name node shortName, constrained by a

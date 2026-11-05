@@ -8,11 +8,11 @@ import (
 
 // inputsFor maps a compiled value node to the WebTemplate inputs for the
 // core clinical datatype subset (REQ-106). Input suffix and type mirror the
-// EHRbase v2.3 reference exactly; list values, terminology and numeric-range
-// validation are populated where the constraint carries them. Deeper input
-// contents (date patterns, default values, duration/precision ranges,
-// per-unit validation, term bindings) are documented deviations — see
-// deviations.md.
+// EHRbase v2.3 reference exactly; list values, terminology, pattern and
+// numeric-range validation are populated where the constraint carries them.
+// Deeper input contents (date patterns, default values, duration/precision
+// ranges, per-unit validation, term bindings) are documented deviations —
+// see deviations.md.
 func inputsFor(v *templatecompile.CompiledNode) []Input {
 	switch v.RMTypeName() {
 	case "DV_TEXT":
@@ -45,9 +45,10 @@ func inputsFor(v *templatecompile.CompiledNode) []Input {
 
 // textInputs emits the single TEXT input for DV_TEXT. The C_STRING
 // constraint lives on the value node's value child; its list becomes the
-// input's list, each entry labelled with its own string, and its list_open
-// flag becomes listOpen, mirroring the reference. This listOpen is the
-// OPT's flag, not the empty-list reading codedTextInputs applies.
+// input's list, each entry labelled with its own string, its list_open flag
+// becomes listOpen, and a pattern that is not blank becomes the input's
+// validation pattern, mirroring the reference. This listOpen is the OPT's
+// flag, not the empty-list reading codedTextInputs applies.
 func textInputs(v *templatecompile.CompiledNode) []Input {
 	in := Input{Type: "TEXT"}
 	cs := childConstraint[constraints.CString](v, "value")
@@ -55,6 +56,7 @@ func textInputs(v *templatecompile.CompiledNode) []Input {
 		in.List = append(in.List, InputListItem{Value: s, Label: s})
 	}
 	in.ListOpen = cs.ListOpen
+	in.Validation = patternValidation(cs.Pattern)
 	return []Input{in}
 }
 
@@ -228,9 +230,9 @@ func intRangeValidation(nr constraints.NumericRange) *Validation {
 	return v
 }
 
-// patternValidation wraps a temporal constraint pattern (e.g.
-// "yyyy-mm-ddTHH:MM:SS") as input validation, or nil when unconstrained.
-// The reference copies the OPT pattern verbatim.
+// patternValidation wraps a constraint pattern, a temporal one (e.g.
+// "yyyy-mm-ddTHH:MM:SS") or a C_STRING's, as input validation, or nil when
+// unconstrained. The reference copies the OPT pattern verbatim.
 func patternValidation(pattern string) *Validation {
 	if pattern == "" {
 		return nil

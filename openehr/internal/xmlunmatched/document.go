@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 )
 
 // Unmarshal decodes data, one canonical-XML document, into v: through t, so
@@ -20,12 +21,14 @@ import (
 // declaration, comments, processing instructions, whitespace and one
 // document type declaration, after a UTF-8 byte order mark at the very
 // start; comments, processing instructions and whitespace may follow the
-// root, as XML allows. Anything else before or after the root, such as an
-// element or text other than whitespace, is not well-formed XML, and the
-// decode refuses it whatever t's policy: it is malformed input, not
-// unmatched content. The error wraps [ErrInvalidShape] and carries none of
-// that content. A root that fails to decode fails as itself, and the decode
-// does not read on.
+// root, as XML allows. XML reserves the processing instruction target xml,
+// in any letter case, for the XML declaration, which comes first: one
+// elsewhere before or after the root, a second declaration among them, is
+// refused. Anything else before or after the root, such as an element or
+// text other than whitespace, is not well-formed XML, and the decode refuses
+// it whatever t's policy: it is malformed input, not unmatched content. The
+// error wraps [ErrInvalidShape] and carries none of that content. A root that
+// fails to decode fails as itself, and the decode does not read on.
 //
 // A primitive failure comes back on its own, naming the element by its path
 // from the root of the value (see "Primitive failures" in the package
@@ -92,9 +95,9 @@ func decodeAgain(data []byte, v any, err error) error {
 
 // end reads the rest of the document after the root element. Comments,
 // processing instructions and whitespace pass. Anything else, an element,
-// other text, a document type declaration or a token encoding/xml cannot
-// read, is refused: the error wraps [ErrInvalidShape] and names none of
-// it.
+// other text, a document type declaration, a processing instruction whose
+// target is xml in any letter case, or a token encoding/xml cannot read, is
+// refused: the error wraps [ErrInvalidShape] and names none of it.
 func end(dec *xml.Decoder) error {
 	for {
 		tok, err := dec.Token()
@@ -105,8 +108,12 @@ func end(dec *xml.Decoder) error {
 			return errAfterRoot()
 		}
 		switch t := tok.(type) {
-		case xml.Comment, xml.ProcInst:
+		case xml.Comment:
 			continue
+		case xml.ProcInst:
+			if !isXMLTarget(t.Target) {
+				continue
+			}
 		case xml.CharData:
 			if isXMLSpace(t) {
 				continue
@@ -130,8 +137,11 @@ var utf8BOM = []byte("\ufeff")
 // mark at the very start, the XML declaration and other processing
 // instructions, comments, whitespace and one document type declaration
 // pass. Anything else, other text or markup, a second document type
-// declaration or an end element, is refused: the error wraps
-// [ErrInvalidShape] and names none of it. A token encoding/xml cannot read,
+// declaration, an end element, or a processing instruction whose target is
+// xml in any letter case other than the XML declaration, is refused: the
+// error wraps [ErrInvalidShape] and names none of it. The XML declaration is
+// a processing instruction whose target is xml, in lower case, that only
+// whitespace comes before. A token encoding/xml cannot read,
 // and data that holds no element, are left to the decode, which fails on
 // them as it would without this check. Data that opens with its root after
 // whitespace, as the encoder writes it, costs no tokenizing.
@@ -203,6 +213,9 @@ func (c *recorder) Read(p []byte) (int, error) {
 // one it refused is refused as well.
 func prolog(d *xml.Decoder, untilRoot bool) error {
 	doctype, refused := false, false
+	// start holds while only whitespace has come, where the XML declaration
+	// may stand.
+	start := true
 	for {
 		tok, err := d.RawToken()
 		if err != nil {
@@ -223,7 +236,11 @@ func prolog(d *xml.Decoder, untilRoot bool) error {
 			}
 			return nil
 		}
-		if refused || beforeRoot(tok, &doctype) {
+		ok := refused || beforeRoot(tok, &doctype, start)
+		if t, isText := tok.(xml.CharData); !isText || !isXMLSpace(t) {
+			start = false
+		}
+		if ok {
 			continue
 		}
 		if !untilRoot {
@@ -234,12 +251,15 @@ func prolog(d *xml.Decoder, untilRoot bool) error {
 }
 
 // beforeRoot reports whether tok may come before the root element: a
-// processing instruction, a comment, whitespace, or the first document type
-// declaration, which it records in doctype.
-func beforeRoot(tok xml.Token, doctype *bool) bool {
+// comment, whitespace, the first document type declaration, which it records
+// in doctype, or a processing instruction other than one whose target is xml
+// in any letter case, unless that is the XML declaration, at the start.
+func beforeRoot(tok xml.Token, doctype *bool, start bool) bool {
 	switch t := tok.(type) {
-	case xml.ProcInst, xml.Comment:
+	case xml.Comment:
 		return true
+	case xml.ProcInst:
+		return !isXMLTarget(t.Target) || (start && t.Target == "xml")
 	case xml.CharData:
 		return isXMLSpace(t)
 	case xml.Directive:
@@ -258,6 +278,14 @@ func beforeRoot(tok xml.Token, doctype *bool) bool {
 func rootFirst(data []byte) bool {
 	head := bytes.TrimLeft(data, " \t\r\n")
 	return len(head) > 1 && head[0] == '<' && head[1] != '?' && head[1] != '!' && head[1] != '/'
+}
+
+// isXMLTarget reports whether target, a processing instruction's, is xml in
+// any letter case, which XML reserves for the XML declaration
+// (https://www.w3.org/TR/xml/#NT-PITarget). A target that only starts with
+// those letters, such as xml-stylesheet, is not.
+func isXMLTarget(target string) bool {
+	return strings.EqualFold(target, "xml")
 }
 
 // errBeforeRoot is the refusal of content before the root element.

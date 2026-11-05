@@ -196,3 +196,43 @@ func TestREQ107_OtherValueFillDegradesToExampleFill(t *testing.T) {
 		}
 	}
 }
+
+// TestGenerateRandomFillTypedNilValueSourceDrawsFromGlobal is the idiom.md
+// § No panics check that a typed-nil ValueSource is read as a nil one: under
+// RandomFill, Generate draws the leaf values from the auto-seeded global
+// generator and returns a valid composition, where the first draw from the
+// source would otherwise panic.
+func TestGenerateRandomFillTypedNilValueSourceDrawsFromGlobal(t *testing.T) {
+	c := compileFixture(t, "vital_signs")
+	name := "Test Composer"
+	for _, tc := range typedNilSources {
+		t.Run(tc.name, func(t *testing.T) {
+			var out any
+			var err error
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						t.Fatalf("Generate(RandomFill, ValueSource: %s) panicked: %v", tc.name, r)
+					}
+				}()
+				out, err = instance.Generate(t.Context(), c, instance.Options{
+					Policy:      instance.Large,
+					Territory:   "NL",
+					Composer:    &rm.PartyIdentified{Name: &name},
+					ValueFill:   instance.RandomFill,
+					ValueSource: tc.src,
+				})
+			}()
+			if err != nil {
+				t.Fatalf("Generate(RandomFill, ValueSource: %s): %v", tc.name, err)
+			}
+			comp, err := instance.AsComposition(out)
+			if err != nil {
+				t.Fatalf("AsComposition: %v", err)
+			}
+			if r := validation.ValidateComposition(comp, c); !r.OK {
+				t.Errorf("Generate(RandomFill, ValueSource: %s) output failed validation: %d issues", tc.name, len(r.Issues))
+			}
+		})
+	}
+}

@@ -177,8 +177,9 @@ type Options struct {
 	Territory string
 
 	// Composer is the COMPOSITION's composer, required for a COMPOSITION
-	// root: nil there returns ErrComposerRequired. It is written as given,
-	// whatever the OPT constrains on composer. Any other root ignores it.
+	// root: nil there, or a nil pointer such as a nil *rm.PartyIdentified,
+	// returns ErrComposerRequired. It is written as given, whatever the OPT
+	// constrains on composer. Any other root ignores it.
 	Composer rm.PartyProxy
 
 	// Now is the clock for unconstrained date-times: every DV_DATE_TIME
@@ -216,8 +217,9 @@ type Options struct {
 	// ValueSource seeds the in-constraint sampler used when ValueFill is
 	// RandomFill; ignored otherwise. A fixed source (e.g.
 	// rand.NewPCG(seed, seed)) makes the leaf values byte-reproducible;
-	// nil draws from the package-global, auto-seeded generator so
-	// successive calls differ. The generator never draws a uid from it:
+	// nil, or a source that holds a nil pointer such as a nil *rand.PCG,
+	// draws from the package-global, auto-seeded generator so successive
+	// calls differ. The generator never draws a uid from it:
 	// the uids come from UIDSource, or from its random fallback.
 	//
 	// A math/rand/v2.Source is not safe for concurrent use: do not share

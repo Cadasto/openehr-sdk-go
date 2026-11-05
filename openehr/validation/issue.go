@@ -360,13 +360,17 @@ type Coverage struct {
 	Stopped []string
 
 	// External lists, in walk order, the path of each node the template
-	// binds to a CONSTRAINT_REF: a constraint whose value set is bound
+	// binds to a CONSTRAINT_REF, or to a C_CODE_REFERENCE that names a
+	// reference set and lists no code: a constraint whose value set is bound
 	// outside the template, which the validator cannot consult, so the code
 	// at that path was not checked against it; the node's other attributes
-	// were. A node bound to a C_CODE_PHRASE that names an external
-	// terminology without listing codes is not listed: the validator checks
-	// it for that terminology, and whether a code exists in an external
-	// terminology is outside every check it makes.
+	// were, and so was the terminology such a C_CODE_REFERENCE names. A node
+	// bound to a C_CODE_PHRASE that names an external terminology without
+	// listing codes is not listed: the validator checks it for that
+	// terminology, and whether a code exists in an external terminology is
+	// outside every check it makes. Nor is a node bound to a
+	// C_CODE_REFERENCE that lists codes or names no reference set, which the
+	// validator checks as it checks a C_CODE_PHRASE.
 	External []string
 
 	// NotInRM lists, in walk order and once per node, the path of each
@@ -399,8 +403,8 @@ type Coverage struct {
 }
 
 // Complete reports whether the call checked everything it reached: no limit
-// stopped the walk, and no node was bound to a CONSTRAINT_REF, whose value
-// set the validator cannot consult. It is true exactly when Stopped and
+// stopped the walk, and no node was bound to a constraint whose value set the
+// validator cannot consult, as External lists them. It is true exactly when Stopped and
 // External are both empty, so the zero Coverage is complete. It says nothing
 // of Unevaluated, which lists rules the validator evaluates on no instance,
 // nor of NotInRM, which lists attributes no instance can carry.

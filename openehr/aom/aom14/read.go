@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"strings"
 	"sync"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/decodeopts"
@@ -59,12 +60,16 @@ const inputBufferMax = 4 << 20
 // the XML declaration, comments, processing instructions, whitespace and one
 // document type declaration, after a UTF-8 byte-order mark at the very start;
 // after the root it may hold comments, processing instructions and
-// whitespace. Without it, the reader also reads past, before the root, any
-// content encoding/xml reads, such as text or a CDATA section, and, after
-// the root, a `<!…>` declaration. Anything else before
-// or after the root, such as an element after it or a stray end tag before it,
-// is refused with an error that wraps [canxml.ErrInvalidShape] and carries
-// none of it. The root element may have any name, so a document whose root is
+// whitespace. XML reserves the processing instruction target xml, in any
+// letter case, for the XML declaration at the start, so a processing
+// instruction with that target elsewhere before or after the root, such as
+// a second declaration or one after the root's end, is refused; a target that only starts with those
+// letters, such as xml-stylesheet, passes. Without it, the reader also reads
+// past, before the root, any content encoding/xml reads, such as text or a
+// CDATA section, and, after the root, a `<!…>` declaration and a processing
+// instruction whose target is xml. Anything else before or after the root,
+// such as an element after it or a stray end tag before it, is refused with
+// an error that wraps [canxml.ErrInvalidShape] and carries none of it. The root element may have any name, so a document whose root is
 // `<OPERATIONAL_TEMPLATE>` reads as one whose root is `<template>`. An input
 // with no root element, empty or holding only a declaration, comments,
 // whitespace or text, is refused with an error that wraps
@@ -365,10 +370,12 @@ func errInputTooLarge() error {
 
 // afterRoot reads r, the rest of the input after the root element, to its
 // end. Comments, processing instructions and whitespace pass, and unless
-// strict a `<!…>` declaration as well, which encoding/xml reads. Anything
-// else, an element, other text or markup encoding/xml cannot read, is
-// refused, with an error that wraps [canxml.ErrInvalidShape] and names none
-// of it, as [canxml.Unmarshal] refuses it.
+// strict a `<!…>` declaration as well, which encoding/xml reads, and a
+// processing instruction whose target is xml in any letter case, which XML
+// reserves for the XML declaration at the start. Anything else, an element,
+// other text or markup encoding/xml cannot read, is refused, with an error
+// that wraps [canxml.ErrInvalidShape] and names none of it, as
+// [canxml.Unmarshal] refuses it.
 func afterRoot(r io.Reader, strict bool) error {
 	dec := xml.NewDecoder(r)
 	for {
@@ -383,8 +390,14 @@ func afterRoot(r io.Reader, strict bool) error {
 			return fmt.Errorf("aom14: read after the root element: %w", err)
 		}
 		switch t := tok.(type) {
-		case xml.Comment, xml.ProcInst:
+		case xml.Comment:
 			continue
+		case xml.ProcInst:
+			// A target that only starts with xml, such as xml-stylesheet,
+			// passes (https://www.w3.org/TR/xml/#NT-PITarget).
+			if !strict || !strings.EqualFold(t.Target, "xml") {
+				continue
+			}
 		case xml.Directive:
 			if !strict {
 				continue

@@ -103,8 +103,8 @@ func WithValueFill(f instance.ValueFill) Option {
 
 // WithValueSource seeds the in-constraint sampler used under
 // instance.RandomFill. A fixed source (e.g. rand.NewPCG(seed, seed))
-// makes the generated leaf values byte-reproducible; nil draws from the
-// auto-seeded global generator so successive calls differ. Ignored
+// makes the generated leaf values byte-reproducible; nil, or a typed-nil
+// source such as a nil *rand.PCG, draws from the auto-seeded global generator so successive calls differ. Ignored
 // under ExampleFill.
 //
 // A math/rand/v2.Source is not safe for concurrent use: do not share one

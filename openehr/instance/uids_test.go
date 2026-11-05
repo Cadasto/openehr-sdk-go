@@ -104,3 +104,54 @@ func TestREQ107_UIDsFromNilSourceIsNil(t *testing.T) {
 		t.Errorf("UIDsFrom(nil) returned a non-nil func, want nil so Options.UIDSource stays nil")
 	}
 }
+
+// funcSource is a math/rand/v2.Source whose Uint64 calls the func itself, so a
+// nil one is a typed-nil source of func kind.
+type funcSource func() uint64
+
+func (f funcSource) Uint64() uint64 { return f() }
+
+// sliceSource, mapSource and chanSource are math/rand/v2.Sources of slice,
+// map and chan kind whose Uint64 panics when the value is nil: indexing a
+// nil slice, writing to a nil map and closing a nil chan all panic.
+type (
+	sliceSource []uint64
+	mapSource   map[int]uint64
+	chanSource  chan uint64
+)
+
+func (s sliceSource) Uint64() uint64 { return s[0] }
+
+func (m mapSource) Uint64() uint64 { m[0]++; return m[0] }
+
+func (c chanSource) Uint64() uint64 { close(c); return 0 }
+
+// typedNilSources are sources that are not nil themselves but hold a nil
+// pointer, func, slice, map or chan, so a plain nil check passes them and their first draw
+// panics.
+var typedNilSources = []struct {
+	name string
+	src  mrand.Source
+}{
+	{name: "nil *rand.PCG", src: (*mrand.PCG)(nil)},
+	{name: "nil *rand.ChaCha8", src: (*mrand.ChaCha8)(nil)},
+	{name: "nil *rand.Rand", src: (*mrand.Rand)(nil)},
+	{name: "nil func source", src: funcSource(nil)},
+	{name: "nil slice source", src: sliceSource(nil)},
+	{name: "nil map source", src: mapSource(nil)},
+	{name: "nil chan source", src: chanSource(nil)},
+}
+
+// TestUIDsFromTypedNilSourceIsNil is the idiom.md § No panics check that a
+// typed-nil source is read as a nil one: UIDsFrom returns nil, so UIDSource
+// stays nil and the random fallback applies, where the returned func would
+// otherwise panic on its first draw.
+func TestUIDsFromTypedNilSourceIsNil(t *testing.T) {
+	for _, tc := range typedNilSources {
+		t.Run(tc.name, func(t *testing.T) {
+			if next := instance.UIDsFrom(tc.src); next != nil {
+				t.Errorf("UIDsFrom(%s) returned a non-nil func, want nil so Options.UIDSource stays nil", tc.name)
+			}
+		})
+	}
+}

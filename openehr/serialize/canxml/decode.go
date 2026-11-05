@@ -540,11 +540,15 @@ func (d *Decoder) RelaxedTypeDispatch() bool { return d.cfg.relaxedTypeDispatch 
 // may hold the XML declaration, comments, processing instructions,
 // whitespace and one document type declaration, after a UTF-8 byte order
 // mark at the very start; comments, processing instructions and whitespace
-// may follow the root, as XML allows. Anything else before or after the
-// root, such as an element or text other than whitespace, is not
-// well-formed XML, and the decode refuses it in every mode, with or without
-// [WithUnmatched], [WithStrict] or [WithMissing]: it is malformed input, not
-// unmatched content. The error wraps [ErrInvalidShape] and carries none of that
+// may follow the root, as XML allows. XML reserves the processing
+// instruction target xml, in any letter case, for the XML declaration at the
+// start, so one elsewhere before or after the root, such as a second
+// declaration or one after the root's end, is refused; a target that only starts with those letters, such as
+// xml-stylesheet, passes. Anything else before or after the root, such as
+// an element or text other than whitespace, is not well-formed XML, and the
+// decode refuses it in every mode, with or without [WithUnmatched],
+// [WithStrict] or [WithMissing]: it is malformed input, not unmatched
+// content. The error wraps [ErrInvalidShape] and carries none of that
 // content. A root that fails to decode fails as itself, and the decode does
 // not read on.
 //
