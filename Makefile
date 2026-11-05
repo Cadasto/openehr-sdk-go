@@ -263,11 +263,14 @@ terminology-check: ## Verify the vendored terminology (offline sha256)
 # xmllint validates those documents, and every corpus OPT as written, against
 # AM/Release-1.4/Template.xsd. It fails on a re-encoded document the schemas
 # refuse, on an OPT they refuse as written that the ratchet does not list, and
-# on a ratchet entry they now accept.
+# on a ratchet entry they now accept. mktemp makes the folder private to the
+# host user; it is opened to all so that the dev container's user, whose uid
+# need not be the host's, can read it.
 operational-template-schema-check: ## Validate the corpus OPTs, as written and re-encoded, against the pinned AM 1.4 schemas (xmllint)
 	@set -e; mkdir -p .tmp; \
 	dir="$$(mktemp -d .tmp/operational-template-schema-check.XXXXXX)"; \
 	trap '[ -n "$$dir" ] && rm -rf "$$dir"' EXIT; \
+	chmod 755 "$$dir"; \
 	(cd resources/its-xml && find components -name '*.xsd') | while IFS= read -r f; do \
 	  mkdir -p "$$dir/schemas/$$(dirname "$$f")"; \
 	  sed 's|http://schemas.openehr.org/v2|http://schemas.openehr.org/v1|g' "resources/its-xml/$$f" > "$$dir/schemas/$$f"; \
