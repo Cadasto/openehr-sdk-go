@@ -12,10 +12,10 @@ import (
 //   - REQ-013 (docs/specifications/module-layout.md § REQ-013): no transport,
 //     auth or openehr/client. openehr/serialize is not forbidden here: REQ-013
 //     does not bar openehr/template from it.
-//   - REQ-100 (docs/specifications/clinical-modeling.md § REQ-100): the
-//     package is importable without openehr/rm or openehr/aom/aom14, so
-//     nothing it pulls in may import them either. RM class names reach it as
-//     strings from the OPT XML, never as Go types.
+//   - REQ-013 (docs/specifications/module-layout.md, the openehr/template
+//     row): the package is importable without openehr/rm or
+//     openehr/aom/aom14, so nothing it pulls in may import them either. RM
+//     class names reach it as strings, never as Go types.
 func TestTemplateForbiddenImports(t *testing.T) {
 	t.Parallel()
 	rules := []struct {
@@ -24,7 +24,7 @@ func TestTemplateForbiddenImports(t *testing.T) {
 	}{
 		{rule: "REQ-013 building-block independence", forbidden: importguard.WireLayers()},
 		{
-			rule: "REQ-100: openehr/template is importable without the RM and AOM packages",
+			rule: "REQ-013: openehr/template is importable without the RM and AOM packages",
 			forbidden: []string{
 				"github.com/cadasto/openehr-sdk-go/openehr/rm",
 				"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14",

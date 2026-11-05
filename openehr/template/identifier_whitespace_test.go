@@ -3,7 +3,6 @@ package template_test
 import (
 	"bytes"
 	jsonv2 "encoding/json/v2"
-	"errors"
 	"fmt"
 	mrand "math/rand/v2"
 	"regexp"
@@ -17,8 +16,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
-	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
@@ -28,7 +25,7 @@ import (
 // with both bounds constrained to a date-time pattern. The OBSERVATION
 // archetype root names a template id of its own. Every identifier element
 // is written on one line, and so is the path of its one annotation;
-// paddedIdentifierOPT pads them.
+// paddedElementOPT pads them.
 const identifierOPT = `<?xml version="1.0" encoding="UTF-8"?>
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
@@ -152,208 +149,24 @@ const identifierBound = `<attributes xsi:type="C_SINGLE_ATTRIBUTE">
                               </children>
                             </attributes>`
 
-// identifierText matches the text of each identifier element of
-// identifierOPT, the <value> of its template, archetype and terminology
-// ids among them, each xsi:type value and the annotation path.
-var identifierText = regexp.MustCompile(`(<(?:rm_attribute_name|rm_type_name|node_id|value|code_list|code_string)>)([^<]*)(</)|((?:xsi:type|path)=")([^"]*)(")`)
-
 // unpaddedIdentifierOPT is identifierOPT as written.
 func unpaddedIdentifierOPT() string {
 	return fmt.Sprintf(identifierOPT, fmt.Sprintf(identifierBound, "lower"), fmt.Sprintf(identifierBound, "upper"))
 }
 
-// paddedIdentifierOPT is identifierOPT as a pretty-printer writes it: the
-// text of every identifier element, every xsi:type value and the annotation
-// path start and end with a line break and indentation, as in
-// "defining_code\n   ".
-func paddedIdentifierOPT() string {
-	return identifierText.ReplaceAllString(unpaddedIdentifierOPT(), "$1$4\n \t\t  $2$5\n\t   $3$6")
-}
-
-// elementText is identifierText without the xsi:type values: the operational
-// template model refuses an xsi:type padded with white space, as it refuses
-// an unknown one, so a test that reads the model pads the other identifiers
-// only.
+// elementText matches the text of each identifier element of identifierOPT,
+// the <value> of its template, archetype and terminology ids among them, and
+// the annotation path. It leaves out the xsi:type values: the reader's strict
+// mode, which the test reads with, refuses an xsi:type padded with white
+// space, as it refuses an unknown one.
 var elementText = regexp.MustCompile(`(<(?:rm_attribute_name|rm_type_name|node_id|value|code_list|code_string)>)([^<]*)(</)|(path=")([^"]*)(")`)
 
-// paddedElementOPT is paddedIdentifierOPT with every xsi:type value left as
-// written.
+// paddedElementOPT is identifierOPT as a pretty-printer writes it: the text
+// of every identifier element and the annotation path start and end with a
+// line break and indentation, as in "defining_code\n   ". Every xsi:type
+// value is left as written.
 func paddedElementOPT() string {
 	return elementText.ReplaceAllString(unpaddedIdentifierOPT(), "$1$4\n \t\t  $2$5\n\t   $3$6")
-}
-
-// dumpNode writes n and its subtree, one line per node or attribute, with
-// every name, id and primitive constraint the parser read.
-func dumpNode(b *strings.Builder, n template.Node, indent string) {
-	switch v := n.(type) {
-	case *template.ArchetypeRoot:
-		fmt.Fprintf(b, "%sroot %q %q archetype %q template %q name %q terms %v\n",
-			indent, v.RMTypeName(), v.NodeID(), v.ArchetypeID(), v.TemplateID(), v.NodeName(), v.Terms())
-		for _, a := range v.Attributes() {
-			dumpNode(b, a, indent+"  ")
-		}
-	case *template.ComplexObject:
-		fmt.Fprintf(b, "%sobject %q %q name %q constraint %T %+v\n",
-			indent, v.RMTypeName(), v.NodeID(), v.NodeName(), v.PrimitiveConstraint(), v.PrimitiveConstraint())
-		for _, a := range v.Attributes() {
-			dumpNode(b, a, indent+"  ")
-		}
-	case *template.Attribute:
-		fmt.Fprintf(b, "%sattribute %q %v\n", indent, v.Name(), v.Cardinality())
-		for _, c := range v.Children() {
-			dumpNode(b, c, indent+"  ")
-		}
-	default:
-		fmt.Fprintf(b, "%s%T %q %q\n", indent, n, n.RMTypeName(), n.NodeID())
-	}
-}
-
-// dumpOPT writes the identity fields of tmpl, its annotations and its
-// definition tree.
-func dumpOPT(tmpl *template.OperationalTemplate) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "template %q concept %q language %q annotations %v\n", tmpl.TemplateID(), tmpl.Concept(), tmpl.Language(), tmpl.Annotations())
-	dumpNode(&b, tmpl.Root(), "")
-	return b.String()
-}
-
-// nodeAt resolves path on tmpl, failing t when it does not resolve.
-func nodeAt(t *testing.T, tmpl *template.OperationalTemplate, path string) template.Node {
-	t.Helper()
-	p, err := tmpl.ParsePath(path)
-	if err != nil {
-		t.Fatalf("ParsePath(%q): %v", path, err)
-	}
-	n, err := tmpl.NodeAt(p)
-	if err != nil {
-		t.Fatalf("NodeAt(%q): %v", path, err)
-	}
-	return n
-}
-
-// TestREQ100_IdentifierElementsReadTrimmed pins § REQ-100 Node taxonomy:
-// both parse modes read each identifier element, and each xsi:type value,
-// without the white space and line breaks a pretty-printer puts around its
-// text. The padded OPT parses to the tree the unpadded one parses to, so
-// its attribute names, RM type names, node ids, archetype and template ids,
-// its C_CODE_PHRASE terminology and codes and its annotation path are the
-// unpadded ones.
-func TestREQ100_IdentifierElementsReadTrimmed(t *testing.T) {
-	padded := paddedIdentifierOPT()
-	for _, want := range []string{"<rm_attribute_name>\n \t\t  defining_code\n\t   </", "<rm_type_name>\n \t\t  DV_DATE_TIME\n\t   </", "xsi:type=\"\n \t\t  C_SINGLE_ATTRIBUTE\n\t   \""} {
-		if !strings.Contains(padded, want) {
-			t.Fatalf("paddedIdentifierOPT() does not contain %q", want)
-		}
-	}
-	for _, mode := range parseModes {
-		t.Run(mode.name, func(t *testing.T) {
-			plain, err := mode.parse(strings.NewReader(unpaddedIdentifierOPT()))
-			if err != nil {
-				t.Fatalf("%s(unpadded): %v", mode.name, err)
-			}
-			tmpl, err := mode.parse(strings.NewReader(padded))
-			if err != nil {
-				t.Fatalf("%s(padded): %v", mode.name, err)
-			}
-			if got, want := dumpOPT(tmpl), dumpOPT(plain); got != want {
-				t.Errorf("%s(padded) tree differs from the unpadded tree:\ngot:\n%s\nwant:\n%s", mode.name, got, want)
-			}
-
-			if got := tmpl.TemplateID(); got != "padded_identifiers" {
-				t.Errorf("TemplateID() = %q, want padded_identifiers", got)
-			}
-			root, ok := tmpl.Root().(*template.ArchetypeRoot)
-			if !ok {
-				t.Fatalf("Root() = %T, want *template.ArchetypeRoot", tmpl.Root())
-			}
-			if got := root.ArchetypeID(); got != "openEHR-EHR-COMPOSITION.encounter.v1" {
-				t.Errorf("Root().ArchetypeID() = %q, want openEHR-EHR-COMPOSITION.encounter.v1", got)
-			}
-			if got := root.RMTypeName(); got != "COMPOSITION" {
-				t.Errorf("Root().RMTypeName() = %q, want COMPOSITION", got)
-			}
-			if got := root.NodeID(); got != "at0000" {
-				t.Errorf("Root().NodeID() = %q, want at0000", got)
-			}
-
-			obs, ok := nodeAt(t, tmpl, "/content[openEHR-EHR-OBSERVATION.padded.v1]").(*template.ArchetypeRoot)
-			if !ok {
-				t.Fatal("/content[openEHR-EHR-OBSERVATION.padded.v1] is not an archetype root")
-			}
-			if got := obs.TemplateID(); got != "padded_observation" {
-				t.Errorf("OBSERVATION TemplateID() = %q, want padded_observation", got)
-			}
-
-			code, ok := nodeAt(t, tmpl, "/category/defining_code").(*template.ComplexObject)
-			if !ok {
-				t.Fatal("/category/defining_code is not a complex object")
-			}
-			want := constraints.CodePhrase{Terminology: "openehr", CodeList: []string{"433"}}
-			got, ok := code.PrimitiveConstraint().(constraints.CodePhrase)
-			if !ok || got.Terminology != want.Terminology || !slices.Equal(got.CodeList, want.CodeList) {
-				t.Errorf("/category/defining_code PrimitiveConstraint() = %#v, want %#v", code.PrimitiveConstraint(), want)
-			}
-
-			element := "/content[openEHR-EHR-OBSERVATION.padded.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0004]"
-			if got := tmpl.Annotations()[element]; len(got) != 1 || got[0].Value != "A period." {
-				t.Errorf("Annotations()[%q] = %+v, want the one comment; annotations %v", element, got, tmpl.Annotations())
-			}
-			value := element + "/value"
-			if got := nodeAt(t, tmpl, value).RMTypeName(); got != "DV_INTERVAL<DV_DATE_TIME>" {
-				t.Errorf("%s RMTypeName() = %q, want DV_INTERVAL<DV_DATE_TIME>", value, got)
-			}
-			for _, bound := range []string{"lower", "upper"} {
-				if got := nodeAt(t, tmpl, value+"/"+bound).RMTypeName(); got != "DV_DATE_TIME" {
-					t.Errorf("%s/%s RMTypeName() = %q, want DV_DATE_TIME", value, bound, got)
-				}
-			}
-		})
-	}
-}
-
-// TestREQ100_BlankXSITypeReadsAsEmpty pins § REQ-100 Node taxonomy and
-// Strict parse mode together: an xsi:type that holds only white space reads
-// as an empty one. Strict mode refuses an <attributes> or a <children> so
-// typed, and the default mode reads them as it reads an untyped one.
-func TestREQ100_BlankXSITypeReadsAsEmpty(t *testing.T) {
-	const blank = "\n \t "
-	attrBlank := strings.Replace(unpaddedIdentifierOPT(), `<attributes xsi:type="C_SINGLE_ATTRIBUTE">
-      <rm_attribute_name>category</rm_attribute_name>`, `<attributes xsi:type="`+blank+`">
-      <rm_attribute_name>category</rm_attribute_name>`, 1)
-	childBlank := strings.Replace(unpaddedIdentifierOPT(), `<children xsi:type="C_CODE_PHRASE">`, `<children xsi:type="`+blank+`">`, 1)
-	if attrBlank == unpaddedIdentifierOPT() || childBlank == unpaddedIdentifierOPT() {
-		t.Fatal("the xsi:type to blank is not found")
-	}
-	tests := []struct {
-		name string
-		body string
-	}{
-		{name: "attributes", body: attrBlank},
-		{name: "children", body: childBlank},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			_, err := template.ParseOPTStrict(strings.NewReader(tc.body))
-			if !errors.Is(err, template.ErrInvalidOPT) || !strings.Contains(err.Error(), "no xsi:type") {
-				t.Errorf("ParseOPTStrict(blank xsi:type on %s) error = %v, want ErrInvalidOPT naming no xsi:type", tc.name, err)
-			}
-			tmpl, err := template.ParseOPT(strings.NewReader(tc.body))
-			if err != nil {
-				t.Fatalf("ParseOPT(blank xsi:type on %s): %v, want it read as an untyped one", tc.name, err)
-			}
-			root, ok := tmpl.Root().(*template.ArchetypeRoot)
-			if !ok {
-				t.Fatalf("Root() = %T, want *template.ArchetypeRoot", tmpl.Root())
-			}
-			i := slices.IndexFunc(root.Attributes(), func(a *template.Attribute) bool { return a.Name() == "category" })
-			if i < 0 || root.Attributes()[i].Cardinality() != template.Single {
-				t.Errorf("ParseOPT(blank xsi:type on %s): no single attribute category on the root", tc.name)
-			}
-			if got := nodeAt(t, tmpl, "/category/defining_code").RMTypeName(); got != "CODE_PHRASE" {
-				t.Errorf("/category/defining_code RMTypeName() = %q, want CODE_PHRASE", got)
-			}
-		})
-	}
 }
 
 // compiledAttributes lists the path of every attribute under n, with " not
@@ -439,15 +252,15 @@ func holdsType(t *testing.T, raw []byte, typ string) bool {
 	return walk(tree)
 }
 
-// TestREQ100_PaddedIdentifiersCompileGenerateAndValidate pins the effect of
-// § REQ-100 Node taxonomy on the compile, the generator (REQ-107) and the
+// TestREQ111_PaddedIdentifiersCompileGenerateAndValidate pins the effect of
+// § REQ-111 Reading the model on the compile, the generator (REQ-107) and the
 // validators (REQ-102): the padded OPT (paddedElementOPT, which leaves the
 // xsi:type values as written) compiles to the attributes the unpadded one
 // compiles to, none marked NotInRM, and under every policy and
 // value fill the generator writes the root it writes for the unpadded OPT,
 // which both validators accept. Medium and Large build the optional
 // OBSERVATION, so their root holds the interval and its two bounds.
-func TestREQ100_PaddedIdentifiersCompileGenerateAndValidate(t *testing.T) {
+func TestREQ111_PaddedIdentifiersCompileGenerateAndValidate(t *testing.T) {
 	compile := func(t *testing.T, body string) *templatecompile.Compiled {
 		t.Helper()
 		opt, err := aom14.ReadOperationalTemplate(strings.NewReader(body), canxml.WithStrict())

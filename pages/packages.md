@@ -31,7 +31,7 @@ None of these import `transport/` or `auth/`. That independence is REQ-013 in
 | [`openehr/serialize/canjson`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson) | Canonical JSON |
 | [`openehr/serialize/canxml`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml) | Canonical XML |
 | [`openehr/serialize/simplified`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified) | FLAT and STRUCTURED |
-| [`openehr/template`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/template) | ADL 1.4 operational template parse and paths |
+| [`openehr/template`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/template) | ADL 1.4 operational template path grammar and the small types a compiled template shares |
 | [`openehr/templatecompile`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/templatecompile) | Compile an OPT for the builder, validator, and AQL lint |
 | [`openehr/template/webtemplate`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate) | Web Template JSON export from a compiled OPT, EHRbase v2.3 ids |
 | [`openehr/validation`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/validation) | Reference Model rules with no template (`ValidateRM`), a Composition or other RM root against a compiled OPT, a canonical JSON or XML document decoded and validated in one call (`ValidateJSON`, `ValidateXML`), and the AQL lint entry |

@@ -2,7 +2,7 @@
 // (OPT) tooling shares: the openEHR path grammar and the small value
 // types a compiled template hands out.
 //
-// The package keeps:
+// The package holds:
 //
 //   - [Path] and the path grammar, read by [ParsePath];
 //   - [Cardinality] with [Single] and [Multiple], and [Multiplicity]
@@ -21,16 +21,6 @@
 // Compiled.Resolve or Compiled.ValidatePath, passing the [Path] that
 // [ParsePath] returns and, to refuse an ambiguous segment,
 // templatecompile.WithStrictPaths.
-//
-// The OPT parser ([ParseOPT], [ParseOPTStrict], [ParseFile] and
-// [ParseFileStrict]), the node tree it builds ([OperationalTemplate],
-// [Node], [ObjectNode], [ComplexObject], [ArchetypeRoot], [Attribute],
-// [Slot], [Annotation] and [Description]), [OperationalTemplate.NodeAt],
-// [OperationalTemplate.ValidatePath], [OperationalTemplate.ParsePath],
-// [ResolveOption] and [WithStrictPaths] are deprecated. They keep
-// working, with the behaviour documented on each, until a later release
-// removes them. So do the parser's errors, [ErrInvalidOPT],
-// [ErrNotOPTFile] and [ErrUnsupportedNode].
 //
 // An OPT is an XML artifact with root element <template> in namespace
 // http://schemas.openehr.org/v1 (the Ocean Template Designer XSD form),
