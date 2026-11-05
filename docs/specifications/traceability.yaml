@@ -2478,6 +2478,7 @@ requirements:
       - openehr/serialize/canjson/unmatched_test.go
       - openehr/serialize/canxml/interval_flag_defaults_test.go
       - openehr/serialize/canxml/interval_unbounded_bound_test.go
+      - openehr/serialize/canxml/repeated_test.go
       - openehr/serialize/canxml/unmatched_test.go
       - openehr/serialize/simplified/interval_unbounded_test.go
       - openehr/serialize/simplified/null_test.go
@@ -2489,8 +2490,8 @@ requirements:
     title: Unmatched content on decode
     canonical: docs/specifications/wire.md#req-170--unmatched-content-on-decode
     status: draft
-    implementation: partial
-    packages: [openehr/serialize/canjson, internal/rmjsonwalk, openehr/serialize/canxml, openehr/internal/xmlunmatched, internal/bmmgen, openehr/rm, openehr/serialize/simplified, testkit/expectedform]
+    implementation: landed
+    packages: [openehr/serialize/canjson, internal/rmjsonwalk, openehr/serialize/canxml, openehr/internal/xmlunmatched, internal/bmmgen, openehr/rm, openehr/aom/aom14, openehr/serialize/simplified, testkit/expectedform]
     probes: [PROBE-086, PROBE-105, PROBE-030]
     tests:
       - internal/bmmgen/render_jsonhooks_test.go
@@ -2506,6 +2507,7 @@ requirements:
       - openehr/internal/xmlunmatched/entry_internal_test.go
       - openehr/serialize/canjson/unmatched_test.go
       - openehr/serialize/canxml/primitive_error_test.go
+      - openehr/serialize/canxml/repeated_test.go
       - openehr/serialize/canxml/unmatched_test.go
       - openehr/serialize/simplified/composer_test.go
       - openehr/serialize/simplified/composition_name_test.go
@@ -2648,8 +2650,8 @@ requirements:
     title: Missing members on decode
     canonical: docs/specifications/wire.md#req-175--missing-members-on-decode
     status: draft
-    implementation: partial
-    packages: [openehr/serialize/canjson, openehr/serialize/canxml, internal/rmjsonwalk, openehr/internal/xmlunmatched, internal/bmmgen, openehr/rm, openehr/aom/aom14, openehr/validation]
+    implementation: landed
+    packages: [openehr/serialize/canjson, openehr/serialize/canxml, internal/rmjsonwalk, openehr/internal/xmlunmatched, openehr/internal/decodeopts, internal/bmmgen, openehr/rm, openehr/aom/aom14, openehr/validation]
     probes: [PROBE-110, PROBE-081]
     tests:
       - internal/bmmgen/render_xmlunmar_class_test.go
@@ -2661,6 +2663,7 @@ requirements:
       - openehr/rm/missing_members_test.go
       - openehr/serialize/canjson/missing_test.go
       - openehr/serialize/canxml/missing_test.go
+      - openehr/serialize/canxml/presence_test.go
       - openehr/validation/missing_members_test.go
 
   - id: REQ-176
