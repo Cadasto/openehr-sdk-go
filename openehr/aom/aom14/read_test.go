@@ -298,6 +298,7 @@ func TestREQ176_REQ111_ReadOperationalTemplateHoldsContentBeforeTheRoot(t *testi
 		"a second XML declaration":    `<?xml version="1.0"?><?xml version="1.0" extra="` + planted + `"?>`,
 		"a misplaced XML declaration": `<!-- note --><?xml version="1.0"?>`,
 		"an xml target in capitals":   `<?XML ` + planted + `?>`,
+		"an xml target in the subset": `<!DOCTYPE template [<?xml ` + planted + `?>]>`,
 	}
 	accepted := map[string]string{
 		"nothing":                       "",

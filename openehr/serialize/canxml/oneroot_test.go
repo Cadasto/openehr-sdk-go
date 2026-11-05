@@ -126,7 +126,9 @@ func TestREQ056_XMLOneRootAfterFailedRoot(t *testing.T) {
 // canxml.ErrInvalidShape, carries none of the content, and is not unmatched
 // content. A processing instruction whose target is xml in any letter case is
 // the XML declaration only at the start: a second one, one after other
-// markup, or one in capitals is refused. A UTF-8 byte order mark at the very
+// markup, one in the document type's internal subset, or one in capitals is
+// refused, and the same bytes in a literal or a comment of that subset pass.
+// A UTF-8 byte order mark at the very
 // start is the document's encoding signature, not content, and is accepted.
 // canxml.Decoder, which reads a stream of values, is unchanged.
 //
@@ -134,7 +136,8 @@ func TestREQ056_XMLOneRootAfterFailedRoot(t *testing.T) {
 // refused case decodes without an error, or fails with an unclassified
 // syntax error, since encoding/xml skips every token before the first start
 // element; let a second document type declaration, an end element or a
-// misplaced XML declaration through and its case decodes; drop the byte order
+// misplaced XML declaration through and its case decodes; let a document type
+// whose subset holds one through and its case decodes; drop the byte order
 // mark rule and the accepted cases that start with one fail.
 func TestREQ056_XMLBeforeRoot(t *testing.T) {
 	const root = `<dv_count xmlns="http://schemas.openehr.org/v1"><magnitude>1</magnitude></dv_count>`
@@ -157,6 +160,7 @@ func TestREQ056_XMLBeforeRoot(t *testing.T) {
 		"XML declaration after a comment":  `<!-- note --><?xml version="1.0"?>`,
 		"XML declaration after a PI":       `<?pi data?><?xml version="1.0"?>`,
 		"xml target in capitals":           `<?XML pi data?>`,
+		"xml target in the document type":  `<!DOCTYPE dv_count [<?xml pi data?>]>`,
 	}
 	accepted := map[string]string{
 		"nothing":         "",
@@ -169,6 +173,8 @@ func TestREQ056_XMLBeforeRoot(t *testing.T) {
 		"processing instruction":           `<?pi data?>`,
 		"document type":                    `<!DOCTYPE dv_count>`,
 		"document type with subset":        `<!DOCTYPE dv_count [<!ENTITY e "v">]>`,
+		"xml target in a subset literal":   `<!DOCTYPE dv_count [<!ENTITY e "<?xml v?>">]>`,
+		"xml target in a subset comment":   `<!DOCTYPE dv_count [<!-- <?xml v?> -->]>`,
 		"byte order mark":                  bom,
 		"target that starts with xml":      `<?xml version="1.0"?><?xml-stylesheet href="a.xsl"?>`,
 		"the whole prolog": bom + `<?xml version="1.0"?>` + "\n<!-- a -->\n" + `<!DOCTYPE dv_count SYSTEM "x.dtd">` +
@@ -240,8 +246,9 @@ func TestREQ056_XMLBeforeRoot(t *testing.T) {
 // TestREQ056_XMLTargetInsideTheRoot pins that XML reserves the processing
 // instruction target xml, in any letter case, for the declaration at the start
 // of a document, inside the root as before and after it (REQ-056):
-// canxml.Unmarshal refuses one inside an element in every mode, and so does a
-// canxml.Decoder given any option, canxml.WithMaxDepth included, with an error
+// canxml.Unmarshal refuses one inside an element, or inside a document type
+// declaration there, in every mode, and so does a canxml.Decoder given
+// any option, canxml.WithMaxDepth included, with an error
 // that wraps canxml.ErrInvalidShape, is no unmatched content and carries none
 // of the instruction. A target that only starts with xml passes, and so do the
 // same bytes inside a comment or a CDATA section, which are no instruction.
@@ -257,6 +264,7 @@ func TestREQ056_XMLTargetInsideTheRoot(t *testing.T) {
 		"after a member":                `<dv_text ` + ns + `><value>a</value><?xml version="1.0"?></dv_text>`,
 		"xml target in capitals":        `<dv_text ` + ns + `><value>a</value><?XML pi data?></dv_text>`,
 		"bare xml target":               `<dv_text ` + ns + `><value>a</value><?xml?></dv_text>`,
+		"in a document type":            `<dv_text ` + ns + `><!DOCTYPE x [<?xml pi data?>]><value>a</value></dv_text>`,
 	}
 	accepted := map[string]struct{ in, value string }{
 		"target that starts with xml": {`<dv_text ` + ns + `><?xml-stylesheet href="a.xsl"?><value>a</value></dv_text>`, "a"},

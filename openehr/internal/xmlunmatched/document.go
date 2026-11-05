@@ -152,7 +152,8 @@ var utf8BOM = []byte("\ufeff")
 // instructions, comments, whitespace and one document type declaration
 // pass. Anything else, other text or markup, a second document type
 // declaration, an end element, or a processing instruction whose target is
-// xml in any letter case other than the XML declaration, is refused: the
+// xml in any letter case other than the XML declaration, in the internal
+// subset of the document type declaration too, is refused: the
 // error wraps [ErrInvalidShape] and names none of it. The XML declaration is
 // a processing instruction whose target is xml, in lower case, that only
 // whitespace comes before. A token encoding/xml cannot read,
@@ -266,8 +267,9 @@ func prolog(d *xml.Decoder, untilRoot bool) error {
 
 // beforeRoot reports whether tok may come before the root element: a
 // comment, whitespace, the first document type declaration, which it records
-// in doctype, or a processing instruction other than one whose target is xml
-// in any letter case, unless that is the XML declaration, at the start.
+// in doctype, unless it holds a processing instruction whose target is xml
+// ([holdsXMLTarget]), or a processing instruction other than one whose target
+// is xml in any letter case, unless that is the XML declaration, at the start.
 func beforeRoot(tok xml.Token, doctype *bool, start bool) bool {
 	switch t := tok.(type) {
 	case xml.Comment:
@@ -277,7 +279,7 @@ func beforeRoot(tok xml.Token, doctype *bool, start bool) bool {
 	case xml.CharData:
 		return isXMLSpace(t)
 	case xml.Directive:
-		if !*doctype && isDoctype(t) {
+		if !*doctype && isDoctype(t) && !holdsXMLTarget(t) {
 			*doctype = true
 			return true
 		}
@@ -295,28 +297,57 @@ func rootFirst(data []byte) bool {
 }
 
 // xmlTargetPastStart reports whether data, one document, may hold a
-// processing instruction whose target is xml anywhere but at its very start,
-// after a byte order mark: `<?` and the letters xml in any letter case,
-// followed by XML whitespace or `?`. A comment or a CDATA section can hold
-// those bytes too, which only a decode tells apart. It costs one search of
-// data for `<?`.
+// processing instruction whose target is xml anywhere but at its start, after
+// a byte order mark and XML whitespace, where the XML declaration stands
+// ([opensXMLTarget]). A comment or a CDATA section can hold those bytes too,
+// which only a decode tells apart. It costs one search of data for `<?`.
 func xmlTargetPastStart(data []byte) bool {
-	data = bytes.TrimPrefix(data, utf8BOM)
-	for at := 0; ; {
+	data = bytes.TrimLeft(bytes.TrimPrefix(data, utf8BOM), " \t\r\n")
+	for at := 1; at < len(data); at += len(piOpen) {
 		i := bytes.Index(data[at:], piOpen)
 		if i < 0 {
 			return false
 		}
-		at += i + len(piOpen)
-		rest := data[at:]
-		if at > len(piOpen) && len(rest) > 3 && bytes.EqualFold(rest[:3], xmlTarget) && (rest[3] == '?' || isXMLSpace(rest[3:4])) {
+		at += i
+		if opensXMLTarget(data[at:]) {
 			return true
 		}
 	}
+	return false
+}
+
+// opensXMLTarget reports whether b opens with a processing instruction whose
+// target is xml in any letter case: `<?`, those letters, and XML whitespace
+// or `?`.
+func opensXMLTarget(b []byte) bool {
+	const n = len("<?xml")
+	return len(b) > n && bytes.HasPrefix(b, piOpen) && bytes.EqualFold(b[len(piOpen):n], xmlTarget) && (b[n] == '?' || isXMLSpace(b[n:n+1]))
+}
+
+// holdsXMLTarget reports whether d, the text of a `<!…>` directive, holds a
+// processing instruction whose target is xml outside its quoted literals,
+// such as one in the internal subset of a document type declaration, which
+// XML does not allow there either. encoding/xml puts a space in place of each
+// comment a directive holds.
+func holdsXMLTarget(d xml.Directive) bool {
+	var quote byte
+	for i, b := range d {
+		switch {
+		case quote != 0:
+			if b == quote {
+				quote = 0
+			}
+		case b == '"' || b == '\'':
+			quote = b
+		case b == '<' && opensXMLTarget(d[i:]):
+			return true
+		}
+	}
+	return false
 }
 
 // piOpen opens a processing instruction, and xmlTarget is the target XML
-// reserves for its declaration ([xmlTargetPastStart]).
+// reserves for its declaration ([opensXMLTarget]).
 var piOpen, xmlTarget = []byte("<?"), []byte("xml")
 
 // isXMLTarget reports whether target, a processing instruction's, is xml in

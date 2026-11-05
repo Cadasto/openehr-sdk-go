@@ -831,6 +831,12 @@ func (r *trackingReader) Token() (xml.Token, error) {
 		if len(r.t.open) > 1 && isXMLTarget(tk.Target) {
 			return nil, r.t.fail(r.t.path(), errXMLTargetInside)
 		}
+	case xml.Directive:
+		// A directive inside an element, such as a document type
+		// declaration, may not hold one either.
+		if len(r.t.open) > 1 && holdsXMLTarget(tk) {
+			return nil, r.t.fail(r.t.path(), errXMLTargetInside)
+		}
 	}
 	return tok, err
 }
