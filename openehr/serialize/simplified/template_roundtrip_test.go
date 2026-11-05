@@ -9,10 +9,12 @@ package simplified_test
 // member, so decode rebuilds, empty, one the template requires and lets hold
 // no member; and the formats have no key for a node's name below the root, so
 // decode gives a node the coded name the template determines for it; and the
-// formats carry an ordinal's code but not its terminology, so decode gives the
-// symbol the terminology the template's C_DV_ORDINAL gives that code.
+// formats carry an ordinal's code and value but not its terminology, so decode
+// gives the symbol the terminology of the template's pair with that code and
+// value.
 
 import (
+	"cmp"
 	"encoding/json"
 	"maps"
 	"os"
@@ -547,33 +549,64 @@ func TestREQ053WithTemplateRoundTripKeepsInContextIsmTransition(t *testing.T) {
 }
 
 // TestREQ053WithTemplateOrdinalTerminology — REQ-053. FLAT and STRUCTURED carry
-// an ordinal's code but not its terminology. Decode without the template
-// rebuilds the symbol in local, as the reference does; a WithTemplate decode
-// gives it the terminology the template's C_DV_ORDINAL gives its code, so a
-// template whose ordinals are coded outside local decodes to the value it
-// lists. A |raw ordinal keeps its own terminology, and a code the template
-// gives two terminologies stays local.
+// an ordinal's code and value but not its terminology. Decode without the
+// template rebuilds the symbol in local, as the reference does; a WithTemplate
+// decode gives it the terminology of the template's C_DV_ORDINAL pair with that
+// code and value, so a template whose ordinals are coded outside local decodes
+// to the value it lists. The pair is looked up by the leaf's path without the
+// names it carries, a |raw ordinal keeps its own terminology, and a pair the
+// template gives two terminologies stays local.
 func TestREQ053WithTemplateOrdinalTerminology(t *testing.T) {
 	const (
-		id        = "Test_dv_ordinal_with_constraints.v0"
-		valuePath = "/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0037]/value"
-		localPair = "<value>1</value>\n                            <symbol>\n<defining_code>\n    <terminology_id>\n        <value>local</value>\n    </terminology_id>\n    <code_string>at0039</code_string>\n</defining_code>\n                            </symbol>\n                        </list>"
+		id         = "Test_dv_ordinal_with_constraints.v0"
+		valuePath  = "/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0037]/value"
+		localPair  = "<value>1</value>\n                            <symbol>\n<defining_code>\n    <terminology_id>\n        <value>local</value>\n    </terminology_id>\n    <code_string>at0039</code_string>\n</defining_code>\n                            </symbol>\n                        </list>"
+		element    = "<node_id>at0037</node_id>"
+		exactlyOne = "<existence><lower_included>true</lower_included><upper_included>true</upper_included>" +
+			"<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>1</lower><upper>1</upper></existence>"
 	)
 	raw, err := os.ReadFile(fixtures.TemplateOpt(id))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := strings.Count(string(raw), localPair); n != 1 {
-		t.Fatalf("%s holds the local::at0039 ordinal pair %d times, want once", id, n)
+	for _, anchor := range []string{localPair, element} {
+		if n := strings.Count(string(raw), anchor); n != 1 {
+			t.Fatalf("%s holds %q %d times, want once", id, anchor, n)
+		}
 	}
-	// snomed codes the one pair in SNOMED-CT; twice lists the code again, as
-	// ordinal 2 in SNOMED-CT, beside the local pair.
-	snomed := strings.Replace(string(raw), localPair, strings.Replace(localPair, "<value>local</value>", "<value>SNOMED-CT</value>", 1), 1)
-	twice := strings.Replace(string(raw), localPair,
-		localPair+"\n                        <list>"+strings.Replace(strings.Replace(localPair, "<value>local</value>", "<value>SNOMED-CT</value>", 1), "<value>1</value>", "<value>2</value>", 1), 1)
+	// pair spells the template's one ordinal pair with the value and the
+	// terminology given; withPairs puts pairs in its place.
+	pair := func(value, terminology string) string {
+		return strings.Replace(strings.Replace(localPair, "<value>1</value>", "<value>"+value+"</value>", 1),
+			"<value>local</value>", "<value>"+terminology+"</value>", 1)
+	}
+	withPairs := func(opt string, pairs ...string) string {
+		return strings.Replace(opt, localPair, strings.Join(pairs, "\n                        <list>"), 1)
+	}
+	snomed := withPairs(string(raw), pair("1", "SNOMED-CT"))
+	// named pins the name 'Schmerzgrad' on the ordinal's ELEMENT, so its path
+	// in the compiled template carries the name.
+	named := strings.Replace(snomed, element, element+
+		`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>name</rm_attribute_name>`+exactlyOne+
+		`<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>DV_TEXT</rm_type_name>`+strings.ReplaceAll(exactlyOne, "existence", "occurrences")+`<node_id/>`+
+		`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>value</rm_attribute_name>`+exactlyOne+
+		`<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>STRING</rm_type_name>`+strings.ReplaceAll(exactlyOne, "existence", "occurrences")+`<node_id/>`+
+		`<item xsi:type="C_STRING"><list>Schmerzgrad</list></item></children></attributes></children></attributes>`, 1)
+	// apart gives the code local at 1 and SNOMED-CT at 2; twice gives it both
+	// at 1.
+	apart := withPairs(string(raw), pair("1", "local"), pair("2", "SNOMED-CT"))
+	twice := withPairs(string(raw), pair("1", "local"), pair("1", "SNOMED-CT"))
 
-	// ordinalOf returns the terminology of the decoded ordinal's symbol.
-	ordinalOf := func(t *testing.T, comp *rm.Composition) string {
+	compileEdited := func(t *testing.T, opt string) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
+		t.Helper()
+		model, err := aom14.ReadOperationalTemplate(strings.NewReader(opt))
+		if err != nil {
+			t.Fatalf("ReadOperationalTemplate: %v", err)
+		}
+		return compileTemplate(t, id, model)
+	}
+	// terminologyOf returns the terminology of the decoded ordinal's symbol.
+	terminologyOf := func(t *testing.T, comp *rm.Composition) string {
 		t.Helper()
 		items, err := rmpath.ItemsAtPath(comp, valuePath)
 		if err != nil || len(items) != 1 {
@@ -585,11 +618,11 @@ func TestREQ053WithTemplateOrdinalTerminology(t *testing.T) {
 		}
 		return ord.Symbol.DefiningCode.TerminologyID.Value
 	}
-	// readerFlat writes the ordinal as the reference does, |code, |value and
-	// |ordinal with no terminology, where the encoder wrote it as |raw.
-	readerFlat := func(t *testing.T, comp *rm.Composition, wt *webtemplate.WebTemplate) []byte {
+	// encode writes the skeleton of compiled as FLAT, and returns the body and
+	// the key of the ordinal, which the encoder writes as |raw.
+	encode := func(t *testing.T, wt *webtemplate.WebTemplate, compiled *templatecompile.Compiled) (map[string]any, string) {
 		t.Helper()
-		body, err := simplified.MarshalFlat(comp, wt)
+		body, err := simplified.MarshalFlat(skeletonOf(t, compiled, instance.Large), wt)
 		if err != nil {
 			t.Fatalf("MarshalFlat: %v", err)
 		}
@@ -597,42 +630,43 @@ func TestREQ053WithTemplateOrdinalTerminology(t *testing.T) {
 		if err := json.Unmarshal(body, &flat); err != nil {
 			t.Fatal(err)
 		}
-		const rawKey = "test_dv_ordinal_with_constraints.v0/test123/any_event:0/dv_ordinal|raw"
-		frag, ok := flat[rawKey].(map[string]any)
-		if !ok {
-			t.Fatalf("MarshalFlat wrote no %s: %v", rawKey, slices.Sorted(maps.Keys(flat)))
+		for key := range flat {
+			if strings.HasSuffix(key, "|raw") {
+				return flat, key
+			}
 		}
+		t.Fatalf("MarshalFlat wrote no |raw ordinal: %v", slices.Sorted(maps.Keys(flat)))
+		return nil, ""
+	}
+	// readerFlat spells the |raw ordinal at rawKey as the reference does, |code,
+	// |value and |ordinal with no terminology, the ordinal value replaced by
+	// ordinal where it is not nil.
+	readerFlat := func(t *testing.T, flat map[string]any, rawKey string, ordinal any) []byte {
+		t.Helper()
+		frag, _ := flat[rawKey].(map[string]any)
 		symbol, _ := frag["symbol"].(map[string]any)
 		code, _ := symbol["defining_code"].(map[string]any)
+		out := maps.Clone(flat)
 		base := strings.TrimSuffix(rawKey, "|raw")
-		delete(flat, rawKey)
-		flat[base+"|code"], flat[base+"|value"], flat[base+"|ordinal"] = code["code_string"], symbol["value"], frag["value"]
-		out, err := json.Marshal(flat)
+		delete(out, rawKey)
+		out[base+"|code"], out[base+"|value"], out[base+"|ordinal"] = code["code_string"], symbol["value"], cmp.Or(ordinal, frag["value"])
+		b, err := json.Marshal(out)
 		if err != nil {
 			t.Fatal(err)
 		}
-		return out
-	}
-	compileEdited := func(t *testing.T, opt string) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
-		t.Helper()
-		model, err := aom14.ReadOperationalTemplate(strings.NewReader(opt))
-		if err != nil {
-			t.Fatalf("ReadOperationalTemplate: %v", err)
-		}
-		return compileTemplate(t, id, model)
+		return b
 	}
 
 	for _, format := range []string{"FLAT", "STRUCTURED"} {
 		t.Run(format, func(t *testing.T) {
 			wt, compiled := compileEdited(t, snomed)
-			comp := skeletonOf(t, compiled, instance.Large)
-			flat := readerFlat(t, comp, wt)
-
-			if got := ordinalOf(t, decodeAs(t, format, flat, wt)); got != "local" {
+			flat, rawKey := encode(t, wt, compiled)
+			body := readerFlat(t, flat, rawKey, nil)
+			if got := terminologyOf(t, decodeAs(t, format, body, wt)); got != "local" {
 				t.Errorf("decode without the template: symbol terminology %q, want local", got)
 			}
-			back := decodeAs(t, format, flat, wt, simplified.WithTemplate(compiled))
-			if got := ordinalOf(t, back); got != "SNOMED-CT" {
+			back := decodeAs(t, format, body, wt, simplified.WithTemplate(compiled))
+			if got := terminologyOf(t, back); got != "SNOMED-CT" {
 				t.Errorf("WithTemplate decode: symbol terminology %q, want SNOMED-CT, the template's", got)
 			}
 			for _, is := range validation.ValidateComposition(back, compiled).Issues {
@@ -642,20 +676,50 @@ func TestREQ053WithTemplateOrdinalTerminology(t *testing.T) {
 			}
 
 			// A |raw ordinal is decoded as written, its terminology included.
-			body, err := simplified.MarshalFlat(comp, wt)
+			localRaw := maps.Clone(flat)
+			frag := maps.Clone(flat[rawKey].(map[string]any))
+			symbol := maps.Clone(frag["symbol"].(map[string]any))
+			code := maps.Clone(symbol["defining_code"].(map[string]any))
+			code["terminology_id"] = map[string]any{"_type": "TERMINOLOGY_ID", "value": "local"}
+			symbol["defining_code"], frag["symbol"], localRaw[rawKey] = code, symbol, frag
+			b, err := json.Marshal(localRaw)
 			if err != nil {
-				t.Fatalf("MarshalFlat: %v", err)
+				t.Fatal(err)
 			}
-			localRaw := []byte(strings.Replace(string(body), `"value":"SNOMED-CT"`, `"value":"local"`, 1))
-			if got := ordinalOf(t, decodeAs(t, format, localRaw, wt, simplified.WithTemplate(compiled))); got != "local" {
+			if got := terminologyOf(t, decodeAs(t, format, b, wt, simplified.WithTemplate(compiled))); got != "local" {
 				t.Errorf("WithTemplate decode of a |raw ordinal in local: symbol terminology %q, want local, as written", got)
 			}
 
-			// A code the template gives local and SNOMED-CT has no single
-			// terminology, and the symbol stays local.
-			wt2, compiled2 := compileEdited(t, twice)
-			if got := ordinalOf(t, decodeAs(t, format, flat, wt2, simplified.WithTemplate(compiled2))); got != "local" {
-				t.Errorf("WithTemplate decode, code in two terminologies: symbol terminology %q, want local", got)
+			// Below a node the template names, the pair is still found.
+			wtNamed, compiledNamed := compileEdited(t, named)
+			flatNamed, rawKeyNamed := encode(t, wtNamed, compiledNamed)
+			if !strings.Contains(rawKeyNamed, "schmerzgrad") {
+				t.Fatalf("the ordinal's key %q does not carry the pinned name", rawKeyNamed)
+			}
+			if got := terminologyOf(t, decodeAs(t, format, readerFlat(t, flatNamed, rawKeyNamed, nil), wtNamed, simplified.WithTemplate(compiledNamed))); got != "SNOMED-CT" {
+				t.Errorf("WithTemplate decode below a named node: symbol terminology %q, want SNOMED-CT", got)
+			}
+
+			// The code at each ordinal value takes that pair's terminology,
+			// the value written as a JSON number or a numeric string.
+			wtApart, compiledApart := compileEdited(t, apart)
+			for _, tc := range []struct {
+				ordinal any
+				want    string
+			}{
+				{ordinal: 1, want: "local"},
+				{ordinal: "2.0", want: "SNOMED-CT"},
+			} {
+				if got := terminologyOf(t, decodeAs(t, format, readerFlat(t, flat, rawKey, tc.ordinal), wtApart, simplified.WithTemplate(compiledApart))); got != tc.want {
+					t.Errorf("WithTemplate decode at ordinal %v of local 1 and SNOMED-CT 2: symbol terminology %q, want %s", tc.ordinal, got, tc.want)
+				}
+			}
+
+			// A code and value the template gives local and SNOMED-CT have no
+			// single terminology, and the symbol stays local.
+			wtTwice, compiledTwice := compileEdited(t, twice)
+			if got := terminologyOf(t, decodeAs(t, format, body, wtTwice, simplified.WithTemplate(compiledTwice))); got != "local" {
+				t.Errorf("WithTemplate decode, one pair in two terminologies: symbol terminology %q, want local", got)
 			}
 		})
 	}

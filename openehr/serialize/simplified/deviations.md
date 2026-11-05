@@ -336,8 +336,9 @@ partially or silently accepted.
 - **An ordinal's terminology on `WithTemplate` decode.** A `DV_ORDINAL` leaf carries `\|code`,
   `\|value` and `\|ordinal` and no terminology, and the reference rebuilds the symbol in `local`
   whatever the template says (its `DvOrdinalRMUnmarshaller`); decode without the template does
-  the same. With `WithTemplate`, the symbol takes the terminology the template's `C_DV_ORDINAL`
-  gives its code, where the nodes at the leaf's path agree on one, so a template whose ordinals
+  the same. With `WithTemplate`, the symbol takes the terminology of the template's
+  `C_DV_ORDINAL` pair with its code and ordinal value, where the pairs at the leaf's path agree
+  on one, so a template whose ordinals
   are coded outside `local` decodes to the value it lists rather than one its validation refuses
   as `primitive_not_in_list`. A `\|raw` ordinal keeps its own terminology, encode still writes a
   non-local ordinal as `\|raw`, since it cannot know the decode will have the template, and a

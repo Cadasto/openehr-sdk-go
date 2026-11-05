@@ -2218,10 +2218,10 @@ type templateIndex struct {
 	// included: the template then gives no single coded name.
 	codedNames map[string]codedName
 	// ordinals maps the bare path of a C_DV_ORDINAL node to the terminology
-	// its pairs give each code. A code maps to "" where the nodes at that
-	// path, or the pairs of one of them, give it more than one: the template
-	// then gives no single answer.
-	ordinals map[string]map[string]string
+	// its pairs give each code at each ordinal value. A pair maps to "" where
+	// the nodes at that path, or the pairs of one of them, give it more than
+	// one: the template then gives no single answer.
+	ordinals map[string]map[ordinalPair]string
 	// rmTypes maps a path to the RM type the template gives the node there. It
 	// maps to "" where the nodes at one path disagree, the alternatives of one
 	// single-valued attribute, say, which share a path: the template then gives
@@ -2289,28 +2289,36 @@ func (x *templateIndex) nameJSON(path string) map[string]any {
 	return nil
 }
 
+// ordinalPair is a C_DV_ORDINAL pair without its terminology: the symbol's
+// code and the ordinal value, which FLAT carries as |code and |ordinal.
+type ordinalPair struct {
+	code  string
+	value int
+}
+
 // addOrdinals records the terminology each pair of ord, the C_DV_ORDINAL of
-// a node at path, gives its code. A code that another pair or another node at
-// path gives another terminology is left with none.
+// a node at path, gives its code at its value. A code and value that another
+// pair or another node at path gives another terminology are left with none.
 func (x *templateIndex) addOrdinals(path string, ord constraints.CDvOrdinal) {
 	terms := x.ordinals[path]
 	if terms == nil {
-		terms = make(map[string]string, len(ord.Values))
+		terms = make(map[ordinalPair]string, len(ord.Values))
 		x.ordinals[path] = terms
 	}
 	for _, v := range ord.Values {
+		pair := ordinalPair{code: v.Symbol.CodeString, value: v.Value}
 		term := v.Symbol.Terminology
-		if prev, seen := terms[v.Symbol.CodeString]; seen && prev != term {
+		if prev, seen := terms[pair]; seen && prev != term {
 			term = ""
 		}
-		terms[v.Symbol.CodeString] = term
+		terms[pair] = term
 	}
 }
 
 // ordinalTerminologies returns the terminology the template's C_DV_ORDINAL at
-// path gives each code, "" for a code it gives no single one; nil where there
-// is none, and in a decode without the template.
-func (x *templateIndex) ordinalTerminologies(path string) map[string]string {
+// path gives each code and value, "" for one it gives no single one; nil
+// where there is none, and in a decode without the template.
+func (x *templateIndex) ordinalTerminologies(path string) map[ordinalPair]string {
 	if x == nil {
 		return nil
 	}
@@ -2582,7 +2590,7 @@ func buildTemplateIndex(c *templatecompile.Compiled) *templateIndex {
 		codedNames: make(map[string]codedName),
 		rmTypes:    make(map[string]string),
 		structures: make(map[string][]emptyStructure),
-		ordinals:   make(map[string]map[string]string),
+		ordinals:   make(map[string]map[ordinalPair]string),
 	}
 	var walk func(n *templatecompile.CompiledNode)
 	walk = func(n *templatecompile.CompiledNode) {
@@ -3588,16 +3596,25 @@ func checkSuffixAllowlist(rmType string, sfx map[string]any) error {
 }
 
 // settleOrdinalTerminology gives the symbol of dv, a DV_ORDINAL decode built
-// from its suffixes in local, the terminology terms gives its code, where it
-// gives one (REQ-053): the formats carry an ordinal's code but not its
-// terminology, and a WithTemplate decode takes it from the template's
-// C_DV_ORDINAL. dv has been placed already; the symbol is changed in place.
-func settleOrdinalTerminology(dv any, terms map[string]string) {
+// from its suffixes in local, the terminology terms gives its code at its
+// ordinal value, where it gives one (REQ-053): the formats carry an ordinal's
+// code and value but not its terminology, and a WithTemplate decode takes it
+// from the template's C_DV_ORDINAL. dv has been placed already; the symbol is
+// changed in place.
+//
+// The value is read as canonical JSON reads an Integer, from a JSON number or
+// a numeric string. One that is no Integer is refused when the tree is
+// decoded, so the terminology it would take does not matter.
+func settleOrdinalTerminology(dv any, terms map[ordinalPair]string) {
 	m, _ := dv.(map[string]any)
 	symbol, _ := m["symbol"].(map[string]any)
 	code, _ := symbol["defining_code"].(map[string]any)
 	codeString, _ := code["code_string"].(string)
-	if t := terms[codeString]; t != "" {
+	value, err := strconv.ParseFloat(fmt.Sprint(m["value"]), 64)
+	if err != nil {
+		return
+	}
+	if t := terms[ordinalPair{code: codeString, value: int(value)}]; t != "" {
 		code["terminology_id"] = map[string]any{"_type": "TERMINOLOGY_ID", "value": t}
 	}
 }
