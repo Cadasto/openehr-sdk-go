@@ -1,10 +1,16 @@
-package template_test
+package templatecompile_test
+
+// compile_readings_test.go: readings that hold from an operational template to
+// the compiled tree and past it: each CONSTRAINT_REF reference the corpus
+// templates carry, and identifiers padded with white space, which compile,
+// generate and validate as the unpadded ones do.
 
 import (
 	"bytes"
 	jsonv2 "encoding/json/v2"
 	"fmt"
 	mrand "math/rand/v2"
+	"os"
 	"regexp"
 	"slices"
 	"strings"
@@ -16,9 +22,63 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
+	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
+
+// constraintRefCorpus lists, in document order, the references of the
+// CONSTRAINT_REF nodes in the vendored OPTs that carry them.
+var constraintRefCorpus = []struct {
+	template string
+	want     []string
+}{
+	{template: "Demonstration.v1", want: []string{"ac0001", "ac0003", "ac0001", "ac0003", "ac0001", "ac0003", "ac0001", "ac0003"}},
+	{template: "TestPerson.v2", want: []string{"ac0001", "ac0007", "ac0004"}},
+	{template: "Address.v2", want: []string{"ac0004"}},
+}
+
+// compiledConstraintRefs walks the compiled tree in document order and
+// returns the reference of every node carrying a ConstraintRef.
+func compiledConstraintRefs(n *templatecompile.CompiledNode) []string {
+	var refs []string
+	if cr, ok := n.PrimitiveConstraint().(constraints.ConstraintRef); ok {
+		refs = append(refs, cr.Reference)
+	}
+	for _, a := range n.Attributes() {
+		for _, c := range a.Children() {
+			refs = append(refs, compiledConstraintRefs(c)...)
+		}
+	}
+	return refs
+}
+
+// REQ-103: compiling the template threads each ConstraintRef through to
+// CompiledNode.PrimitiveConstraint unchanged.
+func TestREQ103_ConstraintRefThreadedThroughCompile(t *testing.T) {
+	t.Parallel()
+	for _, tc := range constraintRefCorpus {
+		t.Run(tc.template, func(t *testing.T) {
+			t.Parallel()
+			raw, err := os.ReadFile(fixtures.TemplateOpt(tc.template))
+			if err != nil {
+				t.Fatalf("ReadFile(%s) error = %v", tc.template, err)
+			}
+			tmpl, err := fixtures.ReadOperationalTemplate(raw)
+			if err != nil {
+				t.Fatalf("ReadOperationalTemplate(%s) error = %v", tc.template, err)
+			}
+			compiled, err := templatecompile.Compile(tmpl)
+			if err != nil {
+				t.Fatalf("Compile(%s) error = %v", tc.template, err)
+			}
+			if got := compiledConstraintRefs(compiled.Root()); !slices.Equal(got, tc.want) {
+				t.Errorf("Compile(%s) ConstraintRef references = %v, want %v", tc.template, got, tc.want)
+			}
+		})
+	}
+}
 
 // identifierOPT is a COMPOSITION, coded as an event, whose content holds an
 // OBSERVATION with one ELEMENT whose value is a DV_INTERVAL<DV_DATE_TIME>
