@@ -243,10 +243,12 @@ func TestREQ176_REQ111_ReadOperationalTemplateHoldsContentAfterTheRoot(t *testin
 // declaration, comments, processing instructions, whitespace and one document
 // type declaration pass, and a stray end element, or markup encoding/xml
 // cannot read, is refused with an error wrapping canxml.ErrInvalidShape that
-// carries none of it. Text, a CDATA section, a second document type and
-// another declaration, which encoding/xml reads, are read past in the default
-// mode and refused so given canxml.WithStrict. An input with only such
-// content and no root is the no-root case
+// carries none of it. Text, a CDATA section, a second document type, another
+// declaration, and a processing instruction whose target is xml in any letter
+// case other than the XML declaration at the start, which encoding/xml reads,
+// are read past in the default mode and refused so given canxml.WithStrict.
+// A target that only starts with xml passes in every mode. An input with only
+// such content and no root is the no-root case
 // (TestREQ108_ReadOperationalTemplateRefusesAnInputWithNoRootElement).
 func TestREQ176_REQ111_ReadOperationalTemplateHoldsContentBeforeTheRoot(t *testing.T) {
 	t.Parallel()
@@ -256,20 +258,24 @@ func TestREQ176_REQ111_ReadOperationalTemplateHoldsContentBeforeTheRoot(t *testi
 		"text, then bad markup": planted + `<1>`,
 	}
 	defaultOnly := map[string]string{
-		"text":                     planted,
-		"text after a declaration": `<?xml version="1.0"?>` + planted,
-		"a CDATA section":          `<![CDATA[` + planted + `]]>`,
-		"a second document type":   `<!DOCTYPE template><!DOCTYPE ` + planted + `>`,
-		"another declaration":      `<!ENTITY ` + planted + ` "x">`,
+		"text":                        planted,
+		"text after a declaration":    `<?xml version="1.0"?>` + planted,
+		"a CDATA section":             `<![CDATA[` + planted + `]]>`,
+		"a second document type":      `<!DOCTYPE template><!DOCTYPE ` + planted + `>`,
+		"another declaration":         `<!ENTITY ` + planted + ` "x">`,
+		"a second XML declaration":    `<?xml version="1.0"?><?xml version="1.0" extra="` + planted + `"?>`,
+		"a misplaced XML declaration": `<!-- note --><?xml version="1.0"?>`,
+		"an xml target in capitals":   `<?XML ` + planted + `?>`,
 	}
 	accepted := map[string]string{
-		"nothing":                  "",
-		"whitespace":               " \n\t\r\n",
-		"the XML declaration":      `<?xml version="1.0" encoding="UTF-8"?>` + "\n",
-		"a comment":                `<!-- note -->`,
-		"a processing instruction": `<?pi data?>`,
-		"one document type":        `<!DOCTYPE template>`,
-		"all of them":              `<?xml version="1.0"?><!-- note --><!DOCTYPE template><?pi data?>` + "\n",
+		"nothing":                       "",
+		"whitespace":                    " \n\t\r\n",
+		"a target that starts with xml": `<?xml version="1.0"?><?xml-stylesheet href="a.xsl"?>`,
+		"the XML declaration":           `<?xml version="1.0" encoding="UTF-8"?>` + "\n",
+		"a comment":                     `<!-- note -->`,
+		"a processing instruction":      `<?pi data?>`,
+		"one document type":             `<!DOCTYPE template>`,
+		"all of them":                   `<?xml version="1.0"?><!-- note --><!DOCTYPE template><?pi data?>` + "\n",
 	}
 	for mode, opts := range readModes {
 		for name, head := range refused {

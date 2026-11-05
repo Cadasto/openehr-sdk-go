@@ -16,11 +16,14 @@ import (
 // canxml.ErrInvalidShape, carries none of the trailing content, and is not
 // unmatched content, so WithUnmatched reports nothing and the refusal does not
 // wrap canxml.ErrUnknownElement. Comments, processing instructions and
-// whitespace after the root are accepted, as XML allows them.
+// whitespace after the root are accepted, as XML allows them, except a
+// processing instruction whose target is xml in any letter case, which XML
+// reserves for the XML declaration at the start.
 //
 // Can-fail control: stop reading after the root, or accept any text after it,
-// and the refused cases decode without an error; refuse a comment or a
-// processing instruction there and the accepted cases fail.
+// and the refused cases decode without an error; accept every processing
+// instruction there and the XML declaration cases decode; refuse a comment or
+// a processing instruction there and the accepted cases fail.
 func TestREQ056_XMLOneRoot(t *testing.T) {
 	const root = `<dv_count xmlns="http://schemas.openehr.org/v1"><magnitude>1</magnitude></dv_count>`
 
@@ -37,6 +40,8 @@ func TestREQ056_XMLOneRoot(t *testing.T) {
 		"second root after a comment":    `<!-- note --><extra/>`,
 		"second copy of the root":        root,
 		"element in a foreign namespace": `<x:extra xmlns:x="urn:example"/>`,
+		"XML declaration":                `<?xml version="1.0"?>`,
+		"xml target in capitals":         `<?XML pi data?>`,
 	}
 	accepted := map[string]string{
 		"nothing":                         "",
@@ -44,6 +49,7 @@ func TestREQ056_XMLOneRoot(t *testing.T) {
 		"trailing comment":                `<!-- note -->`,
 		"trailing processing instruction": `<?pi data?>`,
 		"comments, PIs and whitespace":    "\n<!-- a -->\n<?pi x?>\n<!-- b -->\n",
+		"target that starts with xml":     `<?xml-stylesheet href="a.xsl"?>`,
 	}
 
 	for _, mode := range []string{"default", "report", "strict"} {
@@ -118,16 +124,18 @@ func TestREQ056_XMLOneRootAfterFailedRoot(t *testing.T) {
 // the XML declaration, whitespace, comments, processing instructions and one
 // document type declaration, as malformed input. The refusal wraps
 // canxml.ErrInvalidShape, carries none of the content, and is not unmatched
-// content. A UTF-8 byte order mark at the very start is the document's
-// encoding signature, not content, and is accepted. canxml.Decoder, which
-// reads a stream of values, is unchanged.
+// content. A processing instruction whose target is xml in any letter case is
+// the XML declaration only at the start: a second one, one after other
+// markup, or one in capitals is refused. A UTF-8 byte order mark at the very
+// start is the document's encoding signature, not content, and is accepted.
+// canxml.Decoder, which reads a stream of values, is unchanged.
 //
 // Can-fail control: drop the scan of what precedes the root and every
 // refused case decodes without an error, or fails with an unclassified
 // syntax error, since encoding/xml skips every token before the first start
-// element; let a second document type declaration or an end element through
-// and its case decodes; drop the byte order mark rule and the accepted
-// cases that start with one fail.
+// element; let a second document type declaration, an end element or a
+// misplaced XML declaration through and its case decodes; drop the byte order
+// mark rule and the accepted cases that start with one fail.
 func TestREQ056_XMLBeforeRoot(t *testing.T) {
 	const root = `<dv_count xmlns="http://schemas.openehr.org/v1"><magnitude>1</magnitude></dv_count>`
 	const bom = "\ufeff"
@@ -145,16 +153,21 @@ func TestREQ056_XMLBeforeRoot(t *testing.T) {
 		"byte order mark after whitespace": " " + bom,
 		"text after a byte order mark":     bom + xmlPlanted,
 		"no-break space":                   "\u00a0",
+		"second XML declaration":           `<?xml version="1.0"?><?xml version="1.0"?>`,
+		"XML declaration after a comment":  `<!-- note --><?xml version="1.0"?>`,
+		"XML declaration after a PI":       `<?pi data?><?xml version="1.0"?>`,
+		"xml target in capitals":           `<?XML pi data?>`,
 	}
 	accepted := map[string]string{
-		"nothing":                   "",
-		"XML declaration":           `<?xml version="1.0" encoding="UTF-8"?>`,
-		"whitespace":                " \n\t\r\n",
-		"comment":                   `<!-- note -->`,
-		"processing instruction":    `<?pi data?>`,
-		"document type":             `<!DOCTYPE dv_count>`,
-		"document type with subset": `<!DOCTYPE dv_count [<!ENTITY e "v">]>`,
-		"byte order mark":           bom,
+		"nothing":                     "",
+		"XML declaration":             `<?xml version="1.0" encoding="UTF-8"?>`,
+		"whitespace":                  " \n\t\r\n",
+		"comment":                     `<!-- note -->`,
+		"processing instruction":      `<?pi data?>`,
+		"document type":               `<!DOCTYPE dv_count>`,
+		"document type with subset":   `<!DOCTYPE dv_count [<!ENTITY e "v">]>`,
+		"byte order mark":             bom,
+		"target that starts with xml": `<?xml version="1.0"?><?xml-stylesheet href="a.xsl"?>`,
 		"the whole prolog": bom + `<?xml version="1.0"?>` + "\n<!-- a -->\n" + `<!DOCTYPE dv_count SYSTEM "x.dtd">` +
 			"\n<?pi x?>\n<!-- b -->\n",
 	}

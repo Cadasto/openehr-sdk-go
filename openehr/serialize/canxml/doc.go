@@ -31,7 +31,11 @@
 //     instructions and whitespace are accepted on either side of the root,
 //     as XML allows them, and so are, before it, the XML declaration, one
 //     document type declaration and a UTF-8 byte order mark at the very
-//     start.
+//     start. XML reserves the processing instruction target xml, in any
+//     letter case, for the XML declaration at the start, so [Unmarshal]
+//     refuses one anywhere else, such as a second declaration or one after
+//     the root, with [ErrInvalidShape]; a target that only starts with those
+//     letters, such as xml-stylesheet, is accepted.
 //   - Default namespace: `http://schemas.openehr.org/v1`.
 //   - `xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"` is
 //     declared on the document root whenever any descendant carries
