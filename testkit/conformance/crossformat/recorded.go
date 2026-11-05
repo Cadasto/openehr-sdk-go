@@ -336,7 +336,7 @@ var Recorded = map[string]map[Leg]Record{
 	},
 	"test_all_types": {
 		LegCanonicalFlat: {
-			Outcome: Outcome{Compared: 83, Missing: 8, Extra: 6, Altered: 11},
+			Outcome: Outcome{Compared: 83, Missing: 8, Extra: 6, Altered: 10},
 			Reason: "party reference type: the canonical types the composer's reference PERSON, so FLAT encode " +
 				"writes composer|type, which the upstream FLAT omits. Web Template projection: the SDK's Web Template has no in-context time or ism_transition " +
 				"node for the section_3 ACTION (openehr/template/webtemplate/deviations.md, inContext coverage), and its " +
@@ -347,7 +347,7 @@ var Recorded = map[string]map[Leg]Record{
 				"value, which the codec does not write (a PROBE-086 residue), and writes the Integer type and the " +
 				"Real denominator as 1.0 where the codec writes 1. Upstream date and time spelling: the canonical " +
 				"writes dates in the basic format (20190114) and date-times with a comma and +00:00, the FLAT in the " +
-				"extended format with a full stop and Z (8 leaves). Upstream conversion differences: upstream " +
+				"extended format with a full stop and Z (7 leaves). Upstream conversion differences: upstream " +
 				"openEHR_SDK's FlatJsonMarshallerTest.toFlatJsonAllTypesErrors encodes this canonical " +
 				"(all_types_no_multimedia.json) as FLAT and expects these differences against this FLAT " +
 				"(test_all_types.json): duration_any (P1Y2M10DT2H30M against PT30M), a DV_URI only the canonical " +
@@ -355,7 +355,7 @@ var Recorded = map[string]map[Leg]Record{
 				"and proportion type spellings above.",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 423, Missing: 51, Extra: 36, Altered: 40, Excluded: 11},
+			Outcome: Outcome{Compared: 423, Missing: 51, Extra: 36, Altered: 39, Excluded: 11},
 			Reason: "The 11 excluded keys are the section_3 ACTION's in-context ism_transition/current_state (3) " +
 				"and time (1) and the identifier keys (4), refused, and " +
 				"choice/quantity_value|magnitude and |unit (2) and the bare proportion_any (1), reported as " +
@@ -371,7 +371,7 @@ var Recorded = map[string]map[Leg]Record{
 				"§ Floating-point precision). Upstream conversion differences: a DV_URI and the proportion's " +
 				"precision only the canonical carries, and duration_any (P1Y2M10DT2H30M against PT30M). Upstream " +
 				"date and time spelling: the canonical writes dates in the basic format (20190114) and date-times " +
-				"with a comma and +00:00, the FLAT in the extended format with a full stop and Z (7 leaves). " +
+				"with a comma and +00:00, the FLAT in the extended format with a full stop and Z (6 leaves). " +
 				"HISTORY.origin: the FLAT has no origin key and decode fills it from the context start time " +
 				"(openehr/serialize/simplified/deviations.md), where the canonical sets it otherwise. Shifted " +
 				"positions: the elements decode lacks move their later siblings up, the identifier in the " +
