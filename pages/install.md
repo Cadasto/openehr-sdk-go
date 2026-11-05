@@ -39,9 +39,10 @@ Makefile picks.
 ## Two integration paths
 
 **Building blocks** need no HTTP at all. Import `openehr/rm`,
-`openehr/serialize/canjson`, `openehr/template`, `openehr/validation`,
-`openehr/instance`, or `openehr/aql`. This is the path for validation in CI,
-for parsing an operational template (OPT), and for canonical-JSON transforms.
+`openehr/serialize/canjson`, `openehr/aom/aom14`, `openehr/templatecompile`,
+`openehr/validation`, `openehr/instance`, or `openehr/aql`. This is the path
+for validation in CI, for reading an operational template (OPT), and for
+canonical-JSON transforms.
 
 **The REST client** adds three pieces: a service catalog (`smart/discovery`),
 an injected `*http.Client` on `transport`, and the client packages under

@@ -35,13 +35,13 @@ SDK starts from the file you export.
 <span class="scope scope--in">In the SDK</span>
 
 ### 2. Work in process
-Parse the OPT and compile it, all without a network. Export Web Template JSON
+Read the OPT and compile it, all without a network. Export Web Template JSON
 for FLAT paths. Build a Composition or synthesise one, then validate it
 against the Reference Model and the compiled template. Encode canonical JSON,
 canonical XML, FLAT, or STRUCTURED. Build or parse AQL and lint it.
 
-Packages: `template`, `templatecompile`, `validation`, and the codecs under
-`serialize/`. The full map is on [Packages](packages.md).
+Packages: `aom/aom14`, `templatecompile`, `template`, `validation`, and the
+codecs under `serialize/`. The full map is on [Packages](packages.md).
 
 [Run a building-block example](examples.md){ .md-button }
 
@@ -53,9 +53,10 @@ Packages: `template`, `templatecompile`, `validation`, and the codecs under
 
 :material-file-code:
 
-### Parse and compile
-`template` reads the `.opt`. `templatecompile.Compile` returns the handle the
-builder, the synthesiser, the validator, and AQL lint all accept.
+### Read and compile
+`aom14.ReadOperationalTemplate` reads the `.opt` into the operational template
+model. `templatecompile.Compile` turns that model into the handle the builder,
+the synthesiser, the validator, and AQL lint all accept.
 
 </div>
 
@@ -111,8 +112,9 @@ definition API. ADL 2 upload is **deferred**.
 
 ### 4. Write
 Attach one `auth.TokenSource`: SMART-on-openEHR, client credentials, JWT
-bearer, or HTTP Basic. Then create an EHR, commit a Composition, or batch
-several versions through a contribution. Point the service catalog at your
+bearer, or HTTP Basic. Then create an EHR, save a Composition in canonical
+JSON, canonical XML, FLAT or STRUCTURED, or batch several versions through a
+contribution. Point the service catalog at your
 [ITS-REST](https://specifications.openehr.org/releases/ITS-REST/Release-1.1.0/)
 CDR.
 
@@ -149,8 +151,11 @@ repository rather than any vendor's own SDK. It can therefore point at any CDR
 that implements that contract. Wider interoperability work is still under way, and we publish
 no compatibility matrix.
 
-`make test` never dials a CDR. The Live probes skip unless you set the
-variables below.
+`make test` never dials a CDR. It replays exchanges recorded from EHRbase,
+most of them 2.36.0, and FerroEHR 5.0.0
+([`testkit/recordings/`](https://github.com/cadasto/openehr-sdk-go/tree/main/testkit/recordings)).
+The Live probes and `make cdr-crosscheck`, which checks documents the SDK
+generates against live CDRs, run only when you set the variables below.
 
 The [roadmap](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/roadmap.md#deployment-targets)
 tracks the status of each target; this table says how to point the SDK at one.
