@@ -29,6 +29,8 @@ var xmlClassItemList = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A single-valued member keeps its first child element; a second one is
+// unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (i *ItemList) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -43,6 +45,8 @@ func (i *ItemList) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 			break
 		}
 	}
+	// A bit per single-valued member that has had a child element.
+	var _got uint64
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -52,16 +56,37 @@ func (i *ItemList) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "name":
+				if _got&(1<<0) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 0
 				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
 				}
 				i.Name = _v
 			case "archetype_node_id":
+				if _got&(1<<1) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 1
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &i.ArchetypeNodeID); _err != nil {
 					return _err
 				}
 			case "uid":
+				if _got&(1<<2) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 2
 				_v, _err := canxml.DecodeAs[UIDBasedID](_dec, _t)
 				if _err != nil {
 					return _err
@@ -74,12 +99,26 @@ func (i *ItemList) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 				}
 				i.Links = append(i.Links, _v)
 			case "archetype_details":
+				if _got&(1<<3) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 3
 				_v := new(Archetyped)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
 				}
 				i.ArchetypeDetails = _v
 			case "feeder_audit":
+				if _got&(1<<4) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 4
 				_v := new(FeederAudit)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -121,6 +160,8 @@ var xmlClassItemSingle = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A single-valued member keeps its first child element; a second one is
+// unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (i *ItemSingle) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -135,6 +176,8 @@ func (i *ItemSingle) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 			break
 		}
 	}
+	// A bit per single-valued member that has had a child element.
+	var _got uint64
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -144,16 +187,37 @@ func (i *ItemSingle) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "name":
+				if _got&(1<<0) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 0
 				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
 				}
 				i.Name = _v
 			case "archetype_node_id":
+				if _got&(1<<1) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 1
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &i.ArchetypeNodeID); _err != nil {
 					return _err
 				}
 			case "uid":
+				if _got&(1<<2) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 2
 				_v, _err := canxml.DecodeAs[UIDBasedID](_dec, _t)
 				if _err != nil {
 					return _err
@@ -166,18 +230,39 @@ func (i *ItemSingle) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 				}
 				i.Links = append(i.Links, _v)
 			case "archetype_details":
+				if _got&(1<<3) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 3
 				_v := new(Archetyped)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
 				}
 				i.ArchetypeDetails = _v
 			case "feeder_audit":
+				if _got&(1<<4) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 4
 				_v := new(FeederAudit)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
 				}
 				i.FeederAudit = _v
 			case "item":
+				if _got&(1<<5) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 5
 				if _err := _dec.DecodeElement(&i.Item, &_t); _err != nil {
 					return _err
 				}
@@ -211,6 +296,8 @@ var xmlClassItemTable = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A single-valued member keeps its first child element; a second one is
+// unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (i *ItemTable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -225,6 +312,8 @@ func (i *ItemTable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 			break
 		}
 	}
+	// A bit per single-valued member that has had a child element.
+	var _got uint64
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -234,16 +323,37 @@ func (i *ItemTable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "name":
+				if _got&(1<<0) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 0
 				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
 				}
 				i.Name = _v
 			case "archetype_node_id":
+				if _got&(1<<1) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 1
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &i.ArchetypeNodeID); _err != nil {
 					return _err
 				}
 			case "uid":
+				if _got&(1<<2) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 2
 				_v, _err := canxml.DecodeAs[UIDBasedID](_dec, _t)
 				if _err != nil {
 					return _err
@@ -256,12 +366,26 @@ func (i *ItemTable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 				}
 				i.Links = append(i.Links, _v)
 			case "archetype_details":
+				if _got&(1<<3) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 3
 				_v := new(Archetyped)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
 				}
 				i.ArchetypeDetails = _v
 			case "feeder_audit":
+				if _got&(1<<4) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 4
 				_v := new(FeederAudit)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -303,6 +427,8 @@ var xmlClassItemTree = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A single-valued member keeps its first child element; a second one is
+// unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (i *ItemTree) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -317,6 +443,8 @@ func (i *ItemTree) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 			break
 		}
 	}
+	// A bit per single-valued member that has had a child element.
+	var _got uint64
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -326,16 +454,37 @@ func (i *ItemTree) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "name":
+				if _got&(1<<0) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 0
 				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
 				}
 				i.Name = _v
 			case "archetype_node_id":
+				if _got&(1<<1) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 1
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &i.ArchetypeNodeID); _err != nil {
 					return _err
 				}
 			case "uid":
+				if _got&(1<<2) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 2
 				_v, _err := canxml.DecodeAs[UIDBasedID](_dec, _t)
 				if _err != nil {
 					return _err
@@ -348,12 +497,26 @@ func (i *ItemTree) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 				}
 				i.Links = append(i.Links, _v)
 			case "archetype_details":
+				if _got&(1<<3) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 3
 				_v := new(Archetyped)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
 				}
 				i.ArchetypeDetails = _v
 			case "feeder_audit":
+				if _got&(1<<4) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 4
 				_v := new(FeederAudit)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err

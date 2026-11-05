@@ -29,6 +29,8 @@ var xmlClassComposition = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A single-valued member keeps its first child element; a second one is
+// unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *Composition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -43,6 +45,8 @@ func (c *Composition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 			break
 		}
 	}
+	// A bit per single-valued member that has had a child element.
+	var _got uint64
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -52,16 +56,37 @@ func (c *Composition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "name":
+				if _got&(1<<0) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 0
 				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
 				}
 				c.Name = _v
 			case "archetype_node_id":
+				if _got&(1<<1) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 1
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.ArchetypeNodeID); _err != nil {
 					return _err
 				}
 			case "uid":
+				if _got&(1<<2) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 2
 				_v, _err := canxml.DecodeAs[UIDBasedID](_dec, _t)
 				if _err != nil {
 					return _err
@@ -74,36 +99,85 @@ func (c *Composition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 				}
 				c.Links = append(c.Links, _v)
 			case "archetype_details":
+				if _got&(1<<3) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 3
 				_v := new(Archetyped)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
 				}
 				c.ArchetypeDetails = _v
 			case "feeder_audit":
+				if _got&(1<<4) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 4
 				_v := new(FeederAudit)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
 				}
 				c.FeederAudit = _v
 			case "language":
+				if _got&(1<<5) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 5
 				if _err := _dec.DecodeElement(&c.Language, &_t); _err != nil {
 					return _err
 				}
 			case "territory":
+				if _got&(1<<6) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 6
 				if _err := _dec.DecodeElement(&c.Territory, &_t); _err != nil {
 					return _err
 				}
 			case "category":
+				if _got&(1<<7) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 7
 				if _err := _dec.DecodeElement(&c.Category, &_t); _err != nil {
 					return _err
 				}
 			case "context":
+				if _got&(1<<8) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 8
 				_v := new(EventContext)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
 				}
 				c.Context = _v
 			case "composer":
+				if _got&(1<<9) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 9
 				_v, _err := canxml.DecodeAs[PartyProxy](_dec, _t)
 				if _err != nil {
 					return _err
@@ -144,6 +218,8 @@ var xmlClassEventContext = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A single-valued member keeps its first child element; a second one is
+// unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (e *EventContext) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -152,6 +228,8 @@ func (e *EventContext) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 	} else if _fresh {
 		*e = EventContext{}
 	}
+	// A bit per single-valued member that has had a child element.
+	var _got uint64
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -161,32 +239,74 @@ func (e *EventContext) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "start_time":
+				if _got&(1<<0) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 0
 				if _err := _dec.DecodeElement(&e.StartTime, &_t); _err != nil {
 					return _err
 				}
 			case "end_time":
+				if _got&(1<<1) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 1
 				_v := new(DVDateTime)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
 				}
 				e.EndTime = _v
 			case "location":
+				if _got&(1<<2) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 2
 				var _v string
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				e.Location = &_v
 			case "setting":
+				if _got&(1<<3) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 3
 				if _err := _dec.DecodeElement(&e.Setting, &_t); _err != nil {
 					return _err
 				}
 			case "other_context":
+				if _got&(1<<4) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 4
 				_v, _err := canxml.DecodeAs[ItemStructure](_dec, _t)
 				if _err != nil {
 					return _err
 				}
 				e.OtherContext = _v
 			case "health_care_facility":
+				if _got&(1<<5) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 5
 				_v, _err := canxml.DecodeAsOrDefault[PartyIdentifiedLike](_dec, _t, func() any { return new(PartyIdentified) })
 				if _err != nil {
 					return _err

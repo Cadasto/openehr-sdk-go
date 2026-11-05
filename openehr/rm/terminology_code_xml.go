@@ -2,6 +2,7 @@ package rm
 
 import (
 	"encoding/xml"
+	"slices"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
@@ -22,6 +23,10 @@ var (
 // decode runtime, as the generator describes each class it emits a decoder
 // for. The RM tables list no mandatory member for it, so none is required.
 var xmlClassTerminologyCode = xmlunmatched.Class{Name: "TERMINOLOGY_CODE"}
+
+// terminologyCodeMembers names the members [TerminologyCode.UnmarshalXML]
+// reads as child elements, each single-valued.
+var terminologyCodeMembers = [...]string{"terminology_id", "code_string", "terminology_version", "uri"}
 
 // MarshalXML emits canonical openEHR XML for TerminologyCode in the shape of a
 // CODE_PHRASE, the form ITS-XML gives a coded term: `terminology_id` holds its
@@ -63,14 +68,18 @@ func (t *TerminologyCode) MarshalXML(e *xml.Encoder, start xml.StartElement) err
 // identifier in a `value` child, and the plain text
 // one that mirrors the canonical-JSON string. `code_string`,
 // `terminology_version` and `uri` are text. Content it does not read, text
-// between its child elements among it, is unmatched: skipped, or reported or
-// refused under canxml.WithUnmatched and canxml.WithStrict.
+// between its child elements and a second child element of one member among
+// it, is unmatched: skipped, or reported or refused under
+// canxml.WithUnmatched and canxml.WithStrict. The first child element of a
+// member gives its value.
 func (t *TerminologyCode) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error {
 	if fresh, err := xmlunmatched.Enter(dec, start, &xmlClassTerminologyCode); err != nil {
 		return err
 	} else if fresh {
 		*t = TerminologyCode{}
 	}
+	// Which members have had a child element.
+	var got [len(terminologyCodeMembers)]bool
 	for {
 		tok, err := dec.Token()
 		if err != nil {
@@ -78,7 +87,17 @@ func (t *TerminologyCode) UnmarshalXML(dec *xml.Decoder, start xml.StartElement)
 		}
 		switch tk := tok.(type) {
 		case xml.StartElement:
-			switch xmlunmatched.LocalName(tk.Name) {
+			name := xmlunmatched.LocalName(tk.Name)
+			if i := slices.Index(terminologyCodeMembers[:], name); i >= 0 {
+				if got[i] {
+					if err := xmlunmatched.SkipUnmatched(dec, tk); err != nil {
+						return err
+					}
+					continue
+				}
+				got[i] = true
+			}
+			switch name {
 			case "terminology_id":
 				if err := decodeTerminologyIDXML(dec, tk, &t.TerminologyID); err != nil {
 					return err

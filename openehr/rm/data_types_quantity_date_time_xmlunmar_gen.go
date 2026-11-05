@@ -28,6 +28,8 @@ var xmlClassDVDate = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A single-valued member keeps its first child element; a second one is
+// unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -36,6 +38,8 @@ func (d *DVDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 	} else if _fresh {
 		*d = DVDate{}
 	}
+	// A bit per single-valued member that has had a child element.
+	var _got uint64
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -45,24 +49,52 @@ func (d *DVDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "magnitude_status":
+				if _got&(1<<0) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 0
 				var _v string
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.MagnitudeStatus = &_v
 			case "accuracy":
+				if _got&(1<<1) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 1
 				_v := new(DVDuration)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
 				}
 				d.Accuracy = _v
 			case "normal_status":
+				if _got&(1<<2) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 2
 				_v := new(CodePhrase)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
 				}
 				d.NormalStatus = _v
 			case "normal_range":
+				if _got&(1<<3) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 3
 				_v := new(DVInterval[DVOrdered])
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -75,6 +107,13 @@ func (d *DVDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 				}
 				d.OtherReferenceRanges = append(d.OtherReferenceRanges, _v)
 			case "value":
+				if _got&(1<<4) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 4
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Value); _err != nil {
 					return _err
 				}
@@ -107,6 +146,8 @@ var xmlClassDVDateTime = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A single-valued member keeps its first child element; a second one is
+// unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -115,6 +156,8 @@ func (d *DVDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 	} else if _fresh {
 		*d = DVDateTime{}
 	}
+	// A bit per single-valued member that has had a child element.
+	var _got uint64
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -124,24 +167,52 @@ func (d *DVDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "magnitude_status":
+				if _got&(1<<0) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 0
 				var _v string
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.MagnitudeStatus = &_v
 			case "accuracy":
+				if _got&(1<<1) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 1
 				_v := new(DVDuration)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
 				}
 				d.Accuracy = _v
 			case "normal_status":
+				if _got&(1<<2) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 2
 				_v := new(CodePhrase)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
 				}
 				d.NormalStatus = _v
 			case "normal_range":
+				if _got&(1<<3) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 3
 				_v := new(DVInterval[DVOrdered])
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -154,6 +225,13 @@ func (d *DVDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 				}
 				d.OtherReferenceRanges = append(d.OtherReferenceRanges, _v)
 			case "value":
+				if _got&(1<<4) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 4
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Value); _err != nil {
 					return _err
 				}
@@ -186,6 +264,8 @@ var xmlClassDVDuration = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A single-valued member keeps its first child element; a second one is
+// unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -194,6 +274,8 @@ func (d *DVDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 	} else if _fresh {
 		*d = DVDuration{}
 	}
+	// A bit per single-valued member that has had a child element.
+	var _got uint64
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -203,30 +285,65 @@ func (d *DVDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "accuracy_is_percent":
+				if _got&(1<<0) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 0
 				var _v bool
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.AccuracyIsPercent = &_v
 			case "magnitude_status":
+				if _got&(1<<1) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 1
 				var _v string
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.MagnitudeStatus = &_v
 			case "accuracy":
+				if _got&(1<<2) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 2
 				var _v Real
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.Accuracy = &_v
 			case "normal_status":
+				if _got&(1<<3) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 3
 				_v := new(CodePhrase)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
 				}
 				d.NormalStatus = _v
 			case "normal_range":
+				if _got&(1<<4) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 4
 				_v := new(DVInterval[DVOrdered])
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -239,6 +356,13 @@ func (d *DVDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 				}
 				d.OtherReferenceRanges = append(d.OtherReferenceRanges, _v)
 			case "value":
+				if _got&(1<<5) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 5
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Value); _err != nil {
 					return _err
 				}
@@ -271,6 +395,8 @@ var xmlClassDVTime = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A single-valued member keeps its first child element; a second one is
+// unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -279,6 +405,8 @@ func (d *DVTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 	} else if _fresh {
 		*d = DVTime{}
 	}
+	// A bit per single-valued member that has had a child element.
+	var _got uint64
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -288,24 +416,52 @@ func (d *DVTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "magnitude_status":
+				if _got&(1<<0) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 0
 				var _v string
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.MagnitudeStatus = &_v
 			case "accuracy":
+				if _got&(1<<1) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 1
 				_v := new(DVDuration)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
 				}
 				d.Accuracy = _v
 			case "normal_status":
+				if _got&(1<<2) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 2
 				_v := new(CodePhrase)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
 				}
 				d.NormalStatus = _v
 			case "normal_range":
+				if _got&(1<<3) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 3
 				_v := new(DVInterval[DVOrdered])
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -318,6 +474,13 @@ func (d *DVTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 				}
 				d.OtherReferenceRanges = append(d.OtherReferenceRanges, _v)
 			case "value":
+				if _got&(1<<4) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 4
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Value); _err != nil {
 					return _err
 				}

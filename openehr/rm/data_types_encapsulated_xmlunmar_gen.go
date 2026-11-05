@@ -28,6 +28,8 @@ var xmlClassDVMultimedia = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A single-valued member keeps its first child element; a second one is
+// unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVMultimedia) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -36,6 +38,8 @@ func (d *DVMultimedia) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 	} else if _fresh {
 		*d = DVMultimedia{}
 	}
+	// A bit per single-valued member that has had a child element.
+	var _got uint64
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -45,60 +49,137 @@ func (d *DVMultimedia) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "charset":
+				if _got&(1<<0) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 0
 				_v := new(CodePhrase)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
 				}
 				d.Charset = _v
 			case "language":
+				if _got&(1<<1) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 1
 				_v := new(CodePhrase)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
 				}
 				d.Language = _v
 			case "alternate_text":
+				if _got&(1<<2) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 2
 				var _v string
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.AlternateText = &_v
 			case "uri":
+				if _got&(1<<3) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 3
 				_v, _err := canxml.DecodeAsOrDefault[DVURILike](_dec, _t, func() any { return new(DVURI) })
 				if _err != nil {
 					return _err
 				}
 				d.URI = _v
 			case "data":
+				if _got&(1<<4) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 4
 				if _err := xmlunmatched.DecodeBase64(_dec, &_t, &d.Data); _err != nil {
 					return _err
 				}
 			case "media_type":
+				if _got&(1<<5) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 5
 				if _err := _dec.DecodeElement(&d.MediaType, &_t); _err != nil {
 					return _err
 				}
 			case "compression_algorithm":
+				if _got&(1<<6) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 6
 				_v := new(CodePhrase)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
 				}
 				d.CompressionAlgorithm = _v
 			case "integrity_check":
+				if _got&(1<<7) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 7
 				if _err := xmlunmatched.DecodeBase64(_dec, &_t, &d.IntegrityCheck); _err != nil {
 					return _err
 				}
 			case "integrity_check_algorithm":
+				if _got&(1<<8) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 8
 				_v := new(CodePhrase)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
 				}
 				d.IntegrityCheckAlgorithm = _v
 			case "thumbnail":
+				if _got&(1<<9) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 9
 				_v := new(DVMultimedia)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
 				}
 				d.Thumbnail = _v
 			case "size":
+				if _got&(1<<10) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 10
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Size); _err != nil {
 					return _err
 				}
@@ -130,6 +211,8 @@ var xmlClassDVParsable = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A single-valued member keeps its first child element; a second one is
+// unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVParsable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -138,6 +221,8 @@ func (d *DVParsable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 	} else if _fresh {
 		*d = DVParsable{}
 	}
+	// A bit per single-valued member that has had a child element.
+	var _got uint64
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -147,22 +232,50 @@ func (d *DVParsable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "charset":
+				if _got&(1<<0) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 0
 				_v := new(CodePhrase)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
 				}
 				d.Charset = _v
 			case "language":
+				if _got&(1<<1) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 1
 				_v := new(CodePhrase)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
 				}
 				d.Language = _v
 			case "value":
+				if _got&(1<<2) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 2
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Value); _err != nil {
 					return _err
 				}
 			case "formalism":
+				if _got&(1<<3) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 3
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Formalism); _err != nil {
 					return _err
 				}

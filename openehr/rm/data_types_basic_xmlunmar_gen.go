@@ -27,6 +27,8 @@ var xmlClassDVBoolean = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A single-valued member keeps its first child element; a second one is
+// unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVBoolean) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -35,6 +37,8 @@ func (d *DVBoolean) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 	} else if _fresh {
 		*d = DVBoolean{}
 	}
+	// A bit per single-valued member that has had a child element.
+	var _got uint64
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -44,6 +48,13 @@ func (d *DVBoolean) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "value":
+				if _got&(1<<0) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 0
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Value); _err != nil {
 					return _err
 				}
@@ -75,6 +86,8 @@ var xmlClassDVIdentifier = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A single-valued member keeps its first child element; a second one is
+// unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVIdentifier) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -83,6 +96,8 @@ func (d *DVIdentifier) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 	} else if _fresh {
 		*d = DVIdentifier{}
 	}
+	// A bit per single-valued member that has had a child element.
+	var _got uint64
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -92,22 +107,50 @@ func (d *DVIdentifier) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "issuer":
+				if _got&(1<<0) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 0
 				var _v string
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.Issuer = &_v
 			case "assigner":
+				if _got&(1<<1) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 1
 				var _v string
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.Assigner = &_v
 			case "id":
+				if _got&(1<<2) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 2
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.ID); _err != nil {
 					return _err
 				}
 			case "type":
+				if _got&(1<<3) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 3
 				var _v string
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
@@ -141,6 +184,8 @@ var xmlClassDVState = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A single-valued member keeps its first child element; a second one is
+// unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVState) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -149,6 +194,8 @@ func (d *DVState) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 	} else if _fresh {
 		*d = DVState{}
 	}
+	// A bit per single-valued member that has had a child element.
+	var _got uint64
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -158,10 +205,24 @@ func (d *DVState) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "value":
+				if _got&(1<<0) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 0
 				if _err := _dec.DecodeElement(&d.Value, &_t); _err != nil {
 					return _err
 				}
 			case "is_terminal":
+				if _got&(1<<1) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 1
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.IsTerminal); _err != nil {
 					return _err
 				}

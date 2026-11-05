@@ -26,6 +26,8 @@ var xmlClassInterval = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A single-valued member keeps its first child element; a second one is
+// unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 //
@@ -51,6 +53,8 @@ func (i *Interval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 	} else if _fresh {
 		*i = Interval[T]{}
 	}
+	// A bit per single-valued member that has had a child element.
+	var _got uint64
 	var _seen intervalFlagsSeen
 	for {
 		_tok, _err := _dec.Token()
@@ -61,28 +65,70 @@ func (i *Interval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "lower", "Lower":
+				if _got&(1<<0) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 0
 				if _err := xmlunmatched.DecodeParam(_dec, &_t, &i.Lower, canxml.DecodeAs[T]); _err != nil {
 					return _err
 				}
 				_seen.lower = true
 			case "upper", "Upper":
+				if _got&(1<<1) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 1
 				if _err := xmlunmatched.DecodeParam(_dec, &_t, &i.Upper, canxml.DecodeAs[T]); _err != nil {
 					return _err
 				}
 				_seen.upper = true
 			case "lower_unbounded", "LowerUnbounded":
+				if _got&(1<<2) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 2
 				if _err := decodeIntervalFlagXML(_dec, &_t, &i.LowerUnbounded, &_seen.lowerUnbounded); _err != nil {
 					return _err
 				}
 			case "upper_unbounded", "UpperUnbounded":
+				if _got&(1<<3) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 3
 				if _err := decodeIntervalFlagXML(_dec, &_t, &i.UpperUnbounded, &_seen.upperUnbounded); _err != nil {
 					return _err
 				}
 			case "lower_included", "LowerIncluded":
+				if _got&(1<<4) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 4
 				if _err := decodeIntervalFlagXML(_dec, &_t, &i.LowerIncluded, &_seen.lowerIncluded); _err != nil {
 					return _err
 				}
 			case "upper_included", "UpperIncluded":
+				if _got&(1<<5) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 5
 				if _err := decodeIntervalFlagXML(_dec, &_t, &i.UpperIncluded, &_seen.upperIncluded); _err != nil {
 					return _err
 				}
@@ -116,6 +162,8 @@ var xmlClassPointInterval = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A single-valued member keeps its first child element; a second one is
+// unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 //
@@ -136,6 +184,8 @@ func (p *PointInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 	} else if _fresh {
 		*p = PointInterval[T]{}
 	}
+	// A bit per single-valued member that has had a child element.
+	var _got uint64
 	var _seen intervalFlagsSeen
 	for {
 		_tok, _err := _dec.Token()
@@ -146,28 +196,70 @@ func (p *PointInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "lower":
+				if _got&(1<<0) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 0
 				if _err := xmlunmatched.DecodeParam(_dec, &_t, &p.Lower, canxml.DecodeAs[T]); _err != nil {
 					return _err
 				}
 				_seen.lower = true
 			case "upper":
+				if _got&(1<<1) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 1
 				if _err := xmlunmatched.DecodeParam(_dec, &_t, &p.Upper, canxml.DecodeAs[T]); _err != nil {
 					return _err
 				}
 				_seen.upper = true
 			case "lower_unbounded":
+				if _got&(1<<2) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 2
 				if _err := decodeIntervalFlagXML(_dec, &_t, &p.LowerUnbounded, &_seen.lowerUnbounded); _err != nil {
 					return _err
 				}
 			case "upper_unbounded":
+				if _got&(1<<3) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 3
 				if _err := decodeIntervalFlagXML(_dec, &_t, &p.UpperUnbounded, &_seen.upperUnbounded); _err != nil {
 					return _err
 				}
 			case "lower_included":
+				if _got&(1<<4) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 4
 				if _err := decodeIntervalFlagXML(_dec, &_t, &p.LowerIncluded, &_seen.lowerIncluded); _err != nil {
 					return _err
 				}
 			case "upper_included":
+				if _got&(1<<5) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 5
 				if _err := decodeIntervalFlagXML(_dec, &_t, &p.UpperIncluded, &_seen.upperIncluded); _err != nil {
 					return _err
 				}
@@ -201,6 +293,8 @@ var xmlClassProperInterval = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A single-valued member keeps its first child element; a second one is
+// unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 //
@@ -221,6 +315,8 @@ func (p *ProperInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 	} else if _fresh {
 		*p = ProperInterval[T]{}
 	}
+	// A bit per single-valued member that has had a child element.
+	var _got uint64
 	var _seen intervalFlagsSeen
 	for {
 		_tok, _err := _dec.Token()
@@ -231,28 +327,70 @@ func (p *ProperInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "lower":
+				if _got&(1<<0) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 0
 				if _err := xmlunmatched.DecodeParam(_dec, &_t, &p.Lower, canxml.DecodeAs[T]); _err != nil {
 					return _err
 				}
 				_seen.lower = true
 			case "upper":
+				if _got&(1<<1) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 1
 				if _err := xmlunmatched.DecodeParam(_dec, &_t, &p.Upper, canxml.DecodeAs[T]); _err != nil {
 					return _err
 				}
 				_seen.upper = true
 			case "lower_unbounded":
+				if _got&(1<<2) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 2
 				if _err := decodeIntervalFlagXML(_dec, &_t, &p.LowerUnbounded, &_seen.lowerUnbounded); _err != nil {
 					return _err
 				}
 			case "upper_unbounded":
+				if _got&(1<<3) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 3
 				if _err := decodeIntervalFlagXML(_dec, &_t, &p.UpperUnbounded, &_seen.upperUnbounded); _err != nil {
 					return _err
 				}
 			case "lower_included":
+				if _got&(1<<4) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 4
 				if _err := decodeIntervalFlagXML(_dec, &_t, &p.LowerIncluded, &_seen.lowerIncluded); _err != nil {
 					return _err
 				}
 			case "upper_included":
+				if _got&(1<<5) != 0 {
+					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+						return _err
+					}
+					break
+				}
+				_got |= 1 << 5
 				if _err := decodeIntervalFlagXML(_dec, &_t, &p.UpperIncluded, &_seen.upperIncluded); _err != nil {
 					return _err
 				}
