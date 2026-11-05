@@ -173,7 +173,10 @@ func WithStrict() DecoderOption {
 // the element, in every mode, with [WithUnmatched], [WithStrict] or
 // [WithMissing] or without. Use it on input from outside the caller's
 // control, whose nesting would otherwise cost the decode memory and time in
-// proportion to its depth.
+// proportion to its depth. No decode sets a limit by default, and none
+// bounds the bytes it reads: a caller that decodes untrusted input gives this
+// option and bounds the input itself, as aom14.ReadOperationalTemplate
+// does.
 //
 // The refusal is a [DecodeError] on its own, outside any slot envelope, that
 // wraps [ErrLimitExceeded]. Its Path is the element's path from the root of
