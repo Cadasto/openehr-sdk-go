@@ -55,6 +55,12 @@ func (c *CodePhrase) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.TerminologyID)
+					break
+				}
 				if _err := _dec.DecodeElement(&c.TerminologyID, &_t); _err != nil {
 					return _err
 				}
@@ -66,7 +72,13 @@ func (c *CodePhrase) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 					break
 				}
 				_got |= 1 << 1
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.CodeString); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.CodeString)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &c.CodeString); _err != nil {
 					return _err
 				}
 			case "preferred_term":
@@ -148,7 +160,13 @@ func (d *DVCodedText) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Value); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&d.Value)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &d.Value); _err != nil {
 					return _err
 				}
 			case "hyperlink":
@@ -244,6 +262,12 @@ func (d *DVCodedText) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 5
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&d.DefiningCode)
+					break
+				}
 				if _err := _dec.DecodeElement(&d.DefiningCode, &_t); _err != nil {
 					return _err
 				}
@@ -355,7 +379,13 @@ func (d *DVText) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Value); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&d.Value)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &d.Value); _err != nil {
 					return _err
 				}
 			case "hyperlink":
@@ -499,7 +529,13 @@ func (t *TermMapping) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &t.Match); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&t.Match)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &t.Match); _err != nil {
 					return _err
 				}
 			case "purpose":
@@ -529,6 +565,12 @@ func (t *TermMapping) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 2
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&t.Target)
+					break
+				}
 				if _err := _dec.DecodeElement(&t.Target, &_t); _err != nil {
 					return _err
 				}

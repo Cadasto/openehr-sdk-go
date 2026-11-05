@@ -56,6 +56,12 @@ func (e *EHR) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&e.SystemID)
+					break
+				}
 				if _err := _dec.DecodeElement(&e.SystemID, &_t); _err != nil {
 					return _err
 				}
@@ -67,6 +73,12 @@ func (e *EHR) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&e.EHRID)
+					break
+				}
 				if _err := _dec.DecodeElement(&e.EHRID, &_t); _err != nil {
 					return _err
 				}
@@ -84,6 +96,12 @@ func (e *EHR) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 					break
 				}
 				_got |= 1 << 2
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&e.EHRStatus)
+					break
+				}
 				_v, _err := canxml.DecodeAsOrDefault[ObjectRefLike](_dec, _t, func() any { return new(ObjectRef) })
 				if _err != nil {
 					return _err
@@ -97,6 +115,12 @@ func (e *EHR) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 					break
 				}
 				_got |= 1 << 3
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&e.EHRAccess)
+					break
+				}
 				_v, _err := canxml.DecodeAsOrDefault[ObjectRefLike](_dec, _t, func() any { return new(ObjectRef) })
 				if _err != nil {
 					return _err
@@ -135,6 +159,12 @@ func (e *EHR) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 					break
 				}
 				_got |= 1 << 5
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&e.TimeCreated)
+					break
+				}
 				if _err := _dec.DecodeElement(&e.TimeCreated, &_t); _err != nil {
 					return _err
 				}
@@ -214,6 +244,12 @@ func (e *EHRAccess) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&e.Name)
+					break
+				}
 				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
@@ -227,7 +263,13 @@ func (e *EHRAccess) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 					break
 				}
 				_got |= 1 << 1
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &e.ArchetypeNodeID); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&e.ArchetypeNodeID)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &e.ArchetypeNodeID); _err != nil {
 					return _err
 				}
 			case "uid":
@@ -376,6 +418,12 @@ func (e *EHRStatus) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&e.Name)
+					break
+				}
 				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
@@ -389,7 +437,13 @@ func (e *EHRStatus) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 					break
 				}
 				_got |= 1 << 1
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &e.ArchetypeNodeID); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&e.ArchetypeNodeID)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &e.ArchetypeNodeID); _err != nil {
 					return _err
 				}
 			case "uid":
@@ -463,6 +517,12 @@ func (e *EHRStatus) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 					break
 				}
 				_got |= 1 << 5
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&e.Subject)
+					break
+				}
 				if _err := _dec.DecodeElement(&e.Subject, &_t); _err != nil {
 					return _err
 				}
@@ -474,7 +534,13 @@ func (e *EHRStatus) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 					break
 				}
 				_got |= 1 << 6
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &e.IsQueryable); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&e.IsQueryable)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &e.IsQueryable); _err != nil {
 					return _err
 				}
 			case "is_modifiable":
@@ -485,7 +551,13 @@ func (e *EHRStatus) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 					break
 				}
 				_got |= 1 << 7
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &e.IsModifiable); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&e.IsModifiable)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &e.IsModifiable); _err != nil {
 					return _err
 				}
 			case "other_details":
@@ -563,6 +635,12 @@ func (v *VersionedComposition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartE
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&v.UID)
+					break
+				}
 				if _err := _dec.DecodeElement(&v.UID, &_t); _err != nil {
 					return _err
 				}
@@ -574,6 +652,12 @@ func (v *VersionedComposition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartE
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&v.OwnerID)
+					break
+				}
 				_v, _err := canxml.DecodeAsOrDefault[ObjectRefLike](_dec, _t, func() any { return new(ObjectRef) })
 				if _err != nil {
 					return _err
@@ -587,6 +671,12 @@ func (v *VersionedComposition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartE
 					break
 				}
 				_got |= 1 << 2
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&v.TimeCreated)
+					break
+				}
 				if _err := _dec.DecodeElement(&v.TimeCreated, &_t); _err != nil {
 					return _err
 				}
@@ -646,6 +736,12 @@ func (v *VersionedEHRAccess) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&v.UID)
+					break
+				}
 				if _err := _dec.DecodeElement(&v.UID, &_t); _err != nil {
 					return _err
 				}
@@ -657,6 +753,12 @@ func (v *VersionedEHRAccess) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&v.OwnerID)
+					break
+				}
 				_v, _err := canxml.DecodeAsOrDefault[ObjectRefLike](_dec, _t, func() any { return new(ObjectRef) })
 				if _err != nil {
 					return _err
@@ -670,6 +772,12 @@ func (v *VersionedEHRAccess) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 					break
 				}
 				_got |= 1 << 2
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&v.TimeCreated)
+					break
+				}
 				if _err := _dec.DecodeElement(&v.TimeCreated, &_t); _err != nil {
 					return _err
 				}
@@ -729,6 +837,12 @@ func (v *VersionedEHRStatus) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&v.UID)
+					break
+				}
 				if _err := _dec.DecodeElement(&v.UID, &_t); _err != nil {
 					return _err
 				}
@@ -740,6 +854,12 @@ func (v *VersionedEHRStatus) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&v.OwnerID)
+					break
+				}
 				_v, _err := canxml.DecodeAsOrDefault[ObjectRefLike](_dec, _t, func() any { return new(ObjectRef) })
 				if _err != nil {
 					return _err
@@ -753,6 +873,12 @@ func (v *VersionedEHRStatus) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 					break
 				}
 				_got |= 1 << 2
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&v.TimeCreated)
+					break
+				}
 				if _err := _dec.DecodeElement(&v.TimeCreated, &_t); _err != nil {
 					return _err
 				}

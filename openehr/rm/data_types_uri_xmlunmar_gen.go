@@ -55,7 +55,13 @@ func (d *DVEHRURI) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Value); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&d.Value)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &d.Value); _err != nil {
 					return _err
 				}
 			default:
@@ -114,7 +120,13 @@ func (d *DVURI) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Value); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&d.Value)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &d.Value); _err != nil {
 					return _err
 				}
 			default:

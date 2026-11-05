@@ -6,11 +6,12 @@ import (
 )
 
 // SkipNil skips the element start opens when it carries `xsi:nil="true"` (or
-// `1`), the element of an optional member sent without a value, and reports
-// whether it did: the member then holds no value, as a `null` member does in
-// canonical JSON, whatever the element holds, and the decoder leaves it
-// absent. The element is not read, so it needs no `xsi:type` where the member
-// is polymorphic. start must be the token the decoder read last.
+// `1`), the element of a member sent without a value, and reports whether it
+// did: the member then holds no value, as a `null` member does in canonical
+// JSON, whatever the element holds, and the decoder leaves an optional member
+// absent and gives a mandatory one its zero value ([Zero]). The element is
+// not read, so it needs no `xsi:type` where the member is polymorphic. start
+// must be the token the decoder read last.
 //
 // By default the content of a nilled element is skipped. A tracked decode
 // applies its policy for unmatched content to the content: each attribute
@@ -90,6 +91,30 @@ func DecodeOptional(dec *xml.Decoder, start *xml.StartElement, v any) (bool, err
 		return false, untrackedFailure(start, v, err)
 	}
 	return true, nil
+}
+
+// Zero sets *p to the zero value of its type: the value of a mandatory member
+// whose element carries `xsi:nil`, as of one the document leaves out, which
+// the decoder sets once [SkipNil] has skipped the element.
+func Zero[T any](p *T) {
+	var zero T
+	*p = zero
+}
+
+// DecodeMandatory decodes the element start opens, that of a mandatory member
+// of a primitive type, into v as [DecodeElement] does, except a string
+// element whose text is XML whitespace only: it carries no value, so the
+// member gets the empty string, the zero value the decode gives a document
+// without the element. The decoder hands a nilled element to [SkipNil]
+// first. start must be the token the decoder read last.
+func DecodeMandatory(dec *xml.Decoder, start *xml.StartElement, v any) error {
+	if err := DecodeElement(dec, start, v); err != nil {
+		return err
+	}
+	if s, ok := v.(*string); ok && noValue(*s, s) {
+		*s = ""
+	}
+	return nil
 }
 
 // noValue reports whether text, the whole text of a primitive element decoded

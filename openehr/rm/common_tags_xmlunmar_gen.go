@@ -55,7 +55,13 @@ func (i *ItemTag) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &i.Key); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&i.Key)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &i.Key); _err != nil {
 					return _err
 				}
 			case "value":
@@ -88,6 +94,12 @@ func (i *ItemTag) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 					break
 				}
 				_got |= 1 << 2
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&i.Target)
+					break
+				}
 				_v, _err := canxml.DecodeAs[UIDBasedID](_dec, _t)
 				if _err != nil {
 					return _err
@@ -123,6 +135,12 @@ func (i *ItemTag) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 					break
 				}
 				_got |= 1 << 4
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&i.OwnerID)
+					break
+				}
 				_v, _err := canxml.DecodeAsOrDefault[ObjectRefLike](_dec, _t, func() any { return new(ObjectRef) })
 				if _err != nil {
 					return _err

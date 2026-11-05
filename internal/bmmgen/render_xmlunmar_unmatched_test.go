@@ -71,7 +71,7 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 
 	for _, target := range []Target{TargetRM, TargetAOM14} {
 		plan := plans[target.GoPackage]
-		hashes, anys, params, octets, lists, choices, singles, nils, optionals := 0, 0, 0, 0, 0, 0, 0, 0, 0
+		hashes, anys, params, octets, lists, choices, singles, nils, zeroed, optionals := 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 		for _, f := range plan.Files {
 			classes, err := codecClassesIn(plan, f)
 			if err != nil {
@@ -125,15 +125,23 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 					if err != nil {
 						t.Fatalf("xmlNilable(%s.%s): %v", pc.BMMName, prop, err)
 					}
-					nilGuard := nilGuardOf(FieldName(prop)).FindString(arm)
+					nilGuard := nilGuardOf(FieldName(prop)).FindStringSubmatch(arm)
 					switch {
-					case nilable && nilGuard == "":
-						t.Errorf("%s.%s is optional and its field can hold nil; its arm must hand a nilled element to xmlunmatched.SkipNil and set the field to nil:\n%s", pc.BMMName, prop, arm)
-					case !nilable && nilGuard != "":
-						t.Errorf("%s.%s is mandatory, multi-valued or held by value; its arm must not leave it nil:\n%s", pc.BMMName, prop, arm)
-					case nilGuard != "":
+					case nilable && nilGuard == nil:
+						t.Errorf("%s.%s is single-valued; its arm must hand a nilled element to xmlunmatched.SkipNil and give the member no value:\n%s", pc.BMMName, prop, arm)
+					case !nilable && nilGuard != nil:
+						t.Errorf("%s.%s is multi-valued, a Hash, a boundary flag or typed by a generic parameter; its arm must not skip a nilled element:\n%s", pc.BMMName, prop, arm)
+					case nilGuard != nil:
 						nils++
-						arm = strings.Replace(arm, nilGuard, "", 1)
+						// A mandatory member gets its zero value, as a missing one
+						// does (REQ-175); an optional one is left nil (REQ-056).
+						if zeroes := nilGuard[1] == ""; zeroes != mandatoryProperty(ef.Prop) {
+							t.Errorf("%s.%s: mandatory is %t, yet its nil guard zeroes it is %t; want a mandatory member zeroed and an optional one set to nil:\n%s", pc.BMMName, prop, mandatoryProperty(ef.Prop), zeroes, arm)
+						}
+						if nilGuard[1] == "" {
+							zeroed++
+						}
+						arm = strings.Replace(arm, nilGuard[0], "", 1)
 					}
 					if p, ok := ef.Prop.(*bmm.SingleProperty); ok && !p.IsMandatory && isPrimitive(p.TypeName) && !isOpenParam(ef.Owner, p.TypeName) {
 						optionals++
@@ -203,8 +211,8 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 				}
 			}
 		}
-		if singles == 0 || nils == 0 || optionals == 0 {
-			t.Errorf("the %s target rendered %d repeat guards, %d nil guards and %d optional primitives; want each covered", target.GoPackage, singles, nils, optionals)
+		if singles == 0 || nils == 0 || zeroed == 0 || nils == zeroed || optionals == 0 {
+			t.Errorf("the %s target rendered %d repeat guards, %d nil guards (%d zeroing) and %d optional primitives; want each covered", target.GoPackage, singles, nils, zeroed, optionals)
 		}
 		if target.GoPackage == TargetRM.GoPackage && (hashes == 0 || params == 0 || octets == 0) {
 			t.Errorf("the RM target rendered %d Hash arms, %d generic-parameter arms and %d Octet arms; want the resource-metadata Hash members, VERSION<T>.data and DV_MULTIMEDIA.data covered", hashes, params, octets)
@@ -220,9 +228,11 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 var repeatGuard = regexp.MustCompile(`\t\t\t\tif _got&\(1<<(\d+)\) != 0 \{\n\t\t\t\t\tif _err := xmlunmatched\.SkipUnmatched\(_dec, _t\); _err != nil \{\n\t\t\t\t\t\treturn _err\n\t\t\t\t\t\}\n\t\t\t\t\tbreak\n\t\t\t\t\}\n\t\t\t\t_got \|= 1 << (\d+)\n`)
 
 // nilGuardOf matches the nil guard of the member held in the Go field field
-// ([withNilGuard]).
+// ([withNilGuard]); its first group holds " = nil" when the guard sets the
+// field to nil, and is empty when it zeroes the field.
 func nilGuardOf(field string) *regexp.Regexp {
-	return regexp.MustCompile(`\t\t\t\tif _nil, _err := xmlunmatched\.SkipNil\(_dec, _t\); _err != nil \{\n\t\t\t\t\treturn _err\n\t\t\t\t\} else if _nil \{\n\t\t\t\t\t[a-z]+\.` + regexp.QuoteMeta(field) + ` = nil\n\t\t\t\t\tbreak\n\t\t\t\t\}\n`)
+	f := regexp.QuoteMeta(field)
+	return regexp.MustCompile(`\t\t\t\tif _nil, _err := xmlunmatched\.SkipNil\(_dec, _t\); _err != nil \{\n\t\t\t\t\treturn _err\n\t\t\t\t\} else if _nil \{\n\t\t\t\t\t(?:[a-z]+\.` + f + `( = nil)|xmlunmatched\.Zero\(&[a-z]+\.` + f + `\))\n\t\t\t\t\tbreak\n\t\t\t\t\}\n`)
 }
 
 // xmlCaseArm returns the case arm of a rendered UnmarshalXML that matches the

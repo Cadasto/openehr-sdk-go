@@ -55,6 +55,12 @@ func (d *DVGeneralTimeSpecification) UnmarshalXML(_dec *xml.Decoder, _start xml.
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&d.Value)
+					break
+				}
 				if _err := _dec.DecodeElement(&d.Value, &_t); _err != nil {
 					return _err
 				}
@@ -114,6 +120,12 @@ func (d *DVPeriodicTimeSpecification) UnmarshalXML(_dec *xml.Decoder, _start xml
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&d.Value)
+					break
+				}
 				if _err := _dec.DecodeElement(&d.Value, &_t); _err != nil {
 					return _err
 				}

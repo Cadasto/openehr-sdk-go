@@ -63,6 +63,12 @@ func (s *Section) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&s.Name)
+					break
+				}
 				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
@@ -76,7 +82,13 @@ func (s *Section) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 					break
 				}
 				_got |= 1 << 1
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &s.ArchetypeNodeID); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&s.ArchetypeNodeID)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &s.ArchetypeNodeID); _err != nil {
 					return _err
 				}
 			case "uid":

@@ -56,7 +56,13 @@ func (c *CBoolean) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.TrueValid); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.TrueValid)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &c.TrueValid); _err != nil {
 					return _err
 				}
 			case "false_valid":
@@ -67,7 +73,13 @@ func (c *CBoolean) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 					break
 				}
 				_got |= 1 << 1
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.FalseValid); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.FalseValid)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &c.FalseValid); _err != nil {
 					return _err
 				}
 			case "assumed_value":

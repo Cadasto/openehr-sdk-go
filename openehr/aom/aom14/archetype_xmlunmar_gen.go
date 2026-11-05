@@ -61,6 +61,12 @@ func (a *Archetype) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.OriginalLanguage)
+					break
+				}
 				if _err := _dec.DecodeElement(&a.OriginalLanguage, &_t); _err != nil {
 					return _err
 				}
@@ -139,6 +145,12 @@ func (a *Archetype) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 					break
 				}
 				_got |= 1 << 4
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.Definition)
+					break
+				}
 				_v, _err := canxml.DecodeAsOrDefault[CComplexObjectLike](_dec, _t, func() any { return new(CComplexObject) })
 				if _err != nil {
 					return _err
@@ -152,6 +164,12 @@ func (a *Archetype) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 					break
 				}
 				_got |= 1 << 5
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.Ontology)
+					break
+				}
 				_v, _err := canxml.DecodeAsOrDefault[ArchetypeOntologyLike](_dec, _t, func() any { return new(ArchetypeOntology) })
 				if _err != nil {
 					return _err
@@ -187,6 +205,12 @@ func (a *Archetype) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 					break
 				}
 				_got |= 1 << 7
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.ArchetypeID)
+					break
+				}
 				if _err := _dec.DecodeElement(&a.ArchetypeID, &_t); _err != nil {
 					return _err
 				}
@@ -217,7 +241,13 @@ func (a *Archetype) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 					break
 				}
 				_got |= 1 << 9
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &a.Concept); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.Concept)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &a.Concept); _err != nil {
 					return _err
 				}
 			case "parent_archetype_id":

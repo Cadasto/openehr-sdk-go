@@ -63,6 +63,12 @@ func (c *Composition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.Name)
+					break
+				}
 				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
@@ -76,7 +82,13 @@ func (c *Composition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 1
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.ArchetypeNodeID); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.ArchetypeNodeID)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &c.ArchetypeNodeID); _err != nil {
 					return _err
 				}
 			case "uid":
@@ -150,6 +162,12 @@ func (c *Composition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 5
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.Language)
+					break
+				}
 				if _err := _dec.DecodeElement(&c.Language, &_t); _err != nil {
 					return _err
 				}
@@ -161,6 +179,12 @@ func (c *Composition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 6
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.Territory)
+					break
+				}
 				if _err := _dec.DecodeElement(&c.Territory, &_t); _err != nil {
 					return _err
 				}
@@ -172,6 +196,12 @@ func (c *Composition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 7
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.Category)
+					break
+				}
 				if _err := _dec.DecodeElement(&c.Category, &_t); _err != nil {
 					return _err
 				}
@@ -202,6 +232,12 @@ func (c *Composition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 9
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.Composer)
+					break
+				}
 				_v, _err := canxml.DecodeAs[PartyProxy](_dec, _t)
 				if _err != nil {
 					return _err
@@ -270,6 +306,12 @@ func (e *EventContext) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&e.StartTime)
+					break
+				}
 				if _err := _dec.DecodeElement(&e.StartTime, &_t); _err != nil {
 					return _err
 				}
@@ -322,6 +364,12 @@ func (e *EventContext) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 					break
 				}
 				_got |= 1 << 3
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&e.Setting)
+					break
+				}
 				if _err := _dec.DecodeElement(&e.Setting, &_t); _err != nil {
 					return _err
 				}

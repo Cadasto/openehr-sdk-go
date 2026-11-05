@@ -55,7 +55,13 @@ func (d *DVBoolean) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Value); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&d.Value)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &d.Value); _err != nil {
 					return _err
 				}
 			default:
@@ -158,7 +164,13 @@ func (d *DVIdentifier) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 					break
 				}
 				_got |= 1 << 2
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.ID); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&d.ID)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &d.ID); _err != nil {
 					return _err
 				}
 			case "type":
@@ -239,6 +251,12 @@ func (d *DVState) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&d.Value)
+					break
+				}
 				if _err := _dec.DecodeElement(&d.Value, &_t); _err != nil {
 					return _err
 				}
@@ -250,7 +268,13 @@ func (d *DVState) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 					break
 				}
 				_got |= 1 << 1
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.IsTerminal); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&d.IsTerminal)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &d.IsTerminal); _err != nil {
 					return _err
 				}
 			default:

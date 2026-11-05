@@ -335,7 +335,7 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 			return "", fmt.Errorf("%s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
 		}
 		if nilable {
-			caseBody, err = withNilGuard(caseBody, recv, FieldName(ef.Prop.PropertyName()))
+			caseBody, err = withNilGuard(caseBody, recv, FieldName(ef.Prop.PropertyName()), isMandatoryMember(ef.Prop))
 			if err != nil {
 				return "", fmt.Errorf("render UnmarshalXML field %s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
 			}
@@ -562,9 +562,13 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 // its text and ignores any attribute or child element on it, and the helper
 // hands those to the decode's policy for unmatched content.
 
+// unmarshalXMLPrimitiveMandatory emits the case of a mandatory member of a
+// primitive type, through xmlunmatched.DecodeMandatory, which gives a string
+// element of whitespace only the empty string, as an absent one has
+// (REQ-175).
 func unmarshalXMLPrimitiveMandatory(recv, field, elem string) string {
 	return fmt.Sprintf(
-		"\t\t\tcase %q:\n\t\t\t\tif _err := xmlunmatched.DecodeElement(_dec, &_t, &%s.%s); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
+		"\t\t\tcase %q:\n\t\t\t\tif _err := xmlunmatched.DecodeMandatory(_dec, &_t, &%s.%s); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
 		elem, recv, field)
 }
 
@@ -1011,12 +1015,13 @@ func withRepeatGuard(caseBody string, bit int) (string, error) {
 	return b.String(), nil
 }
 
-// xmlNilable reports whether ef is an optional single-valued member whose Go
-// field can hold nil, a pointer, an interface or an Octet list, so that a
-// nilled element leaves it absent (REQ-056): not a mandatory member, a
-// multi-valued one or a Hash, not a boundary flag, not a member typed by the
-// owner's generic parameter, which the field holds by value, and not one whose
-// class has no decoder, which the decoder skips.
+// xmlNilable reports whether ef is a single-valued member that a nilled
+// element gives no value: an optional one, whose Go field holds a pointer, an
+// interface or an Octet list, is left absent (REQ-056), and a mandatory one
+// gets its zero value, as a missing member does (REQ-175). Not a multi-valued
+// member or a Hash, not a boundary flag, not a member typed by the owner's
+// generic parameter, which the field holds by value, and not one whose class
+// has no decoder, which the decoder skips.
 func xmlNilable(plan *Plan, ef emittedField) (bool, error) {
 	if isIntervalFlag(ef.Prop.PropertyName()) {
 		return false, nil
@@ -1027,7 +1032,7 @@ func xmlNilable(plan *Plan, ef emittedField) (bool, error) {
 	}
 	switch p := ef.Prop.(type) {
 	case *bmm.SingleProperty:
-		if p.IsMandatory || isOpenParam(ef.Owner, p.TypeName) {
+		if isOpenParam(ef.Owner, p.TypeName) {
 			return false, nil
 		}
 		if isPrimitive(p.TypeName) || p.TypeName == bmmAnyType || isInterfaceTypeRef(plan, p.TypeName) {
@@ -1036,22 +1041,39 @@ func xmlNilable(plan *Plan, ef emittedField) (bool, error) {
 		decoding, err := xmlClassDecoding(plan, p.TypeName)
 		return decoding != xmlNoDecoder, err
 	case *bmm.GenericProperty:
-		if p.IsMandatory || p.TypeDef == nil || containerKinds[p.TypeDef.RootType] {
+		if p.TypeDef == nil || containerKinds[p.TypeDef.RootType] {
 			return false, nil
 		}
 		decoding, err := xmlClassDecoding(plan, p.TypeDef.RootType)
 		return decoding == xmlOwnDecoder, err
 	case *bmm.ContainerProperty:
-		return !containerRequired(p.Cardinality, p.IsMandatory) && isOctetContainer(p.TypeDef), nil
+		return isOctetContainer(p.TypeDef), nil
 	}
 	return false, nil
 }
 
-// withNilGuard puts at the head of caseBody, the case branch of an optional
-// member held in the field field of recv, the check that hands a nilled
-// element to xmlunmatched.SkipNil, leaves the member absent and leaves the
-// branch (REQ-056). caseBody's first line is its case label.
-func withNilGuard(caseBody, recv, field string) (string, error) {
+// isMandatoryMember reports whether prop is a mandatory member, whatever its
+// kind.
+func isMandatoryMember(prop bmm.Property) bool {
+	switch p := prop.(type) {
+	case *bmm.SingleProperty:
+		return p.IsMandatory
+	case *bmm.SinglePropertyOpen:
+		return p.IsMandatory
+	case *bmm.GenericProperty:
+		return p.IsMandatory
+	case *bmm.ContainerProperty:
+		return containerRequired(p.Cardinality, p.IsMandatory)
+	}
+	return false
+}
+
+// withNilGuard puts at the head of caseBody, the case branch of a member held
+// in the field field of recv, the check that hands a nilled element to
+// xmlunmatched.SkipNil, gives the member no value, nil when it is optional
+// and its zero value when it is mandatory, and leaves the branch (REQ-056,
+// REQ-175). caseBody's first line is its case label.
+func withNilGuard(caseBody, recv, field string, mandatory bool) (string, error) {
 	label, body, ok := strings.Cut(caseBody, "\n")
 	if !ok || !strings.HasPrefix(label, "\t\t\tcase ") {
 		return "", fmt.Errorf("the case branch does not open with its case label: %q", label)
@@ -1061,7 +1083,11 @@ func withNilGuard(caseBody, recv, field string) (string, error) {
 	b.WriteString("\t\t\t\tif _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {\n")
 	b.WriteString("\t\t\t\t\treturn _err\n")
 	b.WriteString("\t\t\t\t} else if _nil {\n")
-	fmt.Fprintf(&b, "\t\t\t\t\t%s.%s = nil\n", recv, field)
+	if mandatory {
+		fmt.Fprintf(&b, "\t\t\t\t\txmlunmatched.Zero(&%s.%s)\n", recv, field)
+	} else {
+		fmt.Fprintf(&b, "\t\t\t\t\t%s.%s = nil\n", recv, field)
+	}
 	b.WriteString("\t\t\t\t\tbreak\n")
 	b.WriteString("\t\t\t\t}\n")
 	b.WriteString(body)

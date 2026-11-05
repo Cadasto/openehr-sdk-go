@@ -2658,6 +2658,7 @@ requirements:
     probes: [PROBE-110, PROBE-081]
     tests:
       - internal/bmmgen/render_xmlunmar_class_test.go
+      - internal/bmmgen/render_xmlunmar_unmatched_test.go
       - internal/rmjsonwalk/walk_once_internal_test.go
       - openehr/aom/aom14/symbol_value_xml_test.go
       - openehr/client/ehr/contribution/submission_decode_test.go

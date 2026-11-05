@@ -117,6 +117,15 @@ func decodeXMLMissing(into func() any, in []byte, opts ...canxml.DecoderOption) 
 // and the report under strict is the same.
 func assertXMLReportedAsDefault(t *testing.T, into func() any, in []byte, want []string) {
 	t.Helper()
+	assertXMLReported(t, into, in, want, false)
+}
+
+// assertXMLReported is [assertXMLReportedAsDefault] for in, which also holds
+// unmatched content when unmatched is set: WithStrict then refuses it, with
+// or without WithMissing beside it, through canxml.ErrUnknownElement, never
+// the missing members.
+func assertXMLReported(t *testing.T, into func() any, in []byte, want []string, unmatched bool) {
+	t.Helper()
 	def := into()
 	if err := canxml.Unmarshal(in, def); err != nil {
 		t.Fatalf("canxml.Unmarshal(%s) = %v; want nil: a missing member is no decode error", in, err)
@@ -130,6 +139,14 @@ func assertXMLReportedAsDefault(t *testing.T, into func() any, in []byte, want [
 	}
 	if !reflect.DeepEqual(got, def) {
 		t.Errorf("canxml.Unmarshal(WithMissing) decoded\n%#v\nwant the default's value\n%#v", got, def)
+	}
+	if unmatched {
+		for _, opts := range [][]canxml.DecoderOption{{canxml.WithStrict()}, {canxml.WithStrict(), canxml.WithMissing(func(string) {})}} {
+			if err := canxml.Unmarshal(in, into(), opts...); !errors.Is(err, canxml.ErrUnknownElement) {
+				t.Errorf("canxml.Unmarshal(%s, WithStrict) = %v; want canxml.ErrUnknownElement: strict refuses the unmatched content", in, err)
+			}
+		}
+		return
 	}
 	if err := canxml.Unmarshal(in, into(), canxml.WithStrict()); err != nil {
 		t.Errorf("canxml.Unmarshal(%s, WithStrict) = %v; want nil: strict refuses unmatched content only", in, err)
@@ -200,6 +217,9 @@ type missingXMLRow struct {
 	name  string
 	edits map[string]string
 	want  []string
+	// unmatched marks a document that also holds unmatched content, which
+	// strict refuses: what a nilled element holds (REQ-056).
+	unmatched bool
 }
 
 // missingXMLRows puts a missing member everywhere REQ-175's acceptance
@@ -258,13 +278,15 @@ func missingXMLRows() []missingXMLRow {
 			// holds, and nothing below it is: a DV_DATE_TIME holding an empty
 			// `value`, and a PARTY_IDENTIFIED holding a PARTY_REF that lacks
 			// its `namespace` and `type`, whose id lacks its `value` one level
-			// further down.
+			// further down. What a nilled element holds is unmatched content,
+			// which strict refuses.
 			name: "nothing inside a nilled element that holds content",
 			edits: map[string]string{
 				mxHistory + "/origin": `<origin xsi:nil="true"><value></value></origin>`,
 				mxEntry + "/subject":  `<subject xsi:type="PARTY_IDENTIFIED" xsi:nil="true"><external_ref><id xsi:type="HIER_OBJECT_ID"/></external_ref></subject>`,
 			},
-			want: []string{mxHistory + "/origin", mxEntry + "/subject"},
+			want:      []string{mxHistory + "/origin", mxEntry + "/subject"},
+			unmatched: true,
 		},
 		{
 			// A primitive element with no text, or XML whitespace only, carries
@@ -317,7 +339,7 @@ func TestREQ175_XMLMissingMembersReportedAsDefault(t *testing.T) {
 	for _, row := range missingXMLRows() {
 		t.Run(row.name, func(t *testing.T) {
 			in := rewriteXML(t, missingCompositionXML, row.edits)
-			assertXMLReportedAsDefault(t, into, in, row.want)
+			assertXMLReported(t, into, in, row.want, row.unmatched)
 		})
 	}
 }
@@ -504,5 +526,162 @@ func TestREQ175_XMLUnmodelledMemberIsPresent(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestREQ175_XMLMandatoryWithoutAValueDecodesAsAbsent pins that a mandatory
+// member sent without a value, a string element whose text is XML whitespace
+// only or an element carrying xsi:nil whatever it holds, is missing and
+// decodes as the default for a missing member asks: in every mode, through
+// canxml.Unmarshal and a canxml.Decoder, the document decodes to the value of
+// the same document without the element, its zero value. A nilled
+// polymorphic member needs no xsi:type. What a nilled element holds is
+// unmatched content, which strict refuses. TERMINOLOGY_CODE, whose decoder is
+// written by hand, does the same, `terminology_id` in both spellings. An item
+// of a list, which is no member, and text with whitespace around it keep
+// their text.
+func TestREQ175_XMLMandatoryWithoutAValueDecodesAsAbsent(t *testing.T) {
+	const ws = " \t\n"
+	quantity := func(units string) string {
+		return `<q ` + ucNS + `><magnitude>1</magnitude>` + units + `</q>`
+	}
+	code := func(id, codeString string) string {
+		return `<c ` + ucNS + `>` + id + codeString + `</c>`
+	}
+	observation := func(subject string) string {
+		return `<o ` + ucNS + ` archetype_node_id="openEHR-EHR-OBSERVATION.x.v1"><name><value>o</value></name>` + subject + `</o>`
+	}
+	item := func(keywords string) string {
+		return `<item ` + ucNS + `><language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language><purpose>p</purpose>` + keywords + `</item>`
+	}
+	for _, c := range []struct {
+		name        string
+		into        func() any
+		in, without string
+		unmatched   bool             // the nilled element holds content, which strict refuses
+		keep        func(v any) bool // a control: whether the value keeps its text
+		kept        string
+	}{
+		{name: "DV_QUANTITY units", into: func() any { return new(rm.DVQuantity) }, in: quantity(`<units>` + ws + `</units>`), without: quantity("")},
+		{name: "DV_TEXT value", into: func() any { return new(rm.DVText) }, in: `<t ` + ucNS + `><value> </value></t>`, without: `<t ` + ucNS + `/>`},
+		{
+			name: "TERMINOLOGY_CODE code_string", into: func() any { return new(rm.TerminologyCode) },
+			in: code(`<terminology_id>snomed_ct</terminology_id>`, `<code_string>`+ws+`</code_string>`), without: code(`<terminology_id>snomed_ct</terminology_id>`, ""),
+		},
+		{
+			name: "TERMINOLOGY_CODE terminology_id as text", into: func() any { return new(rm.TerminologyCode) },
+			in: code(`<terminology_id>`+ws+`</terminology_id>`, `<code_string>1</code_string>`), without: code("", `<code_string>1</code_string>`),
+		},
+		{
+			name: "TERMINOLOGY_CODE terminology_id in a value child", into: func() any { return new(rm.TerminologyCode) },
+			in: code(`<terminology_id><value>`+ws+`</value></terminology_id>`, `<code_string>1</code_string>`), without: code("", `<code_string>1</code_string>`),
+		},
+		{
+			name: "AOM 1.4 C_COMPLEX_OBJECT rm_type_name", into: func() any { return new(aom14.CComplexObject) },
+			in: `<c ` + ucNS + `><rm_type_name>` + ws + `</rm_type_name><node_id>at0000</node_id></c>`, without: `<c ` + ucNS + `><node_id>at0000</node_id></c>`,
+		},
+		{name: "nilled DV_QUANTITY units", into: func() any { return new(rm.DVQuantity) }, in: quantity(`<units xsi:nil="true"/>`), without: quantity("")},
+		{name: "nilled DV_QUANTITY units holding text", into: func() any { return new(rm.DVQuantity) }, in: quantity(`<units xsi:nil="true">kg</units>`), without: quantity(""), unmatched: true},
+		{
+			name: "nilled CODE_PHRASE terminology_id holding content", into: func() any { return new(rm.CodePhrase) },
+			in:      `<c ` + ucNS + `><terminology_id xsi:nil="1"><value>local</value></terminology_id><code_string>1</code_string></c>`,
+			without: `<c ` + ucNS + `><code_string>1</code_string></c>`, unmatched: true,
+		},
+		{
+			name: "nilled polymorphic OBSERVATION subject, no xsi:type", into: func() any { return new(rm.Observation) },
+			in: observation(`<subject xsi:nil="true"/>`), without: observation(""),
+		},
+		{
+			name: "nilled TERMINOLOGY_CODE members holding text", into: func() any { return new(rm.TerminologyCode) },
+			in: code(`<terminology_id xsi:nil="true">snomed_ct</terminology_id>`, `<code_string xsi:nil="true">1</code_string>`), without: code("", ""), unmatched: true,
+		},
+		{
+			name: "control: a list item", into: func() any { return new(rm.ResourceDescriptionItem) },
+			in: item(`<keywords> </keywords>`), kept: "a keyword of one space",
+			keep: func(v any) bool { return slices.Equal(v.(*rm.ResourceDescriptionItem).Keywords, []string{" "}) },
+		},
+		{
+			name: "control: text with whitespace around it", into: func() any { return new(rm.DVText) },
+			in: `<t ` + ucNS + `><value> a </value></t>`, kept: `the value " a "`,
+			keep: func(v any) bool { return v.(*rm.DVText).Value == " a " },
+		},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			for _, m := range []struct {
+				name string
+				opts []canxml.DecoderOption
+			}{
+				{name: "default"},
+				{name: "WithStrict", opts: []canxml.DecoderOption{canxml.WithStrict()}},
+				{name: "WithUnmatched", opts: []canxml.DecoderOption{canxml.WithUnmatched(func(string) {})}},
+				{name: "WithMissing", opts: []canxml.DecoderOption{canxml.WithMissing(func(string) {})}},
+				{name: "WithPresence", opts: []canxml.DecoderOption{canxml.WithPresence(func(string, canxml.Presence) {})}},
+				{name: "WithMaxDepth", opts: []canxml.DecoderOption{canxml.WithMaxDepth(64)}},
+			} {
+				decode := map[string]func(string) (any, error){
+					"canxml.Unmarshal": func(doc string) (any, error) {
+						v := c.into()
+						return v, canxml.Unmarshal([]byte(doc), v, m.opts...)
+					},
+					"Decoder.Decode": func(doc string) (any, error) {
+						v := c.into()
+						return v, canxml.NewDecoder(strings.NewReader(doc), m.opts...).Decode(v)
+					},
+				}
+				for call, run := range decode {
+					got, err := run(c.in)
+					if c.unmatched && m.name == "WithStrict" {
+						if !errors.Is(err, canxml.ErrUnknownElement) {
+							t.Errorf("%s %s(%s) = %v; want canxml.ErrUnknownElement: what a nilled element holds is unmatched content", call, m.name, c.in, err)
+						}
+						continue
+					}
+					if err != nil {
+						t.Fatalf("%s %s(%s) = %v; want nil", call, m.name, c.in, err)
+					}
+					if c.keep != nil {
+						if !c.keep(got) {
+							t.Errorf("%s %s(%s) = %#v; want %s kept", call, m.name, c.in, got, c.kept)
+						}
+						continue
+					}
+					want, err := run(c.without)
+					if err != nil {
+						t.Fatalf("%s %s(%s) = %v; want nil", call, m.name, c.without, err)
+					}
+					if !reflect.DeepEqual(got, want) {
+						t.Errorf("%s %s(%s) = %#v; want %#v, the value of the document without the element", call, m.name, c.in, got, want)
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestREQ175_XMLMandatoryWithoutAValueClearsAReusedValue pins that a decode
+// into a value that already holds a mandatory member gives it its zero value
+// when the document sends it without one, nilled or a string of whitespace
+// only, as an optional one sent so is left nil: the document says the member
+// has no value, where one that leaves the element out says nothing of it.
+func TestREQ175_XMLMandatoryWithoutAValueClearsAReusedValue(t *testing.T) {
+	quantity := func(units string) string {
+		return `<q ` + ucNS + `><magnitude>1</magnitude>` + units + `</q>`
+	}
+	for _, in := range []string{quantity(`<units xsi:nil="true"/>`), quantity(`<units> </units>`)} {
+		q := rm.DVQuantity{Units: "kg"}
+		if err := canxml.NewDecoder(strings.NewReader(in)).Decode(&q); err != nil {
+			t.Fatalf("Decoder.Decode(%s) = %v; want nil", in, err)
+		}
+		if q.Units != "" {
+			t.Errorf("Decoder.Decode(%s) into a value with units kg left Units = %q; want \"\"", in, q.Units)
+		}
+	}
+	code := rm.TerminologyCode{TerminologyID: "snomed_ct", CodeString: "1"}
+	in := `<c ` + ucNS + `><terminology_id xsi:nil="true"/><code_string xsi:nil="true"/></c>`
+	if err := canxml.NewDecoder(strings.NewReader(in)).Decode(&code); err != nil {
+		t.Fatalf("Decoder.Decode(%s) = %v; want nil", in, err)
+	}
+	if code.TerminologyID != "" || code.CodeString != "" {
+		t.Errorf("Decoder.Decode(%s) into a filled TERMINOLOGY_CODE left %+v; want both members empty", in, code)
 	}
 }

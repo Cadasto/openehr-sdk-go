@@ -70,7 +70,13 @@ func (r *ResourceDescription) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEl
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &r.LifecycleState); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&r.LifecycleState)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &r.LifecycleState); _err != nil {
 					return _err
 				}
 			case "resource_package_uri":
@@ -110,6 +116,12 @@ func (r *ResourceDescription) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEl
 					break
 				}
 				_got |= 1 << 2
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&r.ParentResource)
+					break
+				}
 				_v, _err := canxml.DecodeAs[AuthoredResource](_dec, _t)
 				if _err != nil {
 					return _err
@@ -180,6 +192,12 @@ func (r *ResourceDescriptionItem) UnmarshalXML(_dec *xml.Decoder, _start xml.Sta
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&r.Language)
+					break
+				}
 				if _err := _dec.DecodeElement(&r.Language, &_t); _err != nil {
 					return _err
 				}
@@ -191,7 +209,13 @@ func (r *ResourceDescriptionItem) UnmarshalXML(_dec *xml.Decoder, _start xml.Sta
 					break
 				}
 				_got |= 1 << 1
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &r.Purpose); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&r.Purpose)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &r.Purpose); _err != nil {
 					return _err
 				}
 			case "keywords":
@@ -340,6 +364,12 @@ func (t *TranslationDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&t.Language)
+					break
+				}
 				if _err := _dec.DecodeElement(&t.Language, &_t); _err != nil {
 					return _err
 				}

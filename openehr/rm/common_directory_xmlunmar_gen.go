@@ -63,6 +63,12 @@ func (f *Folder) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&f.Name)
+					break
+				}
 				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
@@ -76,7 +82,13 @@ func (f *Folder) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 					break
 				}
 				_got |= 1 << 1
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &f.ArchetypeNodeID); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&f.ArchetypeNodeID)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &f.ArchetypeNodeID); _err != nil {
 					return _err
 				}
 			case "uid":
@@ -229,6 +241,12 @@ func (v *VersionedFolder) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElemen
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&v.UID)
+					break
+				}
 				if _err := _dec.DecodeElement(&v.UID, &_t); _err != nil {
 					return _err
 				}
@@ -240,6 +258,12 @@ func (v *VersionedFolder) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElemen
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&v.OwnerID)
+					break
+				}
 				_v, _err := canxml.DecodeAsOrDefault[ObjectRefLike](_dec, _t, func() any { return new(ObjectRef) })
 				if _err != nil {
 					return _err
@@ -253,6 +277,12 @@ func (v *VersionedFolder) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElemen
 					break
 				}
 				_got |= 1 << 2
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&v.TimeCreated)
+					break
+				}
 				if _err := _dec.DecodeElement(&v.TimeCreated, &_t); _err != nil {
 					return _err
 				}

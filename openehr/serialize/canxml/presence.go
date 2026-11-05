@@ -35,10 +35,10 @@ func (p Presence) String() string {
 // it holds, which fn receives as [PresenceNil]; or is a primitive element
 // whose text is empty, or XML whitespace only for a string, which fn
 // receives as [PresenceEmpty]. An optional member sent so decodes as absent,
-// a nil pointer, interface or slice, as if the input had left it out (see
-// the package documentation, "Wire profile"), so the value the decode
-// returns cannot say that the input sent it, and [WithMissing] reports
-// mandatory members only.
+// a nil pointer, interface or slice, and a mandatory one to its zero value,
+// as if the input had left it out (see the package documentation, "Wire
+// profile"), so the value the decode returns cannot say that the input sent
+// it, and [WithMissing] reports mandatory members only.
 //
 // A member that carries a value is not reported: an empty struct element
 // such as `<subject xsi:type="PARTY_SELF"/>`, `<magnitude>0</magnitude>`,

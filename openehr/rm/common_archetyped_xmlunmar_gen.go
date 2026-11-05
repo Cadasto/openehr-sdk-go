@@ -55,6 +55,12 @@ func (a *Archetyped) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.ArchetypeID)
+					break
+				}
 				if _err := _dec.DecodeElement(&a.ArchetypeID, &_t); _err != nil {
 					return _err
 				}
@@ -85,7 +91,13 @@ func (a *Archetyped) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 					break
 				}
 				_got |= 1 << 2
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &a.RMVersion); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.RMVersion)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &a.RMVersion); _err != nil {
 					return _err
 				}
 			default:
@@ -176,6 +188,12 @@ func (f *FeederAudit) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&f.OriginatingSystemAudit)
+					break
+				}
 				if _err := _dec.DecodeElement(&f.OriginatingSystemAudit, &_t); _err != nil {
 					return _err
 				}
@@ -254,7 +272,13 @@ func (f *FeederAuditDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &f.SystemID); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&f.SystemID)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &f.SystemID); _err != nil {
 					return _err
 				}
 			case "location":
@@ -430,6 +454,12 @@ func (l *Link) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&l.Meaning)
+					break
+				}
 				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
@@ -443,6 +473,12 @@ func (l *Link) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&l.Type)
+					break
+				}
 				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
@@ -456,6 +492,12 @@ func (l *Link) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 					break
 				}
 				_got |= 1 << 2
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&l.Target)
+					break
+				}
 				if _err := _dec.DecodeElement(&l.Target, &_t); _err != nil {
 					return _err
 				}

@@ -55,7 +55,13 @@ func (a *ArchetypeInternalRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartE
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &a.RMTypeName); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.RMTypeName)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &a.RMTypeName); _err != nil {
 					return _err
 				}
 			case "occurrences":
@@ -66,6 +72,12 @@ func (a *ArchetypeInternalRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartE
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.Occurrences)
+					break
+				}
 				if _err := _dec.DecodeElement(&a.Occurrences, &_t); _err != nil {
 					return _err
 				}
@@ -77,7 +89,13 @@ func (a *ArchetypeInternalRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartE
 					break
 				}
 				_got |= 1 << 2
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &a.NodeID); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.NodeID)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &a.NodeID); _err != nil {
 					return _err
 				}
 			case "target_path":
@@ -88,7 +106,13 @@ func (a *ArchetypeInternalRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartE
 					break
 				}
 				_got |= 1 << 3
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &a.TargetPath); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.TargetPath)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &a.TargetPath); _err != nil {
 					return _err
 				}
 			default:
@@ -148,7 +172,13 @@ func (a *ArchetypeSlot) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &a.RMTypeName); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.RMTypeName)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &a.RMTypeName); _err != nil {
 					return _err
 				}
 			case "occurrences":
@@ -159,6 +189,12 @@ func (a *ArchetypeSlot) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.Occurrences)
+					break
+				}
 				if _err := _dec.DecodeElement(&a.Occurrences, &_t); _err != nil {
 					return _err
 				}
@@ -170,7 +206,13 @@ func (a *ArchetypeSlot) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 					break
 				}
 				_got |= 1 << 2
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &a.NodeID); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.NodeID)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &a.NodeID); _err != nil {
 					return _err
 				}
 			case "includes":
@@ -242,7 +284,13 @@ func (c *CComplexObject) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.RMTypeName); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.RMTypeName)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &c.RMTypeName); _err != nil {
 					return _err
 				}
 			case "occurrences":
@@ -253,6 +301,12 @@ func (c *CComplexObject) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.Occurrences)
+					break
+				}
 				if _err := _dec.DecodeElement(&c.Occurrences, &_t); _err != nil {
 					return _err
 				}
@@ -264,7 +318,13 @@ func (c *CComplexObject) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement
 					break
 				}
 				_got |= 1 << 2
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.NodeID); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.NodeID)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &c.NodeID); _err != nil {
 					return _err
 				}
 			case "attributes":
@@ -330,7 +390,13 @@ func (c *CMultipleAttribute) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.RMAttributeName); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.RMAttributeName)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &c.RMAttributeName); _err != nil {
 					return _err
 				}
 			case "existence":
@@ -341,6 +407,12 @@ func (c *CMultipleAttribute) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.Existence)
+					break
+				}
 				if _err := _dec.DecodeElement(&c.Existence, &_t); _err != nil {
 					return _err
 				}
@@ -358,6 +430,12 @@ func (c *CMultipleAttribute) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 					break
 				}
 				_got |= 1 << 2
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.Cardinality)
+					break
+				}
 				if _err := _dec.DecodeElement(&c.Cardinality, &_t); _err != nil {
 					return _err
 				}
@@ -422,7 +500,13 @@ func (c *CPrimitiveObject) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.RMTypeName); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.RMTypeName)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &c.RMTypeName); _err != nil {
 					return _err
 				}
 			case "occurrences":
@@ -433,6 +517,12 @@ func (c *CPrimitiveObject) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.Occurrences)
+					break
+				}
 				if _err := _dec.DecodeElement(&c.Occurrences, &_t); _err != nil {
 					return _err
 				}
@@ -444,7 +534,13 @@ func (c *CPrimitiveObject) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 					break
 				}
 				_got |= 1 << 2
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.NodeID); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.NodeID)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &c.NodeID); _err != nil {
 					return _err
 				}
 			case "item":
@@ -455,6 +551,12 @@ func (c *CPrimitiveObject) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 					break
 				}
 				_got |= 1 << 3
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.Item)
+					break
+				}
 				_v, _err := canxml.DecodeAs[CPrimitive](_dec, _t)
 				if _err != nil {
 					return _err
@@ -517,7 +619,13 @@ func (c *CSingleAttribute) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.RMAttributeName); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.RMAttributeName)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &c.RMAttributeName); _err != nil {
 					return _err
 				}
 			case "existence":
@@ -528,6 +636,12 @@ func (c *CSingleAttribute) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.Existence)
+					break
+				}
 				if _err := _dec.DecodeElement(&c.Existence, &_t); _err != nil {
 					return _err
 				}
@@ -598,6 +712,12 @@ func (c *Cardinality) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.Interval)
+					break
+				}
 				if _err := _dec.DecodeElement(&c.Interval, &_t); _err != nil {
 					return _err
 				}
@@ -609,7 +729,13 @@ func (c *Cardinality) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 1
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.IsOrdered); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.IsOrdered)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &c.IsOrdered); _err != nil {
 					return _err
 				}
 			case "is_unique":
@@ -620,7 +746,13 @@ func (c *Cardinality) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 2
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.IsUnique); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.IsUnique)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &c.IsUnique); _err != nil {
 					return _err
 				}
 			default:
@@ -679,7 +811,13 @@ func (c *ConstraintRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.RMTypeName); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.RMTypeName)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &c.RMTypeName); _err != nil {
 					return _err
 				}
 			case "occurrences":
@@ -690,6 +828,12 @@ func (c *ConstraintRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.Occurrences)
+					break
+				}
 				if _err := _dec.DecodeElement(&c.Occurrences, &_t); _err != nil {
 					return _err
 				}
@@ -701,7 +845,13 @@ func (c *ConstraintRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 					break
 				}
 				_got |= 1 << 2
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.NodeID); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.NodeID)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &c.NodeID); _err != nil {
 					return _err
 				}
 			case "reference":
@@ -712,7 +862,13 @@ func (c *ConstraintRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 					break
 				}
 				_got |= 1 << 3
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.Reference); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.Reference)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &c.Reference); _err != nil {
 					return _err
 				}
 			default:

@@ -72,7 +72,9 @@ func (t *TerminologyCode) MarshalXML(e *xml.Encoder, start xml.StartElement) err
 // between its child elements and a second child element of one member among
 // it, is unmatched: skipped, or reported or refused under
 // canxml.WithUnmatched and canxml.WithStrict. The first child element of a
-// member gives its value.
+// member gives its value. A member whose element carries `xsi:nil` has none:
+// a mandatory one gets the empty string, an optional one stays nil, and what
+// the element holds is unmatched content.
 func (t *TerminologyCode) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error {
 	if fresh, err := xmlunmatched.Enter(dec, start, &xmlClassTerminologyCode); err != nil {
 		return err
@@ -100,11 +102,23 @@ func (t *TerminologyCode) UnmarshalXML(dec *xml.Decoder, start xml.StartElement)
 			}
 			switch name {
 			case "terminology_id":
+				if nilled, err := xmlunmatched.SkipNil(dec, tk); err != nil {
+					return err
+				} else if nilled {
+					t.TerminologyID = ""
+					continue
+				}
 				if err := decodeTerminologyIDXML(dec, tk, &t.TerminologyID); err != nil {
 					return err
 				}
 			case "code_string":
-				if err := xmlunmatched.DecodeElement(dec, &tk, &t.CodeString); err != nil {
+				if nilled, err := xmlunmatched.SkipNil(dec, tk); err != nil {
+					return err
+				} else if nilled {
+					t.CodeString = ""
+					continue
+				}
+				if err := xmlunmatched.DecodeMandatory(dec, &tk, &t.CodeString); err != nil {
 					return err
 				}
 			case "terminology_version":
@@ -163,7 +177,7 @@ func decodeOptionalStringXML(dec *xml.Decoder, start xml.StartElement, field **s
 // and the text has been checked, or once the element closes with no `value`
 // child, the text then being the identifier. An identifier that is empty or
 // XML whitespace only is a member sent without a value
-// ([xmlunmatched.ReportEmpty]).
+// ([xmlunmatched.ReportEmpty]), and out gets the empty string.
 func decodeTerminologyIDXML(dec *xml.Decoder, start xml.StartElement, out *string) error {
 	if err := xmlunmatched.CheckUnmatchedAttrs(dec, start); err != nil {
 		return err
@@ -219,6 +233,8 @@ func decodeTerminologyIDXML(dec *xml.Decoder, start xml.StartElement, out *strin
 				*out = string(text)
 			}
 			if strings.TrimLeft(*out, " \t\r\n") == "" {
+				// No value: the empty identifier of a document without it.
+				*out = ""
 				xmlunmatched.ReportEmpty(dec, start)
 			}
 			return nil

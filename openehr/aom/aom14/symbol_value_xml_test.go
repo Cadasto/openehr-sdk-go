@@ -45,7 +45,9 @@ func symbolValues(t *testing.T, doc []byte) (values []string, without int) {
 // a `value` only when it is non-empty, held by pointer or by value, compact
 // and indented, so a symbol read with no `value` or an empty one is written
 // with none, and one with text keeps it, with the rest of the symbol as its
-// own encoder writes it; each round-trips under strict.
+// own encoder writes it; each round-trips under strict. A `value` of XML
+// whitespace only is written, and reads back empty: it carries no value in
+// canonical XML (REQ-175, REQ-056).
 func TestREQ176_SymbolValueIsWrittenOnlyWhenNonEmpty(t *testing.T) {
 	code := rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "local"}, CodeString: "at0001"}
 	language := &rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}, CodeString: "en"}
@@ -53,11 +55,12 @@ func TestREQ176_SymbolValueIsWrittenOnlyWhenNonEmpty(t *testing.T) {
 		name      string
 		symbol    rm.DVCodedText
 		wantValue []string
+		wantBack  string // the symbol's value read back
 	}{
-		{"empty", rm.DVCodedText{DefiningCode: code}, nil},
-		{"empty, with the optional elements", rm.DVCodedText{Language: language, DefiningCode: code}, nil},
-		{"with text", rm.DVCodedText{Value: "Mild", DefiningCode: code}, []string{"Mild"}},
-		{"white space", rm.DVCodedText{Value: " ", DefiningCode: code}, []string{" "}},
+		{"empty", rm.DVCodedText{DefiningCode: code}, nil, ""},
+		{"empty, with the optional elements", rm.DVCodedText{Language: language, DefiningCode: code}, nil, ""},
+		{"with text", rm.DVCodedText{Value: "Mild", DefiningCode: code}, []string{"Mild"}, "Mild"},
+		{"white space", rm.DVCodedText{Value: " ", DefiningCode: code}, []string{" "}, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			sym := tc.symbol
@@ -82,9 +85,11 @@ func TestREQ176_SymbolValueIsWrittenOnlyWhenNonEmpty(t *testing.T) {
 					if err := canxml.Unmarshal(b, back, canxml.WithStrict()); err != nil {
 						t.Fatalf("round trip of %s = %v", b, err)
 					}
+					want := sym
+					want.Value = tc.wantBack
 					got := reflect.ValueOf(back).Elem().FieldByName("Symbol").Interface()
-					if !reflect.DeepEqual(got, &sym) {
-						t.Errorf("round trip of %s: Symbol = %#v; want %#v", b, got, &sym)
+					if !reflect.DeepEqual(got, &want) {
+						t.Errorf("round trip of %s: Symbol = %#v; want %#v", b, got, &want)
 					}
 				}
 			}

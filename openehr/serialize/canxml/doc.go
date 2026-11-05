@@ -76,16 +76,18 @@
 //     `cardinality.lower == 0` are emitted as absent (no element).
 //     Both absent and an empty self-closing element are accepted on
 //     decode, for optionals and containers; an interface-typed member
-//     (below) needs its `xsi:type` even when empty, unless it is optional
-//     and nilled.
-//   - An optional single-valued member whose element carries
-//     `xsi:nil="true"` (or `1`), whatever it holds, or, for a member of a
-//     primitive type, has no text, or XML whitespace only for a string,
-//     decodes as absent in every mode: a nil pointer, interface or slice, as
-//     a `null` member does in canonical JSON. What a nilled element holds is
-//     unmatched content. A mandatory member, a list item, a member held by
-//     value, an enumeration sent empty and an empty struct element decode as
-//     before.
+//     (below) needs its `xsi:type` even when empty or nilled.
+//   - A single-valued member whose element carries `xsi:nil="true"` (or
+//     `1`), whatever it holds, or, for a member of a primitive type, has no
+//     text, or XML whitespace only for a string, has no value in every mode:
+//     an optional one decodes as absent, a nil pointer, interface or slice,
+//     as a `null` member does in canonical JSON, and a mandatory one to its
+//     zero value, the empty string for a string of whitespace only, as a
+//     missing member does. What a nilled element holds is unmatched content,
+//     and a nilled polymorphic member needs no `xsi:type`. A list item, a
+//     member typed by a generic parameter, which needs its `xsi:type` even
+//     when nilled, an optional enumeration sent empty and an empty struct
+//     element decode as before.
 //   - An element that carries one attribute twice, by its name as written or
 //     as namespaces resolve it, is not well-formed XML: every decode refuses
 //     it with [ErrInvalidShape], naming the attribute and none of its values,
@@ -274,9 +276,9 @@
 // An input can send a member and give it no value: an element that carries
 // `xsi:nil="true"` (or `1`), or a primitive element whose text is empty, or
 // XML whitespace only for a string. An optional member sent so decodes as
-// absent, as if the input had left it out (see "Wire profile"), and
-// [WithMissing] reports mandatory members only, so neither the value nor that
-// option says the input sent it. [WithPresence] passes each such member, mandatory or optional, to a
+// absent, and a mandatory one to its zero value, as if the input had left it
+// out (see "Wire profile"), and [WithMissing] reports mandatory members only,
+// so neither the value nor that option says the input sent it. [WithPresence] passes each such member, mandatory or optional, to a
 // function, once, as its element closes, by the JSON Pointer [WithMissing]
 // uses and with its form, [PresenceNil] or [PresenceEmpty]; nothing inside a
 // nilled element is reported. A member that carries a value, as "Missing

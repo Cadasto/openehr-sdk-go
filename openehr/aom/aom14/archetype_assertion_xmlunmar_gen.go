@@ -101,6 +101,12 @@ func (a *Assertion) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 					break
 				}
 				_got |= 1 << 2
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.Expression)
+					break
+				}
 				_v, _err := canxml.DecodeAs[ExprItem](_dec, _t)
 				if _err != nil {
 					return _err
@@ -168,7 +174,13 @@ func (a *AssertionVariable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &a.Name); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.Name)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &a.Name); _err != nil {
 					return _err
 				}
 			case "definition":
@@ -179,7 +191,13 @@ func (a *AssertionVariable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 					break
 				}
 				_got |= 1 << 1
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &a.Definition); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.Definition)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &a.Definition); _err != nil {
 					return _err
 				}
 			default:
@@ -238,7 +256,13 @@ func (e *ExprBinaryOperator) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &e.Operator); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&e.Operator)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &e.Operator); _err != nil {
 					return _err
 				}
 			case "precedence_overridden":
@@ -249,7 +273,13 @@ func (e *ExprBinaryOperator) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 					break
 				}
 				_got |= 1 << 1
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &e.PrecedenceOverridden); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&e.PrecedenceOverridden)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &e.PrecedenceOverridden); _err != nil {
 					return _err
 				}
 			case "type":
@@ -260,7 +290,13 @@ func (e *ExprBinaryOperator) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 					break
 				}
 				_got |= 1 << 2
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &e.Type); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&e.Type)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &e.Type); _err != nil {
 					return _err
 				}
 			case "left_operand":
@@ -271,6 +307,12 @@ func (e *ExprBinaryOperator) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 					break
 				}
 				_got |= 1 << 3
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&e.LeftOperand)
+					break
+				}
 				_v, _err := canxml.DecodeAs[ExprItem](_dec, _t)
 				if _err != nil {
 					return _err
@@ -284,6 +326,12 @@ func (e *ExprBinaryOperator) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 					break
 				}
 				_got |= 1 << 4
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&e.RightOperand)
+					break
+				}
 				_v, _err := canxml.DecodeAs[ExprItem](_dec, _t)
 				if _err != nil {
 					return _err
@@ -345,7 +393,13 @@ func (e *ExprLeaf) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &e.Type); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&e.Type)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &e.Type); _err != nil {
 					return _err
 				}
 			case "reference_type":
@@ -356,7 +410,13 @@ func (e *ExprLeaf) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 					break
 				}
 				_got |= 1 << 1
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &e.ReferenceType); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&e.ReferenceType)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &e.ReferenceType); _err != nil {
 					return _err
 				}
 			case "item":
@@ -367,6 +427,12 @@ func (e *ExprLeaf) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 					break
 				}
 				_got |= 1 << 2
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&e.Item)
+					break
+				}
 				_v, _err := xmlschema.DecodeAny(_dec, _t)
 				if _err != nil {
 					return _err
@@ -428,7 +494,13 @@ func (e *ExprUnaryOperator) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &e.Operator); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&e.Operator)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &e.Operator); _err != nil {
 					return _err
 				}
 			case "precedence_overridden":
@@ -439,7 +511,13 @@ func (e *ExprUnaryOperator) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 					break
 				}
 				_got |= 1 << 1
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &e.PrecedenceOverridden); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&e.PrecedenceOverridden)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &e.PrecedenceOverridden); _err != nil {
 					return _err
 				}
 			case "type":
@@ -450,7 +528,13 @@ func (e *ExprUnaryOperator) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 					break
 				}
 				_got |= 1 << 2
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &e.Type); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&e.Type)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &e.Type); _err != nil {
 					return _err
 				}
 			case "operand":
@@ -461,6 +545,12 @@ func (e *ExprUnaryOperator) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 					break
 				}
 				_got |= 1 << 3
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&e.Operand)
+					break
+				}
 				_v, _err := canxml.DecodeAs[ExprItem](_dec, _t)
 				if _err != nil {
 					return _err

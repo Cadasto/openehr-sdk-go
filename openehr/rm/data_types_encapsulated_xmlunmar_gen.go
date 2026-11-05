@@ -151,6 +151,12 @@ func (d *DVMultimedia) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 					break
 				}
 				_got |= 1 << 5
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&d.MediaType)
+					break
+				}
 				if _err := _dec.DecodeElement(&d.MediaType, &_t); _err != nil {
 					return _err
 				}
@@ -236,7 +242,13 @@ func (d *DVMultimedia) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 					break
 				}
 				_got |= 1 << 10
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Size); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&d.Size)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &d.Size); _err != nil {
 					return _err
 				}
 			default:
@@ -333,7 +345,13 @@ func (d *DVParsable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 					break
 				}
 				_got |= 1 << 2
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Value); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&d.Value)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &d.Value); _err != nil {
 					return _err
 				}
 			case "formalism":
@@ -344,7 +362,13 @@ func (d *DVParsable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 					break
 				}
 				_got |= 1 << 3
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Formalism); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&d.Formalism)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &d.Formalism); _err != nil {
 					return _err
 				}
 			default:

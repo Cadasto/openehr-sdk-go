@@ -135,7 +135,13 @@ func (a *ArchetypeTerm) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &a.Code); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.Code)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &a.Code); _err != nil {
 					return _err
 				}
 			case "items":
@@ -206,7 +212,13 @@ func (c *CodeDefinitionSet) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.Language); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.Language)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &c.Language); _err != nil {
 					return _err
 				}
 			case "items":
@@ -278,7 +290,13 @@ func (c *ConstraintBindingItem) UnmarshalXML(_dec *xml.Decoder, _start xml.Start
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.Code); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.Code)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &c.Code); _err != nil {
 					return _err
 				}
 			case "value":
@@ -289,7 +307,13 @@ func (c *ConstraintBindingItem) UnmarshalXML(_dec *xml.Decoder, _start xml.Start
 					break
 				}
 				_got |= 1 << 1
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.Value); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.Value)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &c.Value); _err != nil {
 					return _err
 				}
 			default:
@@ -356,7 +380,13 @@ func (c *ConstraintBindingSet) UnmarshalXML(_dec *xml.Decoder, _start xml.StartE
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.Terminology); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&c.Terminology)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &c.Terminology); _err != nil {
 					return _err
 				}
 			case "items":
@@ -428,7 +458,13 @@ func (t *TermBindingItem) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElemen
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &t.Code); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&t.Code)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &t.Code); _err != nil {
 					return _err
 				}
 			case "value":
@@ -439,6 +475,12 @@ func (t *TermBindingItem) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElemen
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&t.Value)
+					break
+				}
 				if _err := _dec.DecodeElement(&t.Value, &_t); _err != nil {
 					return _err
 				}
@@ -506,7 +548,13 @@ func (t *TermBindingSet) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &t.Terminology); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&t.Terminology)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &t.Terminology); _err != nil {
 					return _err
 				}
 			case "items":

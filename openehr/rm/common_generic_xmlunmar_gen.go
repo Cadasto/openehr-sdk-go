@@ -56,7 +56,13 @@ func (a *Attestation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &a.SystemID); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.SystemID)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &a.SystemID); _err != nil {
 					return _err
 				}
 			case "time_committed":
@@ -67,6 +73,12 @@ func (a *Attestation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.TimeCommitted)
+					break
+				}
 				if _err := _dec.DecodeElement(&a.TimeCommitted, &_t); _err != nil {
 					return _err
 				}
@@ -78,6 +90,12 @@ func (a *Attestation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 2
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.ChangeType)
+					break
+				}
 				if _err := _dec.DecodeElement(&a.ChangeType, &_t); _err != nil {
 					return _err
 				}
@@ -108,6 +126,12 @@ func (a *Attestation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 4
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.Committer)
+					break
+				}
 				_v, _err := canxml.DecodeAs[PartyProxy](_dec, _t)
 				if _err != nil {
 					return _err
@@ -168,6 +192,12 @@ func (a *Attestation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 7
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.Reason)
+					break
+				}
 				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
@@ -181,7 +211,13 @@ func (a *Attestation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 8
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &a.IsPending); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.IsPending)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &a.IsPending); _err != nil {
 					return _err
 				}
 			default:
@@ -240,7 +276,13 @@ func (a *AuditDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 					break
 				}
 				_got |= 1 << 0
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &a.SystemID); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.SystemID)
+					break
+				}
+				if _err := xmlunmatched.DecodeMandatory(_dec, &_t, &a.SystemID); _err != nil {
 					return _err
 				}
 			case "time_committed":
@@ -251,6 +293,12 @@ func (a *AuditDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.TimeCommitted)
+					break
+				}
 				if _err := _dec.DecodeElement(&a.TimeCommitted, &_t); _err != nil {
 					return _err
 				}
@@ -262,6 +310,12 @@ func (a *AuditDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 					break
 				}
 				_got |= 1 << 2
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.ChangeType)
+					break
+				}
 				if _err := _dec.DecodeElement(&a.ChangeType, &_t); _err != nil {
 					return _err
 				}
@@ -292,6 +346,12 @@ func (a *AuditDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 					break
 				}
 				_got |= 1 << 4
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&a.Committer)
+					break
+				}
 				_v, _err := canxml.DecodeAs[PartyProxy](_dec, _t)
 				if _err != nil {
 					return _err
@@ -353,6 +413,12 @@ func (p *Participation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&p.Function)
+					break
+				}
 				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
@@ -385,6 +451,12 @@ func (p *Participation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 					break
 				}
 				_got |= 1 << 2
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&p.Performer)
+					break
+				}
 				_v, _err := canxml.DecodeAs[PartyProxy](_dec, _t)
 				if _err != nil {
 					return _err
@@ -608,6 +680,12 @@ func (p *PartyRelated) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 					break
 				}
 				_got |= 1 << 2
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&p.Relationship)
+					break
+				}
 				if _err := _dec.DecodeElement(&p.Relationship, &_t); _err != nil {
 					return _err
 				}
@@ -785,6 +863,12 @@ func (r *RevisionHistoryItem) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEl
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&r.VersionID)
+					break
+				}
 				if _err := _dec.DecodeElement(&r.VersionID, &_t); _err != nil {
 					return _err
 				}
