@@ -54,11 +54,13 @@ func sanitizeID(s string) string {
 }
 
 // termText returns the node's display text: the text of the term for its
-// node id that the nearest enclosing archetype root defines, or "" when no
-// root defines one. A compiled template carries one set of terms, in its
-// default language, so the text is in that language.
+// node id that the nearest enclosing archetype root defines, or "" when that
+// root defines none, even where an archetype further out defines the same
+// code, since that term names another concept. The reference reads each
+// archetype's own terms the same way. A compiled template carries one set of
+// terms, in its default language, so the text is in that language.
 func termText(n *templatecompile.CompiledNode) string {
-	text, _ := impl.TermItem(n, n.NodeID(), "text")
+	text, _ := impl.RootTermItem(n, n.NodeID(), "text")
 	return text
 }
 

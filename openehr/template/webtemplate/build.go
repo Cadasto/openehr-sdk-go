@@ -405,14 +405,15 @@ func setOccurrences(node *Node, c *templatecompile.CompiledNode) {
 }
 
 // setNames sets the display name of node and its text and description in
-// each language of cfg, from the term for c's node id; text is that term's
-// text, as termText returns it. A compiled template carries one set of
-// terms, in its default language, so every language reads the same text and
-// description, which are looked up once.
+// each language of cfg, from the term for c's node id that c's nearest
+// enclosing archetype root defines; text is that term's text, as termText
+// returns it. A compiled template carries one set of terms, in its default
+// language, so every language reads the same text and description, which
+// are looked up once.
 func setNames(node *Node, c *templatecompile.CompiledNode, text string, cfg *config) {
 	node.Name = text
 	node.LocalizedName = text
-	desc, _ := impl.TermItem(c, c.NodeID(), "description")
+	desc, _ := impl.RootTermItem(c, c.NodeID(), "description")
 	for _, lang := range cfg.languages {
 		if text != "" {
 			if node.LocalizedNames == nil {

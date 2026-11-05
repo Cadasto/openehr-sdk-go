@@ -250,11 +250,12 @@ func partyProxyInputs() []Input {
 	}
 }
 
-// listItem builds a coded list entry, resolving the code's label and
-// localized text from the archetype terms attached to the value node.
+// listItem builds a coded list entry, its label the text of the code's term
+// in the value node's nearest enclosing archetype root, as [termText] reads a
+// node's own, and none where that root does not define the code.
 func listItem(v *templatecompile.CompiledNode, code string) InputListItem {
 	item := InputListItem{Value: code}
-	item.Label, _ = impl.TermItem(v, code, "text")
+	item.Label, _ = impl.RootTermItem(v, code, "text")
 	return item
 }
 

@@ -2496,7 +2496,10 @@ func templateIndexFor(c *templatecompile.Compiled) *templateIndex {
 // node's RM type and its LOCATABLE name — the template-level node name where
 // the OPT pins one (REQ-116: that pinned value IS the node's modelled name, and
 // it is what the reference materialises), else the node-id term rubric in the
-// default language. Decode repopulates LOCATABLE.name from the names, and takes
+// default language, read from the node's nearest enclosing archetype root
+// alone, as the Web Template builder and the generator read it: a node whose
+// own archetype does not define its node id gets no name from the index.
+// Decode repopulates LOCATABLE.name from the names, and takes
 // a folded ITEM_STRUCTURE's concrete subtype from the types (see WithTemplate).
 // Where the template constrains a node's name as a DV_CODED_TEXT and
 // determines its code and text, the node's coded name ([codedNameOf]) takes
@@ -2549,7 +2552,7 @@ func buildTemplateIndex(c *templatecompile.Compiled) *templateIndex {
 				x.addRMType(bare, n.RMTypeName())
 				x.addCodedName(bare, coded)
 			}
-			rubric, _ := tcimpl.TermItem(n, id, "text")
+			rubric, _ := tcimpl.RootTermItem(n, id, "text")
 			name := n.NodeName()
 			if name == "" {
 				name = rubric
