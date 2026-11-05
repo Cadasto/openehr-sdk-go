@@ -14,8 +14,8 @@ import (
 // ListOpen carries the AOM 1.4 C_STRING list_open flag: true when List
 // constrains the value but is not exhaustive. Validate then accepts a
 // value outside List and still checks Pattern. False, the zero value, is
-// a closed List; the OPT parser reads an omitted list_open element as
-// false.
+// a closed List; the compile step reads an omitted or empty list_open
+// element as false.
 //
 // A Pattern must match the whole string, as if written ^(?:Pattern)$.
 // The AOM does not say whether it is a whole-string or a search match;

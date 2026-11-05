@@ -32,7 +32,7 @@ type QuantityUnit struct {
 // property the quantity measures, such as openehr::125 (pressure).
 //
 // PropertyUnits lists the UCUM units that property admits, its primary
-// units first and each part in source order. The OPT parser fills it from
+// units first and each part in source order. The compile step fills it from
 // the openEHR property-unit table (TERM PropertyUnitData.xml, exposed by
 // openehr/terminology) when Property is an openehr code the table lists,
 // and leaves it empty otherwise. [DvQuantity.Validate] checks the units

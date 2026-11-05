@@ -60,8 +60,8 @@ func TestBuildNoDefaultLanguage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Strip the OPT-level <language> block; the lenient parser accepts
-	// the document, leaving Compiled.Language() empty.
+	// Strip the OPT-level <language> block; the reader accepts the
+	// document, leaving Compiled.Language() empty.
 	before, rest, foundOpen := bytes.Cut(raw, []byte("<language>"))
 	_, after, foundClose := bytes.Cut(rest, []byte("</language>"))
 	if !foundOpen || !foundClose {

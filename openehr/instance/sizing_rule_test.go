@@ -76,7 +76,7 @@ func itemIDs(t *testing.T, out any) []string {
 // seed of the top-up to the cardinality lower bound. A CLUSTER whose items
 // the OPT prohibits still gets its members: the RM requires them. It
 // holds under every policy, both value fills and both compile modes. A
-// slot is not covered: the template parser keeps no occurrences for an
+// slot is not covered: the compiled template keeps no occurrences for an
 // ARCHETYPE_SLOT.
 func TestREQ107_ProhibitedChildGetsNoMember(t *testing.T) {
 	cases := []struct {
