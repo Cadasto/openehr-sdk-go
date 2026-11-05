@@ -36,11 +36,13 @@ var attributeGroups = func() map[classAttribute]*terminology.Group {
 // to the text its code has, where node admits the coded text with that
 // text (takeText). An openehr code takes its rubric in the group the RM
 // ties v's attribute to (nodeGroup); the rubric is the group's, since one
-// code can have another rubric in another group. A code of any other
+// code can have another rubric in another group. On an attribute the RM
+// ties to no group, such as a locatable's name, it takes the rubric every
+// group that holds it agrees on (agreedRubric). A code of any other
 // terminology takes the text of the term node's own archetype defines for
-// it (useTermText). A code the group has no rubric for, a code of an
-// attribute the RM ties to no group, and a code the archetype defines no
-// term for keep the text the walk wrote. A nil node leaves v alone.
+// it (useTermText). A code the group has no rubric for, a code the groups
+// disagree on, and a code the archetype defines no term for keep the text
+// the walk wrote. A nil node leaves v alone.
 func useCodedText(node *tcimpl.CompiledNode, v *rm.DVCodedText) {
 	if node == nil {
 		return
@@ -49,13 +51,36 @@ func useCodedText(node *tcimpl.CompiledNode, v *rm.DVCodedText) {
 		useTermText(node, v)
 		return
 	}
-	group := nodeGroup(node)
-	if group == nil {
-		return
+	code := v.DefiningCode.CodeString
+	var rubric string
+	var ok bool
+	if group := nodeGroup(node); group != nil {
+		rubric, ok = group.Rubric(code)
+	} else {
+		rubric, ok = agreedRubric(code)
 	}
-	if rubric, ok := group.Rubric(v.DefiningCode.CodeString); ok {
+	if ok {
 		takeText(node, v, rubric)
 	}
+}
+
+// agreedRubric returns the rubric the openEHR terminology gives code where
+// no group is chosen: the one every group that holds code gives it, so 433
+// is "event", while 532, "complete" in one group and "completed" in
+// another, has none. ok is false where no group holds code or two give it
+// different rubrics.
+func agreedRubric(code string) (rubric string, ok bool) {
+	for g := range terminology.Groups() {
+		r, held := g.Rubric(code)
+		if !held {
+			continue
+		}
+		if rubric != "" && r != rubric {
+			return "", false
+		}
+		rubric = r
+	}
+	return rubric, rubric != ""
 }
 
 // nodeGroup returns the group of the openEHR terminology the RM ties to

@@ -862,13 +862,17 @@ func (e *engine) leaveOutNotInRM(p issuePath, name string, from int) {
 // instance can carry it: when no serialization of the bound node's class
 // carries it, and when the compile marks it as one that class does not have
 // ([tcimpl.CompiledAttribute.NotInRM]), which REQ-171 One walk leaves out.
+// The bound node's class is the one the compile reads it as
+// ([tcimpl.ReadAsRMType]), so an untyped node under a HISTORY's events is
+// an EVENT, whose offset no serialization carries (REQ-111 A node that
+// names no RM type).
 func declaredAttr(n engineNode, decl *tcimpl.CompiledAttribute, walked *engineAttr) (a engineAttr, visited bool) {
 	if walked != nil {
 		a = walked.inRole(n.role)
 		a.decl = decl
 		return a, true
 	}
-	if decl.NotInRM() || rminfo.IsNonStorableAttr(bmmtype.Class(n.bound.RMTypeName()), decl.Name()) {
+	if decl.NotInRM() || rminfo.IsNonStorableAttr(bmmtype.Class(tcimpl.ReadAsRMType(n.bound)), decl.Name()) {
 		return a, false
 	}
 	a = engineAttr{name: decl.Name(), rmType: decl.RMTypeName(), shape: shapeSingle, decl: decl}

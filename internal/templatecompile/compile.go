@@ -302,6 +302,7 @@ func (w *walker) compileNode(ob object, parent *CompiledNode, path, heldAs strin
 // and depth are as for compileNode.
 func (w *walker) descend(ob object, cn *CompiledNode, heldAs string, depth int) error {
 	cn.rmTypeName = ob.rmTypeName
+	cn.readAs = readAs(cn.rmTypeName, heldAs)
 	cn.nodeID = ob.nodeID
 	cn.nodeName = ob.nodeName
 	if ob.slot != nil {
@@ -337,7 +338,7 @@ func (w *walker) descend(ob object, cn *CompiledNode, heldAs string, depth int) 
 		}
 		cn.primitive = primitive
 	}
-	return w.attachAttributes(cn, readAs(cn.rmTypeName, heldAs), attrs, depth)
+	return w.attachAttributes(cn, cn.readAs, attrs, depth)
 }
 
 // readAs returns the RM type the attributes of a node are read on: the

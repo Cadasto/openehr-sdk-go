@@ -1837,6 +1837,8 @@ requirements:
       - openehr/templatecompile/not_in_rm_test.go
       - openehr/templatecompile/resolve_test.go
       - openehr/validation/attribute_not_in_rm_test.go
+      - openehr/validation/multi_nonlocatable_test.go
+      - openehr/validation/nonstorable_generic_test.go
       - testkit/probes/template/probe_022_opt_path_resolution.go
       - testkit/probes/template/probes_test.go
 
