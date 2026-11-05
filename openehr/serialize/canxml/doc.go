@@ -307,13 +307,13 @@
 // in every mode with a [DecodeError] whose Inner wraps [ErrInvalidShape]
 // and the conversion's own error. Its text names the element and carries
 // none of its text. [Unmarshal], and a [Decoder] given [WithUnmatched],
-// [WithStrict] or [WithMissing], return it on its own with the element's
-// path from the root of the value, such as
+// [WithStrict], [WithMissing] or [WithPresence], return it on its own with
+// the element's path from the root of the value, such as
 // "/ehr_status[1]/is_queryable[1]". Without an
 // option, [Unmarshal] decodes the input a second time to find that path,
 // once the first decode has failed so; a decode that succeeds never pays
-// for it. A [Decoder] given no option does not decode a value again to find
-// that path, so it names the element alone, "/is_queryable", inside the
+// for it. A [Decoder] given none of them does not decode a value again to
+// find that path, so it names the element alone, "/is_queryable", inside the
 // envelope of each polymorphic slot the element sits in.
 //
 // # Nesting depth

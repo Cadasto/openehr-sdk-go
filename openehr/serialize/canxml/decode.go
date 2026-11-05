@@ -457,8 +457,9 @@ func (f failedReader) Read([]byte) (int, error) { return 0, f.err }
 
 // Decode reads the next XML element from the stream and stores it
 // in v. Errors follow the same classification as [Unmarshal], with one
-// difference: a Decoder given none of [WithUnmatched], [WithStrict] and
-// [WithMissing] does not name the path of the elements it reads, so the
+// difference: a Decoder given none of [WithUnmatched], [WithStrict],
+// [WithMissing] and [WithPresence] does not name the path of the elements it
+// reads, so the
 // [DecodeError] for the text of a primitive element that does not decode as
 // its type names the element alone, such as "/is_queryable", inside the
 // envelope of each polymorphic slot it sits in. A Decoder given any of them
