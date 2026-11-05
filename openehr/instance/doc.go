@@ -168,7 +168,9 @@
 // coded text whose code is in the openEHR terminology, on an attribute the
 // RM ties to a group of that terminology (a COMPOSITION's category, an
 // INTERVAL_EVENT's math function, a PARTY_RELATED's relationship, …),
-// takes as its text that code's rubric in the group. A coded text whose
+// takes as its text that code's rubric in the group, and on any other
+// attribute, such as a locatable's name, the rubric every group that holds
+// the code gives it, where they all give the same one. A coded text whose
 // code is in any other terminology takes the text its own archetype, the
 // nearest enclosing archetype root, gives that code, in
 // [Options.Language]: under its code string for a local code, and under
@@ -177,8 +179,9 @@
 // under that key, under the bare code string unless it is an at-code.
 // Either way the walk's text stays where the template's constraint on the
 // text rejects the new one, and where the group has no rubric for the
-// code or its own archetype does not define it, even where an enclosing
-// archetype does. A coded name whose text the template pins and whose
+// code, the groups disagree on it, or its own archetype does not define
+// it, even where an enclosing archetype does. A coded name whose text the
+// template pins and whose
 // codes it lists is the exception: where the pin rejects the term text of
 // the code the walk wrote, the name takes the first listed code whose term
 // text the pin admits, with that text, and it keeps the walk's code and
