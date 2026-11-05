@@ -1,12 +1,12 @@
 ---
 kind: adr
 id: ADR-0035
-title: "The compile step reads the generated operational template model; the OPT parser and its tree are deprecated once it does"
+title: "The compile step reads the generated operational template model; the OPT parser and its tree are deprecated once it does, then removed"
 status: accepted
 date: 2026-11-03
 ---
 
-# ADR 0035 — The compile step reads the generated operational template model; the OPT parser and its tree are deprecated once it does
+# ADR 0035 — The compile step reads the generated operational template model; the OPT parser and its tree are deprecated once it does, then removed
 
 - **Status:** Accepted, 2026-11-03 — maintainer decision, taken in the delivery of [REQ-176](../specifications/clinical-modeling.md#req-176--adl-14-operational-template-model) once the corpus showed what the OPT parser leaves out.
 - **Supersedes:** —
@@ -33,7 +33,7 @@ date: 2026-11-03
 
 ## Decision
 
-**The compile step reads the generated operational template model, which replaces `template.ParseOPT`'s tree as its source.** `templatecompile` stays and takes the model's `OperationalTemplate`. In the change that makes the switch, path lookup and its rules for a path without node ids are rewritten over the compiled template; the model's reader and the compile step keep every reading of the parser's default mode but four, an integer past the 32-bit range, a `match_negated` of true, an infinite integer bound that admits no integer and a `<definition>` read as a slot or a primitive constraint, which the reader refuses in every mode, and refuse the parser's weaker readings under their strict options; and `template.ParseOPT` and its node tree are deprecated, to be removed in a later release, once the new path reads every OPT the parser reads but one that holds a reading it does not keep. `openehr/template` stays the home of `constraints`, `webtemplate` and the small shared types (`Cardinality`, `Multiplicity`, `ErrPathNotFound`). The REQ-108 bounds reach the model's reader in the same change, so an untrusted OPT is bounded on the new path as on the old one. The parity check (replaced by recorded compiled trees in the 2026-11-05 amendment, D2) holds the compiled tree built from the model to the one built from the parser over every corpus OPT, apart from what the model adds (`C_CODE_REFERENCE`, the `<constraints>` default values), and holds the new path to compile every OPT the parser reads but one that holds a reading it does not keep or that the compile step refuses on its own ground, as [§ REQ-111](../specifications/clinical-modeling.md#recorded-compiled-trees) *Recorded compiled trees* says. Until the switch lands, the parser feeds the compile step, as [§ REQ-176](../specifications/clinical-modeling.md#req-176--adl-14-operational-template-model) *Out of scope* says.
+**The compile step reads the generated operational template model, which replaces `template.ParseOPT`'s tree as its source.** `templatecompile` stays and takes the model's `OperationalTemplate`. In the change that makes the switch, path lookup and its rules for a path without node ids are rewritten over the compiled template; the model's reader and the compile step keep every reading of the parser's default mode but four, an integer past the 32-bit range, a `match_negated` of true, an infinite integer bound that admits no integer and a `<definition>` read as a slot or a primitive constraint, which the reader refuses in every mode, and refuse the parser's weaker readings under their strict options; and `template.ParseOPT` and its node tree are deprecated in 0.45.0 and removed in 0.46.0, once the new path reads every OPT the parser reads but one that holds a reading it does not keep, [REQ-100](../specifications/retired-requirements.md#req-100--adl-14-operational-template-opt-parse-and-paths) retired into REQ-111. `openehr/template` stays the home of `constraints`, `webtemplate` and the small shared types (`Cardinality`, `Multiplicity`, `ErrPathNotFound`). The REQ-108 bounds reach the model's reader in the same change, so an untrusted OPT is bounded on the new path as on the old one. While both existed, a parity check held the compiled tree built from the model to the one built from the parser over every corpus OPT, apart from what the model adds (`C_CODE_REFERENCE`, the `<constraints>` default values), and the new path to compile every OPT the parser reads but one that holds a reading it does not keep or that the compile step refuses on its own ground; the compiled trees it held, recorded in 0.45.0, replace it, as [§ REQ-111](../specifications/clinical-modeling.md#recorded-compiled-trees) *Recorded compiled trees* says.
 
 **Not taken.** STRAND-17's three options. Two readers: the consumers keep missing what the parser leaves out, and each reader keeps tolerances of its own. A view over the model, the parser decoding with the model and projecting its tree: the tree, its API and the projection are kept in step for no consumer the compiled template does not already serve. A converter outside `openehr/template` between the model and the tree: a third representation to keep in step.
 
@@ -41,7 +41,7 @@ date: 2026-11-03
 
 - **Easier:** OPTs have one reader; the compiled template carries `C_CODE_REFERENCE` and the `<constraints>` default values with no parser code for them; each tolerance is stated once.
 - **Harder:** every compile pays the generated decoders' cost, so the switch compares the compile benchmarks before and after. The parser's users move: the examples that read the tree, `cmd/cdrcheck`, `testkit/fixtures` and the probes. Each tolerance is restated on the model without weakening the report of REQ-170.
-- **Permanently constrained:** `template.ParseOPT` and its tree leave the public API, a break the pre-1.0 policy allows, announced by a deprecation first. The `openehr/template` row of REQ-013 is restated for what the package then holds.
+- **Permanently constrained:** `template.ParseOPT` and its tree left the public API in 0.46.0, a break the pre-1.0 policy allows, announced by the 0.45.0 deprecation. The `openehr/template` row of REQ-013 is restated for what the package now holds.
 
 ## Traceability
 
