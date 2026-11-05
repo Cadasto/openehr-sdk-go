@@ -78,15 +78,29 @@ cp_comp_xml valid_templates/minimal/minimal_action_2.instance.composition.xml 'm
 
 # 4 — validation (compile-passing) + Test_dv_* OPT+JSON
 cp_opt valid_templates/validation/clinical_content_validation.opt 'clinical_content_validation.opt'
-# Upstream constrains ITEM_TABLE.rotated, an attribute RM 1.2.0's ITEM_TABLE
-# does not define; drop that constraint (testkit/corpus/README.md).
+# Two upstream edits keep this OPT from validating against openEHR
+# Template.xsd; drop both (testkit/corpus/README.md):
+# - ITEM_TABLE.rotated is constrained, an attribute RM 1.2.0's ITEM_TABLE does
+#   not define;
+# - an ELEMENT at0005 sits directly under the ITEM_SINGLE with no `item`
+#   attribute around it, with its term definition.
 python3 - "$CAS/templates/clinical_content_validation.opt" <<'PY'
 import re, sys
 p = sys.argv[1]
 s = open(p, encoding='utf-8', newline='').read()
-s, n = re.subn(r'[ \t]*<attributes xsi:type="C_SINGLE_ATTRIBUTE">\s*<rm_attribute_name>rotated</rm_attribute_name>.*?</attributes>\r?\n', '', s, flags=re.S)
-if n != 1:
-    sys.exit(f'expected one ITEM_TABLE.rotated block in {p}, found {n}')
+# Each block may hold no nested element of the kind it removes, so a match
+# cannot reach from one block into the next.
+for what, pattern in (
+    ('ITEM_TABLE.rotated block',
+     r'[ \t]*<attributes xsi:type="C_SINGLE_ATTRIBUTE">\s*<rm_attribute_name>rotated</rm_attribute_name>.*?</attributes>\r?\n'),
+    ('ELEMENT at0005 node',
+     r'[ \t]*<children xsi:type="C_COMPLEX_OBJECT">\s*<rm_type_name>ELEMENT</rm_type_name>(?:(?!</?children\b).)*?<node_id>at0005</node_id>\s*</children>\r?\n'),
+    ('at0005 term definition',
+     r'[ \t]*<term_definitions code="at0005">(?:(?!</?term_definitions\b).)*</term_definitions>\r?\n'),
+):
+    s, n = re.subn(pattern, '', s, flags=re.S)
+    if n != 1:
+        sys.exit(f'expected one {what} in {p}, found {n}')
 open(p, 'w', encoding='utf-8', newline='').write(s)
 PY
 cp_comp_json compositions/CANONICAL_JSON/clinical_content_validation__full.json 'clinical_content_validation.json'

@@ -132,7 +132,7 @@ Two OPTs in this table are not CODE24's. `alternative_types.en.v1` is byte-ident
 
 ### ehrbase (openEHR_SDK)
 
-**License:** Apache 2.0 — [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) (pin `8a5dae6fd82a5f0aa23b25681a13df79bfc21d2b`, the `ehrbase/openEHR_SDK` line of [`UPSTREAM_PINS.txt`](UPSTREAM_PINS.txt)).
+**License:** Apache 2.0 — [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) (pin `e07110a2d969d6971ff157b93288f64ee30764af`, the `ehrbase/openEHR_SDK` line of [`UPSTREAM_PINS.txt`](UPSTREAM_PINS.txt)).
 
 **RM-only** (`rm/`, no OPT):
 

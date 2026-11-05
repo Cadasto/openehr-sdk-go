@@ -4,9 +4,9 @@ source_repo: ehrbase/openEHR_SDK
 source_opt: test-data/src/main/resources/operationaltemplate/conformance_ehrbase.de.v0.opt
 source_flat: test-data/src/main/resources/composition/flat/simSDT/conformance
 pin: testkit/corpus/UPSTREAM_PINS.txt
-commit: 8a5dae6fd82a5f0aa23b25681a13df79bfc21d2b
-fetched_utc: 2026-10-26T16:30:43Z
-source_tree: https://github.com/ehrbase/openEHR_SDK/tree/8a5dae6fd82a5f0aa23b25681a13df79bfc21d2b/test-data/src/main/resources/composition/flat/simSDT/conformance
+commit: e07110a2d969d6971ff157b93288f64ee30764af
+fetched_utc: 2026-11-05T11:04:23Z
+source_tree: https://github.com/ehrbase/openEHR_SDK/tree/e07110a2d969d6971ff157b93288f64ee30764af/test-data/src/main/resources/composition/flat/simSDT/conformance
 license: Apache-2.0 (see ../THIRD_PARTY_LICENSES.md)
 #
 # sha256  path

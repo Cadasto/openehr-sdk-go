@@ -44,8 +44,8 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 | nested | flat-canonical | compared 156, missing 34, extra 4, altered 8, excluded 0 |
 | persistent_minimal | canonical-flat | compared 11, missing 0, extra 1, altered 1, excluded 0 |
 | persistent_minimal | flat-canonical | compared 72, missing 2, extra 0, altered 5, excluded 0 |
-| test_all_types | canonical-flat | compared 83, missing 8, extra 6, altered 11, excluded 0 |
-| test_all_types | flat-canonical | compared 423, missing 51, extra 36, altered 40, excluded 11 |
+| test_all_types | canonical-flat | compared 83, missing 8, extra 6, altered 10, excluded 0 |
+| test_all_types | flat-canonical | compared 423, missing 51, extra 36, altered 39, excluded 11 |
 
 ## alternative_events
 
@@ -378,8 +378,8 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 
 ### canonical-flat
 
-- Outcome: compared 83, missing 8, extra 6, altered 11, excluded 0
-- Reason: party reference type: the canonical types the composer's reference PERSON, so FLAT encode writes composer|type, which the upstream FLAT omits. Web Template projection: the SDK's Web Template has no in-context time or ism_transition node for the section_3 ACTION (openehr/template/webtemplate/deviations.md, inContext coverage), and its per-careflow-step transition nodes do not match a transition without a careflow_step, so FLAT encode writes neither (4 missing keys). Choice element: upstream spells the value of the choice element choice/quantity_value, the SDK choice. DV_IDENTIFIER: this upstream FLAT writes the id as the bare value, the codec as |id. DV_PROPORTION: upstream writes the derived magnitude as a bare value, which the codec does not write (a PROBE-086 residue), and writes the Integer type and the Real denominator as 1.0 where the codec writes 1. Upstream date and time spelling: the canonical writes dates in the basic format (20190114) and date-times with a comma and +00:00, the FLAT in the extended format with a full stop and Z (8 leaves). Upstream conversion differences: upstream openEHR_SDK's FlatJsonMarshallerTest.toFlatJsonAllTypesErrors encodes this canonical (all_types_no_multimedia.json) as FLAT and expects these differences against this FLAT (test_all_types.json): duration_any (P1Y2M10DT2H30M against PT30M), a DV_URI only the canonical carries and the proportion's precision, which only the canonical carries, besides the DV_IDENTIFIER and proportion type spellings above.
+- Outcome: compared 83, missing 8, extra 6, altered 10, excluded 0
+- Reason: party reference type: the canonical types the composer's reference PERSON, so FLAT encode writes composer|type, which the upstream FLAT omits. Web Template projection: the SDK's Web Template has no in-context time or ism_transition node for the section_3 ACTION (openehr/template/webtemplate/deviations.md, inContext coverage), and its per-careflow-step transition nodes do not match a transition without a careflow_step, so FLAT encode writes neither (4 missing keys). Choice element: upstream spells the value of the choice element choice/quantity_value, the SDK choice. DV_IDENTIFIER: this upstream FLAT writes the id as the bare value, the codec as |id. DV_PROPORTION: upstream writes the derived magnitude as a bare value, which the codec does not write (a PROBE-086 residue), and writes the Integer type and the Real denominator as 1.0 where the codec writes 1. Upstream date and time spelling: the canonical writes dates in the basic format (20190114) and date-times with a comma and +00:00, the FLAT in the extended format with a full stop and Z (7 leaves). Upstream conversion differences: upstream openEHR_SDK's FlatJsonMarshallerTest.toFlatJsonAllTypesErrors encodes this canonical (all_types_no_multimedia.json) as FLAT and expects these differences against this FLAT (test_all_types.json): duration_any (P1Y2M10DT2H30M against PT30M), a DV_URI only the canonical carries and the proportion's precision, which only the canonical carries, besides the DV_IDENTIFIER and proportion type spellings above.
 - Missing (8):
   - `test_all_types/test_all_types2:0/choice/quantity_value|magnitude`
   - `test_all_types/test_all_types2:0/choice/quantity_value|unit`
@@ -396,10 +396,9 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - `test_all_types/test_all_types2:0/uri`
   - `test_all_types/test_all_types:0/identifier|id`
   - `test_all_types/test_all_types:0/proportion_any|precision`
-- Altered (11, first 10 shown):
+- Altered (10):
   - `test_all_types/test_all_types2:0/interval_datetime/lower`: reference `"2019-01-28T21:22:49.426Z"`, ours `"2019-01-28T21:22:49,426+00:00"`
   - `test_all_types/test_all_types2:0/interval_datetime/upper`: reference `"2019-01-28T21:22:49.426Z"`, ours `"2019-01-28T21:22:49,426+00:00"`
-  - `test_all_types/test_all_types3:0/section_2/section_3/test_all_types:0/current_activity/partial_date`: reference `"2019-01-14"`, ours `"20190114"`
   - `test_all_types/test_all_types3:0/section_2/section_3/test_all_types:0/current_activity/partial_datetime`: reference `"2019-01-28T21:22:49.426Z"`, ours `"2019-01-28T21:22:49,426+00:00"`
   - `test_all_types/test_all_types:0/date`: reference `"2019-01-14"`, ours `"20190114"`
   - `test_all_types/test_all_types:0/datetime`: reference `"2019-01-28T21:22:49.426Z"`, ours `"2019-01-28T21:22:49,426+00:00"`
@@ -407,11 +406,12 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - `test_all_types/test_all_types:0/duration_any`: reference `"PT30M"`, ours `"P1Y2M10DT2H30M"`
   - `test_all_types/test_all_types:0/proportion_any|denominator`: reference `1.0`, ours `1`
   - `test_all_types/test_all_types:0/proportion_any|type`: reference `1.0`, ours `1`
+  - `test_all_types/test_all_types:0/time2`: reference `"2019-01-28T21:22:49.332Z"`, ours `"2019-01-28T21:22:49,332+00:00"`
 
 ### flat-canonical
 
-- Outcome: compared 423, missing 51, extra 36, altered 40, excluded 11
-- Reason: The 11 excluded keys are the section_3 ACTION's in-context ism_transition/current_state (3) and time (1) and the identifier keys (4), refused, and choice/quantity_value|magnitude and |unit (2) and the bare proportion_any (1), reported as unmatched content, as follows. Web Template projection: decode refuses the ACTION's in-context ism_transition and time in every mode as RM data it would otherwise drop or replace (REQ-170), so the decoded ACTION has an empty current_state (3 leaves) and the context start time as its time. party reference type: the upstream FLAT writes no composer|type, so decode gives the composer's reference the type PARTY against the canonical's PERSON. DV_IDENTIFIER: the FLAT writes the id as the bare value, and decode refuses the four identifier keys as missing the required |id, so the identifier element is missing. Choice element: decode does not read choice/quantity_value (the SDK spells it choice), so the choice element is missing. DV_PROPORTION: decode reports the bare proportion_any, the derived magnitude, as unmatched content, and reads |type 1.0 as the Integer 1 (wire.md § Floating-point precision). Upstream conversion differences: a DV_URI and the proportion's precision only the canonical carries, and duration_any (P1Y2M10DT2H30M against PT30M). Upstream date and time spelling: the canonical writes dates in the basic format (20190114) and date-times with a comma and +00:00, the FLAT in the extended format with a full stop and Z (7 leaves). HISTORY.origin: the FLAT has no origin key and decode fills it from the context start time (openehr/serialize/simplified/deviations.md), where the canonical sets it otherwise. Shifted positions: the elements decode lacks move their later siblings up, the identifier in the OBSERVATION and the DV_URI and the choice element in the EVALUATION, so the OBSERVATION's proportion and the EVALUATION's intervals and cluster compare against the canonical's next element; this accounts for most of the missing, extra and altered leaves. RM-FLOOR archetype_details: the canonical SECTION and the ACTION's description CLUSTER have none, decode adds them (8 extra leaves), and rm_version is 1.2.0 against 1.0.2 and 1.0.4.
+- Outcome: compared 423, missing 51, extra 36, altered 39, excluded 11
+- Reason: The 11 excluded keys are the section_3 ACTION's in-context ism_transition/current_state (3) and time (1) and the identifier keys (4), refused, and choice/quantity_value|magnitude and |unit (2) and the bare proportion_any (1), reported as unmatched content, as follows. Web Template projection: decode refuses the ACTION's in-context ism_transition and time in every mode as RM data it would otherwise drop or replace (REQ-170), so the decoded ACTION has an empty current_state (3 leaves) and the context start time as its time. party reference type: the upstream FLAT writes no composer|type, so decode gives the composer's reference the type PARTY against the canonical's PERSON. DV_IDENTIFIER: the FLAT writes the id as the bare value, and decode refuses the four identifier keys as missing the required |id, so the identifier element is missing. Choice element: decode does not read choice/quantity_value (the SDK spells it choice), so the choice element is missing. DV_PROPORTION: decode reports the bare proportion_any, the derived magnitude, as unmatched content, and reads |type 1.0 as the Integer 1 (wire.md § Floating-point precision). Upstream conversion differences: a DV_URI and the proportion's precision only the canonical carries, and duration_any (P1Y2M10DT2H30M against PT30M). Upstream date and time spelling: the canonical writes dates in the basic format (20190114) and date-times with a comma and +00:00, the FLAT in the extended format with a full stop and Z (6 leaves). HISTORY.origin: the FLAT has no origin key and decode fills it from the context start time (openehr/serialize/simplified/deviations.md), where the canonical sets it otherwise. Shifted positions: the elements decode lacks move their later siblings up, the identifier in the OBSERVATION and the DV_URI and the choice element in the EVALUATION, so the OBSERVATION's proportion and the EVALUATION's intervals and cluster compare against the canonical's next element; this accounts for most of the missing, extra and altered leaves. RM-FLOOR archetype_details: the canonical SECTION and the ACTION's description CLUSTER have none, decode adds them (8 extra leaves), and rm_version is 1.2.0 against 1.0.2 and 1.0.4.
 - Missing (51, first 10 shown):
   - `/content/0/data/events/0/data/items/14/value/assigner`
   - `/content/0/data/events/0/data/items/14/value/id`
@@ -434,7 +434,7 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - `/content/1/data/items/0/value/upper/magnitude`
   - `/content/1/data/items/0/value/upper_included`
   - `/content/1/data/items/0/value/upper_unbounded`
-- Altered (40, first 10 shown):
+- Altered (39, first 10 shown):
   - `/archetype_details/rm_version`: reference `"1.0.2"`, ours `"1.2.0"`
   - `/composer/external_ref/type`: reference `"PERSON"`, ours `"PARTY"`
   - `/content/0/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
