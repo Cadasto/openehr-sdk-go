@@ -732,9 +732,12 @@ requirements:
       - openehr/serialize/canxml/missing_test.go
       - openehr/serialize/canxml/names_test.go
       - openehr/serialize/canxml/oneroot_test.go
+      - openehr/serialize/canxml/optional_nil_test.go
+      - openehr/serialize/canxml/presence_test.go
       - openehr/serialize/canxml/primitive_error_test.go
       - openehr/serialize/canxml/real_precision_test.go
       - openehr/serialize/canxml/real_xsd_text_test.go
+      - openehr/serialize/canxml/repeated_attr_test.go
       - openehr/serialize/canxml/roundtrip_test.go
       - openehr/serialize/canxml/stream_decoder_test.go
       - openehr/serialize/canxml/unmatched_test.go
