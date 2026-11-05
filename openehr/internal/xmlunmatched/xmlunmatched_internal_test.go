@@ -270,3 +270,67 @@ func TestREQ170_TextBeforeNoElement(t *testing.T) {
 		t.Errorf("CheckUnmatchedTextBefore(untracked decoder) = %v; want nil", err)
 	}
 }
+
+// leaves is a decode target whose children are primitive elements, each read
+// into an int through DecodeElement as a generated decoder reads one. After
+// each, it notes the decoder the tracker kept for converting text.
+type leaves struct {
+	vals []int
+	decs []*textDecoder
+}
+
+func (l *leaves) UnmarshalXML(dec *xml.Decoder, _ xml.StartElement) error {
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			return err
+		}
+		switch tk := tok.(type) {
+		case xml.StartElement:
+			var n int
+			if err := DecodeElement(dec, &tk, &n); err != nil {
+				return err
+			}
+			l.vals = append(l.vals, n)
+			if t := trackerOf(dec); t != nil {
+				l.decs = append(l.decs, t.textDec)
+			}
+		case xml.EndElement:
+			return nil
+		}
+	}
+}
+
+// TestREQ170_TrackedDecodeConvertsTextThroughOneDecoder pins that a tracked
+// decode converts the text of its primitive elements through one decoder,
+// made for the first element and handed each later element's tokens, whatever
+// the element's name, and that it drops that decoder after a conversion that
+// fails, so the next conversion makes one afresh.
+//
+// Can-fail control: convert each element's text through a decoder of its own,
+// as the tracker did before, and it keeps no decoder after an element; keep
+// the decoder after a failure, and the tracker still holds it.
+func TestREQ170_TrackedDecodeConvertsTextThroughOneDecoder(t *testing.T) {
+	const doc = "<r><a>1</a><b>2</b><a>3</a></r>"
+	tr := NewTracker(nil, false)
+	var l leaves
+	if err := tr.Decode(tr.NewDecoder(strings.NewReader(doc)), &l); err != nil {
+		t.Fatalf("Decode(%q) = %v; want nil", doc, err)
+	}
+	if !slices.Equal(l.vals, []int{1, 2, 3}) {
+		t.Errorf("Decode(%q) read %v; want [1 2 3]", doc, l.vals)
+	}
+	if len(l.decs) != 3 || l.decs[0] == nil || l.decs[1] != l.decs[0] || l.decs[2] != l.decs[0] {
+		t.Errorf("Decode(%q): the tracker kept the decoders %v after each element; want one decoder, the same after each of the 3 elements", doc, l.decs)
+	}
+
+	const bad = "<r><a>1</a><a>x</a></r>"
+	tr = NewTracker(nil, false)
+	err := tr.Decode(tr.NewDecoder(strings.NewReader(bad)), new(leaves))
+	if !IsPrimitiveFailure(err) {
+		t.Fatalf("Decode(%q) = %v; want a primitive failure for /r[1]/a[2]", bad, err)
+	}
+	if tr.textDec != nil {
+		t.Errorf("Decode(%q): the tracker keeps its decoder after the failed conversion; want none", bad)
+	}
+}

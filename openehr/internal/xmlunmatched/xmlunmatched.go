@@ -101,7 +101,11 @@
 // through on its way out. A tracked or scoped decode turns that error into a
 // refusal of the same form, which names encoding/xml's limit
 // ([IsXMLDepthError]); after an untracked decode, the value is decoded again
-// through a tracker to find the element's path.
+// through a tracker to find the element's path. A tracked decode converts the
+// text of a primitive element through a decoder that sees that element alone,
+// and so refuses a primitive element past encoding/xml's limit itself, with
+// the same refusal: it refuses the primitive elements an untracked decode
+// refuses.
 //
 // # Whole documents
 //
@@ -201,6 +205,9 @@ type Tracker struct {
 	// reader is the token source of the decoder [Tracker.NewDecoder] returned,
 	// which [DecodeChoice] reads ahead through; nil until then.
 	reader *trackingReader
+	// textDec converts the text of each primitive element ([Tracker.convert]);
+	// nil until the first, and after a conversion that failed.
+	textDec *textDecoder
 	// again marks the second decode [Unmarshal] runs of a document into the
 	// value its first decode filled in part, whose root decoder [Enter] tells
 	// to clear its receiver first.
@@ -608,9 +615,12 @@ func isXMLSpace(text []byte) bool {
 // decodeText decodes the element start opens, whose content is text, into v.
 // An attribute and a child element are unmatched, and the text around a child
 // element is kept, as encoding/xml keeps it. The text then decodes into v
-// through encoding/xml itself, so the conversion is the one an untracked
-// decode applies. Text that does not convert is a primitive failure, which
-// names the element by its path from the root of the value.
+// through encoding/xml itself ([Tracker.convert]), so the conversion is the
+// one an untracked decode applies. Text that does not convert is a primitive
+// failure, which names the element by its path from the root of the value. An
+// element nested deeper than encoding/xml's own depth limit is refused before
+// anything of it is read, as an untracked decode refuses it
+// ([Tracker.refuseXMLDepth]).
 func (t *Tracker) decodeText(dec *xml.Decoder, start *xml.StartElement, v any) error {
 	t.open[len(t.open)-1].primitive = true
 	return t.readText(dec, start, v)
@@ -620,6 +630,11 @@ func (t *Tracker) decodeText(dec *xml.Decoder, start *xml.StartElement, v any) e
 // does, but leaves the element unmarked as a primitive: an entry of a Hash
 // member, which is a value of the member whatever its text.
 func (t *Tracker) readText(dec *xml.Decoder, start *xml.StartElement, v any) error {
+	// The element is the innermost open one, at the depth encoding/xml counts
+	// for it: the tracker follows every element from the start of the input.
+	if len(t.open)-1 > xmlMaxDepth() {
+		return t.refuseXMLDepth()
+	}
 	at := t.here()
 	if err := t.attrs(start.Attr, nil); err != nil {
 		return err
@@ -641,18 +656,34 @@ func (t *Tracker) readText(dec *xml.Decoder, start *xml.StartElement, v any) err
 				return err
 			}
 		case xml.EndElement:
-			name := start.Name
-			// The tokens are whole, so the decode fails only where the text
-			// does not convert to v's type.
-			err := xml.NewTokenDecoder(&tokenList{toks: []xml.Token{
-				xml.StartElement{Name: name}, xml.CharData(text), xml.EndElement{Name: name},
-			}}).Decode(v)
-			if err != nil {
+			if err := t.convert(start.Name, text, v); err != nil {
 				return t.fail(t.closedPath(at), err)
 			}
 			return nil
 		}
 	}
+}
+
+// convert decodes text, the whole text of a primitive element named name,
+// into v through encoding/xml, so that the conversion is the one an untracked
+// decode applies; the tokens are whole, so it fails only where the text does
+// not convert to v's type. An encoding/xml decoder is a large value, so t
+// makes one at its first primitive element and hands the same one the tokens
+// of each later element. It drops the decoder after a conversion that failed,
+// which could leave it partway through the element.
+func (t *Tracker) convert(name xml.Name, text []byte, v any) error {
+	if t.textDec == nil {
+		t.textDec = new(textDecoder)
+		t.textDec.dec = xml.NewTokenDecoder(t.textDec)
+	}
+	td := t.textDec
+	td.toks = [3]xml.Token{xml.StartElement{Name: name}, xml.CharData(text), xml.EndElement{Name: name}}
+	td.next = 0
+	if err := td.dec.Decode(v); err != nil {
+		t.textDec = nil
+		return err
+	}
+	return nil
 }
 
 var (
@@ -752,18 +783,25 @@ func withoutNamespaceDecls(attrs []xml.Attr) []xml.Attr {
 	return slices.DeleteFunc(slices.Clone(attrs), func(a xml.Attr) bool { return isNamespaceDecl(a.Name) })
 }
 
-// tokenList is a token source over a fixed list of tokens.
-type tokenList struct {
-	toks []xml.Token
+// textDecoder is the decoder [Tracker.convert] converts the text of a
+// primitive element with, and its token source: the element's start, its text
+// and its end, which the decoder reads once each.
+type textDecoder struct {
+	dec  *xml.Decoder
+	toks [3]xml.Token
+	next int
 }
 
-// Token returns the next token of the list, and io.EOF after the last.
-func (l *tokenList) Token() (xml.Token, error) {
-	if len(l.toks) == 0 {
+// Token returns the next of the element's three tokens, and io.EOF after the
+// last. It lets go of each token as it returns it, so a decoder kept between
+// elements holds no element's text.
+func (d *textDecoder) Token() (xml.Token, error) {
+	if d.next == len(d.toks) {
 		return nil, io.EOF
 	}
-	tok := l.toks[0]
-	l.toks = l.toks[1:]
+	tok := d.toks[d.next]
+	d.toks[d.next] = nil
+	d.next++
 	return tok, nil
 }
 
