@@ -301,7 +301,9 @@ partially or silently accepted.
   decode cannot name every node from the WT alone. Passing
   [`WithTemplate(compiled)`](simplified.go) repopulates the mandatory `name` on every
   reconstructed node below the root from the archetype terminology (keyed by the compiled
-  aqlPath); without it, those nodes are unnamed and the round-trip is merely
+  aqlPath): the term the node's own archetype, its nearest enclosing archetype root, defines for
+  its node id, so a node whose archetype does not define it stays unnamed even where an enclosing
+  archetype defines the same code; without it, those nodes are unnamed and the round-trip is merely
   **format-idempotent**. Their names never leak into FLAT, so idempotence is preserved either
   way. **A coded node name:** where the template constrains a node's name as a `DV_CODED_TEXT`
   (one child, or alternatives that agree) and determines one coded value, decode gives the node
@@ -330,6 +332,17 @@ partially or silently accepted.
   unmatched content (REQ-170). Until then decode reported a renamed composition's
   `<root>/_name` as unmatched and named the composition after the template, and encode wrote
   no name at all (the PROBE-105 census recorded it for `consult_record` and `ehrn_abdm`).
+
+- **An ordinal's terminology on `WithTemplate` decode.** A `DV_ORDINAL` leaf carries `\|code`,
+  `\|value` and `\|ordinal` and no terminology, and the reference rebuilds the symbol in `local`
+  whatever the template says (its `DvOrdinalRMUnmarshaller`); decode without the template does
+  the same. With `WithTemplate`, the symbol takes the terminology the template's `C_DV_ORDINAL`
+  gives its code, where the nodes at the leaf's path agree on one, so a template whose ordinals
+  are coded outside `local` decodes to the value it lists rather than one its validation refuses
+  as `primitive_not_in_list`. A `\|raw` ordinal keeps its own terminology, encode still writes a
+  non-local ordinal as `\|raw`, since it cannot know the decode will have the template, and a
+  `DV_SCALE` symbol stays `local`: the compiled template holds no pairs for it. No corpus
+  template codes an ordinal outside `local`; `TestREQ053WithTemplateOrdinalTerminology` pins it.
 
 - **`archetype_details` is rebuilt on decode, not carried.** FLAT has no key for it, because
   the Web Template already holds the archetype id of every archetype root and the template id.

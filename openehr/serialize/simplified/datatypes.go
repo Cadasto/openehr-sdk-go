@@ -464,9 +464,9 @@ func capturedFully(rmType string, m map[string]any, captured map[string]bool) bo
 		if !codePhraseCaptured(sym["defining_code"]) {
 			return false
 		}
-		// The ordinal suffix set has no |terminology channel and decode rebuilds
-		// the symbol as archetype-local; a non-local terminology would be
-		// silently rewritten, so it rides |raw instead.
+		// The ordinal suffix set has no |terminology channel and decode without
+		// the template rebuilds the symbol as archetype-local; a non-local
+		// terminology would be silently rewritten, so it rides |raw instead.
 		if dc, ok := sym["defining_code"].(map[string]any); ok {
 			if tv := codePhraseTerminology(dc); tv != "" && tv != "local" {
 				return false
