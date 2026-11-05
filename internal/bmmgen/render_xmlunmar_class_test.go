@@ -76,7 +76,11 @@ func TestREQ175_RenderUnmarshalXMLClassDescriptor(t *testing.T) {
 					prop := ef.Prop.PropertyName()
 					switch p := ef.Prop.(type) {
 					case *bmm.ContainerProperty:
-						items = append(items, prop)
+						// An Octet list is one base64 element, and one
+						// string in canonical JSON: no list of items.
+						if inner, ok := p.TypeDef.TypeDef.(*bmm.SimpleType); !ok || inner.TypeName != "Octet" {
+							items = append(items, prop)
+						}
 					case *bmm.GenericProperty:
 						if p.TypeDef != nil && slices.Contains([]string{"List", "Set", "Array"}, p.TypeDef.RootType) {
 							items = append(items, prop)

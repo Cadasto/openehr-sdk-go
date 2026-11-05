@@ -976,17 +976,13 @@ func xmlSingleValuedMembers(plan *Plan, pc *PlannedClass, fields []emittedField)
 
 // xmlSingleValued reports whether ef is a single-valued member, whose value
 // canonical XML writes as one child element: neither a multi-valued member
-// ([xmlMultiValued]), whose child elements are its items, except an Octet
-// list, which is one base64 element, nor a Hash member, whose child elements
-// are its entries. A second child element of a single-valued member is a
-// repeat (REQ-170).
+// ([xmlMultiValued]), whose child elements are its items, nor a Hash member,
+// whose child elements are its entries. A second child element of a
+// single-valued member is a repeat (REQ-170).
 func xmlSingleValued(plan *Plan, ef emittedField) (bool, error) {
 	shape, isHash, err := xmlHashOf(plan, ef)
 	if err != nil || shape != nil || isHash {
 		return false, err
-	}
-	if p, ok := ef.Prop.(*bmm.ContainerProperty); ok {
-		return isOctetContainer(p.TypeDef), nil
 	}
 	return !xmlMultiValued(ef.Prop), nil
 }
@@ -1074,11 +1070,14 @@ func withNilGuard(caseBody, recv, field string) (string, error) {
 
 // xmlMultiValued reports whether prop is a multi-valued member, whose items
 // canonical XML writes as one element each: a container property, or a
-// property typed by a generic List, Set or Array.
+// property typed by a generic List, Set or Array. An Octet list, such as
+// DV_MULTIMEDIA `data`, is one element whose text is the base64 of its bytes,
+// and canonical JSON one string, so it is single-valued: its JSON Pointer
+// takes no index (REQ-175).
 func xmlMultiValued(prop bmm.Property) bool {
 	switch p := prop.(type) {
 	case *bmm.ContainerProperty:
-		return true
+		return !isOctetContainer(p.TypeDef)
 	case *bmm.GenericProperty:
 		return p.TypeDef != nil && containerKinds[p.TypeDef.RootType] && p.TypeDef.RootType != "Hash"
 	}

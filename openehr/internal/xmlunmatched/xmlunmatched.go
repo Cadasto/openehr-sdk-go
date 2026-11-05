@@ -1157,6 +1157,7 @@ type heldItem struct {
 	missing bool
 	sent    bool
 	nilled  bool
+	pointer heldPointer // the pointer of a missing member or a member sent without a value
 }
 
 // SkipUnmatchedAfter skips the element start opens, which the decoder does

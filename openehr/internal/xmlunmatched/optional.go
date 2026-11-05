@@ -120,9 +120,5 @@ func ReportEmpty(dec *xml.Decoder, start xml.StartElement) {
 	if f := &t.open[n-1]; f.class == nil || f.nilled {
 		return
 	}
-	var b strings.Builder
-	t.writePointer(&b, n)
-	b.WriteByte('/')
-	b.WriteString(start.Name.Local)
-	t.sentMember(b.String(), false)
+	t.sentMember(n, start.Name.Local, false)
 }

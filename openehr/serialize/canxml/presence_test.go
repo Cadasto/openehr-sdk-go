@@ -241,24 +241,59 @@ func TestREQ175_XMLPresenceIsNeverAStrictRefusal(t *testing.T) {
 
 // TestREQ175_XMLPresenceHashEntries pins that an entry of a Hash member is a
 // value whatever its text, as for WithMissing; that a member inside the value
-// of an entry is named under the entry's key, which lies inside the value;
-// and that the content of an entry repeating an earlier entry's key counts for
+// of an entry is named under the entry's key, which lies inside the value,
+// even when the member comes before the element that carries the key; and
+// that the content of an entry repeating an earlier entry's key counts for
 // nothing, as it does for WithMissing: its empty `copyright` is not reported.
 func TestREQ175_XMLPresenceHashEntries(t *testing.T) {
-	const language = `<language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>`
+	language := func(code string) string {
+		return `<language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>` + code + `</code_string></language>`
+	}
 	in := []byte(`<description ` + ucNS + `>` +
 		`<original_author id="name"></original_author>` +
 		`<lifecycle_state>published</lifecycle_state>` +
 		`<other_details id="k"></other_details>` +
-		`<details xsi:type="RESOURCE_DESCRIPTION_ITEM">` + language + `<purpose>p</purpose><use></use></details>` +
-		`<details xsi:type="RESOURCE_DESCRIPTION_ITEM">` + language + `<purpose>p</purpose><copyright></copyright></details>` +
+		`<details xsi:type="RESOURCE_DESCRIPTION_ITEM">` + language("en") + `<purpose>p</purpose><use></use></details>` +
+		`<details xsi:type="RESOURCE_DESCRIPTION_ITEM">` + language("en") + `<purpose>p</purpose><copyright></copyright></details>` +
+		`<details xsi:type="RESOURCE_DESCRIPTION_ITEM"><use></use><misuse xsi:nil="true"/>` + language("fr") + `<purpose>p</purpose></details>` +
 		`</description>`)
 	_, reported, err := decodeXMLPresence(func() any { return new(rm.ResourceDescription) }, in)
 	if err != nil {
 		t.Fatalf("canxml.Unmarshal(WithPresence) = %v; want nil", err)
 	}
-	if want := []sent{sentEmpty("/details/en/use")}; !slices.Equal(reported, want) {
+	want := []sent{sentEmpty("/details/en/use"), sentEmpty("/details/fr/use"), sentNil("/details/fr/misuse")}
+	if !slices.Equal(reported, want) {
 		t.Errorf("WithPresence reported %v; want %v: no Hash entry, and the member of an entry's value under its key", reported, want)
+	}
+}
+
+// TestREQ175_XMLPresenceOctetList pins the pointer of a DV_MULTIMEDIA `data`
+// or `integrity_check` sent without a value: an Octet list is one element
+// whose text is base64, and one string in canonical JSON, so its pointer
+// takes no index.
+func TestREQ175_XMLPresenceOctetList(t *testing.T) {
+	multimedia := func(inner string) []byte {
+		return []byte(`<dv_multimedia ` + ucNS + `>` + inner +
+			`<media_type><terminology_id><value>IANA_media-types</value></terminology_id><code_string>image/png</code_string></media_type>` +
+			`<size>0</size></dv_multimedia>`)
+	}
+	for _, c := range []struct {
+		name string
+		in   []byte
+		want []sent
+	}{
+		{name: "empty data and integrity_check", in: multimedia(`<data></data><integrity_check></integrity_check>`), want: []sent{sentEmpty("/data"), sentEmpty("/integrity_check")}},
+		{name: "nilled data", in: multimedia(`<data xsi:nil="true"/>`), want: []sent{sentNil("/data")}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			_, reported, err := decodeXMLPresence(func() any { return new(rm.DVMultimedia) }, c.in)
+			if err != nil {
+				t.Fatalf("canxml.Unmarshal(WithPresence) = %v; want nil", err)
+			}
+			if !slices.Equal(reported, c.want) {
+				t.Errorf("WithPresence reported %v; want %v", reported, c.want)
+			}
+		})
 	}
 }
 

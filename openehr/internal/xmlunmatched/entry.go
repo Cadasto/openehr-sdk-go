@@ -121,20 +121,22 @@ func (t *Tracker) holdEntry(read func() error) ([]heldItem, error) {
 
 // release applies the decode's policy to what [Tracker.holdEntry] held, in
 // document order: to an unmatched item as [Tracker.unmatched] does, so a
-// strict decode refuses the first, to a missing member as the missing-member
-// report does, and to a member sent without a value as its report does.
+// strict decode refuses the first, and passes a missing member or a member
+// sent without a value to its report, its pointer written now that the
+// entry's key is known. Inside another hold, it adds them to that hold.
 func (t *Tracker) release(held []heldItem) error {
 	for _, it := range held {
-		if it.missing {
-			t.missingMember(it.path)
-			continue
-		}
-		if it.sent {
-			t.sentMember(it.path, it.nilled)
-			continue
-		}
-		if err := t.unmatched(it.path, it.foreign); err != nil {
-			return err
+		switch {
+		case (it.missing || it.sent) && t.held != nil:
+			*t.held = append(*t.held, it)
+		case it.missing:
+			t.missing(it.pointer.String())
+		case it.sent:
+			t.presence(it.pointer.String(), it.nilled)
+		default:
+			if err := t.unmatched(it.path, it.foreign); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

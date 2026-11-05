@@ -18,7 +18,6 @@ import (
 var xmlClassDVMultimedia = xmlunmatched.Class{
 	Name:     "DV_MULTIMEDIA",
 	Required: []string{"media_type", "size"},
-	Items:    []string{"data", "integrity_check"},
 }
 
 // UnmarshalXML decodes canonical openEHR XML into DVMultimedia.

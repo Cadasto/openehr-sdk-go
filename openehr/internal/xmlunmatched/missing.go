@@ -150,16 +150,11 @@ func (t *Tracker) skipping() {
 func (t *Tracker) closing(n int) {
 	f := &t.open[n-1]
 	if t.missing != nil && f.class != nil && !f.nilled {
-		var b strings.Builder
 		for i, name := range f.class.Required {
 			if f.seen&(1<<i) != 0 || slices.Contains(f.optional, name) {
 				continue
 			}
-			b.Reset()
-			t.writePointer(&b, n)
-			b.WriteByte('/')
-			b.WriteString(name)
-			t.missingMember(b.String())
+			t.missingMember(n, name)
 		}
 	}
 	p := &t.open[n-2]
@@ -171,9 +166,7 @@ func (t *Tracker) closing(n int) {
 		// entry of a Hash member is a value whatever its text: its decoder
 		// does not read it as a primitive ([decodeEntryValue]).
 		if t.presence != nil && !p.nilled {
-			var b strings.Builder
-			t.writePointer(&b, n)
-			t.sentMember(b.String(), f.nilled)
+			t.sentMember(n, "", f.nilled)
 		}
 		return
 	}
@@ -182,48 +175,111 @@ func (t *Tracker) closing(n int) {
 	}
 }
 
-// sentMember passes the pointer of a member the document sends without a
-// value to the decode's hook, or holds it while a Hash entry's key is
-// unknown ([Tracker.holdEntry]).
-func (t *Tracker) sentMember(pointer string, nilled bool) {
+// sentMember passes to the decode's hook the pointer of a member the document
+// sends without a value: the element whose frame is t.open[n-1], or its
+// member name when name is not empty. While a Hash entry's key is unknown it
+// holds the pointer instead ([Tracker.holdEntry]).
+func (t *Tracker) sentMember(n int, name string, nilled bool) {
 	if t.held != nil {
-		*t.held = append(*t.held, heldItem{path: pointer, sent: true, nilled: nilled})
+		*t.held = append(*t.held, heldItem{pointer: t.heldPointer(n, name), sent: true, nilled: nilled})
 		return
 	}
-	t.presence(pointer, nilled)
+	t.presence(t.pointer(n, name), nilled)
 }
 
-// missingMember passes the pointer of a mandatory member the document leaves
-// out to the decode's hook, or holds it while a Hash entry's key is unknown
+// missingMember passes to the decode's hook the pointer of the mandatory
+// member name that the element whose frame is t.open[n-1] leaves out. While a
+// Hash entry's key is unknown it holds the pointer instead
 // ([Tracker.holdEntry]).
-func (t *Tracker) missingMember(pointer string) {
+func (t *Tracker) missingMember(n int, name string) {
 	if t.held != nil {
-		*t.held = append(*t.held, heldItem{path: pointer, missing: true})
+		*t.held = append(*t.held, heldItem{pointer: t.heldPointer(n, name), missing: true})
 		return
 	}
-	t.missing(pointer)
+	t.missing(t.pointer(n, name))
 }
 
-// writePointer writes the JSON Pointer of the element whose frame is
-// t.open[n-1] in the canonical-JSON form of the value: nothing for the root
-// element, and for each element below it `/` and its local name, followed by
-// `/` and its key, escaped as RFC 6901 asks, when it is one entry of a Hash
-// member, or by `/` and its 0-based position among its same-named siblings
-// when the parent's class lists the name among its multi-valued members.
-func (t *Tracker) writePointer(b *strings.Builder, n int) {
+// pointer returns the JSON Pointer, in the canonical-JSON form of the value,
+// of the element whose frame is t.open[n-1], followed by `/` and name when
+// name is not empty: nothing for the root element, and a token per element
+// below it ([Tracker.token]).
+func (t *Tracker) pointer(n int, name string) string {
+	var b strings.Builder
 	for k := 2; k < n; k++ {
-		f := &t.open[k]
+		t.token(k).write(&b)
+	}
+	if name != "" {
 		b.WriteByte('/')
-		b.WriteString(f.name)
-		if f.key != nil {
-			b.WriteByte('/')
-			_, _ = pointerKey.WriteString(b, f.key()) // a strings.Builder never fails
-			continue
-		}
-		if p := &t.open[k-1]; p.class != nil && slices.Contains(p.class.Items, f.name) {
-			b.WriteByte('/')
-			b.WriteString(strconv.Itoa(f.pos - 1))
-		}
+		b.WriteString(name)
+	}
+	return b.String()
+}
+
+// heldPointer returns what [Tracker.pointer] returns, kept as its tokens, so
+// that it is written only when the decode passes it to its hook. A member of
+// a Hash entry whose key lies inside the entry's value can close before the
+// element that carries the key, such as an empty `use` before the `language`
+// of a RESOURCE_DESCRIPTION_ITEM; the entry's token reads its key when it is
+// written, once the entry has closed.
+func (t *Tracker) heldPointer(n int, name string) heldPointer {
+	p := heldPointer{tokens: make([]pointerToken, 0, n-2), name: name}
+	for k := 2; k < n; k++ {
+		p.tokens = append(p.tokens, t.token(k))
+	}
+	return p
+}
+
+// heldPointer is a JSON Pointer a held Hash entry holds ([Tracker.heldPointer]).
+type heldPointer struct {
+	tokens []pointerToken
+	name   string // a last member name, or ""
+}
+
+// String writes the pointer.
+func (p heldPointer) String() string {
+	var b strings.Builder
+	for _, tk := range p.tokens {
+		tk.write(&b)
+	}
+	if p.name != "" {
+		b.WriteByte('/')
+		b.WriteString(p.name)
+	}
+	return b.String()
+}
+
+// pointerToken is the part of a JSON Pointer one element below the root
+// gives: its local name, then its key when it is one entry of a Hash member,
+// or else its 0-based position among its same-named siblings when it is one
+// item of a multi-valued member.
+type pointerToken struct {
+	name  string
+	key   func() string // the entry's key, read when the token is written; nil for no entry
+	index int           // the item's position; -1 for no item
+}
+
+// token returns the token of the element whose frame is t.open[k], k >= 2.
+func (t *Tracker) token(k int) pointerToken {
+	f := &t.open[k]
+	tk := pointerToken{name: f.name, key: f.key, index: -1}
+	if p := &t.open[k-1]; f.key == nil && p.class != nil && slices.Contains(p.class.Items, f.name) {
+		tk.index = f.pos - 1
+	}
+	return tk
+}
+
+// write writes tk to b: `/` and the name, then `/` and the key, escaped as
+// RFC 6901 asks, or `/` and the position.
+func (tk pointerToken) write(b *strings.Builder) {
+	b.WriteByte('/')
+	b.WriteString(tk.name)
+	switch {
+	case tk.key != nil:
+		b.WriteByte('/')
+		_, _ = pointerKey.WriteString(b, tk.key()) // a strings.Builder never fails
+	case tk.index >= 0:
+		b.WriteByte('/')
+		b.WriteString(strconv.Itoa(tk.index))
 	}
 }
 
