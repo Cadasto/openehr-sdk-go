@@ -466,11 +466,20 @@ func (l *LocatableRef) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 					break
 				}
 				_got |= 1 << 2
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					l.Path = nil
+					break
 				}
-				l.Path = &_v
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					l.Path = &_v
+				} else {
+					l.Path = nil
+				}
 			case "id":
 				if _got&(1<<3) != 0 {
 					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {

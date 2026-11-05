@@ -181,6 +181,12 @@ func (c *CArchetypeRoot) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement
 					break
 				}
 				_got |= 1 << 4
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					c.TemplateID = nil
+					break
+				}
 				_v := new(rm.TemplateID)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -288,6 +294,12 @@ func (c *CCodeReference) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement
 					break
 				}
 				_got |= 1 << 3
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					c.AssumedValue = nil
+					break
+				}
 				_v := new(rm.CodePhrase)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -301,6 +313,12 @@ func (c *CCodeReference) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement
 					break
 				}
 				_got |= 1 << 4
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					c.TerminologyID = nil
+					break
+				}
 				_v := new(rm.TerminologyID)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -485,11 +503,20 @@ func (o *OperationalTemplate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEl
 					break
 				}
 				_got |= 1 << 1
-				var _v bool
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					o.IsControlled = nil
+					break
 				}
-				o.IsControlled = &_v
+				var _v bool
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					o.IsControlled = &_v
+				} else {
+					o.IsControlled = nil
+				}
 			case "description":
 				if _got&(1<<2) != 0 {
 					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
@@ -498,6 +525,12 @@ func (o *OperationalTemplate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEl
 					break
 				}
 				_got |= 1 << 2
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					o.Description = nil
+					break
+				}
 				_v := new(rm.ResourceDescription)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -511,6 +544,12 @@ func (o *OperationalTemplate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEl
 					break
 				}
 				_got |= 1 << 3
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					o.RevisionHistory = nil
+					break
+				}
 				_v := new(rm.RevisionHistory)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -524,6 +563,12 @@ func (o *OperationalTemplate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEl
 					break
 				}
 				_got |= 1 << 4
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					o.UID = nil
+					break
+				}
 				_v := new(rm.HierObjectID)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -570,6 +615,12 @@ func (o *OperationalTemplate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEl
 					break
 				}
 				_got |= 1 << 8
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					o.Ontology = nil
+					break
+				}
 				_v := new(FlatArchetypeOntology)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -595,6 +646,12 @@ func (o *OperationalTemplate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEl
 					break
 				}
 				_got |= 1 << 9
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					o.Constraints = nil
+					break
+				}
 				_v := new(TConstraint)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -608,6 +665,12 @@ func (o *OperationalTemplate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEl
 					break
 				}
 				_got |= 1 << 10
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					o.View = nil
+					break
+				}
 				_v := new(TView)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -786,6 +849,12 @@ func (t *TComplexObject) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement
 					break
 				}
 				_got |= 1 << 3
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					t.DefaultValue = nil
+					break
+				}
 				_v, _err := canxml.DecodeAs[rm.DataValue](_dec, _t)
 				if _err != nil {
 					return _err

@@ -114,11 +114,20 @@ func (d *DVIdentifier) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 					break
 				}
 				_got |= 1 << 0
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					d.Issuer = nil
+					break
 				}
-				d.Issuer = &_v
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					d.Issuer = &_v
+				} else {
+					d.Issuer = nil
+				}
 			case "assigner":
 				if _got&(1<<1) != 0 {
 					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
@@ -127,11 +136,20 @@ func (d *DVIdentifier) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 					break
 				}
 				_got |= 1 << 1
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					d.Assigner = nil
+					break
 				}
-				d.Assigner = &_v
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					d.Assigner = &_v
+				} else {
+					d.Assigner = nil
+				}
 			case "id":
 				if _got&(1<<2) != 0 {
 					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
@@ -151,11 +169,20 @@ func (d *DVIdentifier) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 					break
 				}
 				_got |= 1 << 3
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					d.Type = nil
+					break
 				}
-				d.Type = &_v
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					d.Type = &_v
+				} else {
+					d.Type = nil
+				}
 			default:
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err

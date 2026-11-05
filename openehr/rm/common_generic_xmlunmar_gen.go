@@ -89,6 +89,12 @@ func (a *Attestation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 3
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					a.Description = nil
+					break
+				}
 				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
@@ -115,6 +121,12 @@ func (a *Attestation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 5
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					a.AttestedView = nil
+					break
+				}
 				_v := new(DVMultimedia)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -128,11 +140,20 @@ func (a *Attestation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 6
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					a.Proof = nil
+					break
 				}
-				a.Proof = &_v
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					a.Proof = &_v
+				} else {
+					a.Proof = nil
+				}
 			case "items":
 				var _v DVEHRURI
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
@@ -252,6 +273,12 @@ func (a *AuditDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 					break
 				}
 				_got |= 1 << 3
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					a.Description = nil
+					break
+				}
 				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
@@ -339,6 +366,12 @@ func (p *Participation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					p.Mode = nil
+					break
+				}
 				_v := new(DVCodedText)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -365,6 +398,12 @@ func (p *Participation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 					break
 				}
 				_got |= 1 << 3
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					p.Time = nil
+					break
+				}
 				_v := new(DVInterval[DVDateTime])
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -426,6 +465,12 @@ func (p *PartyIdentified) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElemen
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					p.ExternalRef = nil
+					break
+				}
 				_v := new(PartyRef)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -439,11 +484,20 @@ func (p *PartyIdentified) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElemen
 					break
 				}
 				_got |= 1 << 1
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					p.Name = nil
+					break
 				}
-				p.Name = &_v
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					p.Name = &_v
+				} else {
+					p.Name = nil
+				}
 			case "identifiers":
 				var _v DVIdentifier
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
@@ -507,6 +561,12 @@ func (p *PartyRelated) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					p.ExternalRef = nil
+					break
+				}
 				_v := new(PartyRef)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -520,11 +580,20 @@ func (p *PartyRelated) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 					break
 				}
 				_got |= 1 << 1
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					p.Name = nil
+					break
 				}
-				p.Name = &_v
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					p.Name = &_v
+				} else {
+					p.Name = nil
+				}
 			case "identifiers":
 				var _v DVIdentifier
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
@@ -597,6 +666,12 @@ func (p *PartySelf) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					p.ExternalRef = nil
+					break
+				}
 				_v := new(PartyRef)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err

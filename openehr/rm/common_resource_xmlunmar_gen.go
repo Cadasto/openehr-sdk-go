@@ -81,11 +81,20 @@ func (r *ResourceDescription) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEl
 					break
 				}
 				_got |= 1 << 1
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					r.ResourcePackageURI = nil
+					break
 				}
-				r.ResourcePackageURI = &_v
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					r.ResourcePackageURI = &_v
+				} else {
+					r.ResourcePackageURI = nil
+				}
 			case "other_details":
 				if r.OtherDetails == nil {
 					r.OtherDetails = new(map[string]string)
@@ -199,11 +208,20 @@ func (r *ResourceDescriptionItem) UnmarshalXML(_dec *xml.Decoder, _start xml.Sta
 					break
 				}
 				_got |= 1 << 2
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					r.Use = nil
+					break
 				}
-				r.Use = &_v
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					r.Use = &_v
+				} else {
+					r.Use = nil
+				}
 			case "misuse":
 				if _got&(1<<3) != 0 {
 					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
@@ -212,11 +230,20 @@ func (r *ResourceDescriptionItem) UnmarshalXML(_dec *xml.Decoder, _start xml.Sta
 					break
 				}
 				_got |= 1 << 3
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					r.Misuse = nil
+					break
 				}
-				r.Misuse = &_v
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					r.Misuse = &_v
+				} else {
+					r.Misuse = nil
+				}
 			case "copyright":
 				if _got&(1<<4) != 0 {
 					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
@@ -225,11 +252,20 @@ func (r *ResourceDescriptionItem) UnmarshalXML(_dec *xml.Decoder, _start xml.Sta
 					break
 				}
 				_got |= 1 << 4
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					r.Copyright = nil
+					break
 				}
-				r.Copyright = &_v
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					r.Copyright = &_v
+				} else {
+					r.Copyright = nil
+				}
 			case "original_resource_uri":
 				if r.OriginalResourceURI == nil {
 					r.OriginalResourceURI = new(map[string]string)
@@ -319,11 +355,20 @@ func (t *TranslationDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 					break
 				}
 				_got |= 1 << 1
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					t.Accreditation = nil
+					break
 				}
-				t.Accreditation = &_v
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					t.Accreditation = &_v
+				} else {
+					t.Accreditation = nil
+				}
 			case "other_details":
 				if t.OtherDetails == nil {
 					t.OtherDetails = new(map[string]string)

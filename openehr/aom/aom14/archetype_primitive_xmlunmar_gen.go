@@ -78,11 +78,20 @@ func (c *CBoolean) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 					break
 				}
 				_got |= 1 << 2
-				var _v bool
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					c.AssumedValue = nil
+					break
 				}
-				c.AssumedValue = &_v
+				var _v bool
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					c.AssumedValue = &_v
+				} else {
+					c.AssumedValue = nil
+				}
 			default:
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
@@ -138,11 +147,20 @@ func (c *CDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 					break
 				}
 				_got |= 1 << 0
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					c.Pattern = nil
+					break
 				}
-				c.Pattern = &_v
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					c.Pattern = &_v
+				} else {
+					c.Pattern = nil
+				}
 			case "timezone_validity":
 				if _got&(1<<1) != 0 {
 					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
@@ -151,6 +169,12 @@ func (c *CDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					c.TimezoneValidity = nil
+					break
+				}
 				var _v TimezoneValidityKind
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
@@ -164,6 +188,12 @@ func (c *CDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 					break
 				}
 				_got |= 1 << 2
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					c.Range = nil
+					break
+				}
 				_v := new(rm.Interval[string])
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -177,11 +207,20 @@ func (c *CDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 					break
 				}
 				_got |= 1 << 3
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					c.AssumedValue = nil
+					break
 				}
-				c.AssumedValue = &_v
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					c.AssumedValue = &_v
+				} else {
+					c.AssumedValue = nil
+				}
 			default:
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
@@ -237,11 +276,20 @@ func (c *CDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 					break
 				}
 				_got |= 1 << 0
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					c.Pattern = nil
+					break
 				}
-				c.Pattern = &_v
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					c.Pattern = &_v
+				} else {
+					c.Pattern = nil
+				}
 			case "timezone_validity":
 				if _got&(1<<1) != 0 {
 					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
@@ -250,6 +298,12 @@ func (c *CDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					c.TimezoneValidity = nil
+					break
+				}
 				var _v TimezoneValidityKind
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
@@ -263,6 +317,12 @@ func (c *CDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 					break
 				}
 				_got |= 1 << 2
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					c.Range = nil
+					break
+				}
 				_v := new(rm.Interval[string])
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -276,11 +336,20 @@ func (c *CDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 					break
 				}
 				_got |= 1 << 3
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					c.AssumedValue = nil
+					break
 				}
-				c.AssumedValue = &_v
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					c.AssumedValue = &_v
+				} else {
+					c.AssumedValue = nil
+				}
 			default:
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
@@ -336,11 +405,20 @@ func (c *CDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 					break
 				}
 				_got |= 1 << 0
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					c.Pattern = nil
+					break
 				}
-				c.Pattern = &_v
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					c.Pattern = &_v
+				} else {
+					c.Pattern = nil
+				}
 			case "range":
 				if _got&(1<<1) != 0 {
 					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
@@ -349,6 +427,12 @@ func (c *CDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					c.Range = nil
+					break
+				}
 				_v := new(rm.Interval[string])
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -362,11 +446,20 @@ func (c *CDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 					break
 				}
 				_got |= 1 << 2
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					c.AssumedValue = nil
+					break
 				}
-				c.AssumedValue = &_v
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					c.AssumedValue = &_v
+				} else {
+					c.AssumedValue = nil
+				}
 			default:
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
@@ -429,6 +522,12 @@ func (c *CInteger) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					c.Range = nil
+					break
+				}
 				_v := new(rm.Interval[Integer])
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -442,11 +541,20 @@ func (c *CInteger) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 					break
 				}
 				_got |= 1 << 1
-				var _v Integer
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					c.AssumedValue = nil
+					break
 				}
-				c.AssumedValue = &_v
+				var _v Integer
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					c.AssumedValue = &_v
+				} else {
+					c.AssumedValue = nil
+				}
 			default:
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
@@ -509,6 +617,12 @@ func (c *CReal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					c.Range = nil
+					break
+				}
 				_v := new(rm.Interval[Real])
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -522,11 +636,20 @@ func (c *CReal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 					break
 				}
 				_got |= 1 << 1
-				var _v Real
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					c.AssumedValue = nil
+					break
 				}
-				c.AssumedValue = &_v
+				var _v Real
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					c.AssumedValue = &_v
+				} else {
+					c.AssumedValue = nil
+				}
 			default:
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
@@ -583,11 +706,20 @@ func (c *CString) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 					break
 				}
 				_got |= 1 << 0
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					c.Pattern = nil
+					break
 				}
-				c.Pattern = &_v
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					c.Pattern = &_v
+				} else {
+					c.Pattern = nil
+				}
 			case "list":
 				var _v string
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
@@ -602,11 +734,20 @@ func (c *CString) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 					break
 				}
 				_got |= 1 << 1
-				var _v bool
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					c.ListOpen = nil
+					break
 				}
-				c.ListOpen = &_v
+				var _v bool
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					c.ListOpen = &_v
+				} else {
+					c.ListOpen = nil
+				}
 			case "assumed_value":
 				if _got&(1<<2) != 0 {
 					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
@@ -615,11 +756,20 @@ func (c *CString) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 					break
 				}
 				_got |= 1 << 2
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					c.AssumedValue = nil
+					break
 				}
-				c.AssumedValue = &_v
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					c.AssumedValue = &_v
+				} else {
+					c.AssumedValue = nil
+				}
 			default:
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
@@ -675,11 +825,20 @@ func (c *CTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 					break
 				}
 				_got |= 1 << 0
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					c.Pattern = nil
+					break
 				}
-				c.Pattern = &_v
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					c.Pattern = &_v
+				} else {
+					c.Pattern = nil
+				}
 			case "timezone_validity":
 				if _got&(1<<1) != 0 {
 					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
@@ -688,6 +847,12 @@ func (c *CTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					c.TimezoneValidity = nil
+					break
+				}
 				var _v TimezoneValidityKind
 				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
@@ -701,6 +866,12 @@ func (c *CTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 					break
 				}
 				_got |= 1 << 2
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					c.Range = nil
+					break
+				}
 				_v := new(rm.Interval[string])
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -714,11 +885,20 @@ func (c *CTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 					break
 				}
 				_got |= 1 << 3
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					c.AssumedValue = nil
+					break
 				}
-				c.AssumedValue = &_v
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					c.AssumedValue = &_v
+				} else {
+					c.AssumedValue = nil
+				}
 			default:
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err

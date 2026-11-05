@@ -34,10 +34,11 @@ func (p Presence) String() string {
 // or optional, and the element carries `xsi:nil="true"` (or `1`), whatever
 // it holds, which fn receives as [PresenceNil]; or is a primitive element
 // whose text is empty, or XML whitespace only for a string, which fn
-// receives as [PresenceEmpty]. An optional member sent so decodes as an
-// absent one does, to its zero value, so the value the decode returns cannot
-// say that the input sent it, and [WithMissing] reports mandatory members
-// only.
+// receives as [PresenceEmpty]. An optional member sent so decodes as absent,
+// a nil pointer, interface or slice, as if the input had left it out (see
+// the package documentation, "Wire profile"), so the value the decode
+// returns cannot say that the input sent it, and [WithMissing] reports
+// mandatory members only.
 //
 // A member that carries a value is not reported: an empty struct element
 // such as `<subject xsi:type="PARTY_SELF"/>`, `<magnitude>0</magnitude>`,
@@ -47,8 +48,10 @@ func (p Presence) String() string {
 // namespace, a second child element of a single-valued member, which the
 // decode skips, keeping the first, and an element the schema accepts that no
 // member holds, which the decode drops. Nothing inside a nilled element is
-// reported. A number or boolean element whose text is whitespace only is a
-// primitive failure, which fails the decode before any report.
+// reported. A number or boolean element whose text is whitespace only, and an
+// empty element a primitive type refuses, such as TERM_MAPPING's `match`, are
+// primitive failures, which fail the decode; a decode that fails makes no
+// promise about which members it reported before the failure.
 //
 // The option reports only: no member sent without a value refuses the
 // decode, with or without [WithStrict], and the decode returns the same value

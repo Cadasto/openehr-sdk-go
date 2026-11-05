@@ -3,6 +3,7 @@ package rm
 import (
 	"encoding/xml"
 	"slices"
+	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
@@ -107,17 +108,13 @@ func (t *TerminologyCode) UnmarshalXML(dec *xml.Decoder, start xml.StartElement)
 					return err
 				}
 			case "terminology_version":
-				var v string
-				if err := xmlunmatched.DecodeElement(dec, &tk, &v); err != nil {
+				if err := decodeOptionalStringXML(dec, tk, &t.TerminologyVersion); err != nil {
 					return err
 				}
-				t.TerminologyVersion = &v
 			case "uri":
-				var v string
-				if err := xmlunmatched.DecodeElement(dec, &tk, &v); err != nil {
+				if err := decodeOptionalStringXML(dec, tk, &t.URI); err != nil {
 					return err
 				}
-				t.URI = &v
 			default:
 				if err := xmlunmatched.SkipUnmatched(dec, tk); err != nil {
 					return err
@@ -133,6 +130,28 @@ func (t *TerminologyCode) UnmarshalXML(dec *xml.Decoder, start xml.StartElement)
 	}
 }
 
+// decodeOptionalStringXML reads the element start opens, that of an optional
+// String member, into *field: nil when the element is nilled, or has no text
+// or whitespace only, which canonical XML reads as no value.
+func decodeOptionalStringXML(dec *xml.Decoder, start xml.StartElement, field **string) error {
+	if isNil, err := xmlunmatched.SkipNil(dec, start); err != nil || isNil {
+		if isNil {
+			*field = nil
+		}
+		return err
+	}
+	var v string
+	ok, err := xmlunmatched.DecodeOptional(dec, &start, &v)
+	if err != nil {
+		return err
+	}
+	*field = nil
+	if ok {
+		*field = &v
+	}
+	return nil
+}
+
 // decodeTerminologyIDXML reads the `terminology_id` element start opens into
 // out: the text of its first `value` child when it has one (the TERMINOLOGY_ID
 // shape), and its own text otherwise. Any other child, and a second `value`,
@@ -142,7 +161,9 @@ func (t *TerminologyCode) UnmarshalXML(dec *xml.Decoder, start xml.StartElement)
 // after such text and before the `value` child waits for the text, so the
 // items come in document order: it is checked once the `value` child opens
 // and the text has been checked, or once the element closes with no `value`
-// child, the text then being the identifier.
+// child, the text then being the identifier. An identifier that is empty or
+// XML whitespace only is a member sent without a value
+// ([xmlunmatched.ReportEmpty]).
 func decodeTerminologyIDXML(dec *xml.Decoder, start xml.StartElement, out *string) error {
 	if err := xmlunmatched.CheckUnmatchedAttrs(dec, start); err != nil {
 		return err
@@ -196,6 +217,9 @@ func decodeTerminologyIDXML(dec *xml.Decoder, start xml.StartElement, out *strin
 				*out = *value
 			} else {
 				*out = string(text)
+			}
+			if strings.TrimLeft(*out, " \t\r\n") == "" {
+				xmlunmatched.ReportEmpty(dec, start)
 			}
 			return nil
 		}

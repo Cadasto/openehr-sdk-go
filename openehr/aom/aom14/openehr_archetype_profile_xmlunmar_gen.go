@@ -90,6 +90,12 @@ func (c *CCodePhrase) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 3
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					c.AssumedValue = nil
+					break
+				}
 				_v := new(rm.CodePhrase)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -103,6 +109,12 @@ func (c *CCodePhrase) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 4
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					c.TerminologyID = nil
+					break
+				}
 				_v := new(rm.TerminologyID)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -207,6 +219,12 @@ func (c *CDVOrdinal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 					break
 				}
 				_got |= 1 << 3
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					c.AssumedValue = nil
+					break
+				}
 				_v := new(Ordinal)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -308,6 +326,12 @@ func (c *CDVQuantity) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 3
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					c.AssumedValue = nil
+					break
+				}
 				_v := new(rm.DVQuantity)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -321,6 +345,12 @@ func (c *CDVQuantity) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					break
 				}
 				_got |= 1 << 4
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					c.Property = nil
+					break
+				}
 				_v := new(rm.CodePhrase)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -422,6 +452,12 @@ func (c *CDVScale) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 					break
 				}
 				_got |= 1 << 3
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					c.AssumedValue = nil
+					break
+				}
 				_v := new(Scale)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -522,6 +558,12 @@ func (c *CDVState) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 					break
 				}
 				_got |= 1 << 3
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					c.AssumedValue = nil
+					break
+				}
 				_v := new(rm.DVState)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -594,6 +636,12 @@ func (c *CQuantityItem) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					c.Magnitude = nil
+					break
+				}
 				_v := new(rm.Interval[Real])
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -607,6 +655,12 @@ func (c *CQuantityItem) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					c.Precision = nil
+					break
+				}
 				_v := new(rm.Interval[Integer])
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -631,11 +685,20 @@ func (c *CQuantityItem) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 					break
 				}
 				_got |= 1 << 3
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					c.UnitsSystem = nil
+					break
 				}
-				c.UnitsSystem = &_v
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					c.UnitsSystem = &_v
+				} else {
+					c.UnitsSystem = nil
+				}
 			case "units_display_name":
 				if _got&(1<<4) != 0 {
 					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
@@ -644,11 +707,20 @@ func (c *CQuantityItem) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 					break
 				}
 				_got |= 1 << 4
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					c.UnitsDisplayName = nil
+					break
 				}
-				c.UnitsDisplayName = &_v
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					c.UnitsDisplayName = &_v
+				} else {
+					c.UnitsDisplayName = nil
+				}
 			default:
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
@@ -778,6 +850,12 @@ func (o *Ordinal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					o.NormalRange = nil
+					break
+				}
 				_v := new(rm.DVInterval[rm.DVOrdered])
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -797,6 +875,12 @@ func (o *Ordinal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					o.NormalStatus = nil
+					break
+				}
 				_v := new(rm.CodePhrase)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -889,6 +973,12 @@ func (s *Scale) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					s.NormalRange = nil
+					break
+				}
 				_v := new(rm.DVInterval[rm.DVOrdered])
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -908,6 +998,12 @@ func (s *Scale) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					s.NormalStatus = nil
+					break
+				}
 				_v := new(rm.CodePhrase)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
@@ -1114,11 +1210,20 @@ func (t *Transition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 					break
 				}
 				_got |= 1 << 1
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					t.Action = nil
+					break
 				}
-				t.Action = &_v
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					t.Action = &_v
+				} else {
+					t.Action = nil
+				}
 			case "guard":
 				if _got&(1<<2) != 0 {
 					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
@@ -1127,11 +1232,20 @@ func (t *Transition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 					break
 				}
 				_got |= 1 << 2
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					t.Guard = nil
+					break
 				}
-				t.Guard = &_v
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					t.Guard = &_v
+				} else {
+					t.Guard = nil
+				}
 			case "next_state":
 				if _got&(1<<3) != 0 {
 					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
@@ -1140,6 +1254,12 @@ func (t *Transition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 					break
 				}
 				_got |= 1 << 3
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					t.NextState = nil
+					break
+				}
 				_v, _err := canxml.DecodeAs[State](_dec, _t)
 				if _err != nil {
 					return _err

@@ -73,6 +73,11 @@ import (
 //     a second child element of the member goes to
 //     `xmlunmatched.SkipUnmatched`, so the method keeps the first child's
 //     value and the repeat is unmatched content ([withRepeatGuard]).
+//     An optional member whose field can hold nil then hands a nilled
+//     element to `xmlunmatched.SkipNil` and leaves the member absent
+//     ([withNilGuard]); an optional primitive decodes through
+//     `xmlunmatched.DecodeOptional`, which leaves it absent when its element
+//     has no text.
 //
 //  4. A member whose element the target's root schemas give a choice of
 //     shapes, in their schema_forms, goes to `xmlunmatched.DecodeChoice`
@@ -325,6 +330,16 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 			// (REQ-169).
 			caseBody += unmarshalXMLIntervalBoundSeen(prop)
 		}
+		nilable, err := xmlNilable(plan, ef)
+		if err != nil {
+			return "", fmt.Errorf("%s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
+		}
+		if nilable {
+			caseBody, err = withNilGuard(caseBody, recv, FieldName(ef.Prop.PropertyName()))
+			if err != nil {
+				return "", fmt.Errorf("render UnmarshalXML field %s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
+			}
+		}
 		if bit, ok := once[ef.Prop.PropertyName()]; ok {
 			caseBody, err = withRepeatGuard(caseBody, bit)
 			if err != nil {
@@ -450,6 +465,11 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 		if isClass {
 			return unmarshalXMLStructOptionalLit(recv, goField, elemName, goType), nil
 		}
+		if !isPrimitive(p.TypeName) {
+			// An enumeration is a class: an empty element is no value of it,
+			// and its decode refuses it.
+			return unmarshalXMLEnumerationOptionalLit(recv, goField, elemName, goType), nil
+		}
 		return unmarshalXMLPrimitiveOptionalLit(recv, goField, elemName, goType), nil
 
 	case *bmm.SinglePropertyOpen:
@@ -548,10 +568,23 @@ func unmarshalXMLPrimitiveMandatory(recv, field, elem string) string {
 		elem, recv, field)
 }
 
-func unmarshalXMLPrimitiveOptionalLit(recv, field, elem, goType string) string {
+// unmarshalXMLEnumerationOptionalLit emits the case of an optional member
+// typed by an enumeration, which decodes from the element's text like a
+// primitive, through xmlunmatched.DecodeElement.
+func unmarshalXMLEnumerationOptionalLit(recv, field, elem, goType string) string {
 	return fmt.Sprintf(
 		"\t\t\tcase %q:\n\t\t\t\tvar _v %s\n\t\t\t\tif _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s.%s = &_v\n",
 		elem, goType, recv, field)
+}
+
+// unmarshalXMLPrimitiveOptionalLit emits the case of an optional member of a
+// primitive type, through xmlunmatched.DecodeOptional, which leaves the member
+// absent when its element has no text, or whitespace only for a string
+// (REQ-056).
+func unmarshalXMLPrimitiveOptionalLit(recv, field, elem, goType string) string {
+	return fmt.Sprintf(
+		"\t\t\tcase %q:\n\t\t\t\tvar _v %s\n\t\t\t\tif _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t} else if _ok {\n\t\t\t\t\t%s.%s = &_v\n\t\t\t\t} else {\n\t\t\t\t\t%s.%s = nil\n\t\t\t\t}\n",
+		elem, goType, recv, field, recv, field)
 }
 
 // unmarshalXMLOpenParam emits the decode case of a field typed by the open
@@ -978,6 +1011,63 @@ func withRepeatGuard(caseBody string, bit int) (string, error) {
 	b.WriteString("\t\t\t\t\tbreak\n")
 	b.WriteString("\t\t\t\t}\n")
 	fmt.Fprintf(&b, "\t\t\t\t_got |= 1 << %d\n", bit)
+	b.WriteString(body)
+	return b.String(), nil
+}
+
+// xmlNilable reports whether ef is an optional single-valued member whose Go
+// field can hold nil, a pointer, an interface or an Octet list, so that a
+// nilled element leaves it absent (REQ-056): not a mandatory member, a
+// multi-valued one or a Hash, not a boundary flag, not a member typed by the
+// owner's generic parameter, which the field holds by value, and not one whose
+// class has no decoder, which the decoder skips.
+func xmlNilable(plan *Plan, ef emittedField) (bool, error) {
+	if isIntervalFlag(ef.Prop.PropertyName()) {
+		return false, nil
+	}
+	shape, isHash, err := xmlHashOf(plan, ef)
+	if err != nil || shape != nil || isHash {
+		return false, err
+	}
+	switch p := ef.Prop.(type) {
+	case *bmm.SingleProperty:
+		if p.IsMandatory || isOpenParam(ef.Owner, p.TypeName) {
+			return false, nil
+		}
+		if isPrimitive(p.TypeName) || p.TypeName == bmmAnyType || isInterfaceTypeRef(plan, p.TypeName) {
+			return true, nil
+		}
+		decoding, err := xmlClassDecoding(plan, p.TypeName)
+		return decoding != xmlNoDecoder, err
+	case *bmm.GenericProperty:
+		if p.IsMandatory || p.TypeDef == nil || containerKinds[p.TypeDef.RootType] {
+			return false, nil
+		}
+		decoding, err := xmlClassDecoding(plan, p.TypeDef.RootType)
+		return decoding == xmlOwnDecoder, err
+	case *bmm.ContainerProperty:
+		return !containerRequired(p.Cardinality, p.IsMandatory) && isOctetContainer(p.TypeDef), nil
+	}
+	return false, nil
+}
+
+// withNilGuard puts at the head of caseBody, the case branch of an optional
+// member held in the field field of recv, the check that hands a nilled
+// element to xmlunmatched.SkipNil, leaves the member absent and leaves the
+// branch (REQ-056). caseBody's first line is its case label.
+func withNilGuard(caseBody, recv, field string) (string, error) {
+	label, body, ok := strings.Cut(caseBody, "\n")
+	if !ok || !strings.HasPrefix(label, "\t\t\tcase ") {
+		return "", fmt.Errorf("the case branch does not open with its case label: %q", label)
+	}
+	var b strings.Builder
+	b.WriteString(label + "\n")
+	b.WriteString("\t\t\t\tif _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {\n")
+	b.WriteString("\t\t\t\t\treturn _err\n")
+	b.WriteString("\t\t\t\t} else if _nil {\n")
+	fmt.Fprintf(&b, "\t\t\t\t\t%s.%s = nil\n", recv, field)
+	b.WriteString("\t\t\t\t\tbreak\n")
+	b.WriteString("\t\t\t\t}\n")
 	b.WriteString(body)
 	return b.String(), nil
 }

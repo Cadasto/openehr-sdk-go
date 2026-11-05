@@ -66,11 +66,20 @@ func (i *ItemTag) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 					break
 				}
 				_got |= 1 << 1
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					i.Value = nil
+					break
 				}
-				i.Value = &_v
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					i.Value = &_v
+				} else {
+					i.Value = nil
+				}
 			case "target":
 				if _got&(1<<2) != 0 {
 					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
@@ -92,11 +101,20 @@ func (i *ItemTag) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 					break
 				}
 				_got |= 1 << 3
-				var _v string
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
+				} else if _nil {
+					i.TargetPath = nil
+					break
 				}
-				i.TargetPath = &_v
+				var _v string
+				if _ok, _err := xmlunmatched.DecodeOptional(_dec, &_t, &_v); _err != nil {
+					return _err
+				} else if _ok {
+					i.TargetPath = &_v
+				} else {
+					i.TargetPath = nil
+				}
 			case "owner_id":
 				if _got&(1<<4) != 0 {
 					if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {

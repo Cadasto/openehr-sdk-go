@@ -337,3 +337,53 @@ func TestREQ175_XMLPresenceString(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ175_XMLPresenceTerminologyCode pins the report on the hand-written
+// TERMINOLOGY_CODE decoder: an empty `terminology_id`, in its text shape and
+// in its TERMINOLOGY_ID shape with an empty `value`, is reported empty once;
+// a nilled one is reported nil once; one with an identifier is not. Its
+// optional `terminology_version` and `uri` sent without a value are reported
+// and decode as absent (REQ-056).
+func TestREQ175_XMLPresenceTerminologyCode(t *testing.T) {
+	code := func(id, rest string) string {
+		return `<terminology_code ` + ucNS + `>` + id + `<code_string>1</code_string>` + rest + `</terminology_code>`
+	}
+	for _, c := range []struct {
+		name string
+		in   string
+		want []sent
+	}{
+		{name: "an identifier as text", in: code(`<terminology_id>snomed_ct</terminology_id>`, "")},
+		{name: "an identifier in a value child", in: code(`<terminology_id><value>snomed_ct</value></terminology_id>`, "")},
+		{name: "empty text", in: code(`<terminology_id></terminology_id>`, ""), want: []sent{sentEmpty("/terminology_id")}},
+		{name: "whitespace", in: code("<terminology_id> \n</terminology_id>", ""), want: []sent{sentEmpty("/terminology_id")}},
+		{name: "an empty value child", in: code(`<terminology_id><value></value></terminology_id>`, ""), want: []sent{sentEmpty("/terminology_id")}},
+		{name: "nilled", in: code(`<terminology_id xsi:nil="true"/>`, ""), want: []sent{sentNil("/terminology_id")}},
+		{
+			name: "optional members without a value",
+			in:   code(`<terminology_id>snomed_ct</terminology_id>`, `<terminology_version></terminology_version><uri xsi:nil="true"/>`),
+			want: []sent{sentEmpty("/terminology_version"), sentNil("/uri")},
+		},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			got, reported, err := decodeXMLPresence(func() any { return new(rm.TerminologyCode) }, []byte(c.in))
+			if err != nil {
+				t.Fatalf("canxml.Unmarshal(WithPresence) = %v; want nil", err)
+			}
+			if !slices.Equal(reported, c.want) {
+				t.Errorf("WithPresence reported %v; want %v", reported, c.want)
+			}
+			tc := got.(*rm.TerminologyCode)
+			if tc.TerminologyVersion != nil || tc.URI != nil {
+				t.Errorf("TerminologyVersion = %v, URI = %v; want both nil", tc.TerminologyVersion, tc.URI)
+			}
+			var def rm.TerminologyCode
+			if err := canxml.Unmarshal([]byte(c.in), &def); err != nil {
+				t.Fatalf("canxml.Unmarshal = %v; want nil", err)
+			}
+			if !reflect.DeepEqual(*tc, def) {
+				t.Errorf("canxml.Unmarshal(WithPresence) decoded %+v; want the default's %+v", *tc, def)
+			}
+		})
+	}
+}

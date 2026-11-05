@@ -636,36 +636,65 @@ func (t *Tracker) decodeText(dec *xml.Decoder, start *xml.StartElement, v any) e
 // does, but leaves the element unmarked as a primitive: an entry of a Hash
 // member, which is a value of the member whatever its text.
 func (t *Tracker) readText(dec *xml.Decoder, start *xml.StartElement, v any) error {
+	at := t.here()
+	text, err := t.elementText(dec, start)
+	if err != nil {
+		return err
+	}
+	if err := t.convert(start.Name, text, v); err != nil {
+		return t.fail(t.closedPath(at), err)
+	}
+	return nil
+}
+
+// decodeOptional decodes the element start opens into v as
+// [Tracker.decodeText] does, unless the element carries no value
+// ([noValue]), and reports whether it decoded it.
+func (t *Tracker) decodeOptional(dec *xml.Decoder, start *xml.StartElement, v any) (bool, error) {
+	t.open[len(t.open)-1].primitive = true
+	at := t.here()
+	text, err := t.elementText(dec, start)
+	if err != nil || noValue(string(text), v) {
+		return false, err
+	}
+	if err := t.convert(start.Name, text, v); err != nil {
+		return false, t.fail(t.closedPath(at), err)
+	}
+	return true, nil
+}
+
+// elementText reads the element start opens, whose content is text, to its
+// end, and returns its text. An attribute and a child element are unmatched,
+// and the text around a child element is kept, as encoding/xml keeps it. An
+// element nested deeper than encoding/xml's own depth limit is refused before
+// anything of it is read.
+func (t *Tracker) elementText(dec *xml.Decoder, start *xml.StartElement) ([]byte, error) {
 	// The element is the innermost open one, at the depth encoding/xml counts
 	// for it: the tracker follows every element from the start of the input.
 	if len(t.open)-1 > xmlMaxDepth() {
-		return t.refuseXMLDepth()
+		return nil, t.refuseXMLDepth()
 	}
-	at := t.here()
 	if err := t.attrs(start.Attr, nil); err != nil {
-		return err
+		return nil, err
 	}
 	var text []byte
 	for {
 		tok, err := dec.Token()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		switch tk := tok.(type) {
 		case xml.CharData:
 			text = append(text, tk...)
 		case xml.StartElement:
 			if err := t.unmatched(t.path(), isForeign(tk.Name)); err != nil {
-				return err
+				return nil, err
 			}
 			if err := dec.Skip(); err != nil {
-				return err
+				return nil, err
 			}
 		case xml.EndElement:
-			if err := t.convert(start.Name, text, v); err != nil {
-				return t.fail(t.closedPath(at), err)
-			}
-			return nil
+			return text, nil
 		}
 	}
 }
