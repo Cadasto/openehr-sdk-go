@@ -396,10 +396,10 @@ type Options struct {
     Now         time.Time               // clock for unconstrained date-times; zero = current time
     UIDSource   func() *rm.HierObjectID // uids and reference ids (nil = crypto/rand)
     ValueFill   ValueFill               // ExampleFill (default) or RandomFill
-    ValueSource mrand.Source            // seeds RandomFill; nil = auto-seeded global
+    ValueSource mrand.Source            // seeds RandomFill; nil or typed-nil = auto-seeded global
 }
 
-func UIDsFrom(src mrand.Source) func() *rm.HierObjectID // a UIDSource of version-4 UUIDs drawn from src; nil src = nil
+func UIDsFrom(src mrand.Source) func() *rm.HierObjectID // a UIDSource of version-4 UUIDs drawn from src; nil or typed-nil src = nil
 
 func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (any, error)
 func AsComposition(v any) (*rm.Composition, error)
@@ -510,7 +510,7 @@ The known gaps below describe the generator as it is; they are informative.
 
 `Policy` selects *which* nodes are materialised; an orthogonal **`ValueFill`** selects *how* primitive leaves are valued. The SDK **MUST** offer two fills, and read a `ValueFill` other than `RandomFill` as `ExampleFill`, with no error: `ExampleFill` (default) populates each leaf with its REQ-103 `PrimitiveConstraint.ExampleValue` — a single representative value, byte-identical across calls for one OPT; `RandomFill` draws each leaf from within its constraint (in-range magnitudes, value-set-member codes, enumeration entries), valid by construction and varying between calls.
 
-`RandomFill` reproducibility is caller-controlled via **`Options.ValueSource`** (a `math/rand/v2.Source`): a fixed source makes leaf values byte-reproducible (§ Contract *Reproducible uids*); `nil` draws from the auto-seeded package global so successive calls differ — mirroring the `UIDSource` determinism seam. A `Source` is not safe for concurrent use, so each concurrent `Generate` takes its own source, or leaves it `nil` for the concurrency-safe global. The composition builder surfaces the seam as `composition.WithValueFill` / `composition.WithValueSource`.
+`RandomFill` reproducibility is caller-controlled via **`Options.ValueSource`** (a `math/rand/v2.Source`): a fixed source makes leaf values byte-reproducible (§ Contract *Reproducible uids*); `nil`, or a typed-nil source such as a nil `*rand.PCG`, draws from the auto-seeded package global so successive calls differ — mirroring the `UIDSource` determinism seam. A `Source` is not safe for concurrent use, so each concurrent `Generate` takes its own source, or leaves it `nil` for the concurrency-safe global. The composition builder surfaces the seam as `composition.WithValueFill` / `composition.WithValueSource`.
 
 **Deferred.** `Complete` is an alias of `Large`. A complete level of its own, the ITS-REST `detail_level=complete` (every data point the template allows, as reference guidance, not expected to be committable), is planned but not delivered and not a priority; when it lands, `Complete` becomes its own value. That level is **not** part of the v1 `Policy` contract. Tracked in the roadmap.
 

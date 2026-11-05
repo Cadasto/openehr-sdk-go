@@ -216,8 +216,9 @@ type Options struct {
 	// ValueSource seeds the in-constraint sampler used when ValueFill is
 	// RandomFill; ignored otherwise. A fixed source (e.g.
 	// rand.NewPCG(seed, seed)) makes the leaf values byte-reproducible;
-	// nil draws from the package-global, auto-seeded generator so
-	// successive calls differ. The generator never draws a uid from it:
+	// nil, or a source that holds a nil pointer such as a nil *rand.PCG,
+	// draws from the package-global, auto-seeded generator so successive
+	// calls differ. The generator never draws a uid from it:
 	// the uids come from UIDSource, or from its random fallback.
 	//
 	// A math/rand/v2.Source is not safe for concurrent use: do not share

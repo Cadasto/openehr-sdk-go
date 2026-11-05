@@ -76,6 +76,11 @@ var reflectReviewed = map[string]struct {
 		[]string{reflectValueComparison},
 		"equality of two BMM class definitions reached through a shared ancestor",
 	},
+	"openehr/instance/nilsource.go": {
+		[]string{"Chan", "Func", "Map", "Pointer", "Slice", "ValueOf"},
+		[]string{reflectNilOrZeroCheck},
+		"reads a math/rand/v2 source that holds a nil pointer, func, map, slice or chan as a nil source before a draw from it panics; the package cannot share transport's check, which it never imports",
+	},
 	"openehr/internal/xmlunmatched/pointers.go": {
 		[]string{"New", "Pointer", "ValueOf"},
 		[]string{reflectAddressableCopy, reflectNilOrZeroCheck},
