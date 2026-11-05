@@ -26,6 +26,7 @@ import (
 	"strings"
 	"testing"
 
+	impl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rmpath"
@@ -153,7 +154,7 @@ func TestWebTemplatePathsResolveViaRmpath(t *testing.T) {
 					exempted[p] = true
 					continue
 				}
-				root, err := instanceAlong(c, w.Tree.RMType, n, p)
+				root, err := instanceAlong(c, w.Tree.RMType, n, n.AQLPath)
 				if derived, ok := errors.AsType[errDerived](err); ok {
 					exempted[derived.key] = true
 					continue
@@ -258,6 +259,81 @@ func classifyOPT(name string, met *refusal, root string, refused, nonComposition
 	return optOutcome{verdictCheck, ""}
 }
 
+// TestCompiledChildFollowsTheNamePredicate — REQ-121, REQ-053. Walking a Web
+// Template node's aqlPath, compiledChild reaches, at every segment whose
+// predicate pins a template-level name, the compiled sibling of that id and
+// that name, not the first sibling of the id: the guard above builds its
+// instance under that sibling, and under another one whose items differ it
+// would fail. The Web Template oracles reuse one archetype under several
+// names, which the guard's own OPTs do not.
+func TestCompiledChildFollowsTheNamePredicate(t *testing.T) {
+	webtemplates, err := filepath.Glob(referenceDir + "/*.opt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	shared := 0
+	for _, path := range append(vendoredOPTs(t), webtemplates...) {
+		c, w, refused := buildVendored(path)
+		if refused != nil || w.Tree.RMType != encodedRoot {
+			continue
+		}
+		var nodes []*webtemplate.Node
+		collectNodes(w.Tree, &nodes)
+		for _, n := range nodes {
+			segs := splitPath(n.AQLPath)
+			cn := c.Root()
+			for i, s := range segs {
+				cn = compiledChild(cn, s, i == len(segs)-1, n.RMType)
+				if s.whole == s.pred {
+					continue
+				}
+				// A named segment is a node the template constrains, so the
+				// walk reaches it.
+				if cn == nil {
+					t.Errorf("%s: %s: no compiled node at the named segment %q", filepath.Base(path), n.AQLPath, s.raw)
+					break
+				}
+				if got := impl.NamePredicate(s.pred, cn.NodeName()); got != s.whole {
+					t.Errorf("%s: %s: segment %q reaches the compiled node [%s]", filepath.Base(path), n.AQLPath, s.raw, got)
+					break
+				}
+				if siblings := cn.Parent().Attribute(s.attr).Children(); slices.ContainsFunc(siblings, func(k *templatecompile.CompiledNode) bool {
+					return k != cn && k.NodeID() == cn.NodeID() && k.ArchetypeID() == cn.ArchetypeID()
+				}) {
+					shared++
+				}
+			}
+		}
+	}
+	// A walk that never meets a named node sharing its id with a sibling would
+	// not show that the name chooses between them.
+	if shared == 0 {
+		t.Fatal("no named segment reaches a node that shares its id with a sibling: the OPTs no longer exercise the name")
+	}
+	t.Logf("%d named segments reach a node that shares its id with a sibling", shared)
+}
+
+// TestSplitPathKeepsQuotedNames — REQ-121. A template-level name may hold a
+// slash, a bracket or an escaped quote, and splitPath keeps it inside its
+// segment: a bracket in a name would otherwise end or open the predicate.
+func TestSplitPathKeepsQuotedNames(t *testing.T) {
+	cases := []struct {
+		path  string
+		whole string // the predicate of the first segment
+	}{
+		{path: "/items[at0001,'a/b']/value", whole: "at0001,'a/b'"},
+		{path: "/items[at0001,'a]b']/value", whole: "at0001,'a]b'"},
+		{path: "/items[at0001,'a[b']/value", whole: "at0001,'a[b'"},
+		{path: `/items[at0001,'it\'s]']/value`, whole: `at0001,'it\'s]'`},
+	}
+	for _, tc := range cases {
+		segs := splitPath(tc.path)
+		if len(segs) != 2 || segs[0].attr != "items" || segs[0].pred != "at0001" || segs[0].whole != tc.whole || segs[1].raw != "value" {
+			t.Errorf("splitPath(%q) = %+v, want items[%s] then value", tc.path, segs, tc.whole)
+		}
+	}
+}
+
 // TestClassifyOPT drives every arm of the guard's per-OPT decision with
 // synthetic inputs, because today's vendored data reaches only three of them:
 // removing any other arm would leave TestWebTemplatePathsResolveViaRmpath green.
@@ -347,34 +423,42 @@ func unresolvedStep(root rm.Locatable, p string) string {
 	return "no step"
 }
 
-// pathSeg is one segment of a bare aqlPath.
+// pathSeg is one segment of an aqlPath: its attribute, the node id or
+// archetype id its predicate names (pred), and the predicate as written
+// (whole), which also carries a REQ-116 name where the path pins one.
 type pathSeg struct {
-	raw, attr, pred string
+	raw, attr, pred, whole string
 }
 
-// splitPath splits a bare aqlPath at the slashes outside predicates.
+// splitPath splits an aqlPath at the slashes outside predicates and outside
+// the quoted names they may carry, which can hold a slash or a bracket.
 func splitPath(p string) []pathSeg {
 	var out []pathSeg
 	depth, start := 0, 0
+	quoted := false
 	p = strings.TrimPrefix(p, "/")
 	flush := func(raw string) {
 		s := pathSeg{raw: raw, attr: raw}
 		if i := strings.IndexByte(raw, '['); i >= 0 && strings.HasSuffix(raw, "]") {
-			s.attr, s.pred = raw[:i], raw[i+1:len(raw)-1]
+			s.attr, s.whole = raw[:i], raw[i+1:len(raw)-1]
+			s.pred, _, _ = strings.Cut(s.whole, ",")
 		}
 		out = append(out, s)
 	}
-	for i := range len(p) {
-		switch p[i] {
-		case '[':
+	for i := 0; i < len(p); i++ {
+		switch c := p[i]; {
+		case quoted && c == '\\':
+			i++
+		case c == '\'' && depth > 0:
+			quoted = !quoted
+		case quoted:
+		case c == '[':
 			depth++
-		case ']':
+		case c == ']':
 			depth--
-		case '/':
-			if depth == 0 {
-				flush(p[start:i])
-				start = i + 1
-			}
+		case c == '/' && depth == 0:
+			flush(p[start:i])
+			start = i + 1
 		}
 	}
 	if start < len(p) {
@@ -418,10 +502,12 @@ func bareClass(name string) string {
 	return strings.TrimSpace(class)
 }
 
-// instanceAlong builds a COMPOSITION holding one object per segment of p, each
-// of the class the compiled template (or, off the compiled tree, the RM) gives
-// that position, and each carrying the identity its predicate names. The last
-// object is the node's own value.
+// instanceAlong builds a COMPOSITION holding one object per segment of p, the
+// node's aqlPath, each of the class the compiled template (or, off the
+// compiled tree, the RM) gives that position, and each carrying the node id or
+// archetype id its predicate names. A name the predicate pins chooses the
+// compiled sibling but is not set on the object: rmpath resolves the bare path.
+// The last object is the node's own value.
 func instanceAlong(c *templatecompile.Compiled, rootType string, n *webtemplate.Node, p string) (rm.Locatable, error) {
 	ctor, ok := typereg.Default.Lookup(bareClass(rootType))
 	if !ok {
@@ -469,7 +555,10 @@ func instanceAlong(c *templatecompile.Compiled, rootType string, n *webtemplate.
 
 // compiledChild finds the compiled node a segment reaches from cn, or nil when
 // the segment leaves the compiled tree (an in-context attribute the OPT does
-// not constrain) or cannot be told apart from its siblings.
+// not constrain) or cannot be told apart from its siblings. A predicated
+// segment reaches the child whose id and template-level name the Web Template
+// spells as that predicate, so of named siblings sharing an id (two EVENTs
+// 'First event' and 'Second event') it picks the one the path names.
 func compiledChild(cn *templatecompile.CompiledNode, s pathSeg, last bool, leafType string) *templatecompile.CompiledNode {
 	if cn == nil {
 		return nil
@@ -481,7 +570,7 @@ func compiledChild(cn *templatecompile.CompiledNode, s pathSeg, last bool, leafT
 	kids := a.Children()
 	if s.pred != "" {
 		for _, k := range kids {
-			if k.NodeID() == s.pred || k.ArchetypeID() == s.pred {
+			if (k.NodeID() == s.pred || k.ArchetypeID() == s.pred) && impl.NamePredicate(s.pred, k.NodeName()) == s.whole {
 				return k
 			}
 		}
