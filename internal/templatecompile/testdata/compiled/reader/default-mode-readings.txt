@@ -1,4 +1,4 @@
-# compiled tree of reader/parser-readings.opt
+# compiled tree of reader/default-mode-readings.opt
 template_id="sdk.reader_parser.v0" concept="sdk.reader_parser.v0" language="en" uid="" num_nodes=24
 
 node /

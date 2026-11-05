@@ -300,8 +300,8 @@ func (s *sourceReader) Read(p []byte) (int, error) {
 
 // readDocument decodes one document from br with opts and the element limit:
 // what comes before the root, the root, and what comes after it. Unless
-// strict, it reads past what the deprecated parser reads past before and
-// after the root.
+// strict, it reads past the content before the root that encoding/xml reads,
+// and a `<!…>` declaration after it.
 func readDocument(br *bufio.Reader, opts []canxml.DecoderOption, strict bool) (*OperationalTemplate, error) {
 	// The stream decoder skips what comes before the root, so the prolog is
 	// checked first; the decode then reads the bytes the check read again.
@@ -325,11 +325,11 @@ func readDocument(br *bufio.Reader, opts []canxml.DecoderOption, strict bool) (*
 	return ot, nil
 }
 
-// readsPastProlog reports whether the deprecated parser reads past head, the
-// bytes before the root element and its start tag that the prolog check
-// refused: whether encoding/xml reads each token in it up to that start tag,
-// whatever the token is, as the parser's decode does. A byte-order mark at
-// the very start is the one byte sequence it skips unread.
+// readsPastProlog reports whether the default mode reads past head, the bytes
+// before the root element and its start tag that the prolog check refused:
+// whether encoding/xml reads each token in it up to that start tag, whatever
+// the token is. A byte-order mark at the very start is the one byte sequence
+// it skips unread.
 func readsPastProlog(head []byte) bool {
 	d := xml.NewDecoder(bytes.NewReader(bytes.TrimPrefix(head, byteOrderMark)))
 	for {
@@ -364,10 +364,10 @@ func errInputTooLarge() error {
 
 // afterRoot reads r, the rest of the input after the root element, to its
 // end. Comments, processing instructions and whitespace pass, and unless
-// strict a `<!…>` declaration as well, which the deprecated parser reads
-// past. Anything else, an element, other text or markup encoding/xml cannot
-// read, is refused, with an error that wraps [canxml.ErrInvalidShape] and
-// names none of it, as [canxml.Unmarshal] refuses it.
+// strict a `<!…>` declaration as well, which encoding/xml reads. Anything
+// else, an element, other text or markup encoding/xml cannot read, is
+// refused, with an error that wraps [canxml.ErrInvalidShape] and names none
+// of it, as [canxml.Unmarshal] refuses it.
 func afterRoot(r io.Reader, strict bool) error {
 	dec := xml.NewDecoder(r)
 	for {

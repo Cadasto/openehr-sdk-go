@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- How the reader reads parser-readings.opt, written as canonical XML decodes it. SDK-authored. -->
+<!-- How the reader reads default-mode-readings.opt, written as canonical XML decodes it. SDK-authored. -->
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     <language>
         <terminology_id>

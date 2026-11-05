@@ -41,8 +41,8 @@ const (
 	refusedDefinitionNotKept exceptionRefusal = "a definition read as a slot or a primitive constraint"
 	refusedSharedPath        exceptionRefusal = "two nodes under different attributes share an AQL path"
 	refusedNoRMType          exceptionRefusal = "a definition that names no RM type"
-	refusedOther             exceptionRefusal = "a refusal the rule does not allow"
-	notRefused               exceptionRefusal = "no refusal: the new path reads and compiles it"
+	refusedOther             exceptionRefusal = "a refusal the exception fixtures do not name"
+	notRefused               exceptionRefusal = "no refusal: the reader and the compile step read and compile it"
 )
 
 // allowedRefusals are the refusals the exception fixtures name.
@@ -81,7 +81,7 @@ func TestREQ111_ParityExceptionsRefused(t *testing.T) {
 	}
 	for _, r := range allowedRefusals {
 		if !slices.Contains(slices.Collect(maps.Values(want)), r) {
-			t.Errorf("no file of %s is refused as %q; want one for each refusal the rule allows", parityExceptionsDir, r)
+			t.Errorf("no file of %s is refused as %q; want one for each refusal the exception fixtures name", parityExceptionsDir, r)
 		}
 	}
 

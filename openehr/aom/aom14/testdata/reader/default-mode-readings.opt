@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Shapes and values the AM Release-1.4 schemas do not allow, which the reader's default mode reads as the deprecated template parser does, and its strict mode refuses. parser-readings.read.opt is how the reader reads it. SDK-authored. -->
+<!-- Shapes and values the AM Release-1.4 schemas do not allow, which the reader's default mode reads and its strict mode refuses. default-mode-readings.read.opt is how the reader reads it. SDK-authored. -->
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     <language>
         <terminology_id>
@@ -79,7 +79,7 @@
                                 <list>a</list>
                                 <node_id/>
                                 <list>b</list>
-                                <!-- The parser reads no attributes of a primitive leaf. -->
+                                <!-- The reader leaves out the attributes of a primitive leaf. -->
                                 <attributes xsi:type="C_SINGLE_ATTRIBUTE">
                                     <rm_attribute_name>value</rm_attribute_name>
                                     <existence>

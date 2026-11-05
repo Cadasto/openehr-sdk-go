@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- SDK-authored parity fixture: C_INTEGER range bounds and a quantity's precision bounds that are no whole number, or NaN, which the parser reads as floats and the reader as the integer bounds that admit the same integers: a bound that is no whole number rounded up on the lower side and down on the upper one, its side included, and a NaN bound, which the parser compares no integer with, as an unbounded side. -->
+<!-- SDK-authored parity fixture: C_INTEGER range bounds and a quantity's precision bounds that are no whole number, or NaN, which the reader reads as the integer bounds that admit the same integers: a bound that is no whole number rounded up on the lower side and down on the upper one, its side included, and a NaN bound, which bounds no integer, as an unbounded side. -->
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <language>
     <terminology_id><value>ISO_639-1</value></terminology_id>

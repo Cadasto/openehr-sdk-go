@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- SDK-authored parity fixture: a match_negated of true, which the parser ignores and so reads with its meaning inverted and the model's reader refuses, an exception the parity rule allows. -->
+<!-- SDK-authored parity fixture: a match_negated of true, which AOM 1.4 cannot express: one of the four readings the reader refuses in every mode. -->
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <language>
     <terminology_id><value>ISO_639-1</value></terminology_id>
