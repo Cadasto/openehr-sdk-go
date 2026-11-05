@@ -30,8 +30,10 @@ type Class struct {
 	// generator checks, and [Enter] refuses a description past it.
 	Required []string
 	// Items names the multi-valued members, whose child elements are the
-	// items of one list: the n-th child element of such a name is the item
-	// at position n-1 in the canonical-JSON form of the instance.
+	// items of one list: the n-th child element of such a name that the
+	// decoder reads is the item at position n-1 in the canonical-JSON form of
+	// the instance. A child of that local name the decoder skips, one in a
+	// foreign namespace, is no item.
 	Items []string
 }
 
@@ -158,7 +160,15 @@ func (t *Tracker) closing(n int) {
 		}
 	}
 	p := &t.open[n-2]
-	if p.class == nil || f.unread {
+	if p.class == nil {
+		return
+	}
+	if f.unread {
+		// A skipped child named like a list member is no item of it, so it
+		// moves the positions of the items after it ([Tracker.token]).
+		if i := slices.Index(p.class.Items, f.name); i >= 0 {
+			p.skip(i, len(p.class.Items))
+		}
 		return
 	}
 	if f.nilled || (f.primitive && !f.hasText) {
@@ -250,8 +260,8 @@ func (p heldPointer) String() string {
 
 // pointerToken is the part of a JSON Pointer one element below the root
 // gives: its local name, then its key when it is one entry of a Hash member,
-// or else its 0-based position among its same-named siblings when it is one
-// item of a multi-valued member.
+// or else its 0-based position among the same-named siblings the decoder
+// read when it is one item of a multi-valued member.
 type pointerToken struct {
 	name  string
 	key   func() string // the entry's key, read when the token is written; nil for no entry
@@ -259,11 +269,15 @@ type pointerToken struct {
 }
 
 // token returns the token of the element whose frame is t.open[k], k >= 2.
+// An item's position is its position in the document less the earlier
+// siblings of its name the decoder skipped, every one of which has closed.
 func (t *Tracker) token(k int) pointerToken {
 	f := &t.open[k]
 	tk := pointerToken{name: f.name, key: f.key, index: -1}
-	if p := &t.open[k-1]; f.key == nil && p.class != nil && slices.Contains(p.class.Items, f.name) {
-		tk.index = f.pos - 1
+	if p := &t.open[k-1]; f.key == nil && p.class != nil {
+		if i := slices.Index(p.class.Items, f.name); i >= 0 {
+			tk.index = f.pos - 1 - p.skippedAt(i)
+		}
 	}
 	return tk
 }

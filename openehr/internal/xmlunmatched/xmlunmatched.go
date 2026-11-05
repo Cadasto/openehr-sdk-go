@@ -239,7 +239,8 @@ type Tracker struct {
 // members it has a value for, what the element carries: `xsi:nil`, text
 // other than whitespace, and whether a decoder read it as a primitive, and,
 // for one entry of a Hash member, how to read its key. It also marks an
-// element the decoder skipped or dropped, which is no member.
+// element the decoder skipped or dropped, which is no member, and counts the
+// children it skipped that are named like one of its class's list members.
 //
 // The child counts sit in a short slice while the element has opened children
 // of few names, which is the canonical shape and costs no map. Once it opens
@@ -259,6 +260,11 @@ type frame struct {
 	hasText       bool   // the element holds text other than XML whitespace
 	primitive     bool   // a decoder read the element's text as its value
 	unread        bool   // the decoder skipped or dropped the element: it is no member of its parent
+	// skipped counts, for each member class.Items lists, the children of its
+	// name the decoder skipped, which are no items of it ([Tracker.closing]);
+	// empty until the first. It holds no more counts than the class lists
+	// members, whatever the document skips.
+	skipped []int
 	// key reads the key of the element when it is one entry of a Hash member,
 	// so the members inside it are named under the key; nil otherwise.
 	key func() string
@@ -279,7 +285,26 @@ const linearChildNames = 8
 // element is dropped rather than cleared, so a later narrow element never pays
 // for it.
 func (f *frame) open(local string, pos int) {
-	*f = frame{name: local, pos: pos, children: f.children[:0]}
+	*f = frame{name: local, pos: pos, children: f.children[:0], skipped: f.skipped[:0]}
+}
+
+// skip notes one more skipped child named like the i-th of the n members
+// the element's class lists in Items ([frame.skipped]).
+func (f *frame) skip(i, n int) {
+	if len(f.skipped) == 0 {
+		f.skipped = append(f.skipped[:0], make([]int, n)...)
+	}
+	f.skipped[i]++
+}
+
+// skippedAt returns how many children named like the i-th member the
+// element's class lists in Items the decoder has skipped so far
+// ([frame.skipped]).
+func (f *frame) skippedAt(i int) int {
+	if i < len(f.skipped) {
+		return f.skipped[i]
+	}
+	return 0
 }
 
 // nameCount is how many children of one local name an element has opened.

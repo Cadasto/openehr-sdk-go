@@ -229,7 +229,8 @@
 // "/content/0/data/events/0/data/items/0/value/magnitude": the attribute's
 // name under the pointer of the element that lacks it, each child element
 // of a multi-valued attribute by its position among its same-named
-// siblings, counted from 0, and each entry of a `Hash` by its key, such as
+// siblings, counted from 0, one in a foreign namespace counting for none,
+// and each entry of a `Hash` by its key, such as
 // "/description/details/en/purpose". That is not the element path
 // [WithUnmatched] reports: a missing member is a member of the instance, not
 // an item of the document, so both codecs name it one way and a consumer of

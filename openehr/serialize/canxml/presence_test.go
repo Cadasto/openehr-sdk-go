@@ -155,6 +155,19 @@ func presenceRows() []presenceRow {
 			missing: []string{"/language"},
 		},
 		{
+			// An element in a foreign namespace named like a list member is no
+			// item of it: the items after it keep the positions canonical JSON
+			// gives them, the next one and one inside a later item alike.
+			name: "a foreign element before a list item",
+			edits: map[string]string{
+				mxItems + "1": `<x:items xmlns:x="urn:example:ext"/>` +
+					`<items xsi:type="ELEMENT" archetype_node_id="at0005"><name><value>count</value></name><value xsi:type="DV_COUNT"><magnitude></magnitude></value></items>`,
+				pxInner: `<items xsi:type="ELEMENT" archetype_node_id="at0012"><name><value></value></name></items>`,
+			},
+			want:    []sent{sentEmpty(mxItems + "1/value/magnitude"), sentEmpty(pxInner + "/name/value")},
+			missing: []string{mxItems + "1/value/magnitude", pxInner + "/name/value"},
+		},
+		{
 			// An unknown element is unmatched content, nothing inside it is a
 			// member.
 			name:  "an unknown empty element",
@@ -338,6 +351,31 @@ func TestREQ175_XMLPresenceDecoderReportsPerValue(t *testing.T) {
 	}
 	if err := dec.Decode(new(rm.DVText)); !errors.Is(err, io.EOF) {
 		t.Errorf("Decode(past the end) = %v; want io.EOF", err)
+	}
+}
+
+// TestREQ175_XMLPresenceDecoderListPositionsPerValue pins that a Decoder
+// counts the items of a list afresh in each value: an element in a foreign
+// namespace before the first value's item moves no position, in that value or
+// the next.
+func TestREQ175_XMLPresenceDecoderListPositionsPerValue(t *testing.T) {
+	const item = `<items xsi:type="ELEMENT"><value xsi:type="DV_TEXT"><value/></value></items>`
+	stream := `<cluster ` + ucNS + `><x:items xmlns:x="urn:example:ext"/>` + item + `</cluster>` +
+		`<cluster ` + ucNS + `>` + item + `</cluster>`
+	var got []sent
+	dec := canxml.NewDecoder(strings.NewReader(stream), canxml.WithPresence(func(p string, s canxml.Presence) { got = append(got, sent{p, s}) }))
+	for i := range 2 {
+		got = nil
+		var v rm.Cluster
+		if err := dec.Decode(&v); err != nil {
+			t.Fatalf("Decode(value %d) = %v; want nil", i, err)
+		}
+		if len(v.Items) != 1 {
+			t.Fatalf("Decode(value %d) decoded %d items; want 1", i, len(v.Items))
+		}
+		if want := []sent{sentEmpty("/items/0/value/value")}; !slices.Equal(got, want) {
+			t.Errorf("Decoder reported %v for value %d; want %v, the position the item has in the decoded list", got, i, want)
+		}
 	}
 }
 
