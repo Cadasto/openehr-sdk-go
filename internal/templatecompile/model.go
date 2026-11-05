@@ -9,6 +9,7 @@ package templatecompile
 import (
 	"fmt"
 	"maps"
+	"math"
 	"slices"
 	"strings"
 
@@ -289,7 +290,9 @@ func fixedValueString(o aom14.CObject) string {
 
 // multiplicityOf returns the interval iv closed into a Multiplicity, as
 // [template.NewMultiplicity] closes it, or nil when iv is nil or the zero
-// interval.
+// interval. It returns an error for an excluded end on a bounded side whose
+// closed end the model's 32-bit Integer cannot hold, on every platform,
+// where NewMultiplicity refuses only a closed end Go's int cannot hold.
 //
 // The model holds each interval by value, so an interval the template leaves
 // out reads as the zero interval, as an absent definition reads as the zero
@@ -301,6 +304,15 @@ func fixedValueString(o aom14.CObject) string {
 func multiplicityOf(iv *rm.Interval[aom14.Integer]) (*template.Multiplicity, error) {
 	if iv == nil || *iv == (rm.Interval[aom14.Integer]{}) {
 		return nil, nil
+	}
+	// The closed end of ">2147483647" or "<-2147483648" is outside the
+	// Integer range, so the result would depend on the width of int: kept
+	// on a 64-bit build, refused on a 32-bit one. Refuse it on both.
+	if !iv.LowerUnbounded && !iv.LowerIncluded && iv.Lower == math.MaxInt32 {
+		return nil, fmt.Errorf("closed lower bound overflows the 32-bit Integer: excluded lower=%d", iv.Lower)
+	}
+	if !iv.UpperUnbounded && !iv.UpperIncluded && iv.Upper == math.MinInt32 {
+		return nil, fmt.Errorf("closed upper bound overflows the 32-bit Integer: excluded upper=%d", iv.Upper)
 	}
 	return template.NewMultiplicity(template.IntervalBounds{
 		Lower:          int(iv.Lower),
