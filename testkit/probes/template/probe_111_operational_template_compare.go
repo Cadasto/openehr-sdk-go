@@ -52,7 +52,7 @@ func probe111CompareDocuments(input, reEncoded []byte) (string, error) {
 	probe111Rewrite(in)
 	probe111Normalise(in, true)
 	probe111Normalise(out, true)
-	return probe111Diff(in, out, "/"+in.name.Local+"[1]"), nil
+	return probe111Diff(in, out, "/"+in.name.Local+"[1]", nil, nil), nil
 }
 
 // probe111Parse reads doc into elements, keeping the namespace declarations
@@ -417,17 +417,84 @@ var probe111Decimal = regexp.MustCompile(`^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)
 // probe111Booleans maps each literal of an XML Schema boolean to its value.
 var probe111Booleans = map[string]bool{"true": true, "1": true, "false": false, "0": false}
 
+// probe111ValueNames are the elements whose every declaration with simple
+// content in the pinned ITS-XML schemas (AM Release-1.4, RM Release-1.1.0,
+// BASE Release-1.2.0) is a number or a boolean. `magnitude`, `precision` and
+// `accuracy` are among them: they are otherwise an interval or a duration,
+// with element content.
+var probe111ValueNames = map[string]bool{
+	"accuracy": true, "accuracy_is_percent": true, "all_contributions": true, "denominator": true,
+	"extract_version_count": true, "false_valid": true, "include_all_versions": true, "includes_data": true,
+	"includes_multimedia": true, "includes_revision_history": true, "includes_versions": true, "is_changed": true,
+	"is_controlled": true, "is_masked": true, "is_modifiable": true, "is_ordered": true, "is_pending": true,
+	"is_primary": true, "is_queryable": true, "is_terminal": true, "is_unique": true, "link_depth": true,
+	"list_open": true, "lower_included": true, "lower_unbounded": true, "magnitude": true, "match_negated": true,
+	"numerator": true, "persist_in_server": true, "precedence_overridden": true, "precision": true, "priority": true,
+	"sample_count": true, "sequence_nr": true, "size": true, "total_version_count": true, "true_valid": true,
+	"upper_included": true, "upper_unbounded": true, "urgency": true,
+}
+
+// probe111ByValue reports whether the comparison reads the text of el, a
+// child of parent, itself a child of grand (each nil at the root), as a
+// number or a boolean: a name of [probe111ValueNames]; a bound of an interval
+// of integers or reals, which `occurrences`, `existence`, `interval`,
+// `magnitude` and `precision` are, and so is the `range` of a C_INTEGER or a
+// C_REAL; a `list` item or the `assumed_value` of a C_INTEGER, C_REAL or
+// C_BOOLEAN; or the `value` of a `list` item or `assumed_value` of a
+// C_DV_ORDINAL or C_DV_SCALE. Every other text, a string's among them, must
+// come back as written.
+func probe111ByValue(grand, parent, el *probe111Element) bool {
+	name := el.name.Local
+	if probe111ValueNames[name] {
+		return true
+	}
+	if parent == nil {
+		return false
+	}
+	switch name {
+	case "lower", "upper":
+		switch parent.name.Local {
+		case "occurrences", "existence", "interval", "magnitude", "precision":
+			return true
+		case "range":
+			return grand != nil && probe111TypeIs(grand, "C_INTEGER", "C_REAL")
+		}
+	case "list", "assumed_value":
+		return probe111TypeIs(parent, "C_INTEGER", "C_REAL", "C_BOOLEAN")
+	case "value":
+		return (parent.name.Local == "list" || parent.name.Local == "assumed_value") &&
+			grand != nil && probe111TypeIs(grand, "C_DV_ORDINAL", "C_DV_SCALE")
+	}
+	return false
+}
+
+// probe111TypeIs reports whether the `xsi:type` of el names one of classes,
+// whatever its namespace.
+func probe111TypeIs(el *probe111Element, classes ...string) bool {
+	t := el.attrs[probe111XSIType]
+	if _, local, ok := strings.Cut(t, "}"); ok {
+		t = local
+	} else if _, local, ok := strings.Cut(t, ":"); ok {
+		t = local
+	}
+	return slices.Contains(classes, t)
+}
+
 // probe111SameText reports whether in, the input's text, and out, the
-// re-encoded text, are equal, or both numbers of the same value, or both
-// booleans of the same value. A number or a boolean is read as XML Schema
-// reads it, its white space collapsed, so `true` followed by a line break and
-// indentation is `true`. out is a boolean when it is `true` or `false`, the
-// only form the encoder writes a boolean in and never the form of a number;
-// in is then read as a boolean in any of its literals, so `1` is `true` and
-// `0` is `false`.
-func probe111SameText(in, out string) bool {
+// re-encoded text, are equal, or, when byValue is set, both numbers of the
+// same value or both booleans of the same value. A number or a boolean is read
+// as XML Schema reads it, its white space collapsed, so `true` followed by a
+// line break and indentation is `true`. out is a boolean when it is `true` or
+// `false`, the only form the encoder writes a boolean in and never the form of
+// a number; in is then read as a boolean in any of its literals, so `1` is
+// `true` and `0` is `false`. Without byValue the text must be equal, so a
+// string `1.0` re-encoded as `1` differs.
+func probe111SameText(in, out string, byValue bool) bool {
 	if in == out {
 		return true
+	}
+	if !byValue {
+		return false
 	}
 	ta, tb := strings.Trim(in, probe111XMLWhiteSpace), strings.Trim(out, probe111XMLWhiteSpace)
 	if tb == "true" || tb == "false" {
@@ -444,12 +511,13 @@ func probe111SameText(in, out string) bool {
 }
 
 // probe111Diff returns the first difference between in and out, the
-// element at path here; "" when they agree. An `xsi:type` on in that out
+// element at path here, a child of parent, itself a child of grand (each nil
+// at the root); "" when they agree. An `xsi:type` on in that out
 // carries none is set aside: the encoder writes no `xsi:type` where the
 // element's slot holds a single class, so a redundant one the input wrote is
 // no lost content (REQ-176 § Round trip). An `xsi:type` out carries with
 // another value, or one out adds, still differs.
-func probe111Diff(in, out *probe111Element, here string) string {
+func probe111Diff(in, out *probe111Element, here string, parent, grand *probe111Element) string {
 	if in.name != out.name {
 		return fmt.Sprintf("%s: the re-encoded document has %s there", here, out.name.Local)
 	}
@@ -482,7 +550,7 @@ func probe111Diff(in, out *probe111Element, here string) string {
 			return fmt.Sprintf("%s/@%s: %s, re-encoded as %s", here, n.Local, probe111Quote(iv), probe111Quote(ov))
 		}
 	}
-	if !probe111SameText(in.text, out.text) {
+	if !probe111SameText(in.text, out.text, probe111ByValue(grand, parent, in)) {
 		return fmt.Sprintf("%s: text %s, re-encoded as %s", here, probe111Quote(in.text), probe111Quote(out.text))
 	}
 	seen := map[string]int{}
@@ -496,7 +564,7 @@ func probe111Diff(in, out *probe111Element, here string) string {
 		}
 		c := in.children[i]
 		seen[c.name.Local]++
-		if d := probe111Diff(c, out.children[i], fmt.Sprintf("%s/%s[%d]", here, c.name.Local, seen[c.name.Local])); d != "" {
+		if d := probe111Diff(c, out.children[i], fmt.Sprintf("%s/%s[%d]", here, c.name.Local, seen[c.name.Local]), in, parent); d != "" {
 			return d
 		}
 	}

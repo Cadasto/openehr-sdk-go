@@ -28,14 +28,16 @@ var xmlClassArchetypeOntology = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *ArchetypeOntology) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassArchetypeOntology); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassArchetypeOntology); _err != nil {
 		return _err
-	} else if _fresh {
-		*a = ArchetypeOntology{}
 	}
+	// Whether the element has had an item of each list member.
+	var _begunTermDefinitions, _begunConstraintDefinitions, _begunTermBindings, _begunConstraintBindings bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -49,11 +51,19 @@ func (a *ArchetypeOntology) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
 				}
+				if !_begunTermDefinitions {
+					_begunTermDefinitions = true
+					a.TermDefinitions = nil
+				}
 				a.TermDefinitions = append(a.TermDefinitions, _v)
 			case "constraint_definitions":
 				var _v CodeDefinitionSet
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
+				}
+				if !_begunConstraintDefinitions {
+					_begunConstraintDefinitions = true
+					a.ConstraintDefinitions = nil
 				}
 				a.ConstraintDefinitions = append(a.ConstraintDefinitions, _v)
 			case "term_bindings":
@@ -61,11 +71,19 @@ func (a *ArchetypeOntology) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
 				}
+				if !_begunTermBindings {
+					_begunTermBindings = true
+					a.TermBindings = nil
+				}
 				a.TermBindings = append(a.TermBindings, _v)
 			case "constraint_bindings":
 				var _v ConstraintBindingSet
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
+				}
+				if !_begunConstraintBindings {
+					_begunConstraintBindings = true
+					a.ConstraintBindings = nil
 				}
 				a.ConstraintBindings = append(a.ConstraintBindings, _v)
 			default:
@@ -104,10 +122,8 @@ var xmlClassArchetypeTerm = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *ArchetypeTerm) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassArchetypeTerm); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassArchetypeTerm); _err != nil {
 		return _err
-	} else if _fresh {
-		*a = ArchetypeTerm{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "code" && _a.Name.Space == "" {
@@ -178,15 +194,15 @@ var xmlClassCodeDefinitionSet = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CodeDefinitionSet) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassCodeDefinitionSet); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassCodeDefinitionSet); _err != nil {
 		return _err
-	} else if _fresh {
-		*c = CodeDefinitionSet{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "language" && _a.Name.Space == "" {
@@ -196,6 +212,8 @@ func (c *CodeDefinitionSet) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunItems bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -225,6 +243,10 @@ func (c *CodeDefinitionSet) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 				var _v ArchetypeTerm
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
+				}
+				if !_begunItems {
+					_begunItems = true
+					c.Items = nil
 				}
 				c.Items = append(c.Items, _v)
 			default:
@@ -261,10 +283,8 @@ var xmlClassConstraintBindingItem = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *ConstraintBindingItem) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassConstraintBindingItem); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassConstraintBindingItem); _err != nil {
 		return _err
-	} else if _fresh {
-		*c = ConstraintBindingItem{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "code" && _a.Name.Space == "" {
@@ -346,15 +366,15 @@ var xmlClassConstraintBindingSet = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *ConstraintBindingSet) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassConstraintBindingSet); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassConstraintBindingSet); _err != nil {
 		return _err
-	} else if _fresh {
-		*c = ConstraintBindingSet{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "terminology" && _a.Name.Space == "" {
@@ -364,6 +384,8 @@ func (c *ConstraintBindingSet) UnmarshalXML(_dec *xml.Decoder, _start xml.StartE
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunItems bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -393,6 +415,10 @@ func (c *ConstraintBindingSet) UnmarshalXML(_dec *xml.Decoder, _start xml.StartE
 				var _v ConstraintBindingItem
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
+				}
+				if !_begunItems {
+					_begunItems = true
+					c.Items = nil
 				}
 				c.Items = append(c.Items, _v)
 			default:
@@ -429,10 +455,8 @@ var xmlClassTermBindingItem = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TermBindingItem) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassTermBindingItem); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassTermBindingItem); _err != nil {
 		return _err
-	} else if _fresh {
-		*t = TermBindingItem{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "code" && _a.Name.Space == "" {
@@ -514,15 +538,15 @@ var xmlClassTermBindingSet = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TermBindingSet) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassTermBindingSet); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassTermBindingSet); _err != nil {
 		return _err
-	} else if _fresh {
-		*t = TermBindingSet{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "terminology" && _a.Name.Space == "" {
@@ -532,6 +556,8 @@ func (t *TermBindingSet) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunItems bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -561,6 +587,10 @@ func (t *TermBindingSet) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement
 				var _v TermBindingItem
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
+				}
+				if !_begunItems {
+					_begunItems = true
+					t.Items = nil
 				}
 				t.Items = append(t.Items, _v)
 			default:

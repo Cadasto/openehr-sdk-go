@@ -243,6 +243,33 @@ func TestREQ176_REQ111_ReadOperationalTemplateHoldsContentAfterTheRoot(t *testin
 	}
 }
 
+// TestREQ176_REQ056_ReadOperationalTemplateRefusesAnXMLTargetInsideTheRoot
+// pins that a processing instruction whose target is xml, in any letter case,
+// inside the root element is refused in both modes, as a canonical-XML decode
+// given any option refuses it, with an error wrapping canxml.ErrInvalidShape
+// that carries none of it; a target that only starts with xml passes. The
+// default mode reads past one before or after the root alone.
+func TestREQ176_REQ056_ReadOperationalTemplateRefusesAnXMLTargetInsideTheRoot(t *testing.T) {
+	t.Parallel()
+	const planted = "PLANTED"
+	refused := map[string]string{
+		"an XML declaration":        `<?xml version="1.0" extra="` + planted + `"?>`,
+		"an xml target in capitals": `<?XML ` + planted + `?>`,
+	}
+	for mode, opts := range readModes {
+		for name, pi := range refused {
+			t.Run(mode+"/refused/"+name, func(t *testing.T) {
+				t.Parallel()
+				refusesContentOutsideTheRoot(t, readTemplateHead+pi+`</template>`, planted, opts...)
+			})
+		}
+		t.Run(mode+"/accepted/a target that starts with xml", func(t *testing.T) {
+			t.Parallel()
+			readsTemplateT(t, readTemplateHead+`<?xml-stylesheet href="a.xsl"?></template>`, opts...)
+		})
+	}
+}
+
 // TestREQ176_REQ111_ReadOperationalTemplateHoldsContentBeforeTheRoot pins
 // what the reader reads before the root element. In every mode the XML
 // declaration, comments, processing instructions, whitespace and one document
@@ -271,6 +298,7 @@ func TestREQ176_REQ111_ReadOperationalTemplateHoldsContentBeforeTheRoot(t *testi
 		"a second XML declaration":    `<?xml version="1.0"?><?xml version="1.0" extra="` + planted + `"?>`,
 		"a misplaced XML declaration": `<!-- note --><?xml version="1.0"?>`,
 		"an xml target in capitals":   `<?XML ` + planted + `?>`,
+		"an xml target in the subset": `<!DOCTYPE template [<?xml ` + planted + `?>]>`,
 	}
 	accepted := map[string]string{
 		"nothing":                       "",

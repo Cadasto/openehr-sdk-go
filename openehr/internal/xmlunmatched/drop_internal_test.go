@@ -28,7 +28,7 @@ type flagged struct {
 var flaggedClass = &Class{Name: "FLAGGED"}
 
 func (f *flagged) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error {
-	if _, err := Enter(dec, start, flaggedClass); err != nil {
+	if err := Enter(dec, start, flaggedClass); err != nil {
 		return err
 	}
 	for {

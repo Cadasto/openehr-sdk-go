@@ -23,8 +23,8 @@ import (
 // start; comments, processing instructions and whitespace may follow the
 // root, as XML allows. XML reserves the processing instruction target xml,
 // in any letter case, for the XML declaration, which comes first: one
-// elsewhere before or after the root, a second declaration among them, is
-// refused. Anything else before or after the root, such as an element or
+// elsewhere, before, inside or after the root, a second declaration among
+// them, is refused. Anything else before or after the root, such as an element or
 // text other than whitespace, is not well-formed XML, and the decode refuses
 // it whatever t's policy: it is malformed input, not unmatched content. The
 // error wraps [ErrInvalidShape] and carries none of that content. A root that
@@ -42,8 +42,10 @@ import (
 // element, which an `xsi:type` written with a prefix needs ([LookupPrefix]).
 // An untracked one sees only those its element declares itself; when an
 // `xsi:type` needs another ([UnresolvedPrefix]), it decodes data a second
-// time, through a decoder that sees them all, into v cleared to its zero
-// value, so that only a document with such a value pays for the second
+// time, through a decoder that sees them all, so that only a document with
+// such a value pays for the second decode. The second decode reads into v as
+// the first left it: each member it decodes replaces what v held, a list from
+// its first item, so v keeps what the document leaves out, as after one
 // decode.
 func Unmarshal(data []byte, v any, t *Tracker) error {
 	if err := checkProlog(data); err != nil {
@@ -57,7 +59,16 @@ func Unmarshal(data []byte, v any, t *Tracker) error {
 			}
 			return err
 		}
-		return end(dec)
+		if err := end(dec); err != nil {
+			return err
+		}
+		if xmlTargetPastStart(data) {
+			// Only a tracked decode sees the processing instructions inside
+			// the root, so a document that may hold one whose target is xml
+			// is decoded again through one, which refuses it.
+			return decodeAgain(data, v, errXMLTargetInside)
+		}
+		return nil
 	}
 	dec := t.NewDecoder(bytes.NewReader(data))
 	if err := t.Decode(dec, v); err != nil {
@@ -69,20 +80,23 @@ func Unmarshal(data []byte, v any, t *Tracker) error {
 // decodeAgain decodes data into v once more after an untracked decode failed
 // with err: a primitive failure that names the element alone, an `xsi:type`
 // whose prefix the decode could not resolve, or encoding/xml's refusal of an
-// element nested past its own depth limit, which names no element. The second
-// decode reads through a tracker that follows the open elements and their
-// namespace scope and applies no policy. A primitive failure fails again at
-// the same element, named by its path from the root of the value, and so does
-// a depth refusal, since a tracked decode refuses every element an untracked
-// one hands to encoding/xml past its limit, a primitive element too
-// ([Tracker.decodeText]). A prefix resolves, and the decode reads on to the
-// end: so that it does not add to what the first decode left in v, such as the
-// items of a list, the root's decoder clears v before it reads ([Enter]). It
-// returns what the second decode returns, or err should a primitive failure
-// not fail again.
+// element nested past its own depth limit, which names no element; or after
+// one that succeeded on data that may hold a processing instruction whose
+// target is xml inside its root, which err is then [errXMLTargetInside] for.
+// The second decode reads through a tracker that follows the open elements
+// and their namespace scope and applies no policy, into v as the first left
+// it: each member it decodes replaces what v held, a list from its first
+// item, so v keeps what the document leaves out, as after one decode. A
+// primitive failure fails again at the same element, named by its path from
+// the root of the value, and so does a depth refusal, since a tracked decode
+// refuses every element an untracked one hands to encoding/xml past its
+// limit, a primitive element too ([Tracker.decodeText]). A prefix resolves,
+// and the decode reads on to the end, as it does past a processing
+// instruction it finds to be no such one, or refuses one that is. It returns
+// what the second decode returns, or err should a primitive failure not fail
+// again.
 func decodeAgain(data []byte, v any, err error) error {
 	t := NewTracker(nil, false)
-	t.again = IsUnresolvedPrefix(err)
 	dec := t.NewDecoder(bytes.NewReader(data))
 	if again := t.Decode(dec, v); again != nil {
 		return again
@@ -138,7 +152,8 @@ var utf8BOM = []byte("\ufeff")
 // instructions, comments, whitespace and one document type declaration
 // pass. Anything else, other text or markup, a second document type
 // declaration, an end element, or a processing instruction whose target is
-// xml in any letter case other than the XML declaration, is refused: the
+// xml in any letter case other than the XML declaration, in the internal
+// subset of the document type declaration too, is refused: the
 // error wraps [ErrInvalidShape] and names none of it. The XML declaration is
 // a processing instruction whose target is xml, in lower case, that only
 // whitespace comes before. A token encoding/xml cannot read,
@@ -252,8 +267,9 @@ func prolog(d *xml.Decoder, untilRoot bool) error {
 
 // beforeRoot reports whether tok may come before the root element: a
 // comment, whitespace, the first document type declaration, which it records
-// in doctype, or a processing instruction other than one whose target is xml
-// in any letter case, unless that is the XML declaration, at the start.
+// in doctype, unless it holds a processing instruction whose target is xml
+// ([holdsXMLTarget]), or a processing instruction other than one whose target
+// is xml in any letter case, unless that is the XML declaration, at the start.
 func beforeRoot(tok xml.Token, doctype *bool, start bool) bool {
 	switch t := tok.(type) {
 	case xml.Comment:
@@ -263,7 +279,7 @@ func beforeRoot(tok xml.Token, doctype *bool, start bool) bool {
 	case xml.CharData:
 		return isXMLSpace(t)
 	case xml.Directive:
-		if !*doctype && isDoctype(t) {
+		if !*doctype && isDoctype(t) && !holdsXMLTarget(t) {
 			*doctype = true
 			return true
 		}
@@ -279,6 +295,60 @@ func rootFirst(data []byte) bool {
 	head := bytes.TrimLeft(data, " \t\r\n")
 	return len(head) > 1 && head[0] == '<' && head[1] != '?' && head[1] != '!' && head[1] != '/'
 }
+
+// xmlTargetPastStart reports whether data, one document, may hold a
+// processing instruction whose target is xml anywhere but at its start, after
+// a byte order mark and XML whitespace, where the XML declaration stands
+// ([opensXMLTarget]). A comment or a CDATA section can hold those bytes too,
+// which only a decode tells apart. It costs one search of data for `<?`.
+func xmlTargetPastStart(data []byte) bool {
+	data = bytes.TrimLeft(bytes.TrimPrefix(data, utf8BOM), " \t\r\n")
+	for at := 1; at < len(data); at += len(piOpen) {
+		i := bytes.Index(data[at:], piOpen)
+		if i < 0 {
+			return false
+		}
+		at += i
+		if opensXMLTarget(data[at:]) {
+			return true
+		}
+	}
+	return false
+}
+
+// opensXMLTarget reports whether b opens with a processing instruction whose
+// target is xml in any letter case: `<?`, those letters, and XML whitespace
+// or `?`.
+func opensXMLTarget(b []byte) bool {
+	const n = len("<?xml")
+	return len(b) > n && bytes.HasPrefix(b, piOpen) && bytes.EqualFold(b[len(piOpen):n], xmlTarget) && (b[n] == '?' || isXMLSpace(b[n:n+1]))
+}
+
+// holdsXMLTarget reports whether d, the text of a `<!…>` directive, holds a
+// processing instruction whose target is xml outside its quoted literals,
+// such as one in the internal subset of a document type declaration, which
+// XML does not allow there either. encoding/xml puts a space in place of each
+// comment a directive holds.
+func holdsXMLTarget(d xml.Directive) bool {
+	var quote byte
+	for i, b := range d {
+		switch {
+		case quote != 0:
+			if b == quote {
+				quote = 0
+			}
+		case b == '"' || b == '\'':
+			quote = b
+		case b == '<' && opensXMLTarget(d[i:]):
+			return true
+		}
+	}
+	return false
+}
+
+// piOpen opens a processing instruction, and xmlTarget is the target XML
+// reserves for its declaration ([opensXMLTarget]).
+var piOpen, xmlTarget = []byte("<?"), []byte("xml")
 
 // isXMLTarget reports whether target, a processing instruction's, is xml in
 // any letter case, which XML reserves for the XML declaration

@@ -28,18 +28,20 @@ var xmlClassDVDate = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVDate); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVDate); _err != nil {
 		return _err
-	} else if _fresh {
-		*d = DVDate{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunOtherReferenceRanges bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -131,6 +133,10 @@ func (d *DVDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 				var _v ReferenceRange[DVOrdered]
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
+				}
+				if !_begunOtherReferenceRanges {
+					_begunOtherReferenceRanges = true
+					d.OtherReferenceRanges = nil
 				}
 				d.OtherReferenceRanges = append(d.OtherReferenceRanges, _v)
 			case "value":
@@ -179,18 +185,20 @@ var xmlClassDVDateTime = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVDateTime); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVDateTime); _err != nil {
 		return _err
-	} else if _fresh {
-		*d = DVDateTime{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunOtherReferenceRanges bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -283,6 +291,10 @@ func (d *DVDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
 				}
+				if !_begunOtherReferenceRanges {
+					_begunOtherReferenceRanges = true
+					d.OtherReferenceRanges = nil
+				}
 				d.OtherReferenceRanges = append(d.OtherReferenceRanges, _v)
 			case "value":
 				if _got&(1<<4) != 0 {
@@ -330,18 +342,20 @@ var xmlClassDVDuration = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVDuration); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVDuration); _err != nil {
 		return _err
-	} else if _fresh {
-		*d = DVDuration{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunOtherReferenceRanges bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -459,6 +473,10 @@ func (d *DVDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
 				}
+				if !_begunOtherReferenceRanges {
+					_begunOtherReferenceRanges = true
+					d.OtherReferenceRanges = nil
+				}
 				d.OtherReferenceRanges = append(d.OtherReferenceRanges, _v)
 			case "value":
 				if _got&(1<<5) != 0 {
@@ -506,18 +524,20 @@ var xmlClassDVTime = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVTime); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVTime); _err != nil {
 		return _err
-	} else if _fresh {
-		*d = DVTime{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunOtherReferenceRanges bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -609,6 +629,10 @@ func (d *DVTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 				var _v ReferenceRange[DVOrdered]
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
+				}
+				if !_begunOtherReferenceRanges {
+					_begunOtherReferenceRanges = true
+					d.OtherReferenceRanges = nil
 				}
 				d.OtherReferenceRanges = append(d.OtherReferenceRanges, _v)
 			case "value":

@@ -384,14 +384,17 @@ func nestedConstraints(levels int) []byte {
 // CLUSTER items and an operational template's constraint objects nest that
 // deep, and so does a tree whose only element past the limit is the text of a
 // DV_TEXT, a primitive element, which a tracked decode converts through a
-// decoder of its own.
+// decoder of its own, and an AOM 1.4 ORDINAL symbol, whose shape a decode
+// given no option chooses by reading the element ahead.
 //
 // Can-fail control: let a decode return encoding/xml's error as it comes, and
 // the error wraps no sentinel and names every slot it passed through, 330 044
 // bytes for the items and 469 950 for the template; let a tracked decode
 // convert a primitive element's text without checking its depth, and the
 // modes that track the decode, and Unmarshal given no option, which decodes
-// the document again through a tracker, decode the primitive tree.
+// the document again through a tracker, decode the primitive tree; let a
+// decode given no option read the symbol ahead through a decoder of its own,
+// which counts depth from the symbol, and it decodes the symbol.
 func TestREQ108_XMLRefusesPastEncodingXMLsDepthLimit(t *testing.T) {
 	items := nestedClusters(xmlDepth+8, "")
 	// The DV_TEXT is at depth 10 000 and its text, the first element past the
@@ -404,6 +407,12 @@ func TestREQ108_XMLRefusesPastEncodingXMLsDepthLimit(t *testing.T) {
 	template := nestedConstraints(5008)
 	templateCut := "/template[1]/definition[1]" + strings.Repeat("/attributes[1]/children[1]", 3) +
 		"/..." + strings.Repeat("/children[1]/attributes[1]", 4)
+	// The innermost purpose is at depth 10 000 and its value, the first
+	// element past the limit, one deeper, below the ORDINAL's symbol, whose
+	// first child chooses its shape.
+	symbol := symbolPastXMLDepth()
+	symbolCut := "/ordinal[1]/symbol[1]" + strings.Repeat("/mappings[1]/purpose[1]", 3) +
+		"/.../purpose[1]" + strings.Repeat("/mappings[1]/purpose[1]", 3) + "/value[1]"
 	for _, limit := range []struct {
 		name string
 		opt  canxml.DecoderOption
@@ -416,8 +425,28 @@ func TestREQ108_XMLRefusesPastEncodingXMLsDepthLimit(t *testing.T) {
 			checkDepthRefusal(t, mode+", items", decode(items, new(rm.ItemTree)), cutClusterPath, xmlDepth+1, xmlDepth)
 			checkDepthRefusal(t, mode+", template", decode(template, new(aom14.OperationalTemplate)), templateCut, xmlDepth+1, xmlDepth)
 			checkDepthRefusal(t, mode+", primitive", decode(primitive, new(rm.ItemTree)), primitiveCut, xmlDepth+1, xmlDepth)
+			checkDepthRefusal(t, mode+", symbol", decode(symbol, new(aom14.Ordinal)), symbolCut, xmlDepth+1, xmlDepth)
 		}
 	}
+}
+
+// symbolPastXMLDepth returns an AOM 1.4 ORDINAL whose symbol, at depth 2,
+// takes the DV_CODED_TEXT shape and holds 4 999 mappings and purpose pairs,
+// each inside the one before: the innermost purpose is at depth 10 000 and
+// its value one deeper.
+func symbolPastXMLDepth() []byte {
+	const pairs = (xmlDepth - 2) / 2
+	var b strings.Builder
+	b.WriteString(`<ordinal ` + ucNS + `><value>1</value><symbol>`)
+	for range pairs {
+		b.WriteString(`<mappings><purpose>`)
+	}
+	b.WriteString(`<value>deep</value>`)
+	for range pairs {
+		b.WriteString(`</purpose></mappings>`)
+	}
+	b.WriteString(`</symbol></ordinal>`)
+	return []byte(b.String())
 }
 
 // primitivePastXMLDepth returns an ITEM_TREE whose only element past

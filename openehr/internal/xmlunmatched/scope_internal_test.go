@@ -8,7 +8,6 @@ package xmlunmatched
 import (
 	"encoding/xml"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 )
@@ -92,17 +91,17 @@ func TestREQ056_LookupPrefixResolvesInScope(t *testing.T) {
 // prefixedList reads as a generated decoder reads a class with a list member,
 // `item`, each item the namespace its `type` attribute's prefix is bound to,
 // which, like canxml's dispatch, it refuses with UnresolvedPrefix when the
-// decode cannot tell.
+// decode cannot tell. Like a generated decoder, it starts the list over at the
+// first item it reads.
 type prefixedList struct{ items []string }
 
 var prefixedListClass = &Class{Name: "PREFIXED_LIST", Items: []string{"item"}}
 
 func (l *prefixedList) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error {
-	if fresh, err := Enter(dec, start, prefixedListClass); err != nil {
+	if err := Enter(dec, start, prefixedListClass); err != nil {
 		return err
-	} else if fresh {
-		*l = prefixedList{}
 	}
+	begun := false
 	for {
 		tok, err := dec.Token()
 		if err != nil {
@@ -121,6 +120,10 @@ func (l *prefixedList) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) er
 			if !known {
 				return UnresolvedPrefix()
 			}
+			if !begun {
+				begun = true
+				l.items = nil
+			}
 			l.items = append(l.items, uri)
 			if err := dec.Skip(); err != nil {
 				return err
@@ -134,9 +137,10 @@ func (l *prefixedList) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) er
 // TestREQ056_UnmarshalDecodesAgainForUnresolvedPrefix pins the second decode
 // of an untracked Unmarshal that meets a prefix no element it can see
 // declares: it reads the document again through a decoder that keeps the
-// namespace scope, into the value cleared, so the value holds each item once,
-// as a tracked decode reads it; the first item, whose element declares its
-// prefix itself, the untracked decode read before it gave up.
+// namespace scope, into the value as the first decode left it, whose list
+// starts over at its first item, so the value holds each item once, as a
+// tracked decode reads it; the first item, whose element declares its prefix
+// itself, the untracked decode read before it gave up.
 func TestREQ056_UnmarshalDecodesAgainForUnresolvedPrefix(t *testing.T) {
 	const doc = `<list xmlns:r="urn:root"><item type="o:x" xmlns:o="urn:own"/><item type="r:x"/><item type="r:y"/></list>`
 	want := []string{"urn:own", "urn:root", "urn:root"}
@@ -147,67 +151,6 @@ func TestREQ056_UnmarshalDecodesAgainForUnresolvedPrefix(t *testing.T) {
 		}
 		if !slices.Equal(l.items, want) {
 			t.Errorf("Unmarshal(%s) items = %q; want %q", mode, l.items, want)
-		}
-	}
-}
-
-// freshProbe records, for every element it reads, the element's local name and
-// whether Enter tells its decoder to clear its receiver.
-type freshProbe struct{ got []string }
-
-var freshProbeClass = &Class{Name: "FRESH_PROBE"}
-
-func (p *freshProbe) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error {
-	fresh, err := Enter(dec, start, freshProbeClass)
-	if err != nil {
-		return err
-	}
-	p.got = append(p.got, start.Name.Local+" "+strconv.FormatBool(fresh))
-	for {
-		tok, err := dec.Token()
-		if err != nil {
-			return err
-		}
-		switch tk := tok.(type) {
-		case xml.StartElement:
-			if err := p.UnmarshalXML(dec, tk.Copy()); err != nil {
-				return err
-			}
-		case xml.EndElement:
-			return nil
-		}
-	}
-}
-
-// TestREQ056_ScopeDecodeAgainClearsTheRootOnly pins the second decode a Scope
-// runs of a stream value: Enter tells the decoder of the value's root element
-// to clear its receiver, and no other, and a Scope's decode of a value once,
-// before or after, tells none, even while another Scope decodes a value
-// again.
-func TestREQ056_ScopeDecodeAgainClearsTheRootOnly(t *testing.T) {
-	const stream = `<a><b><c/></b></a><a><b/></a><a/>`
-	var s Scope
-	dec := s.NewDecoder(strings.NewReader(stream))
-	steps := []struct {
-		name   string
-		decode func(*xml.Decoder, any) error
-		want   []string
-	}{
-		{"Decode", s.Decode, []string{"a false", "b false", "c false"}},
-		{"DecodeAgain", s.DecodeAgain, []string{"a true", "b false"}},
-		{"Decode after DecodeAgain, while another Scope decodes again", func(dec *xml.Decoder, v any) error {
-			rereading.Add(1)
-			defer rereading.Add(-1)
-			return s.Decode(dec, v)
-		}, []string{"a false"}},
-	}
-	for _, step := range steps {
-		var p freshProbe
-		if err := step.decode(dec, &p); err != nil {
-			t.Fatalf("%s: %v", step.name, err)
-		}
-		if !slices.Equal(p.got, step.want) {
-			t.Errorf("%s: Enter answered %q; want %q", step.name, p.got, step.want)
 		}
 	}
 }

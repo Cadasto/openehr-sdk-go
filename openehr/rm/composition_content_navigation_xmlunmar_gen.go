@@ -29,15 +29,15 @@ var xmlClassSection = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (s *Section) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassSection); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassSection); _err != nil {
 		return _err
-	} else if _fresh {
-		*s = Section{}
 	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "archetype_node_id" && _a.Name.Space == "" {
@@ -47,6 +47,8 @@ func (s *Section) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunLinks, _begunItems bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -115,6 +117,10 @@ func (s *Section) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
 				}
+				if !_begunLinks {
+					_begunLinks = true
+					s.Links = nil
+				}
 				s.Links = append(s.Links, _v)
 			case "archetype_details":
 				if _got&(1<<3) != 0 {
@@ -158,6 +164,10 @@ func (s *Section) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 				_v, _err := canxml.DecodeAs[ContentItem](_dec, _t)
 				if _err != nil {
 					return _err
+				}
+				if !_begunItems {
+					_begunItems = true
+					s.Items = nil
 				}
 				s.Items = append(s.Items, _v)
 			default:

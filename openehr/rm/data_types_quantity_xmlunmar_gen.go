@@ -28,18 +28,20 @@ var xmlClassDVCount = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVCount) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVCount); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVCount); _err != nil {
 		return _err
-	} else if _fresh {
-		*d = DVCount{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunOtherReferenceRanges bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -174,6 +176,10 @@ func (d *DVCount) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
 				}
+				if !_begunOtherReferenceRanges {
+					_begunOtherReferenceRanges = true
+					d.OtherReferenceRanges = nil
+				}
 				d.OtherReferenceRanges = append(d.OtherReferenceRanges, _v)
 			default:
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
@@ -219,10 +225,8 @@ var xmlClassDVInterval = xmlunmatched.Class{
 // An empty or whitespace-only flag element carries no boolean and reads as
 // a flag the document leaves out.
 func (d *DVInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVInterval); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVInterval); _err != nil {
 		return _err
-	} else if _fresh {
-		*d = DVInterval[T]{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -243,6 +247,12 @@ func (d *DVInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 					break
 				}
 				_got |= 1 << 0
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&d.Lower)
+					break
+				}
 				_v, _err := canxml.DecodeAs[T](_dec, _t)
 				if _err != nil {
 					return _err
@@ -257,6 +267,12 @@ func (d *DVInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 					break
 				}
 				_got |= 1 << 1
+				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
+					return _err
+				} else if _nil {
+					xmlunmatched.Zero(&d.Upper)
+					break
+				}
 				_v, _err := canxml.DecodeAs[T](_dec, _t)
 				if _err != nil {
 					return _err
@@ -339,18 +355,20 @@ var xmlClassDVOrdinal = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVOrdinal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVOrdinal); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVOrdinal); _err != nil {
 		return _err
-	} else if _fresh {
-		*d = DVOrdinal{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunOtherReferenceRanges bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -401,6 +419,10 @@ func (d *DVOrdinal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 				var _v ReferenceRange[DVOrdered]
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
+				}
+				if !_begunOtherReferenceRanges {
+					_begunOtherReferenceRanges = true
+					d.OtherReferenceRanges = nil
 				}
 				d.OtherReferenceRanges = append(d.OtherReferenceRanges, _v)
 			case "symbol":
@@ -466,18 +488,20 @@ var xmlClassDVProportion = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVProportion) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVProportion); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVProportion); _err != nil {
 		return _err
-	} else if _fresh {
-		*d = DVProportion{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunOtherReferenceRanges bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -668,6 +692,10 @@ func (d *DVProportion) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
 				}
+				if !_begunOtherReferenceRanges {
+					_begunOtherReferenceRanges = true
+					d.OtherReferenceRanges = nil
+				}
 				d.OtherReferenceRanges = append(d.OtherReferenceRanges, _v)
 			default:
 				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
@@ -698,18 +726,20 @@ var xmlClassDVQuantity = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVQuantity) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVQuantity); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVQuantity); _err != nil {
 		return _err
-	} else if _fresh {
-		*d = DVQuantity{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunOtherReferenceRanges bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -883,6 +913,10 @@ func (d *DVQuantity) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
 				}
+				if !_begunOtherReferenceRanges {
+					_begunOtherReferenceRanges = true
+					d.OtherReferenceRanges = nil
+				}
 				d.OtherReferenceRanges = append(d.OtherReferenceRanges, _v)
 			case "units_system":
 				if _got&(1<<8) != 0 {
@@ -957,18 +991,20 @@ var xmlClassDVScale = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVScale) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVScale); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVScale); _err != nil {
 		return _err
-	} else if _fresh {
-		*d = DVScale{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunOtherReferenceRanges bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -1019,6 +1055,10 @@ func (d *DVScale) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 				var _v ReferenceRange[DVOrdered]
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
+				}
+				if !_begunOtherReferenceRanges {
+					_begunOtherReferenceRanges = true
+					d.OtherReferenceRanges = nil
 				}
 				d.OtherReferenceRanges = append(d.OtherReferenceRanges, _v)
 			case "symbol":
@@ -1088,10 +1128,8 @@ var xmlClassReferenceRange = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (r *ReferenceRange[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassReferenceRange); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassReferenceRange); _err != nil {
 		return _err
-	} else if _fresh {
-		*r = ReferenceRange[T]{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64

@@ -126,7 +126,9 @@ func TestREQ056_XMLOneRootAfterFailedRoot(t *testing.T) {
 // canxml.ErrInvalidShape, carries none of the content, and is not unmatched
 // content. A processing instruction whose target is xml in any letter case is
 // the XML declaration only at the start: a second one, one after other
-// markup, or one in capitals is refused. A UTF-8 byte order mark at the very
+// markup, one in the document type's internal subset, or one in capitals is
+// refused, and the same bytes in a literal or a comment of that subset pass.
+// A UTF-8 byte order mark at the very
 // start is the document's encoding signature, not content, and is accepted.
 // canxml.Decoder, which reads a stream of values, is unchanged.
 //
@@ -134,7 +136,8 @@ func TestREQ056_XMLOneRootAfterFailedRoot(t *testing.T) {
 // refused case decodes without an error, or fails with an unclassified
 // syntax error, since encoding/xml skips every token before the first start
 // element; let a second document type declaration, an end element or a
-// misplaced XML declaration through and its case decodes; drop the byte order
+// misplaced XML declaration through and its case decodes; let a document type
+// whose subset holds one through and its case decodes; drop the byte order
 // mark rule and the accepted cases that start with one fail.
 func TestREQ056_XMLBeforeRoot(t *testing.T) {
 	const root = `<dv_count xmlns="http://schemas.openehr.org/v1"><magnitude>1</magnitude></dv_count>`
@@ -157,6 +160,7 @@ func TestREQ056_XMLBeforeRoot(t *testing.T) {
 		"XML declaration after a comment":  `<!-- note --><?xml version="1.0"?>`,
 		"XML declaration after a PI":       `<?pi data?><?xml version="1.0"?>`,
 		"xml target in capitals":           `<?XML pi data?>`,
+		"xml target in the document type":  `<!DOCTYPE dv_count [<?xml pi data?>]>`,
 	}
 	accepted := map[string]string{
 		"nothing":         "",
@@ -169,6 +173,8 @@ func TestREQ056_XMLBeforeRoot(t *testing.T) {
 		"processing instruction":           `<?pi data?>`,
 		"document type":                    `<!DOCTYPE dv_count>`,
 		"document type with subset":        `<!DOCTYPE dv_count [<!ENTITY e "v">]>`,
+		"xml target in a subset literal":   `<!DOCTYPE dv_count [<!ENTITY e "<?xml v?>">]>`,
+		"xml target in a subset comment":   `<!DOCTYPE dv_count [<!-- <?xml v?> -->]>`,
 		"byte order mark":                  bom,
 		"target that starts with xml":      `<?xml version="1.0"?><?xml-stylesheet href="a.xsl"?>`,
 		"the whole prolog": bom + `<?xml version="1.0"?>` + "\n<!-- a -->\n" + `<!DOCTYPE dv_count SYSTEM "x.dtd">` +
@@ -235,4 +241,80 @@ func TestREQ056_XMLBeforeRoot(t *testing.T) {
 			t.Errorf("canxml.NewDecoder(text + root).Decode: Magnitude = %d; want 1", v.Magnitude)
 		}
 	})
+}
+
+// TestREQ056_XMLTargetInsideTheRoot pins that XML reserves the processing
+// instruction target xml, in any letter case, for the declaration at the start
+// of a document, inside the root as before and after it (REQ-056):
+// canxml.Unmarshal refuses one inside an element, or inside a document type
+// declaration there, in every mode, and so does a canxml.Decoder given
+// any option, canxml.WithMaxDepth included, with an error
+// that wraps canxml.ErrInvalidShape, is no unmatched content and carries none
+// of the instruction. A target that only starts with xml passes, and so do the
+// same bytes inside a comment or a CDATA section, which are no instruction.
+//
+// Can-fail control: let the tracked token source pass such an instruction and
+// every refused row decodes; let Unmarshal given no option skip its check of
+// the bytes and that mode decodes them.
+func TestREQ056_XMLTargetInsideTheRoot(t *testing.T) {
+	const ns = `xmlns="http://schemas.openehr.org/v1"`
+	refused := map[string]string{
+		"declaration first in the root": `<dv_text ` + ns + `><?xml version="1.0"?><value>a</value></dv_text>`,
+		"inside a primitive's text":     `<dv_text ` + ns + `><value>a<?xml version="1.0"?>b</value></dv_text>`,
+		"after a member":                `<dv_text ` + ns + `><value>a</value><?xml version="1.0"?></dv_text>`,
+		"xml target in capitals":        `<dv_text ` + ns + `><value>a</value><?XML pi data?></dv_text>`,
+		"bare xml target":               `<dv_text ` + ns + `><value>a</value><?xml?></dv_text>`,
+		"in a document type":            `<dv_text ` + ns + `><!DOCTYPE x [<?xml pi data?>]><value>a</value></dv_text>`,
+	}
+	accepted := map[string]struct{ in, value string }{
+		"target that starts with xml": {`<dv_text ` + ns + `><?xml-stylesheet href="a.xsl"?><value>a</value></dv_text>`, "a"},
+		"xml target in a comment":     {`<dv_text ` + ns + `><!-- <?xml version="1.0"?> --><value>a</value></dv_text>`, "a"},
+		"xml target in CDATA":         {`<?xml version="1.0"?><dv_text ` + ns + `><value><![CDATA[<?xml version="1.0"?>]]></value></dv_text>`, `<?xml version="1.0"?>`},
+	}
+	modes := map[string]func(in string, v any) error{
+		"Unmarshal": func(in string, v any) error { return canxml.Unmarshal([]byte(in), v) },
+		"Unmarshal WithUnmatched": func(in string, v any) error {
+			return canxml.Unmarshal([]byte(in), v, canxml.WithUnmatched(func(string) {}))
+		},
+		"Unmarshal WithStrict": func(in string, v any) error { return canxml.Unmarshal([]byte(in), v, canxml.WithStrict()) },
+		"Unmarshal WithMissing": func(in string, v any) error {
+			return canxml.Unmarshal([]byte(in), v, canxml.WithMissing(func(string) {}))
+		},
+		"Unmarshal WithMaxDepth": func(in string, v any) error { return canxml.Unmarshal([]byte(in), v, canxml.WithMaxDepth(100)) },
+		"Decoder WithMaxDepth": func(in string, v any) error {
+			return canxml.NewDecoder(strings.NewReader(in), canxml.WithMaxDepth(100)).Decode(v)
+		},
+		"Decoder WithStrict": func(in string, v any) error {
+			return canxml.NewDecoder(strings.NewReader(in), canxml.WithStrict()).Decode(v)
+		},
+		"Decoder WithUnmatched": func(in string, v any) error {
+			return canxml.NewDecoder(strings.NewReader(in), canxml.WithUnmatched(func(string) {})).Decode(v)
+		},
+	}
+	for mode, decode := range modes {
+		for name, in := range refused {
+			t.Run(mode+"/refused/"+name, func(t *testing.T) {
+				err := decode(in, new(rm.DVText))
+				if !errors.Is(err, canxml.ErrInvalidShape) || errors.Is(err, canxml.ErrUnknownElement) {
+					t.Fatalf("%s(%s) = %v; want an error that wraps canxml.ErrInvalidShape and not canxml.ErrUnknownElement", mode, in, err)
+				}
+				for _, leak := range []string{"version", "pi data"} {
+					if strings.Contains(err.Error(), leak) {
+						t.Errorf("%s(%s) err = %q; it echoes the instruction's %q", mode, in, err, leak)
+					}
+				}
+			})
+		}
+		for name, c := range accepted {
+			t.Run(mode+"/accepted/"+name, func(t *testing.T) {
+				var v rm.DVText
+				if err := decode(c.in, &v); err != nil {
+					t.Fatalf("%s(%s) = %v; want nil", mode, c.in, err)
+				}
+				if v.Value != c.value {
+					t.Errorf("%s(%s) decoded value %q; want %q", mode, c.in, v.Value, c.value)
+				}
+			})
+		}
+	}
 }
