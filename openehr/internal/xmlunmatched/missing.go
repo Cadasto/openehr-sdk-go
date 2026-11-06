@@ -172,7 +172,11 @@ func (t *Tracker) closing(n int) {
 		if t.presence != nil && !p.nilled {
 			t.sentMember(n, "", f.nilled)
 		}
-		return
+		// A string whose text the decode keeps is sent empty and still
+		// carries a value, as the empty string does in canonical JSON.
+		if !f.kept {
+			return
+		}
 	}
 	if i := slices.Index(p.class.Required, f.name); i >= 0 {
 		p.seen |= 1 << i

@@ -10,7 +10,8 @@ package canxml
 // that is unmatched content, one in a foreign namespace or a repeat of an
 // earlier child, counting for none; the
 // child it has carries `xsi:nil="true"` (or `1`), whatever it holds; or the
-// child is a primitive element whose text is empty or XML whitespace only.
+// child is a primitive element whose text is empty or XML whitespace only,
+// unless it is a string whose text [WithStringText] keeps.
 // The value the decode returns cannot always show that: a member held by
 // value, a number, a boolean, a string or a value struct such as PARTY_SELF
 // or ARCHETYPE_ID, decodes to its zero value whether the input carried it or

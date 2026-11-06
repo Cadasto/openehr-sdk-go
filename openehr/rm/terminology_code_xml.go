@@ -231,8 +231,11 @@ func decodeTerminologyIDXML(dec *xml.Decoder, start xml.StartElement, out *strin
 				*out = string(text)
 			}
 			if strings.TrimLeft(*out, " \t\r\n") == "" {
-				// No value: the empty identifier of a document without it.
-				*out = ""
+				// No value: the empty identifier of a document without it,
+				// unless the decode keeps a string's text as it was sent.
+				if !xmlunmatched.KeepsStringText(dec) {
+					*out = ""
+				}
 				xmlunmatched.ReportEmpty(dec, start)
 			}
 			return nil

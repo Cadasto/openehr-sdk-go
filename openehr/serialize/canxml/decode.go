@@ -36,6 +36,7 @@ type decoderConfig struct {
 	maxDepth            int // 0 for no limit
 	relaxedTypeDispatch bool
 	strict              bool
+	stringText          bool
 }
 
 // newDecoderConfig applies opts in order, skipping a nil option.
@@ -64,10 +65,10 @@ func init() {
 }
 
 // tracked reports whether the decode reports or refuses unmatched content,
-// or reports missing members or members sent without a value: each needs the
-// decode to follow the elements it reads.
+// reports missing members or members sent without a value, or keeps a
+// string's text: each needs the decode to follow the elements it reads.
 func (c decoderConfig) tracked() bool {
-	return c.unmatched != nil || c.strict || c.missing != nil || c.presence != nil
+	return c.unmatched != nil || c.strict || c.missing != nil || c.presence != nil || c.stringText
 }
 
 // tracker returns the tracker of a decode with c's options, and nil for a
@@ -79,6 +80,9 @@ func (c decoderConfig) tracker() *xmlunmatched.Tracker {
 	t := xmlunmatched.NewTracker(c.unmatched, c.strict)
 	t.ReportMissing(c.missing)
 	t.ReportPresence(reportPresence(c.presence))
+	if c.stringText {
+		t.KeepStringText()
+	}
 	t.LimitDepth(c.maxDepth)
 	return t
 }

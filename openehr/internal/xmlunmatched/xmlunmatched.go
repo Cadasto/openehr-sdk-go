@@ -198,6 +198,9 @@ type Tracker struct {
 	// presence is the caller's hook for the members a document sends without
 	// a value, set by [Tracker.ReportPresence]; nil when none asked.
 	presence func(pointer string, nilled bool)
+	// stringText keeps the text of a string element sent empty or as XML
+	// whitespace only, set by [Tracker.KeepStringText].
+	stringText bool
 	// open holds one frame per element opened and not yet closed, after a
 	// first frame for the document itself, which counts the top-level
 	// elements of the value being decoded.
@@ -255,6 +258,7 @@ type frame struct {
 	nilled        bool   // the start element, or one around it, carried xsi:nil="true"
 	hasText       bool   // the element holds text other than XML whitespace
 	primitive     bool   // a decoder read the element's text as its value
+	kept          bool   // a string element whose text the decode keeps, empty or whitespace only ([Tracker.KeepStringText])
 	unread        bool   // the decoder skipped or dropped the element: it is no member of its parent
 	// skipped counts, for each member class.Items lists, the children of its
 	// name the decoder skipped, which are no items of it ([Tracker.closing]);
@@ -649,7 +653,9 @@ func isXMLSpace(text []byte) bool {
 // anything of it is read, as an untracked decode refuses it
 // ([Tracker.refuseXMLDepth]).
 func (t *Tracker) decodeText(dec *xml.Decoder, start *xml.StartElement, v any) error {
-	t.open[len(t.open)-1].primitive = true
+	f := &t.open[len(t.open)-1]
+	f.primitive = true
+	f.kept = t.keepsText(v)
 	return t.readText(dec, start, v)
 }
 
@@ -672,10 +678,13 @@ func (t *Tracker) readText(dec *xml.Decoder, start *xml.StartElement, v any) err
 // [Tracker.decodeText] does, unless the element carries no value
 // ([noValue]), and reports whether it decoded it.
 func (t *Tracker) decodeOptional(dec *xml.Decoder, start *xml.StartElement, v any) (bool, error) {
-	t.open[len(t.open)-1].primitive = true
+	f := &t.open[len(t.open)-1]
+	f.primitive = true
+	kept := t.keepsText(v)
+	f.kept = kept
 	at := t.here()
 	text, err := t.elementText(dec, start)
-	if err != nil || noValue(string(text), v) {
+	if err != nil || (!kept && noValue(string(text), v)) {
 		return false, err
 	}
 	if err := t.convert(start.Name, text, v); err != nil {

@@ -38,7 +38,9 @@ func (p Presence) String() string {
 // a nil pointer, interface or slice, and a mandatory one to its zero value,
 // as if the input had left it out (see the package documentation, "Wire
 // profile"), so the value the decode returns cannot say that the input sent
-// it, and [WithMissing] reports mandatory members only.
+// it, and [WithMissing] reports mandatory members only. Under
+// [WithStringText] a string member sent empty keeps its text and is no
+// missing member, and fn still receives it as [PresenceEmpty].
 //
 // A member that carries a value is not reported: an empty struct element
 // such as `<subject xsi:type="PARTY_SELF"/>`, `<magnitude>0</magnitude>`,

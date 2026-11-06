@@ -87,7 +87,8 @@
 //     an optional one decodes as absent, a nil pointer, interface or slice,
 //     as a `null` member does in canonical JSON, and a mandatory one to its
 //     zero value, the empty string for a string of whitespace only, as a
-//     missing member does. What a nilled element holds is unmatched content,
+//     missing member does. [WithStringText] keeps a string's text instead,
+//     as canonical JSON keeps it. What a nilled element holds is unmatched content,
 //     and a nilled polymorphic member needs no `xsi:type`. A nilled
 //     interval bound is a null bound: it holds its zero value, and its side
 //     has no bound when absent boundary flags take their defaults. A list
@@ -285,8 +286,9 @@
 // `xsi:nil="true"` (or `1`), or a primitive element whose text is empty, or
 // XML whitespace only for a string. An optional member sent so decodes as
 // absent, and a mandatory one to its zero value, as if the input had left it
-// out (see "Wire profile"), and [WithMissing] reports mandatory members only,
-// so neither the value nor that option says the input sent it. [WithPresence] passes each such member, mandatory or optional, to a
+// out (see "Wire profile"), unless [WithStringText] keeps a string's text,
+// and [WithMissing] reports mandatory members only, so neither the value nor
+// that option says the input sent it. [WithPresence] passes each such member, mandatory or optional, to a
 // function, once, as its element closes, by the JSON Pointer [WithMissing]
 // uses and with its form, [PresenceNil] or [PresenceEmpty]; nothing inside a
 // nilled element is reported. A member that carries a value, as "Missing
