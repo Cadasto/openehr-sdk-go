@@ -107,7 +107,7 @@ func TestREQ056_UnmarshalDecodesAgainWithoutAddingToTheValue(t *testing.T) {
 	if err := canxml.Unmarshal(in, &plain); err != nil {
 		t.Fatalf("Unmarshal: err = %v; want nil, the second decode resolving the prefix", err)
 	}
-	if err := canxml.Unmarshal(in, &tracked, canxml.WithMissing(func(string) {})); err != nil {
+	if err := canxml.Unmarshal(in, &tracked, canxml.WithMissing(func(canxml.Pointer) {})); err != nil {
 		t.Fatalf("Unmarshal WithMissing: err = %v; want nil", err)
 	}
 	want := &aom14.TypedString{Value: "archetype_id/value", Type: "xs:string"}
@@ -294,9 +294,9 @@ func TestREQ056_DecoderReadsNoFurtherThanTheValue(t *testing.T) {
 		opts []canxml.DecoderOption
 	}{
 		{"no option", nil},
-		{"WithUnmatched", []canxml.DecoderOption{canxml.WithUnmatched(func(string) {})}},
+		{"WithUnmatched", []canxml.DecoderOption{canxml.WithUnmatched(func(canxml.Path) {})}},
 		{"WithStrict", []canxml.DecoderOption{canxml.WithStrict()}},
-		{"WithMissing", []canxml.DecoderOption{canxml.WithMissing(func(string) {})}},
+		{"WithMissing", []canxml.DecoderOption{canxml.WithMissing(func(canxml.Pointer) {})}},
 	}
 	for _, s := range streams {
 		var stream strings.Builder

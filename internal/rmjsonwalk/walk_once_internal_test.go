@@ -9,6 +9,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/internal/reportpath"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -17,8 +18,8 @@ import (
 // they were called.
 func logHooks(log *[]string) Hooks {
 	return Hooks{
-		Unmatched: func(p string) error { *log = append(*log, "unmatched "+p); return nil },
-		Missing:   func(p string) error { *log = append(*log, "missing "+p); return nil },
+		Unmatched: func(p *reportpath.Node) error { *log = append(*log, "unmatched "+p.String()); return nil },
+		Missing:   func(p *reportpath.Node) error { *log = append(*log, "missing "+p.String()); return nil },
 	}
 }
 

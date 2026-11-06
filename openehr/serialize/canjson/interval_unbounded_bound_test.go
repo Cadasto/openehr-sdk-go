@@ -86,7 +86,7 @@ var jsonClosedSideCases = []struct {
 func jsonDecodeModes() map[string][]canjson.DecoderOption {
 	return map[string][]canjson.DecoderOption{
 		"default":       nil,
-		"WithUnmatched": {canjson.WithUnmatched(func(string) {})},
+		"WithUnmatched": {canjson.WithUnmatched(func(canjson.Pointer) {})},
 		"WithStrict":    {canjson.WithStrict()},
 	}
 }

@@ -46,8 +46,8 @@ func limitModes(t *testing.T, limit canxml.DecoderOption) map[string]func(data [
 		all := slices.Concat(opts, []canxml.DecoderOption{limit})
 		return func(data []byte, v any) error { return canxml.NewDecoder(reader(data), all...).Decode(v) }
 	}
-	report := canxml.WithUnmatched(func(p string) { t.Errorf("reported %s; want nothing", p) })
-	missing := canxml.WithMissing(func(string) {})
+	report := canxml.WithUnmatched(func(p canxml.Path) { t.Errorf("reported %s; want nothing", p.String()) })
+	missing := canxml.WithMissing(func(canxml.Pointer) {})
 	modes := map[string]func([]byte, any) error{
 		"Unmarshal":               unmarshal(),
 		"Unmarshal WithUnmatched": unmarshal(report),

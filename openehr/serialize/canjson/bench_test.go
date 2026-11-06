@@ -160,7 +160,7 @@ func BenchmarkDecodeWithMissing(b *testing.B) {
 		if err != nil {
 			b.Fatalf("read fixture %s: %v", id, err)
 		}
-		report := canjson.WithMissing(func(string) {})
+		report := canjson.WithMissing(func(canjson.Pointer) {})
 		if err := canjson.Unmarshal(payload, new(rm.Composition), report); err != nil {
 			b.Fatalf("setup decode of %s: %v", id, err)
 		}

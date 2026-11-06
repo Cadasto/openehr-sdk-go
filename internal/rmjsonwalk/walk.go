@@ -6,6 +6,8 @@ import (
 	"errors"
 	"slices"
 	"unicode/utf8"
+
+	"github.com/cadasto/openehr-sdk-go/internal/reportpath"
 )
 
 // Root is the RM shape a decode target gives a document's root: the JSON
@@ -33,15 +35,19 @@ type Root struct {
 // Hooks are the functions a [Model.Walk] calls for what it finds. Each takes
 // the JSON Pointer (RFC 6901) of a member, which names the member and
 // carries none of its value: its segments are member names, positions in a
-// JSON array counted from 0, and the keys of a Hash. A nil hook asks for
-// nothing, and the walk does no work for it. When a hook returns an error
-// the walk stops and returns that error.
+// JSON array counted from 0, and the keys of a Hash. The pointer is a
+// [reportpath.Node], which writes its text only when asked and shares the
+// nodes of its object's pointer with the pointers of the object's other
+// members, so a report costs the walk the nodes it has not made yet, not the
+// length of the pointer. A nil hook asks for nothing, and the walk does no
+// work for it. When a hook returns an error the walk stops and returns that
+// error.
 type Hooks struct {
 	// Unmatched is called for every unmatched member, once each, in the
 	// order the members appear. A member is unmatched when its name is
 	// neither "_type" nor an attribute of the RM type its object decodes
 	// as.
-	Unmatched func(pointer string) error
+	Unmatched func(pointer *reportpath.Node) error
 	// Missing is called for every missing member, once each: an attribute
 	// the RM makes mandatory on the RM type an object decodes as, which the
 	// object has no member for or holds null at, as the attribute's name
@@ -52,7 +58,7 @@ type Hooks struct {
 	// The members of one object are reported as the object closes, in the
 	// order the RM declares the attributes, an ancestor's before the
 	// class's own; the objects inside an object close first.
-	Missing func(pointer string) error
+	Missing func(pointer *reportpath.Node) error
 }
 
 // Walk walks the first JSON value in data and calls the hooks in h for what
@@ -84,7 +90,8 @@ type Hooks struct {
 //
 // The walk holds the calls back while it reads the document the first time,
 // but only up to a budget: the larger of 64 KiB and the document's length,
-// each call counted as its pointer's length plus 24 bytes. Past it the walk
+// each call counted as 16 bytes plus, for each node of its pointer the walk
+// made for it, 48 bytes and the length of the node's text. Past it the walk
 // reads the document again as above, calling each hook as it goes, so a hook
 // that returns an error at the first of a great many unmatched or missing
 // members still stops the walk there.
@@ -108,7 +115,10 @@ func (m *Model) Walk(data []byte, root Root, h Hooks) error {
 // The two passes then decide, the error included.
 //
 // The budget is the larger of [holdFloor] and the length of data, each call
-// counted as its pointer's length plus [callBytes]. A hook may stop the walk
+// counted as [callBytes] plus what the nodes of its pointer that the pass made
+// for it hold: [reportpath.NodeBytes] and the length of the node's text each.
+// The calls share the nodes of the objects around them, so a node counts for
+// the call that made it alone. A hook may stop the walk
 // at its first call, as a strict decode does at the first unmatched member,
 // and the two passes stop there too; the one pass, holding the calls back,
 // would read on and hold a pointer for every member of a hostile document
@@ -116,7 +126,7 @@ func (m *Model) Walk(data []byte, root Root, h Hooks) error {
 // holds at most the budget beyond what the two passes hold, and reads the
 // document at most once more than they do.
 func (m *Model) walkOnce(data []byte, root Root, h Hooks) (calls []call, ok bool) {
-	w := &walk{m: m, hooks: h, once: true, budget: max(holdFloor, len(data))}
+	w := &walk{m: m, hooks: h, once: true, budget: max(holdFloor, len(data)), path: make([]level, 0, openLevels)}
 	if err := w.root(newDecoder(data), root.Nest, root); err != nil {
 		return nil, false
 	}
@@ -129,9 +139,13 @@ const (
 	// largest report of a corpus composition holds under 1 KiB, and under
 	// 46 KiB with a member no RM class has added to every object.
 	holdFloor = 64 << 10
-	// callBytes is what a held call counts for beside its pointer's bytes:
-	// a call's own size on a 64-bit platform.
-	callBytes = 24
+	// callBytes is what a held call counts for beside the nodes of its
+	// pointer: a call's own size on a 64-bit platform.
+	callBytes = 16
+	// openLevels is the room a walk makes for the containers it is inside
+	// before it needs more: no composition of the corpus nests deeper than 15
+	// containers.
+	openLevels = 16
 )
 
 // walkIndexed is [Model.Walk] in two passes: [typeIndex] reads the "_type" of
@@ -142,7 +156,7 @@ func (m *Model) walkIndexed(data []byte, root Root, h Hooks) error {
 	if err != nil {
 		return err
 	}
-	w := &walk{m: m, types: types, hooks: h}
+	w := &walk{m: m, types: types, hooks: h, path: make([]level, 0, openLevels)}
 	return w.root(newDecoder(data), root.Nest, root)
 }
 
@@ -150,7 +164,7 @@ func (m *Model) walkIndexed(data []byte, root Root, h Hooks) error {
 // Unmatched, and the pointer it is called with.
 type call struct {
 	missing bool
-	pointer string
+	pointer *reportpath.Node
 }
 
 // replay makes calls in order, and stops at the first hook that returns an
@@ -232,7 +246,7 @@ func newDecoder(data []byte) *jsontext.Decoder {
 // Unmatched is [Model.Walk] with report as the Unmatched hook alone: it calls
 // report with the pointer of every unmatched member, once each, in the order
 // the members appear. report must not be nil.
-func (m *Model) Unmatched(data []byte, root Root, report func(pointer string) error) error {
+func (m *Model) Unmatched(data []byte, root Root, report func(pointer *reportpath.Node) error) error {
 	return m.Walk(data, root, Hooks{Unmatched: report})
 }
 
@@ -242,15 +256,16 @@ func (w *walk) root(dec *jsontext.Decoder, nest string, root Root) error {
 	if nest == "" {
 		return w.value(dec, root.Type, root.Bound)
 	}
-	return each(dec, jsontext.Kind(nest[0]), func() error {
+	return w.each(dec, jsontext.Kind(nest[0]), func() error {
 		return w.root(dec, nest[1:], root)
 	})
 }
 
 // each reads the next value from dec as a JSON array (open '[') or object
-// (open '{') and calls fn to read each element or member value in turn. A
-// value of any other kind is skipped.
-func each(dec *jsontext.Decoder, open jsontext.Kind, fn func() error) error {
+// (open '{') and calls fn to read each element or member value in turn, with
+// the element's position or the member's name as the innermost open level's
+// current child. A value of any other kind is skipped.
+func (w *walk) each(dec *jsontext.Decoder, open jsontext.Kind, fn func() error) error {
 	if dec.PeekKind() != open {
 		return dec.SkipValue()
 	}
@@ -261,16 +276,22 @@ func each(dec *jsontext.Decoder, open jsontext.Kind, fn func() error) error {
 	if open == '{' {
 		end = '}'
 	}
-	for dec.PeekKind() != end {
+	top := w.open()
+	for i := 0; dec.PeekKind() != end; i++ {
 		if open == '{' {
-			if _, err := dec.ReadToken(); err != nil { // the member's name
+			tok, err := dec.ReadToken() // the member's name
+			if err != nil {
 				return err
 			}
+			w.path[top] = level{name: tok.String(), index: -1}
+		} else {
+			w.path[top] = level{index: i}
 		}
 		if err := fn(); err != nil {
 			return err
 		}
 	}
+	w.path = w.path[:top]
 	_, err := dec.ReadToken()
 	return err
 }
@@ -339,6 +360,67 @@ type walk struct {
 	calls  []call
 	budget int
 	types  map[int64]string
+	// path holds the containers the walk is inside, outermost first, each
+	// with the member or element it reads now. A report makes the pointer
+	// nodes of the levels that have none yet ([walk.pointer]), and made
+	// counts the bytes they hold until the report that made them takes the
+	// count ([walk.report]).
+	path []level
+	made int
+}
+
+// level is one container the walk is inside: an object or a JSON array whose
+// members or elements it reads, and the one it reads now, by its name or its
+// position. node is that member's or element's pointer once a report has
+// needed it, and nil until then: the walk makes a node only for a report, and
+// once for each member or element, whatever the reports under it.
+type level struct {
+	name  string           // the member's name, in an object
+	index int              // the element's position, in an array; -1 in an object
+	node  *reportpath.Node // the pointer of the member or element, or nil
+}
+
+// open adds a level for a container the walk has just opened and returns its
+// index in w.path. The caller sets the level's member or element before it
+// reads one, and drops the level as the container closes.
+func (w *walk) open() int {
+	w.path = append(w.path, level{index: -1})
+	return len(w.path) - 1
+}
+
+// pointer returns the pointer of the member or element the innermost open
+// level reads, nil for the root of the value, making the nodes of the levels
+// that have none yet: those after the innermost level that has one. Each
+// level's node is made once, so a report costs the levels opened since the
+// last report, whatever its depth.
+func (w *walk) pointer() *reportpath.Node {
+	i := len(w.path)
+	for i > 0 && w.path[i-1].node == nil {
+		i--
+	}
+	var p *reportpath.Node
+	if i > 0 {
+		p = w.path[i-1].node
+	}
+	for ; i < len(w.path); i++ {
+		l := &w.path[i]
+		if l.index >= 0 {
+			p = p.Index(l.index)
+		} else {
+			p = p.Token(l.name)
+		}
+		l.node = p
+		w.made += reportpath.NodeBytes + len(l.name)
+	}
+	return p
+}
+
+// memberOf returns the pointer of the member name of the object the innermost
+// open level reads, which has just closed.
+func (w *walk) memberOf(name string) *reportpath.Node {
+	p := w.pointer().Token(name)
+	w.made += reportpath.NodeBytes + len(name)
+	return p
 }
 
 // typeOf returns the "_type" of the object dec has just opened, and whether
@@ -354,11 +436,13 @@ func (w *walk) typeOf(dec *jsontext.Decoder) (string, bool) {
 
 // report calls the Missing hook with pointer, or the Unmatched hook when
 // missing is false. The one pass holds the call back instead, counting it
-// against its budget, and gives the pass up with [errOverBudget] once the
-// calls it holds would pass it.
-func (w *walk) report(missing bool, pointer string) error {
+// and the nodes made for its pointer against its budget, and gives the pass
+// up with [errOverBudget] once the calls it holds would pass it.
+func (w *walk) report(missing bool, pointer *reportpath.Node) error {
+	made := w.made
+	w.made = 0
 	if w.once {
-		w.budget -= len(pointer) + callBytes
+		w.budget -= callBytes + made
 		if w.budget < 0 {
 			return errOverBudget
 		}
@@ -394,6 +478,7 @@ func (w *walk) value(dec *jsontext.Decoder, declared, bound string) error {
 		required = w.m.required(rmType)
 		seen = make([]bool, len(required))
 	}
+	top := w.open()
 	for dec.PeekKind() != '}' {
 		tok, rerr := dec.ReadToken()
 		if rerr != nil {
@@ -420,6 +505,7 @@ func (w *walk) value(dec *jsontext.Decoder, declared, bound string) error {
 		if late && dec.PeekKind() == '"' {
 			return errLateType
 		}
+		w.path[top] = level{name: name, index: -1}
 		if i := slices.Index(required, name); i >= 0 && dec.PeekKind() != 'n' {
 			seen[i] = true
 		}
@@ -430,13 +516,14 @@ func (w *walk) value(dec *jsontext.Decoder, declared, bound string) error {
 	if _, rerr := dec.ReadToken(); rerr != nil {
 		return rerr
 	}
-	// The object has closed: dec's pointer names it, and each required
-	// attribute it holds no value for is missing.
+	// The object has closed: the innermost open level now reads it, and
+	// each required attribute it holds no value for is missing.
+	w.path = w.path[:top]
 	for i, attr := range required {
 		if seen[i] {
 			continue
 		}
-		if herr := w.report(true, string(dec.StackPointer())+"/"+attr); herr != nil {
+		if herr := w.report(true, w.memberOf(attr)); herr != nil {
 			return herr
 		}
 	}
@@ -454,7 +541,7 @@ func (w *walk) member(dec *jsontext.Decoder, rmType, name, bound string) error {
 	switch {
 	case !ok:
 		if w.hooks.Unmatched != nil {
-			if err := w.report(false, string(dec.StackPointer())); err != nil {
+			if err := w.report(false, w.pointer()); err != nil {
 				return err
 			}
 		}
@@ -466,7 +553,7 @@ func (w *walk) member(dec *jsontext.Decoder, rmType, name, bound string) error {
 		if attr.Hash {
 			open = '{'
 		}
-		return each(dec, open, func() error { return w.value(dec, attr.Type, attr.Bound) })
+		return w.each(dec, open, func() error { return w.value(dec, attr.Type, attr.Bound) })
 	default:
 		return w.value(dec, attr.Type, attr.Bound)
 	}

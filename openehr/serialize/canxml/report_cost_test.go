@@ -68,13 +68,13 @@ func TestREQ170_REQ175_XMLReportCostGrowsWithTheDocument(t *testing.T) {
 			name:  "WithPresence",
 			named: `<name><value/></name>`,
 			opt: func(count *int) canxml.DecoderOption {
-				return canxml.WithPresence(func(string, canxml.Presence) { *count++ })
+				return canxml.WithPresence(func(canxml.Pointer, canxml.Presence) { *count++ })
 			},
 		},
 		{
 			name: "WithMissing",
 			opt: func(count *int) canxml.DecoderOption {
-				return canxml.WithMissing(func(string) { *count++ })
+				return canxml.WithMissing(func(canxml.Pointer) { *count++ })
 			},
 		},
 		{
@@ -82,7 +82,7 @@ func TestREQ170_REQ175_XMLReportCostGrowsWithTheDocument(t *testing.T) {
 			named: `<name><value>x</value></name>`,
 			inner: `<x/>`,
 			opt: func(count *int) canxml.DecoderOption {
-				return canxml.WithUnmatched(func(string) { *count++ })
+				return canxml.WithUnmatched(func(canxml.Path) { *count++ })
 			},
 		},
 	}

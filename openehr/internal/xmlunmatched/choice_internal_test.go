@@ -13,6 +13,8 @@ import (
 	"errors"
 	"slices"
 	"testing"
+
+	"github.com/cadasto/openehr-sdk-go/internal/reportpath"
 )
 
 // codeShape reads as a generated decoder reads a class with two mandatory
@@ -221,7 +223,7 @@ func TestDecodeChoice_REQ041_REQ170_ShapeContentIsItsOwn(t *testing.T) {
 			in := holderDoc(tc.symbol)
 			var reported []string
 			var h holder
-			if err := Unmarshal([]byte(in), &h, NewTracker(func(p string) { reported = append(reported, p) }, false)); err != nil {
+			if err := Unmarshal([]byte(in), &h, NewTracker(func(p *reportpath.Node) { reported = append(reported, p.String()) }, false)); err != nil {
 				t.Fatalf("Unmarshal(%q, report) = %v; want nil", in, err)
 			}
 			if !slices.Equal(reported, tc.want) {
@@ -264,7 +266,7 @@ func TestDecodeChoice_REQ041_ReportsTheShapesMissingMembers(t *testing.T) {
 			in := holderDoc(tc.symbol)
 			var missing []string
 			tr := NewTracker(nil, false)
-			tr.ReportMissing(func(p string) { missing = append(missing, p) })
+			tr.ReportMissing(func(p *reportpath.Node) { missing = append(missing, p.String()) })
 			if err := Unmarshal([]byte(in), new(holder), tr); err != nil {
 				t.Fatalf("Unmarshal(%q) = %v; want nil", in, err)
 			}

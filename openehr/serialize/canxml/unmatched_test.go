@@ -276,7 +276,7 @@ func xmlCases() []xmlCase {
 func unmarshalCollecting(into func() any, in []byte, opts ...canxml.DecoderOption) (any, []string, error) {
 	var got []string
 	v := into()
-	opts = append(opts, canxml.WithUnmatched(func(p string) { got = append(got, p) }))
+	opts = append(opts, canxml.WithUnmatched(func(p canxml.Path) { got = append(got, p.String()) }))
 	err := canxml.Unmarshal(in, v, opts...)
 	return v, got, err
 }
@@ -1040,7 +1040,7 @@ func TestREQ170_XMLInterfaceTypedParameter(t *testing.T) {
 		in := []byte(`<iv ` + ucNS + `><lower>` + quantity + `</lower></iv>`)
 		for name, opts := range map[string][]canxml.DecoderOption{
 			"default": nil,
-			"report":  {canxml.WithUnmatched(func(string) {})},
+			"report":  {canxml.WithUnmatched(func(canxml.Path) {})},
 			"strict":  {canxml.WithStrict()},
 		} {
 			err := canxml.Unmarshal(in, new(rm.Interval[rm.DVOrdered]), opts...)
@@ -1159,7 +1159,7 @@ func TestREQ056_XMLOriginalVersionData(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			for mode, opts := range map[string][]canxml.DecoderOption{
 				"default": nil,
-				"report":  {canxml.WithUnmatched(func(string) {})},
+				"report":  {canxml.WithUnmatched(func(canxml.Path) {})},
 				"strict":  {canxml.WithStrict()},
 			} {
 				err := canxml.Unmarshal(version(tc.attrs, ""), new(rm.OriginalVersion[any]), opts...)
@@ -1179,7 +1179,7 @@ func TestREQ056_XMLOriginalVersionData(t *testing.T) {
 		`<code_string>532</code_string></defining_code></lifecycle_state>`
 	everyMode := map[string][]canxml.DecoderOption{
 		"default": nil,
-		"report":  {canxml.WithUnmatched(func(string) {})},
+		"report":  {canxml.WithUnmatched(func(canxml.Path) {})},
 		"strict":  {canxml.WithStrict()},
 	}
 	for name, empty := range map[string]string{
@@ -1202,7 +1202,7 @@ func TestREQ056_XMLOriginalVersionData(t *testing.T) {
 		for mode, opts := range everyMode {
 			var reported []string
 			if mode == "report" {
-				opts = []canxml.DecoderOption{canxml.WithUnmatched(func(p string) { reported = append(reported, p) })}
+				opts = []canxml.DecoderOption{canxml.WithUnmatched(func(p canxml.Path) { reported = append(reported, p.String()) })}
 			}
 			v := new(rm.OriginalVersion[any])
 			if err := canxml.Unmarshal(in, v, opts...); err != nil {
@@ -1616,7 +1616,7 @@ func TestREQ170_XMLDecoderUnmatchedOptions(t *testing.T) {
 		`<dv_text ` + ucNS + `><value>b</value><x-two>` + xmlPlanted + `</x-two></dv_text>`
 
 	var got []string
-	dec := canxml.NewDecoder(strings.NewReader(stream), nil, canxml.WithUnmatched(func(p string) { got = append(got, p) }))
+	dec := canxml.NewDecoder(strings.NewReader(stream), nil, canxml.WithUnmatched(func(p canxml.Path) { got = append(got, p.String()) }))
 	var first, second rm.DVText
 	if err := dec.Decode(&first); err != nil {
 		t.Fatalf("Decode(first value) = %v; want nil", err)
@@ -1658,7 +1658,7 @@ func TestREQ170_XMLConcurrentDecodesKeepTheirOwnReports(t *testing.T) {
 				switch i % 3 {
 				case 0:
 					var got []string
-					err := canxml.Unmarshal(in, new(rm.Element), canxml.WithUnmatched(func(p string) { got = append(got, p) }))
+					err := canxml.Unmarshal(in, new(rm.Element), canxml.WithUnmatched(func(p canxml.Path) { got = append(got, p.String()) }))
 					if err != nil || !slices.Equal(got, []string{path}) {
 						t.Errorf("%s: canxml.Unmarshal(WithUnmatched) = %v, reported %q; want nil and [%q]", name, err, got, path)
 						return
@@ -1690,7 +1690,7 @@ func TestREQ170_XMLUnknownTypeFailsInEveryMode(t *testing.T) {
 	for _, mode := range []string{"default", "report", "strict"} {
 		t.Run(mode, func(t *testing.T) {
 			var reported []string
-			report := canxml.WithUnmatched(func(p string) { reported = append(reported, p) })
+			report := canxml.WithUnmatched(func(p canxml.Path) { reported = append(reported, p.String()) })
 			var opts []canxml.DecoderOption
 			switch mode {
 			case "report":
@@ -1762,7 +1762,7 @@ func TestREQ170_XMLRegisteredTypeCensus(t *testing.T) {
 		in := `<x ` + ucNS + ` xsi:type="` + name + `" x-attr="` + xmlPlanted + `">` + xmlPlanted +
 			`<x-census>` + xmlPlanted + `</x-census>` + xmlPlanted + `</x>`
 		var got []string
-		err := canxml.Unmarshal([]byte(in), v, canxml.WithUnmatched(func(p string) { got = append(got, p) }))
+		err := canxml.Unmarshal([]byte(in), v, canxml.WithUnmatched(func(p canxml.Path) { got = append(got, p.String()) }))
 		if err != nil {
 			t.Errorf("%s: canxml.Unmarshal(%s, WithUnmatched) = %v; want nil", name, in, err)
 			continue

@@ -105,7 +105,7 @@ func rewriteXML(t *testing.T, doc string, edits map[string]string) []byte {
 func decodeXMLMissing(into func() any, in []byte, opts ...canxml.DecoderOption) (any, []string, error) {
 	var got []string
 	v := into()
-	opts = append(opts, canxml.WithMissing(func(p string) { got = append(got, p) }))
+	opts = append(opts, canxml.WithMissing(func(p canxml.Pointer) { got = append(got, p.String()) }))
 	err := canxml.Unmarshal(in, v, opts...)
 	return v, got, err
 }
@@ -141,7 +141,7 @@ func assertXMLReported(t *testing.T, into func() any, in []byte, want []string, 
 		t.Errorf("canxml.Unmarshal(WithMissing) decoded\n%#v\nwant the default's value\n%#v", got, def)
 	}
 	if unmatched {
-		for _, opts := range [][]canxml.DecoderOption{{canxml.WithStrict()}, {canxml.WithStrict(), canxml.WithMissing(func(string) {})}} {
+		for _, opts := range [][]canxml.DecoderOption{{canxml.WithStrict()}, {canxml.WithStrict(), canxml.WithMissing(func(canxml.Pointer) {})}} {
 			if err := canxml.Unmarshal(in, into(), opts...); !errors.Is(err, canxml.ErrUnknownElement) {
 				t.Errorf("canxml.Unmarshal(%s, WithStrict) = %v; want canxml.ErrUnknownElement: strict refuses the unmatched content", in, err)
 			}
@@ -421,8 +421,8 @@ func TestREQ175_XMLWithUnmatchedAndWithMissingShareOneDecode(t *testing.T) {
 		`<defining_code><x-c/><code_string>c</code_string></defining_code><x-d/></dv_coded_text>`
 	var log []string
 	err := canxml.Unmarshal([]byte(in), new(rm.DVCodedText),
-		canxml.WithUnmatched(func(p string) { log = append(log, "unmatched "+p) }),
-		canxml.WithMissing(func(p string) { log = append(log, "missing "+p) }),
+		canxml.WithUnmatched(func(p canxml.Path) { log = append(log, "unmatched "+p.String()) }),
+		canxml.WithMissing(func(p canxml.Pointer) { log = append(log, "missing "+p.String()) }),
 	)
 	if err != nil {
 		t.Fatalf("canxml.Unmarshal(WithUnmatched, WithMissing) = %v; want nil", err)
@@ -447,7 +447,7 @@ func TestREQ175_XMLWithUnmatchedAndWithMissingShareOneDecode(t *testing.T) {
 func TestREQ175_XMLDecoderReportsPerValue(t *testing.T) {
 	stream := `<dv_text ` + ucNS + `/> <dv_quantity ` + ucNS + `><units>kg</units><magnitude xsi:nil="true"/></dv_quantity>`
 	var got []string
-	dec := canxml.NewDecoder(strings.NewReader(stream), canxml.WithMissing(func(p string) { got = append(got, p) }), canxml.WithStrict())
+	dec := canxml.NewDecoder(strings.NewReader(stream), canxml.WithMissing(func(p canxml.Pointer) { got = append(got, p.String()) }), canxml.WithStrict())
 	var text rm.DVText
 	if err := dec.Decode(&text); err != nil {
 		t.Fatalf("Decode(first value) = %v; want nil", err)
@@ -494,7 +494,7 @@ func TestREQ175_XMLNilMissingIsNoOption(t *testing.T) {
 	if de, ok := errors.AsType[*canxml.DecodeError](err); !ok || de == nil || de.Path != "/magnitude" {
 		t.Errorf("Decoder(WithMissing(nil)).Decode err = %v; want a DecodeError on \"/magnitude\", the element alone, as with no options", err)
 	}
-	err = canxml.NewDecoder(strings.NewReader(bad), canxml.WithMissing(func(string) {})).Decode(new(rm.DVQuantity))
+	err = canxml.NewDecoder(strings.NewReader(bad), canxml.WithMissing(func(canxml.Pointer) {})).Decode(new(rm.DVQuantity))
 	if de, ok := errors.AsType[*canxml.DecodeError](err); !ok || de == nil || de.Path != "/dv_quantity[1]/magnitude[1]" {
 		t.Errorf("Decoder(WithMissing).Decode err = %v; want a DecodeError on \"/dv_quantity[1]/magnitude[1]\": the decode is tracked", err)
 	}
@@ -516,7 +516,7 @@ func TestREQ175_XMLUnmodelledMemberIsPresent(t *testing.T) {
 		{name: "left out", in: `<annotations ` + ucNS + `/>`, want: []string{"/documentation"}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			for _, opts := range [][]canxml.DecoderOption{nil, {canxml.WithUnmatched(func(string) {})}} {
+			for _, opts := range [][]canxml.DecoderOption{nil, {canxml.WithUnmatched(func(canxml.Path) {})}} {
 				_, got, err := decodeXMLMissing(into, []byte(c.in), opts...)
 				if err != nil {
 					t.Fatalf("canxml.Unmarshal(WithMissing) = %v; want nil", err)
@@ -613,9 +613,9 @@ func TestREQ175_XMLMandatoryWithoutAValueDecodesAsAbsent(t *testing.T) {
 			}{
 				{name: "default"},
 				{name: "WithStrict", opts: []canxml.DecoderOption{canxml.WithStrict()}},
-				{name: "WithUnmatched", opts: []canxml.DecoderOption{canxml.WithUnmatched(func(string) {})}},
-				{name: "WithMissing", opts: []canxml.DecoderOption{canxml.WithMissing(func(string) {})}},
-				{name: "WithPresence", opts: []canxml.DecoderOption{canxml.WithPresence(func(string, canxml.Presence) {})}},
+				{name: "WithUnmatched", opts: []canxml.DecoderOption{canxml.WithUnmatched(func(canxml.Path) {})}},
+				{name: "WithMissing", opts: []canxml.DecoderOption{canxml.WithMissing(func(canxml.Pointer) {})}},
+				{name: "WithPresence", opts: []canxml.DecoderOption{canxml.WithPresence(func(canxml.Pointer, canxml.Presence) {})}},
 				{name: "WithMaxDepth", opts: []canxml.DecoderOption{canxml.WithMaxDepth(64)}},
 			} {
 				decode := map[string]func(string) (any, error){

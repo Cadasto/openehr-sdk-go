@@ -138,7 +138,7 @@ func TestREQ056_XMLSecondDecodeKeepsAReusedValue(t *testing.T) {
 		return &aom14.ArchetypeSlot{Includes: []aom14.Assertion{{Tag: new("old")}}, Excludes: []aom14.Assertion{{Tag: new("kept")}}}
 	}
 	once := stale()
-	if err := canxml.Unmarshal([]byte(in), once, canxml.WithMissing(func(string) {})); err != nil {
+	if err := canxml.Unmarshal([]byte(in), once, canxml.WithMissing(func(canxml.Pointer) {})); err != nil {
 		t.Fatalf("canxml.Unmarshal WithMissing into the stale value = %v; want nil", err)
 	}
 	if len(once.Includes) != 2 || len(once.Excludes) != 1 || *once.Excludes[0].Tag != "kept" {

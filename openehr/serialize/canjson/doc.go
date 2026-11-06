@@ -254,8 +254,9 @@
 //
 //   - [WithUnmatched] passes each one to a function, in the order it
 //     appears in the input, as a JSON Pointer (RFC 6901) from the root of
-//     the value, such as "/content/0/x-note". The decode returns the same
-//     value as the default.
+//     the value, such as "/content/0/x-note": a [Pointer], which writes its
+//     text only when asked. The decode returns the same value as the
+//     default.
 //   - [WithStrict] refuses the decode at the first one, with a
 //     [DecodeError] whose Path is its pointer and which wraps
 //     [ErrUnknownMember]. An absent member is never refused.
@@ -300,8 +301,8 @@
 // member is never a decode error in any mode: [WithStrict] covers unmatched
 // members only.
 //
-// [WithMissing] passes each missing member to a function, once, as a JSON
-// Pointer (RFC 6901) from the root of the value, such as
+// [WithMissing] passes each missing member to a function, once, as a
+// [Pointer], its JSON Pointer (RFC 6901) from the root of the value, such as
 // "/content/0/data/events/0/data/items/0/value/magnitude": the attribute's
 // name under the pointer of the object that lacks it, each item of a list
 // by its position counted from 0, each entry of a `Hash` by its key. The

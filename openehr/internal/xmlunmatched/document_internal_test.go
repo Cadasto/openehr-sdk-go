@@ -17,6 +17,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/internal/reportpath"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
@@ -68,7 +69,7 @@ func isNumError(err error) bool {
 func documentModes() map[string]func() *Tracker {
 	return map[string]func() *Tracker{
 		"untracked": func() *Tracker { return nil },
-		"report":    func() *Tracker { return NewTracker(func(string) {}, false) },
+		"report":    func() *Tracker { return NewTracker(func(*reportpath.Node) {}, false) },
 		"strict":    func() *Tracker { return NewTracker(nil, true) },
 	}
 }
@@ -252,8 +253,8 @@ func TestREQ052_UnmarshalLocatesAPrimitiveFailure(t *testing.T) {
 func TestREQ175_UnmarshalAppliesTheTracker(t *testing.T) {
 	const in = `<counted xmlns="http://schemas.openehr.org/v1" x="1"><extra/></counted>`
 	var unmatched, missing []string
-	tr := NewTracker(func(p string) { unmatched = append(unmatched, p) }, false)
-	tr.ReportMissing(func(p string) { missing = append(missing, p) })
+	tr := NewTracker(func(p *reportpath.Node) { unmatched = append(unmatched, p.String()) }, false)
+	tr.ReportMissing(func(p *reportpath.Node) { missing = append(missing, p.String()) })
 	if err := Unmarshal([]byte(in), new(counted), tr); err != nil {
 		t.Fatalf("Unmarshal(report) = %v; want nil", err)
 	}

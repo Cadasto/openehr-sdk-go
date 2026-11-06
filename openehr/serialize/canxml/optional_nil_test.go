@@ -115,10 +115,10 @@ func nilCases() []nilCase {
 func TestREQ056_XMLOptionalMemberWithoutAValueIsAbsent(t *testing.T) {
 	modes := map[string][]canxml.DecoderOption{
 		"default":       nil,
-		"WithUnmatched": {canxml.WithUnmatched(func(p string) { t.Errorf("WithUnmatched reported %q; want nothing", p) })},
+		"WithUnmatched": {canxml.WithUnmatched(func(p canxml.Path) { t.Errorf("WithUnmatched reported %q; want nothing", p.String()) })},
 		"WithStrict":    {canxml.WithStrict()},
-		"WithMissing":   {canxml.WithMissing(func(string) {})},
-		"WithPresence":  {canxml.WithPresence(func(string, canxml.Presence) {})},
+		"WithMissing":   {canxml.WithMissing(func(canxml.Pointer) {})},
+		"WithPresence":  {canxml.WithPresence(func(canxml.Pointer, canxml.Presence) {})},
 	}
 	for _, c := range nilCases() {
 		t.Run(c.name, func(t *testing.T) {

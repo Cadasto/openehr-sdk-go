@@ -434,9 +434,9 @@ func TestREQ108_ReadOperationalTemplateRefusesAnElementPastTheElementLimit(t *te
 		"no option":               nil,
 		"a larger limit":          {canxml.WithMaxDepth(10 * readElementLimit)},
 		"no limit":                {canxml.WithMaxDepth(0)},
-		"WithUnmatched":           {canxml.WithUnmatched(func(string) {})},
-		"WithMissing":             {canxml.WithMissing(func(string) {})},
-		"WithUnmatched, no limit": {canxml.WithUnmatched(func(string) {}), canxml.WithMaxDepth(0)},
+		"WithUnmatched":           {canxml.WithUnmatched(func(canxml.Path) {})},
+		"WithMissing":             {canxml.WithMissing(func(canxml.Pointer) {})},
+		"WithUnmatched, no limit": {canxml.WithUnmatched(func(canxml.Path) {}), canxml.WithMaxDepth(0)},
 	}
 	for name, opts := range callers {
 		t.Run(name, func(t *testing.T) {
@@ -477,7 +477,7 @@ func TestREQ108_ReadOperationalTemplateAppliesTheCallersSmallerLimit(t *testing.
 		"a larger limit, then the limit": {canxml.WithMaxDepth(2 * limit), canxml.WithMaxDepth(limit)},
 		"the limit, then no limit":       {canxml.WithMaxDepth(limit), canxml.WithMaxDepth(0)},
 		"no limit, then the limit":       {canxml.WithMaxDepth(0), canxml.WithMaxDepth(limit)},
-		"the limit with WithUnmatched":   {canxml.WithMaxDepth(limit), canxml.WithUnmatched(func(string) {})},
+		"the limit with WithUnmatched":   {canxml.WithMaxDepth(limit), canxml.WithUnmatched(func(canxml.Path) {})},
 	}
 	for name, opts := range callers {
 		t.Run(name, func(t *testing.T) {
@@ -592,10 +592,10 @@ func TestREQ108_ReadOperationalTemplateReturnsTheSourcesError(t *testing.T) {
 		strict bool
 	}{
 		{name: "no option"},
-		{name: "WithUnmatched", opts: []canxml.DecoderOption{canxml.WithUnmatched(func(string) {})}},
-		{name: "WithMissing", opts: []canxml.DecoderOption{canxml.WithMissing(func(string) {})}},
+		{name: "WithUnmatched", opts: []canxml.DecoderOption{canxml.WithUnmatched(func(canxml.Path) {})}},
+		{name: "WithMissing", opts: []canxml.DecoderOption{canxml.WithMissing(func(canxml.Pointer) {})}},
 		{name: "WithStrict", opts: []canxml.DecoderOption{canxml.WithStrict()}, strict: true},
-		{name: "WithStrict and WithUnmatched", opts: []canxml.DecoderOption{canxml.WithStrict(), canxml.WithUnmatched(func(string) {})}, strict: true},
+		{name: "WithStrict and WithUnmatched", opts: []canxml.DecoderOption{canxml.WithStrict(), canxml.WithUnmatched(func(canxml.Path) {})}, strict: true},
 	}
 	for name, src := range sources {
 		for _, o := range options {
@@ -666,10 +666,10 @@ func TestREQ108_ReadOperationalTemplateRefusesADeepElementAReadingLeavesOut(t *t
 		limit int
 	}{
 		{name: "the element limit", limit: readElementLimit},
-		{name: "the element limit, with WithUnmatched", opts: []canxml.DecoderOption{canxml.WithUnmatched(func(string) {})}, limit: readElementLimit},
+		{name: "the element limit, with WithUnmatched", opts: []canxml.DecoderOption{canxml.WithUnmatched(func(canxml.Path) {})}, limit: readElementLimit},
 		{name: "a larger limit of the caller's", opts: []canxml.DecoderOption{canxml.WithMaxDepth(2 * readElementLimit)}, limit: readElementLimit},
 		{name: "a caller's limit of 50", opts: []canxml.DecoderOption{canxml.WithMaxDepth(50)}, limit: 50},
-		{name: "a caller's limit of 50, with WithUnmatched", opts: []canxml.DecoderOption{canxml.WithMaxDepth(50), canxml.WithUnmatched(func(string) {})}, limit: 50},
+		{name: "a caller's limit of 50, with WithUnmatched", opts: []canxml.DecoderOption{canxml.WithMaxDepth(50), canxml.WithUnmatched(func(canxml.Path) {})}, limit: 50},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

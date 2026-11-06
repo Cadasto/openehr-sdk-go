@@ -503,7 +503,7 @@ func TestUnmarshalSubmissionMissingImportedItem(t *testing.T) { // REQ-130, REQ-
 		member("commit_audit", audit),
 		member("item", "{}")))
 	var got []string
-	if _, err := contribution.UnmarshalSubmission(body, canjson.WithMissing(func(p string) { got = append(got, p) })); err != nil {
+	if _, err := contribution.UnmarshalSubmission(body, canjson.WithMissing(func(p canjson.Pointer) { got = append(got, p.String()) })); err != nil {
 		t.Fatalf("UnmarshalSubmission: %v", err)
 	}
 	slices.Sort(got)
@@ -737,7 +737,7 @@ func TestUnmarshalSubmissionUnmatched(t *testing.T) { // REQ-130, REQ-170
 		"/versions/0/data/x_data",
 	}
 	var got []string
-	withOption := encodeSubmission(t, body, canjson.WithUnmatched(func(p string) { got = append(got, p) }))
+	withOption := encodeSubmission(t, body, canjson.WithUnmatched(func(p canjson.Pointer) { got = append(got, p.String()) }))
 	if !slices.Equal(got, want) {
 		t.Errorf("WithUnmatched received %q, want %q", got, want)
 	}
@@ -750,7 +750,7 @@ func TestUnmarshalSubmissionUnmatched(t *testing.T) { // REQ-130, REQ-170
 		member("versions", "["+originalJSON(member("x_version", extension), member("data", compositionJSON))+"]"),
 		member("audit", auditJSON("AUDIT_DETAILS", member("x_audit", extension)))))
 	got = nil
-	encodeSubmission(t, auditLast, canjson.WithUnmatched(func(p string) { got = append(got, p) }))
+	encodeSubmission(t, auditLast, canjson.WithUnmatched(func(p canjson.Pointer) { got = append(got, p.String()) }))
 	if want := []string{"/versions/0/x_version", "/audit/x_audit"}; !slices.Equal(got, want) {
 		t.Errorf("WithUnmatched received %q for a body whose audit comes last, want %q", got, want)
 	}
@@ -817,7 +817,7 @@ func TestUnmarshalSubmissionMissing(t *testing.T) { // REQ-130, REQ-175
 			member("data", compositionJSON)),
 	)
 	var got []string
-	withOption := encodeSubmission(t, body, canjson.WithMissing(func(p string) { got = append(got, p) }))
+	withOption := encodeSubmission(t, body, canjson.WithMissing(func(p canjson.Pointer) { got = append(got, p.String()) }))
 	if want := []string{"/versions/0/data/language"}; !slices.Equal(got, want) {
 		t.Errorf("WithMissing received %q, want %q", got, want)
 	}
@@ -852,7 +852,7 @@ func TestUnmarshalSubmissionFailedDecodeReportsNothing(t *testing.T) { // REQ-13
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			var reported []string
-			report := func(p string) { reported = append(reported, p) }
+			report := func(p canjson.Pointer) { reported = append(reported, p.String()) }
 			_, err := contribution.UnmarshalSubmission(tc.body, canjson.WithUnmatched(report), canjson.WithMissing(report), canjson.WithStrict())
 			if !errors.Is(err, tc.want) {
 				t.Errorf("error = %v, want one wrapping %v, ahead of the strict refusal", err, tc.want)
@@ -867,7 +867,7 @@ func TestUnmarshalSubmissionFailedDecodeReportsNothing(t *testing.T) { // REQ-13
 	}
 	t.Run("Validate refuses the submission", func(t *testing.T) {
 		var reported []string
-		report := func(p string) { reported = append(reported, p) }
+		report := func(p canjson.Pointer) { reported = append(reported, p.String()) }
 		body := bodyJSON(noCommitter, originalJSON(member("data", unmatched)))
 		_, err := contribution.UnmarshalSubmission(body, canjson.WithUnmatched(report), canjson.WithMissing(report))
 		if err == nil || !strings.Contains(err.Error(), "committer is nil") {

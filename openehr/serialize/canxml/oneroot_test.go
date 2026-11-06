@@ -58,7 +58,7 @@ func TestREQ056_XMLOneRoot(t *testing.T) {
 			var opts []canxml.DecoderOption
 			switch mode {
 			case "report":
-				opts = append(opts, canxml.WithUnmatched(func(p string) { reported = append(reported, p) }))
+				opts = append(opts, canxml.WithUnmatched(func(p canxml.Path) { reported = append(reported, p.String()) }))
 			case "strict":
 				opts = append(opts, canxml.WithStrict())
 			}
@@ -187,7 +187,7 @@ func TestREQ056_XMLBeforeRoot(t *testing.T) {
 			var opts []canxml.DecoderOption
 			switch mode {
 			case "report":
-				opts = append(opts, canxml.WithUnmatched(func(p string) { reported = append(reported, p) }))
+				opts = append(opts, canxml.WithUnmatched(func(p canxml.Path) { reported = append(reported, p.String()) }))
 			case "strict":
 				opts = append(opts, canxml.WithStrict())
 			}
@@ -274,11 +274,11 @@ func TestREQ056_XMLTargetInsideTheRoot(t *testing.T) {
 	modes := map[string]func(in string, v any) error{
 		"Unmarshal": func(in string, v any) error { return canxml.Unmarshal([]byte(in), v) },
 		"Unmarshal WithUnmatched": func(in string, v any) error {
-			return canxml.Unmarshal([]byte(in), v, canxml.WithUnmatched(func(string) {}))
+			return canxml.Unmarshal([]byte(in), v, canxml.WithUnmatched(func(canxml.Path) {}))
 		},
 		"Unmarshal WithStrict": func(in string, v any) error { return canxml.Unmarshal([]byte(in), v, canxml.WithStrict()) },
 		"Unmarshal WithMissing": func(in string, v any) error {
-			return canxml.Unmarshal([]byte(in), v, canxml.WithMissing(func(string) {}))
+			return canxml.Unmarshal([]byte(in), v, canxml.WithMissing(func(canxml.Pointer) {}))
 		},
 		"Unmarshal WithMaxDepth": func(in string, v any) error { return canxml.Unmarshal([]byte(in), v, canxml.WithMaxDepth(100)) },
 		"Decoder WithMaxDepth": func(in string, v any) error {
@@ -288,7 +288,7 @@ func TestREQ056_XMLTargetInsideTheRoot(t *testing.T) {
 			return canxml.NewDecoder(strings.NewReader(in), canxml.WithStrict()).Decode(v)
 		},
 		"Decoder WithUnmatched": func(in string, v any) error {
-			return canxml.NewDecoder(strings.NewReader(in), canxml.WithUnmatched(func(string) {})).Decode(v)
+			return canxml.NewDecoder(strings.NewReader(in), canxml.WithUnmatched(func(canxml.Path) {})).Decode(v)
 		},
 	}
 	for mode, decode := range modes {

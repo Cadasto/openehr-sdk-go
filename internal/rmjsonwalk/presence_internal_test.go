@@ -4,6 +4,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/internal/reportpath"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 )
 
@@ -40,7 +41,7 @@ func TestREQ175_RequiredIsComputedOncePerClass(t *testing.T) {
 	}
 	doc := []byte(`[{"units":"kg"},{"magnitude":1},{"_type":"DV_COUNT"}]`)
 	for range 3 {
-		err := m.Walk(doc, Root{Nest: "[", Type: "DV_QUANTITY"}, Hooks{Missing: func(string) error { return nil }})
+		err := m.Walk(doc, Root{Nest: "[", Type: "DV_QUANTITY"}, Hooks{Missing: func(*reportpath.Node) error { return nil }})
 		if err != nil {
 			t.Fatalf("Walk(): %v", err)
 		}
@@ -65,7 +66,7 @@ func TestREQ175_RequiredIsNotReadWithoutTheMissingHook(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New(): %v", err)
 	}
-	if err := m.Unmatched([]byte(`{"_type":"DV_QUANTITY","x-a":1}`), Root{}, func(string) error { return nil }); err != nil {
+	if err := m.Unmatched([]byte(`{"_type":"DV_QUANTITY","x-a":1}`), Root{}, func(*reportpath.Node) error { return nil }); err != nil {
 		t.Fatalf("Unmatched(): %v", err)
 	}
 	if len(l.calls) != 0 {

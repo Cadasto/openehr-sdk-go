@@ -71,14 +71,14 @@ func TestREQ170_REQ175_ReportCostGrowsWithTheDocument(t *testing.T) {
 			name: "WithMissing",
 			leaf: `{"_type":"FOLDER","archetype_node_id":"a"}`,
 			opt: func(count *int) canjson.DecoderOption {
-				return canjson.WithMissing(func(string) { *count++ })
+				return canjson.WithMissing(func(canjson.Pointer) { *count++ })
 			},
 		},
 		{
 			name: "WithUnmatched",
 			leaf: `{"_type":"FOLDER","name":{"_type":"DV_TEXT","value":"x"},"archetype_node_id":"a","x":0}`,
 			opt: func(count *int) canjson.DecoderOption {
-				return canjson.WithUnmatched(func(string) { *count++ })
+				return canjson.WithUnmatched(func(canjson.Pointer) { *count++ })
 			},
 		},
 	}

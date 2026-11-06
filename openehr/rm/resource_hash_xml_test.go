@@ -86,8 +86,8 @@ func TestREQ176_REQ056_ResourceDescriptionHashRoundTrip(t *testing.T) {
 	var got rm.ResourceDescription
 	var unmatched, missing []string
 	if err := canxml.Unmarshal(doc, &got, canxml.WithStrict(),
-		canxml.WithUnmatched(func(p string) { unmatched = append(unmatched, p) }),
-		canxml.WithMissing(func(p string) { missing = append(missing, p) })); err != nil {
+		canxml.WithUnmatched(func(p canxml.Path) { unmatched = append(unmatched, p.String()) }),
+		canxml.WithMissing(func(p canxml.Pointer) { missing = append(missing, p.String()) })); err != nil {
 		t.Fatalf("canxml.Unmarshal(%s, strict) = %v; want nil", doc, err)
 	}
 	if len(unmatched) > 0 || len(missing) > 0 {
@@ -154,7 +154,7 @@ func TestREQ176_REQ056_ResourceClassesCarryNoID(t *testing.T) {
 		`<code_string>en</code_string></language><purpose>p</purpose></details></description>`)
 	var got rm.ResourceDescription
 	var unmatched []string
-	if err := canxml.Unmarshal(base, &got, canxml.WithUnmatched(func(p string) { unmatched = append(unmatched, p) })); err != nil {
+	if err := canxml.Unmarshal(base, &got, canxml.WithUnmatched(func(p canxml.Path) { unmatched = append(unmatched, p.String()) })); err != nil {
 		t.Fatalf("canxml.Unmarshal = %v; want nil", err)
 	}
 	if want := []string{"/description[1]/details[1]/@id"}; !slices.Equal(unmatched, want) {
@@ -207,7 +207,7 @@ func TestREQ176_REQ056_HashMissingMembers(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			doc := []byte(`<description xmlns="http://schemas.openehr.org/v1">` + tc.body + `</description>`)
 			var missing []string
-			if err := canxml.Unmarshal(doc, new(rm.ResourceDescription), canxml.WithMissing(func(p string) { missing = append(missing, p) })); err != nil {
+			if err := canxml.Unmarshal(doc, new(rm.ResourceDescription), canxml.WithMissing(func(p canxml.Pointer) { missing = append(missing, p.String()) })); err != nil {
 				t.Fatalf("canxml.Unmarshal = %v; want nil", err)
 			}
 			if !slices.Equal(missing, tc.want) {

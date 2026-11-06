@@ -25,7 +25,7 @@ var memberOptions = []struct {
 	opt  func() canjson.DecoderOption
 }{
 	{name: "WithStrict", opt: canjson.WithStrict},
-	{name: "WithUnmatched", opt: func() canjson.DecoderOption { return canjson.WithUnmatched(func(string) {}) }},
+	{name: "WithUnmatched", opt: func() canjson.DecoderOption { return canjson.WithUnmatched(func(canjson.Pointer) {}) }},
 }
 
 // REQ-052 — a duplicate member name is refused with ErrInvalidShape on the

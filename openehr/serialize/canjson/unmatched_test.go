@@ -177,7 +177,7 @@ func unmatchedCases() []unmatchedCase {
 func decodeCollecting(c unmatchedCase, in []byte, opts ...canjson.DecoderOption) (any, []string, error) {
 	var got []string
 	v := c.into()
-	opts = append(opts, canjson.WithUnmatched(func(p string) { got = append(got, p) }))
+	opts = append(opts, canjson.WithUnmatched(func(p canjson.Pointer) { got = append(got, p.String()) }))
 	err := canjson.Unmarshal(in, v, opts...)
 	return v, got, err
 }
@@ -296,7 +296,7 @@ func TestREQ170_DecoderUnmatchedOptions(t *testing.T) {
 		`{"_type":"DV_QUANTITY","magnitude":1,"units":"kg","x-two":{"nested":"` + plantedValue + `"}}`
 
 	var got []string
-	dec := canjson.NewDecoder(strings.NewReader(stream), canjson.WithUnmatched(func(p string) { got = append(got, p) }))
+	dec := canjson.NewDecoder(strings.NewReader(stream), canjson.WithUnmatched(func(p canjson.Pointer) { got = append(got, p.String()) }))
 	var text rm.DVText
 	var qty rm.DVQuantity
 	if err := dec.Decode(&text); err != nil {
@@ -354,7 +354,7 @@ func TestREQ170_DecoderWithOptionsReadsTheValueWhole(t *testing.T) {
 		}
 	})
 	opts := map[string][]canjson.DecoderOption{
-		"WithUnmatched": {canjson.WithUnmatched(func(string) {})},
+		"WithUnmatched": {canjson.WithUnmatched(func(canjson.Pointer) {})},
 		"WithStrict":    {canjson.WithStrict()},
 	}
 	for name, o := range opts {
@@ -386,7 +386,7 @@ func TestREQ170_ConcurrentDecodesKeepTheirOwnReports(t *testing.T) {
 			want := []string{"/value/" + name}
 			for range 200 {
 				var got []string
-				err := canjson.Unmarshal(in, new(rm.Element), canjson.WithUnmatched(func(p string) { got = append(got, p) }))
+				err := canjson.Unmarshal(in, new(rm.Element), canjson.WithUnmatched(func(p canjson.Pointer) { got = append(got, p.String()) }))
 				if err != nil {
 					t.Fatalf("canjson.Unmarshal(WithUnmatched) = %v; want nil", err)
 				}
@@ -401,7 +401,7 @@ func TestREQ170_ConcurrentDecodesKeepTheirOwnReports(t *testing.T) {
 // modes are the three decode modes, each as the options it passes and the
 // pointers it collects.
 func modes(reported *[]string) map[string][]canjson.DecoderOption {
-	report := canjson.WithUnmatched(func(p string) { *reported = append(*reported, p) })
+	report := canjson.WithUnmatched(func(p canjson.Pointer) { *reported = append(*reported, p.String()) })
 	return map[string][]canjson.DecoderOption{
 		"default": nil,
 		"report":  {report},
@@ -639,7 +639,7 @@ func TestREQ170_RootTargetsAreChecked(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			var got []string
-			if err := canjson.Unmarshal([]byte(tc.in), tc.into(), canjson.WithUnmatched(func(p string) { got = append(got, p) })); err != nil {
+			if err := canjson.Unmarshal([]byte(tc.in), tc.into(), canjson.WithUnmatched(func(p canjson.Pointer) { got = append(got, p.String()) })); err != nil {
 				t.Fatalf("canjson.Unmarshal(%s, WithUnmatched) = %v; want nil", tc.in, err)
 			}
 			if !slices.Equal(got, tc.want) {
@@ -720,7 +720,7 @@ func TestREQ170_NonRMTargetsAreNotChecked(t *testing.T) {
 	for name, control := range controls {
 		t.Run("control "+name, func(t *testing.T) {
 			var reported []string
-			if err := canjson.Unmarshal([]byte(control.in), control.into(), canjson.WithUnmatched(func(p string) { reported = append(reported, p) })); err != nil {
+			if err := canjson.Unmarshal([]byte(control.in), control.into(), canjson.WithUnmatched(func(p canjson.Pointer) { reported = append(reported, p.String()) })); err != nil {
 				t.Fatalf("canjson.Unmarshal(%s, WithUnmatched) = %v; want nil", control.in, err)
 			}
 			if want := []string{"/x-ext"}; !slices.Equal(reported, want) {
@@ -812,7 +812,7 @@ func TestREQ170_RegisteredTypeCensus(t *testing.T) {
 		}
 		in := `{"_type":"` + name + `","x-census":"` + plantedValue + `"}`
 		var got []string
-		err := canjson.Unmarshal([]byte(in), ctor(), canjson.WithUnmatched(func(p string) { got = append(got, p) }))
+		err := canjson.Unmarshal([]byte(in), ctor(), canjson.WithUnmatched(func(p canjson.Pointer) { got = append(got, p.String()) }))
 		if err != nil {
 			t.Errorf("%s: canjson.Unmarshal(%s, WithUnmatched) = %v; want nil", name, in, err)
 			continue
@@ -863,7 +863,7 @@ func TestREQ170_CorpusUnderReportAndStrict(t *testing.T) {
 			}
 			factory := fixtureFactory(t, rel)
 			var got []string
-			if err := canjson.Unmarshal(raw, factory(), canjson.WithUnmatched(func(p string) { got = append(got, p) })); err != nil {
+			if err := canjson.Unmarshal(raw, factory(), canjson.WithUnmatched(func(p canjson.Pointer) { got = append(got, p.String()) })); err != nil {
 				t.Fatalf("canjson.Unmarshal(WithUnmatched) = %v; want nil", err)
 			}
 			want := corpusUnmatched[rel.Rel]

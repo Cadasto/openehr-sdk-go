@@ -4,8 +4,9 @@ import (
 	"encoding/xml"
 	"fmt"
 	"slices"
-	"strconv"
 	"strings"
+
+	"github.com/cadasto/openehr-sdk-go/internal/reportpath"
 )
 
 // Class describes one class to the runtime: what its generated decoder reads
@@ -103,7 +104,7 @@ func (t *Tracker) enter(start xml.StartElement, c *Class) error {
 // `/description/details/en/purpose`. The report is the whole policy: no
 // missing member refuses the decode, strict or not. A nil fn asks for
 // nothing.
-func (t *Tracker) ReportMissing(fn func(pointer string)) {
+func (t *Tracker) ReportMissing(fn func(pointer *reportpath.Node)) {
 	t.missing = fn
 }
 
@@ -120,7 +121,7 @@ func (t *Tracker) ReportMissing(fn func(pointer string)) {
 // with no content is a value, and so is an entry of a Hash member, whatever
 // its text, unless it is nilled. The report is the whole policy: nothing
 // refuses the decode, strict or not. A nil fn asks for nothing.
-func (t *Tracker) ReportPresence(fn func(pointer string, nilled bool)) {
+func (t *Tracker) ReportPresence(fn func(pointer *reportpath.Node, nilled bool)) {
 	t.presence = fn
 }
 
@@ -184,11 +185,12 @@ func (t *Tracker) closing(n int) {
 // member name when name is not empty. While a Hash entry's key is unknown it
 // holds the pointer instead ([Tracker.holdEntry]).
 func (t *Tracker) sentMember(n int, name string, nilled bool) {
+	p := t.memberPointer(n, name)
 	if t.held != nil {
-		*t.held = append(*t.held, heldItem{pointer: t.heldPointer(n, name), sent: true, nilled: nilled})
+		*t.held = append(*t.held, heldItem{path: p, sent: true, nilled: nilled})
 		return
 	}
-	t.presence(t.pointer(n, name), nilled)
+	t.presence(p, nilled)
 }
 
 // missingMember passes to the decode's hook the pointer of the mandatory
@@ -196,99 +198,75 @@ func (t *Tracker) sentMember(n int, name string, nilled bool) {
 // Hash entry's key is unknown it holds the pointer instead
 // ([Tracker.holdEntry]).
 func (t *Tracker) missingMember(n int, name string) {
+	p := t.memberPointer(n, name)
 	if t.held != nil {
-		*t.held = append(*t.held, heldItem{pointer: t.heldPointer(n, name), missing: true})
+		*t.held = append(*t.held, heldItem{path: p, missing: true})
 		return
 	}
-	t.missing(t.pointer(n, name))
+	t.missing(p)
 }
 
-// pointer returns the JSON Pointer, in the canonical-JSON form of the value,
-// of the element whose frame is t.open[n-1], followed by `/` and name when
-// name is not empty: nothing for the root element, and a token per element
-// below it ([Tracker.token]).
-func (t *Tracker) pointer(n int, name string) string {
-	var b strings.Builder
-	for k := 2; k < n; k++ {
-		t.token(k).write(&b)
-	}
+// memberPointer returns the JSON Pointer, in the canonical-JSON form of the
+// value, of the element whose frame is t.open[n-1], followed by `/` and name
+// when name is not empty.
+func (t *Tracker) memberPointer(n int, name string) *reportpath.Node {
+	p := t.pointerPath(n)
 	if name != "" {
-		b.WriteByte('/')
-		b.WriteString(name)
-	}
-	return b.String()
-}
-
-// heldPointer returns what [Tracker.pointer] returns, kept as its tokens, so
-// that it is written only when the decode passes it to its hook. A member of
-// a Hash entry whose key lies inside the entry's value can close before the
-// element that carries the key, such as an empty `use` before the `language`
-// of a RESOURCE_DESCRIPTION_ITEM; the entry's token reads its key when it is
-// written, once the entry has closed.
-func (t *Tracker) heldPointer(n int, name string) heldPointer {
-	p := heldPointer{tokens: make([]pointerToken, 0, n-2), name: name}
-	for k := 2; k < n; k++ {
-		p.tokens = append(p.tokens, t.token(k))
+		p = p.Name(name)
 	}
 	return p
 }
 
-// heldPointer is a JSON Pointer a held Hash entry holds ([Tracker.heldPointer]).
-type heldPointer struct {
-	tokens []pointerToken
-	name   string // a last member name, or ""
-}
-
-// String writes the pointer.
-func (p heldPointer) String() string {
-	var b strings.Builder
-	for _, tk := range p.tokens {
-		tk.write(&b)
+// pointerPath returns the JSON Pointer, in the canonical-JSON form of the
+// value, of the element whose frame is t.open[n-1]: nil, the empty pointer,
+// for the root element, and the nodes of one token per element below it
+// ([Tracker.pointerNode]). It makes the nodes of the frames that have none
+// yet, those after the innermost frame below the root that has one, and keeps
+// each in its frame until the element closes.
+func (t *Tracker) pointerPath(n int) *reportpath.Node {
+	j := n - 1
+	for j >= 2 && t.open[j].ptr == nil {
+		j--
 	}
-	if p.name != "" {
-		b.WriteByte('/')
-		b.WriteString(p.name)
+	var p *reportpath.Node
+	if j >= 2 {
+		p = t.open[j].ptr
 	}
-	return b.String()
+	for j = max(j+1, 2); j < n; j++ {
+		p = t.pointerNode(j, p)
+		t.open[j].ptr = p
+	}
+	return p
 }
 
-// pointerToken is the part of a JSON Pointer one element below the root
-// gives: its local name, then its key when it is one entry of a Hash member,
-// or else its 0-based position among the same-named siblings the decoder
-// read when it is one item of a multi-valued member.
-type pointerToken struct {
-	name  string
-	key   func() string // the entry's key, read when the token is written; nil for no entry
-	index int           // the item's position; -1 for no item
-}
-
-// token returns the token of the element whose frame is t.open[k], k >= 2.
-// An item's position is its position in the document less the earlier
+// pointerNode returns the pointer of the element whose frame is t.open[k],
+// k >= 2, given parent, the pointer of the element around it: `/` and its
+// local name, then `/` and its key, escaped as RFC 6901 asks, when it is one
+// entry of a Hash member, or else `/` and its 0-based position among the
+// same-named siblings the decoder read when it is one item of a multi-valued
+// member. An item's position is its position in the document less the earlier
 // siblings of its name the decoder skipped, every one of which has closed.
-func (t *Tracker) token(k int) pointerToken {
+//
+// While a Hash entry is held, an entry's key may lie in its value, still to
+// be read: the node is then made without it and given it when the hold ends
+// ([Tracker.holdEntry]).
+func (t *Tracker) pointerNode(k int, parent *reportpath.Node) *reportpath.Node {
 	f := &t.open[k]
-	tk := pointerToken{name: f.name, key: f.key, index: -1}
-	if p := &t.open[k-1]; f.key == nil && p.class != nil {
-		if i := slices.Index(p.class.Items, f.name); i >= 0 {
-			tk.index = f.pos - 1 - p.skippedAt(i)
+	p := parent.Name(f.name)
+	if f.key != nil {
+		if t.held == nil {
+			return p.Token(f.key())
+		}
+		p = p.Token("")
+		t.pending = append(t.pending, pendingKey{node: p, key: f.key})
+		return p
+	}
+	if up := &t.open[k-1]; up.class != nil {
+		if i := slices.Index(up.class.Items, f.name); i >= 0 {
+			return p.Index(f.pos - 1 - up.skippedAt(i))
 		}
 	}
-	return tk
-}
-
-// write writes tk to b: `/` and the name, then `/` and the key, escaped as
-// RFC 6901 asks, or `/` and the position.
-func (tk pointerToken) write(b *strings.Builder) {
-	b.WriteByte('/')
-	b.WriteString(tk.name)
-	switch {
-	case tk.key != nil:
-		b.WriteByte('/')
-		_, _ = pointerKey.WriteString(b, tk.key()) // a strings.Builder never fails
-	case tk.index >= 0:
-		b.WriteByte('/')
-		b.WriteString(strconv.Itoa(tk.index))
-	}
+	return p
 }
 
 // isNilled reports whether attrs carries `xsi:nil="true"`: an attribute

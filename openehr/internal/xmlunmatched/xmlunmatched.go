@@ -149,6 +149,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/cadasto/openehr-sdk-go/internal/reportpath"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
@@ -183,8 +184,14 @@ var ErrLimitExceeded = errors.New("canxml: decode limit exceeded")
 // report function, whether the first unmatched item refuses the decode, and
 // the elements open at the decoder's current token. A Tracker serves one
 // decoder, from one goroutine at a time.
+//
+// The paths and pointers it reports are [reportpath.Node] chains, which share
+// the nodes of the elements open around the item reported. A frame makes its
+// node when a report first needs it ([Tracker.elemPath],
+// [Tracker.pointerPath]), so a report costs the decode the elements opened
+// since the last report, not the depth of the item.
 type Tracker struct {
-	report func(path string)
+	report func(path *reportpath.Node)
 	strict bool
 	// checked counts the elements whose content a decoder of the SDK has
 	// checked: each generated UnmarshalXML, through [Enter], and each
@@ -194,10 +201,10 @@ type Tracker struct {
 	// missing is the caller's hook for the mandatory members a document
 	// leaves out, set by [Tracker.ReportMissing]; nil when none asked, and
 	// then no element is checked for them.
-	missing func(pointer string)
+	missing func(pointer *reportpath.Node)
 	// presence is the caller's hook for the members a document sends without
 	// a value, set by [Tracker.ReportPresence]; nil when none asked.
-	presence func(pointer string, nilled bool)
+	presence func(pointer *reportpath.Node, nilled bool)
 	// open holds one frame per element opened and not yet closed, after a
 	// first frame for the document itself, which counts the top-level
 	// elements of the value being decoded.
@@ -224,6 +231,18 @@ type Tracker struct {
 	// missing members the value holds, in place of applying the policy to
 	// them ([Tracker.holdEntry]); nil otherwise.
 	held *[]heldItem
+	// pending holds the pointer nodes made while a Hash entry is held for
+	// entries whose key may lie inside their value, each with the way to read
+	// the key, which the node is given once the outermost hold ends
+	// ([Tracker.holdEntry]).
+	pending []pendingKey
+}
+
+// pendingKey is a pointer node of a Hash entry made while the entry's key may
+// not be known yet, and the way to read the key.
+type pendingKey struct {
+	node *reportpath.Node
+	key  func() string
 }
 
 // frame is one open element: its local name, its 1-based position among its
@@ -268,6 +287,11 @@ type frame struct {
 	// takes as one of a choice of shapes makes optional, which are never
 	// missing; nil otherwise.
 	optional []string
+	// elem is the element's path, and ptr its JSON Pointer, once a report
+	// has needed them; nil until then ([Tracker.elemPath],
+	// [Tracker.pointerPath]).
+	elem *reportpath.Node
+	ptr  *reportpath.Node
 }
 
 // linearChildNames is the number of distinct child names a frame counts in its
@@ -311,8 +335,9 @@ type nameCount struct {
 
 // NewTracker returns the tracker of a decode that passes every unmatched item
 // to report, when report is not nil, and refuses the first one when strict is
-// set.
-func NewTracker(report func(path string), strict bool) *Tracker {
+// set. An item's path is one `/name[n]` segment per element from the root of
+// the value, then `/@name` for an attribute or `/text()` for text.
+func NewTracker(report func(path *reportpath.Node), strict bool) *Tracker {
 	return &Tracker{report: report, strict: strict, open: make([]frame, 1, 16)}
 }
 
@@ -428,21 +453,38 @@ func (f *frame) count(local string) int {
 	return 1
 }
 
-// path returns the path of the innermost open element: one `/name[n]`
-// segment per open element, from the root of the value.
+// path returns the text of the path of the innermost open element: one
+// `/name[n]` segment per open element, from the root of the value.
 func (t *Tracker) path() string {
-	var b strings.Builder
-	t.writePath(&b, len(t.open))
-	return b.String()
+	return t.elemPath(len(t.open)).String()
 }
 
-// writePath writes the path of the open element whose frame is t.open[n-1]:
+// elemPath returns the path of the open element whose frame is t.open[n-1]:
 // one `/name[n]` segment per open element from the root of the value down to
-// it, and nothing for the document frame.
-func (t *Tracker) writePath(b *strings.Builder, n int) {
-	for _, f := range t.open[1:n] {
-		writeSegment(b, f.name, f.pos)
+// it, and nil, the empty path, for the document frame. It makes the nodes of
+// the frames that have none yet, those after the innermost frame that has
+// one, and keeps each in its frame until the element closes.
+func (t *Tracker) elemPath(n int) *reportpath.Node {
+	j := n - 1
+	for j >= 1 && t.open[j].elem == nil {
+		j--
 	}
+	var p *reportpath.Node
+	if j >= 1 {
+		p = t.open[j].elem
+	}
+	for j++; j < n; j++ {
+		f := &t.open[j]
+		p = p.Element(f.name, f.pos)
+		f.elem = p
+	}
+	return p
+}
+
+// childPath returns the path of the element at p, a child of the open
+// element whose frame is t.open[n-1], open or closed.
+func (t *Tracker) childPath(n int, p place) *reportpath.Node {
+	return t.elemPath(n).Element(p.name, p.pos)
 }
 
 // LimitDepth makes the decodes through t's decoder refuse an element nested
@@ -565,16 +607,13 @@ func (t *Tracker) here() place {
 
 // closedPath returns the path of the element at p, a child of the innermost
 // open element that has closed since its place was kept.
-func (t *Tracker) closedPath(p place) string {
-	var b strings.Builder
-	t.writePath(&b, len(t.open))
-	writeSegment(&b, p.name, p.pos)
-	return b.String()
+func (t *Tracker) closedPath(p place) *reportpath.Node {
+	return t.childPath(len(t.open), p)
 }
 
 // unmatched applies the policy to the unmatched item at path: report it, then
 // refuse it under strict. foreign marks an element in a foreign namespace.
-func (t *Tracker) unmatched(path string, foreign bool) error {
+func (t *Tracker) unmatched(path *reportpath.Node, foreign bool) error {
 	if t.held != nil {
 		*t.held = append(*t.held, heldItem{path: path, foreign: foreign})
 		return nil
@@ -583,7 +622,7 @@ func (t *Tracker) unmatched(path string, foreign bool) error {
 		t.report(path)
 	}
 	if t.strict {
-		return &unknownElementError{path: path, foreign: foreign}
+		return &unknownElementError{path: path.String(), foreign: foreign}
 	}
 	return nil
 }
@@ -594,7 +633,6 @@ func (t *Tracker) unmatched(path string, foreign bool) error {
 // no namespace, nor a bare `type` that dispatch read as the discriminator.
 func (t *Tracker) attrs(attrs []xml.Attr, known []string) error {
 	t.checked++
-	var base string
 	read := t.open[len(t.open)-1].discriminator
 	for _, a := range attrs {
 		if isSchemaInstance(a.Name) || isNamespaceDecl(a.Name) ||
@@ -602,10 +640,7 @@ func (t *Tracker) attrs(attrs []xml.Attr, known []string) error {
 			(read && isBareType(a.Name)) {
 			continue
 		}
-		if base == "" {
-			base = t.path()
-		}
-		if err := t.unmatched(base+"/@"+a.Name.Local, false); err != nil {
+		if err := t.unmatched(t.elemPath(len(t.open)).Attr(a.Name.Local), false); err != nil {
 			return err
 		}
 	}
@@ -627,10 +662,7 @@ func (t *Tracker) text(n int, text []byte) error {
 		return nil
 	}
 	f.text = true
-	var b strings.Builder
-	t.writePath(&b, n)
-	b.WriteString("/text()")
-	return t.unmatched(b.String(), false)
+	return t.unmatched(t.elemPath(n).Text(), false)
 }
 
 // isXMLSpace reports whether text holds XML whitespace only: spaces, tabs,
@@ -663,7 +695,7 @@ func (t *Tracker) readText(dec *xml.Decoder, start *xml.StartElement, v any) err
 		return err
 	}
 	if err := t.convert(start.Name, text, v); err != nil {
-		return t.fail(t.closedPath(at), err)
+		return t.fail(t.closedPath(at).String(), err)
 	}
 	return nil
 }
@@ -679,7 +711,7 @@ func (t *Tracker) decodeOptional(dec *xml.Decoder, start *xml.StartElement, v an
 		return false, err
 	}
 	if err := t.convert(start.Name, text, v); err != nil {
-		return false, t.fail(t.closedPath(at), err)
+		return false, t.fail(t.closedPath(at).String(), err)
 	}
 	return true, nil
 }
@@ -708,7 +740,7 @@ func (t *Tracker) elementText(dec *xml.Decoder, start *xml.StartElement) ([]byte
 		case xml.CharData:
 			text = append(text, tk...)
 		case xml.StartElement:
-			if err := t.unmatched(t.path(), isForeign(tk.Name)); err != nil {
+			if err := t.unmatched(t.elemPath(len(t.open)), isForeign(tk.Name)); err != nil {
 				return nil, err
 			}
 			if err := dec.Skip(); err != nil {
@@ -1085,7 +1117,7 @@ func LocalName(name xml.Name) string {
 func SkipUnmatched(dec *xml.Decoder, start xml.StartElement) error {
 	if t := trackerOf(dec); t != nil {
 		t.skipping()
-		if err := t.unmatched(t.path(), isForeign(start.Name)); err != nil {
+		if err := t.unmatched(t.elemPath(len(t.open)), isForeign(start.Name)); err != nil {
 			return err
 		}
 		return dec.Skip()
@@ -1103,7 +1135,7 @@ func SkipUnmatched(dec *xml.Decoder, start xml.StartElement) error {
 // decoder read last.
 func SkipUnmodelled(dec *xml.Decoder, start xml.StartElement) error {
 	if t := trackerOf(dec); t != nil {
-		if err := t.unmatched(t.path(), isForeign(start.Name)); err != nil {
+		if err := t.unmatched(t.elemPath(len(t.open)), isForeign(start.Name)); err != nil {
 			return err
 		}
 		return dec.Skip()
@@ -1179,18 +1211,17 @@ type Held struct {
 }
 
 // heldItem is one unmatched element a [Held] holds, or one item a held Hash
-// entry holds ([Tracker.holdEntry]): its path from the root of the value, and
-// whether it lies in a foreign namespace; or, when missing is set, the JSON
-// Pointer of a mandatory member the entry leaves out; or, when sent is set,
-// the JSON Pointer of a member the entry sends without a value, and whether
-// it was nilled.
+// entry holds ([Tracker.holdEntry]): in path, its path from the root of the
+// value, and whether it lies in a foreign namespace; or, when missing is set,
+// the JSON Pointer of a mandatory member the entry leaves out; or, when sent
+// is set, the JSON Pointer of a member the entry sends without a value, and
+// whether it was nilled.
 type heldItem struct {
-	path    string
+	path    *reportpath.Node
 	foreign bool
 	missing bool
 	sent    bool
 	nilled  bool
-	pointer heldPointer // the pointer of a missing member or a member sent without a value
 }
 
 // SkipUnmatchedAfter skips the element start opens, which the decoder does
@@ -1208,8 +1239,8 @@ func SkipUnmatchedAfter(dec *xml.Decoder, start xml.StartElement, text []byte, h
 	if t := trackerOf(dec); t != nil {
 		t.skipping()
 		if !isXMLSpace(text) {
-			h.items = append(h.items, heldItem{path: t.path(), foreign: isForeign(start.Name)})
-		} else if err := t.unmatched(t.path(), isForeign(start.Name)); err != nil {
+			h.items = append(h.items, heldItem{path: t.elemPath(len(t.open)), foreign: isForeign(start.Name)})
+		} else if err := t.unmatched(t.elemPath(len(t.open)), isForeign(start.Name)); err != nil {
 			return err
 		}
 		return dec.Skip()
@@ -1361,15 +1392,18 @@ func decodeInterface(dec *xml.Decoder, start *xml.StartElement, v, held any) err
 		}
 		return err
 	}
-	path, checked := t.path(), t.checked
+	// The element's path is made only when it is reported or fails: its
+	// parent stays open, so the parent's path and the element's place name
+	// it whether the element has closed or not.
+	n, at, checked := len(t.open)-1, t.here(), t.checked
 	if err := dec.DecodeElement(target, start); err != nil {
 		if cause := conversionRefusal(err); cause != nil {
-			return t.fail(path, cause)
+			return t.fail(t.childPath(n, at).String(), cause)
 		}
 		return err
 	}
 	if t.checked == checked {
-		return t.unmatched(path, isForeign(start.Name))
+		return t.unmatched(t.childPath(n, at), isForeign(start.Name))
 	}
 	return nil
 }
@@ -1396,7 +1430,7 @@ func DecodeText(dec *xml.Decoder, start *xml.StartElement, convert func(text str
 	}
 	if err := convert(text); err != nil {
 		if t != nil {
-			return t.fail(t.closedPath(at), err)
+			return t.fail(t.closedPath(at).String(), err)
 		}
 		return primitiveFailure("/"+start.Name.Local, err)
 	}

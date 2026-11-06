@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/internal/reportpath"
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -40,8 +41,8 @@ func TestREQ175_ClassDescriptorsMatchRMTables(t *testing.T) {
 		}
 		t.Run(class, func(t *testing.T) {
 			var got []string
-			tr := xmlunmatched.NewTracker(func(p string) { t.Errorf("unmatched %q reported for an empty element", p) }, false)
-			tr.ReportMissing(func(p string) { got = append(got, p) })
+			tr := xmlunmatched.NewTracker(func(p *reportpath.Node) { t.Errorf("unmatched %q reported for an empty element", p.String()) }, false)
+			tr.ReportMissing(func(p *reportpath.Node) { got = append(got, p.String()) })
 			doc := "<" + class + ` xmlns="http://schemas.openehr.org/v1"/>`
 			if err := tr.Decode(tr.NewDecoder(strings.NewReader(doc)), ctor()); err != nil {
 				t.Fatalf("Decode(%s) = %v; want nil", doc, err)

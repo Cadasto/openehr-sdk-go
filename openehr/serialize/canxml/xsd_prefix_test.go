@@ -65,8 +65,8 @@ func decodeModes(t *testing.T) map[string]func(data []byte, v any) error {
 	decoder := func(opts ...canxml.DecoderOption) func([]byte, any) error {
 		return func(data []byte, v any) error { return canxml.NewDecoder(bytes.NewReader(data), opts...).Decode(v) }
 	}
-	report := canxml.WithUnmatched(func(p string) { t.Errorf("reported %s; want nothing", p) })
-	missing := canxml.WithMissing(func(string) {})
+	report := canxml.WithUnmatched(func(p canxml.Path) { t.Errorf("reported %s; want nothing", p.String()) })
+	missing := canxml.WithMissing(func(canxml.Pointer) {})
 	return map[string]func([]byte, any) error{
 		"Unmarshal":                 unmarshal(),
 		"Unmarshal WithUnmatched":   unmarshal(report),

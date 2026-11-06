@@ -190,7 +190,7 @@ func TestREQ170_XMLRepeatedChildIsUnmatched(t *testing.T) {
 			// A Decoder reads the value as Unmarshal does.
 			var streamed []string
 			dv := c.into()
-			dec := canxml.NewDecoder(bytes.NewReader([]byte(c.in)), canxml.WithUnmatched(func(p string) { streamed = append(streamed, p) }))
+			dec := canxml.NewDecoder(bytes.NewReader([]byte(c.in)), canxml.WithUnmatched(func(p canxml.Path) { streamed = append(streamed, p.String()) }))
 			if err := dec.Decode(dv); err != nil {
 				t.Fatalf("Decoder.Decode(WithUnmatched) = %v; want nil", err)
 			}
@@ -214,8 +214,8 @@ func TestREQ170_XMLRepeatedChildKeepsTheFirstValue(t *testing.T) {
 		opts []canxml.DecoderOption
 	}{
 		{name: "default"},
-		{name: "WithUnmatched", opts: []canxml.DecoderOption{canxml.WithUnmatched(func(string) {})}},
-		{name: "WithMissing", opts: []canxml.DecoderOption{canxml.WithMissing(func(string) {})}},
+		{name: "WithUnmatched", opts: []canxml.DecoderOption{canxml.WithUnmatched(func(canxml.Path) {})}},
+		{name: "WithMissing", opts: []canxml.DecoderOption{canxml.WithMissing(func(canxml.Pointer) {})}},
 	} {
 		t.Run(mode.name, func(t *testing.T) {
 			var c rm.Composition

@@ -140,8 +140,8 @@ func BenchmarkUnmarshalCorpusTracked(b *testing.B) {
 			opts []canxml.DecoderOption
 		}{
 			{name: "plain"},
-			{name: "WithMissing", opts: []canxml.DecoderOption{canxml.WithMissing(func(string) {})}},
-			{name: "WithPresence", opts: []canxml.DecoderOption{canxml.WithPresence(func(string, canxml.Presence) {})}},
+			{name: "WithMissing", opts: []canxml.DecoderOption{canxml.WithMissing(func(canxml.Pointer) {})}},
+			{name: "WithPresence", opts: []canxml.DecoderOption{canxml.WithPresence(func(canxml.Pointer, canxml.Presence) {})}},
 		} {
 			b.Run(id+"/"+mode.name, func(b *testing.B) {
 				b.ReportAllocs()

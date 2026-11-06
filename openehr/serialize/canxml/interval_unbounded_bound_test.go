@@ -68,7 +68,7 @@ var xmlClosedSideCases = []struct {
 func xmlDecodeModes() map[string][]canxml.DecoderOption {
 	return map[string][]canxml.DecoderOption{
 		"default":       nil,
-		"WithUnmatched": {canxml.WithUnmatched(func(string) {})},
+		"WithUnmatched": {canxml.WithUnmatched(func(canxml.Path) {})},
 		"WithStrict":    {canxml.WithStrict()},
 	}
 }

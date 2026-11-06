@@ -30,9 +30,9 @@ type DecoderOption func(*decoderConfig)
 // decoderConfig holds the option-driven state of a decode. Kept unexported so
 // the option list can grow without churning the [Decoder] type.
 type decoderConfig struct {
-	unmatched           func(path string)
-	missing             func(pointer string)
-	presence            func(pointer string, p Presence)
+	unmatched           func(p Path)
+	missing             func(p Pointer)
+	presence            func(p Pointer, pr Presence)
 	maxDepth            int // 0 for no limit
 	relaxedTypeDispatch bool
 	strict              bool
@@ -76,8 +76,8 @@ func (c decoderConfig) tracker() *xmlunmatched.Tracker {
 	if !c.tracked() {
 		return nil
 	}
-	t := xmlunmatched.NewTracker(c.unmatched, c.strict)
-	t.ReportMissing(c.missing)
+	t := xmlunmatched.NewTracker(reportUnmatched(c.unmatched), c.strict)
+	t.ReportMissing(reportMissing(c.missing))
 	t.ReportPresence(reportPresence(c.presence))
 	t.LimitDepth(c.maxDepth)
 	return t
@@ -134,13 +134,14 @@ func (c decoderConfig) documentTracker() *xmlunmatched.Tracker {
 // attribute adds a last `/@name` segment, and text a last `/text()` segment.
 // For example "/composition[1]/content[2]/x-note[1]",
 // "/composition[1]/@x-flag" or "/ehr_status[1]/subject[1]/text()". The path
-// carries names only, never a value from the input. fn runs during the
-// decode, on the caller's goroutine.
+// is a [Path], which writes its text only when asked, so a caller that only
+// counts the items pays nothing for the text. It carries names only, never a
+// value from the input. fn runs during the decode, on the caller's goroutine.
 //
 // A nil fn is the same as leaving the option out. Combined with
 // [WithStrict], fn sees the first unmatched item before the decode is
 // refused.
-func WithUnmatched(fn func(path string)) DecoderOption {
+func WithUnmatched(fn func(p Path)) DecoderOption {
 	return func(c *decoderConfig) { c.unmatched = fn }
 }
 

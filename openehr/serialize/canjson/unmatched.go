@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strconv"
 
+	"github.com/cadasto/openehr-sdk-go/internal/reportpath"
 	"github.com/cadasto/openehr-sdk-go/internal/rmjsonwalk"
 )
 
@@ -72,13 +73,14 @@ func (e *unknownMemberError) Unwrap() error {
 // reports nothing.
 //
 // fn gets the member's JSON Pointer (RFC 6901) from the root of the value,
-// such as "/content/0/data/x-note". The pointer carries the member's name,
-// never its value.
+// such as "/content/0/data/x-note", as a [Pointer] that writes its text only
+// when asked: a caller that only counts the members pays nothing for the
+// text. The pointer carries the member's name, never its value.
 //
 // A nil fn is the same as leaving the option out. Combined with
 // [WithStrict], fn sees the first unmatched member before the decode is
 // refused.
-func WithUnmatched(fn func(pointer string)) DecoderOption {
+func WithUnmatched(fn func(p Pointer)) DecoderOption {
 	return func(c *decoderConfig) { c.unmatched = fn }
 }
 
@@ -140,19 +142,20 @@ func (c *decoderConfig) walkMembers(data []byte, v any) error {
 	}
 	var hooks rmjsonwalk.Hooks
 	if c.unmatched != nil || c.strict {
-		hooks.Unmatched = func(pointer string) error {
+		hooks.Unmatched = func(node *reportpath.Node) error {
 			if c.unmatched != nil {
-				c.unmatched(pointer)
+				c.unmatched(Pointer{node: node})
 			}
 			if c.strict {
+				pointer := node.String()
 				return &DecodeError{Path: pointer, Inner: &unknownMemberError{pointer: pointer}}
 			}
 			return nil
 		}
 	}
 	if c.missing != nil {
-		hooks.Missing = func(pointer string) error {
-			c.missing(pointer)
+		hooks.Missing = func(node *reportpath.Node) error {
+			c.missing(Pointer{node: node})
 			return nil
 		}
 	}

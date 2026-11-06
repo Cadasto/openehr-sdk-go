@@ -101,10 +101,10 @@ func TestREQ056_XMLRepeatedAttributeIsRefused(t *testing.T) {
 		tracked bool
 	}{
 		{name: "default"},
-		{name: "WithUnmatched", opts: []canxml.DecoderOption{canxml.WithUnmatched(func(string) {})}, tracked: true},
+		{name: "WithUnmatched", opts: []canxml.DecoderOption{canxml.WithUnmatched(func(canxml.Path) {})}, tracked: true},
 		{name: "WithStrict", opts: []canxml.DecoderOption{canxml.WithStrict()}, tracked: true},
-		{name: "WithMissing", opts: []canxml.DecoderOption{canxml.WithMissing(func(string) {})}, tracked: true},
-		{name: "WithPresence", opts: []canxml.DecoderOption{canxml.WithPresence(func(string, canxml.Presence) {})}, tracked: true},
+		{name: "WithMissing", opts: []canxml.DecoderOption{canxml.WithMissing(func(canxml.Pointer) {})}, tracked: true},
+		{name: "WithPresence", opts: []canxml.DecoderOption{canxml.WithPresence(func(canxml.Pointer, canxml.Presence) {})}, tracked: true},
 		{name: "WithMaxDepth", opts: []canxml.DecoderOption{canxml.WithMaxDepth(64)}, tracked: true},
 	}
 	for _, c := range repeatedAttrCases() {

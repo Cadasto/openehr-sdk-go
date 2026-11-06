@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/internal/reportpath"
 	"github.com/cadasto/openehr-sdk-go/internal/rmjsonwalk"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
@@ -18,8 +19,8 @@ func BenchmarkWalk(b *testing.B) {
 		b.Fatalf("Default(): %v", err)
 	}
 	hooks := rmjsonwalk.Hooks{
-		Unmatched: func(string) error { return nil },
-		Missing:   func(string) error { return nil },
+		Unmatched: func(*reportpath.Node) error { return nil },
+		Missing:   func(*reportpath.Node) error { return nil },
 	}
 	root := rmjsonwalk.Root{Type: "COMPOSITION"}
 	for _, id := range []string{"body_weight", "BMI", "Demonstration.v1"} {

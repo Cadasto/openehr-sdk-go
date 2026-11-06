@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/internal/reportpath"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
@@ -83,7 +84,7 @@ func TestDropElement_REQ041_REQ176_DropsItsOneValue(t *testing.T) {
 				var reported []string
 				tr := tracker()
 				if tr != nil && !tr.strict {
-					tr = NewTracker(func(p string) { reported = append(reported, p) }, false)
+					tr = NewTracker(func(p *reportpath.Node) { reported = append(reported, p.String()) }, false)
 				}
 				var f flagged
 				in := flaggedDoc("", text)
@@ -173,7 +174,7 @@ func TestDropElement_REQ041_REQ170_AttributeIsUnmatched(t *testing.T) {
 		t.Errorf("Unmarshal(%q, untracked) = %v; want nil", in, err)
 	}
 	var reported []string
-	if err := Unmarshal([]byte(in), new(flagged), NewTracker(func(p string) { reported = append(reported, p) }, false)); err != nil {
+	if err := Unmarshal([]byte(in), new(flagged), NewTracker(func(p *reportpath.Node) { reported = append(reported, p.String()) }, false)); err != nil {
 		t.Errorf("Unmarshal(%q, report) = %v; want nil", in, err)
 	}
 	if want := []string{"/flagged[1]/legacy[1]/@x"}; !slices.Equal(reported, want) {

@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/cadasto/openehr-sdk-go/internal/reportpath"
 )
 
 // The targets below read as a generated decoder reads (REQ-175): on entry
@@ -115,7 +117,7 @@ const xmlnsDecl = `xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w
 func decodeMissing(doc string, target any, strict bool) ([]string, error) {
 	var got []string
 	tr := NewTracker(nil, strict)
-	tr.ReportMissing(func(p string) { got = append(got, p) })
+	tr.ReportMissing(func(p *reportpath.Node) { got = append(got, p.String()) })
 	err := tr.Decode(tr.NewDecoder(strings.NewReader(doc)), target)
 	return got, err
 }
@@ -252,8 +254,8 @@ func TestREQ175_MissingMembersReportOnly(t *testing.T) {
 	}
 
 	var unmatched, missing []string
-	tr := NewTracker(func(p string) { unmatched = append(unmatched, p) }, false)
-	tr.ReportMissing(func(p string) { missing = append(missing, p) })
+	tr := NewTracker(func(p *reportpath.Node) { unmatched = append(unmatched, p.String()) }, false)
+	tr.ReportMissing(func(p *reportpath.Node) { missing = append(missing, p.String()) })
 	withAttr := `<composition xmlns="http://schemas.openehr.org/v1" foo="1" archetype_node_id="at0000"><content/></composition>`
 	if err := tr.Decode(tr.NewDecoder(strings.NewReader(withAttr)), compositionTarget()); err != nil {
 		t.Fatalf("Decode = %v; want nil", err)
@@ -265,7 +267,7 @@ func TestREQ175_MissingMembersReportOnly(t *testing.T) {
 		t.Errorf("missing members = %q; want %q", missing, want)
 	}
 
-	tr = NewTracker(func(p string) { t.Errorf("unmatched %q reported; want nothing", p) }, true)
+	tr = NewTracker(func(p *reportpath.Node) { t.Errorf("unmatched %q reported; want nothing", p.String()) }, true)
 	if err := tr.Decode(tr.NewDecoder(strings.NewReader(doc)), compositionTarget()); err != nil {
 		t.Errorf("tracked Decode without the hook = %v; want nil", err)
 	}
@@ -307,7 +309,7 @@ func TestREQ175_EnterCostsNothingWithoutTheHook(t *testing.T) {
 </composition>`
 	decode := func(target func() any) float64 {
 		return testing.AllocsPerRun(50, func() {
-			tr := NewTracker(func(string) {}, false)
+			tr := NewTracker(func(*reportpath.Node) {}, false)
 			if err := tr.Decode(tr.NewDecoder(strings.NewReader(doc)), target()); err != nil {
 				t.Fatalf("Decode = %v; want nil", err)
 			}

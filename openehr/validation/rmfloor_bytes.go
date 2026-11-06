@@ -24,6 +24,7 @@ import (
 	"encoding/json/jsontext"
 	json "encoding/json/v2"
 
+	"github.com/cadasto/openehr-sdk-go/internal/reportpath"
 	"github.com/cadasto/openehr-sdk-go/internal/rmjsonwalk"
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -93,8 +94,8 @@ func decodeJSONReporting(data []byte, root any) ([]string, error) {
 		return nil, nil
 	}
 	var missing []string
-	err = model.Walk(data, start, rmjsonwalk.Hooks{Missing: func(pointer string) error {
-		missing = append(missing, pointer)
+	err = model.Walk(data, start, rmjsonwalk.Hooks{Missing: func(pointer *reportpath.Node) error {
+		missing = append(missing, pointer.String())
 		return nil
 	}})
 	return missing, err
@@ -133,7 +134,7 @@ func (v *Validator) ValidateXML(data []byte, root any, c *templatecompile.Compil
 	}
 	var missing []string
 	t := xmlunmatched.NewTracker(nil, false)
-	t.ReportMissing(func(pointer string) { missing = append(missing, pointer) })
+	t.ReportMissing(func(pointer *reportpath.Node) { missing = append(missing, pointer.String()) })
 	if err := xmlunmatched.Unmarshal(data, root, t); err != nil {
 		return decodeFailure(entry, err)
 	}

@@ -141,7 +141,7 @@ func TestREQ176_REQ056_ArchetypeTranslations(t *testing.T) {
 	}
 	var got aom14.Archetype
 	var reported []string
-	if err := canxml.Unmarshal(out, &got, canxml.WithUnmatched(func(p string) { reported = append(reported, p) })); err != nil {
+	if err := canxml.Unmarshal(out, &got, canxml.WithUnmatched(func(p canxml.Path) { reported = append(reported, p.String()) })); err != nil {
 		t.Fatalf("canxml.Unmarshal(%s) = %v; want nil", out, err)
 	}
 	if len(reported) > 0 {
@@ -207,7 +207,7 @@ func TestREQ176_REQ170_RepeatedHashKeyUnmatched(t *testing.T) {
 			}
 			var reported []string
 			got = aom14.OperationalTemplate{}
-			if err := canxml.Unmarshal(doc, &got, canxml.WithUnmatched(func(p string) { reported = append(reported, p) })); err != nil || !reflect.DeepEqual(got, want) {
+			if err := canxml.Unmarshal(doc, &got, canxml.WithUnmatched(func(p canxml.Path) { reported = append(reported, p.String()) })); err != nil || !reflect.DeepEqual(got, want) {
 				t.Errorf("canxml.Unmarshal(WithUnmatched) = %v; want nil and the OPT without the repeat", err)
 			}
 			if w := []string{tc.path}; !slices.Equal(reported, w) {
@@ -257,7 +257,7 @@ func TestREQ176_REQ170_RepeatedTranslationUnmatched(t *testing.T) {
 		t.Errorf("canxml.Unmarshal(%s) = %#v, %v; want %#v, the earlier translation kept", doc, got.Translations, err, *in.Translations)
 	}
 	var reported []string
-	if err := canxml.Unmarshal(doc, new(aom14.Archetype), canxml.WithUnmatched(func(p string) { reported = append(reported, p) })); err != nil {
+	if err := canxml.Unmarshal(doc, new(aom14.Archetype), canxml.WithUnmatched(func(p canxml.Path) { reported = append(reported, p.String()) })); err != nil {
 		t.Errorf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
 	}
 	if w := []string{path}; !slices.Equal(reported, w) {

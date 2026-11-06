@@ -122,9 +122,9 @@ type DecoderOption func(*decoderConfig)
 // [Decoder] type.
 type decoderConfig struct {
 	relaxedTypeDispatch bool
-	unmatched           func(pointer string)
+	unmatched           func(p Pointer)
 	strict              bool
-	missing             func(pointer string)
+	missing             func(p Pointer)
 }
 
 // newDecoderConfig applies opts in order, skipping a nil option.
