@@ -42,7 +42,7 @@ import (
 // (REQ-056). The other checks read the arm without its guards.
 func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 	const (
-		attrs        = "\tif _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClass"
+		attrs        = "\tif _err := xmlunmatched.Enter(_dec, _start, &xmlClass"
 		switchOnName = "\t\t\tswitch xmlunmatched.LocalName(_t.Name) {\n"
 		defaultArm   = "\t\t\tdefault:\n\t\t\t\tif _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {\n"
 		textArm      = "\t\tcase xml.CharData:\n\t\t\tif _err := xmlunmatched.CheckUnmatchedText(_dec, _t); _err != nil {\n"
@@ -71,7 +71,7 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 
 	for _, target := range []Target{TargetRM, TargetAOM14} {
 		plan := plans[target.GoPackage]
-		hashes, anys, params, octets, lists, choices, singles, nils, zeroed, optionals := 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+		hashes, anys, params, octets, lists, choices, singles, nils, zeroed, optionals, resets, bounds := 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 		for _, f := range plan.Files {
 			classes, err := codecClassesIn(plan, f)
 			if err != nil {
@@ -85,6 +85,10 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 				src, err := renderUnmarshalXML(plan, pc, fields)
 				if err != nil {
 					t.Fatalf("renderUnmarshalXML(%s): %v", pc.BMMName, err)
+				}
+				flagged, err := intervalFlagged(fields)
+				if err != nil {
+					t.Fatalf("intervalFlagged(%s): %v", pc.BMMName, err)
 				}
 				for _, want := range []string{attrs, switchOnName, defaultArm, textArm} {
 					if !strings.Contains(src, want) {
@@ -125,23 +129,44 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 					if err != nil {
 						t.Fatalf("xmlNilable(%s.%s): %v", pc.BMMName, prop, err)
 					}
+					// A nilled interval bound is a null one, which leaves its
+					// side with no bound for the flag defaults (REQ-169).
+					bound := flagged && isIntervalBound(prop)
 					nilGuard := nilGuardOf(FieldName(prop)).FindStringSubmatch(arm)
 					switch {
-					case nilable && nilGuard == nil:
-						t.Errorf("%s.%s is single-valued; its arm must hand a nilled element to xmlunmatched.SkipNil and give the member no value:\n%s", pc.BMMName, prop, arm)
-					case !nilable && nilGuard != nil:
-						t.Errorf("%s.%s is multi-valued, a Hash, a boundary flag or typed by a generic parameter; its arm must not skip a nilled element:\n%s", pc.BMMName, prop, arm)
+					case (nilable || bound) && nilGuard == nil:
+						t.Errorf("%s.%s is single-valued or an interval bound; its arm must hand a nilled element to xmlunmatched.SkipNil and give the member no value:\n%s", pc.BMMName, prop, arm)
+					case !nilable && !bound && nilGuard != nil:
+						t.Errorf("%s.%s is multi-valued, a Hash, a boundary flag or typed by a generic parameter other than an interval bound; its arm must not skip a nilled element:\n%s", pc.BMMName, prop, arm)
 					case nilGuard != nil:
 						nils++
 						// A mandatory member gets its zero value, as a missing one
-						// does (REQ-175); an optional one is left nil (REQ-056).
-						if zeroes := nilGuard[1] == ""; zeroes != mandatoryProperty(ef.Prop) {
-							t.Errorf("%s.%s: mandatory is %t, yet its nil guard zeroes it is %t; want a mandatory member zeroed and an optional one set to nil:\n%s", pc.BMMName, prop, mandatoryProperty(ef.Prop), zeroes, arm)
+						// does (REQ-175), and so does a bound, which may be held by
+						// value; an optional one is left nil (REQ-056).
+						if zeroes, want := nilGuard[1] == "", mandatoryProperty(ef.Prop) || bound; zeroes != want {
+							t.Errorf("%s.%s: mandatory is %t and an interval bound is %t, yet its nil guard zeroes it is %t; want a mandatory member and a bound zeroed and an optional one set to nil:\n%s", pc.BMMName, prop, mandatoryProperty(ef.Prop), bound, zeroes, arm)
+						}
+						if bound {
+							bounds++
 						}
 						if nilGuard[1] == "" {
 							zeroed++
 						}
 						arm = strings.Replace(arm, nilGuard[0], "", 1)
+					}
+					// An arm that appends each element as one item starts the
+					// list empty at the element's first item, as canonical JSON
+					// replaces an array (REQ-056).
+					if at := strings.Index(arm, "= append("); at >= 0 {
+						reset := listResetOf(FieldName(prop)).FindStringIndex(arm)
+						switch {
+						case reset == nil:
+							t.Errorf("%s.%s appends each element as one item; its arm must start the list empty at the element's first item:\n%s", pc.BMMName, prop, arm)
+						case reset[0] > at:
+							t.Errorf("%s.%s starts its list empty after appending an item; want the reset first:\n%s", pc.BMMName, prop, arm)
+						default:
+							resets++
+						}
 					}
 					if p, ok := ef.Prop.(*bmm.SingleProperty); ok && !p.IsMandatory && isPrimitive(p.TypeName) && !isOpenParam(ef.Owner, p.TypeName) {
 						optionals++
@@ -211,11 +236,11 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 				}
 			}
 		}
-		if singles == 0 || nils == 0 || zeroed == 0 || nils == zeroed || optionals == 0 {
-			t.Errorf("the %s target rendered %d repeat guards, %d nil guards (%d zeroing) and %d optional primitives; want each covered", target.GoPackage, singles, nils, zeroed, optionals)
+		if singles == 0 || nils == 0 || zeroed == 0 || nils == zeroed || optionals == 0 || resets == 0 {
+			t.Errorf("the %s target rendered %d repeat guards, %d nil guards (%d zeroing), %d optional primitives and %d list resets; want each covered", target.GoPackage, singles, nils, zeroed, optionals, resets)
 		}
-		if target.GoPackage == TargetRM.GoPackage && (hashes == 0 || params == 0 || octets == 0) {
-			t.Errorf("the RM target rendered %d Hash arms, %d generic-parameter arms and %d Octet arms; want the resource-metadata Hash members, VERSION<T>.data and DV_MULTIMEDIA.data covered", hashes, params, octets)
+		if target.GoPackage == TargetRM.GoPackage && (hashes == 0 || params == 0 || octets == 0 || bounds == 0) {
+			t.Errorf("the RM target rendered %d Hash arms, %d generic-parameter arms, %d Octet arms and %d interval bound nil guards; want the resource-metadata Hash members, VERSION<T>.data, DV_MULTIMEDIA.data and the interval bounds covered", hashes, params, octets, bounds)
 		}
 		if target.GoPackage == TargetAOM14.GoPackage && (anys == 0 || lists == 0 || choices == 0) {
 			t.Errorf("the AOM 1.4 target rendered %d Any arms, %d generic-list arms and %d choice arms; want `EXPR_LEAF.item`, C_CODE_PHRASE's `code_list` and ORDINAL's `symbol` covered", anys, lists, choices)
@@ -233,6 +258,13 @@ var repeatGuard = regexp.MustCompile(`\t\t\t\tif _got&\(1<<(\d+)\) != 0 \{\n\t\t
 func nilGuardOf(field string) *regexp.Regexp {
 	f := regexp.QuoteMeta(field)
 	return regexp.MustCompile(`\t\t\t\tif _nil, _err := xmlunmatched\.SkipNil\(_dec, _t\); _err != nil \{\n\t\t\t\t\treturn _err\n\t\t\t\t\} else if _nil \{\n\t\t\t\t\t(?:[a-z]+\.` + f + `( = nil)|xmlunmatched\.Zero\(&[a-z]+\.` + f + `\))\n\t\t\t\t\tbreak\n\t\t\t\t\}\n`)
+}
+
+// listResetOf matches the lines that start the list held in the Go field
+// field empty at the element's first item ([withListReset]).
+func listResetOf(field string) *regexp.Regexp {
+	f := regexp.QuoteMeta(field)
+	return regexp.MustCompile(`\t\t\t\tif !_begun` + f + ` \{\n\t\t\t\t\t_begun` + f + ` = true\n\t\t\t\t\t[a-z]+\.` + f + ` = nil\n\t\t\t\t\}\n`)
 }
 
 // xmlCaseArm returns the case arm of a rendered UnmarshalXML that matches the

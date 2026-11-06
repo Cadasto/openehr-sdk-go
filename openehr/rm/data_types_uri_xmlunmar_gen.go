@@ -32,10 +32,8 @@ var xmlClassDVEHRURI = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVEHRURI) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVEHRURI); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVEHRURI); _err != nil {
 		return _err
-	} else if _fresh {
-		*d = DVEHRURI{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -97,10 +95,8 @@ var xmlClassDVURI = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVURI) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVURI); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassDVURI); _err != nil {
 		return _err
-	} else if _fresh {
-		*d = DVURI{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64

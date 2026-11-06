@@ -31,18 +31,20 @@ var xmlClassArchetype = xmlunmatched.Class{
 // are read from _start.Attr.
 // A Hash member reads each element of its name as one entry, into a
 // map that starts empty at the first entry.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *Archetype) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassArchetype); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassArchetype); _err != nil {
 		return _err
-	} else if _fresh {
-		*a = Archetype{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunInvariants bool
 	// Whether the element has had an entry of each Hash member.
 	var _begunTranslations bool
 	for {
@@ -273,6 +275,10 @@ func (a *Archetype) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 				var _v Assertion
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
+				}
+				if !_begunInvariants {
+					_begunInvariants = true
+					a.Invariants = nil
 				}
 				a.Invariants = append(a.Invariants, _v)
 			default:

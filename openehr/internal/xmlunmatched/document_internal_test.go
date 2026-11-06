@@ -27,7 +27,7 @@ type counted struct{ n int }
 var countedClass = &Class{Name: "COUNTED", Required: []string{"n"}}
 
 func (c *counted) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error {
-	if _, err := Enter(dec, start, countedClass); err != nil {
+	if err := Enter(dec, start, countedClass); err != nil {
 		return err
 	}
 	for {
@@ -140,9 +140,10 @@ func TestREQ056_UnmarshalOneRoot(t *testing.T) {
 // TestREQ056_ReadPrologXMLTarget pins that ReadProlog holds a processing
 // instruction whose target is xml to the rule Unmarshal holds it to: the XML
 // declaration passes as the first token, after a byte order mark too, and
-// one anywhere else before the root, or one whose target is xml in another
-// letter case, is refused with an error that wraps ErrInvalidShape and
-// carries none of it.
+// one anywhere else before the root, the document type's internal subset
+// included, or one whose target is xml in another letter case, is refused with
+// an error that wraps ErrInvalidShape and carries none of it; the same bytes in
+// a literal of that subset pass.
 func TestREQ056_ReadPrologXMLTarget(t *testing.T) {
 	const root = `<counted><n>1</n></counted>`
 	const planted = "planted-secret-value"
@@ -150,11 +151,13 @@ func TestREQ056_ReadPrologXMLTarget(t *testing.T) {
 		"XML declaration":             `<?xml version="1.0"?>` + root,
 		"after a byte order mark":     "\ufeff" + `<?xml version="1.0"?>` + root,
 		"target that starts with xml": `<?xml version="1.0"?><?xml-stylesheet href="a.xsl"?>` + root,
+		"xml target in a literal":     `<!DOCTYPE counted [<!ENTITY e "<?xml v?>">]>` + root,
 	}
 	refused := map[string]string{
 		"second XML declaration":          `<?xml version="1.0"?><?xml version="1.0" extra="` + planted + `"?>` + root,
 		"XML declaration after a comment": `<!-- a --><?xml version="1.0"?>` + root,
 		"xml target in capitals":          `<?XML ` + planted + `?>` + root,
+		"xml target in the document type": `<!DOCTYPE counted [<?xml ` + planted + `?>]>` + root,
 	}
 	for name, in := range accepted {
 		t.Run("accepted/"+name, func(t *testing.T) {
@@ -171,6 +174,39 @@ func TestREQ056_ReadPrologXMLTarget(t *testing.T) {
 			}
 			if strings.Contains(err.Error(), planted) {
 				t.Errorf("ReadProlog(%q) err = %q; it echoes the content", in, err)
+			}
+		})
+	}
+}
+
+// TestREQ056_XMLTargetPastStart pins what makes Unmarshal given no option
+// decode a document a second time, through a decoder that refuses a
+// processing instruction whose target is xml inside the root: such bytes past
+// the start, in a comment too, but not the XML declaration, after a byte order
+// mark and whitespace as well, and not a target that only starts with xml.
+//
+// Can-fail control: count the whitespace before the declaration as content
+// past the start, and the rows with the declaration after whitespace report
+// true.
+func TestREQ056_XMLTargetPastStart(t *testing.T) {
+	for _, tc := range []struct {
+		name, data string
+		want       bool
+	}{
+		{"empty", "", false},
+		{"whitespace only", " \n", false},
+		{"no declaration", `<a/>`, false},
+		{"the declaration", `<?xml version="1.0"?><a/>`, false},
+		{"the declaration after whitespace", "\n " + `<?xml version="1.0"?><a/>`, false},
+		{"the declaration after a byte order mark and whitespace", "\ufeff\n" + `<?xml version="1.0"?><a/>`, false},
+		{"a target that starts with xml", `<?xml version="1.0"?><a><?xml-stylesheet href="a.xsl"?></a>`, false},
+		{"one inside the root", `<a><?xml version="1.0"?></a>`, true},
+		{"one after the declaration and whitespace", "\n" + `<?xml version="1.0"?><a><?XML?></a>`, true},
+		{"one in a comment", `<a><!-- <?xml v?> --></a>`, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := xmlTargetPastStart([]byte(tc.data)); got != tc.want {
+				t.Errorf("xmlTargetPastStart(%q) = %t; want %t", tc.data, got, tc.want)
 			}
 		})
 	}

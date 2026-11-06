@@ -29,10 +29,8 @@ var xmlClassOpenehrCodeSetIdentifiers = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (o *OpenehrCodeSetIdentifiers) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassOpenehrCodeSetIdentifiers); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassOpenehrCodeSetIdentifiers); _err != nil {
 		return _err
-	} else if _fresh {
-		*o = OpenehrCodeSetIdentifiers{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -72,10 +70,8 @@ var xmlClassOpenehrTerminologyGroupIdentifiers = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (o *OpenehrTerminologyGroupIdentifiers) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassOpenehrTerminologyGroupIdentifiers); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassOpenehrTerminologyGroupIdentifiers); _err != nil {
 		return _err
-	} else if _fresh {
-		*o = OpenehrTerminologyGroupIdentifiers{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -115,10 +111,8 @@ var xmlClassTerminologyService = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TerminologyService) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassTerminologyService); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassTerminologyService); _err != nil {
 		return _err
-	} else if _fresh {
-		*t = TerminologyService{}
 	}
 	for {
 		_tok, _err := _dec.Token()

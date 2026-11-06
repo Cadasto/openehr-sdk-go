@@ -33,9 +33,12 @@
 //     document type declaration and a UTF-8 byte order mark at the very
 //     start. XML reserves the processing instruction target xml, in any
 //     letter case, for the XML declaration at the start, so [Unmarshal]
-//     refuses one elsewhere before or after the root, such as a second
-//     declaration or one after the root's end, with [ErrInvalidShape]; a target that only starts with those
-//     letters, such as xml-stylesheet, is accepted.
+//     refuses one elsewhere, before, inside or after the root, such as a
+//     second declaration or one inside an element, with [ErrInvalidShape],
+//     and so does a [Decoder] given [WithUnmatched], [WithStrict],
+//     [WithMissing], [WithPresence] or a positive [WithMaxDepth] inside the
+//     value it decodes; a target that only starts with those letters, such
+//     as xml-stylesheet, is accepted.
 //   - Default namespace: `http://schemas.openehr.org/v1`.
 //   - `xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"` is
 //     declared on the document root whenever any descendant carries
@@ -76,7 +79,8 @@
 //     `cardinality.lower == 0` are emitted as absent (no element).
 //     Both absent and an empty self-closing element are accepted on
 //     decode, for optionals and containers; an interface-typed member
-//     (below) needs its `xsi:type` even when empty or nilled.
+//     (below) needs its `xsi:type` even when empty or nilled, unless it is
+//     a nilled interval bound.
 //   - A single-valued member whose element carries `xsi:nil="true"` (or
 //     `1`), whatever it holds, or, for a member of a primitive type, has no
 //     text, or XML whitespace only for a string, has no value in every mode:
@@ -84,17 +88,20 @@
 //     as a `null` member does in canonical JSON, and a mandatory one to its
 //     zero value, the empty string for a string of whitespace only, as a
 //     missing member does. What a nilled element holds is unmatched content,
-//     and a nilled polymorphic member needs no `xsi:type`. A list item, a
-//     member typed by a generic parameter, which needs its `xsi:type` even
-//     when nilled, an optional enumeration sent empty and an empty struct
-//     element decode as before.
+//     and a nilled polymorphic member needs no `xsi:type`. A nilled
+//     interval bound is a null bound: it holds its zero value, and its side
+//     has no bound when absent boundary flags take their defaults. A list
+//     item, any other member typed by a generic parameter, which needs its
+//     `xsi:type` even when nilled, an optional enumeration sent empty and an
+//     empty struct element decode as before.
 //   - An element that carries one attribute twice, by its name as written or
 //     as namespaces resolve it, is not well-formed XML: every decode refuses
 //     it with [ErrInvalidShape], naming the attribute and none of its values,
 //     wherever the decode reads the element or skips it as unmatched content.
-//     Inside a primitive element's text, which a decode with no option reads
-//     past without looking at it, such a decode may accept it; a decode
-//     given any option refuses it.
+//     Inside a primitive element's text, which a decode given none of
+//     [WithUnmatched], [WithStrict], [WithMissing], [WithPresence] and a
+//     positive [WithMaxDepth] reads past without looking at it, such a
+//     decode may accept it; a decode given one of them refuses it.
 //   - ISO 8601 dates/times/durations are passed through as element
 //     text content; the codec does not parse them.
 //   - Numeric magnitudes use IEEE 754 double-precision (same as
@@ -300,13 +307,13 @@
 // in every mode with a [DecodeError] whose Inner wraps [ErrInvalidShape]
 // and the conversion's own error. Its text names the element and carries
 // none of its text. [Unmarshal], and a [Decoder] given [WithUnmatched],
-// [WithStrict] or [WithMissing], return it on its own with the element's
-// path from the root of the value, such as
+// [WithStrict], [WithMissing] or [WithPresence], return it on its own with
+// the element's path from the root of the value, such as
 // "/ehr_status[1]/is_queryable[1]". Without an
 // option, [Unmarshal] decodes the input a second time to find that path,
 // once the first decode has failed so; a decode that succeeds never pays
-// for it. A [Decoder] given no option does not decode a value again to find
-// that path, so it names the element alone, "/is_queryable", inside the
+// for it. A [Decoder] given none of them does not decode a value again to
+// find that path, so it names the element alone, "/is_queryable", inside the
 // envelope of each polymorphic slot the element sits in.
 //
 // # Nesting depth

@@ -29,10 +29,8 @@ var xmlClassBasicDefinitions = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (b *BasicDefinitions) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassBasicDefinitions); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassBasicDefinitions); _err != nil {
 		return _err
-	} else if _fresh {
-		*b = BasicDefinitions{}
 	}
 	for {
 		_tok, _err := _dec.Token()
@@ -72,10 +70,8 @@ var xmlClassOpenehrDefinitions = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (o *OpenehrDefinitions) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassOpenehrDefinitions); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassOpenehrDefinitions); _err != nil {
 		return _err
-	} else if _fresh {
-		*o = OpenehrDefinitions{}
 	}
 	for {
 		_tok, _err := _dec.Token()

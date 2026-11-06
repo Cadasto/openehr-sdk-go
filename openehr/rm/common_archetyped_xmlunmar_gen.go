@@ -32,10 +32,8 @@ var xmlClassArchetyped = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *Archetyped) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassArchetyped); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassArchetyped); _err != nil {
 		return _err
-	} else if _fresh {
-		*a = Archetyped{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -129,18 +127,20 @@ var xmlClassFeederAudit = xmlunmatched.Class{
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are read from _start.Attr.
+// A list member reads each element of its name as one item, into a
+// list that starts empty at the first item.
 // A single-valued member keeps its first child element; a second one is
 // unmatched content.
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (f *FeederAudit) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassFeederAudit); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassFeederAudit); _err != nil {
 		return _err
-	} else if _fresh {
-		*f = FeederAudit{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
+	// Whether the element has had an item of each list member.
+	var _begunOriginatingSystemItemIds, _begunFeederSystemItemIds bool
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -154,11 +154,19 @@ func (f *FeederAudit) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
 				}
+				if !_begunOriginatingSystemItemIds {
+					_begunOriginatingSystemItemIds = true
+					f.OriginatingSystemItemIds = nil
+				}
 				f.OriginatingSystemItemIds = append(f.OriginatingSystemItemIds, _v)
 			case "feeder_system_item_ids":
 				var _v DVIdentifier
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
 					return _err
+				}
+				if !_begunFeederSystemItemIds {
+					_begunFeederSystemItemIds = true
+					f.FeederSystemItemIds = nil
 				}
 				f.FeederSystemItemIds = append(f.FeederSystemItemIds, _v)
 			case "original_content":
@@ -249,10 +257,8 @@ var xmlClassFeederAuditDetails = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (f *FeederAuditDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassFeederAuditDetails); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassFeederAuditDetails); _err != nil {
 		return _err
-	} else if _fresh {
-		*f = FeederAuditDetails{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64
@@ -431,10 +437,8 @@ var xmlClassLink = xmlunmatched.Class{
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (l *Link) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _fresh, _err := xmlunmatched.Enter(_dec, _start, &xmlClassLink); _err != nil {
+	if _err := xmlunmatched.Enter(_dec, _start, &xmlClassLink); _err != nil {
 		return _err
-	} else if _fresh {
-		*l = Link{}
 	}
 	// A bit per single-valued member that has had a child element.
 	var _got uint64

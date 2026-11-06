@@ -3,8 +3,8 @@ package canxml_test
 // REQ-056 (wire.md § REQ-056): a Decoder given no option resolves the prefix
 // of an `xsi:type` against every namespace declaration in scope, as Unmarshal
 // does. A stream value whose prefix is declared on an element around the
-// attribute is decoded again from where Decode began, into the value cleared,
-// and the values after it decode as they would have.
+// attribute is decoded again from where Decode began, into the value as the
+// first decode left it, and the values after it decode as they would have.
 
 import (
 	"bufio"
@@ -90,16 +90,18 @@ var (
 	streamAgain = streamValue{parent: ` xmlns:xs="` + xsdNamespace + `"`, item: ` xsi:type="xs:string"`, content: "archetype_id/value"}
 )
 
-// TestREQ056_UnmarshalDecodesAgainIntoAClearedValue pins Unmarshal given no
-// option on a slot whose second include's item declares its `xs` prefix on
-// its parent: the first decode reads the first include, then stops at that
-// item, and Unmarshal decodes the document a second time, tracked, into the
-// value cleared first, so the slot holds the two includes it was written
-// with, as a tracked decode reads it, not three.
+// TestREQ056_UnmarshalDecodesAgainWithoutAddingToTheValue pins Unmarshal
+// given no option on a slot whose second include's item declares its `xs`
+// prefix on its parent: the first decode reads the first include, then stops
+// at that item, and Unmarshal decodes the document a second time, tracked,
+// into the value as the first decode left it, whose includes start over at
+// their first item, so the slot holds the two includes it was written with,
+// as a tracked decode reads it, not three.
 //
-// Can-fail control: decode the document again into the value the first decode
-// filled in part, without clearing it, and the slot holds three includes.
-func TestREQ056_UnmarshalDecodesAgainIntoAClearedValue(t *testing.T) {
+// Can-fail control: let a list member's decoder append to the items the value
+// holds instead of starting over at its first item, and the slot holds three
+// includes.
+func TestREQ056_UnmarshalDecodesAgainWithoutAddingToTheValue(t *testing.T) {
 	in := []byte(streamAgain.slot())
 	var plain, tracked aom14.ArchetypeSlot
 	if err := canxml.Unmarshal(in, &plain); err != nil {

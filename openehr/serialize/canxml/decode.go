@@ -173,7 +173,10 @@ func WithStrict() DecoderOption {
 // the element, in every mode, with [WithUnmatched], [WithStrict] or
 // [WithMissing] or without. Use it on input from outside the caller's
 // control, whose nesting would otherwise cost the decode memory and time in
-// proportion to its depth.
+// proportion to its depth. No decode sets a limit by default, and none
+// bounds the bytes it reads: a caller that decodes untrusted input gives this
+// option and bounds the input itself, as aom14.ReadOperationalTemplate
+// does.
 //
 // The refusal is a [DecodeError] on its own, outside any slot envelope, that
 // wraps [ErrLimitExceeded]. Its Path is the element's path from the root of
@@ -454,8 +457,9 @@ func (f failedReader) Read([]byte) (int, error) { return 0, f.err }
 
 // Decode reads the next XML element from the stream and stores it
 // in v. Errors follow the same classification as [Unmarshal], with one
-// difference: a Decoder given none of [WithUnmatched], [WithStrict] and
-// [WithMissing] does not name the path of the elements it reads, so the
+// difference: a Decoder given none of [WithUnmatched], [WithStrict],
+// [WithMissing] and [WithPresence] does not name the path of the elements it
+// reads, so the
 // [DecodeError] for the text of a primitive element that does not decode as
 // its type names the element alone, such as "/is_queryable", inside the
 // envelope of each polymorphic slot it sits in. A Decoder given any of them
@@ -468,8 +472,8 @@ func (f failedReader) Read([]byte) (int, error) { return 0, f.err }
 // reads. One given none reads an element's own declarations as it goes; when
 // a prefix is declared on an element around the attribute, Decode decodes the
 // value a second time, from where the call began, through a reader that keeps
-// every declaration in scope, into v cleared to its zero value. The Decoder
-// then reads the rest of the stream through that reader. It does the same
+// every declaration in scope, into v as the first decode left it, so v keeps
+// what the value leaves out, as after one decode. The Decoder then reads the rest of the stream through that reader. It does the same
 // when the value nests deeper than encoding/xml decodes, 10 000 elements, to
 // name the element refused by its path (see [WithMaxDepth]). To read the value
 // again, a Decoder whose reader is an io.ByteReader and an io.Seeker, such as
@@ -484,7 +488,11 @@ func (f failedReader) Read([]byte) (int, error) { return 0, f.err }
 // stream may hold many values, one after another, and Decode skips what
 // precedes each one, as encoding/xml does. [Unmarshal], which is given a
 // whole document, is the call that holds it to one root element and checks
-// what comes before and after it.
+// what comes before and after it. Inside the value, a Decoder given
+// [WithUnmatched], [WithStrict], [WithMissing], [WithPresence] or a positive
+// [WithMaxDepth] refuses a processing instruction whose target is xml, which
+// XML reserves for the declaration at the start of a document, with
+// [ErrInvalidShape]; one given none of them may read past it.
 func (d *Decoder) Decode(v any) error {
 	switch {
 	case d.trk != nil:
@@ -507,7 +515,7 @@ func (d *Decoder) Decode(v any) error {
 	d.scope = new(xmlunmatched.Scope)
 	d.dec = d.scope.NewDecoder(src)
 	d.rec, d.seeker = nil, nil
-	return d.scope.DecodeAgain(d.dec, v)
+	return d.scope.Decode(d.dec, v)
 }
 
 // rewind returns a reader of the stream from start, the input offset of d.dec
@@ -548,9 +556,9 @@ func (d *Decoder) RelaxedTypeDispatch() bool { return d.cfg.relaxedTypeDispatch 
 // mark at the very start; comments, processing instructions and whitespace
 // may follow the root, as XML allows. XML reserves the processing
 // instruction target xml, in any letter case, for the XML declaration at the
-// start, so one elsewhere before or after the root, such as a second
-// declaration or one after the root's end, is refused; a target that only starts with those letters, such as
-// xml-stylesheet, passes. Anything else before or after the root, such as
+// start, so one elsewhere, before, inside or after the root, such as a
+// second declaration or one inside an element, is refused; a target that
+// only starts with those letters, such as xml-stylesheet, passes. Anything else before or after the root, such as
 // an element or text other than whitespace, is not well-formed XML, and the
 // decode refuses it in every mode, with or without [WithUnmatched],
 // [WithStrict] or [WithMissing]: it is malformed input, not unmatched
@@ -582,9 +590,9 @@ func (d *Decoder) RelaxedTypeDispatch() bool { return d.cfg.relaxedTypeDispatch 
 // scope where the attribute stands (see [XSITypeOf]). Given no option,
 // Unmarshal reads an element's own declarations as it goes; when the prefix
 // is declared on an element around it, Unmarshal decodes data a second time,
-// through a decoder that keeps every declaration in scope, into v cleared to
-// its zero value, so only a document with such a value pays for the second
-// decode.
+// through a decoder that keeps every declaration in scope, into v as the
+// first decode left it, so v keeps what the document leaves out, as after one
+// decode. Only a document with such a value pays for the second decode.
 //
 // Content the decode does not read is ignored by default. [WithUnmatched]
 // reports each such item and [WithStrict] refuses the first, wrapping
