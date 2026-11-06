@@ -245,7 +245,7 @@ var Probe076SkeletonExclusions = slices.Concat(
 		"Medium fills the two ELEMENTs of node at0002 in the context's other_context, which pin no name and so share one bare path; "+
 			"encode refuses data at a reused sibling rather than write it under every sibling's FLAT id. "+
 			"Under Required the skeleton holds no data there, and the pair passes.",
-		"openehr/serialize/simplified/deviations.md § Conformance, Archetype-reuse siblings, Encode",
+		"openehr/serialize/simplified/deviations.md § Conformance, Archetype-reuse siblings, residual, Encode",
 	),
 	probe076InBothFormats(
 		Probe076Finding{
