@@ -1,0 +1,524 @@
+# compiled tree of ehrbase-service/templates/IDCR  - Laboratory Order.v0.opt
+template_id="IDCR  - Laboratory Order.v0" concept="IDCR - Laboratory Order.v0" language="en" uid="6df44507-ae50-495b-aee4-f01a31774f50" num_nodes=36
+
+node /
+  rm_type="COMPOSITION" node_id="at0000" archetype_id="openEHR-EHR-COMPOSITION.referral.v0" node_name="Laboratory order" occurrences=1..1 slot=false
+  term[en] "at0000" code="at0000" description="Document containing all significant patient information required to transmit a request from one treating healthcare provider or organisation to another, for the purpose of consultation, review or transfer of care." text="Referral document"
+  attr "category" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "context" rm_type="EVENT_CONTEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "content" rm_type="CONTENT_ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=2
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "territory" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "composer" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /category
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /category/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["433"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context
+  rm_type="EVENT_CONTEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "other_context" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "start_time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "setting" rm_type="DV_CODED_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context/other_context
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=3..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context/other_context/items[at0042]
+  rm_type="CLUSTER" node_id="at0042" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0042" code="at0042" comment="For example: Local hospital departmental infomation or additional metadata to align with FHIR or CIMI equivalents." description="Additional information required to capture local context or to align with other reference models/formalisms." text="Extension"
+
+node /name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["Laboratory order"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]
+  rm_type="INSTRUCTION" node_id="at0000.1" archetype_id="openEHR-EHR-INSTRUCTION.request-lab_test.v1" node_name="" occurrences=0..1 slot=false
+  term[en] "at0000.1" code="at0000.1" description="Generic request for a laboratory request." text="Laboratory Test request"
+  attr "activities" rm_type="ACTIVITY" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "protocol" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "encoding" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "subject" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "narrative" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]/activities[at0001,'Lab Request']
+  rm_type="ACTIVITY" node_id="at0001" archetype_id="" node_name="Lab Request" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="Current Activity." text="Request"
+  attr "description" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "action_archetype_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]/activities[at0001,'Lab Request']/description
+  rm_type="ITEM_TREE" node_id="at0009" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0009" code="at0009" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=4
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]/activities[at0001,'Lab Request']/description/items[at0121]
+  rm_type="ELEMENT" node_id="at0121" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0121" code="at0121" description="Identification of the service requested. This is often coded with an external terminology." text="Service requested"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]/activities[at0001,'Lab Request']/description/items[at0121]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]/activities[at0001,'Lab Request']/description/items[at0132]
+  rm_type="CLUSTER" node_id="at0132" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0132" code="at0132" description="Structured detail defining the service requested eg CLUSTER archetype specifying the specific catheter that is to be inserted." text="Specific details"
+
+node /content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]/activities[at0001,'Lab Request']/description/items[at0.145]
+  rm_type="CLUSTER" node_id="at0.145" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0.145" code="at0.145" description="Structured detail defining the specimen." text="Specimen details"
+
+node /content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]/activities[at0001,'Lab Request']/description/items[at0116]
+  rm_type="CLUSTER" node_id="at0116" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0116" code="at0116" description="Language, transport or other personal requirements to support the patient's attendance or participation in provision of the service." text="Patient requirements"
+
+node /content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]/activities[at0001,'Lab Request']/name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]/activities[at0001,'Lab Request']/name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["Lab Request"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]/protocol
+  rm_type="ITEM_TREE" node_id="at0008" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0008" code="at0008" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=4
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]/protocol/items[at0141]
+  rm_type="CLUSTER" node_id="at0141" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0141" code="at0141" description="Details about the healthcare provider or organisation requesting the service." text="Requestor"
+
+node /content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]/protocol/items[at0142]
+  rm_type="CLUSTER" node_id="at0142" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0142" code="at0142" description="Details about the healthcare provider or organisation receiving the request for service." text="Receiver"
+
+node /content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]/protocol/items[at0128]
+  rm_type="CLUSTER" node_id="at0128" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.distribution\\.v1"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.distribution\\.v1"] excludes=[] raw_include_count=1
+  term[en] "at0128" code="at0128" description="A list of person's or organisation who should receive copies of any communication." text="Distribution list for response"
+
+node /content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]/protocol/items[at0112]
+  rm_type="CLUSTER" node_id="at0112" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0112" code="at0112" description="Local detailed information such as billing requirements." text="Localisation"
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]
+  rm_type="ACTION" node_id="at0000" archetype_id="openEHR-EHR-ACTION.laboratory_test.v1" node_name="" occurrences=0..1 slot=false
+  term[en] "at0000" code="at0000" description="Clinical activity about performing a laboratory test." text="Laboratory test tracker"
+  attr "ism_transition" rm_type="ISM_TRANSITION" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=11
+  attr "description" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "protocol" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "encoding" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "subject" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition
+  rm_type="ISM_TRANSITION" node_id="at0002" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0002" code="at0002" description="Pathology test is planned." text="Test planned"
+  attr "current_state" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "careflow_step" rm_type="DV_CODED_TEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["526"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0002"]}
+  code_term[en] "at0002" code="at0002" description="Pathology test is planned." text="Test planned"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition
+  rm_type="ISM_TRANSITION" node_id="at0003" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0003" code="at0003" description="Pathology test has been requested." text="Test requested"
+  attr "current_state" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "careflow_step" rm_type="DV_CODED_TEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["526"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0003"]}
+  code_term[en] "at0003" code="at0003" description="Pathology test has been requested." text="Test requested"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition
+  rm_type="ISM_TRANSITION" node_id="at0009" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0009" code="at0009" description="The pathology test has been postponed." text="Test postponed"
+  attr "current_state" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "careflow_step" rm_type="DV_CODED_TEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["527"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0009"]}
+  code_term[en] "at0009" code="at0009" description="The pathology test has been postponed." text="Test postponed"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition
+  rm_type="ISM_TRANSITION" node_id="at0011" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0011" code="at0011" description="The planned pathology test has been cancelled prior to commencement." text="Test cancelled"
+  attr "current_state" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "careflow_step" rm_type="DV_CODED_TEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["528"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0011"]}
+  code_term[en] "at0011" code="at0011" description="The planned pathology test has been cancelled prior to commencement." text="Test cancelled"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition
+  rm_type="ISM_TRANSITION" node_id="at0004" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0004" code="at0004" description="Appoinment for pathology test has been made." text="Appointment scheduled"
+  attr "current_state" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "careflow_step" rm_type="DV_CODED_TEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["529"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0004"]}
+  code_term[en] "at0004" code="at0004" description="Appoinment for pathology test has been made." text="Appointment scheduled"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition
+  rm_type="ISM_TRANSITION" node_id="at0005" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0005" code="at0005" description="Appointment for pathology test has been rescheduled." text="Appointment rescheduled"
+  attr "current_state" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "careflow_step" rm_type="DV_CODED_TEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["529"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0005"]}
+  code_term[en] "at0005" code="at0005" description="Appointment for pathology test has been rescheduled." text="Appointment rescheduled"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition
+  rm_type="ISM_TRANSITION" node_id="at0008" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0008" code="at0008" description="The pathology test has been performed but related activities not completed." text="Test performed"
+  attr "current_state" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "careflow_step" rm_type="DV_CODED_TEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["245"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0008"]}
+  code_term[en] "at0008" code="at0008" description="The pathology test has been performed but related activities not completed." text="Test performed"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition
+  rm_type="ISM_TRANSITION" node_id="at0014" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0014" code="at0014" description="The pathology test was commenced but not completed successfully." text="Failed attempt"
+  attr "current_state" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "careflow_step" rm_type="DV_CODED_TEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["245"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0014"]}
+  code_term[en] "at0014" code="at0014" description="The pathology test was commenced but not completed successfully." text="Failed attempt"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition
+  rm_type="ISM_TRANSITION" node_id="at0010" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0010" code="at0010" description="The pathology test has been suspended." text="Test suspended"
+  attr "current_state" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "careflow_step" rm_type="DV_CODED_TEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["530"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0010"]}
+  code_term[en] "at0010" code="at0010" description="The pathology test has been suspended." text="Test suspended"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition
+  rm_type="ISM_TRANSITION" node_id="at0012" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0012" code="at0012" description="The pathology test has been aborted." text="Test aborted"
+  attr "current_state" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "careflow_step" rm_type="DV_CODED_TEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["531"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0012"]}
+  code_term[en] "at0012" code="at0012" description="The pathology test has been aborted." text="Test aborted"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition
+  rm_type="ISM_TRANSITION" node_id="at0007" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0007" code="at0007" description="The pathology test has been performed and all associated activities completed." text="Test complete"
+  attr "current_state" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "careflow_step" rm_type="DV_CODED_TEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["532"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0007"]}
+  code_term[en] "at0007" code="at0007" description="The pathology test has been performed and all associated activities completed." text="Test complete"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/description
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=3
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/description/items[at0017]
+  rm_type="ELEMENT" node_id="at0017" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0017" code="at0017" description="The name of the laboratory test (to be) performed. Coding of the specific test with a terminology is preferred, where possible." text="Test name"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/description/items[at0017]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/description/items[at0022]
+  rm_type="CLUSTER" node_id="at0022" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.specimen(-[a-zA-Z0-9_]+)*\\.v1"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.specimen(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[] raw_include_count=1
+  term[en] "at0022" code="at0022" description="Structured information about the specimen on which the test was conducted." text="Specimen detail"
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/description/items[at0021]
+  rm_type="CLUSTER" node_id="at0021" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0021" code="at0021" description="Structured information about the test. Use to capture detailed, structured information about method & technique etc." text="Test procedure"
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/protocol
+  rm_type="ITEM_TREE" node_id="at0015" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0015" code="at0015" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ACTION.laboratory_test.v1]/protocol/items[at0023]
+  rm_type="CLUSTER" node_id="at0023" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0023" code="at0023" comment="For example: Local hospital departmental infomation or additional metadata to align with FHIR or CIMI equivalents." description="Additional information required to capture local context or to align with other reference models/formalisms." text="Extension"
+
+# walked nodes=86

@@ -80,7 +80,7 @@ The size limit **MUST** be 32 MiB for an OPT, an uploaded template and a BMM doc
   An input with no root element is refused with an error wrapping `io.ErrUnexpectedEOF`, not a bare `io.EOF`.
 - The element limit is the depth limit counted in the model's XML elements, with the root element at depth 1.
   It is 320 = 2 × 128 + 64: an `<attributes>` and a `<children>` for each of the 128 levels below the definition, and 64 for the root `<template>`, its `<definition>` and the deepest content one constraint object holds, such as an assumed value or an expression tree.
-  The deepest of the 74 corpus OPTs nests 11 levels and 26 elements.
+  The deepest of the 84 corpus OPTs nests 11 levels and 26 elements.
 - A caller that decodes an OPT with `canxml.Unmarshal` or a `canxml.Decoder` itself gets neither limit unless it applies them.
 
 ### Canonical-XML decode depth (`openehr/serialize/canxml/`)

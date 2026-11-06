@@ -1,0 +1,296 @@
+# compiled tree of ehrbase-service/templates/IDCR - Medication List.v0.opt
+template_id="IDCR - Medication List.v0" concept="IDCR - Medication List.v0" language="en" uid="20eac6f3-cf70-43da-9401-b9c5e21f30e9" num_nodes=47
+
+node /
+  rm_type="COMPOSITION" node_id="at0000" archetype_id="openEHR-EHR-COMPOSITION.medication_list.v0" node_name="Current medication list" occurrences=1..1 slot=false
+  term[en] "at0000" code="at0000" description="A persistent and managed list of medications that are reasonably assumed to be taken by the individual and that may influence clinical decision-making and care provision." text="Medication list"
+  attr "category" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "context" rm_type="EVENT_CONTEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "content" rm_type="CONTENT_ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "territory" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "composer" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /category
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /category/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["433"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context
+  rm_type="EVENT_CONTEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "other_context" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "start_time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "setting" rm_type="DV_CODED_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context/other_context
+  rm_type="ITEM_TREE" node_id="at0005" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0005" code="at0005" description="@ internal @" text="Tree"
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["Current medication list"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]
+  rm_type="SECTION" node_id="at0000" archetype_id="openEHR-EHR-SECTION.medication_medical_devices_rcp.v1" node_name="" occurrences=0..* slot=false
+  term[en] "at0000" code="at0000" description="Medication and medical devices heading (AoMRC)." text="Medication and medical devices"
+  attr "items" rm_type="CONTENT_ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]
+  rm_type="SECTION" node_id="at0000" archetype_id="openEHR-EHR-SECTION.current_medication_rcp.v1" node_name="" occurrences=0..* slot=false
+  term[en] "at0000" code="at0000" description="Current, active medication subheading (AoMRC)." text="Current medication"
+  attr "items" rm_type="CONTENT_ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]
+  rm_type="INSTRUCTION" node_id="at0000" archetype_id="openEHR-EHR-INSTRUCTION.medication_order.v0" node_name="" occurrences=0..* slot=false
+  term[en] "at0000" code="at0000" description="Instructions for use of a medication, vaccine or other therapeutic item." text="Medication order"
+  attr "activities" rm_type="ACTIVITY" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "protocol" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "encoding" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "subject" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "narrative" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]
+  rm_type="ACTIVITY" node_id="at0001" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[en] "at0001" code="at0001" description="Order." text="Order"
+  attr "description" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "action_archetype_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description
+  rm_type="ITEM_TREE" node_id="at0002" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0002" code="at0002" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=13
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0070]
+  rm_type="ELEMENT" node_id="at0070" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0070" code="at0070" comment="It is strongly recommended that the 'Medication item' be coded with a terminology capable of triggering decision support, where possible. The extent of coding may vary from the simple name of the medication item through to structured details about the actual medication pack to be used. Free text entry should only be used if there is no appropriate terminology available." description="Identification of the medication, vaccine or other therapeutic item being ordered." text="Medication item"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0070]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0143]
+  rm_type="CLUSTER" node_id="at0143" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.medication_substance(-[a-zA-Z0-9_]+)*\\.v0"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.medication_substance(-[a-zA-Z0-9_]+)*\\.v0"] excludes=[] raw_include_count=1
+  term[en] "at0143" code="at0143" comment="For example: the form, strength, any diluents or mixture of ingredients." description="Structured details about the strength and form of the overall preparation." text="Preparation"
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0091]
+  rm_type="ELEMENT" node_id="at0091" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[en] "at0091" code="at0091" comment="For example: 'oral', 'intravenous', or 'topical'.\nCoding of the route with a terminology is preferred, where possible. Multiple potential routes may be specified." description="The route of administration." text="Route"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0091]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0009]
+  rm_type="ELEMENT" node_id="at0009" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0009" code="at0009" comment="Including the amount, when to take it and additional instructions for use. Where the medication dose directions are fully carried by the structured, computable dose directions, this element should carry the narrative equivalent, generally auto-generated. If it is not possible to represent the intended dosage directions fully in computable form, partial representation is not recommended, and the directions should be only recorded in narrative form using this data element." description="Complete narrative description about how the medication is to be used." text="Dose directions description"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0009]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0109]
+  rm_type="ELEMENT" node_id="at0109" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0109" code="at0109" comment="Will generally only be used for legacy formats where dose directions are simply split between textual representations of dose and amount." description="The narrative description of the dose amount of the medication, vaccine or other therapeutic item." text="Dose amount description"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0109]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0055]
+  rm_type="ELEMENT" node_id="at0055" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0055" code="at0055" comment="Will generally only be used for legacy formats where dose directions are simply split between textual representations of dose and amount." description="The narrative description of the dose frequency and other timing of the medication, vaccine or other therapeutic item." text="Dose timing description"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0055]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0056]
+  rm_type="CLUSTER" node_id="at0056" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[en] "at0056" code="at0056" comment="For example: '1 tab in the morning, 1 tab at night, for 3 weeks, on Mondays, Wednesdays and Fridays'. This cluster allows multiple occurrences to enable representation of a complete set of dose directions for a single medication order." description="Details about a dose direction for the medication order." text="Dose direction"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=3
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0056]/items[at0058]
+  rm_type="CLUSTER" node_id="at0058" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[en] "at0058" code="at0058" comment="For example: '2 tablets at 6pm' or '20mg three times per day'. Please note: this cluster allows multiple occurrences to enable representation of a complete set of dose patterns for a single dose direction." description="The combination of a medication amount associated with a single medication timing." text="Dose pattern"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0056]/items[at0058]/items[at0037]
+  rm_type="CLUSTER" node_id="at0037" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.daily_timing(-[a-zA-Z0-9_]+)*\\.v0"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.daily_timing(-[a-zA-Z0-9_]+)*\\.v0"] excludes=[] raw_include_count=1
+  term[en] "at0037" code="at0037" comment="For example: 'in the morning', 'at 0600, 1400, 2100'." description="Structured details about the timing of a single use or administration." text="Dose timing"
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0056]/items[at0058]/items[at0156]
+  rm_type="CLUSTER" node_id="at0156" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.conditional_medication_rules(-[a-zA-Z0-9_]+)*\\.v0"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.conditional_medication_rules(-[a-zA-Z0-9_]+)*\\.v0"] excludes=[] raw_include_count=1
+  term[en] "at0156" code="at0156" description="Details of dose amount / administration rate dependent on specific conditions." text="Conditional administration"
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0056]/items[at0066]
+  rm_type="ELEMENT" node_id="at0066" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0066" code="at0066" comment="For exampe: 'for 7 days','Indefinite'." description="The duration of this dose direction." text="Direction duration"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0056]/items[at0066]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0056]/items[at0066]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0067" "at0068"]}
+  code_term[en] "at0067" code="at0067" description="The direction should be continued indefinitely." text="Indefinite"
+  code_term[en] "at0068" code="at0068" description="The direction should be continued indefinitely and discontinuation is not recommended." text="Indefinite - Do not discontinue"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0056]/items[at0066]/value
+  rm_type="DV_DURATION" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0056]/items[at0066]/value/value
+  rm_type="DURATION" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CDuration{Pattern:"" Range:constraints.TemporalRange{Lower:"PT0S" Upper:"" LowerInclusive:true UpperInclusive:false LowerUnbounded:false UpperUnbounded:true}}
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0056]/items[at0090]
+  rm_type="CLUSTER" node_id="at0090" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.timing_repetition(-[a-zA-Z0-9_]+)*\\.v0"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.timing_repetition(-[a-zA-Z0-9_]+)*\\.v0"] excludes=[] raw_include_count=1
+  term[en] "at0090" code="at0090" comment="For exampe: 'every 3 days', 'on Thursdays and Sundays', '3 days after onset of menstruation'." description="Structured details about pattern of repetition for each set of daily dose directions." text="Direction repetition"
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0044]
+  rm_type="ELEMENT" node_id="at0044" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[en] "at0044" code="at0044" comment="For example: precautions as 'take with food', 'Avoid grapefruit', 'Dissolve in water'. This data element allows multiple occurrences and should be coded with a reference terminology, where possible." description="An additional instruction on how to use the medication, vaccine or other therapeutic good." text="Additional instruction"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0044]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0105]
+  rm_type="ELEMENT" node_id="at0105" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[en] "at0105" code="at0105" comment="For example: 'To reduce your blood pressure', 'To thin your blood'.This data element allows multiple occurrences and should be coded with a reference terminology, where possible. If required it is possible to use a LINK attribute to associate this element with, for example, the 'original diagnosis' in a separate Problem list composition but the indication should be explicitly recorded here, as the link target may change over time." description="An additional instruction directed primarily at the patient or carers." text="Patient guidance"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0105]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0107]
+  rm_type="ELEMENT" node_id="at0107" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[en] "at0107" code="at0107" comment="For example: 'Please check renal function in 2 weeks'. This data element allows multiple occurrences." description="An additional instruction which gives advice on appropriate monitoring of the medication." text="Monitoring instruction"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0107]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0018]
+  rm_type="ELEMENT" node_id="at0018" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[en] "at0018" code="at0018" comment="For example: 'Angina'. Coding of the clinical indication with a terminology is preferred, where possible. This data element allows multiple occurrences." description="The clinical reason for ordering the medication, vaccine or other therapeutic good." text="Clinical indication"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0018]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0113]
+  rm_type="CLUSTER" node_id="at0113" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0113" code="at0113" description="Details about the intended course of the medication." text="Course details"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0113]/items[at0012]
+  rm_type="ELEMENT" node_id="at0012" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0012" code="at0012" description="The date and optional time to commence use of the medication, vaccine or other therapeutic good." text="Order start date/time"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0113]/items[at0012]/value
+  rm_type="DV_DATE_TIME" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0113]/items[at0112]
+  rm_type="CLUSTER" node_id="at0112" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.medication_course_summary(-[a-zA-Z0-9_]+)*\\.v0"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.medication_course_summary(-[a-zA-Z0-9_]+)*\\.v0"] excludes=[] raw_include_count=1
+  term[en] "at0112" code="at0112" comment="Course summary may be required when transmitting medication information between systems. For example: as part of a referral, emergency patient summary or discharge communication." description="Summary information about the medication, such as current status or key dates, generally used in non-prescription contexts." text="Course summary"
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0069]
+  rm_type="CLUSTER" node_id="at0069" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.medication_authorisation(-[a-zA-Z0-9_]+)*\\.v0"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.medication_authorisation(-[a-zA-Z0-9_]+)*\\.v0"] excludes=[] raw_include_count=1
+  term[en] "at0069" code="at0069" comment="For example: details of repeat supply. This SLOT allows for local variation in the different jurisdictions regarding medication authorisation and re-authorisation to be managed." description="Details of authorisation of the medication, vaccine or other therapeutic good." text="Authorisation details"
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/protocol
+  rm_type="ITEM_TREE" node_id="at0005" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0005" code="at0005" description="The amount and units of the medication, vaccine or other therapeutic good to be used or administered at one time." text="Dose amount description"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/protocol/items[at0008]
+  rm_type="CLUSTER" node_id="at0008" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0008" code="at0008" comment="For example: local information requirements or additional metadata to align with FHIR or CIMI equivalents." description="Additional information required to capture local content or to align with other reference models/formalisms." text="Extension"
+
+# walked nodes=48

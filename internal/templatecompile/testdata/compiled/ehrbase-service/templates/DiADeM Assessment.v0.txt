@@ -1,0 +1,1042 @@
+# compiled tree of ehrbase-service/templates/DiADeM Assessment.v0.opt
+template_id="DiADeM Assessment.v0" concept="DiADeM Assessment.v0" language="en" uid="8db6bdf2-7f9b-4dcc-ad49-453002d4ba4f" num_nodes=161
+
+node /
+  rm_type="COMPOSITION" node_id="at0000" archetype_id="openEHR-EHR-COMPOSITION.encounter.v1" node_name="DiADeM Assessment" occurrences=1..1 slot=false
+  term[en] "at0000" code="at0000" description="Interaction, contact or care event between a subject of care and healthcare provider(s)." text="Encounter"
+  attr "category" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "context" rm_type="EVENT_CONTEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "content" rm_type="CONTENT_ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=4
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "territory" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "composer" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /category
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /category/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["433"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context
+  rm_type="EVENT_CONTEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "other_context" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "start_time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "setting" rm_type="DV_CODED_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context/other_context
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context/other_context/items[openEHR-EHR-CLUSTER.individual_professional_uk.v1,'Composer details']
+  rm_type="CLUSTER" node_id="at0000" archetype_id="openEHR-EHR-CLUSTER.individual_professional_uk.v1" node_name="Composer details" occurrences=0..1 slot=false
+  term[en] "at0000" code="at0000" description="Professional demographics details including name(s) , addresse(s) and telecommunication contact details." text="Individual professional demographics (UK)"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=4
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context/other_context/items[openEHR-EHR-CLUSTER.individual_professional_uk.v1,'Composer details']/items[at0015]
+  rm_type="CLUSTER" node_id="at0015" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.person_name\\.v1"] slot_excludes=[".*"]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.person_name\\.v1"] excludes=[".*"] raw_include_count=1
+  term[en] "at0015" code="at0015" description="Personal name details of the individual." text="Name"
+
+node /context/other_context/items[openEHR-EHR-CLUSTER.individual_professional_uk.v1,'Composer details']/items[at0017]
+  rm_type="CLUSTER" node_id="at0017" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0017" code="at0017" description="Telecommunication details of the individual." text="Telecoms"
+
+node /context/other_context/items[openEHR-EHR-CLUSTER.individual_professional_uk.v1,'Composer details']/items[at0018]
+  rm_type="CLUSTER" node_id="at0018" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.organisation(-[a-zA-Z0-9_]+)*\\.v1"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.organisation(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[] raw_include_count=1
+  term[en] "at0018" code="at0018" description="Organisation details to which the individual is attached." text="Organisation"
+
+node /context/other_context/items[openEHR-EHR-CLUSTER.individual_professional_uk.v1,'Composer details']/items[at0012,'Assessor team']
+  rm_type="ELEMENT" node_id="at0012" archetype_id="" node_name="Assessor team" occurrences=0..1 slot=false
+  term[en] "at0012" code="at0012" description="Team to which the individual belongs." text="Team"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context/other_context/items[openEHR-EHR-CLUSTER.individual_professional_uk.v1,'Composer details']/items[at0012,'Assessor team']/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context/other_context/items[openEHR-EHR-CLUSTER.individual_professional_uk.v1,'Composer details']/items[at0012,'Assessor team']/name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /context/other_context/items[openEHR-EHR-CLUSTER.individual_professional_uk.v1,'Composer details']/items[at0012,'Assessor team']/name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["Assessor team"] ListOpen:false Default:""}
+
+node /context/other_context/items[openEHR-EHR-CLUSTER.individual_professional_uk.v1,'Composer details']/name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /context/other_context/items[openEHR-EHR-CLUSTER.individual_professional_uk.v1,'Composer details']/name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["Composer details"] ListOpen:false Default:""}
+
+node /name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["DiADeM Assessment"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]
+  rm_type="ADMIN_ENTRY" node_id="at0000" archetype_id="openEHR-EHR-ADMIN_ENTRY.key_contacts.v1" node_name="" occurrences=0..* slot=false
+  term[en] "at0000" code="at0000" description="Key contacts for the patient or client, including formal and informal carers, next of kin and key workers." text="Key contacts"
+  attr "data" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "encoding" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "subject" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]
+  rm_type="CLUSTER" node_id="at0018" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[en] "at0018" code="at0018" description="An individual identified by the person as offering care and support , excluding paid carers or carers from voluntary agencies." text="Informal carer"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']
+  rm_type="CLUSTER" node_id="at0000" archetype_id="openEHR-EHR-CLUSTER.individual_personal_uk.v1" node_name="Carer" occurrences=0..1 slot=false
+  term[en] "at0000" code="at0000" description="Personal demographics including name(s) , addresse(s) and telecommunication contact details." text="Individual's personal demographics (UK)"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=4
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/items[openEHR-EHR-CLUSTER.person_name.v1]
+  rm_type="CLUSTER" node_id="at0000" archetype_id="openEHR-EHR-CLUSTER.person_name.v1" node_name="" occurrences=0..1 slot=false
+  term[en] "at0000" code="at0000" description="Details of personal name of an individual, provider or third party." text="Person name"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/items[openEHR-EHR-CLUSTER.person_name.v1]/items[at0001,'Carer name']
+  rm_type="ELEMENT" node_id="at0001" archetype_id="" node_name="Carer name" occurrences=0..1 slot=false
+  term[en] "at0001" code="at0001" description="Name in free text unstructured format." text="Unstructured name"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/items[openEHR-EHR-CLUSTER.person_name.v1]/items[at0001,'Carer name']/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/items[openEHR-EHR-CLUSTER.person_name.v1]/items[at0001,'Carer name']/name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/items[openEHR-EHR-CLUSTER.person_name.v1]/items[at0001,'Carer name']/name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["Carer name"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/items[at0014]
+  rm_type="CLUSTER" node_id="at0014" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0014" code="at0014" description="Address details of the individual." text="Address details"
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/items[openEHR-EHR-CLUSTER.telecom_uk.v1]
+  rm_type="CLUSTER" node_id="at0000" archetype_id="openEHR-EHR-CLUSTER.telecom_uk.v1" node_name="" occurrences=0..* slot=false
+  term[en] "at0000" code="at0000" description="Personal or organisational telecommunication details, including telephone, fax, and email or other telecommunications details e.g skype address." text="Telecom details (UK)"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/items[openEHR-EHR-CLUSTER.telecom_uk.v1]/items[at0002,'Carer telephone']
+  rm_type="ELEMENT" node_id="at0002" archetype_id="" node_name="Carer telephone" occurrences=0..1 slot=false
+  term[en] "at0002" code="at0002" description="An unstructured description of telecoms." text="Unstuctured telcoms"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/items[openEHR-EHR-CLUSTER.telecom_uk.v1]/items[at0002,'Carer telephone']/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/items[openEHR-EHR-CLUSTER.telecom_uk.v1]/items[at0002,'Carer telephone']/name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/items[openEHR-EHR-CLUSTER.telecom_uk.v1]/items[at0002,'Carer telephone']/name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["Carer telephone"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/items[at0008]
+  rm_type="ELEMENT" node_id="at0008" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0008" code="at0008" description="The relationship of this individual to the subject e.g. family member, informal carer." text="Relationship to subject"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/items[at0008]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["Carer"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']
+  rm_type="CLUSTER" node_id="at0014" archetype_id="" node_name="GP" occurrences=0..1 slot=false
+  term[en] "at0014" code="at0014" description="A health and social care professional or staff member, including a carer from voluntary sector." text="Formal carer"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]
+  rm_type="CLUSTER" node_id="at0000" archetype_id="openEHR-EHR-CLUSTER.individual_professional.v1" node_name="" occurrences=0..1 slot=false
+  term[en] "at0000" code="at0000" description="Professional demographics details including name(s) , addresse(s) and telecommunication contact details." text="Individual professional demographics (UK)"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=3
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.person_name.v1]
+  rm_type="CLUSTER" node_id="at0000" archetype_id="openEHR-EHR-CLUSTER.person_name.v1" node_name="" occurrences=0..1 slot=false
+  term[en] "at0000" code="at0000" description="Details of personal name of an individual, provider or third party." text="Person name"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.person_name.v1]/items[at0001,'GP name']
+  rm_type="ELEMENT" node_id="at0001" archetype_id="" node_name="GP name" occurrences=0..1 slot=false
+  term[en] "at0001" code="at0001" description="Name in free text unstructured format." text="Unstructured name"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.person_name.v1]/items[at0001,'GP name']/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.person_name.v1]/items[at0001,'GP name']/name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.person_name.v1]/items[at0001,'GP name']/name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["GP name"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1,'Email']
+  rm_type="CLUSTER" node_id="at0000" archetype_id="openEHR-EHR-CLUSTER.telecom_uk.v1" node_name="Email" occurrences=0..1 slot=false
+  term[en] "at0000" code="at0000" description="Personal or organisational telecommunication details, including telephone, fax, and email or other telecommunications details e.g skype address." text="Telecom details (UK)"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1,'Email']/items[at0002,'GP email']
+  rm_type="ELEMENT" node_id="at0002" archetype_id="" node_name="GP email" occurrences=0..1 slot=false
+  term[en] "at0002" code="at0002" description="An unstructured description of telecoms." text="Unstuctured telcoms"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1,'Email']/items[at0002,'GP email']/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1,'Email']/items[at0002,'GP email']/name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1,'Email']/items[at0002,'GP email']/name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["GP email"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1,'Email']/name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1,'Email']/name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["Email"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.organisation.v1]
+  rm_type="CLUSTER" node_id="at0000" archetype_id="openEHR-EHR-CLUSTER.organisation.v1" node_name="" occurrences=0..* slot=false
+  term[en] "at0000" code="at0000" description="Details of an organisation" text="Organisation"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=3
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.organisation.v1]/items[at0001,'GP Practice name']
+  rm_type="ELEMENT" node_id="at0001" archetype_id="" node_name="GP Practice name" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="Name of the organisation" text="Name of Organisation"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.organisation.v1]/items[at0001,'GP Practice name']/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.organisation.v1]/items[at0001,'GP Practice name']/name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.organisation.v1]/items[at0001,'GP Practice name']/name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["GP Practice name"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.organisation.v1]/items[at0008]
+  rm_type="CLUSTER" node_id="at0008" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.address\\.v1"] slot_excludes=[".*"]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.address\\.v1"] excludes=[".*"] raw_include_count=1
+  term[en] "at0008" code="at0008" description="Details about Address" text="Address details"
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.organisation.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1,'Organisation telecom']
+  rm_type="CLUSTER" node_id="at0000" archetype_id="openEHR-EHR-CLUSTER.telecom_uk.v1" node_name="Organisation telecom" occurrences=0..1 slot=false
+  term[en] "at0000" code="at0000" description="Personal or organisational telecommunication details, including telephone, fax, and email or other telecommunications details e.g skype address." text="Telecom details (UK)"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.organisation.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1,'Organisation telecom']/items[at0002,'GP telephone']
+  rm_type="ELEMENT" node_id="at0002" archetype_id="" node_name="GP telephone" occurrences=0..1 slot=false
+  term[en] "at0002" code="at0002" description="An unstructured description of telecoms." text="Unstuctured telcoms"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.organisation.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1,'Organisation telecom']/items[at0002,'GP telephone']/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.organisation.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1,'Organisation telecom']/items[at0002,'GP telephone']/name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.organisation.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1,'Organisation telecom']/items[at0002,'GP telephone']/name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["GP telephone"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.organisation.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1,'Organisation telecom']/name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.organisation.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1,'Organisation telecom']/name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["Organisation telecom"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[at0030]
+  rm_type="ELEMENT" node_id="at0030" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0030" code="at0030" description="The professional role or responsibility of the carer with respect to the person which should help identify them as being an appropriate contact for an aspect of care, usually a professional role or care pathway name." text="Professional relationship to subject"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[at0030]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  default_value=*rm.DVText {"_type":"DV_TEXT","value":"GP"}
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["GP"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]
+  rm_type="OBSERVATION" node_id="at0000" archetype_id="openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0" node_name="" occurrences=0..1 slot=false
+  term[en] "at0000" code="at0000" description="Additional clinical information used to complete DiADeM assessment." text="YHSCN - DiADeM assessment"
+  attr "data" rm_type="HISTORY" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "encoding" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "subject" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data
+  rm_type="HISTORY" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="@ internal @" text="Event Series"
+  attr "events" rm_type="EVENT" cardinality=multiple existence=0..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "origin" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]
+  rm_type="POINT_EVENT" node_id="at0002" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0002" code="at0002" description="A specific date and/or time which may be explicitly defined in a template or at run-time." text="Point in time"
+  attr "data" rm_type="T" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data
+  rm_type="ITEM_TREE" node_id="at0003" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0003" code="at0003" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=6
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0004]
+  rm_type="ELEMENT" node_id="at0004" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0004" code="at0004" description="Statement to confirm whether the patient is fully independent in relation to basic activities of daily living, washing, dressing, feeding and \nattending to own continence needs. The requirement of prompting or supervision of staff constitutes a loss of full independence." text="Functional impairment"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0004]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0004]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0006" "at0005"]}
+  code_term[en] "at0006" code="at0006" description="The patient is no longer fully independent in relation to the basic activities of daily living." text="No longer fully independent"
+  code_term[en] "at0005" code="at0005" description="The patient is fully independent in relation to basic activities of daily living." text="Fully Independent"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0007]
+  rm_type="ELEMENT" node_id="at0007" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0007" code="at0007" description="Statement whether history of gradual cognitive decline (typically for the last few years) is confirmed by care staff, relatives and medical records. Staff/relatives confirm that in their opinion the patient consistently demonstrates both functional and cognitive \nimpairment." text="Corroborating history"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0007]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0007]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0011" "at0010"]}
+  code_term[en] "at0011" code="at0011" description="History of gradual cognitive decline is confirmed by staff, relatives and medical records." text="Corroborating history confirmed"
+  code_term[en] "at0010" code="at0010" description="History of gradual cognitive decline is not confirmed by staff, relatives and medical records." text="Corroborating history NOT confirmed"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0008]
+  rm_type="ELEMENT" node_id="at0008" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0008" code="at0008" description="Statement whether dementia screening bloods are normal (where clinically appropriate and patient consents to bloods). If patient lacks capacity to consent to bloods, a best interest decision must be made and documented accordingly.\n NB. If intracranial pathology (e.g. subdural haematoma, cerebral tumour) is suspected, referral for a brain scan may be appropriate. Otherwise where dementia is advanced, differential diagnosis is unlikely to affect patient management & a brain scan is unnecessary." text="Investigations"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0008]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0008]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0012" "at0013" "at0023"]}
+  code_term[en] "at0012" code="at0012" description="Blood tests screening for other causes are normal." text="Normal Dementia screening bloods"
+  code_term[en] "at0013" code="at0013" description="Blood tests indicate other causes." text="Abnormal Dementia screening bloods"
+  code_term[en] "at0023" code="at0023" description="Blood tests screening for other causes have not been done." text="Screening bloods not done"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0024]
+  rm_type="ELEMENT" node_id="at0024" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0024" code="at0024" description="Statement why screening blood tests have not been done, e.g. patient refusal." text="Reason why bloods not done"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0024]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0009]
+  rm_type="ELEMENT" node_id="at0009" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0009" code="at0009" description="Statement whether there is acute underlying cause to explain confusion i.e. delirium (acute confusional state) has been excluded. Also confirmation whether mood disorder or psychosis is also confirmed or excluded." text="Exclusion criteria"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0009]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0009]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0014" "at0015"]}
+  code_term[en] "at0014" code="at0014" description="Acute underlying causes to explain confusion have been excluded." text="NO acute underlying cause to explain confusion"
+  code_term[en] "at0015" code="at0015" description="There are acute underlying causes to explain confusion." text="Acute underlying cause to explain confusion"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0022]
+  rm_type="ELEMENT" node_id="at0022" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0022" code="at0022" description="The overall interpretation of the assessment, i.e. a coded statement of whether the assessment indicates a likely diagnosis of dementia or not." text="Interpretation"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0022]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0022]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0029" "at0030"]}
+  code_term[en] "at0029" code="at0029" description="The assessment indicates that a diagnosis of dementia is likely." text="Dementia diagnosis likely"
+  code_term[en] "at0030" code="at0030" description="The assessment indicates that a diagnosis of dementia is not likely." text="Dementia diagnosis not likely"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]
+  rm_type="OBSERVATION" node_id="at0000" archetype_id="openEHR-EHR-OBSERVATION.six_cit_assessment.v0" node_name="" occurrences=0..1 slot=false
+  term[en] "at0000" code="at0000" description="The 6CIT Test used to test for Dementia." text="6 CIT Assessment"
+  attr "data" rm_type="HISTORY" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "protocol" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "encoding" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "subject" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data
+  rm_type="HISTORY" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="@ internal @" text="Event Series"
+  attr "events" rm_type="EVENT" cardinality=multiple existence=0..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "origin" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]
+  rm_type="POINT_EVENT" node_id="at0002" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0002" code="at0002" description="A specific date and/or time which may be explicitly defined in a template or at run-time." text="Point in time"
+  attr "data" rm_type="T" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "state" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data
+  rm_type="ITEM_TREE" node_id="at0003" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0003" code="at0003" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=7
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0004]
+  rm_type="ELEMENT" node_id="at0004" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0004" code="at0004" comment="Original form: '1. What year is it?'" description="Did the patient recall the year correctly?" text="What year?"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0004]/value
+  rm_type="DV_ORDINAL" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CDvOrdinal{Values:[constraints.OrdinalSymbol{Value:0 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0005"}} constraints.OrdinalSymbol{Value:4 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0006"}}]}
+  code_term[en] "at0005" code="at0005" description="Patient recalled the year correctly." text="Correct"
+  code_term[en] "at0006" code="at0006" description="Patient did not recall the year correctly." text="Incorrect"
+  attr "symbol" rm_type="DV_CODED_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "value" rm_type="Integer" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0007]
+  rm_type="ELEMENT" node_id="at0007" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0007" code="at0007" description="Did the patient recall the month correctly?" text="What month?"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0007]/value
+  rm_type="DV_ORDINAL" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CDvOrdinal{Values:[constraints.OrdinalSymbol{Value:0 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0008"}} constraints.OrdinalSymbol{Value:3 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0009"}}]}
+  code_term[en] "at0008" code="at0008" description="Patient recalled the month correctly." text="Correct"
+  code_term[en] "at0009" code="at0009" description="Patient did not recall the month correctly." text="Incorrect"
+  attr "symbol" rm_type="DV_CODED_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "value" rm_type="Integer" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0010]
+  rm_type="ELEMENT" node_id="at0010" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0010" code="at0010" description="Did the patient recall the time correctly (within 1 hour)?" text="About what time?"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0010]/value
+  rm_type="DV_ORDINAL" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CDvOrdinal{Values:[constraints.OrdinalSymbol{Value:0 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0011"}} constraints.OrdinalSymbol{Value:3 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0012"}}]}
+  code_term[en] "at0011" code="at0011" description="Patient recalled the time correctly." text="Correct"
+  code_term[en] "at0012" code="at0012" description="Patient did not recall the time correctly." text="Incorrect"
+  attr "symbol" rm_type="DV_CODED_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "value" rm_type="Integer" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0013]
+  rm_type="ELEMENT" node_id="at0013" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0013" code="at0013" description="Was the patient able to count backwards from 20 to 1 correctly?" text="Count backwards"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0013]/value
+  rm_type="DV_ORDINAL" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CDvOrdinal{Values:[constraints.OrdinalSymbol{Value:0 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0014"}} constraints.OrdinalSymbol{Value:2 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0015"}} constraints.OrdinalSymbol{Value:4 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0016"}}]}
+  code_term[en] "at0014" code="at0014" description="Patient was able to count backwards from 20 to 1 with no errors." text="No errors"
+  code_term[en] "at0015" code="at0015" description="Patient made 1 error when counting backwards from 20 to 1." text="1 error"
+  code_term[en] "at0016" code="at0016" description="Patient made more than 1 error when counting backwards from 20 to 1." text="More than 1 error"
+  attr "symbol" rm_type="DV_CODED_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "value" rm_type="Integer" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0017]
+  rm_type="ELEMENT" node_id="at0017" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0017" code="at0017" description="Was the patient able to say the months of the year in reverse correctly?" text="Months in reverse"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0017]/value
+  rm_type="DV_ORDINAL" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CDvOrdinal{Values:[constraints.OrdinalSymbol{Value:0 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0018"}} constraints.OrdinalSymbol{Value:2 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0019"}} constraints.OrdinalSymbol{Value:4 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0020"}}]}
+  code_term[en] "at0018" code="at0018" description="Patient was able to say the months of the year in reverse with no error." text="No error"
+  code_term[en] "at0019" code="at0019" description="Patient made 1 error when saying the months of the year in reverse." text="1 error"
+  code_term[en] "at0020" code="at0020" description="Patient made more than 1 error when saying the months of the year in reverse." text="More than 1 error"
+  attr "symbol" rm_type="DV_CODED_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "value" rm_type="Integer" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0021]
+  rm_type="ELEMENT" node_id="at0021" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0021" code="at0021" description="Was the patient able to correctly recall the 5-part address phrase given to them earlier?" text="Repeat address phrase"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0021]/value
+  rm_type="DV_ORDINAL" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CDvOrdinal{Values:[constraints.OrdinalSymbol{Value:0 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0022"}} constraints.OrdinalSymbol{Value:2 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0023"}} constraints.OrdinalSymbol{Value:4 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0024"}} constraints.OrdinalSymbol{Value:6 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0025"}} constraints.OrdinalSymbol{Value:8 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0026"}} constraints.OrdinalSymbol{Value:10 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0027"}}]}
+  code_term[en] "at0022" code="at0022" description="Pstient was able to recall the 5-part address phrase given to them earlier with no error." text="No errors"
+  code_term[en] "at0023" code="at0023" description="Patient made 1 error when recalling the 5-part address phrase given to them earlier." text="1 error"
+  code_term[en] "at0024" code="at0024" description="Patient made 2 errors when recalling the 5-part address phrase given to them earlier." text="2 errors"
+  code_term[en] "at0025" code="at0025" description="Patient made 3 errors when recalling the 5-part address phrase given to them earlier." text="3 errors"
+  code_term[en] "at0026" code="at0026" description="Patient made 4 errors when recalling the 5-part address phrase given to them earlier." text="4 errors"
+  code_term[en] "at0027" code="at0027" description="Patient made 5 errors when recalling the 5-part address phrase given to them earlier." text="5 errors"
+  attr "symbol" rm_type="DV_CODED_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "value" rm_type="Integer" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0028]
+  rm_type="ELEMENT" node_id="at0028" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0028" code="at0028" description="Total score from 6 questions." text="Total score"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0028]/value
+  rm_type="DV_COUNT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "magnitude" rm_type="Integer64" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0028]/value/magnitude
+  rm_type="INTEGER" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CInteger{Range:constraints.NumericRange{Lower:0 Upper:28 LowerInclusive:true UpperInclusive:true LowerUnbounded:false UpperUnbounded:false} List:[] Default:nil}
+
+node /content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/state
+  rm_type="ITEM_TREE" node_id="at0029" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0029" code="at0029" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=0
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/protocol
+  rm_type="ITEM_TREE" node_id="at0031" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0031" code="at0031" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/protocol/items[at0032]
+  rm_type="CLUSTER" node_id="at0032" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0032" code="at0032" comment="For example: local information requirements or additional metadata to align with FHIR or CIMI equivalents." description="Additional information required to capture local content or to align with other reference models/formalisms." text="Extension"
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]
+  rm_type="OBSERVATION" node_id="at0000" archetype_id="openEHR-EHR-OBSERVATION.gpcog_screening_test.v0" node_name="" occurrences=0..1 slot=false
+  term[en] "at0000" code="at0000" description="The General Practitioner Assessment of Cognition (GPCOG) screening test." text="GPCOG screening test"
+  attr "data" rm_type="HISTORY" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "protocol" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "encoding" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "subject" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data
+  rm_type="HISTORY" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="@ internal @" text="Event Series"
+  attr "events" rm_type="EVENT" cardinality=multiple existence=0..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "origin" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]
+  rm_type="POINT_EVENT" node_id="at0002" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0002" code="at0002" description="A specific date and/or time which may be explicitly defined in a template or at run-time." text="Point in time"
+  attr "data" rm_type="T" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "state" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data
+  rm_type="ITEM_TREE" node_id="at0003" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0003" code="at0003" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]
+  rm_type="CLUSTER" node_id="at0038" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0038" code="at0038" description="Step 1 of the GPCOG screening test, relating to the patient examination." text="Step 1: patient examination"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=10
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0008]
+  rm_type="ELEMENT" node_id="at0008" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0008" code="at0008" description="Statement whether the patient gives a correct or incorrect answer when asked to give the exact date today." text="Time orientation"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0008]/value
+  rm_type="DV_ORDINAL" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CDvOrdinal{Values:[constraints.OrdinalSymbol{Value:0 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0009"}} constraints.OrdinalSymbol{Value:1 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0010"}}]}
+  code_term[en] "at0009" code="at0009" description="The patient gives an incorrect answer." text="Incorrect"
+  code_term[en] "at0010" code="at0010" description="The patient gives the correct answer." text="Correct"
+  attr "symbol" rm_type="DV_CODED_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "value" rm_type="Integer" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0014]
+  rm_type="ELEMENT" node_id="at0014" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0014" code="at0014" description="Statement whether the patient correctly marks in hands a specified time (i.e. 10 minutes past 11 o'clock) on a clock face." text="Clock drawing - specific time"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0014]/value
+  rm_type="DV_ORDINAL" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CDvOrdinal{Values:[constraints.OrdinalSymbol{Value:0 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0015"}} constraints.OrdinalSymbol{Value:1 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0016"}}]}
+  code_term[en] "at0015" code="at0015" description="The patient does not correctly mark in hands a specified time (11.10) on a clock face." text="Incorrect"
+  code_term[en] "at0016" code="at0016" description="The patient correctly marks in hands a specified time (11.10) on a clock face." text="Correct"
+  attr "symbol" rm_type="DV_CODED_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "value" rm_type="Integer" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0011]
+  rm_type="ELEMENT" node_id="at0011" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0011" code="at0011" description="Statement whether or not the patient marks all the correct numbers to indicate the hours of the clock with the correct spacing." text="Clock drawing - all numbers"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0011]/value
+  rm_type="DV_ORDINAL" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CDvOrdinal{Values:[constraints.OrdinalSymbol{Value:0 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0012"}} constraints.OrdinalSymbol{Value:1 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0013"}}]}
+  code_term[en] "at0012" code="at0012" description="The patient does not mark all the correct numbers to indicate the hours of the clock with the correct spacing." text="Incorrect"
+  code_term[en] "at0013" code="at0013" description="The patient marks all the correct number to indicate the hours of the clock with the correct spacing." text="Correct"
+  attr "symbol" rm_type="DV_CODED_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "value" rm_type="Integer" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0017]
+  rm_type="ELEMENT" node_id="at0017" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0017" code="at0017" description="Statement whether the patient gives a correct and specific answer when asked to say something that happened in the news recently. Recently = in the last week. If a general answer is given, e.g. \"lot of rain\", \"war\", further details should be asked for." text="Information"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0017]/value
+  rm_type="DV_ORDINAL" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CDvOrdinal{Values:[constraints.OrdinalSymbol{Value:0 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0018"}} constraints.OrdinalSymbol{Value:1 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0019"}}]}
+  code_term[en] "at0018" code="at0018" description="Patient does not give specific and correct answer when asked to say something that happened in the news recently." text="Incorrect"
+  code_term[en] "at0019" code="at0019" description="Patient gives specific and correct answer when asked to say something that happened in the news recently." text="Correct"
+  attr "symbol" rm_type="DV_CODED_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "value" rm_type="Integer" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0020]
+  rm_type="ELEMENT" node_id="at0020" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0020" code="at0020" description="Statement whether patient correctly recalls first name of name and address phrase given at the start of the test." text="Recall first name"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0020]/value
+  rm_type="DV_ORDINAL" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CDvOrdinal{Values:[constraints.OrdinalSymbol{Value:0 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0021"}} constraints.OrdinalSymbol{Value:1 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0022"}}]}
+  code_term[en] "at0021" code="at0021" description="Patient does not correctly recall first name of name and address phrase given at the start of the test." text="Incorrect"
+  code_term[en] "at0022" code="at0022" description="Patient correctly recalls first name of name and address phrase given at the start of the test." text="Correct"
+  attr "symbol" rm_type="DV_CODED_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "value" rm_type="Integer" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0023]
+  rm_type="ELEMENT" node_id="at0023" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0023" code="at0023" description="Statement whether patient correctly recalls surname of name and address phrase given at the start of the test." text="Recall surname"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0023]/value
+  rm_type="DV_ORDINAL" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CDvOrdinal{Values:[constraints.OrdinalSymbol{Value:0 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0024"}} constraints.OrdinalSymbol{Value:1 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0025"}}]}
+  code_term[en] "at0024" code="at0024" description="Patient does not correctly recall surname of name and address phrase given at the start of the test." text="Incorrect"
+  code_term[en] "at0025" code="at0025" description="Patient correctly recalls surname of name and address phrase given at the start of the test." text="Correct"
+  attr "symbol" rm_type="DV_CODED_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "value" rm_type="Integer" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0027]
+  rm_type="ELEMENT" node_id="at0027" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0027" code="at0027" description="Statement whether patient correctly recalls house number of name and address phrase given at the start of the test." text="Recall house number"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0027]/value
+  rm_type="DV_ORDINAL" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CDvOrdinal{Values:[constraints.OrdinalSymbol{Value:0 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0028"}} constraints.OrdinalSymbol{Value:1 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0029"}}]}
+  code_term[en] "at0028" code="at0028" description="Patient does not correctly recall house number of name and address phrase given at the start of the test." text="Incorrect"
+  code_term[en] "at0029" code="at0029" description="Patient correctly recalls house number of name and address phrase given at the start of the test." text="Correct"
+  attr "symbol" rm_type="DV_CODED_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "value" rm_type="Integer" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0030]
+  rm_type="ELEMENT" node_id="at0030" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0030" code="at0030" description="Statement whether patient correctly recalls street name of name and address phrase given at the start of the test." text="Recall street name"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0030]/value
+  rm_type="DV_ORDINAL" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CDvOrdinal{Values:[constraints.OrdinalSymbol{Value:0 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0031"}} constraints.OrdinalSymbol{Value:1 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0032"}}]}
+  code_term[en] "at0031" code="at0031" description="Patient does not correctly recall street name of name and address phrase given at the start of the test." text="Incorrect"
+  code_term[en] "at0032" code="at0032" description="Patient correctly recalls street name of name and address phrase given at the start of the test." text="Correct"
+  attr "symbol" rm_type="DV_CODED_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "value" rm_type="Integer" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0033]
+  rm_type="ELEMENT" node_id="at0033" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0033" code="at0033" description="Statement whether patient correctly recalls locality or town of name and address phrase given at the start of the test." text="Recall locality or town"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0033]/value
+  rm_type="DV_ORDINAL" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CDvOrdinal{Values:[constraints.OrdinalSymbol{Value:0 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0034"}} constraints.OrdinalSymbol{Value:1 Symbol:constraints.CodedTermRef{Terminology:"local" CodeString:"at0035"}}]}
+  code_term[en] "at0034" code="at0034" description="Patient does not correctly recall locality or town of name and address phrase given at the start of the test." text="Incorrect"
+  code_term[en] "at0035" code="at0035" description="Patient correctly recalls locality or town of name and address phrase given at the start of the test." text="Correct"
+  attr "symbol" rm_type="DV_CODED_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "value" rm_type="Integer" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0036]
+  rm_type="ELEMENT" node_id="at0036" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0036" code="at0036" description="The total score from all nine individual scores. If patient scores 9, no significant cognitive impairment and further testing not necessary. If patient scores 5-8, more information required. Proceed with Step 2, informant section. If patient scores 5-8, more information required. Proceed with Step 2, informant section." text="Total score"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0036]/value
+  rm_type="DV_COUNT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "magnitude" rm_type="Integer64" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0036]/value/magnitude
+  rm_type="INTEGER" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CInteger{Range:constraints.NumericRange{Lower:0 Upper:9 LowerInclusive:true UpperInclusive:true LowerUnbounded:false UpperUnbounded:false} List:[] Default:nil}
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]
+  rm_type="CLUSTER" node_id="at0039" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0039" code="at0039" description="Step 2 of the GPCOG screening test, relating to the informant interview. This section is required if the total score from Step 1 is between 5 and 8." text="Step 2: informant interview"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=7
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0037]
+  rm_type="ELEMENT" node_id="at0037" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0037" code="at0037" description="Statement whether, compared to a few years ago, the patient has more trouble remembering things that have happened recently than he/she used to." text="Trouble remembering"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0037]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0037]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0040" "at0041" "at0042"]}
+  code_term[en] "at0040" code="at0040" description="The patient has more trouble remembering things that have happened recently than he/she used to." text="Yes"
+  code_term[en] "at0041" code="at0041" description="The patient does not have more trouble remembering things that have recently happened than he/she used to." text="No"
+  code_term[en] "at0042" code="at0042" description="The informant doesn't know whether the patient has more trouble remembering thigns tha thave happened recently than he/she used to." text="Don't know"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0043]
+  rm_type="ELEMENT" node_id="at0043" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0043" code="at0043" description="Statement whether, compared to a few years ago, the patient has more trouble recalling conversations a few days later." text="Trouble recalling conversations"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0043]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0043]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0044" "at0045" "at0046"]}
+  code_term[en] "at0044" code="at0044" description="The patient has trouble recalling conversations a few days later." text="Yes"
+  code_term[en] "at0045" code="at0045" description="The patient does not have trouble recalling conversations a few days later." text="No"
+  code_term[en] "at0046" code="at0046" description="The informant doesn't know whether the patient has trouble recalling conversations a few days later." text="Don't know"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0047]
+  rm_type="ELEMENT" node_id="at0047" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0047" code="at0047" description="Statement whether, compared to a few years ago, the patient, when speaking, has more difficulty in finding the right words or tends to use the wrong words more often." text="Difficulty finding right words or using wrong words"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0047]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0047]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0048" "at0049" "at0050"]}
+  code_term[en] "at0048" code="at0048" description="When speaking, the patient has difficulty in finding the right words or tends to use the wrong words more often." text="Yes"
+  code_term[en] "at0049" code="at0049" description="When speaking, the patient does not have difficulty in finding the right words and does not tend to use the wrong words more often." text="No"
+  code_term[en] "at0050" code="at0050" description="The informant doesn't know whether the patient, when speaking, has more difficulty in finding the right words or tends to use the wrong words more often." text="Don't know"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0051]
+  rm_type="ELEMENT" node_id="at0051" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0051" code="at0051" description="Statement whether, compared to a few years ago, the patient is less able to manage money and financial affairs (e.g. paying bills, budgeting)." text="Less able to manage money"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0051]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0051]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0052" "at0053" "at0054" "at0055"]}
+  code_term[en] "at0052" code="at0052" description="The patient is less able to manage money and financial affairs." text="Yes"
+  code_term[en] "at0053" code="at0053" description="The patient is not less able to manage money and financial affairs." text="No"
+  code_term[en] "at0054" code="at0054" description="The informant doesn't know whether the patient is less able to manage money and financial affairs." text="Don't know"
+  code_term[en] "at0055" code="at0055" description="The question of whether the patient is less able to manage money or financial affairs is not applicable to this patient." text="Not applicable"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0056]
+  rm_type="ELEMENT" node_id="at0056" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0056" code="at0056" description="Statement whether, compared to a few years ago, the patient is less able to manage his/her medication independently." text="Less able to manage medication"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0056]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0056]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0057" "at0058" "at0059" "at0060"]}
+  code_term[en] "at0057" code="at0057" description="The patient is less able to manage his/her medication independently." text="Yes"
+  code_term[en] "at0058" code="at0058" description="The patient is not less able to manage his/her medication independently." text="No"
+  code_term[en] "at0059" code="at0059" description="The informant doesn't know whether the patient is less able to manage his/her medication independently." text="Don't know"
+  code_term[en] "at0060" code="at0060" description="The question whether the patient is less able to manage his/her medication independently is not relevant to this patient." text="Not applicable"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0061]
+  rm_type="ELEMENT" node_id="at0061" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0061" code="at0061" description="Statement whether, compared to a few years ago, the patient needs more assistance with transport (either private or public). If patient has difficulties only due to physical problems, e.g. bad leg, 'No' should be selected." text="Needs more assistance with transport"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0061]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0061]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0062" "at0063" "at0064" "at0065"]}
+  code_term[en] "at0062" code="at0062" description="The patient needs more assistance with transport." text="Yes"
+  code_term[en] "at0063" code="at0063" description="The patient does not need more assistance with transport." text="No"
+  code_term[en] "at0064" code="at0064" description="The informant doesn't know whether the patient needs more assistance with transport." text="Don't know"
+  code_term[en] "at0065" code="at0065" description="The question whether the patient needs more assistance with transport is not applicable to this patient." text="Not applicable"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0066]
+  rm_type="ELEMENT" node_id="at0066" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0066" code="at0066" description="To get the total score, add the number of items answered 'No', 'Don't know' or 'Not applicable'. A total score of 0-3 indicates cognitive impairment, and standard investigations should be conducted." text="Total score"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0066]/value
+  rm_type="DV_COUNT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "magnitude" rm_type="Integer64" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0066]/value/magnitude
+  rm_type="INTEGER" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CInteger{Range:constraints.NumericRange{Lower:0 Upper:6 LowerInclusive:true UpperInclusive:true LowerUnbounded:false UpperUnbounded:false} List:[] Default:nil}
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/state
+  rm_type="ITEM_TREE" node_id="at0004" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0004" code="at0004" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=0
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/protocol
+  rm_type="ITEM_TREE" node_id="at0006" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0006" code="at0006" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/protocol/items[at0007]
+  rm_type="CLUSTER" node_id="at0007" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0007" code="at0007" comment="For example: local information requirements or additional metadata to align with FHIR or CIMI equivalents." description="Additional information required to capture local content or to align with other reference models/formalisms." text="Extension"
+
+# walked nodes=161

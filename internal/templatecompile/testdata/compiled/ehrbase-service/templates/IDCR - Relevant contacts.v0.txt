@@ -1,0 +1,204 @@
+# compiled tree of ehrbase-service/templates/IDCR - Relevant contacts.v0.opt
+template_id="IDCR - Relevant contacts.v0" concept="IDCR - Relevant contacts.v0" language="en" uid="8c13ad3d-f2f3-4d39-b840-5353a3b0ff65" num_nodes=32
+
+node /
+  rm_type="COMPOSITION" node_id="at0000" archetype_id="openEHR-EHR-COMPOSITION.health_summary.v1" node_name="Relevant Contacts List" occurrences=1..1 slot=false
+  term[en] "at0000" code="at0000" description="Generic document containing a summary of health information about an individual." text="Health summary"
+  attr "category" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "context" rm_type="EVENT_CONTEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "content" rm_type="CONTENT_ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "territory" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "composer" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /category
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /category/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["433"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context
+  rm_type="EVENT_CONTEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "other_context" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "start_time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "setting" rm_type="DV_CODED_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context/other_context
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context/other_context/items[at0002]
+  rm_type="CLUSTER" node_id="at0002" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0002" code="at0002" comment="For example: local information requirements or additional metadata to align with FHIR or CIMI equivalents." description="Additional information required to capture local content or to align with other reference models/formalisms." text="Extension"
+
+node /name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["Relevant Contacts List"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]
+  rm_type="SECTION" node_id="at0000" archetype_id="openEHR-EHR-SECTION.relevant_contacts_rcp.v1" node_name="" occurrences=0..1 slot=false
+  term[en] "at0000" code="at0000" description="Relevant contacts heading." text="Relevant contacts"
+  attr "items" rm_type="CONTENT_ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]
+  rm_type="ADMIN_ENTRY" node_id="at0000" archetype_id="openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1" node_name="" occurrences=0..* slot=false
+  term[en] "at0000" code="at0000" description="Relevant contact for the patient or client, including formal and informal carers, next of kin and key workers." text="Relevant contact"
+  attr "data" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "encoding" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "subject" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=5
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[openEHR-EHR-CLUSTER.individual_person_uk.v1]
+  rm_type="CLUSTER" node_id="at0000" archetype_id="openEHR-EHR-CLUSTER.individual_person_uk.v1" node_name="" occurrences=0..1 slot=false
+  term[en] "at0000" code="at0000" description="Personal demographics including name(s) , addresse(s) and telecommunication contact details." text="Individual person"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=4
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[openEHR-EHR-CLUSTER.individual_person_uk.v1]/items[openEHR-EHR-CLUSTER.person_name.v1]
+  rm_type="CLUSTER" node_id="at0000" archetype_id="openEHR-EHR-CLUSTER.person_name.v1" node_name="" occurrences=0..1 slot=false
+  term[en] "at0000" code="at0000" description="Details of personal name of an individual, provider or third party." text="Person name"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[openEHR-EHR-CLUSTER.individual_person_uk.v1]/items[openEHR-EHR-CLUSTER.person_name.v1]/items[at0001]
+  rm_type="ELEMENT" node_id="at0001" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0001" code="at0001" description="Name in free text unstructured format." text="Unstructured name"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[openEHR-EHR-CLUSTER.individual_person_uk.v1]/items[openEHR-EHR-CLUSTER.person_name.v1]/items[at0001]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[openEHR-EHR-CLUSTER.individual_person_uk.v1]/items[openEHR-EHR-CLUSTER.address_uk.v0]
+  rm_type="CLUSTER" node_id="at0000" archetype_id="openEHR-EHR-CLUSTER.address_uk.v0" node_name="" occurrences=0..1 slot=false
+  term[en] "at0000" code="at0000" description="To record details of an address." text="Address"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[openEHR-EHR-CLUSTER.individual_person_uk.v1]/items[openEHR-EHR-CLUSTER.address_uk.v0]/items[at0002]
+  rm_type="ELEMENT" node_id="at0002" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0002" code="at0002" description="A full postal address expressed in an unstructured, narrative form." text="Address description"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[openEHR-EHR-CLUSTER.individual_person_uk.v1]/items[openEHR-EHR-CLUSTER.address_uk.v0]/items[at0002]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[openEHR-EHR-CLUSTER.individual_person_uk.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1]
+  rm_type="CLUSTER" node_id="at0000" archetype_id="openEHR-EHR-CLUSTER.telecom_uk.v1" node_name="" occurrences=0..* slot=false
+  term[en] "at0000" code="at0000" description="Personal or organisational telecommunication details, including telephone, fax, and email or other telecommunications details e.g skype address." text="Contact details"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[openEHR-EHR-CLUSTER.individual_person_uk.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1]/items[at0002]
+  rm_type="ELEMENT" node_id="at0002" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0002" code="at0002" description="An unstructured description of telecoms." text="Comms description"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[openEHR-EHR-CLUSTER.individual_person_uk.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1]/items[at0002]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[openEHR-EHR-CLUSTER.individual_person_uk.v1]/items[at0029]
+  rm_type="CLUSTER" node_id="at0029" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0029" code="at0029" description="Detrails of an associated organisation" text="Organisation"
+
+node /content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[at0035]
+  rm_type="ELEMENT" node_id="at0035" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0035" code="at0035" description="The broad category of care relationship which the contact hods with the subject." text="Relationship category"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[at0035]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[at0035]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0036" "at0037" "at0038" "at0039"]}
+  code_term[en] "at0036" code="at0036" description="An individual identified by the person as offering care and support, excluding paid carers or carers from voluntary agencies." text="Informal carer"
+  code_term[en] "at0037" code="at0037" description="The contact is identified by the subject as being a primary informal source of care and support." text="Main informal carer"
+  code_term[en] "at0038" code="at0038" description="A health and social care professional or staff member, including a carer from voluntary sector." text="Formal care worker"
+  code_term[en] "at0039" code="at0039" description="The formal carer is the subject's key worker." text="Key formal care worker"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[at0030]
+  rm_type="ELEMENT" node_id="at0030" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0030" code="at0030" description="For an informal carer, the personal relationship with the client/carer e.g spouse or friend . For a formal carer, the professional role or responsibility of the carer with respect to the person which should help identify them as being an appropriate contact for an aspect of care, usually a professional role or care pathway name." text="Relationship/ role"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[at0030]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[at0025]
+  rm_type="ELEMENT" node_id="at0025" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0025" code="at0025" description="True if this informal care is  the person's next-of-kin." text="Is next of kin?"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[at0025]/value
+  rm_type="DV_BOOLEAN" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="Boolean" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[at0025]/value/value
+  rm_type="BOOLEAN" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CBoolean{TrueValid:true FalseValid:false Default:nil}
+
+node /content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[at0017]
+  rm_type="ELEMENT" node_id="at0017" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0017" code="at0017" description="Any additional comment or note about the carer or their role." text="Note"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[at0017]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+# walked nodes=32

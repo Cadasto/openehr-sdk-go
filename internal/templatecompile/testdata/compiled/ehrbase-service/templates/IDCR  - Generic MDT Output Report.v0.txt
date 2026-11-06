@@ -1,0 +1,629 @@
+# compiled tree of ehrbase-service/templates/IDCR  - Generic MDT Output Report.v0.opt
+template_id="IDCR  - Generic MDT Output Report.v0" concept="IDCR - Generic MDT Output Report.v0" language="en" uid="09df9eb5-2963-4b6f-88fc-e472292084a5" num_nodes=60
+
+node /
+  rm_type="COMPOSITION" node_id="at0000" archetype_id="openEHR-EHR-COMPOSITION.report.v1" node_name="MDT Output Report" occurrences=1..1 slot=false
+  term[en] "at0000" code="at0000" description="Document to communicate information to others, commonly in response to a request from another party." text="Report"
+  attr "category" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "context" rm_type="EVENT_CONTEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "content" rm_type="CONTENT_ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=3
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "territory" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "composer" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /category
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /category/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["433"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context
+  rm_type="EVENT_CONTEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "other_context" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "start_time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "setting" rm_type="DV_CODED_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context/other_context
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context/other_context/items[at0006]
+  rm_type="CLUSTER" node_id="at0006" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0006" code="at0006" comment="e.g. Local hospital departmental infomation or additional metadata to align with FHIR or CIMI equivalents." description="Additional information required to capture local context or to align with other reference models/formalisms." text="Extension"
+
+node /name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["MDT Output Report"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]
+  rm_type="SECTION" node_id="at0000" archetype_id="openEHR-EHR-SECTION.referral_details_rcp.v1" node_name="" occurrences=0..1 slot=false
+  term[en] "at0000" code="at0000" description="Referral details heading (AoMRC)." text="Referral details"
+  attr "items" rm_type="CONTENT_ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']
+  rm_type="INSTRUCTION" node_id="at0000.1" archetype_id="openEHR-EHR-INSTRUCTION.request-referral.v1" node_name="MDT Referral" occurrences=0..1 slot=false
+  term[en] "at0000.1" code="at0000.1" description="Request for provision of a specified service by another healthcare provider or organisation." text="Referral request"
+  attr "activities" rm_type="ACTIVITY" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "protocol" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "encoding" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "subject" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "narrative" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/activities[at0001]
+  rm_type="ACTIVITY" node_id="at0001" archetype_id="" node_name="" occurrences=1..* slot=false
+  term[en] "at0001" code="at0001" description="Current Activity." text="Request"
+  attr "description" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "action_archetype_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/activities[at0001]/description
+  rm_type="ITEM_TREE" node_id="at0009" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0009" code="at0009" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=3
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/activities[at0001]/description/items[at0121]
+  rm_type="ELEMENT" node_id="at0121" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0121" code="at0121" description="Identification of the service requested. This is often coded with an external terminology." text="Service requested"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/activities[at0001]/description/items[at0121]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/activities[at0001]/description/items[at0132]
+  rm_type="CLUSTER" node_id="at0132" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0132" code="at0132" description="Structured detail defining the service requested eg CLUSTER archetype specifying the specific catheter that is to be inserted." text="Specific details"
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/activities[at0001]/description/items[at0116]
+  rm_type="CLUSTER" node_id="at0116" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0116" code="at0116" description="Language, transport or other personal requirements to support the patient's attendance or participation in provision of the service." text="Patient requirements"
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/protocol
+  rm_type="ITEM_TREE" node_id="at0008" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0008" code="at0008" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=6
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/protocol/items[at0141]
+  rm_type="CLUSTER" node_id="at0141" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0141" code="at0141" description="Details about the healthcare provider or organisation requesting the service." text="Requestor"
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/protocol/items[at0011,'MDT Team']
+  rm_type="ELEMENT" node_id="at0011" archetype_id="" node_name="MDT Team" occurrences=0..1 slot=false
+  term[en] "at0011" code="at0011" description="The ID assigned to the order by the healthcare provider or organisation receiving the request for service. This is also referred to as Filler Order Identifier." text="Receiver identifier"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/protocol/items[at0011,'MDT Team']/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/protocol/items[at0011,'MDT Team']/name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/protocol/items[at0011,'MDT Team']/name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["MDT Team"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/protocol/items[at0142]
+  rm_type="CLUSTER" node_id="at0142" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0142" code="at0142" description="Details about the healthcare provider or organisation receiving the request for service." text="Receiver"
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/protocol/items[at0128]
+  rm_type="CLUSTER" node_id="at0128" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.distribution\\.v1"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.distribution\\.v1"] excludes=[] raw_include_count=1
+  term[en] "at0128" code="at0128" description="A list of people or organisation who should receive copies of any communication." text="Distribution list for response"
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/protocol/items[at0.5]
+  rm_type="CLUSTER" node_id="at0.5" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0.5" code="at0.5" description="A list of people or organisations who are relevant to this referral, including next of kin." text="Contacts"
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/protocol/items[at0112]
+  rm_type="CLUSTER" node_id="at0112" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0112" code="at0112" description="Local detailed information such as billing requirements." text="Localisation"
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["MDT Referral"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']
+  rm_type="ACTION" node_id="at0000" archetype_id="openEHR-EHR-ACTION.referral_uk.v1" node_name="Referral tracking" occurrences=0..1 slot=false
+  term[en] "at0000" code="at0000" description="Activity regarding a referral from a clinician, or self-referral by a patient, for the patient to receive a specific service, advice or care from an expert healthcare provider." text="Referral activity (UK)"
+  attr "ism_transition" rm_type="ISM_TRANSITION" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=10
+  attr "description" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "protocol" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "encoding" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "subject" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition
+  rm_type="ISM_TRANSITION" node_id="at0002" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0002" code="at0002" description="Referral to healthcare provider is planned." text="Referral planned"
+  attr "current_state" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "careflow_step" rm_type="DV_CODED_TEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["526"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0002"]}
+  code_term[en] "at0002" code="at0002" description="Referral to healthcare provider is planned." text="Referral planned"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition
+  rm_type="ISM_TRANSITION" node_id="at0008" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0008" code="at0008" description="The planned referral has been postponed." text="Referral postponed"
+  attr "current_state" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "careflow_step" rm_type="DV_CODED_TEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["527"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0008"]}
+  code_term[en] "at0008" code="at0008" description="The planned referral has been postponed." text="Referral postponed"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition
+  rm_type="ISM_TRANSITION" node_id="at0009" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0009" code="at0009" description="The planned referral for a service has been cancelled prior to commencement." text="Referral cancelled"
+  attr "current_state" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "careflow_step" rm_type="DV_CODED_TEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["528"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0009"]}
+  code_term[en] "at0009" code="at0009" description="The planned referral for a service has been cancelled prior to commencement." text="Referral cancelled"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition
+  rm_type="ISM_TRANSITION" node_id="at0003" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0003" code="at0003" description="Appointment for a healthcare provider service has been made." text="Appoinment scheduled"
+  attr "current_state" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "careflow_step" rm_type="DV_CODED_TEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["529"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0003"]}
+  code_term[en] "at0003" code="at0003" description="Appointment for a healthcare provider service has been made." text="Appoinment scheduled"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition
+  rm_type="ISM_TRANSITION" node_id="at0004" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0004" code="at0004" description="The healthcare provider has provided the service." text="Service provided"
+  attr "current_state" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "careflow_step" rm_type="DV_CODED_TEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["245"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0004"]}
+  code_term[en] "at0004" code="at0004" description="The healthcare provider has provided the service." text="Service provided"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition
+  rm_type="ISM_TRANSITION" node_id="at0024" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0024" code="at0024" description="The service was scheduled but not provided." text="Service not provided"
+  attr "current_state" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "careflow_step" rm_type="DV_CODED_TEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["245"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0024"]}
+  code_term[en] "at0024" code="at0024" description="The service was scheduled but not provided." text="Service not provided"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition
+  rm_type="ISM_TRANSITION" node_id="at0010" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0010" code="at0010" description="The referral has been suspended without completion." text="Referral suspended"
+  attr "current_state" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "careflow_step" rm_type="DV_CODED_TEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["530"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0010"]}
+  code_term[en] "at0010" code="at0010" description="The referral has been suspended without completion." text="Referral suspended"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition
+  rm_type="ISM_TRANSITION" node_id="at0006" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0006" code="at0006" description="The referral has been ceased before the service has been completed." text="Referral terminated"
+  attr "current_state" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "careflow_step" rm_type="DV_CODED_TEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["531"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0006"]}
+  code_term[en] "at0006" code="at0006" description="The referral has been ceased before the service has been completed." text="Referral terminated"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition
+  rm_type="ISM_TRANSITION" node_id="at0023" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0023" code="at0023" description="The referral has expired before the referral episode has been completed." text="Referral expired"
+  attr "current_state" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "careflow_step" rm_type="DV_CODED_TEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["531"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0023"]}
+  code_term[en] "at0023" code="at0023" description="The referral has expired before the referral episode has been completed." text="Referral expired"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition
+  rm_type="ISM_TRANSITION" node_id="at0005" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0005" code="at0005" description="All service activities have been completed and person returned for ongoing care." text="Referral episode complete"
+  attr "current_state" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "careflow_step" rm_type="DV_CODED_TEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["532"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0005"]}
+  code_term[en] "at0005" code="at0005" description="All service activities have been completed and person returned for ongoing care." text="Referral episode complete"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/description
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/description/items[at0011]
+  rm_type="ELEMENT" node_id="at0011" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0011" code="at0011" description="Identification of the clinical service to be/being carried out. This is often coded with an external terminology." text="Referred service"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/description/items[at0011]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  default_value=*rm.DVText {"_type":"DV_TEXT","value":"MDT referral"}
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/description/items[at0014]
+  rm_type="ELEMENT" node_id="at0014" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0014" code="at0014" description="Type of service to be carried out or being carried out." text="Service type"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/description/items[at0014]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/protocol
+  rm_type="ITEM_TREE" node_id="at0015" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0015" code="at0015" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/protocol/items[at0017]
+  rm_type="CLUSTER" node_id="at0017" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0017" code="at0017" description="Details about the healthcare provider or organisation requesting the service." text="Requestor"
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/protocol/items[at0019]
+  rm_type="CLUSTER" node_id="at0019" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0019" code="at0019" description="Details about the healthcare provider or organisation receiving the request for referral." text="Receiver"
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["Referral tracking"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-SECTION.history_rcp.v1]
+  rm_type="SECTION" node_id="at0000" archetype_id="openEHR-EHR-SECTION.history_rcp.v1" node_name="" occurrences=0..1 slot=false
+  term[en] "at0000" code="at0000" description="History details heading (AoMRC)." text="History"
+  attr "items" rm_type="CONTENT_ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.history_rcp.v1]/items[openEHR-EHR-EVALUATION.reason_for_encounter.v1,'Question to MDT']
+  rm_type="EVALUATION" node_id="at0000" archetype_id="openEHR-EHR-EVALUATION.reason_for_encounter.v1" node_name="Question to MDT" occurrences=0..1 slot=false
+  term[en] "at0000" code="at0000" description="The reason for initiation of any healthcare encounter or contact by the individual who is the subject of care." text="Reason for encounter"
+  attr "data" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "encoding" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "subject" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.history_rcp.v1]/items[openEHR-EHR-EVALUATION.reason_for_encounter.v1,'Question to MDT']/data
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.history_rcp.v1]/items[openEHR-EHR-EVALUATION.reason_for_encounter.v1,'Question to MDT']/data/items[at0004,'Question to MDT']
+  rm_type="ELEMENT" node_id="at0004" archetype_id="" node_name="Question to MDT" occurrences=0..1 slot=false
+  term[en] "at0004" code="at0004" comment="Coding of the 'Presenting problem' with a terminology is desirable, where possible. Clinical or social reasons for seeking healthcare can include health issues, symptoms or physical signs. Examples: health issues - desire to quit smoking, domestic violence; symptoms - abdominal pain, shortness of breath; physical signs - an altered conscious state. 'Chief complaint' may be used as a valid synonym for 'Presenting problem' in templates." description="Identification of the clinical or social problem motivating the subject of care to seeking healthcare." text="Presenting problem"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.history_rcp.v1]/items[openEHR-EHR-EVALUATION.reason_for_encounter.v1,'Question to MDT']/data/items[at0004,'Question to MDT']/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.history_rcp.v1]/items[openEHR-EHR-EVALUATION.reason_for_encounter.v1,'Question to MDT']/data/items[at0004,'Question to MDT']/name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-SECTION.history_rcp.v1]/items[openEHR-EHR-EVALUATION.reason_for_encounter.v1,'Question to MDT']/data/items[at0004,'Question to MDT']/name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["Question to MDT"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-SECTION.history_rcp.v1]/items[openEHR-EHR-EVALUATION.reason_for_encounter.v1,'Question to MDT']/name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-SECTION.history_rcp.v1]/items[openEHR-EHR-EVALUATION.reason_for_encounter.v1,'Question to MDT']/name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["Question to MDT"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-SECTION.plan_requested_actions_rcp.v1]
+  rm_type="SECTION" node_id="at0000" archetype_id="openEHR-EHR-SECTION.plan_requested_actions_rcp.v1" node_name="" occurrences=0..1 slot=false
+  term[en] "at0000" code="at0000" description="Plan and requested actions heading (AoMRC)" text="Plan and requested actions"
+  attr "items" rm_type="CONTENT_ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.plan_requested_actions_rcp.v1]/items[openEHR-EHR-EVALUATION.recommendation.v1]
+  rm_type="EVALUATION" node_id="at0000" archetype_id="openEHR-EHR-EVALUATION.recommendation.v1" node_name="" occurrences=0..1 slot=false
+  term[en] "at0000" code="at0000" description="A suggestion, advice or proposal for current healthcare management or for future action." text="Recommendation"
+  attr "data" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "encoding" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "subject" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.plan_requested_actions_rcp.v1]/items[openEHR-EHR-EVALUATION.recommendation.v1]/data
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.plan_requested_actions_rcp.v1]/items[openEHR-EHR-EVALUATION.recommendation.v1]/data/items[at0002,'Meeting notes']
+  rm_type="ELEMENT" node_id="at0002" archetype_id="" node_name="Meeting notes" occurrences=0..1 slot=false
+  term[en] "at0002" code="at0002" description="Narrative description of the recommendation." text="Recommendation"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.plan_requested_actions_rcp.v1]/items[openEHR-EHR-EVALUATION.recommendation.v1]/data/items[at0002,'Meeting notes']/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.plan_requested_actions_rcp.v1]/items[openEHR-EHR-EVALUATION.recommendation.v1]/data/items[at0002,'Meeting notes']/name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /content[openEHR-EHR-SECTION.plan_requested_actions_rcp.v1]/items[openEHR-EHR-EVALUATION.recommendation.v1]/data/items[at0002,'Meeting notes']/name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["Meeting notes"] ListOpen:false Default:""}
+
+# walked nodes=105

@@ -40,13 +40,15 @@ func TestCorpusPinsVerifyNamesTheDisagreeingRecord(t *testing.T) {
 	script := readText(t, filepath.Join(fixtures.CorpusRoot(), "..", "..", "scripts", "corpus-pins.sh"))
 
 	const (
-		sdk   = "1111111111111111111111111111111111111111"
-		robot = "2222222222222222222222222222222222222222"
-		other = "3333333333333333333333333333333333333333"
+		sdk    = "1111111111111111111111111111111111111111"
+		robot  = "2222222222222222222222222222222222222222"
+		other  = "3333333333333333333333333333333333333333"
+		server = "4444444444444444444444444444444444444444"
 	)
 	pins := "# scratch pins\n" +
 		"ehrbase/openEHR_SDK          develop  " + sdk + "\n" +
-		"ehrbase/integration-tests    main     " + robot + "\n"
+		"ehrbase/integration-tests    main     " + robot + "\n" +
+		"ehrbase/ehrbase              develop  " + server + "\n"
 	pinned := func(repo, commit string) string {
 		return "# provenance\nsource_repo: " + repo + "\ncommit: " + commit + "\n"
 	}
@@ -54,6 +56,10 @@ func TestCorpusPinsVerifyNamesTheDisagreeingRecord(t *testing.T) {
 		return "# generated\n" +
 			"source\tsdk\thttps://github.com/ehrbase/openEHR_SDK\t" + sdkCommit + "\tApache-2.0\n" +
 			"source\trobot\thttps://github.com/ehrbase/integration-tests\t" + robotCommit + "\tApache-2.0\n"
+	}
+	service := func(commit string) string {
+		return "# generated\n" +
+			"source\tehrbase\thttps://github.com/ehrbase/ehrbase\t" + commit + "\tApache-2.0\n"
 	}
 	// base is the scratch tree, by path relative to its root; every record
 	// agrees with its pin.
@@ -64,6 +70,7 @@ func TestCorpusPinsVerifyNamesTheDisagreeingRecord(t *testing.T) {
 		"testkit/corpus/aql/suites/AQL_SOURCE.txt":     pinned("ehrbase/integration-tests", robot),
 		"testkit/corpus/ROBOT_SOURCE.txt":              pinned("ehrbase/integration-tests", robot),
 		"testkit/corpus/crossformat/MANIFEST.txt":      crossformat(sdk, robot),
+		"testkit/corpus/ehrbase-service/MANIFEST.txt":  service(server),
 	}
 
 	cases := []struct {
@@ -94,6 +101,16 @@ func TestCorpusPinsVerifyNamesTheDisagreeingRecord(t *testing.T) {
 			name:   "one cross-format source on another commit",
 			change: map[string]string{"testkit/corpus/crossformat/MANIFEST.txt": crossformat(sdk, other)},
 			want:   "STALE: crossformat/MANIFEST.txt records ehrbase/integration-tests",
+		},
+		{
+			name:   "EHRbase server templates on another commit",
+			change: map[string]string{"testkit/corpus/ehrbase-service/MANIFEST.txt": service(other)},
+			want:   "STALE: ehrbase-service/MANIFEST.txt records ehrbase/ehrbase",
+		},
+		{
+			name:   "EHRbase server templates' manifest missing",
+			change: map[string]string{"testkit/corpus/ehrbase-service/MANIFEST.txt": ""},
+			want:   "MISSING: ehrbase-service/MANIFEST.txt",
 		},
 		{
 			name:   "corpus from a repository with no pin",
