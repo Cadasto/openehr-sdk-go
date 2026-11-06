@@ -19,6 +19,8 @@
 //	  _resources/test_data_sets/aql/fields_and_results/**/combinations/{name}.csv
 //	crossformat/{set}/            # pinned upstream cross-format sets (MANIFEST.txt)
 //	  template.opt | canonical.json | canonical.xml | flat.json | structured.json
+//	ehrbase-service/              # pinned EHRbase server test templates (MANIFEST.txt)
+//	  templates/{template-id}.opt
 //
 // Vendor provenance is indexed in testkit/corpus/README.md (not in paths).
 package fixtures
@@ -151,14 +153,22 @@ func ListFlatConformance() ([]string, error) {
 	return names, nil
 }
 
+// optDir is a fixture directory holding operational templates, with the
+// label that [OPTRef.Name] puts before the stem of each of its files.
+type optDir struct {
+	label string
+	path  string
+}
+
 // optDirs are every fixture directory holding operational templates,
 // in [ListAllOPTs] scan order.
-func optDirs() []string {
-	return []string{
-		templatesDir(),
-		webtemplateDir(),
-		filepath.Join(FlatConformanceRoot(), "templates"),
-		filepath.Join(CorpusRoot(), "its_rest", "definition"),
+func optDirs() []optDir {
+	return []optDir{
+		{label: "templates", path: templatesDir()},
+		{label: "webtemplate", path: webtemplateDir()},
+		{label: "flat-conformance", path: filepath.Join(FlatConformanceRoot(), "templates")},
+		{label: "ehrbase-service", path: filepath.Join(CorpusRoot(), "ehrbase-service", "templates")},
+		{label: "definition", path: filepath.Join(CorpusRoot(), "its_rest", "definition")},
 	}
 }
 
@@ -173,31 +183,29 @@ type OPTRef struct {
 
 // ListAllOPTs returns every operational template vendored under
 // [CorpusRoot] (across templates/, webtemplate/, the FLAT
-// conformance corpus, and the ITS-REST definition fixtures), sorted by
-// Name. Callers that must cover the whole corpus (such as the compiled-path
-// regression guard for name-predicated template paths) use this rather than naming templates individually,
-// so a newly vendored OPT is picked up automatically.
+// conformance corpus, the EHRbase server's test templates, and the ITS-REST
+// definition fixtures), sorted by Name. The operational templates of the
+// cross-format sets are not listed. Callers that must cover the whole corpus
+// (such as the compiled-path regression guard for name-predicated template
+// paths) use this rather than naming templates individually, so a newly
+// vendored OPT is picked up automatically.
 func ListAllOPTs() ([]OPTRef, error) {
 	var refs []OPTRef
 	for _, dir := range optDirs() {
-		entries, err := os.ReadDir(dir)
+		entries, err := os.ReadDir(dir.path)
 		if err != nil {
 			if os.IsNotExist(err) {
 				continue
 			}
 			return nil, err
 		}
-		label := filepath.Base(dir)
-		if label == "templates" && filepath.Base(filepath.Dir(dir)) == "flat-conformance" {
-			label = "flat-conformance"
-		}
 		for _, e := range entries {
 			if e.IsDir() || filepath.Ext(e.Name()) != ".opt" {
 				continue
 			}
 			refs = append(refs, OPTRef{
-				Name: label + "/" + strings.TrimSuffix(e.Name(), ".opt"),
-				Path: filepath.Join(dir, e.Name()),
+				Name: dir.label + "/" + strings.TrimSuffix(e.Name(), ".opt"),
+				Path: filepath.Join(dir.path, e.Name()),
 			})
 		}
 	}

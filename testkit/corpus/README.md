@@ -26,6 +26,9 @@ corpus/
     MANIFEST.txt                      #   commit pins, per-file sha256, OPT pointers
     {set}/template.opt                #   absent when the OPT is vendored elsewhere
     {set}/canonical.json | canonical.xml | flat.json | structured.json
+  ehrbase-service/                    # pinned EHRbase server test templates
+    MANIFEST.txt                      #   commit pin + per-file sha256
+    templates/{template-id}.opt       #   OPT only, no compositions
   aql/lint/{name}.aql                 # hand-written AQL lint inputs
   aql/suites/                         # pinned upstream AQL suites + their CSVs (PROBE-107)
     AQL_SOURCE.txt                    #   commit pin (authoritative — byte copies)
@@ -55,14 +58,16 @@ Refresh with [`scripts/ingest-robot-aql.sh`](../../scripts/ingest-robot-aql.sh),
 which also regenerates `EXCLUDED.txt`.
 
 `crossformat/` is a third pinned subtree; do not hand-edit it either. See
-[Cross-format sets](#cross-format-sets) below.
+[Cross-format sets](#cross-format-sets) below. `ehrbase-service/` is a fourth;
+see [EHRbase server test templates](#ehrbase-server-test-templates).
 
 Every corpus vendored from one EHRbase repository comes from one commit, the
 line [`UPSTREAM_PINS.txt`](UPSTREAM_PINS.txt) holds for that repository; the
 vendoring scripts read it, so none carries a pin of its own. `make
 corpus-pins-check`, part of `make ci`, fails when a provenance file
 (`flat-conformance/MANIFEST.txt`, `crossformat/MANIFEST.txt`,
-`aql/suites/AQL_SOURCE.txt`, `ROBOT_SOURCE.txt`) records another commit, and
+`ehrbase-service/MANIFEST.txt`, `aql/suites/AQL_SOURCE.txt`,
+`ROBOT_SOURCE.txt`) records another commit, and
 `make corpus-pins-drift` reports how far each pin is behind its branch. To
 re-pin, change the line and re-run every script the file lists for it.
 
@@ -94,6 +99,26 @@ JSON and XML here are the canonical formats. Inside a set the files have fixed n
 Only files that describe the same instance form a set. The Robot canonical JSON for `nested` and `persistent_minimal`, and the Robot FLAT and STRUCTURED for `family_history`, are other instances of those templates, so they are not vendored.
 
 Each set is at its source's commit in [`UPSTREAM_PINS.txt`](UPSTREAM_PINS.txt). [`crossformat/MANIFEST.txt`](crossformat/MANIFEST.txt) records both commits, and for every file its source, upstream path and `sha256`. To refresh, check out those commits in local clones of both upstreams, point `CROSSFORMAT_SDK_CLONE` and `CROSSFORMAT_ROBOT_CLONE` at them, and run `make crossformat-sync`. It refuses a clone that is not at its pin. `make crossformat-check` checks the vendored bytes offline. The tests in [`crossformat_test.go`](../fixtures/crossformat_test.go) check the same integrity under `make ci`. Resolve the sets with [`fixtures.ListCrossFormatSets`](../fixtures/crossformat.go).
+
+## EHRbase server test templates
+
+[`ehrbase-service/templates/`](ehrbase-service/templates/) holds nine operational templates from the tests of the EHRbase server, [`ehrbase/ehrbase`](https://github.com/ehrbase/ehrbase), under `service/src/test/resources/knowledge/`. Each is a byte copy named after its template id, and none comes with a composition. Three start with a byte-order mark, kept as upstream has it. The upstream is Apache-2.0 (see [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md)).
+
+| Template id | Upstream file, under `service/src/test/resources/knowledge/` |
+|---|---|
+| `careplan.v1` | `operational_templates/careplan.v1.opt` |
+| `DiADeM Assessment.v0` | `operational_templates/DiADeM Assessment.v0.opt` |
+| `IDCR  - Generic MDT Output Report.v0` | `opt/IDCR  - Generic MDT Output Report.opt` |
+| `IDCR  - Laboratory Order.v0` | `operational_templates/IDCR  - Laboratory Order.opt` |
+| `IDCR - End of Life Patient Preferences.v0` | `opt/IDCR - End of Life Patient Preferences.v0.opt` |
+| `IDCR - Immunisation summary.v0` | `IDCR - Immunisation summary.v0.opt` |
+| `IDCR - Procedures List.v1` | `opt/IDCR - Procedures List.v1.opt` |
+| `IDCR - Relevant contacts.v0` | `operational_templates/IDCR - Relevant contacts.v0.opt` |
+| `IDCR - Service Request.v0` | `operational_templates/IDCR - Service Request.v0.opt` |
+
+Two template ids have two spaces before the dash, as upstream writes them. [`fixtures.ListAllOPTs`](../fixtures/paths.go) lists the templates under the `ehrbase-service/` label, so the tests that read the whole corpus through it cover them: the generator's corpus ratchet (PROBE-027) and the compiled-path guards among them. PROBE-111 and its schema check walk the tree and cover them too.
+
+The templates are at the `ehrbase/ehrbase` commit in [`UPSTREAM_PINS.txt`](UPSTREAM_PINS.txt). [`ehrbase-service/MANIFEST.txt`](ehrbase-service/MANIFEST.txt) records that commit, and for every file its upstream path and `sha256`. To refresh, check out that commit in a local clone of the upstream, point `EHRBASE_SERVICE_CLONE` at it, and run `make ehrbase-service-sync`. It refuses a clone that is not at the pin, and a file whose template id is not the one the table in [`scripts/ingest-ehrbase-service.sh`](../../scripts/ingest-ehrbase-service.sh) names for it. To add a template, add its line to that table and run the sync again. `make ehrbase-service-check` checks the vendored bytes offline, and the tests in [`ehrbase_service_test.go`](../fixtures/ehrbase_service_test.go) run the same check under `make ci`.
 
 ## Index by vendor
 
@@ -190,6 +215,10 @@ The Corona pair is the largest fixture in the repo. That size is the cost of gua
 **Submissions** ([`submissions/`](submissions/README.md)): 47 CONTRIBUTION create payloads from `contributions/` (bulk `create_multiple_compositions` omitted). Decode them with `contribution.UnmarshalSubmission`, not into `rm.Contribution`.
 
 **AQL suite corpus** ([`aql/suites/`](aql/suites/)), the tree's one AQL corpus: all 132 Robot AQL suites under upstream `tests/robot/AQL/` (`__init__.robot` included) and all 116 combination CSVs under `tests/robot/_resources/test_data_sets/aql/fields_and_results/**/combinations/`, every clause family's (27 of them are read by no suite), copied byte-exact to their paths relative to upstream `tests/robot/`. A suite's data file `${PROJECT_ROOT}/tests/robot/<rest>` is therefore `aql/suites/<rest>`, and PROBE-107 takes each query template from the suite that sends it. A probe over a subset, such as one clause family, reads it from here. Its own ingest, [`scripts/ingest-robot-aql.sh`](../../scripts/ingest-robot-aql.sh), vendors it on its own cadence, so it carries its own pin: [`AQL_SOURCE.txt`](aql/suites/AQL_SOURCE.txt). That pin is authoritative for the bytes, where `ROBOT_SOURCE.txt` above is best-effort. [`EXCLUDED.txt`](aql/suites/EXCLUDED.txt) is generated beside it and names all 1021 upstream files under `tests/robot/AQL/` and `tests/robot/_resources/test_data_sets/aql/fields_and_results/` that the corpus does not carry, each with a reason tag (`execution-semantics` for the expected-result JSON files, `not-a-suite` for the one non-suite file under `AQL/`). Both files are generated; do not hand-edit them.
+
+### ehrbase (server tests)
+
+**License:** Apache 2.0 — [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) (the `ehrbase/ehrbase` line of [`UPSTREAM_PINS.txt`](UPSTREAM_PINS.txt)). The nine OPT-only templates under `ehrbase-service/` ([EHRbase server test templates](#ehrbase-server-test-templates)), and the `BMI` OPT in `templates/`, whose compositions are CODE24's (see above).
 
 ### SDK (`rm/`)
 

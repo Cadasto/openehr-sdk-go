@@ -1,7 +1,693 @@
 # REQ-116 compiled-path snapshot — templates pinning at least one node name.
 # Phase 3 adds name predicates to these paths; the diff on this file
 # is the deliberately recorded delta.
-# corpus: 67 OPTs — 11 pin a name, 56 pin none, 0 do not compile
+# corpus: 76 OPTs — 19 pin a name, 57 pin none, 0 do not compile
+
+## ehrbase-service/DiADeM Assessment.v0  nodes=161
+/
+/category
+/category/defining_code
+/context
+/context/other_context
+/context/other_context/items[openEHR-EHR-CLUSTER.individual_professional_uk.v1,'Composer details']
+/context/other_context/items[openEHR-EHR-CLUSTER.individual_professional_uk.v1,'Composer details']/items[at0015]
+/context/other_context/items[openEHR-EHR-CLUSTER.individual_professional_uk.v1,'Composer details']/items[at0017]
+/context/other_context/items[openEHR-EHR-CLUSTER.individual_professional_uk.v1,'Composer details']/items[at0018]
+/context/other_context/items[openEHR-EHR-CLUSTER.individual_professional_uk.v1,'Composer details']/items[at0012,'Assessor team']
+/context/other_context/items[openEHR-EHR-CLUSTER.individual_professional_uk.v1,'Composer details']/items[at0012,'Assessor team']/value
+/context/other_context/items[openEHR-EHR-CLUSTER.individual_professional_uk.v1,'Composer details']/items[at0012,'Assessor team']/name
+/context/other_context/items[openEHR-EHR-CLUSTER.individual_professional_uk.v1,'Composer details']/items[at0012,'Assessor team']/name/value
+/context/other_context/items[openEHR-EHR-CLUSTER.individual_professional_uk.v1,'Composer details']/name
+/context/other_context/items[openEHR-EHR-CLUSTER.individual_professional_uk.v1,'Composer details']/name/value
+/name
+/name/value
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/items[openEHR-EHR-CLUSTER.person_name.v1]
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/items[openEHR-EHR-CLUSTER.person_name.v1]/items[at0001,'Carer name']
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/items[openEHR-EHR-CLUSTER.person_name.v1]/items[at0001,'Carer name']/value
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/items[openEHR-EHR-CLUSTER.person_name.v1]/items[at0001,'Carer name']/name
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/items[openEHR-EHR-CLUSTER.person_name.v1]/items[at0001,'Carer name']/name/value
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/items[at0014]
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/items[openEHR-EHR-CLUSTER.telecom_uk.v1]
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/items[openEHR-EHR-CLUSTER.telecom_uk.v1]/items[at0002,'Carer telephone']
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/items[openEHR-EHR-CLUSTER.telecom_uk.v1]/items[at0002,'Carer telephone']/value
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/items[openEHR-EHR-CLUSTER.telecom_uk.v1]/items[at0002,'Carer telephone']/name
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/items[openEHR-EHR-CLUSTER.telecom_uk.v1]/items[at0002,'Carer telephone']/name/value
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/items[at0008]
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/items[at0008]/value
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/name
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0018]/items[openEHR-EHR-CLUSTER.individual_personal_uk.v1,'Carer']/name/value
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.person_name.v1]
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.person_name.v1]/items[at0001,'GP name']
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.person_name.v1]/items[at0001,'GP name']/value
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.person_name.v1]/items[at0001,'GP name']/name
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.person_name.v1]/items[at0001,'GP name']/name/value
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1,'Email']
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1,'Email']/items[at0002,'GP email']
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1,'Email']/items[at0002,'GP email']/value
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1,'Email']/items[at0002,'GP email']/name
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1,'Email']/items[at0002,'GP email']/name/value
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1,'Email']/name
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1,'Email']/name/value
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.organisation.v1]
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.organisation.v1]/items[at0001,'GP Practice name']
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.organisation.v1]/items[at0001,'GP Practice name']/value
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.organisation.v1]/items[at0001,'GP Practice name']/name
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.organisation.v1]/items[at0001,'GP Practice name']/name/value
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.organisation.v1]/items[at0008]
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.organisation.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1,'Organisation telecom']
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.organisation.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1,'Organisation telecom']/items[at0002,'GP telephone']
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.organisation.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1,'Organisation telecom']/items[at0002,'GP telephone']/value
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.organisation.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1,'Organisation telecom']/items[at0002,'GP telephone']/name
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.organisation.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1,'Organisation telecom']/items[at0002,'GP telephone']/name/value
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.organisation.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1,'Organisation telecom']/name
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[openEHR-EHR-CLUSTER.individual_professional.v1]/items[openEHR-EHR-CLUSTER.organisation.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1,'Organisation telecom']/name/value
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[at0030]
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/items[at0030]/value
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/name
+/content[openEHR-EHR-ADMIN_ENTRY.key_contacts.v1]/data/items[at0014,'GP']/name/value
+/content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]
+/content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data
+/content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]
+/content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data
+/content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0004]
+/content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0004]/value
+/content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0004]/value/defining_code
+/content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0007]
+/content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0007]/value
+/content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0007]/value/defining_code
+/content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0008]
+/content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0008]/value
+/content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0008]/value/defining_code
+/content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0024]
+/content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0024]/value
+/content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0009]
+/content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0009]/value
+/content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0009]/value/defining_code
+/content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0022]
+/content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0022]/value
+/content[openEHR-EHR-OBSERVATION.yhscn_diadem_assessment.v0]/data/events[at0002]/data/items[at0022]/value/defining_code
+/content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]
+/content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data
+/content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]
+/content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data
+/content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0004]
+/content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0004]/value
+/content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0007]
+/content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0007]/value
+/content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0010]
+/content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0010]/value
+/content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0013]
+/content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0013]/value
+/content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0017]
+/content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0017]/value
+/content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0021]
+/content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0021]/value
+/content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0028]
+/content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0028]/value
+/content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/data/items[at0028]/value/magnitude
+/content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/data/events[at0002]/state
+/content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/protocol
+/content[openEHR-EHR-OBSERVATION.six_cit_assessment.v0]/protocol/items[at0032]
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0008]
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0008]/value
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0014]
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0014]/value
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0011]
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0011]/value
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0017]
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0017]/value
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0020]
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0020]/value
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0023]
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0023]/value
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0027]
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0027]/value
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0030]
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0030]/value
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0033]
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0033]/value
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0036]
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0036]/value
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0038]/items[at0036]/value/magnitude
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0037]
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0037]/value
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0037]/value/defining_code
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0043]
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0043]/value
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0043]/value/defining_code
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0047]
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0047]/value
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0047]/value/defining_code
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0051]
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0051]/value
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0051]/value/defining_code
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0056]
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0056]/value
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0056]/value/defining_code
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0061]
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0061]/value
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0061]/value/defining_code
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0066]
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0066]/value
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/data/items[at0039]/items[at0066]/value/magnitude
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/data/events[at0002]/state
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/protocol
+/content[openEHR-EHR-OBSERVATION.gpcog_screening_test.v0]/protocol/items[at0007]
+
+## ehrbase-service/IDCR  - Generic MDT Output Report.v0  nodes=105
+/
+/category
+/category/defining_code
+/context
+/context/other_context
+/context/other_context/items[at0006]
+/name
+/name/value
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/activities[at0001]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/activities[at0001]/description
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/activities[at0001]/description/items[at0121]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/activities[at0001]/description/items[at0121]/value
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/activities[at0001]/description/items[at0132]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/activities[at0001]/description/items[at0116]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/protocol
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/protocol/items[at0141]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/protocol/items[at0011,'MDT Team']
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/protocol/items[at0011,'MDT Team']/value
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/protocol/items[at0011,'MDT Team']/name
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/protocol/items[at0011,'MDT Team']/name/value
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/protocol/items[at0142]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/protocol/items[at0128]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/protocol/items[at0.5]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/protocol/items[at0112]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/name
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request-referral.v1,'MDT Referral']/name/value
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/description
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/description/items[at0011]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/description/items[at0011]/value
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/description/items[at0014]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/description/items[at0014]/value
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/protocol
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/protocol/items[at0017]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/protocol/items[at0019]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/name
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.referral_uk.v1,'Referral tracking']/name/value
+/content[openEHR-EHR-SECTION.history_rcp.v1]
+/content[openEHR-EHR-SECTION.history_rcp.v1]/items[openEHR-EHR-EVALUATION.reason_for_encounter.v1,'Question to MDT']
+/content[openEHR-EHR-SECTION.history_rcp.v1]/items[openEHR-EHR-EVALUATION.reason_for_encounter.v1,'Question to MDT']/data
+/content[openEHR-EHR-SECTION.history_rcp.v1]/items[openEHR-EHR-EVALUATION.reason_for_encounter.v1,'Question to MDT']/data/items[at0004,'Question to MDT']
+/content[openEHR-EHR-SECTION.history_rcp.v1]/items[openEHR-EHR-EVALUATION.reason_for_encounter.v1,'Question to MDT']/data/items[at0004,'Question to MDT']/value
+/content[openEHR-EHR-SECTION.history_rcp.v1]/items[openEHR-EHR-EVALUATION.reason_for_encounter.v1,'Question to MDT']/data/items[at0004,'Question to MDT']/name
+/content[openEHR-EHR-SECTION.history_rcp.v1]/items[openEHR-EHR-EVALUATION.reason_for_encounter.v1,'Question to MDT']/data/items[at0004,'Question to MDT']/name/value
+/content[openEHR-EHR-SECTION.history_rcp.v1]/items[openEHR-EHR-EVALUATION.reason_for_encounter.v1,'Question to MDT']/name
+/content[openEHR-EHR-SECTION.history_rcp.v1]/items[openEHR-EHR-EVALUATION.reason_for_encounter.v1,'Question to MDT']/name/value
+/content[openEHR-EHR-SECTION.plan_requested_actions_rcp.v1]
+/content[openEHR-EHR-SECTION.plan_requested_actions_rcp.v1]/items[openEHR-EHR-EVALUATION.recommendation.v1]
+/content[openEHR-EHR-SECTION.plan_requested_actions_rcp.v1]/items[openEHR-EHR-EVALUATION.recommendation.v1]/data
+/content[openEHR-EHR-SECTION.plan_requested_actions_rcp.v1]/items[openEHR-EHR-EVALUATION.recommendation.v1]/data/items[at0002,'Meeting notes']
+/content[openEHR-EHR-SECTION.plan_requested_actions_rcp.v1]/items[openEHR-EHR-EVALUATION.recommendation.v1]/data/items[at0002,'Meeting notes']/value
+/content[openEHR-EHR-SECTION.plan_requested_actions_rcp.v1]/items[openEHR-EHR-EVALUATION.recommendation.v1]/data/items[at0002,'Meeting notes']/name
+/content[openEHR-EHR-SECTION.plan_requested_actions_rcp.v1]/items[openEHR-EHR-EVALUATION.recommendation.v1]/data/items[at0002,'Meeting notes']/name/value
+
+## ehrbase-service/IDCR  - Laboratory Order.v0  nodes=86
+/
+/category
+/category/defining_code
+/context
+/context/other_context
+/context/other_context/items[at0042]
+/name
+/name/value
+/content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]
+/content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]/activities[at0001,'Lab Request']
+/content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]/activities[at0001,'Lab Request']/description
+/content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]/activities[at0001,'Lab Request']/description/items[at0121]
+/content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]/activities[at0001,'Lab Request']/description/items[at0121]/value
+/content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]/activities[at0001,'Lab Request']/description/items[at0132]
+/content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]/activities[at0001,'Lab Request']/description/items[at0.145]
+/content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]/activities[at0001,'Lab Request']/description/items[at0116]
+/content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]/activities[at0001,'Lab Request']/name
+/content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]/activities[at0001,'Lab Request']/name/value
+/content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]/protocol
+/content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]/protocol/items[at0141]
+/content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]/protocol/items[at0142]
+/content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]/protocol/items[at0128]
+/content[openEHR-EHR-INSTRUCTION.request-lab_test.v1]/protocol/items[at0112]
+/content[openEHR-EHR-ACTION.laboratory_test.v1]
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/description
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/description/items[at0017]
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/description/items[at0017]/value
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/description/items[at0022]
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/description/items[at0021]
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/protocol
+/content[openEHR-EHR-ACTION.laboratory_test.v1]/protocol/items[at0023]
+
+## ehrbase-service/IDCR - End of Life Patient Preferences.v0  nodes=50
+/
+/category
+/category/defining_code
+/context
+/context/other_context
+/context/other_context/items[at0003]
+/name
+/name/value
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003]
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003]/name
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003]/name/defining_code
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003]/value
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003]/value/defining_code
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015]
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015]/name
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015]/name/defining_code
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015]/value
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015]/value/defining_code
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0029]
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0029]/value
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/protocol
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.advance_decision_refuse_treatment_uk.v1]
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.advance_decision_refuse_treatment_uk.v1]/data
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.advance_decision_refuse_treatment_uk.v1]/data/items[at0003]
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.advance_decision_refuse_treatment_uk.v1]/data/items[at0003]/value
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.advance_decision_refuse_treatment_uk.v1]/data/items[at0003]/value/defining_code
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.advance_decision_refuse_treatment_uk.v1]/data/items[at0002]
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.advance_decision_refuse_treatment_uk.v1]/data/items[at0002]/value
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.advance_decision_refuse_treatment_uk.v1]/data/items[at0021]
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.advance_decision_refuse_treatment_uk.v1]/data/items[at0021]/value
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.advance_decision_refuse_treatment_uk.v1]/protocol
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/data
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/data/items[at0003]
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/data/items[at0003]/value
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/data/items[at0003]/value/defining_code
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/data/items[at0002]
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/data/items[at0002]/value
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/data/items[at0012]
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/data/items[at0012]/value
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/data/items[at0012]/value/defining_code
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/data/items[at0021]
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/data/items[at0021]/value
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/protocol
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/protocol/items[at0011]
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/protocol/items[at0011]/value
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/protocol/items[at0011]/value
+
+## ehrbase-service/IDCR - Immunisation summary.v0  nodes=48
+/
+/category
+/category/defining_code
+/context
+/context/other_context
+/context/other_context/items[at0002]
+/name
+/name/value
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition/current_state
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition/current_state
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition/current_state
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition/current_state
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition/current_state
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition/current_state
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/description
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/description/items[at0002]
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/description/items[at0002]/value
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/description/items[at0004]
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/description/items[at0004]/value
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/description/items[at0004]/value/magnitude
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/description/items[at0015]
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/description/items[at0015]/value
+/content[openEHR-EHR-ACTION.immunisation_procedure.v1]/protocol
+
+## ehrbase-service/IDCR - Procedures List.v1  nodes=85
+/
+/category
+/category/defining_code
+/context
+/context/other_context
+/context/other_context/items[at0002]
+/name
+/name/value
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/current_state
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/current_state
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/current_state
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/current_state
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/current_state
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/current_state
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/current_state
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/current_state
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/current_state
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/current_state
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/description
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/description/items[at0002]
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/description/items[at0002]/value
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/description/items[at0049,'Procedure notes']
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/description/items[at0049,'Procedure notes']/value
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/description/items[at0049,'Procedure notes']/name
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/description/items[at0049,'Procedure notes']/name/value
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/description/items[at0063]
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/description/items[at0063]/value
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/description/items[at0003]
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/description/items[at0048]
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/description/items[at0048]/value
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/description/items[at0006]
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/description/items[at0006]/value
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/description/items[at0062]
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/description/items[at0067]
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/description/items[at0067]/value
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/description/items[at0014]
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/description/items[at0014]/value
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/description/items[at0005]
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/description/items[at0005]/value
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/protocol
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/protocol/items[at0055]
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/protocol/items[at0057]
+/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/protocol/items[at0064]
+
+## ehrbase-service/IDCR - Relevant contacts.v0  nodes=32
+/
+/category
+/category/defining_code
+/context
+/context/other_context
+/context/other_context/items[at0002]
+/name
+/name/value
+/content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]
+/content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]
+/content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data
+/content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[openEHR-EHR-CLUSTER.individual_person_uk.v1]
+/content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[openEHR-EHR-CLUSTER.individual_person_uk.v1]/items[openEHR-EHR-CLUSTER.person_name.v1]
+/content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[openEHR-EHR-CLUSTER.individual_person_uk.v1]/items[openEHR-EHR-CLUSTER.person_name.v1]/items[at0001]
+/content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[openEHR-EHR-CLUSTER.individual_person_uk.v1]/items[openEHR-EHR-CLUSTER.person_name.v1]/items[at0001]/value
+/content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[openEHR-EHR-CLUSTER.individual_person_uk.v1]/items[openEHR-EHR-CLUSTER.address_uk.v0]
+/content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[openEHR-EHR-CLUSTER.individual_person_uk.v1]/items[openEHR-EHR-CLUSTER.address_uk.v0]/items[at0002]
+/content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[openEHR-EHR-CLUSTER.individual_person_uk.v1]/items[openEHR-EHR-CLUSTER.address_uk.v0]/items[at0002]/value
+/content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[openEHR-EHR-CLUSTER.individual_person_uk.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1]
+/content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[openEHR-EHR-CLUSTER.individual_person_uk.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1]/items[at0002]
+/content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[openEHR-EHR-CLUSTER.individual_person_uk.v1]/items[openEHR-EHR-CLUSTER.telecom_uk.v1]/items[at0002]/value
+/content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[openEHR-EHR-CLUSTER.individual_person_uk.v1]/items[at0029]
+/content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[at0035]
+/content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[at0035]/value
+/content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[at0035]/value/defining_code
+/content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[at0030]
+/content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[at0030]/value
+/content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[at0025]
+/content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[at0025]/value
+/content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[at0025]/value/value
+/content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[at0017]
+/content[openEHR-EHR-SECTION.relevant_contacts_rcp.v1]/items[openEHR-EHR-ADMIN_ENTRY.relevant_contact_rcp.v1]/data/items[at0017]/value
+
+## ehrbase-service/IDCR - Service Request.v0  nodes=103
+/
+/category
+/category/defining_code
+/context
+/context/other_context
+/context/other_context/items[at0042]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/activities[at0001]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/activities[at0001]/description
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/activities[at0001]/description/items[at0121]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/activities[at0001]/description/items[at0121]/value
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/activities[at0001]/description/items[at0062]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/activities[at0001]/description/items[at0062]/value
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/activities[at0001]/description/items[at0064]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/activities[at0001]/description/items[at0064]/value
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/activities[at0001]/description/items[at0132]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/activities[at0001]/description/items[at0149]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/activities[at0001]/description/items[at0116]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/protocol
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/protocol/items[at0112]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/protocol/items[openEHR-EHR-CLUSTER.individual_person_uk.v1,'Requestor']
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/protocol/items[openEHR-EHR-CLUSTER.individual_person_uk.v1,'Requestor']/items[openEHR-EHR-CLUSTER.person_name.v1]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/protocol/items[openEHR-EHR-CLUSTER.individual_person_uk.v1,'Requestor']/items[openEHR-EHR-CLUSTER.person_name.v1]/items[at0001]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/protocol/items[openEHR-EHR-CLUSTER.individual_person_uk.v1,'Requestor']/items[openEHR-EHR-CLUSTER.person_name.v1]/items[at0001]/value
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/protocol/items[openEHR-EHR-CLUSTER.individual_person_uk.v1,'Requestor']/items[at0014]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/protocol/items[openEHR-EHR-CLUSTER.individual_person_uk.v1,'Requestor']/items[at0015]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/protocol/items[openEHR-EHR-CLUSTER.individual_person_uk.v1,'Requestor']/items[at0029]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/protocol/items[openEHR-EHR-CLUSTER.individual_person_uk.v1,'Requestor']/name
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/protocol/items[openEHR-EHR-CLUSTER.individual_person_uk.v1,'Requestor']/name/value
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/protocol/items[at0011]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/protocol/items[at0011]/value
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/protocol/items[openEHR-EHR-CLUSTER.organisation.v1,'Receiver']
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/protocol/items[openEHR-EHR-CLUSTER.organisation.v1,'Receiver']/items[at0001]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/protocol/items[openEHR-EHR-CLUSTER.organisation.v1,'Receiver']/items[at0001]/value
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/protocol/items[openEHR-EHR-CLUSTER.organisation.v1,'Receiver']/items[at0008]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/protocol/items[openEHR-EHR-CLUSTER.organisation.v1,'Receiver']/items[at0009]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/protocol/items[openEHR-EHR-CLUSTER.organisation.v1,'Receiver']/name
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/protocol/items[openEHR-EHR-CLUSTER.organisation.v1,'Receiver']/name/value
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-INSTRUCTION.request.v0]/protocol/items[at0128]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/current_state
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/current_state
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/current_state
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/current_state
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/current_state
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/current_state
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/current_state
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/current_state
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/current_state
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/current_state
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/careflow_step
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/description
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/description/items[at0011]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/description/items[at0011]/value
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/description/items[at0014]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/description/items[at0014]/value
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/description/items[at0027]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/description/items[at0029]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/protocol
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/protocol/items[at0017]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/protocol/items[at0018]
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/protocol/items[at0018]/value
+/content[openEHR-EHR-SECTION.referral_details_rcp.v1]/items[openEHR-EHR-ACTION.service.v0]/protocol/items[at0019]
 
 ## templates/IDCR -  Adverse Reaction List.v1  nodes=67
 /

@@ -87,9 +87,9 @@ HELP_FOOTER    = Before a pull request: make ci · docs site: make docs-serve (h
         fmt fmt-check vet lint mod-tidy \
         test test-race \
         codegen termgen aqlgen spec-generate \
-        bmm-sync bmm-drift its-xml-sync its-xml-drift its-rest-sync its-rest-drift flat-sync flat-drift crossformat-sync corpus-pins-drift \
+        bmm-sync bmm-drift its-xml-sync its-xml-drift its-rest-sync its-rest-drift flat-sync flat-drift crossformat-sync ehrbase-service-sync corpus-pins-drift \
         terminology-sync terminology-drift \
-        mod-tidy-check codegen-check termgen-check aqlgen-check bmm-check its-xml-check flat-check crossformat-check corpus-pins-check terminology-check \
+        mod-tidy-check codegen-check termgen-check aqlgen-check bmm-check its-xml-check flat-check crossformat-check ehrbase-service-check corpus-pins-check terminology-check \
         operational-template-schema-check \
         spec-check sdd-check ci \
         spec-context probe-status probe-record cdr-crosscheck \
@@ -206,6 +206,9 @@ flat-drift: ## Verify the FLAT corpus; report upstream drift (network)
 crossformat-sync: ## Vendor the cross-format sets from local EHRbase clones
 	@./scripts/ingest-crossformat.sh ingest
 
+ehrbase-service-sync: ## Vendor the EHRbase server test templates from a local clone
+	@./scripts/ingest-ehrbase-service.sh ingest
+
 corpus-pins-drift: ## Check the EHRbase corpus pins; report how far each is behind (network)
 	@./scripts/corpus-pins.sh drift
 
@@ -249,6 +252,9 @@ flat-check: ## Verify the vendored FLAT corpus (offline sha256)
 
 crossformat-check: ## Verify the vendored cross-format sets (offline)
 	@./scripts/ingest-crossformat.sh verify
+
+ehrbase-service-check: ## Verify the vendored EHRbase server test templates (offline)
+	@./scripts/ingest-ehrbase-service.sh verify
 
 corpus-pins-check: ## Fail if an EHRbase corpus is not at its upstream pin (offline)
 	@./scripts/corpus-pins.sh verify

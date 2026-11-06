@@ -1,0 +1,427 @@
+# compiled tree of ehrbase-service/templates/IDCR - End of Life Patient Preferences.v0.opt
+template_id="IDCR - End of Life Patient Preferences.v0" concept="IDCR - End of Life Patient Preferences.v0" language="en" uid="5f0139dc-f25c-4a01-a6e0-e14f0a0e981e" num_nodes=49
+template_binding terminology="SNOMED-CT" node_or_path="at0012" target_terminology="SNOMED-CT" target_code="766391000000108"
+template_binding terminology="SNOMED-CT" node_or_path="at0015" target_terminology="SNOMED-CT" target_code="395091006"
+template_binding terminology="SNOMED-CT" node_or_path="at0016" target_terminology="SNOMED-CT" target_code="819211000000102"
+template_binding terminology="SNOMED-CT" node_or_path="at0022" target_terminology="SNOMED-CT" target_code="517111000000103"
+template_binding terminology="SNOMED-CT" node_or_path="at0024" target_terminology="SNOMED-CT" target_code="517131000000106"
+template_binding terminology="SNOMED-CT" node_or_path="at0025" target_terminology="SNOMED-CT" target_code="517161000000101"
+template_binding terminology="SNOMED-CT" node_or_path="at0028" target_terminology="SNOMED-CT" target_code="395091006"
+template_binding terminology="SNOMED-CT" node_or_path="at0032" target_terminology="SNOMED-CT" target_code="766391000000108"
+template_binding terminology="SNOMED-CT" node_or_path="at0033" target_terminology="SNOMED-CT" target_code="819211000000102"
+template_binding terminology="RCD99" node_or_path="at0006" target_terminology="RCD99" target_code="XaQTk"
+template_binding terminology="RCD99" node_or_path="at0007" target_terminology="RCD99" target_code="XaJ3h"
+template_binding terminology="RCD99" node_or_path="at0008" target_terminology="RCD99" target_code="XaQU4"
+template_binding terminology="RCD99" node_or_path="at0009" target_terminology="RCD99" target_code="XaQU5"
+template_binding terminology="RCD99" node_or_path="at0010" target_terminology="RCD99" target_code="XaJ3k"
+template_binding terminology="RCD99" node_or_path="at0011" target_terminology="RCD99" target_code="XaQiX"
+template_binding terminology="RCD99" node_or_path="at0012" target_terminology="RCD99" target_code="XaR7D"
+template_binding terminology="RCD99" node_or_path="at0013" target_terminology="RCD99" target_code="XaQzr"
+template_binding terminology="RCD99" node_or_path="at0016" target_terminology="RCD99" target_code="XaJ3g"
+template_binding terminology="RCD99" node_or_path="at0017" target_terminology="RCD99" target_code="XaJ3h"
+template_binding terminology="RCD99" node_or_path="at0018" target_terminology="RCD99" target_code="XaJ3i"
+template_binding terminology="RCD99" node_or_path="at0019" target_terminology="RCD99" target_code="XaJ3j"
+template_binding terminology="RCD99" node_or_path="at0022" target_terminology="RCD99" target_code="XaQzq"
+template_binding terminology="RCD99" node_or_path="at0023" target_terminology="RCD99" target_code="XaIsy"
+template_binding terminology="RCD99" node_or_path="at0024" target_terminology="RCD99" target_code="XaX2M"
+template_binding terminology="RCD99" node_or_path="at0025" target_terminology="RCD99" target_code="XaQzt"
+template_binding terminology="RCD99" node_or_path="at0033" target_terminology="RCD99" target_code="XaYsj"
+template_binding terminology="READ2" node_or_path="at0006" target_terminology="READ2" target_code="8Ce0."
+template_binding terminology="READ2" node_or_path="at0007" target_terminology="READ2" target_code="8Ce1."
+template_binding terminology="READ2" node_or_path="at0008" target_terminology="READ2" target_code="8Ce2."
+template_binding terminology="READ2" node_or_path="at0009" target_terminology="READ2" target_code="8Ce3."
+template_binding terminology="READ2" node_or_path="at0010" target_terminology="READ2" target_code="94Z5."
+template_binding terminology="READ2" node_or_path="at0011" target_terminology="READ2" target_code="8Ce5."
+template_binding terminology="READ2" node_or_path="at0012" target_terminology="READ2" target_code="8CeB."
+template_binding terminology="READ2" node_or_path="at0014" target_terminology="READ2" target_code="8CeA."
+template_binding terminology="READ2" node_or_path="at0016" target_terminology="READ2" target_code="94Z1."
+template_binding terminology="READ2" node_or_path="at0017" target_terminology="READ2" target_code="94Z2."
+template_binding terminology="READ2" node_or_path="at0018" target_terminology="READ2" target_code="94Z3."
+template_binding terminology="READ2" node_or_path="at0019" target_terminology="READ2" target_code="94Z4."
+template_binding terminology="READ2" node_or_path="at0021" target_terminology="READ2" target_code="94ZC."
+template_binding terminology="READ2" node_or_path="at0022" target_terminology="READ2" target_code="94Z6."
+template_binding terminology="READ2" node_or_path="at0024" target_terminology="READ2" target_code="94Z7."
+template_binding terminology="READ2" node_or_path="at0025" target_terminology="READ2" target_code="94Z8."
+template_binding terminology="READ2" node_or_path="at0004" target_terminology="READ2" target_code="9x2.."
+template_binding terminology="READ2" node_or_path="at0005" target_terminology="READ2" target_code="9NgG."
+template_binding terminology="READ2" node_or_path="at0022" target_terminology="READ2" target_code="9NgG0"
+template_binding terminology="READ2" node_or_path="at0027" target_terminology="READ2" target_code="9NgK."
+template_binding terminology="RCD99" node_or_path="at0004" target_terminology="RCD99" target_code="XaVy8"
+template_binding terminology="RCD99" node_or_path="at0005" target_terminology="RCD99" target_code="XaYld"
+template_binding terminology="RCD99" node_or_path="at0022" target_terminology="RCD99" target_code="XaYle"
+template_binding terminology="RCD99" node_or_path="at0027" target_terminology="RCD99" target_code="XaYv4"
+template_binding terminology="SNOMED-CT" node_or_path="at0005" target_terminology="SNOMED-CT" target_code="816301000000100"
+template_binding terminology="SNOMED-CT" node_or_path="at0022" target_terminology="SNOMED-CT" target_code="816321000000109"
+template_binding terminology="SNOMED-CT" node_or_path="at0027" target_terminology="SNOMED-CT" target_code="820621000000107"
+template_binding terminology="SNOMED-CT" node_or_path="at0004" target_terminology="SNOMED-CT" target_code="450475007"
+template_binding terminology="SNOMED-CT" node_or_path="at0005" target_terminology="SNOMED-CT" target_code="450476008"
+template_binding terminology="SNOMED-CT" node_or_path="at0022" target_terminology="SNOMED-CT" target_code="845151000000104"
+template_binding terminology="RCD99" node_or_path="at0004" target_terminology="RCD99" target_code="1R00."
+template_binding terminology="RCD99" node_or_path="at0005" target_terminology="RCD99" target_code="1R10."
+template_binding terminology="RCD99" node_or_path="at0022" target_terminology="RCD99" target_code="9NgV."
+template_binding terminology="READ2" node_or_path="at0004" target_terminology="READ2" target_code="1R0.."
+template_binding terminology="READ2" node_or_path="at0005" target_terminology="READ2" target_code="1R1.."
+template_binding terminology="READ2" node_or_path="at0015" target_terminology="READ2" target_code="67P1."
+template_binding terminology="READ2" node_or_path="at0016" target_terminology="READ2" target_code="67P0."
+template_binding terminology="READ2" node_or_path="at0022" target_terminology="READ2" target_code="9NgV."
+
+node /
+  rm_type="COMPOSITION" node_id="at0000" archetype_id="openEHR-EHR-COMPOSITION.care_plan.v1" node_name="End of Life Patient Preferences" occurrences=1..1 slot=false
+  term[en] "at0000" code="at0000" description="Care plan." text="Care plan"
+  attr "category" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "context" rm_type="EVENT_CONTEXT" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "content" rm_type="CONTENT_ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "territory" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "composer" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /category
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /category/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["433"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context
+  rm_type="EVENT_CONTEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "other_context" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "start_time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "setting" rm_type="DV_CODED_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context/other_context
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /context/other_context/items[at0003]
+  rm_type="CLUSTER" node_id="at0003" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0003" code="at0003" comment="e.g. Local hospital departmental infomation or additional metadata to align with FHIR or CIMI equivalents." description="Additional information required to capture local context or to align with other reference models/formalisms." text="Extension"
+
+node /name
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /name/value
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["End of Life Patient Preferences"] ListOpen:false Default:""}
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]
+  rm_type="SECTION" node_id="at0000" archetype_id="openEHR-EHR-SECTION.legal_information_rcp.v1" node_name="" occurrences=0..* slot=false
+  term[en] "at0000" code="at0000" description="Legal information heading (AoMRC)." text="Legal information"
+  attr "items" rm_type="CONTENT_ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=3
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]
+  rm_type="EVALUATION" node_id="at0000" archetype_id="openEHR-EHR-EVALUATION.care_preference_uk.v1" node_name="" occurrences=0..* slot=false
+  term[en] "at0000" code="at0000" description="The subject's preferred priorities of care and special requests." text="Preferred priorities of care"
+  attr "data" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "protocol" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "encoding" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "subject" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=3
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003]
+  rm_type="ELEMENT" node_id="at0003" archetype_id="" node_name="" occurrences=0..2 slot=false
+  term[en] "at0003" code="at0003" description="The subject's preferred place of care." text="Preferred place of care"
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003]/name
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003]/name/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0004"]}
+  code_term[en] "at0004" code="at0004" description="The patient's preferred place of care (first choice)." text="Preferred place of care"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0006" "at0007" "at0008" "at0009" "at0010" "at0011" "at0012" "at0013" "at0014"]}
+  code_term[en] "at0006" code="at0006" description="The patient's preferred place of care is at home." text="Preferred place of care - home"
+  code_term[en] "at0007" code="at0007" description="The patient's preferred place of care is a hospice." text="Preferred place of care - hospice"
+  code_term[en] "at0008" code="at0008" description="The patient's preferred place of care is a community hospital." text="Preferred place of care - community hospital"
+  code_term[en] "at0009" code="at0009" description="The patient's preferred place of care is a  hospital." text="Preferred place of care - hospital"
+  code_term[en] "at0010" code="at0010" description="The patient's preferred place of care is a nursing home." text="Preferred place of care - nursing home"
+  code_term[en] "at0011" code="at0011" description="The patient's preferred place of care is a residential home." text="Preferred place of care - residential home"
+  code_term[en] "at0012" code="at0012" description="The patient has declined to offer a preferred place of care." text="Preferred place of care - patient declined to participate"
+  code_term[en] "at0013" code="at0013" description="Discussion of preferred place of care is inappropriate." text="Preferred place of care - discussion not appropriate"
+  code_term[en] "at0014" code="at0014" description="The patient has been unable to express preference about place of care." text="Preferred place of care - patient unable to express preference"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015]
+  rm_type="ELEMENT" node_id="at0015" archetype_id="" node_name="" occurrences=0..2 slot=false
+  term[en] "at0015" code="at0015" description="The subject's preferred place of death." text="Preferred place of death"
+  binding terminology="SNOMED-CT" node_or_path="at0015" target_terminology="SNOMED-CT" target_code="395091006"
+  binding terminology="READ2" node_or_path="at0015" target_terminology="READ2" target_code="67P1."
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015]/name
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015]/name/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0027"]}
+  code_term[en] "at0027" code="at0027" description="The patient's first choice preferred place of death." text="Preferred place of death"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0016" "at0017" "at0018" "at0019" "at0020" "at0021" "at0022" "at0023" "at0024" "at0025" "at0032" "at0033"]}
+  code_term[en] "at0016" code="at0016" description="The patient's preferred place of death is at home." text="Preferred place of death: home"
+  code_term[en] "at0017" code="at0017" description="The patient's preferred place of death is in a hospice." text="Preferred place of death: hospice"
+  code_term[en] "at0018" code="at0018" description="The patient's preferred place of death is in a community hospital." text="Preferred place of death: community hospital"
+  code_term[en] "at0019" code="at0019" description="The patient's preferred place of death is in a hospital." text="Preferred place of death: hospital"
+  code_term[en] "at0020" code="at0020" description="The patient's preferred place of death is in a nursing home." text="Preferred place of death: nursing home"
+  code_term[en] "at0021" code="at0021" description="The patient's preferred place of death is in a residential home." text="Preferred place of death: residential home"
+  code_term[en] "at0022" code="at0022" description="The patient is unable to express a preferred pace of death." text="Preferred place of death: patient unable to express preference"
+  code_term[en] "at0023" code="at0023" description="Preferred place of death has been discussed with the patient." text="Preferred place of death discussed with patient"
+  code_term[en] "at0024" code="at0024" description="Discussion of the patient's preferred place of death is inappropriate." text="Preferred place of death: discussion not appropriate"
+  code_term[en] "at0025" code="at0025" description="The patient is undecided about their preferred place of death." text="Preferred place of death: patient undecided"
+  code_term[en] "at0032" code="at0032" description="The patient declined discussion about their preferred place of death." text="Preferred place of death: patient declined discussion"
+  code_term[en] "at0033" code="at0033" description="The patient's preferred place of death is their usual residence." text="Preferred place of death: usual place of residence"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0029]
+  rm_type="ELEMENT" node_id="at0029" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0029" code="at0029" description="Any additional comments about the subject's place of care preferences." text="Comment"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0029]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/protocol
+  rm_type="ITEM_TREE" node_id="at0031" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0031" code="at0031" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=0
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.advance_decision_refuse_treatment_uk.v1]
+  rm_type="EVALUATION" node_id="at0000" archetype_id="openEHR-EHR-EVALUATION.advance_decision_refuse_treatment_uk.v1" node_name="" occurrences=0..1 slot=false
+  term[en] "at0000" code="at0000" description="An advance decision to refuse treatment (ADRT) is a decision to refuse a specific treatment, made in\n advance by a person who has capacity to do so." text="Advance decision to refuse treatment"
+  attr "data" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "protocol" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "encoding" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "subject" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.advance_decision_refuse_treatment_uk.v1]/data
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=3
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.advance_decision_refuse_treatment_uk.v1]/data/items[at0003]
+  rm_type="ELEMENT" node_id="at0003" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0003" code="at0003" description="The state of the decision to refuse treatment." text="Decision status"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.advance_decision_refuse_treatment_uk.v1]/data/items[at0003]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.advance_decision_refuse_treatment_uk.v1]/data/items[at0003]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0004" "at0005" "at0022" "at0028"]}
+  code_term[en] "at0004" code="at0004" description="The subject has signed an advanced decision to refuse treatment." text="Advanced decision to refuse treatment signed"
+  code_term[en] "at0005" code="at0005" description="The subject has signed an advance decision to refuse treatment (Mental Capacity Act 2005)." text="Has advance decision to refuse treatment (Mental Capacity Act 2005)"
+  code_term[en] "at0022" code="at0022" description="The subject has signed an advance decision to refuse life sustaining treatment (Mental Capacity Act 2005)." text="Has advance decision to refuse life sustaining treatment (Mental Capacity Act 2005)"
+  code_term[en] "at0028" code="at0028" description="The subject has not signed and advance directive or has rescinded an early directive." text="Advanced directive not signed"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.advance_decision_refuse_treatment_uk.v1]/data/items[at0002]
+  rm_type="ELEMENT" node_id="at0002" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0002" code="at0002" description="The date at which the DNACPR decision was originally taken or last reviewed." text="Date of decision"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.advance_decision_refuse_treatment_uk.v1]/data/items[at0002]/value
+  rm_type="DV_DATE_TIME" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.advance_decision_refuse_treatment_uk.v1]/data/items[at0021]
+  rm_type="ELEMENT" node_id="at0021" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0021" code="at0021" description="Other narrative comment pertinent to the advanced directive." text="Comment"
+  binding terminology="READ2" node_or_path="at0021" target_terminology="READ2" target_code="94ZC."
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.advance_decision_refuse_treatment_uk.v1]/data/items[at0021]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.advance_decision_refuse_treatment_uk.v1]/protocol
+  rm_type="ITEM_TREE" node_id="at0010" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0010" code="at0010" description="@ internal @" text="Tree"
+  binding terminology="RCD99" node_or_path="at0010" target_terminology="RCD99" target_code="XaJ3k"
+  binding terminology="READ2" node_or_path="at0010" target_terminology="READ2" target_code="94Z5."
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=0
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]
+  rm_type="EVALUATION" node_id="at0000" archetype_id="openEHR-EHR-EVALUATION.cpr_decision_uk.v1" node_name="" occurrences=0..1 slot=false
+  term[en] "at0000" code="at0000" description="The outcome of a clinical decision as to whether cardio-pulmonary resuscitation should be undertaken or not. This is generally referred to in UK clinical guidance as the CPR (Cardio-pulmonary resuscitation) decision." text="CPR decision"
+  attr "data" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "protocol" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "encoding" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "subject" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/data
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=4
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/data/items[at0003]
+  rm_type="ELEMENT" node_id="at0003" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0003" code="at0003" description="The clinical decision on whether cardiopulmonary resuscitation (CPR) should be attempted. In some cases a clear answer may not be available to the recording clinician." text="CPR decision"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/data/items[at0003]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/data/items[at0003]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0004" "at0005" "at0022"]}
+  code_term[en] "at0004" code="at0004" description="Cardio-pulmonary resuscitation should be attempted." text="For attempted cardio-pulmonary resuscitation"
+  code_term[en] "at0005" code="at0005" description="Cardiopulmonary resuscitation should not be attempted." text="Not for attempted cardiopulmonary resuscitation"
+  code_term[en] "at0022" code="at0022" description="There is no clear information on the outcome of the CPR decision." text="CPR decision status unknown"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/data/items[at0002]
+  rm_type="ELEMENT" node_id="at0002" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0002" code="at0002" description="The date at which the CPR decision was originally taken or last reviewed." text="Date of CPR decision"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/data/items[at0002]/value
+  rm_type="DV_DATE_TIME" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/data/items[at0012]
+  rm_type="ELEMENT" node_id="at0012" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0012" code="at0012" description="Is the informal carer, or carers, aware of the CPR decision?" text="Informal carer awareness of decision"
+  binding terminology="SNOMED-CT" node_or_path="at0012" target_terminology="SNOMED-CT" target_code="766391000000108"
+  binding terminology="RCD99" node_or_path="at0012" target_terminology="RCD99" target_code="XaR7D"
+  binding terminology="READ2" node_or_path="at0012" target_terminology="READ2" target_code="8CeB."
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/data/items[at0012]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/data/items[at0012]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0025" "at0026"]}
+  code_term[en] "at0025" code="at0025" description="The informal carer is not aware of the do not attempt cardiopulmonary resuscitation clinical decision." text="Informal carer not aware of CPR decision"
+  code_term[en] "at0026" code="at0026" description="The informal carer is aware of the do not attempt cardiopulmonary resucitation decision." text="Informal carer aware of CPR decision"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/data/items[at0021]
+  rm_type="ELEMENT" node_id="at0021" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0021" code="at0021" description="Other narrative comment pertinent to the CPR decision." text="Comment"
+  binding terminology="READ2" node_or_path="at0021" target_terminology="READ2" target_code="94ZC."
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/data/items[at0021]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/protocol
+  rm_type="ITEM_TREE" node_id="at0010" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0010" code="at0010" description="@ internal @" text="Tree"
+  binding terminology="RCD99" node_or_path="at0010" target_terminology="RCD99" target_code="XaJ3k"
+  binding terminology="READ2" node_or_path="at0010" target_terminology="READ2" target_code="94Z5."
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/protocol/items[at0011]
+  rm_type="ELEMENT" node_id="at0011" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0011" code="at0011" description="The location of the original CPR document, either a text description or an electronic link." text="Location of CPR documentation"
+  binding terminology="RCD99" node_or_path="at0011" target_terminology="RCD99" target_code="XaQiX"
+  binding terminology="READ2" node_or_path="at0011" target_terminology="READ2" target_code="8Ce5."
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/protocol/items[at0011]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.cpr_decision_uk.v1]/protocol/items[at0011]/value
+  rm_type="DV_URI" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+# walked nodes=50

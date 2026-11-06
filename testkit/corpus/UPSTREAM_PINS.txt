@@ -11,11 +11,14 @@
 #   ehrbase/openEHR_SDK        make flat-sync; make crossformat-sync
 #   ehrbase/integration-tests  scripts/ingest-robot-fixtures.sh;
 #                              scripts/ingest-robot-aql.sh; make crossformat-sync
+#   ehrbase/ehrbase            make ehrbase-service-sync
 # The files vendored by hand from openEHR_SDK (rm/, the template triplets,
 # webtemplate/) have no script: THIRD_PARTY_LICENSES.md names this pin as
-# theirs, so check them against the new commit too.
+# theirs, so check them against the new commit too. The same holds for the
+# BMI OPT in templates/, copied by hand from ehrbase/ehrbase.
 #
 # Edited by hand; fields are separated by spaces.
 # repository                 branch   commit
 ehrbase/openEHR_SDK          develop  e07110a2d969d6971ff157b93288f64ee30764af
 ehrbase/integration-tests    main     8c737bb7b4e2157b1a6dba56e8ad7e45476b5d3e
+ehrbase/ehrbase              develop  cc7ddcefdfb77c30b7833ba02ad98cfb0cf24956
