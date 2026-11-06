@@ -842,8 +842,8 @@ func (r *trackingReader) Token() (xml.Token, error) {
 }
 
 // errXMLTargetInside is the cause of the refusal of a processing instruction
-// whose target is xml inside an element.
-var errXMLTargetInside = errors.New("the element holds a processing instruction whose target is xml, which XML reserves for the declaration at the start of a document")
+// whose target is xml inside an element, which is not well-formed XML.
+var errXMLTargetInside error = notWellFormed("the element holds a processing instruction whose target is xml, which XML reserves for the declaration at the start of a document")
 
 // withoutNamespaceDecls returns attrs without its namespace declarations. It
 // returns attrs itself when it holds none.

@@ -27,7 +27,8 @@ import (
 // declaration or one after whitespace among them, is refused. Anything else before or after the root, such as an element or
 // text other than whitespace, is not well-formed XML, and the decode refuses
 // it whatever t's policy: it is malformed input, not unmatched content. The
-// error wraps [ErrInvalidShape] and carries none of that content. A root that
+// error wraps [ErrInvalidShape] and [ErrNotWellFormed] and carries none of
+// that content. A root that
 // fails to decode fails as itself, and the decode does not read on.
 //
 // A primitive failure comes back on its own, naming the element by its path
@@ -139,8 +140,31 @@ func end(dec *xml.Decoder) error {
 
 // errAfterRoot is the refusal of content after the root element.
 func errAfterRoot() error {
-	return fmt.Errorf("%w: content after the root element", ErrInvalidShape)
+	return fmt.Errorf("%w: %w", ErrInvalidShape, notWellFormed("content after the root element"))
 }
+
+// ContentAfterRoot returns the refusal of content after the root element that
+// [Unmarshal] gives: it wraps [ErrInvalidShape] and [ErrNotWellFormed] and
+// names none of the content. A reader that holds a document to the same rule
+// returns it.
+func ContentAfterRoot() error { return errAfterRoot() }
+
+// ErrNotWellFormed classifies the refusal of input that is not well-formed XML
+// and that encoding/xml reads without a syntax error. It is re-exported as
+// canxml.ErrNotWellFormed, where it is documented.
+var ErrNotWellFormed = errors.New("canxml: XML not well-formed")
+
+// notWellFormed is the cause of a refusal of input that is not well-formed
+// XML. Its text names the rule the input breaks and none of the input, and it
+// matches [ErrNotWellFormed] without writing that sentinel's text, so a
+// refusal's message reads as the rule alone.
+type notWellFormed string
+
+// Error returns the rule the input breaks.
+func (e notWellFormed) Error() string { return string(e) }
+
+// Is reports whether target is [ErrNotWellFormed].
+func (e notWellFormed) Is(target error) bool { return target == ErrNotWellFormed }
 
 // utf8BOM is the UTF-8 byte order mark, which a document may start with as
 // its encoding signature.
@@ -360,7 +384,7 @@ func isXMLTarget(target string) bool {
 
 // errBeforeRoot is the refusal of content before the root element.
 func errBeforeRoot() error {
-	return fmt.Errorf("%w: content before the root element", ErrInvalidShape)
+	return fmt.Errorf("%w: %w", ErrInvalidShape, notWellFormed("content before the root element"))
 }
 
 // isDoctype reports whether d, the text of a `<!…>` directive, is a document

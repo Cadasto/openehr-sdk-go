@@ -27,7 +27,7 @@
 //   - One root element per document. [Unmarshal] refuses an element, or
 //     text other than whitespace, after the root, and text, an end element
 //     or markup other than one document type declaration before it, in
-//     every mode, with [ErrInvalidShape]. Comments, processing
+//     every mode, with [ErrInvalidShape] and [ErrNotWellFormed]. Comments, processing
 //     instructions and whitespace are accepted on either side of the root,
 //     as XML allows them, and so are, before it, the XML declaration, one
 //     document type declaration and a UTF-8 byte order mark at the very
@@ -35,8 +35,8 @@
 //     letter case, for the XML declaration, which nothing but the byte
 //     order mark may precede, so [Unmarshal] refuses one elsewhere, before,
 //     inside or after the root, such as one after whitespace, a second
-//     declaration or one inside an element, with [ErrInvalidShape],
-//     and so does a [Decoder] given [WithUnmatched], [WithStrict],
+//     declaration or one inside an element, with [ErrInvalidShape] and
+//     [ErrNotWellFormed], and so does a [Decoder] given [WithUnmatched], [WithStrict],
 //     [WithMissing], [WithPresence] or a positive [WithMaxDepth] inside the
 //     value it decodes; a target that only starts with those letters, such
 //     as xml-stylesheet, is accepted.
@@ -97,7 +97,8 @@
 //     empty struct element decode as before.
 //   - An element that carries one attribute twice, by its name as written or
 //     as namespaces resolve it, is not well-formed XML: every decode refuses
-//     it with [ErrInvalidShape], naming the attribute and none of its values,
+//     it with [ErrInvalidShape] and [ErrNotWellFormed], naming the attribute
+//     and none of its values,
 //     wherever the decode reads the element or skips it as unmatched content.
 //     Inside a primitive element's text, which a decode given none of
 //     [WithUnmatched], [WithStrict], [WithMissing], [WithPresence] and a

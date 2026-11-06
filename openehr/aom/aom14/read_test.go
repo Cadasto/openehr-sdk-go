@@ -350,13 +350,13 @@ var readModes = map[string][]canxml.DecoderOption{
 }
 
 // refusesContentOutsideTheRoot fails the test unless the reader refuses doc
-// with opts with an error that wraps canxml.ErrInvalidShape and does not
-// carry planted.
+// with opts with an error that wraps canxml.ErrInvalidShape and
+// canxml.ErrNotWellFormed and does not carry planted.
 func refusesContentOutsideTheRoot(t *testing.T, doc, planted string, opts ...canxml.DecoderOption) {
 	t.Helper()
 	_, err := aom14.ReadOperationalTemplate(strings.NewReader(doc), opts...)
-	if !errors.Is(err, canxml.ErrInvalidShape) {
-		t.Fatalf("ReadOperationalTemplate(%q) = %v, want an error wrapping canxml.ErrInvalidShape", doc, err)
+	if !errors.Is(err, canxml.ErrInvalidShape) || !errors.Is(err, canxml.ErrNotWellFormed) {
+		t.Fatalf("ReadOperationalTemplate(%q) = %v, want an error wrapping canxml.ErrInvalidShape and canxml.ErrNotWellFormed", doc, err)
 	}
 	if strings.Contains(err.Error(), planted) {
 		t.Errorf("error %q carries the content outside the root", err)

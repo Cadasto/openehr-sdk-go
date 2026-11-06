@@ -70,8 +70,8 @@ func TestREQ056_XMLOneRoot(t *testing.T) {
 		for name, tail := range refused {
 			t.Run(mode+"/refused/"+name, func(t *testing.T) {
 				_, reported, err := decode(root + tail)
-				if !errors.Is(err, canxml.ErrInvalidShape) {
-					t.Fatalf("canxml.Unmarshal(root + %q) err = %v; want errors.Is(_, canxml.ErrInvalidShape)", tail, err)
+				if !errors.Is(err, canxml.ErrInvalidShape) || !errors.Is(err, canxml.ErrNotWellFormed) {
+					t.Fatalf("canxml.Unmarshal(root + %q) err = %v; want errors.Is(_, canxml.ErrInvalidShape) and errors.Is(_, canxml.ErrNotWellFormed)", tail, err)
 				}
 				if errors.Is(err, canxml.ErrUnknownElement) {
 					t.Errorf("canxml.Unmarshal(root + %q) err = %v; a second root is malformed input, not unmatched content", tail, err)
@@ -199,8 +199,8 @@ func TestREQ056_XMLBeforeRoot(t *testing.T) {
 		for name, head := range refused {
 			t.Run(mode+"/refused/"+name, func(t *testing.T) {
 				_, reported, err := decode(head + root)
-				if !errors.Is(err, canxml.ErrInvalidShape) {
-					t.Fatalf("canxml.Unmarshal(%q + root) err = %v; want errors.Is(_, canxml.ErrInvalidShape)", head, err)
+				if !errors.Is(err, canxml.ErrInvalidShape) || !errors.Is(err, canxml.ErrNotWellFormed) {
+					t.Fatalf("canxml.Unmarshal(%q + root) err = %v; want errors.Is(_, canxml.ErrInvalidShape) and errors.Is(_, canxml.ErrNotWellFormed)", head, err)
 				}
 				if errors.Is(err, canxml.ErrUnknownElement) {
 					t.Errorf("canxml.Unmarshal(%q + root) err = %v; content before the root is malformed input, not unmatched content", head, err)
@@ -295,8 +295,8 @@ func TestREQ056_XMLTargetInsideTheRoot(t *testing.T) {
 		for name, in := range refused {
 			t.Run(mode+"/refused/"+name, func(t *testing.T) {
 				err := decode(in, new(rm.DVText))
-				if !errors.Is(err, canxml.ErrInvalidShape) || errors.Is(err, canxml.ErrUnknownElement) {
-					t.Fatalf("%s(%s) = %v; want an error that wraps canxml.ErrInvalidShape and not canxml.ErrUnknownElement", mode, in, err)
+				if !errors.Is(err, canxml.ErrInvalidShape) || !errors.Is(err, canxml.ErrNotWellFormed) || errors.Is(err, canxml.ErrUnknownElement) {
+					t.Fatalf("%s(%s) = %v; want an error that wraps canxml.ErrInvalidShape and canxml.ErrNotWellFormed, and not canxml.ErrUnknownElement", mode, in, err)
 				}
 				for _, leak := range []string{"version", "pi data"} {
 					if strings.Contains(err.Error(), leak) {

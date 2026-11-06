@@ -563,15 +563,16 @@ func (d *Decoder) RelaxedTypeDispatch() bool { return d.cfg.relaxedTypeDispatch 
 // an element or text other than whitespace, is not well-formed XML, and the
 // decode refuses it in every mode, with or without [WithUnmatched],
 // [WithStrict] or [WithMissing]: it is malformed input, not unmatched
-// content. The error wraps [ErrInvalidShape] and carries none of that
-// content. A root that fails to decode fails as itself, and the decode does
+// content. The error wraps [ErrInvalidShape] and [ErrNotWellFormed] and
+// carries none of that content. A root that fails to decode fails as itself, and the decode does
 // not read on.
 //
 // Returns [DecodeError] wrapping a typereg sentinel
 // ([typereg.ErrMissingType] / ErrUnknownType / ErrTypeMismatch) at
 // polymorphic failures, and [ErrInvalidShape] (wrapped) for an
 // `xmi:type` discriminator failure and for content before or after the
-// root.
+// root, which also wraps [ErrNotWellFormed], as does an element that carries
+// one attribute twice.
 // Other XML syntax errors are not classified: they come back unchanged
 // from encoding/xml, so an errors.Is against [ErrInvalidShape] does not
 // match a truncated root or a syntax error inside it.

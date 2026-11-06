@@ -71,7 +71,9 @@ const inputBufferMax = 4 << 20
 // instruction whose target is xml; one inside the root is refused in both
 // modes, as canonical XML refuses it. Anything else before or after the root,
 // such as an element after it or a stray end tag before it, is refused with
-// an error that wraps [canxml.ErrInvalidShape] and carries none of it. The root element may have any name, so a document whose root is
+// an error that wraps [canxml.ErrInvalidShape] and [canxml.ErrNotWellFormed]
+// and carries none of it, and so is an element that carries one attribute
+// twice. The root element may have any name, so a document whose root is
 // `<OPERATIONAL_TEMPLATE>` reads as one whose root is `<template>`. An input
 // with no root element, empty or holding only a declaration, comments,
 // whitespace or text, is refused with an error that wraps
@@ -413,7 +415,9 @@ func afterRoot(r io.Reader, strict bool) error {
 	}
 }
 
-// errAfterRoot is the refusal of content after the root element.
+// errAfterRoot is the refusal of content after the root element, which wraps
+// [canxml.ErrInvalidShape] and [canxml.ErrNotWellFormed], as canonical XML's
+// does.
 func errAfterRoot() error {
-	return fmt.Errorf("aom14: content after the root element: %w", canxml.ErrInvalidShape)
+	return fmt.Errorf("aom14: %w", xmlunmatched.ContentAfterRoot())
 }
