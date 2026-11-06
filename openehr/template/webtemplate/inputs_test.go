@@ -339,3 +339,32 @@ func TestCodedTextInput_REQ106_REQ103_CodeReference(t *testing.T) {
 		t.Errorf("C_CODE_REFERENCE inputs = %+v, want the C_CODE_PHRASE's %+v", got, want)
 	}
 }
+
+// TestQuantityInput_REQ106_PropertyOnly — REQ-106. A C_DV_QUANTITY that names a
+// property and lists no units gives a unit input with no list, as the
+// reference does: its OPTParser builds the unit list from the C_DV_QUANTITY
+// list alone and never reads the property (the ips template's golden at the
+// pinned openEHR_SDK commit spells such a node so). The units the property
+// admits are the validator's, not the Web Template's.
+func TestQuantityInput_REQ106_PropertyOnly(t *testing.T) {
+	c := compileFixture(t, "../../../testkit/corpus/templates/sdk_crosscheck_values.v1.opt")
+	wt, err := webtemplate.Build(c)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	const path = "/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0005]/value"
+	var got []webtemplate.Input
+	found := false
+	walkOurTree(wt.Tree, func(n *webtemplate.Node) {
+		if n.AQLPath == path {
+			got, found = n.Inputs, true
+		}
+	})
+	if !found {
+		t.Fatalf("Build gave no node at %s", path)
+	}
+	want := []webtemplate.Input{{Suffix: "magnitude", Type: "DECIMAL"}, {Suffix: "unit", Type: "CODED_TEXT"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("property-only quantity %s inputs = %+v, want %+v", path, got, want)
+	}
+}

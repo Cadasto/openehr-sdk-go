@@ -302,3 +302,90 @@ func assertStructuralParity(t *testing.T, stem string) {
 		t.Errorf("structural parity not yet reached (missing=%d extra=%d mismatch=%d)", len(missing), len(extra), len(mismatch))
 	}
 }
+
+// dropRootTerm returns opt with the term definition for code removed from the
+// archetype root archetypeID: the first after that root's archetype_id, which
+// an OPT writes after every root nested in it and before its own terms. It
+// fails the test unless the OPT names that root once and the term found is the
+// root's own.
+func dropRootTerm(t *testing.T, opt []byte, archetypeID, code string) []byte {
+	t.Helper()
+	id := []byte("<value>" + archetypeID + "</value>")
+	if n := bytes.Count(opt, id); n != 1 {
+		t.Fatalf("the OPT names %s %d times, want once", archetypeID, n)
+	}
+	at := bytes.Index(opt, id)
+	start := bytes.Index(opt[at:], []byte(`<term_definitions code="`+code+`">`))
+	if start < 0 || bytes.Contains(opt[at:at+start], []byte("<archetype_id>")) {
+		t.Fatalf("%s defines no term %s of its own", archetypeID, code)
+	}
+	start += at
+	end := bytes.Index(opt[start:], []byte("</term_definitions>"))
+	if end < 0 {
+		t.Fatalf("the term %s of %s is not closed", code, archetypeID)
+	}
+	return slices.Concat(opt[:start], opt[start+end+len("</term_definitions>"):])
+}
+
+// TestNamesComeFromTheNearestArchetypeRoot — REQ-106. A node's name, id and
+// description, and a coded entry's label, come from the terms of the node's
+// nearest enclosing archetype root alone, as the reference reads them. Where
+// that archetype does not define the code, the term an enclosing archetype
+// defines under the same code names another concept: the node falls back as a
+// node with no term does, and a local code is left out of the coded list, as
+// the reference leaves it out.
+func TestNamesComeFromTheNearestArchetypeRoot(t *testing.T) {
+	raw, err := os.ReadFile(referenceDir + "/Corona_Anamnese.opt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The COMPOSITION defines at0002 as "Bericht ID", and an archetype around
+	// travel_event.v0 defines at0005 as "Status".
+	raw = dropRootTerm(t, raw, "openEHR-EHR-OBSERVATION.story.v1", "at0002")
+	raw = dropRootTerm(t, raw, "openEHR-EHR-OBSERVATION.travel_event.v0", "at0005")
+	opt, err := aom14.ReadOperationalTemplate(bytes.NewReader(raw))
+	if err != nil {
+		t.Fatalf("ReadOperationalTemplate: %v", err)
+	}
+	c, err := templatecompile.Compile(opt)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	wt, err := webtemplate.Build(c)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	const (
+		eventPath = "/content[openEHR-EHR-OBSERVATION.story.v1]/data[at0001]/events[at0002]"
+		codedPath = "/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]" +
+			"/data[at0001]/events[at0002]/data[at0003]/items[at0004,'Letzte Reise?']/value"
+	)
+	var event, coded *webtemplate.Node
+	walkOurTree(wt.Tree, func(n *webtemplate.Node) {
+		switch n.AQLPath {
+		case eventPath:
+			event = n
+		case codedPath:
+			coded = n
+		}
+	})
+	if event == nil || coded == nil {
+		t.Fatalf("Build gave no node at %s (%v) or %s (%v)", eventPath, event != nil, codedPath, coded != nil)
+	}
+	if event.ID != "events" || event.Name != "" || len(event.LocalizedNames) != 0 || len(event.LocalizedDescriptions) != 0 {
+		t.Errorf("event %s: id %q, name %q, names %v, descriptions %v; want id \"events\" and no name or description",
+			eventPath, event.ID, event.Name, event.LocalizedNames, event.LocalizedDescriptions)
+	}
+	if len(coded.Inputs) != 1 {
+		t.Fatalf("coded %s inputs = %+v, want one", codedPath, coded.Inputs)
+	}
+	list := coded.Inputs[0].List
+	if slices.ContainsFunc(list, func(item webtemplate.InputListItem) bool { return item.Value == "at0005" }) {
+		t.Errorf("coded %s list %+v holds at0005, which its archetype no longer defines", codedPath, list)
+	}
+	if !slices.ContainsFunc(list, func(item webtemplate.InputListItem) bool {
+		return item.Value == "at0006" && item.Label == "Ja - national"
+	}) {
+		t.Errorf("coded %s list %+v lacks at0006 'Ja - national', which its archetype defines", codedPath, list)
+	}
+}

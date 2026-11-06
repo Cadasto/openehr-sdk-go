@@ -240,8 +240,12 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 		if err != nil {
 			return nil, fmt.Errorf("simplified: decode %q: %w", base, err)
 		}
-		if err := placeLeaf(compJSON, leaf.AQLPath, predIndex, predType, dv, budget, tmpl); err != nil {
+		key, err := placeLeaf(compJSON, leaf.AQLPath, predIndex, predType, dv, budget, tmpl)
+		if err != nil {
 			return nil, fmt.Errorf("simplified: place %q: %w", base, err)
+		}
+		if _, raw := sfx["raw"]; !raw && nodeRMType(leaf) == "DV_ORDINAL" {
+			settleOrdinalTerminology(dv, tmpl.ordinalTerminologies(key))
 		}
 	}
 	// Composite leaves are placed like any other leaf, after the clinical loop so a
@@ -1435,18 +1439,21 @@ func aqlSegments(p string) iter.Seq[aqlSeg] {
 // (rmpath re-resolves by archetype_node_id, so the round-trip does not depend
 // on it — but the result is then format-idempotent, not canonically complete;
 // see deviations.md).
-func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int, predType map[string]string, value any, budget *allocBudget, tmpl *templateIndex) error {
-	cur, attr, err := walkAQL(compJSON, aqlPath, predIndex, predType, budget, tmpl)
+//
+// It returns the placed value's path in the spelling the [templateIndex] is
+// keyed by.
+func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int, predType map[string]string, value any, budget *allocBudget, tmpl *templateIndex) (string, error) {
+	cur, attr, key, err := walkAQLKeyed(compJSON, aqlPath, predIndex, predType, budget, tmpl)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if _, exists := cur[attr]; exists {
 		// Two FLAT keys resolved to the same terminal slot (e.g. "a" vs
 		// "a:0" on a repeatable) — overwriting would silently drop one.
-		return fmt.Errorf("%w: duplicate placement at %q", ErrUnknownPath, aqlPath)
+		return "", fmt.Errorf("%w: duplicate placement at %q", ErrUnknownPath, aqlPath)
 	}
 	cur[attr] = value
-	return nil
+	return key + "/" + attr, nil
 }
 
 // walkAQL materialises the intermediate RM nodes along aqlPath and returns the
@@ -1457,9 +1464,17 @@ func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int
 // (`…/items[at0008]/uid`), which is also the lookahead [concreteType] needs to
 // resolve the abstract ITEM_STRUCTURE slot the Web Template collapses.
 func walkAQL(compJSON map[string]any, aqlPath string, predIndex map[string]int, predType map[string]string, budget *allocBudget, tmpl *templateIndex) (map[string]any, string, error) {
+	holder, attr, _, err := walkAQLKeyed(compJSON, aqlPath, predIndex, predType, budget, tmpl)
+	return holder, attr, err
+}
+
+// walkAQLKeyed is [walkAQL] that also returns the holder's path in the
+// spelling the [templateIndex] is keyed by, so a caller can look up what the
+// template gives the value it places there.
+func walkAQLKeyed(compJSON map[string]any, aqlPath string, predIndex map[string]int, predType map[string]string, budget *allocBudget, tmpl *templateIndex) (map[string]any, string, string, error) {
 	segs := parseAQL(aqlPath)
 	if len(segs) == 0 {
-		return nil, "", fmt.Errorf("%w: empty canonical path", ErrUnknownPath)
+		return nil, "", "", fmt.Errorf("%w: empty canonical path", ErrUnknownPath)
 	}
 	cur := compJSON
 	curType := "COMPOSITION"
@@ -1473,7 +1488,7 @@ func walkAQL(compJSON map[string]any, aqlPath string, predIndex map[string]int, 
 	var aqlPrefix, namePrefix strings.Builder
 	for i, seg := range segs {
 		if i == len(segs)-1 {
-			return cur, seg.attr, nil
+			return cur, seg.attr, namePrefix.String(), nil
 		}
 		aqlPrefix.WriteString("/")
 		aqlPrefix.WriteString(seg.attr)
@@ -1494,12 +1509,12 @@ func walkAQL(compJSON map[string]any, aqlPath string, predIndex map[string]int, 
 		nextAttr := segs[i+1].attr
 		childType := concreteType(curType, seg.attr, wtType, tmpl.rmType(namePrefix.String()), nextAttr)
 		if childType == "" {
-			return nil, "", fmt.Errorf("%w: cannot resolve RM type for %q on %s (aqlPath %q)", ErrUnknownPath, seg.attr, curType, aqlPath)
+			return nil, "", "", fmt.Errorf("%w: cannot resolve RM type for %q on %s (aqlPath %q)", ErrUnknownPath, seg.attr, curType, aqlPath)
 		}
 		if container {
 			next, err := selectElem(cur, seg.attr, childType, seg.pred, predIndex[aqlPrefix.String()], budget)
 			if err != nil {
-				return nil, "", err
+				return nil, "", "", err
 			}
 			cur = next
 		} else {
@@ -1509,7 +1524,7 @@ func walkAQL(compJSON map[string]any, aqlPath string, predIndex map[string]int, 
 				// attribute): a second key reaching the same single-valued
 				// attribute through a deeper node would replace it with an
 				// object and drop the first value (REQ-053).
-				return nil, "", fmt.Errorf("%w: %s.%s already holds a %T, but keys reach it through a second Web Template node — refused rather than overwritten (aqlPath %q)",
+				return nil, "", "", fmt.Errorf("%w: %s.%s already holds a %T, but keys reach it through a second Web Template node — refused rather than overwritten (aqlPath %q)",
 					ErrUnknownPath, curType, seg.attr, held, aqlPath)
 			}
 			if !ok {
@@ -1526,7 +1541,7 @@ func walkAQL(compJSON map[string]any, aqlPath string, predIndex map[string]int, 
 				// attribute (an ACTION's ism_transition[at0005] and [at0006]).
 				// Merging their keys into one object would re-encode them under
 				// one node only, moving the other's keys there (REQ-053).
-				return nil, "", fmt.Errorf("%w: %s.%s is single-valued, but keys reach it through two Web Template nodes, [%s] and [%s] — refused rather than merged (aqlPath %q)",
+				return nil, "", "", fmt.Errorf("%w: %s.%s is single-valued, but keys reach it through two Web Template nodes, [%s] and [%s] — refused rather than merged (aqlPath %q)",
 					ErrUnknownPath, curType, seg.attr, held, seg.pred, aqlPath)
 			}
 			cur = obj
@@ -1541,7 +1556,7 @@ func walkAQL(compJSON map[string]any, aqlPath string, predIndex map[string]int, 
 		curType = childType
 	}
 	// Unreachable: the loop returns at i == len(segs)-1 and segs is non-empty.
-	return nil, "", fmt.Errorf("%w: canonical path %q walked past its last segment", ErrUnknownPath, aqlPath)
+	return nil, "", "", fmt.Errorf("%w: canonical path %q walked past its last segment", ErrUnknownPath, aqlPath)
 }
 
 // nameable reports whether a rebuilt node of this RM type declares a `name`,
@@ -2041,7 +2056,7 @@ func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g 
 		// reused-sibling refusal, each with its own message.
 		return fmt.Errorf("simplified: %q: %w", g.prefix(), err)
 	}
-	value, err := compositeLeafValue(g, nodeRMType(node))
+	value, ordinalBounds, err := compositeLeafValue(g, nodeRMType(node))
 	if err == nil || errors.Is(err, errNothingMatched) {
 		if dupErr := g.settleDups(); dupErr != nil {
 			return dupErr
@@ -2053,28 +2068,35 @@ func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g 
 	if err != nil {
 		return err
 	}
-	if err := placeLeaf(compJSON, node.AQLPath, predIndex, predType, value, budget, tmpl); err != nil {
+	key, err := placeLeaf(compJSON, node.AQLPath, predIndex, predType, value, budget, tmpl)
+	if err != nil {
 		return fmt.Errorf("simplified: place %q: %w", g.prefix(), err)
+	}
+	for _, end := range ordinalBounds {
+		settleOrdinalTerminology(value[end], tmpl.ordinalTerminologies(key+"/"+end))
 	}
 	return nil
 }
 
 // compositeLeafValue decodes a composite leaf's group by its RM type: the party
 // grammar (rmattr_party.go) or the interval grammar (rmattr_value.go), each the
-// same implementation those families use at every other position.
-func compositeLeafValue(g rmattrGroup, rmType string) (map[string]any, error) {
+// same implementation those families use at every other position. It also
+// returns the bounds of a DV_INTERVAL<DV_ORDINAL> leaf that were built from
+// their suffixes, whose symbols a WithTemplate decode settles once the leaf is
+// placed.
+func compositeLeafValue(g rmattrGroup, rmType string) (map[string]any, []string, error) {
 	if anchor, isInterval := intervalLeafAnchor(rmType); isInterval {
 		return intervalLeafSuffixes(g, anchor)
 	}
 	party, populated, err := partyLeafSuffixes(g)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if !populated {
-		return nil, fmt.Errorf("%w: %s carries no party key (PARTY_IDENTIFIED needs at least one of |name, |id or an _identifier)",
+		return nil, nil, fmt.Errorf("%w: %s carries no party key (PARTY_IDENTIFIED needs at least one of |name, |id or an _identifier)",
 			ErrUnsupportedDatatype, g.prefix())
 	}
-	return party, nil
+	return party, nil, nil
 }
 
 // rmattrOwnerAt resolves the owner of an underscore-family group whose base
@@ -2202,6 +2224,11 @@ type templateIndex struct {
 	// nodes at one path disagree on it, one of them determining none
 	// included: the template then gives no single coded name.
 	codedNames map[string]codedName
+	// ordinals maps the bare path of a C_DV_ORDINAL node to the terminology
+	// its pairs give each code at each ordinal value. A pair maps to "" where
+	// the nodes at that path, or the pairs of one of them, give it more than
+	// one: the template then gives no single answer.
+	ordinals map[string]map[ordinalPair]string
 	// rmTypes maps a path to the RM type the template gives the node there. It
 	// maps to "" where the nodes at one path disagree, the alternatives of one
 	// single-valued attribute, say, which share a path: the template then gives
@@ -2267,6 +2294,42 @@ func (x *templateIndex) nameJSON(path string) map[string]any {
 		return textJSON(name)
 	}
 	return nil
+}
+
+// ordinalPair is a C_DV_ORDINAL pair without its terminology: the symbol's
+// code and the ordinal value, which FLAT carries as |code and |ordinal.
+type ordinalPair struct {
+	code  string
+	value int
+}
+
+// addOrdinals records the terminology each pair of ord, the C_DV_ORDINAL of
+// a node at path, gives its code at its value. A code and value that another
+// pair or another node at path gives another terminology are left with none.
+func (x *templateIndex) addOrdinals(path string, ord constraints.CDvOrdinal) {
+	terms := x.ordinals[path]
+	if terms == nil {
+		terms = make(map[ordinalPair]string, len(ord.Values))
+		x.ordinals[path] = terms
+	}
+	for _, v := range ord.Values {
+		pair := ordinalPair{code: v.Symbol.CodeString, value: v.Value}
+		term := v.Symbol.Terminology
+		if prev, seen := terms[pair]; seen && prev != term {
+			term = ""
+		}
+		terms[pair] = term
+	}
+}
+
+// ordinalTerminologies returns the terminology the template's C_DV_ORDINAL at
+// path gives each code and value, "" for one it gives no single one; nil
+// where there is none, and in a decode without the template.
+func (x *templateIndex) ordinalTerminologies(path string) map[ordinalPair]string {
+	if x == nil {
+		return nil
+	}
+	return x.ordinals[path]
 }
 
 // addCodedName records name, the coded name the node at path gets, the zero
@@ -2496,7 +2559,10 @@ func templateIndexFor(c *templatecompile.Compiled) *templateIndex {
 // node's RM type and its LOCATABLE name — the template-level node name where
 // the OPT pins one (REQ-116: that pinned value IS the node's modelled name, and
 // it is what the reference materialises), else the node-id term rubric in the
-// default language. Decode repopulates LOCATABLE.name from the names, and takes
+// default language, read from the node's nearest enclosing archetype root
+// alone, as the Web Template builder and the generator read it: a node whose
+// own archetype does not define its node id gets no name from the index.
+// Decode repopulates LOCATABLE.name from the names, and takes
 // a folded ITEM_STRUCTURE's concrete subtype from the types (see WithTemplate).
 // Where the template constrains a node's name as a DV_CODED_TEXT and
 // determines its code and text, the node's coded name ([codedNameOf]) takes
@@ -2531,9 +2597,15 @@ func buildTemplateIndex(c *templatecompile.Compiled) *templateIndex {
 		codedNames: make(map[string]codedName),
 		rmTypes:    make(map[string]string),
 		structures: make(map[string][]emptyStructure),
+		ordinals:   make(map[string]map[ordinalPair]string),
 	}
 	var walk func(n *templatecompile.CompiledNode)
 	walk = func(n *templatecompile.CompiledNode) {
+		// Under the bare path alone: decode looks an ordinal up by the key
+		// [walkAQLKeyed] composes, which carries no name.
+		if ord, ok := n.PrimitiveConstraint().(constraints.CDvOrdinal); ok {
+			x.addOrdinals(bareAQLPath(n.AQLPath()), ord)
+		}
 		if s := emptyStructuresOf(n); len(s) > 0 {
 			if bare := bareAQLPath(n.AQLPath()); x.structures[bare] == nil {
 				x.structures[bare] = s
@@ -2549,7 +2621,7 @@ func buildTemplateIndex(c *templatecompile.Compiled) *templateIndex {
 				x.addRMType(bare, n.RMTypeName())
 				x.addCodedName(bare, coded)
 			}
-			rubric, _ := tcimpl.TermItem(n, id, "text")
+			rubric, _ := tcimpl.RootTermItem(n, id, "text")
 			name := n.NodeName()
 			if name == "" {
 				name = rubric
@@ -3242,7 +3314,9 @@ func dvFromSuffixesAt(holds, rmType string, listOpen bool, sfx map[string]any, k
 		if err != nil {
 			return nil, err
 		}
-		// Ordinal symbols are archetype-local (at-codes) -> "local" terminology.
+		// The suffixes carry no terminology for the symbol: it is rebuilt in
+		// "local", as the reference does, and a WithTemplate decode then gives
+		// it the template's ([settleOrdinalTerminology]).
 		symbol := map[string]any{
 			"_type": "DV_CODED_TEXT", "value": val,
 			"defining_code": map[string]any{
@@ -3526,6 +3600,30 @@ func checkSuffixAllowlist(rmType string, sfx map[string]any) error {
 		label = "bare value"
 	}
 	return fmt.Errorf("%w: unexpected %s for %s", ErrUnsupportedDatatype, label, rmType)
+}
+
+// settleOrdinalTerminology gives the symbol of dv, a DV_ORDINAL decode built
+// from its suffixes in local, the terminology terms gives its code at its
+// ordinal value, where it gives one (REQ-053): the formats carry an ordinal's
+// code and value but not its terminology, and a WithTemplate decode takes it
+// from the template's C_DV_ORDINAL. dv has been placed already; the symbol is
+// changed in place.
+//
+// The value is read as canonical JSON reads an Integer, from a JSON number or
+// a numeric string. One that is no Integer is refused when the tree is
+// decoded, so the terminology it would take does not matter.
+func settleOrdinalTerminology(dv any, terms map[ordinalPair]string) {
+	m, _ := dv.(map[string]any)
+	symbol, _ := m["symbol"].(map[string]any)
+	code, _ := symbol["defining_code"].(map[string]any)
+	codeString, _ := code["code_string"].(string)
+	value, err := strconv.ParseFloat(fmt.Sprint(m["value"]), 64)
+	if err != nil {
+		return
+	}
+	if t := terms[ordinalPair{code: codeString, value: int(value)}]; t != "" {
+		code["terminology_id"] = map[string]any{"_type": "TERMINOLOGY_ID", "value": t}
+	}
 }
 
 // leafListOpen reports whether a Web Template leaf constrains an open value-set

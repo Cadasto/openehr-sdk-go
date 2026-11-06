@@ -4,12 +4,15 @@ package simplified_test
 // composition must be RM/OPT-conformant (every mandatory name present), not just
 // format-idempotent.
 import (
+	"bytes"
 	"encoding/json"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/rmpath"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
@@ -122,5 +125,107 @@ func TestDecodeWithTemplateNamesAreConformant(t *testing.T) {
 	_ = json.Unmarshal(flat2, &m2)
 	if len(m1) != len(m2) {
 		t.Errorf("naming changed the FLAT key set: %d -> %d", len(m1), len(m2))
+	}
+}
+
+// dropRootTerm returns opt with the term definition for code removed from the
+// archetype root archetypeID: the first after that root's archetype_id, which
+// an OPT writes after every root nested in it and before its own terms. It
+// fails the test unless the OPT names that root once and the term found is the
+// root's own.
+func dropRootTerm(t *testing.T, opt []byte, archetypeID, code string) []byte {
+	t.Helper()
+	id := []byte("<value>" + archetypeID + "</value>")
+	if n := bytes.Count(opt, id); n != 1 {
+		t.Fatalf("the OPT names %s %d times, want once", archetypeID, n)
+	}
+	at := bytes.Index(opt, id)
+	start := bytes.Index(opt[at:], []byte(`<term_definitions code="`+code+`">`))
+	if start < 0 || bytes.Contains(opt[at:at+start], []byte("<archetype_id>")) {
+		t.Fatalf("%s defines no term %s of its own", archetypeID, code)
+	}
+	start += at
+	end := bytes.Index(opt[start:], []byte("</term_definitions>"))
+	if end < 0 {
+		t.Fatalf("the term %s of %s is not closed", code, archetypeID)
+	}
+	return slices.Concat(opt[:start], opt[start+end+len("</term_definitions>"):])
+}
+
+// flatKeyOf returns the FLAT key of the Web Template node at aqlPath below n,
+// whose ancestors' ids are ids: each id joined by "/", with ":0" on every
+// segment below the root whose node repeats.
+func flatKeyOf(n *webtemplate.Node, aqlPath string, ids []string) (string, bool) {
+	seg := n.ID
+	if ids != nil && n.Max != 1 {
+		seg += ":0"
+	}
+	ids = append(slices.Clip(ids), seg)
+	if n.AQLPath == aqlPath {
+		return strings.Join(ids, "/"), true
+	}
+	for _, ch := range n.Children {
+		if key, ok := flatKeyOf(ch, aqlPath, ids); ok {
+			return key, true
+		}
+	}
+	return "", false
+}
+
+// TestDecodeWithTemplateNameFromTheNearestArchetypeRoot — REQ-053. A
+// WithTemplate decode names a node from the term its nearest enclosing
+// archetype root defines for its node id, as the generator and the Web
+// Template do. Where that archetype does not define the node id, the term an
+// enclosing archetype defines under the same code names another concept, and
+// the node gets no name from the template.
+func TestDecodeWithTemplateNameFromTheNearestArchetypeRoot(t *testing.T) {
+	raw, err := os.ReadFile("../../../testkit/corpus/webtemplate/Corona_Anamnese.opt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The COMPOSITION defines at0002 as "Bericht ID"; story.v1 no longer does.
+	raw = dropRootTerm(t, raw, "openEHR-EHR-OBSERVATION.story.v1", "at0002")
+	opt, err := fixtures.ReadOperationalTemplate(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	compiled, err := templatecompile.Compile(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt, err := webtemplate.Build(compiled)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// One value under the story event is enough for decode to rebuild the
+	// event. MarshalFlat cannot write this template (its reused SECTION
+	// siblings), so the key is composed from the Web Template's ids.
+	const storyPath = "/content[openEHR-EHR-OBSERVATION.story.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0004]/value"
+	key, ok := flatKeyOf(wt.Tree, storyPath, nil)
+	if !ok {
+		t.Fatalf("the Web Template has no node at %s", storyPath)
+	}
+	flat, err := json.Marshal(map[string]any{
+		"ctx/language": "de", "ctx/territory": "DE", "ctx/composer_name": "Dr. Test",
+		"ctx/time": "2026-01-01T00:00:00Z", key: "Husten seit drei Tagen",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := simplified.UnmarshalFlat(flat, wt, simplified.WithTemplate(compiled))
+	if err != nil {
+		t.Fatalf("UnmarshalFlat (WithTemplate): %v", err)
+	}
+	const eventPath = "/content[openEHR-EHR-OBSERVATION.story.v1]/data/events[at0002]"
+	items, err := rmpath.ItemsAtPath(got, eventPath)
+	if err != nil || len(items) != 1 {
+		t.Fatalf("ItemsAtPath(%s) = %d items, %v; want the decoded event", eventPath, len(items), err)
+	}
+	event, ok := items[0].(rm.Locatable)
+	if !ok {
+		t.Fatalf("%s holds a %T, not a LOCATABLE", eventPath, items[0])
+	}
+	if name := event.GetName(); name != nil && !rm.IsTypedNil(name) {
+		t.Errorf("decoded event %s name = %q, want none from the template", eventPath, name.GetValue())
 	}
 }
