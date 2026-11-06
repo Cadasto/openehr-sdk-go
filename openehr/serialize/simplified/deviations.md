@@ -651,6 +651,10 @@ attribute and a node id. The codec resolves each node by its *resolution path*: 
   gives such an item. Encode leaves the others' instances out of its resolution, and decode
   keeps its keys out of them. A template name decode would give its instance is withheld
   where it equals a name a sibling pins.
+- **Siblings on one single-valued attribute are never merged.** Two siblings that stand on
+  one single-valued attribute, such as an OBSERVATION's `protocol`, cannot both be in a
+  composition. Decode refuses a body with keys under both (`ErrUnknownPath`,
+  "single-valued"), whichever key sorts first, and whether both pin a name or one pins none.
 - **An instance no sibling claims is refused.** Where every sibling pins a name, an instance
   carrying none of them would be dropped without a word. Encode refuses the composition
   instead (`refuseUnclaimedItems`, wrapping `rmpath.ErrPathAmbiguous`), naming the path and
