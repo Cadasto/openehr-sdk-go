@@ -555,9 +555,10 @@ func (d *Decoder) RelaxedTypeDispatch() bool { return d.cfg.relaxedTypeDispatch 
 // whitespace and one document type declaration, after a UTF-8 byte order
 // mark at the very start; comments, processing instructions and whitespace
 // may follow the root, as XML allows. XML reserves the processing
-// instruction target xml, in any letter case, for the XML declaration at the
-// start, so one elsewhere, before, inside or after the root, such as a
-// second declaration or one inside an element, is refused; a target that
+// instruction target xml, in any letter case, for the XML declaration, which
+// nothing but the byte order mark may precede, so one elsewhere, before,
+// inside or after the root, such as one after whitespace, a second
+// declaration or one inside an element, is refused; a target that
 // only starts with those letters, such as xml-stylesheet, passes. Anything else before or after the root, such as
 // an element or text other than whitespace, is not well-formed XML, and the
 // decode refuses it in every mode, with or without [WithUnmatched],

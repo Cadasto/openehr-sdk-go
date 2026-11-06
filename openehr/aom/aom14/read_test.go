@@ -277,7 +277,8 @@ func TestREQ176_REQ056_ReadOperationalTemplateRefusesAnXMLTargetInsideTheRoot(t 
 // cannot read, is refused with an error wrapping canxml.ErrInvalidShape that
 // carries none of it. Text, a CDATA section, a second document type, another
 // declaration, and a processing instruction whose target is xml in any letter
-// case other than the XML declaration at the start, which encoding/xml reads,
+// case other than the XML declaration at the very start, one after
+// whitespace included, which encoding/xml reads,
 // are read past in the default mode and refused so given canxml.WithStrict.
 // A target that only starts with xml passes in every mode. An input with only
 // such content and no root is the no-root case
@@ -290,15 +291,17 @@ func TestREQ176_REQ111_ReadOperationalTemplateHoldsContentBeforeTheRoot(t *testi
 		"text, then bad markup": planted + `<1>`,
 	}
 	defaultOnly := map[string]string{
-		"text":                        planted,
-		"text after a declaration":    `<?xml version="1.0"?>` + planted,
-		"a CDATA section":             `<![CDATA[` + planted + `]]>`,
-		"a second document type":      `<!DOCTYPE template><!DOCTYPE ` + planted + `>`,
-		"another declaration":         `<!ENTITY ` + planted + ` "x">`,
-		"a second XML declaration":    `<?xml version="1.0"?><?xml version="1.0" extra="` + planted + `"?>`,
-		"a misplaced XML declaration": `<!-- note --><?xml version="1.0"?>`,
-		"an xml target in capitals":   `<?XML ` + planted + `?>`,
-		"an xml target in the subset": `<!DOCTYPE template [<?xml ` + planted + `?>]>`,
+		"text":                                 planted,
+		"text after a declaration":             `<?xml version="1.0"?>` + planted,
+		"a CDATA section":                      `<![CDATA[` + planted + `]]>`,
+		"a second document type":               `<!DOCTYPE template><!DOCTYPE ` + planted + `>`,
+		"another declaration":                  `<!ENTITY ` + planted + ` "x">`,
+		"a second XML declaration":             `<?xml version="1.0"?><?xml version="1.0" extra="` + planted + `"?>`,
+		"a misplaced XML declaration":          `<!-- note --><?xml version="1.0"?>`,
+		"an XML declaration after a space":     " " + `<?xml version="1.0"?>`,
+		"an XML declaration after a line feed": "\n" + `<?xml version="1.0"?>`,
+		"an xml target in capitals":            `<?XML ` + planted + `?>`,
+		"an xml target in the subset":          `<!DOCTYPE template [<?xml ` + planted + `?>]>`,
 	}
 	accepted := map[string]string{
 		"nothing":                       "",

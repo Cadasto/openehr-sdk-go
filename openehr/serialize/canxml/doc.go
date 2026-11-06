@@ -32,9 +32,10 @@
 //     as XML allows them, and so are, before it, the XML declaration, one
 //     document type declaration and a UTF-8 byte order mark at the very
 //     start. XML reserves the processing instruction target xml, in any
-//     letter case, for the XML declaration at the start, so [Unmarshal]
-//     refuses one elsewhere, before, inside or after the root, such as a
-//     second declaration or one inside an element, with [ErrInvalidShape],
+//     letter case, for the XML declaration, which nothing but the byte
+//     order mark may precede, so [Unmarshal] refuses one elsewhere, before,
+//     inside or after the root, such as one after whitespace, a second
+//     declaration or one inside an element, with [ErrInvalidShape],
 //     and so does a [Decoder] given [WithUnmatched], [WithStrict],
 //     [WithMissing], [WithPresence] or a positive [WithMaxDepth] inside the
 //     value it decodes; a target that only starts with those letters, such
