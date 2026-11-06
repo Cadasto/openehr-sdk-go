@@ -201,6 +201,111 @@ func TestREQ053ReusedSiblingEventsDecodeIntoTheirOwnEvent(t *testing.T) {
 	}
 }
 
+// TestREQ053ReusedSiblingItemNamesDecodeWithTemplate — REQ-053, REQ-116: below
+// each of two named EVENT siblings, the ITEM_TREE at0003 and the ELEMENT at0004
+// pin names of their own: 'Tree A' and 'Text A' in the first event, 'Tree B'
+// and 'Text B' in the second. Written as FLAT or STRUCTURED and decoded with
+// the template, each takes the name its own event's template node pins, not
+// the rubric the two events share, and the composition validates against the
+// template. So does an ELEMENT that holds only a null flavour, which decode
+// builds from its underscore attribute (REQ-140), and a tree that holds no
+// item, which no key spells and decode rebuilds from the template.
+func TestREQ053ReusedSiblingItemNamesDecodeWithTemplate(t *testing.T) {
+	opt, err := readOPTFile("testdata/named_sibling_items.opt")
+	if err != nil {
+		t.Fatalf("readOPTFile: %v", err)
+	}
+	wt, compiled := compileTemplate(t, "sdk_named_sibling_items.v1", opt)
+	const tree, element = "/data[at0003]", "/data[at0003]/items[at0004]"
+	edited := func(edit func(t *testing.T, event string, tree *rm.ItemTree)) *rm.Composition {
+		comp := skeletonOf(t, compiled, instance.Large)
+		for _, event := range []string{"First event", "Second event"} {
+			item, err := rmpath.ItemAtPath(comp, namedEventsEvents+"[at0002,'"+event+"']"+tree)
+			if err != nil {
+				t.Fatalf("the ITEM_TREE of the event named %q: %v", event, err)
+			}
+			it, ok := item.(*rm.ItemTree)
+			if !ok {
+				t.Fatalf("the ITEM_TREE of the event named %q is a %T", event, item)
+			}
+			edit(t, event, it)
+		}
+		if r := validation.ValidateComposition(comp, compiled); !r.OK {
+			t.Fatalf("the edited skeleton is invalid: %v", r.Issues)
+		}
+		return comp
+	}
+	for _, tc := range []struct {
+		name string
+		comp *rm.Composition
+		// want maps each event to the names its nodes take, by path below it.
+		want map[string]map[string]string
+	}{
+		{
+			name: "value",
+			comp: edited(func(*testing.T, string, *rm.ItemTree) {}),
+			want: map[string]map[string]string{
+				"First event":  {tree: "Tree A", element: "Text A"},
+				"Second event": {tree: "Tree B", element: "Text B"},
+			},
+		},
+		{
+			name: "null flavour",
+			comp: edited(func(t *testing.T, event string, it *rm.ItemTree) {
+				for _, item := range it.Items {
+					el, ok := item.(*rm.Element)
+					if !ok || el.ArchetypeNodeID != "at0004" {
+						continue
+					}
+					el.Value = nil
+					el.NullFlavour = &rm.DVCodedText{
+						Value:        "unknown",
+						DefiningCode: rm.CodePhrase{CodeString: "253", TerminologyID: rm.TerminologyID{Value: "openehr"}},
+					}
+					return
+				}
+				t.Fatalf("the event named %q holds no ELEMENT at0004", event)
+			}),
+			want: map[string]map[string]string{
+				"First event":  {tree: "Tree A", element: "Text A"},
+				"Second event": {tree: "Tree B", element: "Text B"},
+			},
+		},
+		{
+			name: "empty tree",
+			comp: edited(func(_ *testing.T, _ string, it *rm.ItemTree) { it.Items = nil }),
+			want: map[string]map[string]string{
+				"First event":  {tree: "Tree A"},
+				"Second event": {tree: "Tree B"},
+			},
+		},
+	} {
+		for _, format := range []string{"FLAT", "STRUCTURED"} {
+			t.Run(tc.name+" "+format, func(t *testing.T) {
+				back := bmiRoundTrip(t, format, tc.comp, wt, simplified.WithTemplate(compiled), simplified.WithStrict())
+				for event, names := range tc.want {
+					for rel, want := range names {
+						item, err := rmpath.ItemAtPath(back, namedEventsEvents+"[at0002,'"+event+"']"+rel)
+						if err != nil {
+							t.Fatalf("%s in the event named %q: %v", rel, event, err)
+						}
+						l, ok := item.(rm.Locatable)
+						if !ok {
+							t.Fatalf("%s in the event named %q is a %T", rel, event, item)
+						}
+						if got := rm.DVTextValueOf(l.GetName()); got != want {
+							t.Errorf("%s in the event named %q is named %q, want %q", rel, event, got, want)
+						}
+					}
+				}
+				for _, is := range validation.ValidateComposition(back, compiled).Issues {
+					t.Errorf("decoded composition: %s at %s: %s", is.Code, is.Path, is.Detail)
+				}
+			})
+		}
+	}
+}
+
 // jsonEqual reports whether a and b, two values decoded from JSON, are equal.
 func jsonEqual(t *testing.T, a, b any) bool {
 	t.Helper()

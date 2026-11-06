@@ -508,7 +508,7 @@ func TestWalkAQLGivesNoSiblingsNameToTheUnnamedSibling(t *testing.T) {
 				t.Fatalf("resolveLeaf: %v", err)
 			}
 			compJSON := map[string]any{"_type": "COMPOSITION"}
-			if _, err := placeLeaf(compJSON, sib.nodePath(leaf), predIndex, predType, textJSON("x"), &allocBudget{limit: maxTotalNodes}, tmpl, sib); err != nil {
+			if _, err := placeLeaf(compJSON, sib.nodePath(leaf), leaf.AQLPath, predIndex, predType, textJSON("x"), &allocBudget{limit: maxTotalNodes}, tmpl, sib); err != nil {
 				t.Fatalf("placeLeaf: %v", err)
 			}
 			eval := compJSON["content"].([]any)[0].(map[string]any)

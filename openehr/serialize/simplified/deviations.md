@@ -315,7 +315,8 @@ partially or silently accepted.
   code, or an `openehr` code's rubric where every terminology group that holds the code gives the
   same one. Its terminology is the `C_CODE_PHRASE`'s. Reused siblings that share a bare path and
   disagree on the coded name leave the bare path with none, as they do with a pinned name;
-  decode reads each sibling's own where a pinned name tells it apart (§ Archetype-reuse siblings).
+  decode reads each node's own under its compiled path, every pinned name kept (§ Archetype-reuse
+  siblings).
   **Registered format limit:** FLAT has no key for a node's name below the root, so a coded name
   the template leaves open (a code from an external reference set, several codes and no pinned
   text, a code with no term text) comes back as `DV_TEXT`, and the round trip reports
@@ -658,9 +659,12 @@ attribute and a node id. The codec resolves each node by its *resolution path*: 
   every pinned node in `GECCO_Diagnose`, is removed. Resolving by it would drop an instance
   whose stored name differs from the modelled one, and `WithTemplate` decode repopulates the
   pinned name (`flat_pinned_test.go`).
-- **Decode reads each sibling as its own.** It puts named siblings in template order, and
-  under `WithTemplate` it takes a sibling's name, coded name and RM type from the sibling's
-  own compiled path, falling back to the bare alias only where that path is not indexed.
+- **Decode reads each sibling as its own.** It puts named siblings in template order. Under
+  `WithTemplate` it takes each node's name, coded name and RM type from its compiled path,
+  every name the template pins on the way kept, and falls back to the bare alias only where
+  that path is not indexed. A node below a sibling, an empty structure decode rebuilds
+  included, so takes the name its own template node pins, even where its namesake below the
+  other sibling pins another.
 
 **Residual: siblings no name tells apart.** Siblings spelled alike share one resolution path,
 as the two unnamed OBSERVATIONs and the two ELEMENTs `at0002` of `sdk_crosscheck_siblings.v1`

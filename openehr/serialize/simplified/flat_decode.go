@@ -240,7 +240,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 		if err != nil {
 			return nil, fmt.Errorf("simplified: decode %q: %w", base, err)
 		}
-		key, err := placeLeaf(compJSON, sib.nodePath(leaf), predIndex, predType, dv, budget, tmpl, sib)
+		key, err := placeLeaf(compJSON, sib.nodePath(leaf), leaf.AQLPath, predIndex, predType, dv, budget, tmpl, sib)
 		if err != nil {
 			return nil, fmt.Errorf("simplified: place %q: %w", base, err)
 		}
@@ -1414,16 +1414,17 @@ func aqlSegments(p string) iter.Seq[aqlSeg] {
 // when tmpl is non-nil (a template was supplied via WithTemplate) the mandatory
 // LOCATABLE.name is set from it, and a folded ITEM_STRUCTURE takes the concrete
 // subtype it gives, both keyed by the node's compiled aqlPath — which the walk
-// reconstructs by keeping a predicate only on container attributes (matching
-// templatecompile's path convention). Without tmpl, nodes are left unnamed
-// (rmpath re-resolves by archetype_node_id, so the round-trip does not depend
-// on it — but the result is then format-idempotent, not canonically complete;
-// see deviations.md).
+// reconstructs from namePath by keeping a predicate only on container
+// attributes (matching templatecompile's path convention). Without tmpl, nodes
+// are left unnamed (rmpath re-resolves by archetype_node_id, so the round-trip
+// does not depend on it — but the result is then format-idempotent, not
+// canonically complete; see deviations.md).
 //
 // It returns the placed value's path in the spelling the [templateIndex] is
-// keyed by. aqlPath is the leaf's resolution path ([reusedSiblings], sib).
-func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int, predType map[string]string, value any, budget *allocBudget, tmpl *templateIndex, sib *reusedSiblings) (string, error) {
-	cur, attr, key, err := walkAQLKeyed(compJSON, aqlPath, predIndex, predType, budget, tmpl, sib)
+// keyed by. aqlPath is the leaf's resolution path ([reusedSiblings], sib), and
+// namePath its aqlPath as the Web Template spells it, every pinned name kept.
+func placeLeaf(compJSON map[string]any, aqlPath, namePath string, predIndex map[string]int, predType map[string]string, value any, budget *allocBudget, tmpl *templateIndex, sib *reusedSiblings) (string, error) {
+	cur, attr, key, err := walkAQLKeyed(compJSON, aqlPath, namePath, predIndex, predType, budget, tmpl, sib)
 	if err != nil {
 		return "", err
 	}
@@ -1443,18 +1444,33 @@ func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int
 // underscore family's is the RM attribute it addresses
 // (`…/items[at0008]/uid`), which is also the lookahead [concreteType] needs to
 // resolve the abstract ITEM_STRUCTURE slot the Web Template collapses.
-func walkAQL(compJSON map[string]any, aqlPath string, predIndex map[string]int, predType map[string]string, budget *allocBudget, tmpl *templateIndex, sib *reusedSiblings) (map[string]any, string, error) {
-	holder, attr, _, err := walkAQLKeyed(compJSON, aqlPath, predIndex, predType, budget, tmpl, sib)
+//
+// aqlPath is a resolution path ([reusedSiblings], sib), and namePath the same
+// path as the Web Template spells it, every pinned name kept: the template
+// index is read under namePath's names ([walkAQLKeyed]).
+func walkAQL(compJSON map[string]any, aqlPath, namePath string, predIndex map[string]int, predType map[string]string, budget *allocBudget, tmpl *templateIndex, sib *reusedSiblings) (map[string]any, string, error) {
+	holder, attr, _, err := walkAQLKeyed(compJSON, aqlPath, namePath, predIndex, predType, budget, tmpl, sib)
 	return holder, attr, err
 }
 
 // walkAQLKeyed is [walkAQL] that also returns the holder's path in the
 // spelling the [templateIndex] is keyed by, so a caller can look up what the
 // template gives the value it places there.
-func walkAQLKeyed(compJSON map[string]any, aqlPath string, predIndex map[string]int, predType map[string]string, budget *allocBudget, tmpl *templateIndex, sib *reusedSiblings) (map[string]any, string, string, error) {
+func walkAQLKeyed(compJSON map[string]any, aqlPath, namePath string, predIndex map[string]int, predType map[string]string, budget *allocBudget, tmpl *templateIndex, sib *reusedSiblings) (map[string]any, string, string, error) {
 	segs := parseAQL(aqlPath)
 	if len(segs) == 0 {
 		return nil, "", "", fmt.Errorf("%w: empty canonical path", ErrUnknownPath)
+	}
+	// named holds the segments whose names key the template index: those of
+	// namePath, which keeps the names aqlPath drops. Below a reused sibling,
+	// a node can pin a name its namesake below the other sibling does not
+	// pin, so the bare alias the index answers a dropped name with would give
+	// it the rubric the two share. Only a lookup with the template reads them.
+	named := segs
+	if tmpl != nil && namePath != aqlPath {
+		if s := parseAQL(namePath); len(s) == len(segs) {
+			named = s
+		}
 	}
 	cur := compJSON
 	curType := "COMPOSITION"
@@ -1462,7 +1478,7 @@ func walkAQLKeyed(compJSON map[string]any, aqlPath string, predIndex map[string]
 	// predicate on every predicated segment — the positional key
 	// predIndex/predType are stored under, bare-keyed by resolveLeaf to
 	// match; namePrefix keeps a predicate only on container attributes
-	// (templatecompile's convention), with the name aqlPath keeps there, the
+	// (templatecompile's convention), with the name namePath pins there, the
 	// key of the WithTemplate [templateIndex], which also answers every entry
 	// under its bare spelling. aqlPath keeps a name only where it tells reused
 	// siblings apart (REQ-116), and there the member is chosen by that name
@@ -1486,7 +1502,7 @@ func walkAQLKeyed(compJSON map[string]any, aqlPath string, predIndex map[string]
 		namePrefix.WriteString(seg.attr)
 		if container && seg.pred != "" {
 			namePrefix.WriteString("[")
-			namePrefix.WriteString(tcimpl.NamePredicate(seg.pred, seg.name))
+			namePrefix.WriteString(tcimpl.NamePredicate(seg.pred, named[i].name))
 			namePrefix.WriteString("]")
 		}
 		// A reused sibling's member carries the sibling's name: the coded name
@@ -2076,7 +2092,7 @@ func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g 
 	if err != nil {
 		return err
 	}
-	key, err := placeLeaf(compJSON, sib.nodePath(node), predIndex, predType, value, budget, tmpl, sib)
+	key, err := placeLeaf(compJSON, sib.nodePath(node), node.AQLPath, predIndex, predType, value, budget, tmpl, sib)
 	if err != nil {
 		return fmt.Errorf("simplified: place %q: %w", g.prefix(), err)
 	}
@@ -2139,9 +2155,11 @@ func rmattrOwnerAt(wt *webtemplate.WebTemplate, compJSON map[string]any, base st
 	if len(segs) == 0 || segs[0].id != wt.Tree.ID {
 		return rmattrOwner{}, errSegNotFound
 	}
-	walk := func(ownerAql string, predIndex map[string]int, predType map[string]string) func(string) (map[string]any, error) {
+	// ownerAql is the owner's resolution path, and ownerNames the same path as
+	// the Web Template spells it ([walkAQL]).
+	walk := func(ownerAql, ownerNames string, predIndex map[string]int, predType map[string]string) func(string) (map[string]any, error) {
 		return func(attr string) (map[string]any, error) {
-			node, _, err := walkAQL(compJSON, ownerAql+"/"+attr, predIndex, predType, budget, tmpl, sib)
+			node, _, err := walkAQL(compJSON, ownerAql+"/"+attr, ownerNames+"/"+attr, predIndex, predType, budget, tmpl, sib)
 			return node, err
 		}
 	}
@@ -2153,7 +2171,7 @@ func rmattrOwnerAt(wt *webtemplate.WebTemplate, compJSON map[string]any, base st
 		if segs[1].idx > 0 {
 			return rmattrOwner{}, errSingleValuedIndex(segs[1])
 		}
-		return rmattrOwner{kind: "EVENT_CONTEXT", resolve: walk("/context", nil, nil)}, nil
+		return rmattrOwner{kind: "EVENT_CONTEXT", resolve: walk("/context", "/context", nil, nil)}, nil
 	}
 	if len(segs) == 1 {
 		return rmattrOwner{
@@ -2165,7 +2183,7 @@ func rmattrOwnerAt(wt *webtemplate.WebTemplate, compJSON map[string]any, base st
 	if err != nil {
 		return rmattrOwner{}, err
 	}
-	ownerAql, kind, leaf := sib.nodePath(node), nodeRMType(node), ""
+	ownerAql, ownerNames, kind, leaf := sib.nodePath(node), node.AQLPath, nodeRMType(node), ""
 	if len(node.Children) == 0 {
 		trimmed, isElementValue := strings.CutSuffix(ownerAql, "/value")
 		if !isElementValue {
@@ -2174,9 +2192,9 @@ func rmattrOwnerAt(wt *webtemplate.WebTemplate, compJSON map[string]any, base st
 		// The leaf's own RM type is the *anchor* the value-decoration families are
 		// judged and decoded against (REQ-140 § C1): one FLAT path addresses both
 		// the ELEMENT and the DataValue it holds.
-		ownerAql, kind, leaf = trimmed, "ELEMENT", nodeRMType(node)
+		ownerAql, ownerNames, kind, leaf = trimmed, strings.TrimSuffix(ownerNames, "/value"), "ELEMENT", nodeRMType(node)
 	}
-	return rmattrOwner{kind: kind, leaf: leaf, resolve: walk(ownerAql, predIndex, predType)}, nil
+	return rmattrOwner{kind: kind, leaf: leaf, resolve: walk(ownerAql, ownerNames, predIndex, predType)}, nil
 }
 
 // bareAQLPath strips REQ-116 name predicates from a compiled AQL path,
@@ -2219,8 +2237,9 @@ func bareAQLPath(p string) string {
 // the facts the formats do not carry and the template determines, per archetype
 // node. Each is keyed by the node's compiled aqlPath, which keeps a predicate
 // only on container attributes and which [walkAQL] rebuilds as it walks, and
-// again by that path's bare spelling (REQ-116 name predicates removed), because
-// decode composes its key from FLAT segments that carry no name.
+// again by that path's bare spelling (REQ-116 name predicates removed), which
+// answers where decode's key names no node the template indexes
+// ([templateIndex.indexed]).
 //
 // A nil index is the OPT-free decode: every lookup then answers "".
 type templateIndex struct {
@@ -2266,7 +2285,8 @@ type templateIndex struct {
 // stand for is not the template's alone to name.
 type emptyStructure struct {
 	// attr is the single-valued attribute that holds the structure, and path
-	// the structure's bare path, whose name in the index the structure takes.
+	// the structure's bare path, the one its name in the index falls back to
+	// ([rebuildEmptyStructures]).
 	attr, path string
 	// rmType is the structure's concrete ITEM_STRUCTURE subtype, and nodeID its
 	// archetype_node_id.
@@ -2289,9 +2309,10 @@ func (x *templateIndex) name(path string) string {
 }
 
 // indexed returns path, or its bare spelling where the index holds no node at
-// path. The key [walkAQLKeyed] composes keeps a name only where it tells reused
-// siblings apart (REQ-116), so it can miss a node whose compiled path keeps a
-// name too; every node is also indexed under its bare spelling.
+// path. Decode composes its key with every name the Web Template pins on the
+// way ([walkAQLKeyed], [rebuildEmptyStructures]), which is the node's compiled
+// path; where a key names no node the template indexes, the bare alias, under
+// which every node is also indexed, answers.
 func (x *templateIndex) indexed(path string) string {
 	if _, ok := x.rmTypes[path]; ok || !strings.Contains(path, ",'") {
 		return path
@@ -2592,21 +2613,22 @@ func templateIndexFor(c *templatecompile.Compiled) *templateIndex {
 // spelling. Siblings sharing a bare path carry the same at-code and therefore
 // the same rubric — but where they pin *distinct* names (archetype reuse under
 // a slot), the bare spelling cannot say which sibling is meant, so the name
-// alias falls back to the shared rubric rather than guess. Decode looks a
-// reused sibling's node up under a key that keeps the names telling the
-// siblings apart ([reusedSiblings]), which is its compiled path wherever no
-// other pinned name stands on it, and turns to the bare alias only where that
-// key misses ([templateIndex.indexed]). Siblings sharing a bare path with
+// alias falls back to the shared rubric rather than guess. Decode looks every
+// node up under its compiled path, every name the template pins on the way
+// kept, so a node below a reused sibling takes the name its own template node
+// pins, and turns to the bare alias only where that key misses
+// ([templateIndex.indexed]). Siblings sharing a bare path with
 // distinct RM types leave the type alias with no answer, and siblings there
 // that disagree on a coded name, one of them giving none included, leave the
 // alias with no coded name, so instances read under the alias take the
 // DV_TEXT name.
 //
 // The empty structures each node may get ([emptyStructure]) are indexed under
-// the bare path alone, the one the rebuild walk composes. Nodes at one bare
-// path that disagree on them, alternatives or siblings that narrow one
-// archetype differently, leave the path with none, since decode cannot tell
-// which of them a rebuilt node stands for ([dropDisagreeingStructures]).
+// the bare path alone, the one the rebuild walk composes; their names are read
+// as any other node's. Nodes at one bare path that disagree on them,
+// alternatives or siblings that narrow one archetype differently, leave the
+// path with none, since decode cannot tell which of them a rebuilt node stands
+// for ([dropDisagreeingStructures]).
 //
 // The walk reads the compiled template in place, through the module-internal
 // readers that do not copy a node's attributes, an attribute's children or a
@@ -2623,7 +2645,7 @@ func buildTemplateIndex(c *templatecompile.Compiled) *templateIndex {
 	var walk func(n *templatecompile.CompiledNode)
 	walk = func(n *templatecompile.CompiledNode) {
 		// Under the bare path alone: decode looks an ordinal up by the key
-		// [walkAQLKeyed] composes, which carries no name.
+		// [walkAQLKeyed] composes, made bare ([templateIndex.ordinals]).
 		if ord, ok := n.PrimitiveConstraint().(constraints.CDvOrdinal); ok {
 			x.addOrdinals(bareAQLPath(n.AQLPath()), ord)
 		}
@@ -2829,24 +2851,30 @@ func carriedByEmptyStructure(attr string) bool {
 // one never spells it. Each structure gets its type, its node id and the name
 // the template index gives its path, and its list present and empty where the
 // template requires that list by its existence; one whose path has no name, a
-// node with no node id say, is not rebuilt. The walk composes each node's bare path as
-// walkAQL does, a predicate only on a list member, and enters only the nodes
-// on the way to one the template gives structures (structureRoute). The root
-// is entered with an empty path, which no key has: a COMPOSITION holds no
+// node with no node id say, is not rebuilt. The walk composes each node's bare
+// path as walkAQL does, a predicate only on a list member, and enters only the
+// nodes on the way to one the template gives structures (structureRoute). The
+// root is entered with an empty path, which no key has: a COMPOSITION holds no
 // ITEM_STRUCTURE. It never builds a parent node, a member or a value: only a
 // structure under a node the body rebuilt.
+//
+// The structure's name is read under its path with the names the template
+// pins on the way kept (named): a member's name stays in its predicate where
+// the index holds a node at that spelling. Below reused siblings (REQ-116),
+// one structure can pin a name its namesake below the other sibling does not
+// pin, and the bare path would give it the rubric the two share.
 func rebuildEmptyStructures(compJSON map[string]any, tmpl *templateIndex) {
 	if len(tmpl.structures) == 0 {
 		return
 	}
-	var walk func(node map[string]any, path []byte)
-	walk = func(node map[string]any, path []byte) {
-		base := len(path)
+	var walk func(node map[string]any, path, named []byte)
+	walk = func(node map[string]any, path, named []byte) {
+		base, namedBase := len(path), len(named)
 		for _, s := range tmpl.structures[string(path)] {
 			if _, has := node[s.attr]; has || (!s.required && !rmRequires(node, s.attr)) {
 				continue
 			}
-			if name := tmpl.nameJSON(s.path); name != nil {
+			if name := tmpl.nameJSON(string(named) + "/" + s.attr); name != nil {
 				structure := map[string]any{
 					"_type":             s.rmType,
 					"archetype_node_id": s.nodeID,
@@ -2863,7 +2891,8 @@ func rebuildEmptyStructures(compJSON map[string]any, tmpl *templateIndex) {
 			case map[string]any:
 				path = append(append(path[:base], '/'), attr...)
 				if tmpl.structureRoute[string(path)] {
-					walk(x, path)
+					named = append(append(named[:namedBase], '/'), attr...)
+					walk(x, path, named)
 				}
 			case []any:
 				for _, e := range x {
@@ -2873,13 +2902,14 @@ func rebuildEmptyStructures(compJSON map[string]any, tmpl *templateIndex) {
 					}
 					path = appendMemberPath(path[:base], attr, m)
 					if tmpl.structureRoute[string(path)] {
-						walk(m, path)
+						named = appendMemberName(appendMemberPath(named[:namedBase], attr, m), m, tmpl.rmTypes)
+						walk(m, path, named)
 					}
 				}
 			}
 		}
 	}
-	walk(compJSON, make([]byte, 0, 256))
+	walk(compJSON, make([]byte, 0, 256), make([]byte, 0, 256))
 }
 
 // rmRequires reports whether the RM requires attr of node's class, as the
@@ -3031,11 +3061,12 @@ func appendMemberPath(path []byte, attr string, m map[string]any) []byte {
 	return path
 }
 
-// appendMemberName gives path, the bare path of the rebuilt node m that
-// [appendMemberPath] appended, m's name in its last predicate where rank holds
-// that spelling: m is then one of several reused siblings that their names
-// tell apart.
-func appendMemberName(path []byte, m map[string]any, rank map[string]int) []byte {
+// appendMemberName gives path, which ends at the segment [appendMemberPath]
+// appended for the rebuilt node m, m's name in that segment's predicate where
+// known holds that spelling. In the ranks of [orderByTemplate], m is then one
+// of several reused siblings that their names tell apart; in the
+// [templateIndex], it stands for the node the template pins that name on.
+func appendMemberName[V any](path []byte, m map[string]any, known map[string]V) []byte {
 	name := nameValue(m)
 	if name == "" || len(path) == 0 || path[len(path)-1] != ']' {
 		return path
@@ -3043,7 +3074,7 @@ func appendMemberName(path []byte, m map[string]any, rank map[string]int) []byte
 	end := len(path) - 1
 	path = append(path[:end], tcimpl.NamePredicate("", name)...)
 	path = append(path, ']')
-	if _, known := rank[string(path)]; known {
+	if _, ok := known[string(path)]; ok {
 		return path
 	}
 	return append(path[:end], ']')
