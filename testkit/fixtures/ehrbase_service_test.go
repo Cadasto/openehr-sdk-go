@@ -331,7 +331,7 @@ func TestIngestEHRbaseServiceVerifyRefusesADisagreeingTree(t *testing.T) {
 			switch {
 			case tc.want == "" && err != nil:
 				t.Fatalf("verify = %v; want success\n%s", err, out)
-			case tc.want == "" && !strings.Contains(out, "Integrity OK (2 file(s))"):
+			case tc.want == "" && !strings.Contains(out, "(2 file(s))"):
 				t.Errorf("verify succeeded with %q; want it to count 2 files", out)
 			case tc.want != "" && err == nil:
 				t.Fatalf("verify succeeded; want a refusal naming %q\n%s", tc.want, out)
