@@ -397,6 +397,91 @@ func TestFlatReusedSiblingPinningNoName(t *testing.T) {
 	}
 }
 
+// elementSiblingWT is a minimal WebTemplate whose one EVALUATION holds two
+// reused ELEMENT siblings, at0002 pinning the names pinA and pinB, none where
+// empty, each collapsed into its DV_TEXT leaf: a and b.
+func elementSiblingWT(pinA, pinB string) *webtemplate.WebTemplate {
+	leaf := func(id, pin string) *webtemplate.Node {
+		pred := "at0002"
+		if pin != "" {
+			pred += ",'" + pin + "'"
+		}
+		return &webtemplate.Node{
+			ID: id, RMType: "DV_TEXT", NodeID: "at0002", Max: 1,
+			AQLPath: "/content[openEHR-EHR-EVALUATION.test.v1]/data[at0001]/items[" + pred + "]/value",
+			Inputs:  []webtemplate.Input{{Type: "TEXT"}},
+		}
+	}
+	return &webtemplate.WebTemplate{Tree: &webtemplate.Node{
+		ID: "root", RMType: "COMPOSITION", NodeID: "openEHR-EHR-COMPOSITION.t.v1",
+		Children: []*webtemplate.Node{{
+			ID: "ev", RMType: "EVALUATION", NodeID: "openEHR-EHR-EVALUATION.test.v1", Max: 1,
+			AQLPath:  "/content[openEHR-EHR-EVALUATION.test.v1]",
+			Children: []*webtemplate.Node{leaf("a", pinA), leaf("b", pinB)},
+		}},
+	}}
+}
+
+// TestMarshalFlatSingleUnnamedSiblingLeavesTheNamedInstance — REQ-053,
+// REQ-116, REQ-140: beside a reused sibling that pins a name, the one that
+// pins none and occurs at most once does not take the named sibling's
+// instance. A composition holding only an instance named A writes it, and the
+// underscore attributes of the ELEMENT a collapsed leaf hides, under the
+// sibling that pins A alone.
+func TestMarshalFlatSingleUnnamedSiblingLeavesTheNamedInstance(t *testing.T) {
+	const uid = "9fcc1c70-9349-444d-b9cb-8fa817697f50"
+	for _, tc := range []struct {
+		name string
+		wt   *webtemplate.WebTemplate
+		comp *rm.Composition
+		want map[string]any
+	}{
+		{
+			name: "EVALUATION siblings",
+			wt:   twoSiblingWT("A", ""),
+			comp: siblingComposition(siblingEvaluation("A", "ay")),
+			want: map[string]any{"root/a/x": "ay"},
+		},
+		{
+			name: "ELEMENT siblings",
+			wt:   elementSiblingWT("A", ""),
+			comp: siblingComposition(&rm.Evaluation{
+				ArchetypeNodeID: "openEHR-EHR-EVALUATION.test.v1",
+				Name:            rm.DVText{Value: "ev"},
+				Data: &rm.ItemTree{
+					ArchetypeNodeID: "at0001",
+					Name:            rm.DVText{Value: "tree"},
+					Items: []rm.Item{&rm.Element{
+						ArchetypeNodeID: "at0002",
+						Name:            rm.DVText{Value: "A"},
+						UID:             &rm.HierObjectID{Value: uid},
+						Value:           &rm.DVText{Value: "ay"},
+					}},
+				},
+			}),
+			want: map[string]any{"root/ev/a": "ay", "root/ev/a/_uid": uid},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out, err := MarshalFlat(tc.comp, tc.wt)
+			if err != nil {
+				t.Fatalf("MarshalFlat: %v", err)
+			}
+			got := flatMap(t, out)
+			for k, v := range tc.want {
+				if got[k] != v {
+					t.Errorf("%s = %v, want %v", k, got[k], v)
+				}
+			}
+			for k, v := range got {
+				if strings.HasPrefix(k, "root/b") || strings.HasPrefix(k, "root/ev/b") {
+					t.Errorf("%s = %v: the instance named A was written under the sibling that pins no name too", k, v)
+				}
+			}
+		})
+	}
+}
+
 // TestWalkAQLGivesNoSiblingsNameToTheUnnamedSibling — REQ-053, REQ-116: a
 // member decode builds for a reused sibling that pins no name does not take,
 // from the template, a name a sibling beside it pins: encode would read the
