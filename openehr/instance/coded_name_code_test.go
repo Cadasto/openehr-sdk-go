@@ -240,3 +240,53 @@ func TestREQ107_CodedValueKeepsTheCodeTheWalkWrote(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ107_OpenEHRCodedNameTakesTheRubricItsGroupsAgreeOn is the REQ-107
+// check of a locatable's name whose defining code the OPT pins to an
+// openehr code. The RM ties a name to no group of the openEHR terminology,
+// so the name takes the rubric every group that holds the code gives it:
+// 433 is "event", only in the composition category group. A code two groups
+// give different rubrics, as 532 is "complete" and "completed", has none,
+// and the name keeps the text the walk wrote, as it does where a C_STRING
+// on its value rejects the rubric. It holds under every policy, both value
+// fills and both compile modes, and every root validates.
+func TestREQ107_OpenEHRCodedNameTakesTheRubricItsGroupsAgreeOn(t *testing.T) {
+	cases := []struct {
+		name string
+		opt  string
+		want string
+	}{
+		{
+			name: "a code every group that holds it names alike",
+			opt:  optTemplate("ELEMENT", optSingle("name", optCodedText("openehr", "433"))),
+			want: "event",
+		},
+		{
+			name: "a code two groups name differently",
+			opt:  optTemplate("ELEMENT", optSingle("name", optCodedText("openehr", "532"))),
+			want: walkText,
+		},
+		{
+			name: "a code whose rubric the C_STRING on the text rejects",
+			opt:  optTemplate("ELEMENT", optSingle("name", optCodedNameListing([]string{"Visit"}, "openehr", "433"))),
+			want: "Visit",
+		},
+	}
+	for _, tc := range cases {
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, tc.opt, implicit)
+			for _, opts := range defaultsOptions() {
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, opts)
+					if err != nil {
+						t.Fatalf("Generate: %v", err)
+					}
+					if name := elementCodedName(t, out); name.Value != tc.want {
+						t.Errorf("ELEMENT name = %q coded %s, want the text %q", name.Value, name.DefiningCode.CodeString, tc.want)
+					}
+					checkValid(t, out, c)
+				})
+			}
+		}
+	}
+}

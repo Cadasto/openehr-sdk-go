@@ -181,7 +181,8 @@ func foreignCode(t *testing.T, group *terminology.Group) string {
 // for each code of the attribute's group that code's rubric in the group,
 // and keeps the text the walk wrote for an openehr code the group does not
 // have. The same coded text under an attribute the RM ties to no group, an
-// ELEMENT's value, keeps its text.
+// ELEMENT's value, takes the rubric every group that holds its code gives
+// it, and keeps its text where the groups disagree or none holds the code.
 func TestREQ107_EveryGroupTiedAttributeTakesItsGroupRubric(t *testing.T) {
 	t.Parallel()
 	codedNode := func(t *testing.T, class, attr string) *tcimpl.CompiledNode {
@@ -217,11 +218,21 @@ func TestREQ107_EveryGroupTiedAttributeTakesItsGroupRubric(t *testing.T) {
 			}
 		})
 	}
+	// The RM ties an ELEMENT's value to no group, so a code there takes the
+	// rubric every group that holds it gives, and keeps the walk's text
+	// where two groups give it different ones or none holds it.
 	t.Run("ELEMENT.value", func(t *testing.T) {
 		node := codedNode(t, "ELEMENT", "value")
-		v := coded("271")
-		if useCodedText(node, &v); v.Value != "example" {
-			t.Errorf("ELEMENT value openehr::271 = %q, want the walk's \"example\": the RM ties ELEMENT.value to no group", v.Value)
+		for _, tc := range []struct{ code, want string }{
+			{code: "271", want: "no information"},
+			{code: "433", want: "event"},
+			{code: "532", want: "example"}, // "complete" and "completed"
+			{code: "99999", want: "example"},
+		} {
+			v := coded(tc.code)
+			if useCodedText(node, &v); v.Value != tc.want {
+				t.Errorf("ELEMENT value openehr::%s = %q, want %q", tc.code, v.Value, tc.want)
+			}
 		}
 	})
 }

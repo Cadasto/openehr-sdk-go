@@ -38,8 +38,12 @@ func IsAOMPrimitiveShortName(s string) bool {
 // objects; ArchetypeID is non-empty exactly when the OPT pinned an
 // archetype id on this node (i.e. it was a C_ARCHETYPE_ROOT).
 type CompiledNode struct {
-	aqlPath     string
-	rmTypeName  string
+	aqlPath    string
+	rmTypeName string
+	// readAs is the RM type the compile reads the node's attributes on
+	// ([ReadAsRMType]): rmTypeName, or, for a node that names none, the
+	// type of the attribute that holds it.
+	readAs      string
 	nodeID      string
 	nodeName    string
 	archetypeID string // empty unless this node is a C_ARCHETYPE_ROOT
@@ -292,6 +296,15 @@ func RootTermItem(n *CompiledNode, code, key string) (string, bool) {
 	}
 	return "", false
 }
+
+// ReadAsRMType returns the RM type the compile reads the attributes of n
+// on, as [CompiledAttribute] says: the type n names, or, for a node that
+// names none, the type of the attribute that holds it, or the type the BMM
+// constrains that attribute's open generic parameter to, so an untyped
+// child of a HISTORY's events is read as an EVENT. It is "" for a template
+// root that names no type. It is a function rather than a method so that
+// the public alias of [CompiledNode] gains no method.
+func ReadAsRMType(n *CompiledNode) string { return n.readAs }
 
 // CompiledAttribute is one attribute on a CompiledNode. Carries the
 // OPT-declared cardinality + existence when the OPT had an

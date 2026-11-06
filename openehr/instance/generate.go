@@ -13,6 +13,7 @@ import (
 	"uuid"
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
+	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	"github.com/cadasto/openehr-sdk-go/internal/rmlists"
 	"github.com/cadasto/openehr-sdk-go/internal/rmroots"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
@@ -1247,7 +1248,9 @@ func replacesTerminology(parent any, attr string, child any) bool {
 // in well-known fields (e.g. CODE_PHRASE.terminology_id). String-
 // and Character-typed BMM attributes (e.g. DV_TEXT.value,
 // TERM_MAPPING.match) go through a separate primitive-default path
-// because they don't belong in typereg.
+// because they don't belong in typereg, and so do the other BMM
+// primitives (e.g. DV_COUNT.accuracy), where the parent does not hold
+// them yet (writeBMMPrimitive).
 //
 // Composition-level fields the post-walk defaults pass owns
 // (language, territory, composer, category, context) are skipped
@@ -1291,8 +1294,10 @@ func (g *generator) materialiseImplicitSingle(
 	if !ok {
 		// No RM class to build: a BMM primitive such as Boolean or
 		// Integer, which the parent holds as a Go value, or a type
-		// outside the registry, which the validator flags.
-		return nil
+		// outside the registry, which the validator flags. An optional
+		// primitive is absent until written, so it takes the value of
+		// its BMM type (writeBMMPrimitive).
+		return writeBMMPrimitive(optNode, parentRM, attr.Name(), rmType)
 	}
 	// A default built from the BMM alone has no archetype to name, so it
 	// must not be an archetype root: an optional attribute gets nothing,
@@ -1628,6 +1633,56 @@ func (g *generator) writeBMMString(parent any, attr string) {
 	// locatable's archetype_node_id never gets here: the identity rule
 	// stamps it, and both callers skip it.
 	_ = rmwrite.EnsureSingle(parent, attr, val)
+}
+
+// bmmPrimitiveZero maps each BMM primitive type the pinned RM gives a
+// single-valued attribute, other than the text types writeBMMString
+// writes, to the value of that type a visit writes: the Go zero value,
+// which a field the RM makes mandatory holds when nothing writes it.
+var bmmPrimitiveZero = map[string]any{
+	"Boolean":   false,
+	"Integer":   0,
+	"Integer64": int64(0),
+	"Real":      0.0,
+}
+
+// noPrecisionLimit is the precision of a DV_QUANTITY or a DV_PROPORTION
+// that writeBMMPrimitive writes: -1, which the RM reads as no limit on
+// decimal places, as the generator's own quantities carry. A precision of
+// 0 would claim a whole-number value, which DV_PROPORTION
+// Precision_validity holds the numerator and denominator to.
+const noPrecisionLimit = -1
+
+// writeBMMPrimitive writes the attribute attr of parent, of the BMM
+// primitive type rmType, which the OPT names under optNode with no allowed
+// child, where parent does not hold it yet: a primitive the RM leaves
+// optional, which parent holds behind a pointer, such as a DV_COUNT's
+// accuracy or a DV_QUANTITY's precision. It takes the value built from its
+// BMM type, the one a mandatory primitive holds where the walk writes
+// nothing (bmmPrimitiveZero), except a precision, which takes
+// noPrecisionLimit. So a DV_COUNT whose OPT requires accuracy carries an
+// accuracy of 0, which settleAccuracy narrows where accuracy_is_percent is
+// true. An attribute parent holds, every mandatory one among them, keeps
+// its value, and a type bmmPrimitiveZero does not name is left unwritten.
+// An attribute rmwrite does not address (rmwrite.ErrUnknownAttribute) is
+// one the pinned RM does not have, and is left for the template validator
+// to report; any other error is returned.
+func writeBMMPrimitive(optNode *tcimpl.CompiledNode, parent any, attr, rmType string) error {
+	if _, present, _ := rmaccess.Peek(parent, attr); present {
+		return nil
+	}
+	value, ok := bmmPrimitiveZero[rmType]
+	if !ok {
+		return nil
+	}
+	if attr == "precision" {
+		value = noPrecisionLimit
+	}
+	err := rmwrite.EnsureSingle(parent, attr, value)
+	if err == nil || errors.Is(err, rmwrite.ErrUnknownAttribute) {
+		return nil
+	}
+	return fmt.Errorf("%s.%s at %s: %w", rmTypeOf(parent), attr, optNode.AQLPath(), err)
 }
 
 // bmmStringDefault is the value writeBMMString gives an empty String

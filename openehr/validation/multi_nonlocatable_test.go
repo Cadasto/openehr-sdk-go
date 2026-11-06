@@ -3,6 +3,7 @@ package validation_test
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -666,6 +667,64 @@ func TestValidateFolder_REQ102_ItemsBindByRMType(t *testing.T) {
 			r := validation.ValidateFolder(folder, c)
 			if got := issueKeys(r.Issues); !slices.Equal(got, tc.want) {
 				t.Errorf("ValidateFolder issues = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// subFolderOPT returns a FOLDER OPT whose one sub-folder names the RM type
+// subType, or none where subType is empty, and whose items admit one
+// OBJECT_REF child.
+func subFolderOPT(subType string) string {
+	return `<?xml version="1.0"?>
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <template_id><value>sub-folder-items</value></template_id>
+  <concept>sub-folder-items</concept>
+  <language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
+  <definition>
+    <rm_type_name>FOLDER</rm_type_name>
+    <node_id>at0000</node_id>
+    <attributes xsi:type="C_MULTIPLE_ATTRIBUTE">
+      <rm_attribute_name>folders</rm_attribute_name>
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>` + subType + `</rm_type_name>
+        <node_id>at0001</node_id>
+        <attributes xsi:type="C_MULTIPLE_ATTRIBUTE">
+          <rm_attribute_name>items</rm_attribute_name>
+          <children xsi:type="C_COMPLEX_OBJECT">
+            <rm_type_name>OBJECT_REF</rm_type_name>
+            <node_id></node_id>
+          </children>
+        </attributes>
+      </children>
+    </attributes>
+    <archetype_id><value>openEHR-EHR-FOLDER.generic.v1</value></archetype_id>
+  </definition>
+</template>`
+}
+
+// REQ-102, REQ-111 — the template validator reads a node that names no RM
+// type as the compile reads it, the type of the attribute that holds it
+// (REQ-111 A node that names no RM type): an untyped child of a FOLDER's
+// folders is a FOLDER, whose items are references, not LOCATABLE, so a nil
+// item there is a type mismatch, as under a sub-folder the template types,
+// not a slot_fill. The typed spelling is the control.
+func TestValidateFolder_REQ102_REQ111_NilItemUnderUntypedSubFolder(t *testing.T) {
+	want := []string{"rm_type_mismatch /folders[at0001]/items[1]"}
+	for _, subType := range []string{"FOLDER", ""} {
+		t.Run("sub-folder type "+strconv.Quote(subType), func(t *testing.T) {
+			c := mustCompileInline(t, subFolderOPT(subType))
+			f := &rm.Folder{
+				ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
+				Name:            &rm.DVText{Value: "folder"},
+				Folders: []rm.Folder{{
+					ArchetypeNodeID: "at0001",
+					Name:            &rm.DVText{Value: "sub-folder"},
+					Items:           []rm.ObjectRefLike{nil},
+				}},
+			}
+			if got := issueKeys(validation.ValidateFolder(f, c).Issues); !slices.Equal(got, want) {
+				t.Errorf("ValidateFolder issues = %q, want %q", got, want)
 			}
 		})
 	}
