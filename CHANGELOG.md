@@ -11,18 +11,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - **`canxml.WithPresence`** reports each member a document sends nilled or empty, by its JSON Pointer and how it was sent, and `WithMissing` names a list item after a foreign-namespace sibling at its decoded position (REQ-175).
-- **The Web Template TEXT input** carries a non-blank `C_STRING` pattern as `validation.pattern`, as the reference does (REQ-106).
+- **The Web Template** gives a TEXT input a non-blank `C_STRING` pattern as `validation.pattern`, and takes names and labels from the node's own archetype, as the reference does (REQ-106).
 
 ### Changed
 
 - **Breaking: auth discovery and token documents** (SMART and OpenID configurations, token responses, RFC 6749 errors) decode with `encoding/json/v2`, so a case-variant or repeated member now fails instead of replacing the real one (REQ-062, REQ-063, REQ-071).
-- **Breaking: canonical XML** refuses primitives nested past 10 000 elements, repeated attributes and misplaced XML declarations, keeps a repeated child's first value, and decodes a nilled or empty member as absent (REQ-056, REQ-108, REQ-170, REQ-175).
-- **Breaking: the operational template reader** in strict mode refuses a misplaced XML declaration, and reads a `C_STRING` `list_open` of white space only as empty, a reading 0.45.0 refused (REQ-103, REQ-111).
-- **Breaking: `templatecompile.Compile`** refuses an interval whose excluded end closes past the 32-bit `Integer`, which 64-bit builds accepted (REQ-111).
+- **Breaking: canonical XML** refuses over-deep primitives, repeated attributes and misplaced XML declarations, keeps a repeated child's first value, reads nilled or empty members as absent, and fills a reused value as JSON does (REQ-056, REQ-175).
+- **Breaking: the operational template reader** refuses a misplaced XML declaration in strict mode and reads a white-space `list_open` as empty, and `templatecompile.Compile` refuses an excluded interval end past the 32-bit `Integer` (REQ-103, REQ-111).
 - **`transport.New` and `Do`** refuse a typed-nil token source, reauthentication hook or tracer provider, where they panicked at first use (REQ-025).
 - **The openEHR error envelope** decodes with `encoding/json/v2`, so member names match exactly and a body with a repeated member is left undecoded (REQ-093).
-- **`Coverage.External`** lists a `C_CODE_REFERENCE` leaf that names a reference set and no codes, so `Complete()` is false there (REQ-171).
-- **The instance generator** reads a typed-nil `Options.ValueSource`, `Options.Composer` or `UIDsFrom` source as absent, where it panicked (REQ-107).
+- **Template validation** reads a node with no `rm_type_name` as its attribute's type, as the compile step does, and `Coverage.External` lists a `C_CODE_REFERENCE` leaf naming only a reference set (REQ-102, REQ-171).
+- **The instance generator** writes a primitive the template names with no child, gives an `openehr`-coded name its agreed rubric, and reads a typed-nil `ValueSource`, `Composer` or `UIDsFrom` as absent, where it panicked (REQ-107).
+- **A FLAT or STRUCTURED decode with `WithTemplate`** gives an ordinal the terminology the template codes it in, where it wrote `local`, and a node's name from its own archetype (REQ-053).
 - **The vendored EHRbase corpora** move to newer upstream commits, recorded in `UPSTREAM_PINS.txt`, where `test_all_types` writes its partial date as `2019-01` (PROBE-105).
 
 ### Removed
