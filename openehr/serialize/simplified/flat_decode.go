@@ -1535,14 +1535,16 @@ func walkAQLKeyed(compJSON map[string]any, aqlPath string, predIndex map[string]
 					obj["name"] = pinned
 				}
 				cur[seg.attr] = obj
-			} else if held, _ := obj["archetype_node_id"].(string); held != seg.pred || (pinned != nil && nameValue(obj) != seg.name) {
+			} else if held, _ := obj["archetype_node_id"].(string); held != seg.pred || (pinned != nil && nameValue(obj) != seg.name) ||
+				(pinned == nil && slices.Contains(excluded, nameValue(obj))) {
 				// Two Web Template nodes stand for this one single-valued
 				// attribute (an ACTION's ism_transition[at0005] and [at0006],
-				// or two reused siblings each pinning its name, REQ-116).
+				// or two reused siblings, REQ-116: each pinning its name, or
+				// one pinning none beside one whose name the object carries).
 				// Merging their keys into one object would re-encode them under
 				// one node only, moving the other's keys there (REQ-053).
 				want := seg.pred
-				if pinned != nil {
+				if pinned != nil || len(excluded) > 0 {
 					held, want = tcimpl.NamePredicate(held, nameValue(obj)), tcimpl.NamePredicate(seg.pred, seg.name)
 				}
 				return nil, "", "", fmt.Errorf("%w: %s.%s is single-valued, but keys reach it through two Web Template nodes, [%s] and [%s] — refused rather than merged (aqlPath %q)",

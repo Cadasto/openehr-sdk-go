@@ -524,24 +524,50 @@ func TestWalkAQLGivesNoSiblingsNameToTheUnnamedSibling(t *testing.T) {
 // OBSERVATION's protocol, cannot both be in a composition. A body with keys
 // under both is refused rather than merged into one protocol, which encode
 // would read back under one sibling only; a body with keys under one decodes
-// into a protocol of that name and re-encodes to the same keys.
+// into a protocol of that name and re-encodes to the same keys. The same
+// holds for a sibling that pins no name beside one that pins a name, whichever
+// of their keys sorts first.
 func TestUnmarshalFlatNamedSiblingsOnOneSingleValuedAttribute(t *testing.T) {
 	leaf := func(id, pin, nodeID string) *webtemplate.Node {
+		pred := "at0010"
+		if pin != "" {
+			pred += ",'" + pin + "'"
+		}
 		return &webtemplate.Node{
 			ID: id, RMType: "DV_TEXT", NodeID: nodeID, Max: 1,
-			AQLPath: "/content[openEHR-EHR-OBSERVATION.test.v1]/protocol[at0010,'" + pin + "']/items[" + nodeID + "]/value",
+			AQLPath: "/content[openEHR-EHR-OBSERVATION.test.v1]/protocol[" + pred + "]/items[" + nodeID + "]/value",
 			Inputs:  []webtemplate.Input{{Type: "TEXT"}},
 		}
 	}
-	wt := &webtemplate.WebTemplate{Tree: &webtemplate.Node{
-		ID: "root", RMType: "COMPOSITION", NodeID: "openEHR-EHR-COMPOSITION.t.v1",
-		Children: []*webtemplate.Node{{
-			ID: "obs", RMType: "OBSERVATION", NodeID: "openEHR-EHR-OBSERVATION.test.v1", Max: 1,
-			AQLPath:  "/content[openEHR-EHR-OBSERVATION.test.v1]",
-			Children: []*webtemplate.Node{leaf("a", "A", "at0011"), leaf("b", "B", "at0012")},
-		}},
-	}}
+	observationWT := func(leaves ...*webtemplate.Node) *webtemplate.WebTemplate {
+		return &webtemplate.WebTemplate{Tree: &webtemplate.Node{
+			ID: "root", RMType: "COMPOSITION", NodeID: "openEHR-EHR-COMPOSITION.t.v1",
+			Children: []*webtemplate.Node{{
+				ID: "obs", RMType: "OBSERVATION", NodeID: "openEHR-EHR-OBSERVATION.test.v1", Max: 1,
+				AQLPath:  "/content[openEHR-EHR-OBSERVATION.test.v1]",
+				Children: leaves,
+			}},
+		}}
+	}
+	wt := observationWT(leaf("a", "A", "at0011"), leaf("b", "B", "at0012"))
 	ctx := map[string]any{"ctx/language": "en", "ctx/territory": "NL", "ctx/composer_name": "Dr Test"}
+
+	// The named sibling's id sorts first, then the unnamed one's.
+	for _, ids := range []struct{ named, unnamed string }{{named: "a", unnamed: "b"}, {named: "b", unnamed: "a"}} {
+		t.Run("named "+ids.named+", unnamed "+ids.unnamed, func(t *testing.T) {
+			flat := maps.Clone(ctx)
+			flat["root/obs/"+ids.named] = "named value"
+			flat["root/obs/"+ids.unnamed] = "unnamed value"
+			_, err := UnmarshalFlat(mustJSON(t, flat), observationWT(leaf(ids.named, "A", "at0011"), leaf(ids.unnamed, "", "at0012")))
+			if !errors.Is(err, ErrUnknownPath) || !strings.Contains(err.Error(), "single-valued") ||
+				!strings.Contains(err.Error(), "[at0010,'A']") || !strings.Contains(err.Error(), "[at0010]") {
+				t.Fatalf("err = %v, want the single-valued refusal naming [at0010,'A'] and [at0010]", err)
+			}
+			if strings.Contains(err.Error(), "named value") {
+				t.Errorf("err = %v carries a value of the body", err)
+			}
+		})
+	}
 
 	both := maps.Clone(ctx)
 	both["root/obs/a"] = "ay"
