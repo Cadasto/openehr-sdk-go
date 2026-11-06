@@ -18,9 +18,10 @@ var schemaDocuments = flag.String("schema-documents", "",
 	"write the re-encoded corpus operational templates PROBE-111's schema leg validates to this folder, relative to the module root (make operational-template-schema-check)")
 
 // probe111CorpusFloor is the number of operational templates the corpus
-// vendors today. A walk that finds fewer fails, so a corpus that silently
-// empties, or a walk that stops finding a folder, cannot pass as clean.
-const probe111CorpusFloor = 74
+// vendors today: 84. A walk that finds fewer fails, so a corpus that silently
+// empties, or a walk that stops finding a folder, cannot pass as clean. Raise
+// it when the corpus grows.
+const probe111CorpusFloor = 84
 
 func readCorpusTemplate(t *testing.T, name string) []byte {
 	t.Helper()

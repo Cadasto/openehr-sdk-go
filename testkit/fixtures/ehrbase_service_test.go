@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
@@ -161,11 +162,46 @@ func (h *serviceHarness) newSDK(t *testing.T, pinLine string, files map[string]s
 	t.Helper()
 	sdk := t.TempDir()
 	writeText(t, filepath.Join(sdk, filepath.FromSlash(ehrbaseServiceScript)), h.script)
-	writeText(t, filepath.Join(sdk, "testkit", "corpus", "UPSTREAM_PINS.txt"), "# scratch pins\n"+pinLine+"\n")
+	writePins(t, sdk, pinLine)
 	for rel, body := range files {
 		writeText(t, filepath.Join(sdk, filepath.FromSlash(rel)), body)
 	}
 	return sdk
+}
+
+// writePins sets pinLine as the one pin line of the scratch tree sdk.
+func writePins(t *testing.T, sdk, pinLine string) {
+	t.Helper()
+	writeText(t, filepath.Join(sdk, "testkit", "corpus", "UPSTREAM_PINS.txt"), "# scratch pins\n"+pinLine+"\n")
+}
+
+// staleStamp is a recorded_utc far from any clock reading, so a manifest that
+// carries it shows whether an ingest kept it or wrote a new one.
+const staleStamp = "2000-01-01T00:00:00Z"
+
+const recordedUTCPrefix = "# recorded_utc: "
+
+// recordedUTC returns the value of the `# recorded_utc:` line of a manifest,
+// or "" when it has none.
+func recordedUTC(manifest string) string {
+	for line := range strings.Lines(manifest) {
+		if v, ok := strings.CutPrefix(strings.TrimSuffix(line, "\n"), recordedUTCPrefix); ok {
+			return v
+		}
+	}
+	return ""
+}
+
+// restamp rewrites the `# recorded_utc:` line of the manifest at path to stamp
+// and leaves every other byte of it as it was.
+func restamp(t *testing.T, path, stamp string) {
+	t.Helper()
+	text := readText(t, path)
+	old := recordedUTC(text)
+	if old == "" {
+		t.Fatalf("%s has no recorded_utc line to rewrite:\n%s", path, text)
+	}
+	writeText(t, path, strings.Replace(text, recordedUTCPrefix+old, recordedUTCPrefix+stamp, 1))
 }
 
 // scratchOPT is an operational template that carries only its template id.
@@ -308,10 +344,12 @@ func TestIngestEHRbaseServiceVerifyRefusesADisagreeingTree(t *testing.T) {
 
 // The ingest copies every file of its table from a clone at the pin, byte for
 // byte, under its template id, writes the manifest, removes a file the table
-// no longer lists, and leaves the tree unchanged when run again. It refuses,
-// before it writes anything, without a clone, with a clone that is not at the
-// pin, with a file the clone changed since the pin, and with a file whose
-// template id is not the one its table names.
+// no longer lists, and leaves the tree unchanged when run again at the same
+// pin, the manifest's recorded_utc included; a new pin moves it. It refuses
+// without a clone, with a clone that is not at the pin, with a file the clone
+// changed since the pin, and with a file whose template id is not the one its
+// table names. A refusal leaves the vendored tree as it was, even when the
+// file it refuses is the last of the table, after every other file was staged.
 func TestIngestEHRbaseServiceCopiesOnlyFromThePin(t *testing.T) {
 	t.Parallel()
 	h := newServiceHarness(t)
@@ -333,6 +371,14 @@ func TestIngestEHRbaseServiceCopiesOnlyFromThePin(t *testing.T) {
 	clone := "EHRBASE_SERVICE_CLONE=" + up
 	pinLine := "ehrbase/ehrbase develop " + pin
 	stale := map[string]string{ehrbaseServiceDir + "/templates/stale.v0.opt": scratchOPT("stale.v0")}
+	// Each case that commits upstream runs over its own clone, so a commit one
+	// case makes cannot reach another.
+	cloneOf := func(t *testing.T) string {
+		t.Helper()
+		dir := filepath.Join(t.TempDir(), "clone")
+		h.git(t, up, "clone", "-q", up, dir)
+		return dir
+	}
 
 	t.Run("at the pin", func(t *testing.T) {
 		t.Parallel()
@@ -360,24 +406,60 @@ func TestIngestEHRbaseServiceCopiesOnlyFromThePin(t *testing.T) {
 		if out, err := h.run(t, sdk, "verify"); err != nil {
 			t.Errorf("verify after ingest = %v; want success\n%s", err, out)
 		}
+		// Stamp the manifest long ago, so that a second ingest which writes a
+		// new stamp shows, in whatever second it runs.
+		restamp(t, filepath.Join(dest, "MANIFEST.txt"), staleStamp)
 		before := tree(t, dest)
 		if out, err := h.run(t, sdk, "ingest", clone); err != nil {
 			t.Fatalf("second ingest = %v; want success\n%s", err, out)
 		}
-		if changed := changedFiles(before, tree(t, dest)); len(changed) > 0 {
+		after := tree(t, dest)
+		if got := recordedUTC(after["MANIFEST.txt"]); got != staleStamp {
+			t.Errorf("a second ingest at the same pin wrote recorded_utc %q; want it to keep %q", got, staleStamp)
+		}
+		if changed := changedFiles(before, after); len(changed) > 0 {
 			t.Errorf("a second ingest at the same pin changed %q", changed)
 		}
 	})
 
-	// Each refusal runs over its own clone, so a commit one case makes
-	// cannot reach another.
-	cloneOf := func(t *testing.T) string {
-		t.Helper()
-		dir := filepath.Join(t.TempDir(), "clone")
-		h.git(t, up, "clone", "-q", up, dir)
-		return dir
-	}
-	first := table[0]
+	// A new pin, with the table's files as they were, is the one change that
+	// moves recorded_utc.
+	t.Run("re-pin", func(t *testing.T) {
+		t.Parallel()
+		later := cloneOf(t)
+		writeText(t, filepath.Join(later, "README.md"), "later\n")
+		h.git(t, later, "add", "-A")
+		h.git(t, later, "commit", "-q", "-m", "later")
+		newPin := h.git(t, later, "rev-parse", "HEAD")
+
+		sdk := h.newSDK(t, pinLine, nil)
+		manifestPath := filepath.Join(sdk, filepath.FromSlash(ehrbaseServiceDir), "MANIFEST.txt")
+		if out, err := h.run(t, sdk, "ingest", clone); err != nil {
+			t.Fatalf("ingest at the first pin = %v; want success\n%s", err, out)
+		}
+		restamp(t, manifestPath, staleStamp)
+		writePins(t, sdk, "ehrbase/ehrbase develop "+newPin)
+		if out, err := h.run(t, sdk, "ingest", "EHRBASE_SERVICE_CLONE="+later); err != nil {
+			t.Fatalf("ingest at the new pin = %v; want success\n%s", err, out)
+		}
+		manifest := readText(t, manifestPath)
+		stamp := recordedUTC(manifest)
+		if _, err := time.Parse(time.RFC3339, stamp); err != nil || stamp == staleStamp {
+			t.Errorf("ingest at a new pin wrote recorded_utc %q; want a new time in RFC 3339 form, not %q", stamp, staleStamp)
+		}
+		source := "source\tehrbase\t" + ehrbaseServiceRepo + "\t" + newPin + "\tApache-2.0"
+		if recs := records(manifest); !slices.Contains(recs, source) {
+			t.Errorf("ingest at a new pin wrote the manifest records\n  %s\nwant the source record\n  %s", strings.Join(recs, "\n  "), source)
+		}
+	})
+
+	// The refusals that break a table file break the last one, so that every
+	// other file is staged by the time the run refuses.
+	last := table[len(table)-1]
+	// What a refused run must leave as it was: a template the table no longer
+	// lists and a manifest.
+	vendored := maps.Clone(stale)
+	vendored[ehrbaseServiceDir+"/MANIFEST.txt"] = "# the previous ingest\n"
 	cases := []struct {
 		name string
 		// setup returns the pin line and the environment of the run.
@@ -387,7 +469,7 @@ func TestIngestEHRbaseServiceCopiesOnlyFromThePin(t *testing.T) {
 		{
 			name:  "no clone",
 			setup: func(*testing.T) (string, []string) { return pinLine, nil },
-			want:  "set EHRBASE_SERVICE_CLONE",
+			want:  "to a local clone of",
 		},
 		{
 			name: "clone is not a directory",
@@ -418,7 +500,7 @@ func TestIngestEHRbaseServiceCopiesOnlyFromThePin(t *testing.T) {
 			name: "file changed in the clone since the pin",
 			setup: func(t *testing.T) (string, []string) {
 				dir := cloneOf(t)
-				writeText(t, filepath.Join(dir, filepath.FromSlash(first.upstream)), bodies[first.upstream]+"<!-- edited -->\n")
+				writeText(t, filepath.Join(dir, filepath.FromSlash(last.upstream)), bodies[last.upstream]+"<!-- edited -->\n")
 				return pinLine, []string{"EHRBASE_SERVICE_CLONE=" + dir}
 			},
 			want: "differs from the blob at its pin",
@@ -427,7 +509,7 @@ func TestIngestEHRbaseServiceCopiesOnlyFromThePin(t *testing.T) {
 			name: "template id not the one the table names",
 			setup: func(t *testing.T) (string, []string) {
 				dir := cloneOf(t)
-				writeText(t, filepath.Join(dir, filepath.FromSlash(first.upstream)), scratchOPT("another.v0"))
+				writeText(t, filepath.Join(dir, filepath.FromSlash(last.upstream)), scratchOPT("another.v0"))
 				h.git(t, dir, "commit", "-q", "-am", "rename")
 				return "ehrbase/ehrbase develop " + h.git(t, dir, "rev-parse", "HEAD"), []string{"EHRBASE_SERVICE_CLONE=" + dir}
 			},
@@ -438,7 +520,7 @@ func TestIngestEHRbaseServiceCopiesOnlyFromThePin(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			pinLine, env := tc.setup(t)
-			sdk := h.newSDK(t, pinLine, stale)
+			sdk := h.newSDK(t, pinLine, vendored)
 			before := tree(t, sdk)
 			out, err := h.run(t, sdk, "ingest", env...)
 			if err == nil {
@@ -448,7 +530,7 @@ func TestIngestEHRbaseServiceCopiesOnlyFromThePin(t *testing.T) {
 				t.Errorf("ingest refused with %q; want it to name %q", out, tc.want)
 			}
 			if changed := changedFiles(before, tree(t, sdk)); len(changed) > 0 {
-				t.Errorf("a refused ingest changed %q", changed)
+				t.Errorf("a refused ingest changed the vendored tree: %q", changed)
 			}
 		})
 	}
