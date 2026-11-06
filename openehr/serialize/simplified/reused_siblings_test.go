@@ -16,6 +16,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 // namedEventsTemplate builds the template in testdata whose OBSERVATION holds
@@ -36,20 +37,6 @@ const (
 	namedEventsObs    = "sdk_named_sibling_events/sdk_named_events"
 	namedEventsEvents = "/content[openEHR-EHR-OBSERVATION.sdk_named_events.v1]/data[at0001]/events"
 )
-
-// namedEvent returns the EVENT of comp named name.
-func namedEvent(t *testing.T, comp *rm.Composition, name string) rm.Locatable {
-	t.Helper()
-	v, err := rmpath.ItemAtPath(comp, namedEventsEvents+"[at0002,'"+name+"']")
-	if err != nil {
-		t.Fatalf("the event named %q: %v", name, err)
-	}
-	ev, ok := v.(rm.Locatable)
-	if !ok {
-		t.Fatalf("the event named %q is a %T", name, v)
-	}
-	return ev
-}
 
 // namedEventItem returns the value of the ELEMENT nodeID in the EVENT of comp
 // named name.
@@ -175,6 +162,7 @@ func TestREQ053ReusedSiblingEventsDecodeIntoTheirOwnEvent(t *testing.T) {
 		"ctx/language":                                  "en",
 		"ctx/territory":                                 "NL",
 		"ctx/composer_name":                             "Composer",
+		"ctx/time":                                      "2026-10-26T09:00:00Z",
 		namedEventsObs + "/count":                       7,
 		namedEventsObs + "/text":                        "first text",
 		namedEventsObs + "/time":                        "2026-10-26T09:00:00Z",
@@ -217,4 +205,30 @@ func TestREQ053ReusedSiblingEventsDecodeIntoTheirOwnEvent(t *testing.T) {
 func jsonEqual(t *testing.T, a, b any) bool {
 	t.Helper()
 	return string(mustJSON(t, a)) == string(mustJSON(t, b))
+}
+
+// TestREQ053CoronaLargeRoundTripValidates — REQ-053, REQ-116: corona's
+// skeleton under Large holds a member of every one of its reused siblings,
+// four SECTIONs of one archetype and the OBSERVATIONs each of them reuses.
+// Written as FLAT or STRUCTURED and decoded with the template, it validates
+// against the template and re-encodes to the same FLAT.
+func TestREQ053CoronaLargeRoundTripValidates(t *testing.T) {
+	opt, err := readOPTFile(fixtures.WebTemplateOpt("Corona_Anamnese"))
+	if err != nil {
+		t.Fatalf("readOPTFile: %v", err)
+	}
+	wt, compiled := compileTemplate(t, "Corona_Anamnese", opt)
+	comp := skeletonOf(t, compiled, instance.Large)
+	keys := flatKeys(t, comp, wt)
+	for _, format := range []string{"FLAT", "STRUCTURED"} {
+		t.Run(format, func(t *testing.T) {
+			back := bmiRoundTrip(t, format, comp, wt, simplified.WithTemplate(compiled), simplified.WithStrict())
+			for _, is := range validation.ValidateComposition(back, compiled).Issues {
+				t.Errorf("decoded composition: %s at %s: %s", is.Code, is.Path, is.Detail)
+			}
+			if got := flatKeys(t, back, wt); !maps.EqualFunc(got, keys, func(a, b any) bool { return jsonEqual(t, a, b) }) {
+				t.Errorf("re-encoded FLAT differs:\n got %v\nwant %v", got, keys)
+			}
+		})
+	}
 }

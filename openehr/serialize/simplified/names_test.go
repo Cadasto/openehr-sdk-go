@@ -198,8 +198,7 @@ func TestDecodeWithTemplateNameFromTheNearestArchetypeRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 	// One value under the story event is enough for decode to rebuild the
-	// event. MarshalFlat cannot write this template (its reused SECTION
-	// siblings), so the key is composed from the Web Template's ids.
+	// event, so the key is composed from the Web Template's ids.
 	const storyPath = "/content[openEHR-EHR-OBSERVATION.story.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0004]/value"
 	key, ok := flatKeyOf(wt.Tree, storyPath, nil)
 	if !ok {

@@ -168,9 +168,6 @@ func Verify(res SetResult, recs map[Leg]Record) []string {
 //   - INTERVAL_EVENT attributes: the Web Template has no math_function
 //     or width node for the event, so FLAT encode writes neither and decode
 //     refuses both in every mode, as RM data it would otherwise drop.
-//   - reused archetype siblings: several siblings reuse one archetype
-//     under one attribute, which FLAT encode refuses ("path resolves to
-//     multiple items") and FLAT decode refuses ("not yet decodable").
 //   - RM-FLOOR archetype_details: decode adds archetype_details on archetype
 //     roots and stamps the SDK's RM release in rm_version; upstream canonical
 //     documents lack some of them, give rm_version as 1.0.4 or 1.0.2, or carry a template_id
@@ -237,24 +234,15 @@ var Recorded = map[string]map[Leg]Record{
 	},
 	"corona": {
 		LegCanonicalFlat: {
-			Outcome: Outcome{Refused: `path resolves to multiple items: "/content[openEHR-EHR-SECTION.adhoc.v1]"`},
-			Reason: "reused archetype siblings: the symptome and risikogebiet sections both reuse " +
-				"openEHR-EHR-SECTION.adhoc.v1 under content, and FLAT encode refuses the path that resolves to both.",
+			Outcome: Outcome{Compared: 104, Altered: 1},
+			Reason:  "Upstream number spelling: the upstream FLAT writes the body temperature's magnitude as 39.0, where the codec writes 39.",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 641, Missing: 565, Altered: 2, Excluded: 94},
-			Reason: "reused archetype siblings: decode refuses every key under the symptome and risikogebiet " +
-				"sections (the 94 excluded keys, 70 and 24), so both sections are missing from the decoded " +
-				"composition. RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (2 leaves).",
+			Outcome: Outcome{Compared: 641, Altered: 15},
+			Reason:  "RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (15 leaves).",
 		},
 		LegFlatStructured: {Outcome: Outcome{Compared: 113}},
-		LegStructuredFlat: {
-			Outcome: Outcome{Compared: 10, Excluded: 94},
-			Reason: "reused archetype siblings: the symptome and risikogebiet sections both reuse " +
-				"openEHR-EHR-SECTION.adhoc.v1 under content, and decode refuses every key under them on both sides " +
-				"(the 94 excluded keys of the upstream FLAT, 70 and 24), so both sections drop out of the " +
-				"comparison and the 10 keys compared are what remains.",
-		},
+		LegStructuredFlat: {Outcome: Outcome{Compared: 104}},
 	},
 	"ehrn_abdm": {
 		LegCanonicalFlat: {

@@ -5,11 +5,15 @@ package crossformat_test
 // record, and the mismatch lines the probe reports.
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/testkit/conformance/crossformat"
+	"github.com/cadasto/openehr-sdk-go/testkit/conformance/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -322,16 +326,18 @@ func TestProbe105RunRefusesMisuse(t *testing.T) {
 	}
 }
 
-// TestProbe105LegRefusalIsTheCodecError pins, on the corpus, that a refused
-// leg records the error of the codec that ended it, named by its step, rather
-// than a harness fault or the reducing decode's account of it.
+// TestProbe105LegRefusalIsTheCodecError pins, on the corpus and on a set built
+// to be refused, that a refused leg records the error of the codec that ended
+// it, named by its step, rather than a harness fault or the reducing decode's
+// account of it. The corpus may hold no refused leg, so the built set,
+// [refusedFlatSet], keeps the test from checking nothing.
 func TestProbe105LegRefusalIsTheCodecError(t *testing.T) {
 	sets, err := fixtures.ListCrossFormatSets()
 	if err != nil {
 		t.Fatalf("ListCrossFormatSets() error = %v", err)
 	}
 	var refusals int
-	for _, set := range sets {
+	for _, set := range append(slices.Clip(sets), refusedFlatSet(t, sets)) {
 		res, err := crossformat.Run(set)
 		if err != nil {
 			t.Fatalf("Run(%s) error = %v", set.Name, err)
@@ -351,6 +357,41 @@ func TestProbe105LegRefusalIsTheCodecError(t *testing.T) {
 		}
 	}
 	if refusals == 0 {
-		t.Fatal("no leg of the corpus is refused, so this test checks nothing; drop it or pick another input")
+		t.Fatal("no leg of the corpus or of the built set is refused, so this test checks nothing; drop it or pick another input")
+	}
+}
+
+// refusedFlatSet builds a set whose flat-canonical leg is refused: the OPT and
+// canonical documents of the first corpus set that runs the leg, with a FLAT
+// of one key under a second instance of the template root. Decode removes that
+// key as a path the Web Template does not have, then refuses the body for its
+// missing language and territory.
+func refusedFlatSet(t *testing.T, sets []fixtures.CrossFormatSet) fixtures.CrossFormatSet {
+	t.Helper()
+	i := slices.IndexFunc(sets, func(s fixtures.CrossFormatSet) bool {
+		return slices.Contains(crossformat.Legs(s), crossformat.LegFlatCanonical)
+	})
+	if i < 0 {
+		t.Fatal("no corpus set runs the flat-canonical leg")
+	}
+	base := sets[i]
+	target, err := webtemplate.NewTargetFromOPT(base.OPT)
+	if err != nil {
+		t.Fatalf("NewTargetFromOPT(%s) error = %v", base.OPT, err)
+	}
+	flat, err := json.Marshal(map[string]string{target.Root + ":1/no_such_node": "x"})
+	if err != nil {
+		t.Fatalf("json.Marshal(FLAT) error = %v", err)
+	}
+	path := filepath.Join(t.TempDir(), "flat.json")
+	if err := os.WriteFile(path, flat, 0o600); err != nil {
+		t.Fatalf("WriteFile(%s) error = %v", path, err)
+	}
+	return fixtures.CrossFormatSet{
+		Name:          "refused (" + base.Name + ")",
+		OPT:           base.OPT,
+		CanonicalJSON: base.CanonicalJSON,
+		CanonicalXML:  base.CanonicalXML,
+		FLAT:          path,
 	}
 }

@@ -12,7 +12,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rmpath"
 )
 
@@ -22,7 +21,7 @@ const stringLeafType = "STRING"
 
 // emitStringLeaf resolves a STRING leaf and writes it at flatPath through
 // [leafToFlat], which spells it as its bare value. relPath is the leaf's
-// canonical path relative to root.
+// resolution path relative to the scope's root.
 //
 // rmpath resolves an RM String attribute it knows to the string itself, held
 // by value, so whenever the owner is there the attribute resolves (to "" when
@@ -31,8 +30,8 @@ const stringLeafType = "STRING"
 // resolve to an RM String is therefore refused whenever its owner is there,
 // because whether it holds a value cannot be told; with no owner there is
 // nothing to lose, and it is skipped.
-func emitStringLeaf(out map[string]any, flatPath string, root rm.Locatable, relPath string) error {
-	v, err := itemAtPath(root, relPath)
+func emitStringLeaf(out map[string]any, flatPath string, sc scope, relPath string) error {
+	v, err := sc.itemAt(relPath)
 	if err == nil {
 		return leafToFlat(out, flatPath, v, stringLeafType, false)
 	}
@@ -44,7 +43,7 @@ func emitStringLeaf(out map[string]any, flatPath string, root rm.Locatable, relP
 		ownerRel, attr = before, after
 	}
 	if ownerRel != "" {
-		if _, err := itemAtPath(root, ownerRel); err != nil {
+		if _, err := sc.itemAt(ownerRel); err != nil {
 			return skipNotFound(err, ownerRel)
 		}
 	}

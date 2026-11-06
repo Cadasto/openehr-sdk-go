@@ -192,7 +192,8 @@ Concretely:
   `_feeder_audit` the index-less spelling of a sub-path segment and its `:0` name one slot and
   merge, under the same rule for a key spelled under both),
   a key that walks
-  through one of several reused siblings, and an out-of-bound, over-budget or sparse `:index`.
+  through one of several reused siblings that no pinned name tells apart, and an out-of-bound,
+  over-budget or sparse `:index`.
   Trailing JSON after the object is rejected too. A key is judged segment by segment from the
   left, so an index past the bound of a segment that resolves makes the key malformed whatever
   follows it. An `:index` past `:0` on the template root's own segment (a key that is that
@@ -313,7 +314,8 @@ partially or silently accepted.
   `local` code's archetype term, an external code's term under `<terminology>::<code>` or the bare
   code, or an `openehr` code's rubric where every terminology group that holds the code gives the
   same one. Its terminology is the `C_CODE_PHRASE`'s. Reused siblings that share a bare path and
-  disagree on the coded name leave it with none, as they do with a pinned name.
+  disagree on the coded name leave the bare path with none, as they do with a pinned name;
+  decode reads each sibling's own where a pinned name tells it apart (§ Archetype-reuse siblings).
   **Registered format limit:** FLAT has no key for a node's name below the root, so a coded name
   the template leaves open (a code from an external reference set, several codes and no pinned
   text, a code with no term text) comes back as `DV_TEXT`, and the round trip reports
@@ -542,7 +544,8 @@ leg catches dropped/mistyped leaves that idempotence alone (a symmetric omission
 Its **skeleton leg** builds the `instance.Required` and `instance.Medium` skeletons of every
 COMPOSITION OPT in the corpus (75 templates, 150 pairs) and requires each to validate again
 after a FLAT and a STRUCTURED round trip under `WithTemplate` and `WithStrict`, except two
-named exclusions: the reused-sibling encode refusal (§ Archetype-reuse siblings below) and
+named exclusions: the encode refusal of reused siblings no name tells apart (§ Archetype-reuse
+siblings below, residual) and
 the coded name a template leaves open (§ `LOCATABLE.name` on decode, registered format limit).
 It does **not** compare emitted FLAT/STRUCTURED against vendored upstream simplified
 output — that comparison is **PROBE-086** (Implemented, Sandbox): its harness at
@@ -628,37 +631,49 @@ Closing it needs a FLAT spelling for a folded wrapper — a reference-side chang
 the reference spelling wins), not a codec one. PROBE-086 cannot see the gap at all, because
 its input is FLAT and a folded wrapper never appears there.
 
-**Archetype-reuse siblings (REQ-116 residual).** REQ-116 made templates that reuse one
-archetype among siblings *exportable* (distinct WebTemplate `id`s via the pinned
-template-level name; name-predicated `aqlPath`s), and this codec handles the pinned
-predicate on the paths it consumes: decode strips it when rebuilding lookup keys
-(`bareAQLPath`, keyed consistently across `resolveLeaf` / `placeLeaf` / the name index),
-and encode strips it before rmpath resolution. A **sole** pinned claimant of its bare
-path — every pinned node in `GECCO_Diagnose`, and pinned ELEMENTs generally — round-trips,
-with `WithTemplate` decode repopulating the **pinned** name (`flat_pinned_test.go`). What
-does **not** round-trip yet is *reused siblings*: several pinned siblings sharing one bare
-path (corona's four `SECTION.adhoc.v1`).
+**Archetype-reuse siblings (REQ-116).** REQ-116 made templates that reuse one archetype
+among siblings *exportable*: distinct WebTemplate `id`s via the pinned template-level name,
+and name-predicated `aqlPath`s. Siblings are the nodes under one parent that share an
+attribute and a node id. The codec resolves each node by its *resolution path*: the
+`aqlPath` with only the names that tell siblings apart (`reusedSiblings`,
+`reused_siblings.go`).
 
-- **Encode** — the bare relPath answers to *every* reused sibling: with several
-  instances present a `Max==1` node fails on the rmpath ambiguity, but with **one**
-  instance present (the common partially-filled composition) each sibling's Web Template
-  node would resolve that same instance and emit its data under **every** sibling's FLAT
-  id — silent misattribution, no error. Encode therefore **refuses** whenever data
-  resolves at a reused sibling (`refuseReusedSibling`, wrapping
-  `rmpath.ErrPathAmbiguous`; pinned in `flat_pinned_test.go`, which also pins that a
-  composition with no data in the reused region still encodes). Disambiguating needs
-  the runtime `name/value` carried into resolution — exactly what the stripped
-  predicate expressed — restricted to genuinely ambiguous nodes.
-- **Decode** — sibling FLAT ids map to one bare path, so their instances would collapse
-  onto one list slot (both default to index 0), landing different siblings' leaves in
-  **one** RM instance. Decode therefore **refuses** any key that walks through a reused
-  sibling (`ErrUnknownPath`, "reused siblings"; `ambiguousBarePaths` precomputes the
-  affected paths, `flat_pinned_test.go` pins the refusal on the corona oracle) — a loud
-  no rather than a silent merge. The name index likewise falls back to the shared
-  archetype rubric for the bare spelling. Fixing both needs the FLAT segment identity
-  (which sibling's id the key walked through) carried into placement — the information
-  the stripped predicate expressed.
+- **Named siblings round-trip.** Where two or more siblings are spelled differently and each
+  pins a name, a sibling stands for the instances carrying its name. Encode resolves it with
+  that name predicate, and decode places a key through it into the instance of that name,
+  creating it with the name when absent. Corona's four `SECTION.adhoc.v1` and a pair of
+  lifted `EVENT`s named *First event* and *Second event* round-trip this way
+  (`flat_pinned_test.go`, `reused_siblings_test.go`).
+- **One sibling may pin no name.** It stands for every instance whose name no other sibling
+  pins, the binding
+  [REQ-102](../../../docs/specifications/clinical-modeling.md#req-102--composition-validation)
+  gives such an item. Encode leaves the others' instances out of its resolution, and decode
+  keeps its keys out of them. A template name decode would give its instance is withheld
+  where it equals a name a sibling pins.
+- **An instance no sibling claims is refused.** Where every sibling pins a name, an instance
+  carrying none of them would be dropped without a word. Encode refuses the composition
+  instead (`refuseUnclaimedItems`, wrapping `rmpath.ErrPathAmbiguous`), naming the path and
+  not the name.
+- **Other names stay out of resolution.** A name on a node alone at its bare path, such as
+  every pinned node in `GECCO_Diagnose`, is removed. Resolving by it would drop an instance
+  whose stored name differs from the modelled one, and `WithTemplate` decode repopulates the
+  pinned name (`flat_pinned_test.go`).
+- **Decode reads each sibling as its own.** It puts named siblings in template order, and
+  under `WithTemplate` it takes a sibling's name, coded name and RM type from the sibling's
+  own compiled path, falling back to the bare alias only where that path is not indexed.
 
-Reused-sibling FLAT is therefore **fail-loud in both directions** — nothing silently
-misattributes data — and closing it is owned by the PROBE-086 adapter work (the upstream
-corpus template pins no names, so its parity does not depend on this residual).
+**Residual: siblings no name tells apart.** Siblings spelled alike share one resolution path,
+as the two unnamed OBSERVATIONs and the two ELEMENTs `at0002` of `sdk_crosscheck_siblings.v1`
+do. Nothing in the composition says which instance is whose, so the codec stays
+**fail-loud** there:
+
+- **Encode** refuses data that resolves at such a node (`refuseReusedSibling`, wrapping
+  `rmpath.ErrPathAmbiguous`), since one instance would be written under every sibling's
+  FLAT id. A composition with no data there still encodes (`flat_pinned_test.go`).
+- **Decode** refuses any key through such a node (`ErrUnknownPath`, "reused siblings"),
+  since the siblings' instances would collapse onto one list slot.
+
+Closing it needs a rule the template does not give, such as the validator's binding by room
+and by trial
+([REQ-102](../../../docs/specifications/clinical-modeling.md#req-102--composition-validation)
+*Structural — binding items*).

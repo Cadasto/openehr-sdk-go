@@ -597,6 +597,7 @@ requirements:
       - openehr/serialize/simplified/null_test.go
       - openehr/serialize/simplified/raw_fit_test.go
       - openehr/serialize/simplified/raw_test.go
+      - openehr/serialize/simplified/reused_siblings_test.go
       - openehr/serialize/simplified/rmattr_encapsulated_test.go
       - openehr/serialize/simplified/rmattr_party_test.go
       - openehr/serialize/simplified/rmattr_repeating_test.go
@@ -2009,6 +2010,7 @@ requirements:
       - openehr/serialize/simplified/flat_encode_test.go
       - openehr/serialize/simplified/flat_nameindex_test.go
       - openehr/serialize/simplified/flat_pinned_test.go
+      - openehr/serialize/simplified/reused_siblings_test.go
       - openehr/serialize/simplified/template_roundtrip_test.go
       - openehr/template/webtemplate/build_test.go
       - openehr/template/webtemplate/dedupe_test.go
