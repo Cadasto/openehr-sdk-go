@@ -1,7 +1,7 @@
 # REQ-116 compiled-path snapshot — templates pinning at least one node name.
 # Phase 3 adds name predicates to these paths; the diff on this file
 # is the deliberately recorded delta.
-# corpus: 76 OPTs — 19 pin a name, 57 pin none, 0 do not compile
+# corpus: 77 OPTs — 20 pin a name, 57 pin none, 0 do not compile
 
 ## ehrbase-service/DiADeM Assessment.v0  nodes=161
 /
@@ -462,6 +462,56 @@
 /content[openEHR-EHR-ACTION.immunisation_procedure.v1]/description/items[at0015]
 /content[openEHR-EHR-ACTION.immunisation_procedure.v1]/description/items[at0015]/value
 /content[openEHR-EHR-ACTION.immunisation_procedure.v1]/protocol
+
+## ehrbase-service/IDCR - Medication List.v0  nodes=48
+/
+/category
+/category/defining_code
+/context
+/context/other_context
+/name
+/name/value
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0070]
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0070]/value
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0143]
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0091]
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0091]/value
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0009]
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0009]/value
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0109]
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0109]/value
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0055]
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0055]/value
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0056]
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0056]/items[at0058]
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0056]/items[at0058]/items[at0037]
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0056]/items[at0058]/items[at0156]
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0056]/items[at0066]
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0056]/items[at0066]/value
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0056]/items[at0066]/value/defining_code
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0056]/items[at0066]/value
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0056]/items[at0066]/value/value
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0056]/items[at0090]
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0044]
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0044]/value
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0105]
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0105]/value
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0107]
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0107]/value
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0018]
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0018]/value
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0113]
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0113]/items[at0012]
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0113]/items[at0012]/value
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0113]/items[at0112]
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/activities[at0001]/description/items[at0069]
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/protocol
+/content[openEHR-EHR-SECTION.medication_medical_devices_rcp.v1]/items[openEHR-EHR-SECTION.current_medication_rcp.v1]/items[openEHR-EHR-INSTRUCTION.medication_order.v0]/protocol/items[at0008]
 
 ## ehrbase-service/IDCR - Procedures List.v1  nodes=85
 /

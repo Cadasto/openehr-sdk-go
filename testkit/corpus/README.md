@@ -102,7 +102,7 @@ Each set is at its source's commit in [`UPSTREAM_PINS.txt`](UPSTREAM_PINS.txt). 
 
 ## EHRbase server test templates
 
-[`ehrbase-service/templates/`](ehrbase-service/templates/) holds nine operational templates from the tests of the EHRbase server, [`ehrbase/ehrbase`](https://github.com/ehrbase/ehrbase), under `service/src/test/resources/knowledge/`. Each is a byte copy named after its template id, and none comes with a composition. Three start with a byte-order mark, kept as upstream has it. The upstream is Apache-2.0 (see [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md)).
+[`ehrbase-service/templates/`](ehrbase-service/templates/) holds ten operational templates from the tests of the EHRbase server, [`ehrbase/ehrbase`](https://github.com/ehrbase/ehrbase), under `service/src/test/resources/knowledge/`. Each is a byte copy named after its template id, and none comes with a composition. Three start with a byte-order mark, kept as upstream has it. The upstream is Apache-2.0 (see [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md)).
 
 | Template id | Upstream file, under `service/src/test/resources/knowledge/` |
 |---|---|
@@ -112,6 +112,7 @@ Each set is at its source's commit in [`UPSTREAM_PINS.txt`](UPSTREAM_PINS.txt). 
 | `IDCR  - Laboratory Order.v0` | `operational_templates/IDCR  - Laboratory Order.opt` |
 | `IDCR - End of Life Patient Preferences.v0` | `opt/IDCR - End of Life Patient Preferences.v0.opt` |
 | `IDCR - Immunisation summary.v0` | `IDCR - Immunisation summary.v0.opt` |
+| `IDCR - Medication List.v0` | `operational_templates/IDCR - Medication List.v0.opt` |
 | `IDCR - Procedures List.v1` | `opt/IDCR - Procedures List.v1.opt` |
 | `IDCR - Relevant contacts.v0` | `operational_templates/IDCR - Relevant contacts.v0.opt` |
 | `IDCR - Service Request.v0` | `operational_templates/IDCR - Service Request.v0.opt` |
@@ -218,7 +219,7 @@ The Corona pair is the largest fixture in the repo. That size is the cost of gua
 
 ### ehrbase (server tests)
 
-**License:** Apache 2.0 — [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) (the `ehrbase/ehrbase` line of [`UPSTREAM_PINS.txt`](UPSTREAM_PINS.txt)). The nine OPT-only templates under `ehrbase-service/` ([EHRbase server test templates](#ehrbase-server-test-templates)), and the `BMI` OPT in `templates/`, whose compositions are CODE24's (see above).
+**License:** Apache 2.0 — [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) (the `ehrbase/ehrbase` line of [`UPSTREAM_PINS.txt`](UPSTREAM_PINS.txt)). The ten OPT-only templates under `ehrbase-service/` ([EHRbase server test templates](#ehrbase-server-test-templates)), and the `BMI` OPT in `templates/`, whose compositions are CODE24's (see above).
 
 ### SDK (`rm/`)
 

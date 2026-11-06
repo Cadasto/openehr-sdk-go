@@ -71,6 +71,7 @@ IDCR  - Generic MDT Output Report.v0|$KNOWLEDGE/opt/IDCR  - Generic MDT Output R
 IDCR  - Laboratory Order.v0|$KNOWLEDGE/operational_templates/IDCR  - Laboratory Order.opt
 IDCR - End of Life Patient Preferences.v0|$KNOWLEDGE/opt/IDCR - End of Life Patient Preferences.v0.opt
 IDCR - Immunisation summary.v0|$KNOWLEDGE/IDCR - Immunisation summary.v0.opt
+IDCR - Medication List.v0|$KNOWLEDGE/operational_templates/IDCR - Medication List.v0.opt
 IDCR - Procedures List.v1|$KNOWLEDGE/opt/IDCR - Procedures List.v1.opt
 IDCR - Relevant contacts.v0|$KNOWLEDGE/operational_templates/IDCR - Relevant contacts.v0.opt
 IDCR - Service Request.v0|$KNOWLEDGE/operational_templates/IDCR - Service Request.v0.opt

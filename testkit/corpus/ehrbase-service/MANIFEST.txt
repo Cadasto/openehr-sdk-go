@@ -10,6 +10,7 @@ file	templates/IDCR  - Generic MDT Output Report.v0.opt	ehrbase	service/src/test
 file	templates/IDCR  - Laboratory Order.v0.opt	ehrbase	service/src/test/resources/knowledge/operational_templates/IDCR  - Laboratory Order.opt	d0811b786c9cb341cf6de1e84a35e5f51ec9638f0e9de257fe7b8af0e09316c2
 file	templates/IDCR - End of Life Patient Preferences.v0.opt	ehrbase	service/src/test/resources/knowledge/opt/IDCR - End of Life Patient Preferences.v0.opt	8f5c1eb8855309039d5570f54c17a21769b25412a410ab45d45bb21d157aa429
 file	templates/IDCR - Immunisation summary.v0.opt	ehrbase	service/src/test/resources/knowledge/IDCR - Immunisation summary.v0.opt	7c20d4bb3b2d66d4e1c23999bb8e3c3113755f5f97b662f709e8ca9d0648b1fb
+file	templates/IDCR - Medication List.v0.opt	ehrbase	service/src/test/resources/knowledge/operational_templates/IDCR - Medication List.v0.opt	f693da9f84c191f2dab4be0c70fd3620ffa1d9ffdb0b73b8f2a83c9f229cf56b
 file	templates/IDCR - Procedures List.v1.opt	ehrbase	service/src/test/resources/knowledge/opt/IDCR - Procedures List.v1.opt	c947f75a31ea9e72068700ee7e5b9f088943204063ae2c9912443f94ef8c5ab7
 file	templates/IDCR - Relevant contacts.v0.opt	ehrbase	service/src/test/resources/knowledge/operational_templates/IDCR - Relevant contacts.v0.opt	7804dc550ba1ce204482d05167e5c3cb8d70ad4b06d9a06b6b2a55219d47d56b
 file	templates/IDCR - Service Request.v0.opt	ehrbase	service/src/test/resources/knowledge/operational_templates/IDCR - Service Request.v0.opt	44796bb2b9943d517c72ffdd37ab521cc05568bbf30bee06b3c8c1300c485264

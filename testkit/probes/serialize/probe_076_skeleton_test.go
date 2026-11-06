@@ -21,12 +21,12 @@ import (
 var probe076SkeletonPolicies = []instance.Policy{instance.Required, instance.Medium}
 
 // probe076SkeletonPairFloor is the number of (template, policy) pairs the
-// corpus gives today: 74 COMPOSITION templates under two policies. A corpus
+// corpus gives today: 75 COMPOSITION templates under two policies. A corpus
 // that silently empties, or a COMPOSITION OPT that stops parsing and so drops
 // out of the corpus, falls below it. It counts the pairs the corpus lists, not
 // the ones a -run filter selects, so running one pair does not trip it; every
 // pair that runs must pass on its own. Raise it when the corpus grows.
-const probe076SkeletonPairFloor = 148
+const probe076SkeletonPairFloor = 150
 
 // compositionOPT is one COMPOSITION OPT of the corpus: its template id and its
 // body.
