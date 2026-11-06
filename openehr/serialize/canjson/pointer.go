@@ -14,7 +14,9 @@ import "github.com/cadasto/openehr-sdk-go/internal/reportpath"
 //
 // A Pointer stays valid after the function it was passed to returns: it may
 // be kept, and read from any goroutine. The zero Pointer is the root of the
-// value, whose text is empty.
+// value, whose text is empty. Two Pointers compare equal with == only when
+// they come from one report; compare their text, through [Pointer.String],
+// to tell whether they name the same member.
 type Pointer struct {
 	node *reportpath.Node
 }

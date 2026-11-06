@@ -16,7 +16,9 @@ import "github.com/cadasto/openehr-sdk-go/internal/reportpath"
 //
 // A Path stays valid after the function it was passed to returns: it may be
 // kept, and read from any goroutine. The zero Path is the root of the value,
-// whose text is empty.
+// whose text is empty. Two Paths compare equal with == only when they come
+// from one report; compare their text, through [Path.String], to tell
+// whether they name the same item.
 type Path struct {
 	node *reportpath.Node
 }
@@ -48,6 +50,11 @@ func (p Path) AppendText(b []byte) ([]byte, error) {
 // A Pointer stays valid after the function it was passed to returns: it may
 // be kept, and read from any goroutine. The zero Pointer is the root of the
 // value, whose text is empty.
+//
+// Two Pointers compare equal with == only when they come from one report:
+// a member reported by two options gives two values with the same text.
+// Compare their text, through [Pointer.String], to tell whether they name
+// the same member.
 type Pointer struct {
 	node *reportpath.Node
 }

@@ -160,7 +160,7 @@ func (t *Tracker) closing(n int) {
 	}
 	if f.unread {
 		// A skipped child named like a list member is no item of it, so it
-		// moves the positions of the items after it ([Tracker.token]).
+		// moves the positions of the items after it ([Tracker.pointerNode]).
 		if i := slices.Index(p.class.Items, f.name); i >= 0 {
 			p.skip(i, len(p.class.Items))
 		}
