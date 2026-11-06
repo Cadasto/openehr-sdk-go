@@ -2,6 +2,7 @@ package canxml_test
 
 import (
 	"bytes"
+	"encoding/xml"
 	"errors"
 	"os"
 	"path/filepath"
@@ -51,6 +52,15 @@ func TestREQ056_NotWellFormedIsItsOwnClass(t *testing.T) {
 		return joined(doc[:i], []byte(s), doc[i:])
 	}
 
+	// Each document is built here, before the subtests, so a corpus that
+	// no longer holds what a helper looks for fails the test once, here.
+	compositionTwice := withAttr(composition, "COMPOSITION", `archetype_node_id="PLANTED"`)
+	declarationInside := before(composition, `<?xml version="1.0"?>`)
+	declarationAfterSpace := joined([]byte(" "+`<?xml version="1.0" encoding="UTF-8"?>`), composition)
+	compositionTwoRoots := joined(composition, []byte("<PLANTED/>"))
+	templateTwice := withAttr(template, "template", `concept="PLANTED" concept="PLANTED"`)
+	templateTwoRoots := joined(template, []byte("<PLANTED/>"))
+
 	cases := []struct {
 		name, rule string
 		decode     func() error
@@ -59,36 +69,35 @@ func TestREQ056_NotWellFormedIsItsOwnClass(t *testing.T) {
 			name: "composition with archetype_node_id twice",
 			rule: "the element carries one attribute twice",
 			decode: func() error {
-				return canxml.Unmarshal(withAttr(composition, "COMPOSITION", `archetype_node_id="PLANTED"`), new(rm.Composition))
+				return canxml.Unmarshal(compositionTwice, new(rm.Composition))
 			},
 		},
 		{
 			name: "composition with an XML declaration before its name",
 			rule: "the element holds a processing instruction whose target is xml",
 			decode: func() error {
-				return canxml.Unmarshal(before(composition, `<?xml version="1.0"?>`), new(rm.Composition), canxml.WithStrict())
+				return canxml.Unmarshal(declarationInside, new(rm.Composition), canxml.WithStrict())
 			},
 		},
 		{
 			name: "composition after white space and a declaration",
 			rule: "content before the root element",
 			decode: func() error {
-				doc := append([]byte(" "+`<?xml version="1.0" encoding="UTF-8"?>`), composition...)
-				return canxml.Unmarshal(doc, new(rm.Composition))
+				return canxml.Unmarshal(declarationAfterSpace, new(rm.Composition))
 			},
 		},
 		{
 			name: "composition followed by a second root",
 			rule: "content after the root element",
 			decode: func() error {
-				return canxml.Unmarshal(append(joined(composition), []byte("<PLANTED/>")...), new(rm.Composition))
+				return canxml.Unmarshal(compositionTwoRoots, new(rm.Composition))
 			},
 		},
 		{
 			name: "template with concept twice",
 			rule: "the element carries one attribute twice",
 			decode: func() error {
-				_, err := aom14.ReadOperationalTemplate(bytes.NewReader(withAttr(template, "template", `concept="PLANTED" concept="PLANTED"`)))
+				_, err := aom14.ReadOperationalTemplate(bytes.NewReader(templateTwice))
 				return err
 			},
 		},
@@ -96,7 +105,7 @@ func TestREQ056_NotWellFormedIsItsOwnClass(t *testing.T) {
 			name: "template followed by a second root",
 			rule: "content after the root element",
 			decode: func() error {
-				_, err := aom14.ReadOperationalTemplate(bytes.NewReader(append(joined(template), []byte("<PLANTED/>")...)))
+				_, err := aom14.ReadOperationalTemplate(bytes.NewReader(templateTwoRoots))
 				return err
 			},
 		},
@@ -116,6 +125,13 @@ func TestREQ056_NotWellFormedIsItsOwnClass(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("markup encoding/xml cannot read before the root is its syntax error", func(t *testing.T) {
+		err := canxml.Unmarshal(joined([]byte("<1>"), composition), new(rm.Composition), canxml.WithStrict())
+		if _, ok := errors.AsType[*xml.SyntaxError](err); !ok || errors.Is(err, canxml.ErrNotWellFormed) {
+			t.Fatalf("canxml.Unmarshal(<1> + root) = %v; want an *xml.SyntaxError that does not wrap canxml.ErrNotWellFormed", err)
+		}
+	})
 
 	t.Run("a primitive failure is not one", func(t *testing.T) {
 		const doc = `<ehr_status xmlns="http://schemas.openehr.org/v1"><is_queryable>maybe</is_queryable></ehr_status>`

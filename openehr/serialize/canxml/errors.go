@@ -41,7 +41,9 @@ var ErrInvalidShape = xmlunmatched.ErrInvalidShape
 //     anywhere but the XML declaration at the very start, after a UTF-8 byte
 //     order mark at most, whether before, inside or after the root;
 //   - content before or after the root element that XML does not allow
-//     there, such as text, an end element or a second root.
+//     there, such as text, an end element or a second root, apart from
+//     markup before the root that encoding/xml cannot read, which may be
+//     the root's own start tag.
 //
 // Each such refusal wraps [ErrInvalidShape] as well, so a check against that
 // sentinel keeps matching it. The error names the rule the input breaks and
