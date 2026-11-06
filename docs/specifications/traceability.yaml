@@ -2177,6 +2177,7 @@ requirements:
       - openehr/serialize/simplified/leaf_rmtype_test.go
       - openehr/serialize/simplified/null_test.go
       - openehr/serialize/simplified/raw_fit_test.go
+      - openehr/serialize/simplified/reused_siblings_test.go
       - openehr/serialize/simplified/rmattr_encapsulated_test.go
       - openehr/serialize/simplified/rmattr_feeder_test.go
       - openehr/serialize/simplified/rmattr_party_test.go
