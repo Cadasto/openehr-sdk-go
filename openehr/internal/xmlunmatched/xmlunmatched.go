@@ -78,7 +78,8 @@
 // of them the element carried no value for: no child element of that name
 // and no XML attribute of it where the class reads one; a child carrying
 // `xsi:nil="true"`; or a primitive child whose text is empty or XML
-// whitespace only. A struct element with no content, such as `<subject/>`,
+// whitespace only, unless it is a string whose text the decode keeps
+// ([Tracker.KeepStringText]). A struct element with no content, such as `<subject/>`,
 // is a value. Each member is named by its JSON Pointer in the canonical-JSON
 // form of the instance, so a consumer of either canonical format reads one
 // list. The report is the whole policy: a missing member is never a decode
@@ -676,7 +677,8 @@ func (t *Tracker) readText(dec *xml.Decoder, start *xml.StartElement, v any) err
 
 // decodeOptional decodes the element start opens into v as
 // [Tracker.decodeText] does, unless the element carries no value
-// ([noValue]), and reports whether it decoded it.
+// ([noValue]) and t does not keep its text ([Tracker.KeepStringText]), and
+// reports whether it decoded it.
 func (t *Tracker) decodeOptional(dec *xml.Decoder, start *xml.StartElement, v any) (bool, error) {
 	f := &t.open[len(t.open)-1]
 	f.primitive = true

@@ -36,7 +36,8 @@
 //     refuses one elsewhere, before, inside or after the root, such as a
 //     second declaration or one inside an element, with [ErrInvalidShape],
 //     and so does a [Decoder] given [WithUnmatched], [WithStrict],
-//     [WithMissing], [WithPresence] or a positive [WithMaxDepth] inside the
+//     [WithMissing], [WithPresence], [WithStringText] or a positive
+//     [WithMaxDepth] inside the
 //     value it decodes; a target that only starts with those letters, such
 //     as xml-stylesheet, is accepted.
 //   - Default namespace: `http://schemas.openehr.org/v1`.
@@ -100,8 +101,8 @@
 //     it with [ErrInvalidShape], naming the attribute and none of its values,
 //     wherever the decode reads the element or skips it as unmatched content.
 //     Inside a primitive element's text, which a decode given none of
-//     [WithUnmatched], [WithStrict], [WithMissing], [WithPresence] and a
-//     positive [WithMaxDepth] reads past without looking at it, such a
+//     [WithUnmatched], [WithStrict], [WithMissing], [WithPresence],
+//     [WithStringText] and a positive [WithMaxDepth] reads past without looking at it, such a
 //     decode may accept it; a decode given one of them refuses it.
 //   - ISO 8601 dates/times/durations are passed through as element
 //     text content; the codec does not parse them.
@@ -309,7 +310,8 @@
 // in every mode with a [DecodeError] whose Inner wraps [ErrInvalidShape]
 // and the conversion's own error. Its text names the element and carries
 // none of its text. [Unmarshal], and a [Decoder] given [WithUnmatched],
-// [WithStrict], [WithMissing] or [WithPresence], return it on its own with
+// [WithStrict], [WithMissing], [WithPresence] or [WithStringText], return it
+// on its own with
 // the element's path from the root of the value, such as
 // "/ehr_status[1]/is_queryable[1]". Without an
 // option, [Unmarshal] decodes the input a second time to find that path,

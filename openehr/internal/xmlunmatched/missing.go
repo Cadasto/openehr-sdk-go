@@ -94,7 +94,8 @@ func (t *Tracker) enter(start xml.StartElement, c *Class) error {
 // A member is left out when the element has no child element of that name
 // and no XML attribute of it among the class's attribute members; when its
 // child carries `xsi:nil="true"`; or when its child is a primitive element
-// whose text is empty or XML whitespace only. Nothing inside a nilled
+// whose text is empty or XML whitespace only, unless it is a string whose
+// text the decode keeps ([Tracker.KeepStringText]). Nothing inside a nilled
 // element is reported: the member is reported once, by its parent, as a
 // null is in canonical JSON. A struct element with no content is a value,
 // and so is an entry of a Hash member, whatever its text, and an element the

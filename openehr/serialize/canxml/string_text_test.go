@@ -2,6 +2,7 @@ package canxml_test
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -156,6 +157,29 @@ func TestREQ056_REQ175_WithStringTextKeepsAStringsText(t *testing.T) {
 		}
 		if got := c.Name.GetValue(); got != "  " {
 			t.Errorf("Decoder: Name value = %q; want %q", got, "  ")
+		}
+	})
+
+	t.Run("ISO 8601 string type", func(t *testing.T) {
+		const doc = `<dv_date xmlns="http://schemas.openehr.org/v1"><value> </value></dv_date>`
+		var plain, kept rm.DVDate
+		if err := canxml.Unmarshal([]byte(doc), &plain); err != nil {
+			t.Fatal(err)
+		}
+		if err := canxml.Unmarshal([]byte(doc), &kept, canxml.WithStringText()); err != nil {
+			t.Fatal(err)
+		}
+		if plain.Value != "" || kept.Value != " " {
+			t.Errorf("DV_DATE value = %q by default and %q with WithStringText; want %q and %q", plain.Value, kept.Value, "", " ")
+		}
+	})
+
+	t.Run("a Decoder given the option alone names a primitive failure from the root", func(t *testing.T) {
+		const doc = `<ehr_status xmlns="http://schemas.openehr.org/v1"><is_queryable>maybe</is_queryable></ehr_status>`
+		err := canxml.NewDecoder(strings.NewReader(doc), canxml.WithStringText()).Decode(new(rm.EHRStatus))
+		de, ok := errors.AsType[*canxml.DecodeError](err)
+		if !ok || de.Path != "/ehr_status[1]/is_queryable[1]" {
+			t.Fatalf("Decode = %v; want a *canxml.DecodeError whose Path is /ehr_status[1]/is_queryable[1]", err)
 		}
 	})
 
