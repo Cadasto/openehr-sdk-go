@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.46.0] - 2026-11-06
+
+Forty-sixth `v0.x` minor: canonical XML reports what a document sends nilled or empty and decodes as canonical JSON does, generated documents pass the template validator again, and FLAT and the Web Template take values and labels as the reference does. **Breaking:** the deprecated OPT parser is removed, auth discovery and token documents decode with `encoding/json/v2`, and canonical XML, the operational template reader and `templatecompile.Compile` refuse input they accepted.
+
 ### Added
 
 - **`canxml.WithPresence`** reports each member a document sends nilled or empty, by its JSON Pointer and how it was sent, and `WithMissing` names a list item after a foreign-namespace sibling at its decoded position (REQ-175).
