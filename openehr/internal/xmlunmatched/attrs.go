@@ -1,13 +1,10 @@
 package xmlunmatched
 
-import (
-	"encoding/xml"
-	"errors"
-)
+import "encoding/xml"
 
 // errRepeatedAttr is the cause of the refusal of an element that carries one
 // attribute twice, which is not well-formed XML. It names no value.
-var errRepeatedAttr = errors.New("the element carries one attribute twice")
+var errRepeatedAttr error = notWellFormed("the element carries one attribute twice")
 
 // repeatedAttr returns the name of the first attribute of attrs that an
 // earlier one carries too, by its name as the namespaces in scope resolve it,

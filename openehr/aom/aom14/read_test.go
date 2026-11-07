@@ -198,11 +198,12 @@ func TestREQ176_REQ111_ReadOperationalTemplateHoldsContentAfterTheRoot(t *testin
 	t.Parallel()
 	const planted = "PLANTED"
 	refused := map[string]string{
-		"a second root":       `<template><template_id><value>` + planted + `</value></template_id></template>`,
-		"an empty element":    `<` + planted + `/>`,
-		"text":                planted,
-		"a stray end element": `</` + planted + `>`,
-		"a CDATA section":     `<![CDATA[` + planted + `]]>`,
+		"a second root":         `<template><template_id><value>` + planted + `</value></template_id></template>`,
+		"an empty element":      `<` + planted + `/>`,
+		"text":                  planted,
+		"a stray end element":   `</` + planted + `>`,
+		"a CDATA section":       `<![CDATA[` + planted + `]]>`,
+		"markup it cannot read": `<1>`,
 	}
 	defaultOnly := map[string]string{
 		"a document type":           `<!DOCTYPE ` + planted + `>`,
@@ -277,7 +278,8 @@ func TestREQ176_REQ056_ReadOperationalTemplateRefusesAnXMLTargetInsideTheRoot(t 
 // cannot read, is refused with an error wrapping canxml.ErrInvalidShape that
 // carries none of it. Text, a CDATA section, a second document type, another
 // declaration, and a processing instruction whose target is xml in any letter
-// case other than the XML declaration at the start, which encoding/xml reads,
+// case other than the XML declaration at the very start, one after
+// whitespace included, which encoding/xml reads,
 // are read past in the default mode and refused so given canxml.WithStrict.
 // A target that only starts with xml passes in every mode. An input with only
 // such content and no root is the no-root case
@@ -290,15 +292,17 @@ func TestREQ176_REQ111_ReadOperationalTemplateHoldsContentBeforeTheRoot(t *testi
 		"text, then bad markup": planted + `<1>`,
 	}
 	defaultOnly := map[string]string{
-		"text":                        planted,
-		"text after a declaration":    `<?xml version="1.0"?>` + planted,
-		"a CDATA section":             `<![CDATA[` + planted + `]]>`,
-		"a second document type":      `<!DOCTYPE template><!DOCTYPE ` + planted + `>`,
-		"another declaration":         `<!ENTITY ` + planted + ` "x">`,
-		"a second XML declaration":    `<?xml version="1.0"?><?xml version="1.0" extra="` + planted + `"?>`,
-		"a misplaced XML declaration": `<!-- note --><?xml version="1.0"?>`,
-		"an xml target in capitals":   `<?XML ` + planted + `?>`,
-		"an xml target in the subset": `<!DOCTYPE template [<?xml ` + planted + `?>]>`,
+		"text":                                 planted,
+		"text after a declaration":             `<?xml version="1.0"?>` + planted,
+		"a CDATA section":                      `<![CDATA[` + planted + `]]>`,
+		"a second document type":               `<!DOCTYPE template><!DOCTYPE ` + planted + `>`,
+		"another declaration":                  `<!ENTITY ` + planted + ` "x">`,
+		"a second XML declaration":             `<?xml version="1.0"?><?xml version="1.0" extra="` + planted + `"?>`,
+		"a misplaced XML declaration":          `<!-- note --><?xml version="1.0"?>`,
+		"an XML declaration after a space":     " " + `<?xml version="1.0"?>`,
+		"an XML declaration after a line feed": "\n" + `<?xml version="1.0"?>`,
+		"an xml target in capitals":            `<?XML ` + planted + `?>`,
+		"an xml target in the subset":          `<!DOCTYPE template [<?xml ` + planted + `?>]>`,
 	}
 	accepted := map[string]string{
 		"nothing":                       "",
@@ -347,13 +351,13 @@ var readModes = map[string][]canxml.DecoderOption{
 }
 
 // refusesContentOutsideTheRoot fails the test unless the reader refuses doc
-// with opts with an error that wraps canxml.ErrInvalidShape and does not
-// carry planted.
+// with opts with an error that wraps canxml.ErrInvalidShape and
+// canxml.ErrNotWellFormed and does not carry planted.
 func refusesContentOutsideTheRoot(t *testing.T, doc, planted string, opts ...canxml.DecoderOption) {
 	t.Helper()
 	_, err := aom14.ReadOperationalTemplate(strings.NewReader(doc), opts...)
-	if !errors.Is(err, canxml.ErrInvalidShape) {
-		t.Fatalf("ReadOperationalTemplate(%q) = %v, want an error wrapping canxml.ErrInvalidShape", doc, err)
+	if !errors.Is(err, canxml.ErrInvalidShape) || !errors.Is(err, canxml.ErrNotWellFormed) {
+		t.Fatalf("ReadOperationalTemplate(%q) = %v, want an error wrapping canxml.ErrInvalidShape and canxml.ErrNotWellFormed", doc, err)
 	}
 	if strings.Contains(err.Error(), planted) {
 		t.Errorf("error %q carries the content outside the root", err)

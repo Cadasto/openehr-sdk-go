@@ -540,7 +540,7 @@ partially or silently accepted.
 itself OPT-valid, a `WithTemplate` decode must also validate against the OPT. The conformance
 leg catches dropped/mistyped leaves that idempotence alone (a symmetric omission) would miss.
 Its **skeleton leg** builds the `instance.Required` and `instance.Medium` skeletons of every
-COMPOSITION OPT in the corpus (64 templates, 128 pairs) and requires each to validate again
+COMPOSITION OPT in the corpus (75 templates, 150 pairs) and requires each to validate again
 after a FLAT and a STRUCTURED round trip under `WithTemplate` and `WithStrict`, except two
 named exclusions: the reused-sibling encode refusal (§ Archetype-reuse siblings below) and
 the coded name a template leaves open (§ `LOCATABLE.name` on decode, registered format limit).

@@ -67,8 +67,8 @@ You may obtain a copy of the License at
 ## ehrbase/ehrbase (server test resources)
 
 **Source:** https://github.com/ehrbase/ehrbase  
-**Commit:** `040b483d6c53bd15660c37f15a5f6ee8a5fa3b1f` (2026-09-23); the file is unchanged since `296a1693d` (2019-10-08)  
-**Path within source:** `service/src/test/resources/knowledge/operational_templates/`
+**Pinned commit:** the `ehrbase/ehrbase` line of [`UPSTREAM_PINS.txt`](UPSTREAM_PINS.txt), shared by every entry in this section. [`ehrbase-service/MANIFEST.txt`](ehrbase-service/MANIFEST.txt) records it for the templates under `ehrbase-service/`, with each file's upstream path and `sha256`.  
+**Path within source:** `service/src/test/resources/knowledge/`
 
 ```
 Copyright (c) 2019 Vitasystems GmbH and Hannover Medical School.
@@ -76,9 +76,9 @@ Copyright (c) 2019 Vitasystems GmbH and Hannover Medical School.
 Licensed under the Apache License, Version 2.0 (full text: licenses/Apache-2.0.txt)
 ```
 
-**Vendored:** the `BMI` OPT (`templates/BMI.opt`, upstream `BMI.opt`); its compositions are CODE24's, below.
+**Vendored:** the `BMI` OPT (`templates/BMI.opt`, upstream `operational_templates/BMI.opt`, unchanged there since `296a1693d`, 2019-10-08); its compositions are CODE24's, below. Ten OPTs under `ehrbase-service/templates/`, each named after its template id. From `operational_templates/`: `careplan.v1`, `DiADeM Assessment.v0`, `IDCR - Medication List.v0`, `IDCR - Relevant contacts.v0`, `IDCR - Service Request.v0`, and `IDCR  - Laboratory Order.v0` (upstream `IDCR  - Laboratory Order.opt`). From `opt/`: `IDCR - Procedures List.v1`, `IDCR - End of Life Patient Preferences.v0`, and `IDCR  - Generic MDT Output Report.v0` (upstream `IDCR  - Generic MDT Output Report.opt`). From the folder itself: `IDCR - Immunisation summary.v0`. [`scripts/ingest-ehrbase-service.sh`](../../scripts/ingest-ehrbase-service.sh) copies the ten and regenerates their manifest. Not part of the SDK runtime.
 
-**Modifications:** the leading byte-order mark and the CRLF line endings are removed; the content is otherwise identical.
+**Modifications:** `BMI.opt` has its leading byte-order mark and CRLF line endings removed; its content is otherwise identical. The ten files under `ehrbase-service/` are unmodified upstream bytes, byte-order marks included; only their file names change, to their template ids.
 
 ## CODE24 (Cadasto)
 

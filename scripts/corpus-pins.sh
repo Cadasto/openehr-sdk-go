@@ -12,6 +12,7 @@
 # Provenance files checked:
 #   flat-conformance/MANIFEST.txt   source_repo: + commit:
 #   crossformat/MANIFEST.txt        every `source` record (repo URL + commit)
+#   ehrbase-service/MANIFEST.txt    every `source` record (repo URL + commit)
 #   aql/suites/AQL_SOURCE.txt       source_repo: + commit:
 #   ROBOT_SOURCE.txt                source_repo: + commit:
 #
@@ -63,12 +64,13 @@ records() {
       echo "$f - -"
     fi
   done
-  f=crossformat/MANIFEST.txt
-  if [[ -f "$CORPUS/$f" ]]; then
-    awk -F'\t' -v f="$f" '$1 == "source" { sub("^https://github.com/", "", $3); print f, $3, $4 }' "$CORPUS/$f"
-  else
-    echo "$f - -"
-  fi
+  for f in crossformat/MANIFEST.txt ehrbase-service/MANIFEST.txt; do
+    if [[ -f "$CORPUS/$f" ]]; then
+      awk -F'\t' -v f="$f" '$1 == "source" { sub("^https://github.com/", "", $3); print f, $3, $4 }' "$CORPUS/$f"
+    else
+      echo "$f - -"
+    fi
+  done
 }
 
 cmd_verify() {

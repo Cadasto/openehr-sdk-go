@@ -61,16 +61,22 @@ const inputBufferMax = 4 << 20
 // document type declaration, after a UTF-8 byte-order mark at the very start;
 // after the root it may hold comments, processing instructions and
 // whitespace. XML reserves the processing instruction target xml, in any
-// letter case, for the XML declaration at the start, so a processing
-// instruction with that target elsewhere before or after the root, such as
-// a second declaration or one after the root's end, is refused; a target that only starts with those
+// letter case, for the XML declaration, which nothing but the byte-order
+// mark may precede, so a processing instruction with that target elsewhere
+// before or after the root, such as one after whitespace, a second
+// declaration or one after the root's end, is refused; a target that only starts with those
 // letters, such as xml-stylesheet, passes. Without it, the reader also reads
 // past, before the root, any content encoding/xml reads, such as text or a
 // CDATA section, and, after the root, a `<!…>` declaration and a processing
 // instruction whose target is xml; one inside the root is refused in both
 // modes, as canonical XML refuses it. Anything else before or after the root,
 // such as an element after it or a stray end tag before it, is refused with
-// an error that wraps [canxml.ErrInvalidShape] and carries none of it. The root element may have any name, so a document whose root is
+// an error that wraps [canxml.ErrInvalidShape] and [canxml.ErrNotWellFormed]
+// and carries none of it, and so is an element that carries one attribute
+// twice, outside what the default mode leaves out unread. Markup before the
+// root that encoding/xml cannot read fails as its *xml.SyntaxError, unless
+// content [canxml.Unmarshal] refuses comes before it, which both modes then
+// refuse. The root element may have any name, so a document whose root is
 // `<OPERATIONAL_TEMPLATE>` reads as one whose root is `<template>`. An input
 // with no root element, empty or holding only a declaration, comments,
 // whitespace or text, is refused with an error that wraps
@@ -412,7 +418,9 @@ func afterRoot(r io.Reader, strict bool) error {
 	}
 }
 
-// errAfterRoot is the refusal of content after the root element.
+// errAfterRoot is the refusal of content after the root element, which wraps
+// [canxml.ErrInvalidShape] and [canxml.ErrNotWellFormed], as canonical XML's
+// does.
 func errAfterRoot() error {
-	return fmt.Errorf("aom14: content after the root element: %w", canxml.ErrInvalidShape)
+	return fmt.Errorf("aom14: %w", xmlunmatched.ContentAfterRoot())
 }

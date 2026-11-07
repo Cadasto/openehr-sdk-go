@@ -22,12 +22,13 @@ import (
 // document type declaration, after a UTF-8 byte order mark at the very
 // start; comments, processing instructions and whitespace may follow the
 // root, as XML allows. XML reserves the processing instruction target xml,
-// in any letter case, for the XML declaration, which comes first: one
-// elsewhere, before, inside or after the root, a second declaration among
-// them, is refused. Anything else before or after the root, such as an element or
+// in any letter case, for the XML declaration, which only the byte order
+// mark may precede: one elsewhere, before, inside or after the root, a second
+// declaration or one after whitespace among them, is refused. Anything else before or after the root, such as an element or
 // text other than whitespace, is not well-formed XML, and the decode refuses
 // it whatever t's policy: it is malformed input, not unmatched content. The
-// error wraps [ErrInvalidShape] and carries none of that content. A root that
+// error wraps [ErrInvalidShape] and [ErrNotWellFormed] and carries none of
+// that content. A root that
 // fails to decode fails as itself, and the decode does not read on.
 //
 // A primitive failure comes back on its own, naming the element by its path
@@ -139,8 +140,31 @@ func end(dec *xml.Decoder) error {
 
 // errAfterRoot is the refusal of content after the root element.
 func errAfterRoot() error {
-	return fmt.Errorf("%w: content after the root element", ErrInvalidShape)
+	return fmt.Errorf("%w: %w", ErrInvalidShape, notWellFormed("content after the root element"))
 }
+
+// ContentAfterRoot returns the refusal of content after the root element that
+// [Unmarshal] gives: it wraps [ErrInvalidShape] and [ErrNotWellFormed] and
+// names none of the content. A reader that holds a document to the same rule
+// returns it.
+func ContentAfterRoot() error { return errAfterRoot() }
+
+// ErrNotWellFormed classifies the decode's own refusal of input that is not
+// well-formed XML, apart from the syntax errors encoding/xml reports. It is
+// re-exported as canxml.ErrNotWellFormed, where it is documented.
+var ErrNotWellFormed = errors.New("canxml: XML not well-formed")
+
+// notWellFormed is the cause of a refusal of input that is not well-formed
+// XML. Its text names the rule the input breaks and none of the input, and it
+// matches [ErrNotWellFormed] without writing that sentinel's text, so a
+// refusal's message reads as the rule alone.
+type notWellFormed string
+
+// Error returns the rule the input breaks.
+func (e notWellFormed) Error() string { return string(e) }
+
+// Is reports whether target is [ErrNotWellFormed].
+func (e notWellFormed) Is(target error) bool { return target == ErrNotWellFormed }
 
 // utf8BOM is the UTF-8 byte order mark, which a document may start with as
 // its encoding signature.
@@ -155,8 +179,8 @@ var utf8BOM = []byte("\ufeff")
 // xml in any letter case other than the XML declaration, in the internal
 // subset of the document type declaration too, is refused: the
 // error wraps [ErrInvalidShape] and names none of it. The XML declaration is
-// a processing instruction whose target is xml, in lower case, that only
-// whitespace comes before. A token encoding/xml cannot read,
+// a processing instruction whose target is xml, in lower case, that nothing
+// comes before but the byte order mark. A token encoding/xml cannot read,
 // and data that holds no element, are left to the decode, which fails on
 // them as it would without this check. Data that opens with its root after
 // whitespace, as the encoder writes it, costs no tokenizing.
@@ -228,8 +252,10 @@ func (c *recorder) Read(p []byte) (int, error) {
 // one it refused is refused as well.
 func prolog(d *xml.Decoder, untilRoot bool) error {
 	doctype, refused := false, false
-	// start holds while only whitespace has come, where the XML declaration
-	// may stand.
+	// start holds for the first token alone, where the XML declaration may
+	// stand: XML allows nothing before it, whitespace included
+	// (https://www.w3.org/TR/xml/#NT-prolog). The byte order mark is gone by
+	// now.
 	start := true
 	for {
 		tok, err := d.RawToken()
@@ -252,9 +278,7 @@ func prolog(d *xml.Decoder, untilRoot bool) error {
 			return nil
 		}
 		ok := refused || beforeRoot(tok, &doctype, start)
-		if t, isText := tok.(xml.CharData); !isText || !isXMLSpace(t) {
-			start = false
-		}
+		start = false
 		if ok {
 			continue
 		}
@@ -298,11 +322,11 @@ func rootFirst(data []byte) bool {
 
 // xmlTargetPastStart reports whether data, one document, may hold a
 // processing instruction whose target is xml anywhere but at its start, after
-// a byte order mark and XML whitespace, where the XML declaration stands
-// ([opensXMLTarget]). A comment or a CDATA section can hold those bytes too,
-// which only a decode tells apart. It costs one search of data for `<?`.
+// a byte order mark, where the XML declaration stands ([opensXMLTarget]). A
+// comment or a CDATA section can hold those bytes too, which only a decode
+// tells apart. It costs one search of data for `<?`.
 func xmlTargetPastStart(data []byte) bool {
-	data = bytes.TrimLeft(bytes.TrimPrefix(data, utf8BOM), " \t\r\n")
+	data = bytes.TrimPrefix(data, utf8BOM)
 	for at := 1; at < len(data); at += len(piOpen) {
 		i := bytes.Index(data[at:], piOpen)
 		if i < 0 {
@@ -360,7 +384,7 @@ func isXMLTarget(target string) bool {
 
 // errBeforeRoot is the refusal of content before the root element.
 func errBeforeRoot() error {
-	return fmt.Errorf("%w: content before the root element", ErrInvalidShape)
+	return fmt.Errorf("%w: %w", ErrInvalidShape, notWellFormed("content before the root element"))
 }
 
 // isDoctype reports whether d, the text of a `<!…>` directive, is a document

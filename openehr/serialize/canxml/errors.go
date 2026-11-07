@@ -19,7 +19,7 @@ import (
 // document type declaration, and after it other than comments, processing
 // instructions and whitespace, and for a processing instruction whose
 // target is xml in any letter case anywhere but the XML declaration at the
-// start; and for an interval side written bounded with no bound where the
+// start, those three together with [ErrNotWellFormed]; and for an interval side written bounded with no bound where the
 // bound is held by value. Encode returns it for a nil value or a value that
 // does not implement xml.Marshaler. Other XML
 // syntax errors come back unchanged from encoding/xml, so an errors.Is
@@ -31,6 +31,28 @@ import (
 // / [typereg.ErrUnknownType] / [typereg.ErrTypeMismatch], not against
 // this sentinel.
 var ErrInvalidShape = xmlunmatched.ErrInvalidShape
+
+// ErrNotWellFormed classifies the decode's own refusal of input that is not
+// well-formed XML, apart from the syntax errors encoding/xml reports:
+//
+//   - an element that carries one attribute twice, by its name as written or
+//     as the namespaces in scope resolve it;
+//   - a processing instruction whose target is xml in any letter case
+//     anywhere but the XML declaration at the very start, after a UTF-8 byte
+//     order mark at most, whether before, inside or after the root;
+//   - content before or after the root element that XML does not allow
+//     there, such as text, an end element, a second root or markup
+//     encoding/xml cannot read after the root, apart from such markup before
+//     the root with nothing refused before it, which may be the root's own
+//     start tag.
+//
+// Each such refusal wraps [ErrInvalidShape] as well, so a check against that
+// sentinel keeps matching it. The error names the rule the input breaks and
+// carries none of the input. A syntax error encoding/xml reports itself, such
+// as a truncated root, comes back unchanged as an *xml.SyntaxError, which this
+// sentinel does not match; nor does a document of the wrong shape, such as a
+// primitive element whose text does not decode as its type.
+var ErrNotWellFormed = xmlunmatched.ErrNotWellFormed
 
 // ErrUnknownElement is the sentinel for content the decode does not read:
 // an element or attribute that names no attribute of the RM type its

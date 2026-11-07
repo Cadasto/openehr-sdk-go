@@ -507,6 +507,10 @@ var (
 		// cannot import either.
 		`a Hash entry has no key`,
 		`the element holds a value other than the one it may hold`,
+		// Its refusals of XML that is not well-formed, which name the rule
+		// the input breaks.
+		`the element carries one attribute twice`,
+		`the element holds a processing instruction whose target is xml, which XML reserves for the declaration at the start of a document`,
 	)
 )
 
