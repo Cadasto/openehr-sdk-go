@@ -188,14 +188,10 @@ func beginEntry[V any](dec *xml.Decoder, m *map[string]V, begun *bool) (*Tracker
 
 // setEntryKey records key as the way to read the key of the entry the decoder
 // read last, when the decode reports missing members or members sent without
-// a value: the members inside the entry are then named under it. A pointer
-// node the entry's frame holds already, made before it was known to be an
-// entry, is dropped.
+// a value: the members inside the entry are then named under it.
 func setEntryKey(dec *xml.Decoder, key func() string) {
 	if t := trackerOf(dec); t != nil && t.checksPresence() {
-		f := &t.open[len(t.open)-1]
-		f.key = key
-		f.ptr = nil
+		t.open[len(t.open)-1].key = key
 	}
 }
 
