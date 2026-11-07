@@ -32,8 +32,6 @@ func (c *Client) GetComposition(id ObjectVersionID, ctx context.Context) (*rm.Co
 
 Pure functions (codecs, validators with no I/O, AQL string builders) **SHOULD NOT** take `context.Context`, because a context they never consult is noise at every call site.
 
-**In tests**, the same pure-vs-I/O split applies. Test code that drives an I/O-bearing call (the `transport`, `auth`, `smart`, and `openehr/client` packages, all `httptest`-backed) uses `t.Context()` rather than `context.Background()` or `context.TODO()`, so cancellation and deadlines reach the call under test and are released at test cleanup. Pure-compute test packages (codec, validator and builder tests, such as `internal/bmmgen` and `openehr/instance`) can keep `context.Background()`, where `t.Context()` is cosmetic, and the conformance probes under `testkit/probes/` keep it too. The rule of thumb: if the production method takes `ctx` to do real I/O, its test passes `t.Context()`.
-
 ## HTTP client injection (REQ-021)
 
 All outgoing network I/O **MUST** go through the `*http.Client` the caller injects, its `Transport`, `Jar` and `Timeout` included, and a constructor given no client refuses with an error rather than fall back to a client of its own. Constructors accept the client via functional option or wrapper:
@@ -46,7 +44,7 @@ client, err := transport.New(catalog,
 )
 ```
 
-The SDK allocates no `*http.Client` of its own. Three shallow copies of the injected client are the exceptions, each changing only its redirect policy, and each **MUST** leave the injected client unmodified: the copy that [auth.md § Credential-bearing requests](auth.md#credential-bearing-requests) prescribes for token, refresh and revocation requests; the copy the discovery resolver fetches with, to refuse a redirect to a URL that is not https ([service-discovery.md § REQ-073](service-discovery.md#req-073--discovery-trust-posture)); and the copy the transport sends a request carrying a credential header (`Authorization`, `Proxy-Authorization`, `Cookie` or `Cookie2`) with, to refuse a redirect from https to a URL that is not https ([transport.md § REQ-092](transport.md#req-092--tls-posture)). Each copy keeps the injected client's `Transport`, `Jar` and `Timeout`.
+The SDK allocates no `*http.Client` of its own. Three shallow copies of the injected client are the exceptions, each changing only its redirect policy, and each **MUST** leave the injected client unmodified: the copy that [auth.md § Credential-bearing requests](auth.md#credential-bearing-requests) prescribes for token, refresh and revocation requests; the copy the discovery resolver fetches with, to refuse a redirect to a URL that is not https ([auth.md § REQ-073](auth.md#req-073--discovery-trust-posture)); and the copy the transport sends a request carrying a credential header (`Authorization`, `Proxy-Authorization`, `Cookie` or `Cookie2`) with, to refuse a redirect from https to a URL that is not https ([transport.md § REQ-092](transport.md#req-092--tls-posture)). Each copy keeps the injected client's `Transport`, `Jar` and `Timeout`.
 
 Rationale:
 
@@ -76,7 +74,7 @@ client, err := transport.New(catalog,
 
 - An option is a value of one small interface type, typically `func(*config) error` or `func(*config)`.
 - Options are additive: applying two options of the same family has a well-defined result, typically "last write wins", with any exception for a slice-accumulator option documented on it.
-- The `config` struct is **unexported**; consumers configure it only through `With*` options.
+- The `config` struct is **unexported**; consumers configure it only through `With*` options. The auth providers (`auth/smart`, `auth/clientcreds`, `auth/jwtbearer`) are the exception: their options act on an exported `Config`, which also serves as the serialised form below.
 - A public `Config` struct for serialised configuration (YAML, env) can exist, and the constructor routes it through the same option chain.
 
 The SDK does not use:
@@ -93,15 +91,15 @@ The primary call-site surface is **package-level functions**:
 // Idiomatic
 import "github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
 
-err := composition.Save(ctx, ehrID, comp, write.Options{...})
+saved, meta, err := composition.Save(ctx, client, ehrID, comp, composition.WithPrefer(transport.PreferRepresentation))
 ```
 
 A repository-style struct surface can be offered alongside as an injection-seam convenience:
 
 ```go
 // Allowed seam for tests / DI
-repo := composition.NewRepository(httpClient, ts, catalog)
-err := repo.Save(ctx, ehrID, comp, write.Options{...})
+repo := composition.NewRepository(client)
+saved, meta, err := repo.Save(ctx, ehrID, comp)
 ```
 
 Such a repository is an interface (e.g. `composition.Repository`), so consumers can mock it directly rather than wrap the package functions, and the package-level functions stay present beside it.
@@ -111,17 +109,17 @@ Such a repository is an interface (e.g. `composition.Repository`), so consumers 
 Go generics are used where they remove a reflection hop, an `interface{}` cast, or a type assertion, never decoratively.
 
 ```go
-// Idiomatic — typed response, no reflection
-func Get[T rm.Resource](ctx context.Context, c *Client, id string) (T, error)
+// Idiomatic — the caller names the type, no reflection (openehr/rm/typereg)
+func DecodeAs[T any](data []byte) (T, error)
 
-// Not used — reflection-based decoder for polymorphic _type
-func Get(ctx context.Context, c *Client, id string) (any, error) // forces type assertions everywhere
+// Not used — a decoder that returns any for a polymorphic _type
+func Decode(data []byte) (any, error) // forces type assertions everywhere
 ```
 
-Library code (non-test code outside `cmd/`) uses no reflection, with two exceptions: ordinary field mapping over struct tags (it is what `encoding/json` does), and uses that never choose a Go type from `_type`. The second exception has four classes: a typed-nil or zero-value check, a value comparison (`reflect.DeepEqual`), a type name in an error message, and an addressable copy that reaches pointer-receiver methods. The type registry ([rm-modeling.md § Type registry (REQ-040)](rm-modeling.md#type-registry-req-040)) is the only mechanism that projects the `_type` discriminator onto a concrete Go type. A guard test still checks this convention: it holds every library file that imports `reflect` to a reviewed list naming the class of each use.
+Library code (non-test code outside `cmd/`) uses no reflection, with two exceptions: ordinary field mapping over struct tags (it is what `encoding/json` does), and uses that never choose a Go type from `_type`. The second exception has four classes: a typed-nil or zero-value check, a value comparison (`reflect.DeepEqual`), a type name in an error message, and an addressable copy that reaches pointer-receiver methods. The type registry ([reference-model.md § Type registry (REQ-040)](reference-model.md#type-registry-req-040)) is the only mechanism that projects the `_type` discriminator onto a concrete Go type. A guard test still checks this convention: it holds every library file that imports `reflect` to a reviewed list naming the class of each use.
 
-- A constraint interface is a marker (`isComposition()`) plus the necessary method set — the same rule as for abstract categories.
-- A constraint interface appears only in the type parameter list of a function signature: `Get[T rm.CompositionLike](...) (T, error)` keeps the runtime type, while `func Get(...) (rm.CompositionLike, error)` erases it.
+- A constraint is a closed type set, such as `contribution.Versionable` (`rm.Composition | rm.EHRStatus | rm.Folder | rm.EHRAccess`), or a marker method plus the necessary method set — the same rule as for abstract categories.
+- A constraint appears only in the type parameter list of a function signature: `contribution.Creation[T Versionable](data *T, …)` keeps the caller's type, where a parameter of an interface type would erase it.
 
 If a generic API is harder to read than a `T`-specific one for the most common call site, the generic is wrong — drop it.
 
@@ -192,28 +190,7 @@ A wrapped error **MUST** stay reachable with `errors.Is` and `errors.As`, and a 
 
 ### Typed errors
 
-The SDK defines a typed error hierarchy in `transport/` (and re-exported from leaf packages where useful):
-
-```go
-type WireError struct {
-    StatusCode int
-    OpenEHR    *OpenEHRErrorDetail  // ITS-REST error envelope, if parseable
-    Inner      error
-}
-
-var (
-    ErrPreconditionFailed   = errors.New("precondition failed")    // 412
-    ErrUnprocessable        = errors.New("unprocessable entity")   // 422
-    ErrPreconditionRequired = errors.New("precondition required")  // 428 (defensive; not openEHR-canonical)
-    ErrVersionConflict      = errors.New("version conflict")       // 409
-    ErrNotFound             = errors.New("not found")              // 404
-    ErrUnauthorized         = errors.New("unauthorized")           // 401
-    ErrForbidden            = errors.New("forbidden")              // 403
-    ErrDiscovery            = errors.New("service catalog error")
-)
-```
-
-Consumers detect classes with `errors.Is(err, transport.ErrPreconditionFailed)`. Discovery, parse, and auth errors **MUST** have their own sentinel or typed error so they are distinguishable from wire errors.
+A wire failure is a `*transport.WireError` matched by a status sentinel such as `transport.ErrPreconditionFailed` ([transport.md § REQ-093](transport.md#req-093--openehr-error-envelope-mapping)). Consumers detect classes with `errors.Is(err, transport.ErrPreconditionFailed)` and read the details with `errors.AsType[*transport.WireError]`. Discovery, parse, and auth errors **MUST** have their own sentinel or typed error, in their own package (such as `*discovery.DiscoveryError` and `*auth.ExchangeError`), so they are distinguishable from wire errors.
 
 To extract a typed error's fields — not just match a sentinel — SDK code uses the Go 1.26+ `errors.AsType[E]` form, which the module's minimum Go version ([releases.md § Minimum Go version](../releases.md#minimum-go-version)) always makes available. The older `errors.As(err, &target)` out-parameter remains where that shape is itself the subject, as in the nil-receiver guard in `openehr/client/query`:
 
@@ -258,11 +235,11 @@ Practical implications:
 - The auth refresh path coalesces concurrent refresh attempts (one goroutine refreshes; the others wait), and the discovery cache coalesces concurrent resolution attempts.
 - Connection pooling is handled by the injected `*http.Client`; the SDK does not need to do its own.
 
-A caller waiting on a coalesced refresh or resolution **MUST NOT** be handed the outcome of an attempt that failed only because the running caller's own context ended (its cancellation, deadline or cause), or that panicked: such an attempt releases every waiter, and a waiter whose own context is still live tries again, running a new attempt or joining a newer one, while the panic continues to the caller that ran the attempt. This holds for the token sources of `auth/smart`, `auth/clientcreds` and `auth/jwtbearer`, for the key-set (JWKS) refresh of `auth/smart`, and for discovery resolution, whose cache entry such a failure leaves in place ([service-discovery.md § Refresh API](service-discovery.md#refresh-api)). The token refresh of `auth/smart` runs on a goroutine of its own that the starting caller's context does not end ([auth.md § REQ-063](auth.md#req-063--token-refresh)), so it never fails only because that context ended. Its panic goes to the caller that started it while that caller waits; once that caller has returned, the panic surfaces on the refresh's goroutine after the waiters are released, as any unrecovered panic in a goroutine does.
+A caller waiting on a coalesced refresh or resolution **MUST NOT** be handed the outcome of an attempt that failed only because the running caller's own context ended (its cancellation, deadline or cause), or that panicked: such an attempt releases every waiter, and a waiter whose own context is still live tries again, running a new attempt or joining a newer one, while the panic continues to the caller that ran the attempt. This holds for the token sources of `auth/smart`, `auth/clientcreds` and `auth/jwtbearer`, for the key-set (JWKS) refresh of `auth/smart`, and for discovery resolution, whose cache entry such a failure leaves in place ([auth.md § Refresh API](auth.md#refresh-api)). The token refresh of `auth/smart` runs on a goroutine of its own that the starting caller's context does not end ([auth.md § REQ-063](auth.md#req-063--token-refresh)), so it never fails only because that context ended. Its panic goes to the caller that started it while that caller waits; once that caller has returned, the panic surfaces on the refresh's goroutine after the waiters are released, as any unrecovered panic in a goroutine does.
 
 Documented exceptions:
 
-- Builders (`aql.New().From(...)`, `composition.NewBuilder(opt)`) are **not** goroutine-safe: they are construct-then-finalise types, not long-lived clients, so a caller does not share one across goroutines, and each builder's package documentation says so.
+- Builders (`aql.NewBuilder()`, `composition.NewBuilder(ctx, compiled)`, `contribution.NewBuilder()`) are **not** goroutine-safe: they are construct-then-finalise types, not long-lived clients, so a caller does not share one across goroutines.
 - The Cassette `probe.Recorder` and `probe.Replayer` (REQ-082) guard their captured and remaining exchanges with a mutex, so both are safe to share across goroutines — no single-goroutine restriction applies.
 
 ## Public-API stability

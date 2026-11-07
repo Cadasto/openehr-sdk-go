@@ -12,7 +12,7 @@ date: 2026-10-07
 - **Supersedes:** —
 - **Superseded by:** —
 - **Strand:** none — direct decision, recorded from the maintainer's issue [#246](https://github.com/Cadasto/openehr-sdk-go/issues/246) (its *Proposed solution* and *Alternatives considered*).
-- **Amends:** [REQ-095](../specifications/wire.md#req-095) (OpenAPI authoritative source) — one keyed exception, carried by § REQ-095 itself rather than asserted from here — and [REQ-130](../specifications/wire.md#req-130--contribution-builder) (Contribution builder), whose § *Deletion* carries the mechanics.
+- **Amends:** [REQ-095](../specifications/wire.md#the-openapi-files-are-authoritative) (OpenAPI authoritative source) — one keyed exception, carried by § REQ-095 itself rather than asserted from here — and [REQ-130](../specifications/wire.md#req-130--contribution-builder) (Contribution builder), whose § *Deletion* carries the mechanics.
 - **Related:** [ADR 0019](0019-definition-timestamp-tolerance.md) (the first keyed exception to REQ-095, and the form this one follows).
 
 ## Context

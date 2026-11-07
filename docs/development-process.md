@@ -176,7 +176,7 @@ testkit/corpus/
   compositions/{template-id}.xml     # when vendored
   rm/{name}.json | {name}.xml        # RM-only samples (ehrbase, leaf XML, …)
   submissions/{name}.json            # CONTRIBUTION POST wire (inline ORIGINAL_VERSION)
-  its_rest/                          # ITS-REST wire records (REQ-095)
+  its_rest/                          # ITS-REST wire records (REQ-050)
   crossformat/{set}/                 # one composition in several formats (PROBE-105)
 ```
 
@@ -185,7 +185,7 @@ testkit/corpus/
 | `templates/` + `compositions/` | Operational template + canonical instance for a `template_id` | PROBE-022–027, PROBE-030 (JSON), PROBE-033 (XML when paired) |
 | `rm/` | RM root samples without a paired OPT (ehrbase COMPOSITION/EHR_STATUS/FOLDER, leaf `DV_QUANTITY`, …) | PROBE-030, PROBE-033 |
 | `submissions/` | CONTRIBUTION create payloads for the EHR contribution client (not `rm.Contribution` decode) | contribution client tests (REQ-059) |
-| `its_rest/` | ITS-REST request and response **bodies**: no method, URL, headers or status (§ Modes) | PROBE-010+, discovery probes (REQ-095) |
+| `its_rest/` | ITS-REST request and response **bodies**: no method, URL, headers or status (§ Modes) | PROBE-010+, discovery probes (REQ-050) |
 
 PROBE-030 and PROBE-033 read the top-level files of `compositions/` and `rm/` through `fixtures.ListCompositionJSON` and `fixtures.ListRMXML`. Neither walk enters a subdirectory, so `rm/polymorphic/` is outside both (PROBE-038 names that directory itself). Composition XML those walks skip can be listed in `compositionXMLExcluded`, and a top-level `rm/` JSON sample that is an alternate wire shape or a deliberately invalid API-validation payload in `rmJSONExcluded` or `rmJSONExcludedPrefixes` respectively, all in that package, so the probes stay green while the files remain available for template and validation work.
 

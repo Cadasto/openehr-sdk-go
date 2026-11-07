@@ -2,15 +2,99 @@
 kind: specification
 ---
 
-# BMM conformance
+# Reference Model in Go
 
 **Status:** Draft
 
+Rules for representing the openEHR Reference Model (RM) and the other BMM-derived models in Go: the shape of the generated types, the openEHR terminology vocabulary (REQ-034) and the type registry (REQ-040); the pinned BMM sources, the loader and the generator's mapping (REQ-041, REQ-045, REQ-048); and the RM's behavioural functions (REQ-120, REQ-121, REQ-123). The retired REQ-030 to REQ-033 are [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4, summarised in [§ The shape of the RM in Go](#the-shape-of-the-rm-in-go); the retired REQ-042, REQ-043, REQ-044, REQ-046 and REQ-047 are prose under REQ-041, the retired REQ-049 is part of REQ-048, and the retired REQ-122 is part of REQ-120.
+
+The RM types in `openehr/rm/` are **generated** from the SDK-authored RM root over the pinned BMM schemas in [`../resources/bmm/`](../../resources/bmm); the rules below state the *shape* the generator emits. Generator semantics (mapping rules per P_BMM construct, primitive types, file conventions) are [§ BMM sources and the generator](#bmm-sources-and-the-generator).
+
+## The shape of the RM in Go
+
+The RM has deep polymorphism: `LOCATABLE → ENTRY → COMPOSITION`; `DATA_VALUE → DV_QUANTITY → DV_DURATION`. Go's type system does not have inheritance, and emulating it leads to runtime-tag confusion, reflection-heavy decoders and runtime errors that belong at compile time. The generator's output rule is [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4; in brief:
+
+- **Concrete structs.** Every concrete RM class is a concrete Go struct (`Composition`, `Observation`, `DVQuantity`, …). There is no runtime base struct that types inherit from, no single RM struct with a `Type` discriminator field, and no `interface{}`-typed payload with a `Kind` enum.
+- **Flattened ancestors.** An abstract non-generic ancestor's properties are flattened into every concrete descendant: the generated `Composition` carries `Name`, `ArchetypeNodeID`, `UID` and the other `LOCATABLE` fields as its own. Only concrete ancestors and whitelisted abstract-generic ancestors (such as `EVENT`, [ADR 0003](../adr/0003-rm-event-polymorphism.md)) appear as embedded structs.
+- **Marker interfaces for abstract categories.** An abstract RM category (`DATA_VALUE`, `ITEM_STRUCTURE`, `ENTRY`, …) is a Go interface with an unexported marker method (`isDataValue()`), which keeps a type outside the package from satisfying it by accident; a concrete type satisfies it through its method set, with no registration.
+- **The type registry for `_type`.** The `_type` discriminator maps onto a concrete Go type only through the type registry ([§ Type registry (REQ-040)](#type-registry-req-040)): no tag-magic dispatch on a peeked `_type`, and no generic "RM node" that holds any kind of RM value indistinguishably.
+
+## openEHR terminology vocabulary (REQ-034)
+
+The openEHR Terminology — the `openehr` terminology's **groups** (*audit change type*, *version lifecycle state*, *setting*, *participation mode*, *composition category*, …) and **code sets** (*normal statuses*, *compression algorithms*, *integrity check algorithms*), and the **external code sets** the Foundation publishes beside them (*languages* ISO_639-1, *countries* ISO_3166-1, *character sets* IANA_character-sets, *media types* IANA_media-types), that the RM's own invariants reference (`EVENT_CONTEXT.Setting_valid`, `AUDIT_DETAILS.Change_type_valid`, `PARTICIPATION.Mode_valid`, `DV_ORDERED.Normal_status_validity`, `ENTRY.Language_valid`, …) — is part of the specifications the SDK targets, published as a computable artefact by the openEHR Foundation. It is small, closed and versioned with the specifications; it is **not** a runtime terminology-service lookup. The external code sets are the snapshots the Foundation publishes with the TERM release, not the live ISO and IANA registers. Beside them the release publishes the **property-unit table**, `PropertyUnitData.xml`: for each code of the *property* group, the units of measure that measure it, with their UCUM codes, which a `C_DV_QUANTITY` constraint's `property` names ([clinical-modeling.md § REQ-103](clinical-modeling.md#req-103--primitive-constraint-introspection)). The SDK carries the terminology the way it carries the BMM ([§ REQ-041](#req-041--pinned-bmm-sources)):
+
+- **Pinned source.** The Foundation's `openehr_terminology.xml`, `openehr_external_terminologies.xml` and `PropertyUnitData.xml` for one named TERM release, all three taken from the same upstream commit, are vendored byte-identical under `resources/terminology/`, with the release, the upstream commit and each file's sha256 recorded beside them. A version bump is an explicit, reviewable commit that moves them together; the pin is never hand-edited, and the build gate fails when a vendored file no longer matches its recorded sha256.
+- **Generated accessor.** A building-block package, `openehr/terminology`, **MUST** expose every group and every code set of the pin as typed, closed, source-ordered values — groups with code → rubric, rubric → code and membership lookups, code sets with membership lookups and the issuer and external identifier the pin gives each (`ISO_639-1`, `IANA_character-sets`, `openehr_normal_statuses`, …) — plus the pinned release version and the property-unit table: for each property code, the UCUM codes of the units the table lists for it, taken trimmed, once each and in source order, with the primary units marked, and a membership lookup. A unit the table gives no UCUM code contributes none. Its tables are generated from the pin, and the build gate fails when they drift from it; its import rule is in [module-layout.md § REQ-013](module-layout.md#req-013--building-block-independence).
+- **Membership.** A code set's membership lookup **MUST** ignore letter case when the pin names an issuer other than openEHR (the ISO and IANA sets), because those issuers do: the IANA character-set registry makes no distinction between upper and lower case, RFC 6838 §4.2 makes media type names case-insensitive, and RFC 5646 §2.1.1 treats the ISO 639 language and ISO 3166-1 region subtags of a language tag as case-insensitive. A membership lookup **MUST** be exact for an openEHR-issued code set, as a group's lookups are, and for a UCUM code, which is case-sensitive. A lookup **MUST** accept only a code the pinned set lists, under the letter-case rule above: a code the live ISO or IANA register holds and the pinned snapshot leaves out, such as one the register added after the release, is not a member until a release bump brings it in, and nor is an IANA alias the set leaves out, such as `ISO-8859-1` beside the listed name `ISO_8859-1:1987`.
+- **One home per code.** SDK code that mints, defaults, validates, or reconstructs an `openehr`-terminology coded value from a bare code or a bare rubric takes the code set, the rubric and the membership verdict from the accessor; a hand-typed openEHR code table or rubric outside it is a defect. A surface can keep named constants for the codes it promotes (`LifecycleStateComplete`, `ChangeTypeCreation`, …), but a surface that validates such a code **MUST** judge it by its group membership in the pin, and a `DV_CODED_TEXT` the SDK builds from a code **MUST** carry that code's pinned rubric as its `value`, never a rubric typed beside the code. A codec that instead *transports* a caller-supplied code-and-rubric pair whole — the FLAT `ctx/setting` `|code`+`|value`, say — transcribes it and does **not** re-validate its membership here; enforcing the RM instance invariants (`EVENT_CONTEXT.Setting_valid`, …) on decoded values is [REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)'s, not this requirement's.
+- **Negative space.** A lookup of an unknown code or rubric **MUST** report absence (a false second return) rather than a fabricated value or a panic, on a nil group or property too.
+
+*Out of scope:* external terminologies (SNOMED CT, LOINC, …) — [REQ-111](clinical-modeling.md#req-111--public-compiled-template-bridge) covers the bindings an OPT declares, and a terminology *service* stays a consumer concern. Evaluating the RM's coded invariants against the accessor on an RM instance is the template-less RM floor's ([REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor) § *Coded invariants*), not this requirement's.
+
+## Type registry (REQ-040)
+
+A central type registry in `openehr/rm/typereg` maps each `_type` string to the constructor of its concrete Go type, and polymorphic JSON decoding of RM fields goes through it.
+
+```go
+// package typereg (sketch)
+
+type Registry struct { ... }
+
+// Default is the package-level registry, populated by the rm package's init().
+var Default *Registry
+
+// Register associates a _type string with a constructor returning a zero value
+// of the concrete Go type. Panics on duplicate registration.
+func (r *Registry) Register(typeName string, constructor func() any)
+
+// Decode reads {"_type":"DV_QUANTITY", ...} and returns a *DVQuantity (typed any).
+// Returns an error if _type is missing, unknown, or the body fails to decode into
+// the concrete type.
+func (r *Registry) Decode(data []byte) (any, error)
+```
+
+Rules:
+
+- The registry **MUST** decode the `_type` of every concrete RM type the SDK generates; the `rm` package's `init()` registers each one. A `_type` the registry does not know **MUST** fail with an error that carries `typereg.ErrUnknownType`. A missing `_type` **MUST** fail with an error that carries `typereg.ErrMissingType` where no declared type fixes the value, at the top level (`Registry.Decode`) and at an abstract slot; a narrow-interface slot whose declared parent is concrete reads it as that parent type ([wire.md § Polymorphic substitution](wire.md#polymorphic-substitution)). Neither case decodes as a guessed type.
+- The registry is append-only at runtime. Calling `Register` twice for the same `_type` with different constructors **MUST** panic — a name collision is a programmer error, not a recoverable condition. Consumers do not register types unless they extend the RM, which the SDK does not actively support but does not prevent either.
+- The constructor closure is the only mechanism that instantiates a type: the registry uses no reflection ([idiom.md § Generics and reflection](idiom.md#generics-and-reflection)).
+- A decoded value of static type `any` is type-asserted at the call site. The SDK provides generic helpers (`typereg.DecodeAs[T any](data)`) where useful.
+
+The registry is also **reversible** ([ADR 0013](../adr/0013-generated-locatable-identity-surface.md)):
+
+- A generated `rm.RMTypeName(any) (string, bool)` **MUST** map every registered concrete Go type — including generic instantiations over the parameter bound's closed descendant set — back to its bare registration name (`DVInterval[DVQuantity]` → `"DV_INTERVAL"`), and report `("", false)` for a nil interface, a typed-nil pointer or a non-RM value.
+- A generated `rm.IsTypedNil(any) bool` **MUST** report whether a value is an interface carrying a typed-nil pointer to a registered concrete type; it is the guard to use before calling `Locatable` accessors.
+
+Both are generated with the forward registrations, so forward and reverse mappings cannot drift, and neither uses reflection.
+
+### Generated LOCATABLE identity surface
+
+Because ADR 0002 D4 flattens the `LOCATABLE` fields into every concrete descendant, the generator also emits a polymorphic identity surface over them ([ADR 0013](../adr/0013-generated-locatable-identity-surface.md)):
+
+- Every LOCATABLE concrete type **MUST** satisfy the sealed `rm.Locatable` interface through four value-receiver read accessors — `GetArchetypeNodeID() string`, `GetName() DVTextLike`, `GetUID() UIDBasedID`, `GetArchetypeDetails() *Archetyped` — each returning the flattened field's declared type, so both `T` and `*T` satisfy it.
+- For every LOCATABLE concrete type `T`, `*T` **MUST** satisfy the sealed `rm.MutableLocatable` interface, which collects the four matching pointer-receiver setters.
+- Accessors return the field verbatim, so a getter called on a typed-nil `*T` panics; a caller guards with `rm.IsTypedNil` before asserting or calling.
+- The surface is machine-owned: accessor emission resolves types through the same rules as struct-field rendering, and the generator's drift check covers it ([§ REQ-041](#req-041--pinned-bmm-sources)).
+
+## What is NOT in scope here
+
+- **Template-specific generated structs.** A typed Go struct for a specific OPT (e.g. a vital-signs template) is **not** part of `openehr/rm/` — that belongs in the consuming project (see [scope.md § Out of scope](scope.md#out-of-scope-v1)).
+- **The full RM type list.** The dictionary of types lives in `openehr/rm/` once implemented; this spec defines the *rules*, not the inventory.
+
+## Codec interaction
+
+Codecs in `openehr/serialize/` are the consumers of the type registry on the read path, and the inverse on the write path:
+
+- **Read:** the codec peeks `_type`, looks up the constructor in the registry, decodes into the concrete struct.
+- **Write:** the codec encodes the concrete struct; `_type` is set by the struct's `MarshalJSONTo` (or a custom encoder), keyed off the struct's known `_type` name.
+
+The underlying JSON library is the standard library's `encoding/json/v2` ([ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md)); the type-registry contract above holds regardless — codecs consult the registry, the registry does not depend on them. STRAND-04's remaining open questions are the full-RM inventory and codec performance, not the codec choice.
+
+## BMM sources and the generator
+
 The SDK's domain types (Reference Model, Archetype Object Model, base + language + terminology types) are **derived from openEHR BMM schemas** pinned in [`../resources/bmm/`](../../resources/bmm). This document is the normative contract between those BMM inputs and the Go code in `openehr/rm/`, `openehr/aom/aom14/`, and related packages.
 
-Covers REQ-041, REQ-045, REQ-046 and REQ-048; the retired REQ-042, REQ-043, REQ-044 and REQ-047 are prose under REQ-041, and the retired REQ-049 is part of REQ-048.
-
-## The BMM substrate
+### The BMM substrate
 
 openEHR distributes its information and meta-models as **BMM schemas** — Basic Meta-Model files in the `P_BMM` JSON persistence format. Every class, property, generic parameter, function signature, primitive type, cardinality, and documentation string the SDK needs is in those files. The BMM is machine-readable and lossless with respect to UML; it is the substrate the openEHR ecosystem uses for archetype tooling, AQL path resolution, and code generation across implementations.
 
@@ -27,21 +111,20 @@ Pinned schemas live in [`../resources/bmm/`](../../resources/bmm):
 
 **Primary** files drive v1 code generation. **Deferred** files stay in `resources/bmm/` (no removal) but the generator does not emit Go code from them in v1 — the BMM-conformance contract continues to apply if and when a future phase wires them in.
 
-## Requirements
-
 ### REQ-041 — Pinned BMM sources
 
 The BMM files in `resources/bmm/`, the pinned schemas and the SDK-authored roots over them, are the source of truth for the openEHR domain model. The generated RM and AOM 1.4 types, their primitive mappings and their type registry entries **MUST** correspond to the classes and properties of the pinned BMM files as the SDK-authored root schemas include and amend them ([§ SDK-authored root schemas](#sdk-authored-root-schemas)), mapped by [§ Mapping rules](#mapping-rules) and [§ Primitive type mapping](#primitive-type-mapping); hand-written Go code embeds no out-of-band information about openEHR types: what the pinned schemas lack or get wrong is declared in a root schema, never in a Go table.
 
 How the SDK keeps that correspondence:
 
-- **Generated, reproducibly.** An in-tree generator (`internal/bmmgen`, run by `cmd/bmmgen`) generates `openehr/rm/`, `openehr/rm/typereg/`, `openehr/rm/rminfo/` and `openehr/aom/aom14/` from the **primary** BMM files in the table above. It is reproducible: two runs over the same inputs give byte-identical output.
+- **Generated, reproducibly.** An in-tree generator (`internal/bmmgen`, run by `cmd/bmmgen`) generates `openehr/rm/` (the type registrations included), `openehr/rm/rminfo/` and `openehr/aom/aom14/` from the **primary** BMM files in the table above. It is reproducible: two runs over the same inputs give byte-identical output.
 - **Drift-checked.** The build gate re-runs the generator and fails when the working tree differs from its output, which is the mechanical guarantee against a hand edit silently diverging from the BMM.
 - **Scope.** The generator skips the BMM package `org.openehr.rm.ehr_extract` and its sub-packages, and the deferred BMM files (`am 2.4.0`, `lang 1.1.0`, `term 3.1.0`) are not its inputs in v1.
 - **Generated and hand-written files stay apart.** A generated file carries the standard generated-code header ([§ Generator output conventions](#generator-output-conventions)) and is never edited by hand. Hand-written code in a BMM-derived package lives in its own files, documented in a `doc.go` or named by the `<file>_ext.go` convention; it consumes the generated types, never redefines a generated type or method, and never weakens or overrides an invariant the BMM declares. A hand-written package can hold a generated `*_gen.go` file that the drift check covers like any other output, such as the generated attribute access in `internal/rmaccess` and the invariant inventory in `openehr/validation`, which a hand-kept `invariants.json` classifies.
+- **Primitive types.** Each openEHR primitive type **MUST** map to the Go type the table in [§ Primitive type mapping](#primitive-type-mapping) gives it. The mapping is fixed; an alternative widening, such as `Real` to `float32`, is not permitted. `Character` is the one primitive whose canonical JSON spelling (a one-character string) disagrees with a numeric Go `rune`, so it maps to a named type carrying its own codec.
 - **The BMM wins.** Where a BMM file declares a class, property or cardinality that contradicts a statement elsewhere in the openEHR specifications, the SDK follows the BMM. The BMM is the computable form the openEHR ecosystem uses for validation, AQL path typing and tooling, so diverging from it would make archetype validation disagree with templates compiled from it, and it is the form the openEHR Foundation actively maintains while spec prose lags. A suspected bug in a BMM file is raised upstream, in the openEHR specifications repository, and until the corrected schema is pinned the target's root schema carries the correction ([§ SDK-authored root schemas](#sdk-authored-root-schemas)); it is never worked around in Go. Where an ITS-XML schema and the BMM disagree on the wire form of an ADL 1.4 artefact, the schema is what the documents follow, and the root schema declares the schema's form. A deviation from the mapping rules takes an ADR and an update to [§ Mapping rules](#mapping-rules).
 
-The openEHR Terminology vocabulary is pinned the same way under `resources/terminology/` ([rm-modeling.md § REQ-034](rm-modeling.md#openehr-terminology-vocabulary-req-034)).
+The openEHR Terminology vocabulary is pinned the same way under `resources/terminology/` ([§ REQ-034](#openehr-terminology-vocabulary-req-034)).
 
 #### SDK-authored root schemas
 
@@ -79,12 +162,6 @@ type Resolver interface {
 Schema, Class, Property, Type, FunctionParameter are the in-memory equivalents of the `P_BMM_*` persistence types — abstract over the four property variants and three type variants (see § Mapping rules).
 
 `LoadAll` merges each include into the schema that includes it. A class the including schema declares shadows an included class of the same name ([ADR 0002 D2](../adr/0002-bmm-codegen-decisions.md#d2--descendant-shadows-ancestor-bmm-include-merge)). When one class reaches a schema through its includes in differing forms, the form whose schema descends, through its includes, from the schema of every other form wins, whatever the order of the includes; where several schemas bring one identical form, a differing form wins only when its schema descends from each of them: a root that includes AOM 1.4, which includes BASE, and RM, which includes BASE too, gets the RM form of each class RM and BASE both declare. Two differing forms neither of whose schemas descends from the other's give way to the form of a third schema that descends from both and declares the class again. When no form's schema descends from the schema of every other form, the load fails with `ErrSchemaConflict`.
-
-### REQ-046 — Primitive type mapping
-
-The SDK **MUST** map openEHR primitive types to Go types per the table in [§ Primitive type mapping](#primitive-type-mapping) below. The mapping is fixed; alternative widenings (e.g. mapping `Real` to `float32`) are not permitted.
-
-`Character` is the one primitive whose canonical JSON spelling (a one-character string) disagrees with a numeric Go `rune`, so it maps to a named type carrying its own codec — the mapping is still fixed, this is the fixed target.
 
 ### REQ-048 — RM meta-model introspection surface
 
@@ -141,7 +218,7 @@ Per class, the shipped attribute-name set **MUST** equal the effective property 
 `is_abstract` in the pinned BMM answers "does the model forbid instantiating this class". It is **not** the same question as "can a stored instance carry this name as `_type`", and this surface does not conflate them:
 
 - The surface **MUST** report the BMM's flag verbatim, even where the BMM's answer looks wrong. Six classes the universe admits — `MEASUREMENT_SERVICE`, `TERMINOLOGY_SERVICE`, `CODE_SET_ACCESS`, `TERMINOLOGY_ACCESS`, `OPENEHR_CODE_SET_IDENTIFIERS`, `OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS` — carry no `is_abstract` flag and are reported non-abstract, two of them despite being `P_BMM_INTERFACE` declarations the generator renders as Go interfaces. The BMM wins over a locally derived answer, whether or not the local answer is better ([REQ-041](#req-041--pinned-bmm-sources)).
-- The set of `_type` values the SDK can actually decode is the question of the [REQ-040 type registry](rm-modeling.md#type-registry-req-040), which a caller asks instead. This surface answers the model's shape; the registry answers what is instantiable in Go.
+- The set of `_type` values the SDK can actually decode is the question of the [REQ-040 type registry](#type-registry-req-040), which a caller asks instead. This surface answers the model's shape; the registry answers what is instantiable in Go.
 
 Whether abstractness ought to report BMM-interface-ness as well — and whether the missing flags are an upstream BMM defect to raise — is open as [STRAND-12](research-strands.md#strand-12--bmm-interface-classes-carry-no-is_abstract-flag), and code leaves it open until that strand resolves.
 
@@ -204,13 +281,13 @@ A name reporting an absence reason **MUST** report not-known on every `Lookup` a
 
 **Out of scope:** runtime BMM loading (ruled out above, not deferred); AOM/AM class hierarchies; generic-parameter resolution beyond the root-type reduction the attribute tables already apply; selecting among multiple pinned schemas at run time; deriving *instantiability* beyond the BMM's own abstractness flag (an RM invariant that forbids a value is [REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)'s, not this surface's); shipping any excluded model (the exclusions are pinned intent — PROBE-094 — and the absence reasons make them legible, not reversible); naming the *skipped package* for an excluded-package name (deferred until a consumer needs it); and policy — what a caller does with a reason is the caller's, not this surface's.
 
-## Mapping rules
+### Mapping rules
 
 **Implements:** REQ-041
 
 How each P_BMM construct becomes Go code.
 
-### Schema → Go package set
+#### Schema → Go package set
 
 | BMM schema | Go package | v1 |
 |---|---|---|
@@ -223,22 +300,22 @@ How each P_BMM construct becomes Go code.
 
 **Why AOM is a sibling of RM, not a sub-package of template.** Archetypes and templates are distinct openEHR knowledge artefacts: archetypes define reusable clinical content (parsed from ADL into AOM); templates compose and constrain archetypes for a use case (parsed from OET into OPT). AOM is the in-memory form of an *archetype*; the compile step in `openehr/templatecompile` *consumes* AOM types but does not own them. Placing AOM at `openehr/aom/` keeps the parallel with `openehr/rm/`: both are top-level openEHR information models that the rest of the SDK depends on.
 
-### Class → Go type
+#### Class → Go type
 
 | BMM class kind | Go output |
 |---|---|
-| Concrete class (`is_abstract` absent or `false`) | `type X struct { ... }` with embedded ancestor structs |
-| Abstract class (`is_abstract: true`) | `type X interface { isX() }` plus a marker method on every concrete descendant. Per [`rm-modeling.md`](rm-modeling.md). |
+| Concrete class (`is_abstract` absent or `false`) | `type X struct { ... }` carrying its abstract ancestors' properties as its own, and embedding a concrete or whitelisted abstract-generic ancestor ([§ The shape of the RM in Go](#the-shape-of-the-rm-in-go)) |
+| Abstract class (`is_abstract: true`) | `type X interface { isX() }` plus a marker method on every concrete descendant. Per [§ The shape of the RM in Go](#the-shape-of-the-rm-in-go). |
 | `P_BMM_INTERFACE` | `type X interface { isX() }`, a marker only ([ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4). The generator emits no methods for its `functions`: today that leaves the four of `CODE_SET_ACCESS` and the six of `TERMINOLOGY_ACCESS` out, and no class in the pinned BMM descends from an interface ([STRAND-12](research-strands.md#strand-12--bmm-interface-classes-carry-no-is_abstract-flag)) |
 | `P_BMM_ENUMERATION_STRING` | `type X string` + constants for each item |
 | `P_BMM_ENUMERATION_INTEGER` | `type X int` + constants for each item |
 | Generic class (`generic_parameter_defs` present) | Generic Go type `type X[T constraint] struct { ... }` where the constraint corresponds to the `conforms_to_type` upper bound |
 
-Inheritance via `ancestors` is materialised by **embedding the ancestor struct(s)** in concrete classes, per [rm-modeling.md § The shape of the RM in Go](rm-modeling.md#the-shape-of-the-rm-in-go). Multiple inheritance flattens to multiple embedded structs (Go allows it; the BMM resolves conflicts at the model level).
+Inheritance via `ancestors` follows [§ The shape of the RM in Go](#the-shape-of-the-rm-in-go): an abstract non-generic ancestor's properties are flattened into each concrete descendant, and only a concrete or whitelisted abstract-generic ancestor is embedded.
 
-LOCATABLE concrete descendants additionally receive the **generated identity surface** ([ADR 0013](../adr/0013-generated-locatable-identity-surface.md)): four value-receiver `Get<Field>` accessors (listed on the sealed `Locatable` interface) and four pointer-receiver `Set<Field>` mutators (behind the sealed `MutableLocatable` interface), with types resolved by the same property-mapping rules as the struct fields. The RM target's `typereg_gen.go` also emits the reverse registry — `RMTypeName` (Go concrete → bare registration name, generic instantiations enumerated over the parameter bound's owned concrete descendants) and the `IsTypedNil` guard.
+LOCATABLE concrete descendants additionally receive the generated identity surface and the reverse registry of [§ Type registry (REQ-040)](#type-registry-req-040).
 
-### Property → Go field
+#### Property → Go field
 
 | P_BMM property kind | Go field type |
 |---|---|
@@ -256,7 +333,7 @@ JSON tags **MUST** preserve the original BMM property name (snake_case), with `o
 // Conceptual mapping only — not the generated struct shape.
 type DVQuantity struct {
     DVAmount                            // conceptual ancestor; flattened by generator (ADR 0002 D4)
-    Magnitude            rm.Real        `json:"magnitude"`   // BMM Real → rm.Real per REQ-046 / ADR 0004
+    Magnitude            rm.Real        `json:"magnitude"`   // BMM Real → rm.Real per REQ-041 / ADR 0004
     Units                string         `json:"units"`
     Precision            *rm.Integer    `json:"precision,omitzero"`
     NormalRange          *DVInterval[DVQuantity] `json:"normal_range,omitzero"`
@@ -266,9 +343,9 @@ type DVQuantity struct {
 }
 ```
 
-**Generator output diverges from this example for abstract ancestors.** Per [`../docs/adr/0002-bmm-codegen-decisions.md`](../adr/0002-bmm-codegen-decisions.md) D4, the generator renders non-generic abstract classes as Go marker interfaces and **flattens their properties** into every concrete descendant struct. So the real `openehr/rm/data_types_quantity_gen.go` carries `DVQuantity` with `DVAmount`'s fields (`Accuracy`, `AccuracyIsPercent`, `MagnitudeStatus`, …) inlined and **no `DVAmount` embed**. Only concrete ancestors and whitelisted abstract-generic ancestors (e.g. `EVENT` per ADR 0003) appear as Go-level embeds.
+**Generator output diverges from this example for abstract ancestors.** Per [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4, the generator renders non-generic abstract classes as Go marker interfaces and **flattens their properties** into every concrete descendant struct. So the real `openehr/rm/data_types_quantity_gen.go` carries `DVQuantity` with `DVAmount`'s fields (`Accuracy`, `AccuracyIsPercent`, `MagnitudeStatus`, …) inlined and **no `DVAmount` embed**. Only concrete ancestors and whitelisted abstract-generic ancestors (e.g. `EVENT` per ADR 0003) appear as Go-level embeds.
 
-### Type → Go type expression
+#### Type → Go type expression
 
 | P_BMM type kind | Go expression |
 |---|---|
@@ -276,7 +353,7 @@ type DVQuantity struct {
 | `P_BMM_GENERIC_TYPE` with `root_type: "Foo"`, `generic_parameters: ["Bar"]` | `Foo[Bar]` |
 | `P_BMM_CONTAINER_TYPE` with `container_type: "List"`, nested type | `[]T` (see § Container mapping) |
 
-### Container mapping
+#### Container mapping
 
 | BMM container_type | Go shape | Notes |
 |---|---|---|
@@ -287,11 +364,11 @@ type DVQuantity struct {
 
 The wire format JSON does not distinguish List/Set/Array — they all serialise as arrays. Modelling them all as `[]T` keeps round-tripping exact; the Set / Array semantics surface in validators and AQL path-resolution rather than in the type itself.
 
-### Cardinality
+#### Cardinality
 
 `P_BMM_CONTAINER_PROPERTY.cardinality` (with `lower`, `upper`, `upper_unbounded`) reaches the SDK through the generated attribute metadata in `openehr/rm/rminfo`: `AttrMeta.Container` marks a container property, and `AttrMeta.Required` is true when `cardinality.lower` is 1 or more, which the validation floor checks ([REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)). The upper bound is not kept: no container in the pinned RM and BASE BMMs has a finite one.
 
-### Functions
+#### Functions
 
 `P_BMM_*` function definitions on classes (e.g. `DV_QUANTITY.add`, `DV_QUANTITY.less_than`) carry pre/post-conditions and operator aliases. The SDK's posture:
 
@@ -299,22 +376,22 @@ The wire format JSON does not distinguish List/Set/Array — they all serialise 
 - The generator does **not** emit the function body — implementations are hand-written in non-generated files ([REQ-041](#req-041--pinned-bmm-sources)) where they are needed.
 - Functions that have not been hand-implemented **SHOULD** panic with a clear message (e.g. `panic("not implemented: DV_QUANTITY.add — implement in a non-generated file")`); this is one of the rare allowed panics in SDK code, justified by the fact that the function is documented in the BMM but not yet wired in.
 
-For SDK v1, the priority is the **types**, not the **methods** — most consumers do not need RM-level arithmetic. The RM functions the SDK implements, and those it leaves out, are specified in [rm-functions.md](rm-functions.md).
+For SDK v1, the priority is the **types**, not the **methods** — most consumers do not need RM-level arithmetic. The RM functions the SDK implements, and those it leaves out, are specified in [§ RM behavioural functions](#rm-behavioural-functions).
 
-## Primitive type mapping
+### Primitive type mapping
 
-**Implements:** REQ-046
+**Implements:** REQ-041
 
 The 29 primitives in `openehr_base_1.3.0.bmm.json` map to Go types per the table below. Mappings are **fixed**; do not introduce alternative widenings.
 
 | BMM primitive | Go type | Notes |
 |---|---|---|
 | `Boolean` | `bool` | |
-| `Integer` | `rm.Integer` (underlying `int32`) | Pinned to 32-bit per the BMM spec. Emitted as the defined type `rm.Integer` so the codec can attach the wire-tolerance rule from [`../docs/adr/0004-numeric-wire-tolerance.md`](../adr/0004-numeric-wire-tolerance.md). |
-| `Integer64` | `rm.Integer64` (underlying `int64`) | Emitted as the defined type `rm.Integer64` so the codec can attach the same wire-tolerance rule as `Integer` ([`../docs/adr/0004-numeric-wire-tolerance.md`](../adr/0004-numeric-wire-tolerance.md)). `DV_COUNT.magnitude` is the RM's one `Integer64` attribute. |
-| `Real` | `rm.Real` (underlying `float64`) | The BMM `Real` is single-precision conceptually but openEHR JSON uses unbounded-precision numbers; `float64` is the safe choice. Emitted as the defined type `rm.Real` so the codec can attach the wire-tolerance rule from [`../docs/adr/0004-numeric-wire-tolerance.md`](../adr/0004-numeric-wire-tolerance.md). |
+| `Integer` | `rm.Integer` (underlying `int32`) | Pinned to 32-bit per the BMM spec. Emitted as the defined type `rm.Integer` so the codec can attach the wire-tolerance rule from [ADR 0004](../adr/0004-numeric-wire-tolerance.md). |
+| `Integer64` | `rm.Integer64` (underlying `int64`) | Emitted as the defined type `rm.Integer64` so the codec can attach the same wire-tolerance rule as `Integer` ([ADR 0004](../adr/0004-numeric-wire-tolerance.md)). `DV_COUNT.magnitude` is the RM's one `Integer64` attribute. |
+| `Real` | `rm.Real` (underlying `float64`) | The BMM `Real` is single-precision conceptually but openEHR JSON uses unbounded-precision numbers; `float64` is the safe choice. Emitted as the defined type `rm.Real` so the codec can attach the wire-tolerance rule from [ADR 0004](../adr/0004-numeric-wire-tolerance.md). |
 | `Double` | `float64` | Same as `Real`, no codec tolerance attached. |
-| `Character` | `rm.Character` | canonical JSON single-character **string**, not a number; hand-written named type (`openehr/rm/character.go`), like `Integer`/`Real` |
+| `Character` | `rm.Character` | canonical JSON single-character **string**, not a number; hand-written named type, like `Integer`/`Real` |
 | `String` | `string` | |
 | `Octet` | `byte` | |
 | `Uri` | `string` | Validated at codec boundary; not `net/url.URL` to preserve round-trip exact representation |
@@ -328,7 +405,7 @@ The 29 primitives in `openehr_base_1.3.0.bmm.json` map to Go types per the table
 | `Numeric` | (abstract; not directly used) | |
 | `Ordered` | (abstract; not directly used) | |
 | `Ordered_Numeric` | (abstract; not directly used) | |
-| `Cardinality` | `bmm.Cardinality` (struct) | Hand-written in `openehr/bmm/` — lower, upper, upper_unbounded |
+| `Cardinality` | `rm.Cardinality` (struct) | Generated from the BASE schema — lower, upper, upper_unbounded |
 | `Multiplicity_interval` | `rm.MultiplicityInterval` (struct) | Generated from base BMM |
 | `Interval` | generic `Interval[T]` | Generated; ancestors set on dependent types |
 | `List` | `[]T` | See § Container mapping |
@@ -339,7 +416,7 @@ The 29 primitives in `openehr_base_1.3.0.bmm.json` map to Go types per the table
 | `Terminology_code` | `rm.TerminologyCode` (struct) | Generated from base BMM |
 | `Terminology_term` | `rm.TerminologyTerm` (struct) | Generated from base BMM |
 
-### ISO 8601 types
+#### ISO 8601 types
 
 The four ISO 8601 BMM types map to Go `string` rather than `time.Time` because:
 
@@ -348,27 +425,27 @@ The four ISO 8601 BMM types map to Go `string` rather than `time.Time` because:
 
 Helpers in `openehr/rm/` (hand-written, non-generated) **SHOULD** offer typed parsing into `time.Time` and back for consumers who need it, but the storage type is the wire-equivalent `string`.
 
-## Generator output conventions
+### Generator output conventions
 
 - File naming: `<package_name>_gen.go` for generated files. Example: `openehr/rm/data_types_quantity_gen.go` corresponds to BMM package `org.openehr.rm.data_types.quantity`.
 - Header: every generated file begins with `// Code generated by bmmgen; DO NOT EDIT.` followed by a `// Source:` line naming the root schema and the pinned schemas it includes, for traceability.
 - RM release: the public constant `rm.Release` **MUST** carry the primary RM schema's `rm_release`. What the SDK writes into `ARCHETYPED.rm_version` is [wire.md § REQ-053](wire.md#req-053) for FLAT and STRUCTURED decode and [clinical-modeling.md § REQ-107](clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) for the instance generator.
-- Hand-written companions: `<package_name>_ext.go` (e.g. `data_types_quantity_ext.go`) hold method bodies, helper functions, and codec hooks.
-- One Go package per BMM top-level package; sub-packages flattened into the same Go package via filename (Go does not require a one-to-one directory mapping with BMM packages).
-- The generator emits `openehr/rm/typereg_gen.go` (and `openehr/aom/aom14/typereg_gen.go`) which register every concrete RM/AOM `_type` with its constructor (REQ-040). Per [`../docs/adr/0002-bmm-codegen-decisions.md`](../adr/0002-bmm-codegen-decisions.md) D3, the registration file lives in the target package — **not** under `openehr/rm/typereg/` — so the constructor closures can reference the target types directly without forming a `typereg → rm` import cycle.
+- Hand-written companions: any file without the `_gen.go` suffix in the target package (such as the `*_funcs.go` files of `openehr/rm`) holds method bodies, helper functions, and codec hooks.
+- One Go package per generation target (BASE and RM both emit into `openehr/rm`), one file per BMM package (Go does not require a one-to-one directory mapping with BMM packages).
+- The generator emits a registrations file in `openehr/rm` (and in `openehr/aom/aom14`) which registers every concrete RM/AOM `_type` with its constructor (REQ-040). Per [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D3, the registration file lives in the target package — **not** under `openehr/rm/typereg/` — so the constructor closures can reference the target types directly without forming a `typereg → rm` import cycle.
 
-## Documentation propagation
+### Documentation propagation
 
 The generator carries the BMM `documentation` field on classes, properties, and functions into the Go doc comments of the generated types, fields and methods. The transformation is verbatim — no rewording, no abbreviation. Markdown-style cross-refs (`_units_`, `\`magnitude\``) are converted to Go-doc-friendly equivalents.
 
-## v1 scope summary
+### v1 scope summary
 
 **Generated in v1:**
 - `openehr/rm/` from the SDK-authored RM root over `openehr_rm_1.2.0` (excluding `ehr_extract`) + `openehr_base_1.3.0`.
-- `openehr/rm/typereg/` from the same.
+- The type registrations of `openehr/rm/typereg/`, which is itself hand-written, from the same.
 - `openehr/rm/rminfo/` from the same — the flattened attribute tables, the REQ-048 class graph and absence table, and the REQ-112 function table that `rminfo.IsNonStorableAttr` reads.
-- `internal/rmaccess/access_gen.go` from the same — the attribute access of every registered class (REQ-171).
-- `openehr/validation/inventory_gen.go` from the same and the hand-kept `invariants.json` — the invariant inventory (REQ-171).
+- `internal/rmaccess` from the same — the attribute access of every registered class (REQ-171).
+- The invariant inventory of `openehr/validation` from the same and the hand-kept invariant ledger — the invariant inventory (REQ-171).
 - `openehr/aom/aom14/` from `openehr_operational_template_1.4.0`, the SDK-authored root over `openehr_am_1.4.0` + `openehr_base_1.3.0` and the RM root.
 
 **Deferred (BMM file kept, no v1 generation):**
@@ -378,3 +455,91 @@ The generator carries the BMM `documentation` field on classes, properties, and 
 - RM `ehr_extract` package — EHR Extract is a separate exchange surface not exercised by v1 use cases.
 
 Deferred items become future plan phases when consumer demand arises; the BMM-conformance contract above continues to apply.
+
+## RM behavioural functions
+
+Normative contract for the **derived / behavioural functions** the openEHR Reference Model defines on its identifier, URI, `PATHABLE`/`LOCATABLE`, version-control, and temporal data-value classes — the operations that `bmmgen` emits as signatures from the pinned BMM but cannot implement from a schema (they carry algorithm, not just shape).
+
+The structural rules above say how the types are generated and shaped; this part governs the **runtime behaviour** of the functions on those types. Identifier lexical forms are authoritative in the openEHR BASE *Identification* package and the RM *Common* package; agents look them up there ([base_types identification](https://specifications.openehr.org/releases/BASE/development/base_types.html#_identification_package), [RM common](https://specifications.openehr.org/releases/RM/development/common.html)) rather than guess.
+
+Surface and fallibility decisions: [ADR 0011](../adr/0011-rm-behavioural-functions-surface.md).
+
+### Surface and fallibility (applies to all REQs here)
+
+[ADR 0011](../adr/0011-rm-behavioural-functions-surface.md) sets the surface. A concrete-typed derivation (identifier components, `is_branch`) is a method on the RM type, written by hand beside the generated code, at the generator's documented "implement in a non-generated file" extension point. A fallible parse (input may be malformed) also offers an error-returning entry point: a package-level `Parse…` function for the identifier forms, and the `ToTime` / `ToDuration` conversions for the temporal forms. The BMM-signature derivation methods are **best-effort**: they return a zero value on malformed input, and the package-level error-returning function is the validity check (there is no per-method `ok` boolean). Where a derivation method needs no validation beyond decomposition (e.g. `VersionTreeID.is_branch`), it stays purely lexical, and only the `Parse…` path speaks to well-formedness.
+
+None of these functions panics on a malformed identifier string, on resolving an absent path, or on a typed-nil node in the object tree: the no-panic rule is [idiom.md § Errors (REQ-025)](idiom.md#errors-req-025)'s. Navigation uses no reflection ([idiom.md § Generics and reflection](idiom.md#generics-and-reflection)).
+
+### REQ-120 — RM identifier parsing and derivation
+
+The SDK **MUST** expose the derived components of the openEHR identifier types, and of `DV_URI`, from their normative lexical forms, on the corresponding `openehr/rm` types:
+
+- `UID_BASED_ID` (lexical form `root '::' extension`): `root`, `extension`, and `has_extension`. `HIER_OBJECT_ID` and `OBJECT_VERSION_ID` inherit these; an `OBJECT_VERSION_ID`'s `object_id` is its `root`.
+- `OBJECT_VERSION_ID` (lexical form `object_id '::' creating_system_id '::' version_tree_id`): `object_id`, `creating_system_id`, `version_tree_id`, and `is_branch`.
+- `VERSION_TREE_ID` (lexical form `trunk_version [ '.' branch_number '.' branch_version ]`, 1 or 3 dot-separated parts): `trunk_version`, `branch_number`, `branch_version`, `is_branch` (true iff the 3-part branch form is present), and `is_first` (true iff the trunk version is `1`).
+- `ARCHETYPE_ID` (lexical form `rm_originator '-' rm_name '-' rm_entity '.' concept { '-' specialisation }* '.v' version_id`): `rm_originator`, `rm_name`, `rm_entity`, `qualified_rm_entity`, `domain_concept`, `specialisation`, and `version_id`.
+- `TERMINOLOGY_ID` (lexical form `name [ '(' version ')' ]`): `name` and `version_id`.
+- `DV_URI` (an RFC 3986 URI reference, `[ scheme ':' ] hier-part [ '?' query ] [ '#' fragment ]`): `scheme`, `path`, `query` and `fragment_id`, which `DV_EHR_URI` inherits. Each is the RFC 3986 component as written, not percent-decoded, or empty when the reference has none. A relative reference has no scheme, and the path leaves out the authority (the `//system_id` of an `ehr://` URI). The RM admits plain text as a `DV_URI` value, so these functions split any text: the text before the first colon is the scheme only when RFC 3986 § 3.1 admits it as one (a letter, then letters, digits, `+`, `-` or `.`), and the rest splits as RFC 3986 appendix B reads a reference. A nil `DV_URI` or `DV_EHR_URI` answers empty for each, and the malformed-string rule below does not apply to them.
+
+`OBJECT_REF` / `PARTY_REF` and the `PARTY_PROXY` family **SHOULD** expose convenience accessors for their reference and identity components, and `LOCATABLE_REF` **SHOULD** provide `as_uri()` — the `ehr:`-scheme URI built from `namespace` + `id.value` + `path` — because callers otherwise rebuild these from the fields by hand.
+
+Each fallible identifier form has one error-returning parser in `openehr/rm` (`ParseObjectVersionID`, `ParseVersionTreeID`, `ParseArchetypeID`, `ParseTerminologyID`), and client-side helpers such as the version-uid splitter in `openehr/client/ehr` delegate to it rather than re-parse. `HIER_OBJECT_ID` / `UID_BASED_ID` decomposition is best-effort only, with no `Parse…` entry point.
+
+For a malformed identifier string, the `Parse…` function **MUST** return a non-nil error and the best-effort derivation methods **MUST** return a zero value; neither panics. `DV_URI`'s functions are not identifier derivations in this sense: they split any text, as its bullet above says.
+
+**Acceptance:** for canonical and malformed sample strings of each identifier form, `Parse…`, where the form has one, round-trips the input and derived components equal the spec's lexical decomposition; malformed input yields an error from `Parse…` (no panic); best-effort methods never panic; the client version-uid helper produces identical results to the canonical parser. The `DV_URI` functions split sample references with and without each component, a `DV_EHR_URI` decoded from a `LINK` target answers them without a panic, and a nil `DV_URI` or `DV_EHR_URI` answers empty.
+
+**Out of scope:** validity *checking* of the embedded `UID` syntax beyond decomposition; generation of new identifiers (covered for instance synthesis by REQ-107). Of the recommended convenience accessors, only `LOCATABLE_REF.as_uri` exists; the `OBJECT_REF` / `PARTY_REF` / `PARTY_PROXY` ones are deferred, and the underlying fields are already directly accessible on the generated structs.
+
+#### Version-control derived helpers
+
+The SDK **MUST** implement the pure, derived version-control functions, computed from the version identifier:
+
+- `VERSION.is_branch` **MUST** be derived from the version's `uid` (true iff its `version_tree_id` is a branch, as above).
+
+Client-side version *container management* is **out of scope** and **MUST NOT** be implemented as in-memory RM behaviour: `VERSIONED_OBJECT` operations (`version_count`, `all_versions`, `all_version_ids`, `has_version_at_time`, `has_version_id`, `version_at_time`, `version_with_id`, `latest_version`, `latest_trunk_version`, `trunk_lifecycle_state`) and all `commit_*` mutators are server-mediated in this SDK — they are realised over REST in `openehr/client/ehr` and `openehr/client/demographic`, not against a materialised in-memory container. These methods **MUST** remain explicit, documented stubs that fail loudly rather than return a misleading value (e.g. a `version_count` of `0`).
+
+**Acceptance:** `VERSION.is_branch` is true for a branch version uid and false for a trunk uid; the out-of-scope container operations are documented as server-side and do not silently return zero values.
+
+### REQ-121 — Locatable path read access
+
+The SDK **MUST** provide read navigation of an in-memory RM instance by an openEHR path, implementing the `PATHABLE` read operations over the actual object tree:
+
+- `item_at_path(path)` **MUST** return the single item at a **unique** path, and **MUST** return an error when the path is absent or resolves to more than one item.
+- `items_at_path(path)` **MUST** return all items matching a **non-unique** path (empty when none match).
+- `path_exists(path)` **MUST** report whether the path resolves to at least one item; `path_unique(path)` **MUST** report whether it resolves to exactly one.
+
+The accepted path grammar **MUST** follow the openEHR path syntax — `/`-separated RM attribute-name segments with optional `[archetype_node_id]` and/or `[name]` predicates — consistent with the archetype paths `template.ParsePath` reads ([clinical-modeling.md § REQ-111](clinical-modeling.md#path-lookup) *Path lookup*) and the AQL paths of [§ REQ-109](clinical-modeling.md#req-109--aql-static-lint). An `ISM_TRANSITION` is `PATHABLE` but not `LOCATABLE`, so it carries no `archetype_node_id`; a node-id predicate on `ism_transition` **MUST** therefore match the transition whose `careflow_step` is coded with that id in the `local` terminology. That is the ADL 1.4 convention by which an ACTION archetype's `ism_transition[atNNNN]` constrains `careflow_step` to `local::atNNNN`. A careflow step whose terminology is blank counts as `local`, the reading FLAT decode gives a careflow step that names none ([wire.md § REQ-053](wire.md#req-053)). A transition with no careflow step, another code, or the node id in another terminology **MUST NOT** match the predicate.
+
+The read operations live in `openehr/rm/rmpath`, whose import closure holds neither `transport/` nor `auth/`. Because that package imports `openehr/rm`, the `LOCATABLE` path methods cannot delegate to it without an import cycle; the generated `LOCATABLE.{item_at_path,items_at_path,path_exists,path_unique}` stubs are therefore **suppressed** (not emitted) and the package functions are the canonical surface (see [ADR 0011](../adr/0011-rm-behavioural-functions-surface.md) decision refinement 2).
+
+**Attribute coverage for Web Template leaves.** Path navigation is the resolution step the FLAT encoder ([wire.md § REQ-053](wire.md#req-053)) runs before leaf mapping, so an attribute this package cannot navigate is data the encoder cannot emit. Two guard tests beside the Web Template builder hold navigation to the leaves a Web Template carries. The first covers every RM attribute leaf the Web Template export synthesizes from the RM rather than from the template (the *in-context* leaves of [REQ-106](clinical-modeling.md#req-106--webtemplate-json-export)): each resolves through these read operations on a populated instance of its container RM type, or is a documented exemption that records why it stays unresolved and what that costs on encode. A newly synthesized in-context leaf with no navigation support fails that test rather than reach the encoder, and an exemption that no longer matches an emitted leaf is reported as stale. The second covers the nodes the Web Template builds from the template itself, over the vendored operational templates whose root is a `COMPOSITION` (the FLAT encoder takes compositions only): each RM attribute on the path of a node resolves on an instance populated along that path, or is a documented exemption with its reason. The exemptions are the composition metadata the `ctx/` short forms carry on encode (`/language`, `/territory`, `/context/start_time` and `/context/setting`), which resolving would spell under two keys, and attributes the RM derives rather than stores (`EVENT.offset`, a function).
+
+The FLAT encoder **MUST NOT** silently drop a leaf that resolves and whose datatype it can serialise. Resolution failure **MAY** be treated as an absent optional (that is what an unpopulated optional attribute looks like); an absent leaf whose datatype the encoder cannot write **MAY** stay unemitted. A populated value at that leaf is covered by [wire.md § REQ-140](wire.md#req-140--underscore-prefixed-rm-attributes). Neither licence extends to a resolvable, serialisable leaf — an omission there is a defect, not an absent optional.
+
+The exemption list is kept by hand because `item_at_path` returns the same `ErrPathNotFound` whether the addressed attribute is *unknown to the navigator* or *known but unpopulated*. Whether to split that sentinel (e.g. `ErrUnknownAttribute`) and retire the exemption list is open as [STRAND-10](research-strands.md#strand-10--rmpath-one-sentinel-for-two-not-found-conditions), and code leaves it open until that strand resolves.
+
+**Acceptance:** against a representative composition (the blood-pressure / vital-signs shape, with real archetype-node-id and name predicates), a known unique leaf path resolves via `item_at_path` to the expected value; a non-unique path returns the expected item count via `items_at_path`; an absent path reports `path_exists = false`; a multi-match path reports `path_unique = false` and `item_at_path` errors. A typed-nil node anywhere in the tree (including the root) yields no match rather than a panic. For the in-context coverage rule: every leaf the WebTemplate synthesizes resolves on a populated instance of its container RM type, or appears in the exemption list with its reason and encode consequence — and a stale exemption fails the guard.
+
+**Out of scope:** `parent` and `path_of_item` (the inverse: object → its path). These require parent back-pointers the concrete RM structs do not carry and identity-based tree search; they remain documented, fail-loud panic stubs until a consumer need is established.
+
+### REQ-123 — Temporal data-value helpers
+
+The SDK **MUST** expose read, inspection, comparison, and conversion helpers for the ISO 8601-backed temporal data values `DV_DATE`, `DV_TIME`, `DV_DATE_TIME`, and `DV_DURATION`, parsing each type's `value` string per ISO 8601 (including openEHR's documented `DV_DURATION` deviations: a leading negative sign and mixing the `W` designator with others), in its extended and basic layouts, with a comma or a dot before fractional seconds and the zone forms `Z`, `±hh`, `±hhmm` and `±hh:mm`, refusing `24:00:00` as BASE states, and accepting two forms the BASE predicates do not list, as SDK deviations: a zone whose style differs from the layout of the time it follows (`10:30:00+0530`, `103000+05:30`), and a `DV_DATE_TIME` without its hour (`2024`, `2024-03`, `2024-03-15`), where BASE `Iso8601_date_time` needs one.
+
+- **Component access** — each type **MUST** expose the components of its parsed form: `DV_DATE` → `year`/`month`/`day`; `DV_TIME` → `hour`/`minute`/`second`/`fractional_second`; `DV_DATE_TIME` → their union; all with `timezone` where present; `DV_DURATION` → `years`/`months`/`weeks`/`days`/`hours`/`minutes`/`seconds`/`fractional_seconds`.
+- **Partial-form inspection** — `DV_DATE`/`DV_DATE_TIME`/`DV_TIME` **MUST** report partial forms (`is_partial`, and for dates `month_unknown`/`day_unknown`), since openEHR admits `"2024"` / `"2024-03"` approximate values that Go's `time.Time` cannot represent.
+- **Magnitude & comparison** — each type **MUST** expose `magnitude()` (days for `DV_DATE`; seconds for `DV_TIME`/`DV_DATE_TIME`/`DV_DURATION`, a duration's being its length in seconds within the precision of the result, computed without an intermediate integer overflow; a `DV_TIME`'s counting the seconds from the start of its day as written, its time zone not applied; a `DV_DATE_TIME`'s counting the seconds from `0001-01-01T00:00:00Z`, as the RM defines it, a value with a time zone normalised to UTC and a value without one counting its clock time) and a total ordering consistent with the spec's `less_than` / `is_strictly_comparable_to`; the package-level `Compare` helper **MAY** implement the shared ordering logic for idiomatic Go callers.
+- **Go bridge** — each type **SHOULD** offer idiomatic conversion (`DV_DATE`/`DV_TIME`/`DV_DATE_TIME` → `time.Time`; `DV_DURATION` → `time.Duration`), because a Go caller computes with those types; a value that cannot map cleanly gets an error, as below.
+
+These helpers **MUST NOT** panic on any value or receiver, and **MUST** answer a value they cannot use as follows:
+
+- the component accessors, the partial-form inspections and `magnitude()` answer zero, the empty string or false for a value they cannot read and for a nil receiver, components parsed before the error included, so a malformed value is never reported as partial;
+- `ToTime` and `ToDuration` return a non-nil error for a malformed, partial or calendar-nominal (`Y`/`M` duration components) value, for a definite duration too long for `time.Duration` (never a value wrapped around by overflow), and for a nil receiver;
+- for a leap second (second `60`) on a `DV_TIME` or `DV_DATE_TIME`, `ToTime`'s error wraps `rm.ErrTemporalConversion`: a Go `time.Time` cannot hold it, and normalising it into the next minute would change the instant the value names.
+
+The leap second is still a valid ISO 8601 value: the accessors and `is_partial` read it as written. A duration component too large for a Go `int` is unparseable input.
+
+**Acceptance:** for canonical, partial and basic-layout sample strings of each type, with comma fractions, each zone form and the two SDK deviations (`10:30:00+0530`, a `DV_DATE_TIME` of `2024`), the component accessors and `is_partial` match the ISO 8601 decomposition; `magnitude()` and comparison order a known sequence correctly, and the `DV_DATE_TIME` `2026-01-01T10:00:00+05:00`, which is `05:00Z`, compares below `2026-01-01T08:00:00Z`; the Go-bridge conversion succeeds for full values and errors for partial/nominal ones; malformed samples (an illegal day such as `2024-04-31`, a repeated or misordered duration designator such as `P1Y2Y`) return an error from `ToTime`/`ToDuration`; `23:59:60` and `2016-12-31T23:59:60Z` return an error wrapping `rm.ErrTemporalConversion` from `ToTime`; and malformed samples give zero components and no partial flag, and never panic. A nil receiver never panics and answers as an unparseable value does. `ToDuration` errors for `PT9999999999999H` and `P400000D`, and for a length whose intermediate sum or product would wrap back into range, such as `PT18446744074S`; `PT1.9999999999S` converts to 2 s, its fraction rounded to the nearest nanosecond. `magnitude()` of `PT9999999999999999H` is that duration's length in seconds within the precision of the result, and `PT9999999999999999999H`, whose hours do not fit an `int`, answers as an unparseable value does.
+
+**Out of scope:** temporal **arithmetic** — `add`/`subtract`/`diff` against `DV_DURATION`, `DV_DURATION.multiply`/`negative`, and the calendar-aware `add_nominal`/`subtract_nominal` (leap-year / short-month semantics). Deferred to a follow-up REQ; the generated arithmetic methods remain documented stubs.

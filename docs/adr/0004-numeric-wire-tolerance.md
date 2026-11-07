@@ -15,7 +15,7 @@ date: 2026-05-16
 
 ## Context
 
-The BMM-conformance spec ([`docs/specifications/bmm-conformance.md`](../../docs/specifications/bmm-conformance.md) § Primitive type mapping) pins:
+The BMM-conformance spec ([`docs/specifications/reference-model.md`](../../docs/specifications/reference-model.md) § Primitive type mapping) pins:
 
 - `Real` → Go `float64`.
 - `Integer` → Go `int32`.
@@ -63,11 +63,11 @@ Each is emitted by the BMM generator wherever the BMM primitive `Real` / `Intege
 - openEHR wire conformance (REQ-080): any conforming client has to handle quoted magnitudes the same way on decode to keep fixture round-trip semantics identical. Without this ADR a strict-number-only decoder would reject the `"magnitude": "354"` form that real CDRs emit. (The earlier wire-level cross-SDK parity requirement, REQ-081, has since been retired.)
 - Consumers that need strict-number-only decode can wrap `canjson.Unmarshal` with a pre-pass that rejects quoted numerics, but the SDK itself does not offer a strict-decode mode in v1 — the loss of fixture interoperability outweighs the strictness benefit at this stage.
 - The generated `MarshalJSONTo` for every concrete RM type continues to emit numbers (no behaviour change on the encode side).
-- Documentation: REQ-046 stays as written — its "fixed mapping" pertains to underlying type only. The Floating-point precision section of REQ-052 references this ADR for decode tolerance. The note that `primitiveGoType` emits the alias type name (not the raw primitive) is captured in [`docs/specifications/bmm-conformance.md`](../../docs/specifications/bmm-conformance.md) § Primitive type mapping.
+- Documentation: REQ-046 stays as written — its "fixed mapping" pertains to underlying type only. The Floating-point precision section of REQ-052 references this ADR for decode tolerance. The note that `primitiveGoType` emits the alias type name (not the raw primitive) is captured in [`docs/specifications/reference-model.md`](../../docs/specifications/reference-model.md) § Primitive type mapping.
 
 ## References
 
-- [`docs/specifications/bmm-conformance.md`](../../docs/specifications/bmm-conformance.md) — REQ-046 (primitive mapping).
+- [`docs/specifications/reference-model.md`](../../docs/specifications/reference-model.md) — REQ-046 (primitive mapping).
 - [`docs/specifications/wire.md`](../../docs/specifications/wire.md) — REQ-052 (canonical-JSON wire profile, Floating-point precision).
 - [`openehr/rm/real.go`](../../openehr/rm/real.go), [`openehr/rm/integer.go`](../../openehr/rm/integer.go), [`openehr/rm/integer64.go`](../../openehr/rm/integer64.go) — the defined types implementing this ADR.
 - [`internal/bmmgen/primitives.go`](../../internal/bmmgen/primitives.go) — the generator's mapping table.

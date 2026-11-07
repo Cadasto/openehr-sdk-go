@@ -12,7 +12,7 @@ date: 2026-10-13
 - **Supersedes:** —
 - **Superseded by:** —
 - **Strand:** resolves item 2 of [STRAND-09](../specifications/research-strands.md#strand-09--its-rest-conformance-follow-ups), recorded from the maintainer's issue [#261](https://github.com/Cadasto/openehr-sdk-go/issues/261) (its *Expected behaviour*).
-- **Amends:** [REQ-057](../specifications/wire.md#req-057) (Stored AQL queries), which states the paging rule, and [REQ-095](../specifications/wire.md#req-095) (OpenAPI authoritative source), which carries the third keyed exception.
+- **Amends:** [REQ-057](../specifications/wire.md#req-057) (Stored AQL queries), which states the paging rule, and [REQ-095](../specifications/wire.md#the-openapi-files-are-authoritative) (OpenAPI authoritative source), which carries the third keyed exception.
 - **Related:** [ADR 0024](0024-contribution-deletion-without-data.md) (the keyed-exception form this one follows).
 
 ## Context
@@ -34,7 +34,7 @@ So a POST body that follows the pin to the letter carries a `fetch` value, and t
 
 ## Decision
 
-**Stored-query execution sends `offset` and `fetch` only when the caller sets them, on both verbs, and honours an explicit `0`.** A caller who sets `offset` without `fetch` gets that request as asked; the server decides whether to accept it. The POST body keeps `query_parameters`, as an empty object when the caller passes none. [§ REQ-057](../specifications/wire.md#req-057) *Paging* states the rule, and [§ REQ-095](../specifications/wire.md#req-095) lists the POST omission as its third keyed exception.
+**Stored-query execution sends `offset` and `fetch` only when the caller sets them, on both verbs, and honours an explicit `0`.** A caller who sets `offset` without `fetch` gets that request as asked; the server decides whether to accept it. The POST body keeps `query_parameters`, as an empty object when the caller passes none. [§ REQ-057](../specifications/wire.md#req-057) *Paging* states the rule, and [§ REQ-095](../specifications/wire.md#the-openapi-files-are-authoritative) lists the POST omission as its third keyed exception.
 
 The exception is tied to the pin's current text. It lapses if the pin makes `offset` and `fetch` optional on the `Query` schema, as it already is on the GET operations and on `AdhocQueryExecute`.
 

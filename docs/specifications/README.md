@@ -67,7 +67,7 @@ The chain that drift detection works against:
 ```
 docs/specifications/traceability.yaml (the index: packages, probes, tests, status)
     ├─→ docs/specifications/REQ.md (registry, generated from the map)
-    └─→ canonical topic spec (packaging.md, wire.md, transport.md, …)
+    └─→ canonical topic spec (module-layout.md, wire.md, transport.md, …)
                     └─→ code (Go package)
                             └─→ tests (*_test.go)
                                     └─→ docs/specifications/conformance.md (PROBE-NNN)
@@ -91,7 +91,7 @@ Cite identifiers when crossing the chain:
 | `REQ-NNN` | Enumerated SDK requirement (index) | `REQ.md` (registry); canonical prose in topic specs |
 | `PROBE-NNN` | Conformance probe | `conformance.md` |
 | `STRAND-NN` | Open research strand | `research-strands.md` |
-| `ADR-NNN` | Resolved architectural decision | `../docs/adr/` |
+| `ADR-NNN` | Resolved architectural decision | [`../adr/`](../adr/) |
 
 Identifiers are stable once published — they are referenced from outside the file (commit messages, PR titles, code comments, test names). Renumbering and reuse are prohibited ([REQ.md § Numbering policy](REQ.md#numbering-policy)).
 
@@ -103,21 +103,16 @@ Identifiers are stable once published — they are referenced from outside the f
 | [traceability.yaml](traceability.yaml) | Machine-readable REQ → package / probe / test map |
 | [../.sdd.yaml](../.sdd.yaml) | SDD project descriptor — identifier style, document paths, `make` targets (read by `sdd-*` skills) |
 | [../development-process.md](../development-process.md) | The two lanes, the delivery ladder, the superpowers boundary, the conformance probe harness ([§ Conformance probes](../development-process.md#conformance-probes)) |
-| [packaging.md](packaging.md) | Module path, semantic versioning and the internal boundary (REQ-001, REQ-004, REQ-005) |
-| [transport.md](transport.md) | Transport layer — OTel hooks, retry, TLS posture, error-envelope mapping, `Prefer` negotiation, the request observer, path-segment validation, typed 2xx failures, bearer challenges |
+| [scope.md](scope.md) | What is in and out of v1 scope, and the use cases that justify it |
 | [glossary.md](glossary.md) | openEHR, SMART, Cadasto, and SDK-internal terms |
-| [scope.md](scope.md) | What is in and out of v1 scope |
-| [module-layout.md](module-layout.md) | Package taxonomy, dependency direction, building-block independence and each block's import rule (REQ-013), boundary rules, versioning |
+| [module-layout.md](module-layout.md) | Module path (REQ-001), package taxonomy, dependency direction, building-block independence and each block's import rule (REQ-013), Datamap V2 (REQ-058), boundary rules, the `internal/` boundary, semantic versioning (REQ-004) |
 | [idiom.md](idiom.md) | Idiomatic Go surface — `context.Context`, `*http.Client` injection, errors and no-panic, concurrency (REQ-020, REQ-021, REQ-025, REQ-026), and the informative API conventions (options, surface shape, generics without reflection, naming) |
-| [rm-modeling.md](rm-modeling.md) | openEHR Reference Model in Go — the shape of the generated types, the openEHR terminology vocabulary (REQ-034), the type registry and LOCATABLE identity surface (REQ-040) |
-| [rm-functions.md](rm-functions.md) | RM behavioural functions — identifier parsing/derivation, locatable path read access, version-derived helpers, temporal DV_* helpers (REQ-120–123) |
-| [bmm-conformance.md](bmm-conformance.md) | Pinned BMM sources and generator (REQ-041), BMM loader (REQ-045), primitive type mapping (REQ-046), RM meta-model introspection (REQ-048), P_BMM → Go mapping rules |
-| [auth.md](auth.md) | `auth.TokenSource` contract and the SMART-on-openEHR provider flow |
-| [wire.md](wire.md) | openEHR REST 1.1.0 pin, AQL wire, canonical JSON / FLAT / STRUCTURED |
-| [service-discovery.md](service-discovery.md) | Service catalog resolution and refresh |
-| [conformance.md](conformance.md) | openEHR wire-conformance probe catalog |
+| [reference-model.md](reference-model.md) | openEHR Reference Model in Go — the shape of the generated types, the terminology vocabulary (REQ-034), the type registry (REQ-040), the pinned BMM sources and generator (REQ-041), the BMM loader (REQ-045), RM meta-model introspection (REQ-048), and the RM behavioural functions (REQ-120, REQ-121, REQ-123) |
+| [transport.md](transport.md) | Transport layer — OTel hooks, retry, TLS posture, error-envelope mapping, `Prefer` negotiation, the request observer, path-segment validation, typed 2xx failures, bearer challenges, caller attribution |
+| [auth.md](auth.md) | `auth.TokenSource` contract, the SMART-on-openEHR provider flow and the other providers, and service discovery (REQ-070 to REQ-073) |
+| [wire.md](wire.md) | openEHR REST 1.1.0 pin and its OpenAPI files, the openEHR headers, canonical JSON / XML, FLAT / STRUCTURED, AQL wire, the REST leaf operations and the Admin client |
 | [clinical-modeling.md](clinical-modeling.md) | Clinical-modeling artefacts — the operational template model, the compiled template and its paths, primitive constraints, validation, the instance generator and composition builder, the Web Template export, AQL parse, lint, containment and builders |
-| [use-cases.md](use-cases.md) | Primary use cases, building-block use cases, delivery sequence |
+| [conformance.md](conformance.md) | openEHR wire-conformance probe catalog |
 | [research-strands.md](research-strands.md) | Open strands awaiting resolution (each becomes an ADR) |
 | [retired-requirements.md](retired-requirements.md) | Lookup of retired `REQ-NNN`: where each rule went (binds nothing, so the gate's keyword rules skip it) |
 

@@ -16,6 +16,10 @@ The rule for the `go.mod` `go` directive is now prose in [releases.md § Minimum
 
 The licence rule is now prose in [licensing.md](../licensing.md).
 
+## REQ-005 — Internal boundary
+
+The `internal/` boundary is now prose in [module-layout.md § The `internal/` boundary](module-layout.md#the-internal-boundary).
+
 ## REQ-010 — `cadasto/` cut line
 
 The `cadasto/` cut line is now prose in [module-layout.md § Boundary rules](module-layout.md#boundary-rules).
@@ -46,39 +50,43 @@ Its conventions, the no-reflection rule included, are now prose in [idiom.md § 
 
 ## REQ-030 — Concrete RM structs
 
-The rule is now [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4, summarised in [rm-modeling.md § The shape of the RM in Go](rm-modeling.md#the-shape-of-the-rm-in-go).
+The rule is now [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4, summarised in [reference-model.md § The shape of the RM in Go](reference-model.md#the-shape-of-the-rm-in-go).
 
 ## REQ-031 — Embedded base structs
 
-The rule is now [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4, summarised in [rm-modeling.md § The shape of the RM in Go](rm-modeling.md#the-shape-of-the-rm-in-go).
+The rule is now [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4, summarised in [reference-model.md § The shape of the RM in Go](reference-model.md#the-shape-of-the-rm-in-go).
 
 ## REQ-032 — Interfaces for abstract RM
 
-The rule is now [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4, summarised in [rm-modeling.md § The shape of the RM in Go](rm-modeling.md#the-shape-of-the-rm-in-go).
+The rule is now [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4, summarised in [reference-model.md § The shape of the RM in Go](reference-model.md#the-shape-of-the-rm-in-go).
 
 ## REQ-033 — No inheritance emulation
 
-The rule is now [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4, summarised in [rm-modeling.md § The shape of the RM in Go](rm-modeling.md#the-shape-of-the-rm-in-go).
+The rule is now [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4, summarised in [reference-model.md § The shape of the RM in Go](reference-model.md#the-shape-of-the-rm-in-go).
 
 ## REQ-042 — Generated code, drift-detected
 
-Generation and its drift check are now prose under [REQ-041](bmm-conformance.md#req-041--pinned-bmm-sources).
+Generation and its drift check are now prose under [REQ-041](reference-model.md#req-041--pinned-bmm-sources).
 
 ## REQ-043 — P_BMM → Go mapping rules
 
-The mapping rules now bind through [REQ-041](bmm-conformance.md#req-041--pinned-bmm-sources) and live in [bmm-conformance.md § Mapping rules](bmm-conformance.md#mapping-rules).
+The mapping rules now bind through [REQ-041](reference-model.md#req-041--pinned-bmm-sources) and live in [reference-model.md § Mapping rules](reference-model.md#mapping-rules).
 
 ## REQ-044 — Hand-written extensions isolated
 
-The separation of generated and hand-written files is now prose under [REQ-041](bmm-conformance.md#req-041--pinned-bmm-sources).
+The separation of generated and hand-written files is now prose under [REQ-041](reference-model.md#req-041--pinned-bmm-sources).
+
+## REQ-046 — Primitive type mapping
+
+The fixed primitive-type mapping is now the *Primitive types* rule of [reference-model.md § REQ-041](reference-model.md#req-041--pinned-bmm-sources), with its table in [§ Primitive type mapping](reference-model.md#primitive-type-mapping).
 
 ## REQ-047 — BMM authoritative on divergence
 
-The rule that the BMM wins over spec prose is now prose under [REQ-041](bmm-conformance.md#req-041--pinned-bmm-sources).
+The rule that the BMM wins over spec prose is now prose under [REQ-041](reference-model.md#req-041--pinned-bmm-sources).
 
 ## REQ-049 — RM class-universe absence reasons
 
-Its absence reasons are now [REQ-048 § Absence reasons](bmm-conformance.md#absence-reasons).
+Its absence reasons are now [REQ-048 § Absence reasons](reference-model.md#absence-reasons).
 
 ## REQ-051 — Cadasto spec-version header
 
@@ -86,7 +94,11 @@ The rule for the `Cadasto-OpenEhr-Spec-Version` header moved to [wire.md § REQ-
 
 ## REQ-065 — Per-client tenant binding
 
-A client takes the catalog of one Platform ([service-discovery.md § REQ-070](service-discovery.md#req-070)), and a SMART source built from a catalog defaults its audience to that Platform's base URL ([auth.md § REQ-061](auth.md#req-061--pkce-flow)).
+A client takes the catalog of one Platform ([auth.md § REQ-070](auth.md#req-070)), and a SMART source built from a catalog defaults its audience to that Platform's base URL ([auth.md § REQ-061](auth.md#req-061--pkce-flow)).
+
+## REQ-067 — Platform principal claims
+
+Its rules are now [auth.md § REQ-064](auth.md#req-064--launch-context) *[Platform principal claims](auth.md#platform-principal-claims)*.
 
 ## REQ-080 — openEHR wire conformance
 
@@ -95,6 +107,10 @@ Its test-writing rules moved to [development-process.md § Writing a probe](../d
 ## REQ-081 — Wire-level parity
 
 The SDK checks no parity with another SDK: its wire output is checked against the openEHR specification by the [probe catalog](conformance.md#probe-catalog), and its Go surface follows [idiom.md § Surface shape](idiom.md#surface-shape).
+
+## REQ-095 — OpenAPI authoritative source
+
+Its rules, the keyed exceptions to the pin and path-parameter encoding among them, are now [wire.md § REQ-050](wire.md#req-050) *[The OpenAPI files are authoritative](wire.md#the-openapi-files-are-authoritative)*.
 
 ## REQ-096 — Unambiguous "disable retry"
 
@@ -127,6 +143,10 @@ Its rules moved to [clinical-modeling.md § REQ-113](clinical-modeling.md#req-11
 ## REQ-118 — Deprecated `SELECT TOP` clause and literal source text
 
 Its rules moved to [clinical-modeling.md § REQ-113](clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) (the `TOP` carrier and literal source text), [clinical-modeling.md § REQ-163](clinical-modeling.md#req-163--aql-write-side-expressivity-parity) (the builder's `TOP` and the row-bound channels) and [clinical-modeling.md § REQ-109](clinical-modeling.md#req-109--aql-static-lint) (the `TOP` lint codes).
+
+## REQ-122 — Version-control derived helpers
+
+Its rule is now [reference-model.md § REQ-120](reference-model.md#req-120--rm-identifier-parsing-and-derivation) *[Version-control derived helpers](reference-model.md#version-control-derived-helpers)*.
 
 ## REQ-142 — Contribution read
 

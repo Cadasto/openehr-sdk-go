@@ -66,13 +66,13 @@ If you only need one piece (RM modeling, a codec, validation, AQL string constru
 The [roadmap](docs/roadmap.md) and the [REQ registry](docs/specifications/REQ.md) hold the authoritative landed-vs-planned status, with REQ and PROBE identifiers.
 
 - **openEHR REST client**: System, EHR, EHR_STATUS, Composition, Directory, Contribution, Query, Definition (stored AQL), Demographic, and Admin, over a versioned transport. [wire](docs/specifications/wire.md), [transport](docs/specifications/transport.md)
-- **Reference Model**: typed RM structs and a central type registry, generated from pinned BMM dictionaries, plus hand-written identifier, temporal, and locatable-path helpers. [rm-modeling](docs/specifications/rm-modeling.md)
+- **Reference Model**: typed RM structs and a central type registry, generated from pinned BMM dictionaries, plus hand-written identifier, temporal, and locatable-path helpers. [rm-modeling](docs/specifications/reference-model.md)
 - **Serialization**: canonical JSON and XML round-trips, and bidirectional FLAT / STRUCTURED simplified-format codecs driven by a Web Template. [wire](docs/specifications/wire.md)
 - **Templates (ADL 1.4 OPT)**: an operational template model that reads an OPT and writes it back in canonical JSON or XML, a compile step with typed primitive constraints, and WebTemplate JSON export for form generation. [clinical-modeling](docs/specifications/clinical-modeling.md)
 - **Compositions**: an OPT-driven builder, template-driven validation, and RM-instance synthesis from a template. [clinical-modeling](docs/specifications/clinical-modeling.md)
 - **AQL**: literal AQL wire models and result sets, fluent struct and verb builders, and static parse-and-lint. [wire](docs/specifications/wire.md)
 - **Authentication**: SMART-on-openEHR (PKCE), client credentials, JWT bearer, and basic token sources, all over one injected `TokenSource`. [auth](docs/specifications/auth.md)
-- **Service discovery**: a multi-backend service catalog with per-node spec pinning. [service-discovery](docs/specifications/service-discovery.md)
+- **Service discovery**: a multi-backend service catalog with per-node spec pinning. [service-discovery](docs/specifications/auth.md)
 - **Cadasto platform extras**: mostly still on the roadmap. Datamap, MPI, an Extra API, and Care aggregates are **planned**. The Cadasto admin package has health probes today, and the rest of it is **partial**. These packages live in the same module behind a `cadasto/` cut line, so they can later move out as a subtree instead of being rewritten. [module-layout](docs/specifications/module-layout.md)
 - **Conformance**: an openEHR wire-conformance probe suite covering round trips that keep every value and spec-correct envelopes. [conformance](docs/specifications/conformance.md)
 

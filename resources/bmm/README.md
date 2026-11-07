@@ -1,6 +1,6 @@
 # `resources/bmm/` — pinned openEHR BMM schemas
 
-Machine-readable openEHR meta-model schemas (BMM) in their canonical `P_BMM` JSON form. The SDK's domain types in `openehr/rm/`, `openehr/aom/aom14/`, and related packages are derived from these files (see [`../../docs/specifications/bmm-conformance.md`](../../docs/specifications/bmm-conformance.md)).
+Machine-readable openEHR meta-model schemas (BMM) in their canonical `P_BMM` JSON form. The SDK's domain types in `openehr/rm/`, `openehr/aom/aom14/`, and related packages are derived from these files (see [`../../docs/specifications/reference-model.md`](../../docs/specifications/reference-model.md)).
 
 These files are the SDK's source of truth for the openEHR Reference Model, Archetype Object Model, base types, language types, and terminology service interface. The SDK pins them as in-tree assets so that:
 
@@ -19,7 +19,7 @@ These files are the SDK's source of truth for the openEHR Reference Model, Arche
 | `openehr_lang_1.1.0.bmm.json` | `openehr_lang_1.1.0` | 2.4 | 86 | base 1.3.0 | **deferred** (reference only) | LANG types: BMM meta-model + `P_BMM` persistence classes. Used as documentation while `openehr/bmm/` is hand-written. |
 | `openehr_term_3.1.0.bmm.json` | `openehr_term_3.1.0` | — | (terminology service interface) | — | **deferred** | Terminology service interface |
 
-**Primary** files drive v1 code generation, each target through its root schema under [`sdk/`](#sdk-authored-root-schemas-sdk). **Deferred** files stay here and are not removed. They are kept for future generation phases or as cross-references. See [`../../docs/specifications/scope.md`](../../docs/specifications/scope.md#out-of-scope-v1) and [`../../docs/specifications/bmm-conformance.md § v1 scope summary`](../../docs/specifications/bmm-conformance.md#v1-scope-summary).
+**Primary** files drive v1 code generation, each target through its root schema under [`sdk/`](#sdk-authored-root-schemas-sdk). **Deferred** files stay here and are not removed. They are kept for future generation phases or as cross-references. See [`../../docs/specifications/scope.md`](../../docs/specifications/scope.md#out-of-scope-v1) and [`../../docs/specifications/reference-model.md § v1 scope summary`](../../docs/specifications/reference-model.md#v1-scope-summary).
 
 Schema dependencies (transitive `includes`):
 
@@ -33,7 +33,7 @@ base 1.3.0  (foundation)
 
 ## SDK-authored root schemas (`sdk/`)
 
-Each root here is the schema a generation target loads in place of a pinned file. A root includes the pinned schema and declares only what the pinned schemas lack or get wrong; a class it declares again replaces the included class of that name, whole. Each class and property a root declares ends its `documentation` with a note: its reason (`Reason: …`), then the upstream reference it rests on (`Upstream: …`). The reference is the specification pull request or ticket that carries the same change, as an `https://` URL; the id of the pinned schema it follows; or a vendored ITS-XML schema by its path in the tree, with or without a line, such as `resources/its-xml/components/AM/Release-1.4/Template.xsd:115`. The generator leaves the note out of the Go doc comment it emits. The contract is [`bmm-conformance.md` § SDK-authored root schemas](../../docs/specifications/bmm-conformance.md#sdk-authored-root-schemas); the decision is [ADR 0034](../../docs/adr/0034-sdk-authored-root-schemas.md).
+Each root here is the schema a generation target loads in place of a pinned file. A root includes the pinned schema and declares only what the pinned schemas lack or get wrong; a class it declares again replaces the included class of that name, whole. Each class and property a root declares ends its `documentation` with a note: its reason (`Reason: …`), then the upstream reference it rests on (`Upstream: …`). The reference is the specification pull request or ticket that carries the same change, as an `https://` URL; the id of the pinned schema it follows; or a vendored ITS-XML schema by its path in the tree, with or without a line, such as `resources/its-xml/components/AM/Release-1.4/Template.xsd:115`. The generator leaves the note out of the Go doc comment it emits. The contract is [`reference-model.md` § SDK-authored root schemas](../../docs/specifications/reference-model.md#sdk-authored-root-schemas); the decision is [ADR 0034](../../docs/adr/0034-sdk-authored-root-schemas.md).
 
 ### SDK extension keys
 
@@ -82,7 +82,7 @@ A BMM version bump is always deliberate and follows [ADR 0001: BMM version-bump 
 
 1. Add the new file's upstream path to `SRC_PATHS` in [`scripts/sync-bmm.sh`](../../scripts/sync-bmm.sh), beside the old one, and run `BMM_REF=master make bmm-sync` (e.g. `openehr_rm_1.2.1.bmm.json` lands next to `openehr_rm_1.2.0.bmm.json`). Do **not** overwrite the old file.
 2. Move the roots under `sdk/` with the pin: a root that includes the bumped schema names its new id, and a class it declares again that the new schema now carries in the same form goes, which the root check (`go test ./internal/bmmgen -run RootSchemas -count=1`) reports. Then run `make codegen` and `make codegen-check`. Optionally inspect the semantic diff with `go run ./cmd/bmmdiff <old> <new>`.
-3. Update version pins in [`../../docs/specifications/bmm-conformance.md`](../../docs/specifications/bmm-conformance.md) and the schema ID table above.
+3. Update version pins in [`../../docs/specifications/reference-model.md`](../../docs/specifications/reference-model.md) and the schema ID table above.
 4. Propose the one-line CHANGELOG bullet in the PR body; the CHANGELOG follows the rule in [`AGENTS.md § Code style and conventions`](../../AGENTS.md#code-style-and-conventions) (ADR 0001 step 8).
 5. Remove the old path from `SRC_PATHS` and re-run `make bmm-sync`, which deletes the old file, **in the same commit** once the regen and tests pass.
 
@@ -104,5 +104,5 @@ Mid-version evolution (`openehr_rm_1.2.0` → `openehr_rm_1.2.0.2`, i.e. a `sche
 
 - BMM (abstract meta-model): openEHR LANG specification, *Basic Meta-Model*.
 - P_BMM persistence: openEHR LANG specification, *BMM Persistence Format*.
-- SDK conformance contract: [`../../docs/specifications/bmm-conformance.md`](../../docs/specifications/bmm-conformance.md).
+- SDK conformance contract: [`../../docs/specifications/reference-model.md`](../../docs/specifications/reference-model.md).
 - Generator design: [ADR 0002](../../docs/adr/0002-bmm-codegen-decisions.md); the generator landed on `main` in commit [b89aa589](https://github.com/Cadasto/openehr-sdk-go/commit/b89aa589).

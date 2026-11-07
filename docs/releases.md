@@ -8,7 +8,7 @@ How `github.com/cadasto/openehr-sdk-go` is versioned, tagged, and announced. Qua
 
 ## Versioning
 
-[SemVer 2.0.0](https://semver.org/spec/v2.0.0.html) ([REQ-004](specifications/packaging.md#req-004--semantic-versioning)). The git tag (`vX.Y.Z`) is the single authoritative version. `go.mod` carries only the Go language version, never the SDK's own semver, and there is no runtime `version` package. Consumers pin:
+[SemVer 2.0.0](https://semver.org/spec/v2.0.0.html) ([REQ-004](specifications/module-layout.md#req-004--semantic-versioning)). The git tag (`vX.Y.Z`) is the single authoritative version. `go.mod` carries only the Go language version, never the SDK's own semver, and there is no runtime `version` package. Consumers pin:
 
 ```bash
 go get github.com/cadasto/openehr-sdk-go@vX.Y.Z
@@ -84,7 +84,7 @@ Preview notes locally without side effects: `bash scripts/release-notes.sh X.Y.Z
 
 ## References
 
-- [REQ-004](specifications/packaging.md#req-004--semantic-versioning): semantic versioning
+- [REQ-004](specifications/module-layout.md#req-004--semantic-versioning): semantic versioning
 - [`module-layout.md` § Versioning](specifications/module-layout.md#versioning): bump matrix + `v1.0.0` gates
 - [ADR 0001](adr/0001-bmm-version-bump-runbook.md): BMM bumps vs codegen
 - [`docs/ci.md`](ci.md): quality gate before tag

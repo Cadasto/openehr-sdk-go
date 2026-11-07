@@ -16,7 +16,7 @@
 requirements:
   - id: REQ-001
     title: Module path
-    canonical: docs/specifications/packaging.md#req-001--module-path
+    canonical: docs/specifications/module-layout.md#req-001--module-path
     status: draft
     implementation: landed
     packages: [go.mod]
@@ -35,17 +35,16 @@ requirements:
 
   - id: REQ-004
     title: Semantic versioning
-    canonical: docs/specifications/packaging.md#req-004--semantic-versioning
+    canonical: docs/specifications/module-layout.md#req-004--semantic-versioning
     status: draft
     implementation: landed
     packages: [.github/workflows/release.yml]
 
   - id: REQ-005
-    title: Internal boundary
-    canonical: docs/specifications/packaging.md#req-005--internal-boundary
-    status: draft
-    implementation: landed
-    packages: [internal]
+    title: Internal boundary (retired)
+    canonical: docs/specifications/retired-requirements.md#req-005--internal-boundary
+    status: deprecated
+    implementation: retired
 
   - id: REQ-010
     title: "`cadasto/` cut line (retired)"
@@ -70,7 +69,7 @@ requirements:
     canonical: docs/specifications/module-layout.md#req-013--building-block-independence
     status: draft
     implementation: landed
-    packages: [openehr/rm, openehr/bmm, openehr/serialize, openehr/validation, openehr/instance, openehr/composition, openehr/template, openehr/templatecompile, openehr/template/webtemplate, openehr/terminology, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain, openehr/aql/internal/semcheck]
+    packages: [openehr/rm, openehr/bmm, openehr/serialize, openehr/validation, openehr/instance, openehr/composition, openehr/template, openehr/templatecompile, openehr/template/webtemplate, openehr/terminology, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain, openehr/aql/internal/semcheck, openehr/rm/rminfo, openehr/template/constraints]
     tests:
       - internal/importguard/anybuild_internal_test.go
       - internal/importguard/importguard_test.go
@@ -271,10 +270,10 @@ requirements:
 
   - id: REQ-034
     title: openEHR terminology vocabulary
-    canonical: docs/specifications/rm-modeling.md#openehr-terminology-vocabulary-req-034
+    canonical: docs/specifications/reference-model.md#openehr-terminology-vocabulary-req-034
     status: draft
     implementation: landed
-    packages: [resources/terminology, openehr/terminology, internal/termgen, cmd/termgen, openehr/client/ehr, openehr/client/ehr/contribution, openehr/serialize/simplified, openehr/instance, openehr/template, openehr/validation]
+    packages: [resources/terminology, openehr/terminology, internal/termgen, cmd/termgen, openehr/client/ehr, openehr/client/ehr/contribution, openehr/serialize/simplified, openehr/instance, openehr/validation]
     tests:
       - internal/termgen/parse_test.go
       - internal/termgen/render_test.go
@@ -294,7 +293,7 @@ requirements:
 
   - id: REQ-040
     title: Type registry
-    canonical: docs/specifications/rm-modeling.md#type-registry-req-040
+    canonical: docs/specifications/reference-model.md#type-registry-req-040
     status: draft
     implementation: landed
     packages: [openehr/rm/typereg]
@@ -312,7 +311,7 @@ requirements:
 
   - id: REQ-041
     title: Pinned BMM sources
-    canonical: docs/specifications/bmm-conformance.md#req-041--pinned-bmm-sources
+    canonical: docs/specifications/reference-model.md#req-041--pinned-bmm-sources
     status: draft
     implementation: landed
     packages: [resources/bmm, openehr/bmm, openehr/rm, openehr/aom/aom14, internal/bmmgen, cmd/bmmgen]
@@ -340,8 +339,11 @@ requirements:
       - openehr/aom/aom14/primitive_profile_shapes_xml_test.go
       - openehr/internal/xmlunmatched/choice_internal_test.go
       - openehr/internal/xmlunmatched/drop_internal_test.go
+      - openehr/rm/character_test.go
+      - openehr/rm/character_text_test.go
       - openehr/rm/rminfo/hierarchy_test.go
       - openehr/rm/rminfo/probe_094_test.go
+      - openehr/serialize/canjson/edgecases_test.go
 
   - id: REQ-042
     title: Generated code, drift-detected (retired)
@@ -363,7 +365,7 @@ requirements:
 
   - id: REQ-045
     title: BMM loader building block
-    canonical: docs/specifications/bmm-conformance.md#req-045--bmm-loader-is-a-building-block
+    canonical: docs/specifications/reference-model.md#req-045--bmm-loader-is-a-building-block
     status: draft
     implementation: landed
     packages: [openehr/bmm]
@@ -374,15 +376,10 @@ requirements:
       - openehr/bmm/loadall_test.go
 
   - id: REQ-046
-    title: Primitive type mapping
-    canonical: docs/specifications/bmm-conformance.md#primitive-type-mapping
-    status: draft
-    implementation: landed
-    packages: [openehr/rm]
-    tests:
-      - openehr/rm/character_test.go
-      - openehr/rm/character_text_test.go
-      - openehr/serialize/canjson/edgecases_test.go
+    title: Primitive type mapping (retired)
+    canonical: docs/specifications/retired-requirements.md#req-046--primitive-type-mapping
+    status: deprecated
+    implementation: retired
 
   - id: REQ-047
     title: BMM authoritative on divergence (retired)
@@ -392,7 +389,7 @@ requirements:
 
   - id: REQ-048
     title: RM meta-model introspection
-    canonical: docs/specifications/bmm-conformance.md#req-048--rm-meta-model-introspection-surface
+    canonical: docs/specifications/reference-model.md#req-048--rm-meta-model-introspection-surface
     status: draft
     implementation: landed
     probes: [PROBE-094, PROBE-098]
@@ -421,20 +418,40 @@ requirements:
     canonical: docs/specifications/wire.md#req-050
     status: draft
     implementation: landed
-    packages: [transport, openehr/client/system, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/ehr/contribution, openehr/client/ehr/itemtags, openehr/client/query, openehr/client/definition, openehr/client/admin, openehr/client/demographic]
-    probes: [PROBE-072, PROBE-073]
+    packages: [transport, openehr/client/system, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/ehr/contribution, openehr/client/ehr/itemtags, openehr/client/query, openehr/client/definition, openehr/client/admin, openehr/client/demographic, testkit/corpus/its_rest, openehr/client]
+    probes: [PROBE-072, PROBE-073, PROBE-060, PROBE-102, PROBE-104]
     tests:
+      - openehr/client/definition/path_encoding_test.go
+      - openehr/client/definition/stored_query_test.go
       - openehr/client/demographic/party_test.go
       - openehr/client/demographic/versioned_test.go
+      - openehr/client/ehr/composition/path_encoding_test.go
       - openehr/client/ehr/contribution/contribution_test.go
       - openehr/client/ehr/contribution/submission_test.go
+      - openehr/client/ehr/contribution/update_audit_test.go
+      - openehr/client/ehr/contribution/version_test.go
+      - openehr/client/ehr/path_encoding_test.go
+      - openehr/client/pathencoding_guard_test.go
+      - openehr/client/query/path_encoding_test.go
+      - openehr/client/query/query_encoding_test.go
       - openehr/client/system/system_test.go
+      - testkit/probe/cassette_test.go
+      - testkit/probe/liveexample_test.go
+      - testkit/probe/livestatus_test.go
       - testkit/probes/demographic/probe_073_demographic_round_trip.go
       - testkit/probes/demographic/probes_test.go
+      - testkit/probes/rest/probe_060_ehr_creation_round_trip.go
+      - testkit/probes/rest/probe_102_system_capabilities.go
+      - testkit/probes/rest/probe_104_definition_example.go
+      - testkit/probes/rest/probes_test.go
+      - testkit/probes/transport/probe_091_path_segment_validation.go
       - testkit/probes/versioned/probe_072_contribution_submission_shape.go
       - testkit/probes/versioned/probes_test.go
+      - transport/base_url_encoding_test.go
       - transport/cadasto_header_test.go
       - transport/hot_path_internal_test.go
+      - transport/path_encoding_test.go
+      - transport/query_encoding_test.go
 
   - id: REQ-051
     title: Cadasto spec-version header (retired)
@@ -762,6 +779,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/client/query, openehr/client/definition]
+    probes: [PROBE-066, PROBE-079]
     tests:
       - openehr/client/definition/null_body_test.go
       - openehr/client/definition/stored_query_test.go
@@ -936,6 +954,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [smart, auth/smart]
+    probes: [PROBE-008]
     tests:
       - auth/smart/exchange_idtoken_test.go
       - auth/smart/exchange_test.go
@@ -953,6 +972,8 @@ requirements:
       - smart/launch_test.go
       - smart/log_value_test.go
       - smart/print_test.go
+      - testkit/probes/auth/probe_008_principal_claims.go
+      - testkit/probes/auth/probes_test.go
 
   - id: REQ-065
     title: Per-client tenant binding (retired)
@@ -962,7 +983,7 @@ requirements:
 
   - id: REQ-066
     title: Caller attribution
-    canonical: docs/specifications/auth.md#req-066
+    canonical: docs/specifications/transport.md#req-066--caller-attribution
     status: draft
     implementation: landed
     packages: [transport, auth]
@@ -974,18 +995,10 @@ requirements:
       - transport/client_test.go
 
   - id: REQ-067
-    title: Platform principal claims
-    canonical: docs/specifications/auth.md#req-067
-    status: draft
-    implementation: landed
-    packages: [smart]
-    probes: [PROBE-008]
-    tests:
-      - smart/launch_test.go
-      - smart/log_value_test.go
-      - smart/print_test.go
-      - testkit/probes/auth/probe_008_principal_claims.go
-      - testkit/probes/auth/probes_test.go
+    title: Platform principal claims (retired)
+    canonical: docs/specifications/retired-requirements.md#req-067--platform-principal-claims
+    status: deprecated
+    implementation: retired
 
   - id: REQ-068
     title: SMART flows and launch modes
@@ -1022,7 +1035,7 @@ requirements:
 
   - id: REQ-070
     title: First-class discovery
-    canonical: docs/specifications/service-discovery.md#req-070
+    canonical: docs/specifications/auth.md#req-070
     status: draft
     implementation: landed
     packages: [smart/discovery]
@@ -1045,7 +1058,7 @@ requirements:
 
   - id: REQ-071
     title: Discovery cache
-    canonical: docs/specifications/service-discovery.md#req-071
+    canonical: docs/specifications/auth.md#req-071
     status: draft
     implementation: landed
     packages: [smart/discovery]
@@ -1063,7 +1076,7 @@ requirements:
 
   - id: REQ-072
     title: Discovery validation
-    canonical: docs/specifications/service-discovery.md#req-072
+    canonical: docs/specifications/auth.md#req-072
     status: draft
     implementation: landed
     packages: [smart/discovery]
@@ -1084,7 +1097,7 @@ requirements:
 
   - id: REQ-073
     title: Discovery trust posture
-    canonical: docs/specifications/service-discovery.md#req-073--discovery-trust-posture
+    canonical: docs/specifications/auth.md#req-073--discovery-trust-posture
     status: draft
     implementation: landed
     packages: [smart/discovery]
@@ -1268,34 +1281,10 @@ requirements:
       - transport/null_body_test.go
 
   - id: REQ-095
-    title: OpenAPI authoritative source
-    canonical: docs/specifications/wire.md#req-095
-    status: draft
-    implementation: partial
-    packages: [testkit/corpus/its_rest, transport, openehr/client, openehr/client/definition, openehr/client/query, openehr/client/admin, openehr/client/demographic, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/contribution, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus]
-    probes: [PROBE-060, PROBE-072, PROBE-102, PROBE-104]
-    tests:
-      - openehr/client/definition/path_encoding_test.go
-      - openehr/client/definition/stored_query_test.go
-      - openehr/client/ehr/composition/path_encoding_test.go
-      - openehr/client/ehr/contribution/update_audit_test.go
-      - openehr/client/ehr/contribution/version_test.go
-      - openehr/client/ehr/path_encoding_test.go
-      - openehr/client/pathencoding_guard_test.go
-      - openehr/client/query/path_encoding_test.go
-      - openehr/client/query/query_encoding_test.go
-      - testkit/probe/cassette_test.go
-      - testkit/probe/liveexample_test.go
-      - testkit/probe/livestatus_test.go
-      - testkit/probes/rest/probe_060_ehr_creation_round_trip.go
-      - testkit/probes/rest/probe_102_system_capabilities.go
-      - testkit/probes/rest/probe_104_definition_example.go
-      - testkit/probes/rest/probes_test.go
-      - testkit/probes/transport/probe_091_path_segment_validation.go
-      - testkit/probes/versioned/probe_072_contribution_submission_shape.go
-      - transport/base_url_encoding_test.go
-      - transport/path_encoding_test.go
-      - transport/query_encoding_test.go
+    title: OpenAPI authoritative source (retired)
+    canonical: docs/specifications/retired-requirements.md#req-095--openapi-authoritative-source
+    status: deprecated
+    implementation: retired
 
   - id: REQ-096
     title: Unambiguous "disable retry" (retired)
@@ -1324,7 +1313,7 @@ requirements:
 
   - id: REQ-099
     title: ITS-REST Admin client surface
-    canonical: docs/specifications/module-layout.md#req-099--its-rest-admin-client-surface
+    canonical: docs/specifications/wire.md#req-099--its-rest-admin-client-surface
     status: draft
     implementation: landed
     packages: [openehr/client/admin]
@@ -2077,7 +2066,7 @@ requirements:
 
   - id: REQ-120
     title: RM identifier parsing and derivation
-    canonical: docs/specifications/rm-functions.md#req-120--rm-identifier-parsing-and-derivation
+    canonical: docs/specifications/reference-model.md#req-120--rm-identifier-parsing-and-derivation
     status: draft
     implementation: landed
     probes: []
@@ -2088,12 +2077,13 @@ requirements:
       - internal/bmmgen/render_test.go
       - openehr/aql/lint/semantic_test.go
       - openehr/client/ehr/ids_test.go
+      - openehr/rm/changecontrol_funcs_test.go
       - openehr/rm/identification_funcs_test.go
       - openehr/rm/uri_funcs_test.go
 
   - id: REQ-121
     title: Locatable path read access
-    canonical: docs/specifications/rm-functions.md#req-121--locatable-path-read-access
+    canonical: docs/specifications/reference-model.md#req-121--locatable-path-read-access
     status: draft
     implementation: landed
     probes: []
@@ -2107,19 +2097,14 @@ requirements:
       - openehr/template/webtemplate/paths_rmpath_test.go
 
   - id: REQ-122
-    title: Version-control derived helpers
-    canonical: docs/specifications/rm-functions.md#req-122--version-control-derived-helpers
-    status: draft
-    implementation: landed
-    probes: []
-    packages:
-      - openehr/rm
-    tests:
-      - openehr/rm/changecontrol_funcs_test.go
+    title: Version-control derived helpers (retired)
+    canonical: docs/specifications/retired-requirements.md#req-122--version-control-derived-helpers
+    status: deprecated
+    implementation: retired
 
   - id: REQ-123
     title: Temporal data-value helpers
-    canonical: docs/specifications/rm-functions.md#req-123--temporal-data-value-helpers
+    canonical: docs/specifications/reference-model.md#req-123--temporal-data-value-helpers
     status: draft
     implementation: landed
     probes: []
