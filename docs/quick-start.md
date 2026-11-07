@@ -171,7 +171,7 @@ c, err := transport.New(cat,
 
 The [`service-auth`](examples.md#service-auth) example shows the full wiring, including `clientcreds.NewFromCatalog`, which takes the token endpoint from the service catalog.
 
-For an app that acts for a signed-in user, run a SMART-on-openEHR launch with `auth/smart` and the application-level helpers under `smart/`. The resulting `smart.Source` is a token source too, passed to `transport.New` in the same way. The [`smart-launch`](examples.md#smart-launch) example walks through the PKCE flow and shows that wiring. Details: [specifications/auth.md](specifications/auth.md).
+For an app that acts for a signed-in user, run a SMART-on-openEHR launch with `auth/smart` and the application-level helpers under `smart/`. The `Source` from `auth/smart` is a token source too, passed to `transport.New` in the same way. The [`smart-launch`](examples.md#smart-launch) example walks through the PKCE flow, and its catalogue entry shows that wiring. Details: [specifications/auth.md](specifications/auth.md).
 
 ### Per-request auth (MCP, multi-tenant)
 
