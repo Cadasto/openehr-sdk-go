@@ -166,8 +166,11 @@ CKM's own *Vital signs* template, on the current archetypes: body_temperature.v2
 | Template id | OPT | JSON | XML |
 |---|---|:---:|:---:|
 | `IDCR - Vital Signs Encounter.v1` | yes | — | — |
+| `IDCR - Vital Signs Encounter - updated.v1` | yes | — | — |
 
 The original Ocean Template Designer export: a `SECTION.vital_signs.v1` holding the earlier revisions of the vital-sign OBSERVATIONs (respiration.v1 with `CLUSTER.ambient_oxygen.v0`, pulse.v1, body_temperature.v1, avpu.v1, blood_pressure.v1, indirect_oximetry.v1, news_uk_rcp.v1) and `EVALUATION.clinical_synopsis.v1`. It constrains `is_integral` on a DV_PROPORTION, a function in the Reference Model.
+
+`IDCR - Vital Signs Encounter - updated.v1` is the same template on the current CKM archetypes, assembled for this SDK from the original and the published archetypes: respiration.v2 with `CLUSTER.inspired_oxygen.v1`, pulse.v2, body_temperature.v2, acvpu.v1, blood_pressure.v2, pulse_oximetry.v1 and news2.v1, under the original `SECTION.vital_signs.v1`, with `EVALUATION.clinical_synopsis.v1`. It keeps the data points the original keeps, mapped by meaning, except the NEWS confounding factors, which news2.v1 does not carry.
 
 ### CODE24 (Cadasto)
 
