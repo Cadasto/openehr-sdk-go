@@ -732,6 +732,7 @@ requirements:
       - openehr/serialize/canxml/max_depth_test.go
       - openehr/serialize/canxml/missing_test.go
       - openehr/serialize/canxml/names_test.go
+      - openehr/serialize/canxml/not_well_formed_test.go
       - openehr/serialize/canxml/oneroot_test.go
       - openehr/serialize/canxml/optional_nil_test.go
       - openehr/serialize/canxml/presence_test.go
@@ -742,6 +743,7 @@ requirements:
       - openehr/serialize/canxml/reused_list_test.go
       - openehr/serialize/canxml/roundtrip_test.go
       - openehr/serialize/canxml/stream_decoder_test.go
+      - openehr/serialize/canxml/string_text_test.go
       - openehr/serialize/canxml/unmatched_test.go
       - openehr/serialize/canxml/xsd_prefix_test.go
       - testkit/conformance/crossformat/census_test.go
@@ -1831,6 +1833,7 @@ requirements:
       - openehr/aom/aom14/read_tolerant_test.go
       - openehr/instance/local_term_text_test.go
       - openehr/rm/rminfo/lookup_test.go
+      - openehr/serialize/canxml/not_well_formed_test.go
       - openehr/template/path_test.go
       - openehr/templatecompile/compile_readings_test.go
       - openehr/templatecompile/compile_test.go
@@ -2684,6 +2687,7 @@ requirements:
       - openehr/serialize/canxml/pointer_test.go
       - openehr/serialize/canxml/presence_test.go
       - openehr/serialize/canxml/report_cost_test.go
+      - openehr/serialize/canxml/string_text_test.go
       - openehr/validation/missing_members_test.go
 
   - id: REQ-176

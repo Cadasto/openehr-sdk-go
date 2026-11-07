@@ -144,7 +144,8 @@ func (t *TerminologyCode) UnmarshalXML(dec *xml.Decoder, start xml.StartElement)
 
 // decodeOptionalStringXML reads the element start opens, that of an optional
 // String member, into *field: nil when the element is nilled, or has no text
-// or whitespace only, which canonical XML reads as no value.
+// or whitespace only, which canonical XML reads as no value, unless the
+// decode keeps a string's text as sent (canxml.WithStringText).
 func decodeOptionalStringXML(dec *xml.Decoder, start xml.StartElement, field **string) error {
 	if isNil, err := xmlunmatched.SkipNil(dec, start); err != nil || isNil {
 		if isNil {
@@ -175,7 +176,8 @@ func decodeOptionalStringXML(dec *xml.Decoder, start xml.StartElement, field **s
 // and the text has been checked, or once the element closes with no `value`
 // child, the text then being the identifier. An identifier that is empty or
 // XML whitespace only is a member sent without a value
-// ([xmlunmatched.ReportEmpty]), and out gets the empty string.
+// ([xmlunmatched.ReportEmpty]), and out gets the empty string, unless the
+// decode keeps a string's text as sent ([xmlunmatched.KeepsStringText]).
 func decodeTerminologyIDXML(dec *xml.Decoder, start xml.StartElement, out *string) error {
 	if err := xmlunmatched.CheckUnmatchedAttrs(dec, start); err != nil {
 		return err
@@ -231,8 +233,11 @@ func decodeTerminologyIDXML(dec *xml.Decoder, start xml.StartElement, out *strin
 				*out = string(text)
 			}
 			if strings.TrimLeft(*out, " \t\r\n") == "" {
-				// No value: the empty identifier of a document without it.
-				*out = ""
+				// No value: the empty identifier of a document without it,
+				// unless the decode keeps a string's text as it was sent.
+				if !xmlunmatched.KeepsStringText(dec) {
+					*out = ""
+				}
 				xmlunmatched.ReportEmpty(dec, start)
 			}
 			return nil

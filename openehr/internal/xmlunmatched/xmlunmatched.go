@@ -77,9 +77,10 @@
 // given [Tracker.ReportMissing] reports, as each element closes, every one
 // of them the element carried no value for: no child element of that name
 // and no XML attribute of it where the class reads one; a child carrying
-// `xsi:nil="true"`; or a primitive child whose text is empty or XML
-// whitespace only. A struct element with no content, such as `<subject/>`,
-// is a value. Each member is named by its JSON Pointer in the canonical-JSON
+// `xsi:nil="true"`; or a primitive child with no text, or a string child
+// whose text is XML whitespace only, unless the decode keeps the string's
+// text ([Tracker.KeepStringText]). A struct element with no content, such as
+// `<subject/>`, is a value. Each member is named by its JSON Pointer in the canonical-JSON
 // form of the instance, so a consumer of either canonical format reads one
 // list. The report is the whole policy: a missing member is never a decode
 // error, and a decode that does not ask pays nothing for it.
@@ -205,6 +206,9 @@ type Tracker struct {
 	// presence is the caller's hook for the members a document sends without
 	// a value, set by [Tracker.ReportPresence]; nil when none asked.
 	presence func(pointer *reportpath.Node, nilled bool)
+	// stringText keeps the text of a string element sent empty or as XML
+	// whitespace only, set by [Tracker.KeepStringText].
+	stringText bool
 	// open holds one frame per element opened and not yet closed, after a
 	// first frame for the document itself, which counts the top-level
 	// elements of the value being decoded.
@@ -272,8 +276,10 @@ type frame struct {
 	class         *Class
 	seen          uint64 // a bit per class.Required member the element has a value for
 	nilled        bool   // the start element, or one around it, carried xsi:nil="true"
-	hasText       bool   // the element holds text other than XML whitespace
+	hasText       bool   // the element holds text that carries a value: other than XML whitespace, or any text when spaceIsText
 	primitive     bool   // a decoder read the element's text as its value
+	spaceIsText   bool   // a decoder reads the element's text into a primitive that is no string, whose XML whitespace is text ([noValue])
+	kept          bool   // a string element whose text the decode keeps, empty or whitespace only ([Tracker.KeepStringText])
 	unread        bool   // the decoder skipped or dropped the element: it is no member of its parent
 	// skipped counts, for each member class.Items lists, the children of its
 	// name the decoder skipped, which are no items of it ([Tracker.closing]);
@@ -681,8 +687,21 @@ func isXMLSpace(text []byte) bool {
 // anything of it is read, as an untracked decode refuses it
 // ([Tracker.refuseXMLDepth]).
 func (t *Tracker) decodeText(dec *xml.Decoder, start *xml.StartElement, v any) error {
-	t.open[len(t.open)-1].primitive = true
+	t.markPrimitive(v).kept = t.keepsText(v)
 	return t.readText(dec, start, v)
+}
+
+// markPrimitive marks the innermost open element as a primitive whose text a
+// decoder reads into v, and returns its frame. The text of a primitive that is
+// no string carries a value whenever it is not empty, white space included, as
+// [noValue] reads it: a Character may be one space, and the text of a number
+// or boolean that is white space only fails as it converts.
+func (t *Tracker) markPrimitive(v any) *frame {
+	f := &t.open[len(t.open)-1]
+	f.primitive = true
+	_, isString := v.(*string)
+	f.spaceIsText = !isString
+	return f
 }
 
 // readText decodes the element start opens into v as [Tracker.decodeText]
@@ -702,12 +721,16 @@ func (t *Tracker) readText(dec *xml.Decoder, start *xml.StartElement, v any) err
 
 // decodeOptional decodes the element start opens into v as
 // [Tracker.decodeText] does, unless the element carries no value
-// ([noValue]), and reports whether it decoded it.
+// ([noValue]) and t does not keep its text ([Tracker.KeepStringText]), and
+// reports whether it decoded it.
 func (t *Tracker) decodeOptional(dec *xml.Decoder, start *xml.StartElement, v any) (bool, error) {
-	t.open[len(t.open)-1].primitive = true
+	// The frame does not record kept: [Tracker.closing] reads it for a
+	// required member only, and an optional member is none.
+	t.markPrimitive(v)
+	kept := t.keepsText(v)
 	at := t.here()
 	text, err := t.elementText(dec, start)
-	if err != nil || noValue(string(text), v) {
+	if err != nil || (!kept && noValue(string(text), v)) {
 		return false, err
 	}
 	if err := t.convert(start.Name, text, v); err != nil {
@@ -854,8 +877,10 @@ func (r *trackingReader) Token() (xml.Token, error) {
 		r.t.pop()
 		r.scope.close()
 	case xml.CharData:
-		if r.t.checksPresence() && !isXMLSpace(tk) {
-			r.t.open[len(r.t.open)-1].hasText = true
+		if r.t.checksPresence() {
+			if f := &r.t.open[len(r.t.open)-1]; len(tk) > 0 && (f.spaceIsText || !isXMLSpace(tk)) {
+				f.hasText = true
+			}
 		}
 	case xml.ProcInst:
 		// XML reserves the target xml for the declaration at the start of
@@ -874,8 +899,8 @@ func (r *trackingReader) Token() (xml.Token, error) {
 }
 
 // errXMLTargetInside is the cause of the refusal of a processing instruction
-// whose target is xml inside an element.
-var errXMLTargetInside = errors.New("the element holds a processing instruction whose target is xml, which XML reserves for the declaration at the start of a document")
+// whose target is xml inside an element, which is not well-formed XML.
+var errXMLTargetInside error = notWellFormed("the element holds a processing instruction whose target is xml, which XML reserves for the declaration at the start of a document")
 
 // withoutNamespaceDecls returns attrs without its namespace declarations. It
 // returns attrs itself when it holds none.

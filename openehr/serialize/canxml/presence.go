@@ -38,11 +38,14 @@ func (p Presence) String() string {
 // or optional, and the element carries `xsi:nil="true"` (or `1`), whatever
 // it holds, which fn receives as [PresenceNil]; or is a primitive element
 // whose text is empty, or XML whitespace only for a string, which fn
-// receives as [PresenceEmpty]. An optional member sent so decodes as absent,
-// a nil pointer, interface or slice, and a mandatory one to its zero value,
-// as if the input had left it out (see the package documentation, "Wire
-// profile"), so the value the decode returns cannot say that the input sent
-// it, and [WithMissing] reports mandatory members only.
+// receives as [PresenceEmpty]. By default, an optional member sent so
+// decodes as absent, a nil pointer, interface or slice, and a mandatory one
+// to its zero value, as if the input had left it out (see the package
+// documentation, "Wire profile"), so the value the decode returns cannot say
+// that the input sent it, and [WithMissing] reports mandatory members only.
+// Under [WithStringText] a string member sent empty or as whitespace decodes
+// as the text it carries, an optional one included, and is no missing
+// member, and fn still receives it as [PresenceEmpty].
 //
 // A member that carries a value is not reported: an empty struct element
 // such as `<subject xsi:type="PARTY_SELF"/>`, `<magnitude>0</magnitude>`,

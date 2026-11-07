@@ -129,8 +129,8 @@ func TestREQ056_XMLRepeatedAttributeIsRefused(t *testing.T) {
 					if !refused && err == nil {
 						return // a decode with no option may read past the element
 					}
-					if !errors.Is(err, canxml.ErrInvalidShape) || errors.Is(err, canxml.ErrUnknownElement) {
-						t.Fatalf("%s %s = %v; want an error that wraps canxml.ErrInvalidShape and not canxml.ErrUnknownElement", call, m.name, err)
+					if !errors.Is(err, canxml.ErrInvalidShape) || !errors.Is(err, canxml.ErrNotWellFormed) || errors.Is(err, canxml.ErrUnknownElement) {
+						t.Fatalf("%s %s = %v; want an error that wraps canxml.ErrInvalidShape and canxml.ErrNotWellFormed, and not canxml.ErrUnknownElement", call, m.name, err)
 					}
 					if !strings.Contains(err.Error(), c.attr) {
 						t.Errorf("%s %s = %q; want it to name the attribute %s", call, m.name, err, c.attr)
