@@ -87,7 +87,7 @@ var probeExcludedPackagePrefixes = []string{
 
 // probePrimitiveMappedNames restates, as a literal, the KEY SET of
 // internal/bmmgen's primitiveGoType — the 17 names the generator maps straight
-// onto a Go primitive. That is not the whole of bmm-conformance.md § Primitive
+// onto a Go primitive. That is not the whole of reference-model.md § Primitive
 // type mapping (29 rows): the table also lists the abstract and
 // structured/container primitives the generator handles by other means, and it
 // omits `Iso8601_timezone`, which the map carries. Written out here for the
@@ -279,7 +279,7 @@ func (r *bmmReduction) exclusionReason(name string) (reason string, accounted bo
 	case inTheUniverse:
 		return "in the universe", false
 	case excludedAsPrimitive:
-		return "declared as, or mapped to, a primitive (bmm-conformance.md § Primitive type mapping)", true
+		return "declared as, or mapped to, a primitive (reference-model.md § Primitive type mapping)", true
 	case excludedAsEnumeration:
 		return "an enumeration", true
 	case excludedByClassName:

@@ -78,7 +78,7 @@ func livePerRunComposition(t *testing.T, templateID string) ([]byte, *rm.Composi
 	return optBody, comp
 }
 
-// ehrStatusLiveEntries witnesses PROBE-060 (REQ-095). The create is
+// ehrStatusLiveEntries witnesses PROBE-060 (REQ-050). The create is
 // server-assigned (WithInitialStatus, no WithEHRID). The composition
 // arm does not use this EHR: is_modifiable false means a conformant
 // server refuses later writes to it.
@@ -217,7 +217,7 @@ func minimalCompositionLiveEntries(ehrID openehrclient.EHRID, templateID string,
 }
 
 // TestLiveEHRStatusAndMinimalSnapshot witnesses PROBE-060 and PROBE-065
-// against a live deployment (REQ-082 Live, REQ-095, REQ-094). Opt-in and
+// against a live deployment (REQ-082 Live, REQ-050, REQ-094). Opt-in and
 // skipped in CI, sharing runLiveSnapshot with the other Live snapshots.
 //
 // The two probes use two EHRs. PROBE-060 creates one with

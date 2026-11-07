@@ -11,7 +11,7 @@ import (
 )
 
 // TestREQ043_PinnedContainersHaveNoFiniteUpper checks the premise the
-// Cardinality paragraph of bmm-conformance.md § Mapping rules rests on: the
+// Cardinality paragraph of reference-model.md § Mapping rules rests on: the
 // generator keeps only cardinality.lower of a container property (as
 // AttrMeta.Required), because no container in the pinned BMMs has a finite
 // upper bound. No container property of a class, interface, enumeration or

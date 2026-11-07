@@ -662,7 +662,7 @@ const matchCodes = "=<>?"
 // `match` lands in the intermediate canonical-JSON tree as the one-character
 // string [rmattrTails.matchCode] returns (`"match": "="`) — the same canonical
 // spelling the generated TERM_MAPPING's own JSON contract uses since
-// rm.Character (REQ-046 / REQ-052), so this package's own FLAT decoder never
+// rm.Character (REQ-041 / REQ-052), so this package's own FLAT decoder never
 // depends on rm.Character.UnmarshalJSON's backward-compatibility numeric
 // branch to round-trip a mapping. `/target` is decoded by the CODE_PHRASE leaf
 // builder — `|code` required, `|terminology` optional exactly as at an ENTRY

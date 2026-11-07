@@ -22,7 +22,7 @@ type xmlMatchHolder struct {
 	Match   rm.Character `xml:"match"`
 }
 
-// TestCharacterXMLElementContentValidated pins REQ-046 / REQ-052 /
+// TestCharacterXMLElementContentValidated pins REQ-041 / REQ-052 /
 // REQ-056 on the canonical-XML side: Character validity is a property of
 // the value, not of the codec that carried it. Before rm.Character
 // implemented encoding.TextUnmarshaler / encoding.TextMarshaler,

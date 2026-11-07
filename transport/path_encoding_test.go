@@ -1,6 +1,6 @@
 package transport
 
-// path_encoding_test.go — REQ-095. Pins the Request.Path encoding contract:
+// path_encoding_test.go — REQ-050. Pins the Request.Path encoding contract:
 // Request.Path is a DECODED path (url.URL.Path semantics) and the transport is
 // the single canonical path encoder. A path parameter carrying a percent-
 // encodable character reaches the wire encoded exactly once and the server

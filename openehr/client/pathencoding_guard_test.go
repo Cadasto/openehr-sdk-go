@@ -1,6 +1,6 @@
 package client_test
 
-// pathencoding_guard_test.go — REQ-095. The transport is the single canonical
+// pathencoding_guard_test.go — REQ-050. The transport is the single canonical
 // path encoder (Request.Path is a decoded url.URL.Path), so NO leaf client under
 // openehr/client may pre-escape a path parameter with url.PathEscape — doing so
 // double-encodes any id carrying a percent-encodable character (a space →
@@ -40,7 +40,7 @@ func TestNoPathEscapeInClientPathParams(t *testing.T) {
 		}
 		if strings.Contains(string(b), "url.PathEscape(") {
 			rel, _ := filepath.Rel(root, path)
-			t.Errorf("%s calls url.PathEscape into a request path; interpolate the raw id and let the transport encode once (REQ-095)", rel)
+			t.Errorf("%s calls url.PathEscape into a request path; interpolate the raw id and let the transport encode once (REQ-050)", rel)
 		}
 		return nil
 	})

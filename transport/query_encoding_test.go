@@ -1,6 +1,6 @@
 package transport_test
 
-// query_encoding_test.go — REQ-095. Pins the Request.Query encoding contract:
+// query_encoding_test.go — REQ-050. Pins the Request.Query encoding contract:
 // the pinned OAS declares query parameters `style: form`, which OpenAPI
 // defines by RFC 6570 form-style query expansion, so a space reaches the wire
 // as %20 and never as `+`. A `+` is a space only to an HTML-form decoder; a

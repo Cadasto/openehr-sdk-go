@@ -20,7 +20,7 @@ package rm
 // parts read before the parse stopped; the fallible Go-bridge conversions
 // return an error (also for partial / calendar-nominal values that cannot
 // map cleanly, and for a definite duration that does not fit time.Duration).
-// See docs/specifications/rm-functions.md § REQ-123 and ADR 0011.
+// See docs/specifications/reference-model.md § REQ-123 and ADR 0011.
 //
 // Temporal arithmetic (add / subtract / diff / multiply / negative /
 // add_nominal) is out of scope and remains fail-loud generated stubs.

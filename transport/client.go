@@ -862,7 +862,7 @@ func joinTarget(base *url.URL, path string, query url.Values) (*url.URL, error) 
 	// Path, so String would encode the whole path again from its decoded
 	// form and turn an escaped "/" (%2F) in the base into a real separator.
 	// The base keeps its own encoding instead; the request path is still
-	// encoded from its decoded form alone (REQ-150, REQ-095).
+	// encoded from its decoded form alone (REQ-150, REQ-050).
 	if base.RawPath != "" {
 		out.RawPath = joinPaths(base.EscapedPath(), (&url.URL{Path: path}).EscapedPath())
 	}
@@ -893,7 +893,7 @@ func mergeQuery(baseRaw string, query url.Values) string {
 		}
 		pairs = append(pairs, pair)
 	}
-	// REQ-095: the pinned OAS declares query parameters `style: form`,
+	// REQ-050: the pinned OAS declares query parameters `style: form`,
 	// defined by RFC 6570, where a space is %20; `+` is a space only under
 	// HTML-form decoding. Encode writes a literal plus as %2B, so every `+`
 	// it emits stands for a space.

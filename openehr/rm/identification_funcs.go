@@ -8,7 +8,7 @@ package rm
 // returning (T, error); the BMM-signature methods are best-effort and
 // never panic on malformed input (best-effort lexical decomposition;
 // use Parse… for validation). This is the single canonical home for
-// the identifier lexical forms — see docs/specifications/rm-functions.md
+// the identifier lexical forms — see docs/specifications/reference-model.md
 // § REQ-120 and ADR 0011.
 
 import (

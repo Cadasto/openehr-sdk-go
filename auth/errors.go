@@ -5,8 +5,9 @@ import (
 	"fmt"
 )
 
-// Sentinel auth errors. Detect classes with errors.Is; the underlying
-// wire error is preserved via errors.Unwrap on the wrapping Error type.
+// Sentinel auth errors. Detect classes with errors.Is; the failed request's
+// status and OAuth2 error are on the *ExchangeError that wraps them, reached
+// with errors.AsType.
 var (
 	// ErrTokenExchangeFailed indicates the authorization server
 	// rejected a token-exchange request (authorization_code,

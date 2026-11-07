@@ -12,7 +12,7 @@ import (
 //   - REQ-013 (docs/specifications/module-layout.md § REQ-013): neither the
 //     package nor any package of this module it pulls in imports transport,
 //     auth or openehr/client.
-//   - REQ-034 (docs/specifications/rm-modeling.md § openEHR terminology
+//   - REQ-034 (docs/specifications/reference-model.md § openEHR terminology
 //     vocabulary): every import of the package's own non-test files is a
 //     standard-library package, so it sits below openehr/rm and RM-level code
 //     can import it without a cycle. doc.go promises the same. This rejects

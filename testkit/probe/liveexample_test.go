@@ -12,7 +12,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
-// definitionExampleLiveEntries witnesses PROBE-104 (REQ-095). The upload
+// definitionExampleLiveEntries witnesses PROBE-104 (REQ-050). The upload
 // is the self-scoped setup (REQ-082): templateID embeds the per-run
 // identifier. The example GET is read-only and does not capture the
 // request. It passes when the composition is non-nil and
@@ -65,7 +65,7 @@ func definitionExampleLiveEntries(templateID string, optBody []byte) []probe.Ent
 }
 
 // TestLiveDefinitionExample_PROBE104_REQ095_REQ082 runs the definition
-// example read-back against a live deployment (PROBE-104, REQ-095,
+// example read-back against a live deployment (PROBE-104, REQ-050,
 // REQ-082). Opt-in and skipped in CI, sharing runLiveSnapshot with the
 // other Live snapshots. The per-run OPT is the EHRbase terminology_test
 // fixture rewritten so the template id carries the run identifier.

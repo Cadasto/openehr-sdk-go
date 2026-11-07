@@ -16,7 +16,7 @@ package bmmgen
 // descendants.
 //
 // Scope: only the pure / derived RM behavioural functions realised by
-// REQ-120..123 (see docs/specifications/rm-functions.md and ADR 0011).
+// REQ-120..123 (see docs/specifications/reference-model.md and ADR 0011).
 // Deferred functions (temporal arithmetic, PATHABLE.parent /
 // path_of_item, VERSIONED_OBJECT container ops, commit_*) are NOT
 // listed — they remain generated fail-loud panic stubs until a
@@ -67,7 +67,7 @@ var manuallyImplemented = map[string]bool{
 	"PATHABLE.path_exists":   true,
 	"PATHABLE.path_unique":   true,
 
-	// REQ-122 — version-control derived helper.
+	// REQ-120 — version-control derived helper.
 	// Hand-written: openehr/rm/changecontrol_funcs.go (on the concrete
 	// OriginalVersion / ImportedVersion, which carry the uid).
 	"VERSION.is_branch": true,

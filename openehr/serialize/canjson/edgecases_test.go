@@ -41,7 +41,7 @@ func TestDecodeNullEqualsAbsent(t *testing.T) {
 }
 
 // TestISO8601PassthroughOnString — the codec MUST NOT parse ISO
-// 8601 strings into time.Time at the codec layer (REQ-046). String
+// 8601 strings into time.Time at the codec layer (REQ-041). String
 // values reach the typed helpers (*_ext.go) untouched.
 func TestISO8601PassthroughOnString(t *testing.T) {
 	in := []byte(`{"_type":"DV_DATE_TIME","value":"2026-05-16T12:34:56.789+02:00"}`)

@@ -7,7 +7,7 @@ package rm
 // DV_URI and answers them through nil-safe methods of its own. The
 // validation floor's DV_EHR_URI Scheme_valid rule reads Scheme, so the floor
 // and these functions agree on what a scheme is. See
-// docs/specifications/rm-functions.md § REQ-120.
+// docs/specifications/reference-model.md § REQ-120.
 
 import "strings"
 

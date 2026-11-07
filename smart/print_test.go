@@ -148,7 +148,7 @@ func TestREQ060_LaunchContextPrintsNoToken(t *testing.T) { // REQ-060, REQ-064
 // keep their keys and show UID and Type. The pointer logs the same way
 // through the JSON handler. Printing does not change the principal, and a nil
 // one prints as <nil>.
-func TestREQ060_PrincipalIdentityPrintsNoToken(t *testing.T) { // REQ-060, REQ-067
+func TestREQ060_PrincipalIdentityPrintsNoToken(t *testing.T) { // REQ-060, REQ-064
 	p := tokenBodyLaunchContext(t).Principal
 	p.Raw["id_token"] = idTokenSecret
 	checkPrinted(t,

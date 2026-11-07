@@ -299,7 +299,7 @@ func storedBody(params map[string]any, cfg executeConfig) map[string]any {
 	// So offset and fetch are sent only when the caller set them (an
 	// explicit 0 included), and an unset one is left to the server's
 	// default. Leaving them out departs from the schema: REQ-057 states the
-	// rule, REQ-095 keys the exception and ADR 0026 decides it.
+	// rule, REQ-050 keys the exception and ADR 0026 decides it.
 	// query_parameters is always sent, as {} when there are none.
 	body := map[string]any{}
 	if cfg.offsetSet {

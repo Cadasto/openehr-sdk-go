@@ -551,7 +551,7 @@ type omitRule struct {
 }
 
 // nilableOmitRule returns the omit rule for a field of type t, and false
-// when a value of type t cannot be nil. bmm-conformance.md § Mapping rules
+// when a value of type t cannot be nil. reference-model.md § Mapping rules
 // asks for omitempty on a Go interface and on a field typed by its class's
 // own generic parameter: omitzero leaves out only a nil interface, so an
 // interface that holds a nil pointer would still be written as null. A

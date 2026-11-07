@@ -25,7 +25,7 @@ import (
 // value, not the literal bytes.
 var wireEscapes = map[string]string{"<": "\\u003c", ">": "\\u003e", "&": "\\u0026"}
 
-// REQ-046 / REQ-052: TERM_MAPPING.match is a single-character canonical JSON string.
+// REQ-041 / REQ-052: TERM_MAPPING.match is a single-character canonical JSON string.
 func TestTermMappingMatchRoundTrip(t *testing.T) {
 	for _, want := range []string{">", "=", "<", "?"} {
 		// Feed both spellings the carve-out admits: the literal character,
