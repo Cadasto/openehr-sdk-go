@@ -436,15 +436,27 @@ func trackBuildInputs(t *testing.T, root string) {
 	}
 }
 
-// trackRunInputs shows the Go test cache the corpus directories the
-// allowlisted examples read their fixtures from while they run, so a re-synced
-// template or composition invalidates a cached pass too. Both directories are
-// flat, so opening each records every fixture in it.
+// trackRunInputs shows the Go test cache the directories the allowlisted
+// examples read their fixtures from while they run: the corpus directories,
+// and the testdata directory of each example that has one. A re-synced
+// template or composition, or an edited fixture of an example's own, then
+// invalidates a cached pass too. Every one of these directories is flat, so
+// opening each records every fixture in it.
 func trackRunInputs(t *testing.T, root string) {
 	t.Helper()
 
-	for _, name := range []string{"compositions", "templates"} {
-		dir := filepath.Join(root, "testkit", "corpus", name)
+	dirs := []string{
+		filepath.Join(root, "testkit", "corpus", "compositions"),
+		filepath.Join(root, "testkit", "corpus", "templates"),
+	}
+	for _, tc := range transcripts {
+		// The cache records this stat too, so a testdata directory added
+		// later also invalidates a cached pass.
+		if dir := filepath.Join(root, "cmd", "examples", tc.program, "testdata"); dirExists(dir) {
+			dirs = append(dirs, dir)
+		}
+	}
+	for _, dir := range dirs {
 		if _, err := os.ReadDir(dir); err != nil {
 			t.Fatalf("list the fixture directory %s: %v", dir, err)
 		}
