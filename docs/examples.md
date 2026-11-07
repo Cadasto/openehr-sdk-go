@@ -54,11 +54,12 @@ The Packages column lists the SDK packages each program imports, by short name (
 
 ```bash
 go run ./cmd/examples/canonical_json
+go run ./cmd/examples/canonical_json composition.json
 ```
 
 **Packages:** `openehr/rm`, `openehr/serialize/canjson` (plus `testkit/fixtures`, which locates the fixture)
 
-**Fixture:** `testkit/corpus/compositions/body_weight.json`
+**Fixture:** `testkit/corpus/compositions/body_weight.json` by default; name a canonical-JSON COMPOSITION file to decode that one instead
 
 **Sample output:**
 
@@ -74,7 +75,7 @@ OK: canonical-JSON Composition decoded from body_weight.json
 
 `archetype_node_id` names the archetype the document is built on. `language` and `territory` are CODE_PHRASE values: a code plus the terminology it comes from. `category` is the composition category from the openEHR terminology, and `content items` counts the entries (observations, evaluations, ...) the document carries.
 
-**What to copy into your app:** `canjson.Unmarshal(body, &composition)` into an `rm.Composition`. The codec reads the `_type` discriminator on every object and fills the matching `rm` struct, polymorphic children included, so you never switch on `_type` yourself. A decode error means the bytes are not well-formed canonical JSON; report it before any template gets involved.
+**What to copy into your app:** `canjson.Unmarshal(body, &composition)` into an `rm.Composition`. The codec reads the `_type` discriminator on every object and fills the matching `rm` struct, polymorphic children included, so you never switch on `_type` yourself. A decode error means the bytes are not well-formed canonical JSON; report it before any template gets involved. A member held as an interface, such as `Name`, is nil when the document leaves it out, so check it before calling its methods.
 
 ---
 

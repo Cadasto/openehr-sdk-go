@@ -47,7 +47,9 @@ OK: canonical-JSON Composition decoded from body_weight.json
 
 `archetype_node_id` names the archetype the document is built on, `language`
 and `territory` are codes with the terminology they come from, and
-`content items` counts the entries the document carries.
+`content items` counts the entries the document carries. Name a
+canonical-JSON Composition file after the command to decode that one instead,
+as in `go run ./cmd/examples/canonical_json composition.json`.
 
 Packages: `openehr/rm`, `openehr/serialize/canjson`. Fixture:
 `testkit/corpus/compositions/body_weight.json`.
