@@ -38,6 +38,8 @@ type decoderConfig struct {
 	relaxedTypeDispatch bool
 	strict              bool
 	stringText          bool
+	// observe is passed each token the decode reads (decodeopts.Observer).
+	observe func(xml.Token)
 }
 
 // newDecoderConfig applies opts in order, skipping a nil option.
@@ -63,6 +65,9 @@ func init() {
 		c := newDecoderConfig(list)
 		return decodeopts.Settings{Strict: c.strict, Reports: c.unmatched != nil || c.missing != nil || c.presence != nil, MaxDepth: c.maxDepth}
 	})
+	decodeopts.RegisterObserver(func(fn func(xml.Token)) any {
+		return DecoderOption(func(c *decoderConfig) { c.observe = fn })
+	})
 }
 
 // tracked reports whether the decode reports or refuses unmatched content,
@@ -85,21 +90,24 @@ func (c decoderConfig) tracker() *xmlunmatched.Tracker {
 		t.KeepStringText()
 	}
 	t.LimitDepth(c.maxDepth)
+	t.ObserveTokens(c.observe)
 	return t
 }
 
 // documentTracker returns the tracker [Unmarshal] decodes a document through:
-// c's tracker, or, under a depth limit alone, one that applies no policy and
-// follows the elements for the limit. Such a tracker decodes a document as a
-// decode with no tracker does, in one pass: that decode names a primitive
-// failure by its path, and resolves a prefix declared around its attribute,
-// by decoding the document again through one.
+// c's tracker, or, under a depth limit or a token observer alone, one that
+// applies no policy and follows the elements for the limit and passes the
+// tokens to the observer. Such a tracker decodes a document as a decode with
+// no tracker does, in one pass: that decode names a primitive failure by its
+// path, and resolves a prefix declared around its attribute, by decoding the
+// document again through one.
 func (c decoderConfig) documentTracker() *xmlunmatched.Tracker {
-	if t := c.tracker(); t != nil || c.maxDepth == 0 {
+	if t := c.tracker(); t != nil || (c.maxDepth == 0 && c.observe == nil) {
 		return t
 	}
 	t := xmlunmatched.NewTracker(nil, false)
 	t.LimitDepth(c.maxDepth)
+	t.ObserveTokens(c.observe)
 	return t
 }
 
@@ -276,12 +284,14 @@ func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 	if t := cfg.tracker(); t != nil {
 		return &Decoder{dec: t.NewDecoder(r), cfg: cfg, trk: t}
 	}
-	if cfg.maxDepth > 0 {
-		// The limit needs the decode to follow the elements it reads. A scope
-		// does so and applies no policy, so a value decodes in one pass, and a
-		// primitive failure is named as a decoder given no option names it.
+	if cfg.maxDepth > 0 || cfg.observe != nil {
+		// The limit needs the decode to follow the elements it reads, and an
+		// observer the tokens it reads. A scope does both and applies no
+		// policy, so a value decodes in one pass, and a primitive failure is
+		// named as a decoder given no option names it.
 		s := new(xmlunmatched.Scope)
 		s.LimitDepth(cfg.maxDepth)
+		s.ObserveTokens(cfg.observe)
 		return &Decoder{dec: s.NewDecoder(r), cfg: cfg, scope: s}
 	}
 	if s, ok := r.(byteSeeker); ok {

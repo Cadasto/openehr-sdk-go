@@ -776,21 +776,21 @@ func holdsLinearCost(t *testing.T, cases []costCase) {
 	}
 }
 
-// TestREQ108_ReadOperationalTemplateChecksInLinearTime pins that the checks
-// that decide whether a document needs a second reading cost time in
-// proportion to its size, each match costing about as much as the bytes
-// around it: an element-holding text of 50 000 slashes before a `>`, 20 000
+// TestREQ108_ReadOperationalTemplateChecksInLinearTime pins that deciding
+// whether a document needs a second reading costs time in proportion to its
+// size on the inputs that cost an earlier byte scan of the document work per
+// match: an element-holding text of 50 000 slashes before a `>`, 20 000
 // names of archetype_id under a prefix in text, a start tag that holds
 // C_BOOLEAN 20 000 times, 50 000 character references in text, after a long
 // start tag or before a C_BOOLEAN item, and 50 000 end tags after a comment
 // each read in about the time a document of that size without them takes. It
 // runs alone, since it times the reads.
 //
-// Can-fail control: find the start tag a match stands in by scanning back to
-// the last `<`, or to the end of the tag it opens, once per match, look for
-// the next C_BOOLEAN again after each character reference, or read the name
-// of an end tag past its `>`, and each document takes hundreds of times as
-// long as its baseline.
+// The reader now decides from the tokens of its first decode, at a constant
+// cost per token and an attribute value's length for the C_BOOLEAN test, and
+// each baseline differs from its document only in text, comments and
+// references those facts pass over, so no change to the facts alone fails
+// this test: the cases stay as hostile inputs for the whole first reading.
 func TestREQ108_ReadOperationalTemplateChecksInLinearTime(t *testing.T) {
 	inConcept := func(content string) string {
 		return readTemplateHead + `<concept>` + content + `</concept></template>`

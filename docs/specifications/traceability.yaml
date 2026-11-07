@@ -1826,6 +1826,7 @@ requirements:
       - internal/templatecompile/template_readings_test.go
       - internal/templatecompile/untyped_test.go
       - internal/templatecompile/webtemplate_oracle_compile_test.go
+      - openehr/aom/aom14/read_tokens_internal_test.go
       - openehr/aom/aom14/read_tolerant_test.go
       - openehr/composition/named_sibling_test.go
       - openehr/instance/local_term_text_test.go
