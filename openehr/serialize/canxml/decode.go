@@ -95,17 +95,19 @@ func (c decoderConfig) tracker() *xmlunmatched.Tracker {
 }
 
 // documentTracker returns the tracker [Unmarshal] decodes a document through:
-// c's tracker, or, under a depth limit alone, one that applies no policy and
-// follows the elements for the limit. Such a tracker decodes a document as a
-// decode with no tracker does, in one pass: that decode names a primitive
-// failure by its path, and resolves a prefix declared around its attribute,
-// by decoding the document again through one.
+// c's tracker, or, under a depth limit or a token observer alone, one that
+// applies no policy and follows the elements for the limit and passes the
+// tokens to the observer. Such a tracker decodes a document as a decode with
+// no tracker does, in one pass: that decode names a primitive failure by its
+// path, and resolves a prefix declared around its attribute, by decoding the
+// document again through one.
 func (c decoderConfig) documentTracker() *xmlunmatched.Tracker {
-	if t := c.tracker(); t != nil || c.maxDepth == 0 {
+	if t := c.tracker(); t != nil || (c.maxDepth == 0 && c.observe == nil) {
 		return t
 	}
 	t := xmlunmatched.NewTracker(nil, false)
 	t.LimitDepth(c.maxDepth)
+	t.ObserveTokens(c.observe)
 	return t
 }
 
