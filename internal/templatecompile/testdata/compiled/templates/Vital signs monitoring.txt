@@ -1,0 +1,1325 @@
+# compiled tree of templates/Vital signs monitoring.opt
+template_id="Vital signs monitoring" concept="Vital signs monitoring" language="en" uid="f6bedb30-7da2-4c2f-b7a2-a23aed8082bd" num_nodes=181
+template_binding terminology="SNOMED-CT" node_or_path="at0000" target_terminology="SNOMED-CT(2003)" target_code="364090009"
+template_binding terminology="SNOMED-CT" node_or_path="at0004" target_terminology="SNOMED-CT(2003)" target_code="271649006"
+template_binding terminology="SNOMED-CT" node_or_path="at0005" target_terminology="SNOMED-CT(2003)" target_code="271650006"
+template_binding terminology="SNOMED-CT" node_or_path="at0013" target_terminology="SNOMED-CT(2003)" target_code="246153002"
+template_binding terminology="LNC205" node_or_path="at0004" target_terminology="LNC205" target_code="8310-5"
+template_binding terminology="SNOMED-CT" node_or_path="at0004" target_terminology="SNOMED-CT" target_code="386725007"
+template_binding terminology="SNOMED-CT" node_or_path="at0006" target_terminology="SNOMED-CT" target_code="431314004"
+template_binding terminology="SNOMED-CT" node_or_path="at0015" target_terminology="SNOMED-CT" target_code="16206004"
+template_binding terminology="SNOMED-CT" node_or_path="at0018" target_terminology="SNOMED-CT" target_code="448703006"
+template_binding terminology="SNOMED-CT" node_or_path="at0054" target_terminology="SNOMED-CT" target_code="277923006"
+template_binding terminology="LOINC" node_or_path="at0006" target_terminology="LOINC" target_code="59408-5"
+template_binding terminology="LOINC" node_or_path="at0009" target_terminology="LOINC" target_code="20081-6"
+template_binding terminology="LOINC" node_or_path="at0044" target_terminology="LOINC" target_code="57800-5"
+template_binding terminology="LOINC" node_or_path="at0045" target_terminology="LOINC" target_code="86904-0"
+template_binding terminology="LOINC" node_or_path="at0046" target_terminology="LOINC" target_code="2614-6"
+template_binding terminology="SNOMED-CT" node_or_path="at0004" target_terminology="SNOMED-CT" target_code="271625008"
+template_binding terminology="SNOMED-CT" node_or_path="at0005" target_terminology="SNOMED-CT" target_code="278907009"
+template_binding terminology="SNOMED-CT" node_or_path="at0006" target_terminology="SNOMED-CT" target_code="276888009"
+template_binding terminology="SNOMED-CT" node_or_path="at0007" target_terminology="SNOMED-CT" target_code="248585001"
+template_binding terminology="SNOMED-CT" node_or_path="at0016" target_terminology="SNOMED-CT" target_code="271626009"
+template_binding terminology="SNOMED-CT" node_or_path="at0017" target_terminology="SNOMED-CT" target_code="301284009"
+template_binding terminology="SNOMED-CT" node_or_path="at0018" target_terminology="SNOMED-CT" target_code="386616007"
+template_binding terminology="SNOMED-CT" node_or_path="at0019" target_terminology="SNOMED-CT" target_code="289123006"
+template_binding terminology="SNOMED-CT" node_or_path="at0024" target_terminology="SNOMED-CT" target_code="703852005"
+template_binding terminology="SNOMED-CT" node_or_path="at0025" target_terminology="SNOMED-CT" target_code="248587009"
+template_binding terminology="SNOMED-CT" node_or_path="at0066" target_terminology="SNOMED-CT" target_code="10904000"
+template_binding terminology="SNOMED-CT" node_or_path="at0067" target_terminology="SNOMED-CT" target_code="33586001"
+template_binding terminology="SNOMED-CT" node_or_path="at0068" target_terminology="SNOMED-CT" target_code="272580008"
+template_binding terminology="SNOMED-CT" node_or_path="at0069" target_terminology="SNOMED-CT" target_code="40199007"
+template_binding terminology="SNOMED-CT" node_or_path="at0071" target_terminology="SNOMED-CT" target_code="1240000"
+
+node /
+  rm_type="COMPOSITION" node_id="at0000" archetype_id="openEHR-EHR-COMPOSITION.vital_signs_monitoring.v1" node_name="" occurrences=1..1 slot=false
+  term[en] "at0000" code="at0000" description="unknown" text="Vital signs monitoring"
+  binding terminology="SNOMED-CT" node_or_path="at0000" target_terminology="SNOMED-CT(2003)" target_code="364090009"
+  attr "category" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "content" rm_type="CONTENT_ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=5
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "territory" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "composer" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /category
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /category/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["433"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]
+  rm_type="OBSERVATION" node_id="at0000" archetype_id="openEHR-EHR-OBSERVATION.blood_pressure.v2" node_name="" occurrences=0..* slot=false
+  term[en] "at0000" code="at0000" comment="Most commonly, use of the term 'blood pressure' refers to measurement of brachial artery pressure in the upper arm." description="The local measurement of arterial blood pressure which is a surrogate for arterial pressure in the systemic circulation." text="Blood pressure"
+  binding terminology="SNOMED-CT" node_or_path="at0000" target_terminology="SNOMED-CT(2003)" target_code="364090009"
+  attr "data" rm_type="HISTORY" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "protocol" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "encoding" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "subject" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/data
+  rm_type="HISTORY" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="History Structural node." text="History"
+  attr "events" rm_type="EVENT" cardinality=multiple existence=0..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "origin" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/data/events[at0006]
+  rm_type="EVENT" node_id="at0006" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[en] "at0006" code="at0006" description="Default, unspecified point in time or interval event which may be explicitly defined in a template or at run-time." text="Any event"
+  binding terminology="SNOMED-CT" node_or_path="at0006" target_terminology="SNOMED-CT" target_code="431314004"
+  binding terminology="LOINC" node_or_path="at0006" target_terminology="LOINC" target_code="59408-5"
+  binding terminology="SNOMED-CT" node_or_path="at0006" target_terminology="SNOMED-CT" target_code="276888009"
+  attr "data" rm_type="T" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "state" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/data/events[at0006]/data
+  rm_type="ITEM_TREE" node_id="at0003" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0003" code="at0003" description="@ internal @" text="blood pressure"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=4
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/data/events[at0006]/data/items[at0004]
+  rm_type="ELEMENT" node_id="at0004" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0004" code="at0004" description="Peak systemic arterial blood pressure  - measured in systolic or contraction phase of the heart cycle." text="Systolic"
+  binding terminology="SNOMED-CT" node_or_path="at0004" target_terminology="SNOMED-CT(2003)" target_code="271649006"
+  binding terminology="LNC205" node_or_path="at0004" target_terminology="LNC205" target_code="8310-5"
+  binding terminology="SNOMED-CT" node_or_path="at0004" target_terminology="SNOMED-CT" target_code="386725007"
+  binding terminology="SNOMED-CT" node_or_path="at0004" target_terminology="SNOMED-CT" target_code="271625008"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/data/events[at0006]/data/items[at0004]/value
+  rm_type="DV_QUANTITY" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.DvQuantity{Units:[constraints.QuantityUnit{Units:"mm[Hg]" Magnitude:constraints.NumericRange{Lower:0 Upper:1000 LowerInclusive:true UpperInclusive:false LowerUnbounded:false UpperUnbounded:false} Precision:constraints.NumericRange{Lower:0 Upper:0 LowerInclusive:true UpperInclusive:true LowerUnbounded:false UpperUnbounded:false}}] Property:constraints.CodedTermRef{Terminology:"openehr" CodeString:"125"} PropertyUnits:["N/m2" "atm" "bar" "cm[H2O]" "daPa" "dyn/cm2" "[ft_i'H2O]" "[in_i'Hg]" "[in_i'H2O]" "kg/m2" "kPa" "[lbf_av]/[ft_i]2" "[psi]" "mbar" "mm[Hg]" "mm[H20]" "Pa" "([lb_av].[ft_i]/s2)/[sft_i]" "[ston_av]/[sin_i]"]}
+  attr "magnitude" rm_type="Real" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "units" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/data/events[at0006]/data/items[at0005]
+  rm_type="ELEMENT" node_id="at0005" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0005" code="at0005" description="Minimum systemic arterial blood pressure - measured in the diastolic or relaxation phase of the heart cycle." text="Diastolic"
+  binding terminology="SNOMED-CT" node_or_path="at0005" target_terminology="SNOMED-CT(2003)" target_code="271650006"
+  binding terminology="SNOMED-CT" node_or_path="at0005" target_terminology="SNOMED-CT" target_code="278907009"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/data/events[at0006]/data/items[at0005]/value
+  rm_type="DV_QUANTITY" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.DvQuantity{Units:[constraints.QuantityUnit{Units:"mm[Hg]" Magnitude:constraints.NumericRange{Lower:0 Upper:1000 LowerInclusive:true UpperInclusive:false LowerUnbounded:false UpperUnbounded:false} Precision:constraints.NumericRange{Lower:0 Upper:0 LowerInclusive:true UpperInclusive:true LowerUnbounded:false UpperUnbounded:false}}] Property:constraints.CodedTermRef{Terminology:"openehr" CodeString:"125"} PropertyUnits:["N/m2" "atm" "bar" "cm[H2O]" "daPa" "dyn/cm2" "[ft_i'H2O]" "[in_i'Hg]" "[in_i'H2O]" "kg/m2" "kPa" "[lbf_av]/[ft_i]2" "[psi]" "mbar" "mm[Hg]" "mm[H20]" "Pa" "([lb_av].[ft_i]/s2)/[sft_i]" "[ston_av]/[sin_i]"]}
+  attr "magnitude" rm_type="Real" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "units" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/data/events[at0006]/data/items[at1059]
+  rm_type="ELEMENT" node_id="at1059" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at1059" code="at1059" description="Single word, phrase or brief description that represents the clinical meaning and significance of the blood pressure measurement." text="Clinical interpretation"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/data/events[at0006]/data/items[at1059]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/data/events[at0006]/data/items[at0033]
+  rm_type="ELEMENT" node_id="at0033" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0033" code="at0033" description="Additional narrative about the measurement, not captured in other fields." text="Comment"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/data/events[at0006]/data/items[at0033]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/data/events[at0006]/state
+  rm_type="ITEM_TREE" node_id="at0007" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0007" code="at0007" description="@ internal @" text="state structure"
+  binding terminology="SNOMED-CT" node_or_path="at0007" target_terminology="SNOMED-CT" target_code="248585001"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=5
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/data/events[at0006]/state/items[at0008]
+  rm_type="ELEMENT" node_id="at0008" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0008" code="at0008" description="The position of the individual at the time of measurement." text="Position"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/data/events[at0006]/state/items[at0008]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/data/events[at0006]/state/items[at0008]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at1000" "at1001" "at1002" "at1003" "at1014"]}
+  code_term[en] "at1000" code="at1000" description="Standing at the time of blood pressure measurement." text="Standing"
+  code_term[en] "at1001" code="at1001" description="Sitting (for example on bed or chair) at the time of blood pressure measurement." text="Sitting"
+  code_term[en] "at1002" code="at1002" description="Reclining at the time of blood pressure measurement." text="Reclining"
+  code_term[en] "at1003" code="at1003" description="Lying flat at the time of blood pressure measurement." text="Lying"
+  code_term[en] "at1014" code="at1014" description="Lying flat with some lateral tilt, usually angled towards the left side.   Commonly required in the last trimester of pregnancy to relieve aortocaval compression." text="Lying with tilt to left"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/data/events[at0006]/state/items[at1052]
+  rm_type="ELEMENT" node_id="at1052" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at1052" code="at1052" description="Comment on and record other incidental factors that may be contributing to the blood pressure measurement.  For example, level of anxiety or 'white coat syndrome'; pain or fever; changes in atmospheric pressure etc." text="Confounding factors"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/data/events[at0006]/state/items[at1052]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/data/events[at0006]/state/items[at1030]
+  rm_type="CLUSTER" node_id="at1030" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.level_of_exertion(-[a-zA-Z0-9_]+)*\\.v1"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.level_of_exertion(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[] raw_include_count=1
+  term[en] "at1030" code="at1030" description="Details about physical activity undertaken at the time of blood pressure measurement." text="Exertion"
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/data/events[at0006]/state/items[at1043]
+  rm_type="ELEMENT" node_id="at1043" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at1043" code="at1043" description="Sleep status - supports interpretation of 24 hour ambulatory blood pressure records." text="Sleep status"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/data/events[at0006]/state/items[at1043]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/data/events[at0006]/state/items[at1043]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at1044" "at1045"]}
+  code_term[en] "at1044" code="at1044" description="The individual is fully conscious." text="Awake"
+  code_term[en] "at1045" code="at1045" description="The individual is in the natural state of bodily rest." text="Sleeping"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/data/events[at0006]/state/items[at1005]
+  rm_type="ELEMENT" node_id="at1005" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at1005" code="at1005" description="The craniocaudal tilt of the surface on which the person is lying at the time of measurement." text="Tilt"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/data/events[at0006]/state/items[at1005]/value
+  rm_type="DV_QUANTITY" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.DvQuantity{Units:[constraints.QuantityUnit{Units:"deg" Magnitude:constraints.NumericRange{Lower:-90 Upper:90 LowerInclusive:true UpperInclusive:true LowerUnbounded:false UpperUnbounded:false} Precision:constraints.NumericRange{Lower:0 Upper:0 LowerInclusive:true UpperInclusive:true LowerUnbounded:false UpperUnbounded:false}}] Property:constraints.CodedTermRef{Terminology:"openehr" CodeString:"497"} PropertyUnits:["rad" "''" "'" "deg"]}
+  attr "magnitude" rm_type="Real" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "units" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/protocol
+  rm_type="ITEM_TREE" node_id="at0011" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0011" code="at0011" description="List structure." text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=10
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/protocol/items[at0013]
+  rm_type="ELEMENT" node_id="at0013" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0013" code="at0013" comment="Perloff D, Grim C, Flack J, Frohlich ED, Hill M, McDonald M, Morgenstern BZ. Human blood pressure determination by sphygmomanometry. Circulation 1993;88;2460-2470." description="The size of the cuff used for blood pressure measurement." text="Cuff size"
+  binding terminology="SNOMED-CT" node_or_path="at0013" target_terminology="SNOMED-CT(2003)" target_code="246153002"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/protocol/items[at0013]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/protocol/items[at0013]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0015" "at0016" "at0017" "at1008" "at1009" "at1018" "at1019"]}
+  code_term[en] "at0015" code="at0015" description="A cuff used for an adult thigh." text="Adult Thigh"
+  code_term[en] "at0016" code="at0016" description="A cuff for adults with larger arms." text="Large Adult"
+  code_term[en] "at0017" code="at0017" description="A cuff that is standard for an adult." text="Adult"
+  code_term[en] "at1008" code="at1008" description="A cuff used for a small adult." text="Small Adult"
+  code_term[en] "at1009" code="at1009" description="A cuff that is appropriate for a child or adult with a thin arm." text="Paediatric/Child"
+  code_term[en] "at1018" code="at1018" description="A cuff used for infants." text="Infant"
+  code_term[en] "at1019" code="at1019" description="A cuff used for a neonate, assuming cuff is the appropriate size for maturity and birthweight of the neonate." text="Neonatal"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/protocol/items[at0014]
+  rm_type="ELEMENT" node_id="at0014" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0014" code="at0014" description="Simple body site where blood pressure was measured." text="Location of measurement"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/protocol/items[at0014]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/protocol/items[at0014]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0025" "at0026" "at0027" "at0028" "at1020" "at1021" "at1026" "at1031" "at1032" "at1051" "at1056" "at1053"]}
+  code_term[en] "at0025" code="at0025" description="The right arm of the person." text="Right arm"
+  code_term[en] "at0026" code="at0026" description="The left arm of the person." text="Left arm"
+  code_term[en] "at0027" code="at0027" description="The right thigh of the person." text="Right thigh"
+  code_term[en] "at0028" code="at0028" description="The left thigh of the person." text="Left thigh"
+  code_term[en] "at1020" code="at1020" description="The right wrist of the individual." text="Right wrist"
+  code_term[en] "at1021" code="at1021" description="The left wrist of the individual." text="Left wrist"
+  code_term[en] "at1026" code="at1026" description="The right ankle of the individual." text="Right ankle"
+  code_term[en] "at1031" code="at1031" description="The left ankle of the individual." text="Left ankle"
+  code_term[en] "at1032" code="at1032" description="A finger of the individual." text="Finger"
+  code_term[en] "at1051" code="at1051" description="A toe of the individual." text="Toe"
+  code_term[en] "at1056" code="at1056" description="The individual's dorsum of the foot." text="Dorsum of foot"
+  code_term[en] "at1053" code="at1053" description="Invasive measurement via transducer access line within an artery." text="Intra-arterial"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/protocol/items[at0014]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/protocol/items[at1057]
+  rm_type="CLUSTER" node_id="at1057" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.anatomical_location(-[a-zA-Z0-9_]+)*\\.v1"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.anatomical_location(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[] raw_include_count=1
+  term[en] "at1057" code="at1057" description="Structured anatomical location of where the measurement was taken." text="Structured measurement location"
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/protocol/items[at1035]
+  rm_type="ELEMENT" node_id="at1035" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at1035" code="at1035" description="Method of measurement of blood pressure." text="Method"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/protocol/items[at1035]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/protocol/items[at1035]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at1036" "at1037" "at1039" "at1040"]}
+  code_term[en] "at1036" code="at1036" description="Method of measuring blood pressure externally, using a stethoscope and Korotkoff sounds." text="Auscultation"
+  code_term[en] "at1037" code="at1037" description="Method of measuring blood pressure externally, using palpation (usually of the brachial or radial arteries)." text="Palpation"
+  code_term[en] "at1039" code="at1039" description="Method of measuring blood pressure externally, using a blood pressure machine." text="Machine"
+  code_term[en] "at1040" code="at1040" description="Method of measuring blood pressure internally ie involving penetration of the skin and measuring inside blood vessels." text="Invasive"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/protocol/items[at1038]
+  rm_type="ELEMENT" node_id="at1038" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at1038" code="at1038" description="Formula used to calculate the Mean Arterial Pressure (if recorded in data)." text="Mean arterial pressure formula"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/protocol/items[at1038]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/protocol/items[at1054]
+  rm_type="ELEMENT" node_id="at1054" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at1054" code="at1054" description="Formula used to calculate the systolic pressure from from mean arterial pressure (if recorded in data)." text="Systolic pressure formula"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/protocol/items[at1054]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/protocol/items[at1055]
+  rm_type="ELEMENT" node_id="at1055" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at1055" code="at1055" description="Formula used to calculate the diastolic pressure from mean arterial pressure (if recorded in data)." text="Diastolic pressure formula"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/protocol/items[at1055]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/protocol/items[at1010]
+  rm_type="ELEMENT" node_id="at1010" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at1010" code="at1010" description="Record which Korotkoff sound is used for determining diastolic pressure using auscultative method." text="Diastolic endpoint"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/protocol/items[at1010]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/protocol/items[at1010]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at1011" "at1012"]}
+  code_term[en] "at1011" code="at1011" description="The fourth Korotkoff sound is identified as an abrupt muffling of sounds." text="Phase IV"
+  code_term[en] "at1012" code="at1012" description="The fifth Korotkoff sound is identified by absence of sounds as the cuff pressure drops below the diastolic blood pressure." text="Phase V"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/protocol/items[at1025]
+  rm_type="CLUSTER" node_id="at1025" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.device(-[a-zA-Z0-9_]+)*\\.v1"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.device(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[] raw_include_count=1
+  term[en] "at1025" code="at1025" description="Details about sphygmomanometer or other device used to measure the blood pressure." text="Device"
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/protocol/items[at1058]
+  rm_type="CLUSTER" node_id="at1058" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at1058" code="at1058" comment="For example: Local hospital departmental infomation or additional metadata to align with FHIR or CIMI equivalents." description="Additional information required to capture local context or to align with other reference models/formalisms." text="Extension"
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]
+  rm_type="OBSERVATION" node_id="at0000" archetype_id="openEHR-EHR-OBSERVATION.body_temperature.v2" node_name="" occurrences=0..* slot=false
+  term[en] "at0000" code="at0000" description="A measurement of the body temperature, which is a surrogate for the core body temperature of the individual." text="Body temperature"
+  binding terminology="SNOMED-CT" node_or_path="at0000" target_terminology="SNOMED-CT(2003)" target_code="364090009"
+  attr "data" rm_type="HISTORY" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "protocol" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "encoding" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "subject" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data
+  rm_type="HISTORY" node_id="at0002" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0002" code="at0002" description="@ internal @" text="History"
+  attr "events" rm_type="EVENT" cardinality=multiple existence=0..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "origin" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]
+  rm_type="EVENT" node_id="at0003" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[en] "at0003" code="at0003" description="Default, unspecified point in time or interval event which may be explicitly defined in a template or at run-time." text="Any event"
+  attr "data" rm_type="T" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "state" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/data
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/data/items[at0004]
+  rm_type="ELEMENT" node_id="at0004" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0004" code="at0004" description="The measured temperature." text="Temperature"
+  binding terminology="SNOMED-CT" node_or_path="at0004" target_terminology="SNOMED-CT(2003)" target_code="271649006"
+  binding terminology="LNC205" node_or_path="at0004" target_terminology="LNC205" target_code="8310-5"
+  binding terminology="SNOMED-CT" node_or_path="at0004" target_terminology="SNOMED-CT" target_code="386725007"
+  binding terminology="SNOMED-CT" node_or_path="at0004" target_terminology="SNOMED-CT" target_code="271625008"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/data/items[at0004]/value
+  rm_type="DV_QUANTITY" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.DvQuantity{Units:[] Property:nil PropertyUnits:[]}
+  attr "magnitude" rm_type="Real" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "units" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/data/items[at0063]
+  rm_type="ELEMENT" node_id="at0063" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0063" code="at0063" description="Additional comment about the body temperature measurement not captured in other fields." text="Comment"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/data/items[at0063]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state
+  rm_type="ITEM_TREE" node_id="at0029" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0029" code="at0029" description="State information about the patient." text="State"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=5
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0030]
+  rm_type="ELEMENT" node_id="at0030" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0030" code="at0030" description="The degree of exposure of the individual at the time of measurement." text="Body exposure"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0030]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0030]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0031" "at0032" "at0033" "at0034"]}
+  code_term[en] "at0031" code="at0031" description="No clothing, bedding or covering." text="Naked"
+  code_term[en] "at0032" code="at0032" description="The person is covered by a lesser amount of clothing or bedding than deemed appropriate for the environmental circumstances." text="Reduced clothing/bedding"
+  code_term[en] "at0033" code="at0033" description="The person is covered by an amount of clothing or bedding deemed appropriate for the environmental circumstances." text="Appropriate clothing/bedding"
+  code_term[en] "at0034" code="at0034" description="The person is covered by an increased amount of clothing or bedding than deemed appropriate for the environmental circumstances." text="Increased clothing/bedding"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0030]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0041]
+  rm_type="ELEMENT" node_id="at0041" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0041" code="at0041" description="Narrative description of the conditions applied to the subject that might influence their measured body temperature." text="Description of thermal stress"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0041]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0066]
+  rm_type="ELEMENT" node_id="at0066" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[en] "at0066" code="at0066" description="Additional issues or factors that may impact on the measurement of body temperature, not captured in other fields." text="Confounding factors"
+  binding terminology="SNOMED-CT" node_or_path="at0066" target_terminology="SNOMED-CT" target_code="10904000"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0066]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0056]
+  rm_type="CLUSTER" node_id="at0056" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.environmental_conditions\\.v1|openEHR-EHR-CLUSTER\\.environmental_conditions\\.v0"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.environmental_conditions\\.v1|openEHR-EHR-CLUSTER\\.environmental_conditions\\.v0"] excludes=[] raw_include_count=1
+  term[en] "at0056" code="at0056" description="Details about the environmental conditions at the time of temperature measurement." text="Environmental conditions"
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0057]
+  rm_type="CLUSTER" node_id="at0057" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.level_of_exertion\\.v1|openEHR-EHR-CLUSTER\\.level_of_exertion\\.v0"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.level_of_exertion\\.v1|openEHR-EHR-CLUSTER\\.level_of_exertion\\.v0"] excludes=[] raw_include_count=1
+  term[en] "at0057" code="at0057" description="Details about the exertion of the person at the time of temperature measurement." text="Exertion"
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/protocol
+  rm_type="ITEM_TREE" node_id="at0020" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0020" code="at0020" description="@ internal @" text="Protocol"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=4
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/protocol/items[at0021]
+  rm_type="ELEMENT" node_id="at0021" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0021" code="at0021" description="Simple description about the site of measurement." text="Location of measurement"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/protocol/items[at0021]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/protocol/items[at0021]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0025" "at0024" "at0023" "at0061" "at0022" "at0026" "at0027" "at0028" "at0043" "at0051" "at0054" "at0055" "at0060"]}
+  code_term[en] "at0025" code="at0025" description="Temperature measured within the rectum." text="Rectum"
+  code_term[en] "at0024" code="at0024" description="Temperature is measured from the skin of the axilla with the arm positioned down by the side." text="Axilla"
+  code_term[en] "at0023" code="at0023" description="Temperature is measured from within the external auditory canal." text="Ear canal"
+  code_term[en] "at0061" code="at0061" description="Temperature is measured on the forehead." text="Forehead"
+  code_term[en] "at0022" code="at0022" description="Temperature is measured within the mouth." text="Mouth"
+  code_term[en] "at0026" code="at0026" description="Temperature is measured within the nasopharynx." text="Nasopharynx"
+  code_term[en] "at0027" code="at0027" description="Temperature is measured in the urinary bladder." text="Urinary bladder"
+  code_term[en] "at0028" code="at0028" description="Temperature is measured within the vascular system." text="Intravascular"
+  code_term[en] "at0043" code="at0043" description="Temperature is measured from exposed skin." text="Skin"
+  code_term[en] "at0051" code="at0051" description="Temperature is measured within the vagina." text="Vagina"
+  code_term[en] "at0054" code="at0054" description="Temperatue is measured within the oesophagus." text="Oesophagus"
+  code_term[en] "at0055" code="at0055" description="Temperature is measured in the inguinal skin crease between the leg and abdominal wall." text="Inguinal skin crease"
+  code_term[en] "at0060" code="at0060" description="Temperature is measured at the temple, over the superficial temporal artery." text="Temple"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/protocol/items[at0021]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/protocol/items[at0064]
+  rm_type="CLUSTER" node_id="at0064" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.anatomical_location(-[a-zA-Z0-9_]+)*\\.v1|openEHR-EHR-CLUSTER\\.anatomical_location_relative\\.v1"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.anatomical_location(-[a-zA-Z0-9_]+)*\\.v1|openEHR-EHR-CLUSTER\\.anatomical_location_relative\\.v1"] excludes=[] raw_include_count=1
+  term[en] "at0064" code="at0064" description="Structured details about the location of measurement." text="Structured measurement location"
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/protocol/items[at0059]
+  rm_type="CLUSTER" node_id="at0059" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.device\\.v1"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.device\\.v1"] excludes=[] raw_include_count=1
+  term[en] "at0059" code="at0059" description="Details about the device used to measure body temperature." text="Device"
+
+node /content[openEHR-EHR-OBSERVATION.body_temperature.v2]/protocol/items[at0062]
+  rm_type="CLUSTER" node_id="at0062" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[] excludes=[] raw_include_count=0
+  term[en] "at0062" code="at0062" comment="For example: local information requirements; or additional metadata to align with FHIR." description="Additional information required to extend the model with local content or to align with other reference models or formalisms." text="Extension"
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]
+  rm_type="OBSERVATION" node_id="at0000" archetype_id="openEHR-EHR-OBSERVATION.pulse.v2" node_name="" occurrences=0..* slot=false
+  term[en] "at0000" code="at0000" description="The rate and associated attributes for a pulse or heart beat." text="Pulse/Heart beat"
+  binding terminology="SNOMED-CT" node_or_path="at0000" target_terminology="SNOMED-CT(2003)" target_code="364090009"
+  attr "data" rm_type="HISTORY" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "protocol" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "encoding" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "subject" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data
+  rm_type="HISTORY" node_id="at0002" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0002" code="at0002" description="@ internal @" text="history"
+  attr "events" rm_type="EVENT" cardinality=multiple existence=0..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "origin" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]
+  rm_type="EVENT" node_id="at0003" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[en] "at0003" code="at0003" description="Default, unspecified point in time or interval event which may be explicitly defined in a template or at run-time." text="Any event"
+  attr "data" rm_type="T" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "state" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/data
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="@ internal @" text="structure"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=8
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/data/items[at1005]
+  rm_type="ELEMENT" node_id="at1005" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at1005" code="at1005" comment="It can be implied that the pulse or heart beat is present if Rate >0 /min." description="Presence of a pulse or heart beat." text="Presence"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/data/items[at1005]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/data/items[at1005]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at1024" "at1025"]}
+  code_term[en] "at1024" code="at1024" description="A pulse or heart beat can be detected." text="Present"
+  code_term[en] "at1025" code="at1025" description="A pulse or heart beat cannot be detected." text="Not detected"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/data/items[at0004]
+  rm_type="ELEMENT" node_id="at0004" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0004" code="at0004" description="The rate of the pulse or heart beat, measured in beats per minute." text="Rate"
+  binding terminology="SNOMED-CT" node_or_path="at0004" target_terminology="SNOMED-CT(2003)" target_code="271649006"
+  binding terminology="LNC205" node_or_path="at0004" target_terminology="LNC205" target_code="8310-5"
+  binding terminology="SNOMED-CT" node_or_path="at0004" target_terminology="SNOMED-CT" target_code="386725007"
+  binding terminology="SNOMED-CT" node_or_path="at0004" target_terminology="SNOMED-CT" target_code="271625008"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/data/items[at0004]/value
+  rm_type="DV_QUANTITY" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.DvQuantity{Units:[constraints.QuantityUnit{Units:"/min" Magnitude:constraints.NumericRange{Lower:0 Upper:1000 LowerInclusive:true UpperInclusive:false LowerUnbounded:false UpperUnbounded:false} Precision:constraints.NumericRange{Lower:0 Upper:0 LowerInclusive:true UpperInclusive:true LowerUnbounded:false UpperUnbounded:false}}] Property:constraints.CodedTermRef{Terminology:"openehr" CodeString:"382"} PropertyUnits:["/min" "Hz" "kHz" "MHz" "mHz"]}
+  attr "magnitude" rm_type="Real" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "units" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/data/items[at0005]
+  rm_type="ELEMENT" node_id="at0005" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0005" code="at0005" description="Regularity of the pulse or heart beat." text="Regularity"
+  binding terminology="SNOMED-CT" node_or_path="at0005" target_terminology="SNOMED-CT(2003)" target_code="271650006"
+  binding terminology="SNOMED-CT" node_or_path="at0005" target_terminology="SNOMED-CT" target_code="278907009"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/data/items[at0005]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/data/items[at0005]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0006" "at1028"]}
+  code_term[en] "at0006" code="at0006" description="The pattern is regular." text="Regular"
+  code_term[en] "at1028" code="at1028" description="The pattern is irregular." text="Irregular"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/data/items[at1055]
+  rm_type="ELEMENT" node_id="at1055" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at1055" code="at1055" comment="Selection of a value from this value set is only valid if 'Irregular' is selected from the 'Regularity' data element." description="More specific pattern of an irregular pulse or heart beat." text="Irregular type"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/data/items[at1055]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/data/items[at1055]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0007" "at0008"]}
+  code_term[en] "at0007" code="at0007" description="The pattern is irregular in a regular pattern,. For example, a dropped beat once every 'n' beats." text="Regularly Irregular"
+  code_term[en] "at0008" code="at0008" description="The pattern is irregular in a chaotic and unpredictable manner. For example, atrial fibrillation." text="Irregularly Irregular"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/data/items[at1030]
+  rm_type="ELEMENT" node_id="at1030" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[en] "at1030" code="at1030" comment="Coding with a terminology is desired, where possible. For example: full, thready, bounding, slow rising, or collapsing. Multiple terms may be recorded." description="Description of the character of the pulse or heart beat." text="Character"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/data/items[at1030]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/data/items[at1022]
+  rm_type="ELEMENT" node_id="at1022" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at1022" code="at1022" description="Narrative description about the pulse or heart beat." text="Clinical description"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/data/items[at1022]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/data/items[at1023]
+  rm_type="ELEMENT" node_id="at1023" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[en] "at1023" code="at1023" comment="Coding with a terminology is preferred, where possible. For example: Bradycardia, Extrasystoles or Sinus rhythm. Multiple statements are allowed." description="Single word, phrase or brief description that represents the clinical meaning and significance of the pulse or heart beat findings, including the rhythm." text="Clinical interpretation"
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/data/items[at1023]/name
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/data/items[at1023]/name/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at1057" "at1058"]}
+  code_term[en] "at1057" code="at1057" description="Generic label to allow for any or all statements about the pulse or heart beat." text="Clinical interpretation"
+  code_term[en] "at1058" code="at1058" description="Specific conclusion about the rhythm of the pulse or heartbeat, drawn from a combination of the heart rate, pattern and other characteristics observed on examination." text="Rhythm"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/data/items[at1023]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/data/items[at1059]
+  rm_type="ELEMENT" node_id="at1059" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at1059" code="at1059" description="Additional narrative about the pulse or heart beat findings not captured in other fields." text="Comment"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/data/items[at1059]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/state
+  rm_type="ITEM_TREE" node_id="at0012" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0012" code="at0012" description="@ internal @" text="List"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/state/items[at0013]
+  rm_type="ELEMENT" node_id="at0013" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0013" code="at0013" description="The body position of the subject during the observation." text="Position"
+  binding terminology="SNOMED-CT" node_or_path="at0013" target_terminology="SNOMED-CT(2003)" target_code="246153002"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/state/items[at0013]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/state/items[at0013]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at1003" "at1001" "at1002" "at1000"]}
+  code_term[en] "at1003" code="at1003" description="The subject was standing, walking or running." text="Standing/upright"
+  code_term[en] "at1001" code="at1001" description="The subject was sitting (for example on bed or chair)." text="Sitting"
+  code_term[en] "at1002" code="at1002" description="The subject was reclining at an approximate angle of 45 degrees, with the legs elevated to the level of the pelvis." text="Reclining"
+  code_term[en] "at1000" code="at1000" description="The subject was lying flat." text="Lying"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/state/items[at1017]
+  rm_type="CLUSTER" node_id="at1017" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.level_of_exertion(-[a-zA-Z0-9_]+)*\\.v1|openEHR-EHR-CLUSTER\\.level_of_exertion(-[a-zA-Z0-9_]+)*\\.v0"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.level_of_exertion(-[a-zA-Z0-9_]+)*\\.v1|openEHR-EHR-CLUSTER\\.level_of_exertion(-[a-zA-Z0-9_]+)*\\.v0"] excludes=[] raw_include_count=1
+  term[en] "at1017" code="at1017" description="Details about physical exertion being undertaken during the examination." text="Exertion"
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/protocol
+  rm_type="ITEM_TREE" node_id="at0010" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0010" code="at0010" description="@ internal @" text="List"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=4
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/protocol/items[at1019]
+  rm_type="ELEMENT" node_id="at1019" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at1019" code="at1019" comment="For example, auscultation or electronic monitoring." description="Method used to observe the pulse or heart beat." text="Method"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/protocol/items[at1019]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/protocol/items[at1019]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at1032" "at1033" "at1034" "at1050"]}
+  code_term[en] "at1032" code="at1032" description="The findings are observed by physical touch of the observer on the subject." text="Palpation"
+  code_term[en] "at1033" code="at1033" description="The findings are observed with the assistance of a device, such as a stethoscope." text="Auscultation"
+  code_term[en] "at1034" code="at1034" description="The findings are observed non-invasively using a device such as a pulse oximeter or a stethoscope." text="Automatic, non-invasive"
+  code_term[en] "at1050" code="at1050" description="The findings are observed invasively using a device such as an arterial catheter." text="Automatic, invasive"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/protocol/items[at1037]
+  rm_type="ELEMENT" node_id="at1037" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at1037" code="at1037" description="Body site where the pulse or heart beat were observed." text="Body site"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/protocol/items[at1037]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/protocol/items[at1037]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at1038" "at1039" "at1040" "at1041" "at1042" "at1043" "at1044" "at1049" "at1048" "at1047" "at1054" "at1051"]}
+  code_term[en] "at1038" code="at1038" description="The left radial artery." text="Radial Artery - Left"
+  code_term[en] "at1039" code="at1039" description="The right radial artery." text="Radial Artery - Right"
+  code_term[en] "at1040" code="at1040" description="The region of the heart." text="Heart"
+  code_term[en] "at1041" code="at1041" description="The left carotid artery." text="Carotid Artery - Left"
+  code_term[en] "at1042" code="at1042" description="The right carotid artery." text="Carotid Artery - Right"
+  code_term[en] "at1043" code="at1043" description="The left femoral artery." text="Femoral Artery - Left"
+  code_term[en] "at1044" code="at1044" description="The right femoral artery." text="Femoral Artery - Right"
+  code_term[en] "at1049" code="at1049" description="The right brachial artery." text="Brachial artery - Right"
+  code_term[en] "at1048" code="at1048" description="The left brachial artery." text="Brachial artery - Left"
+  code_term[en] "at1047" code="at1047" description="An unspecified finger." text="Finger"
+  code_term[en] "at1054" code="at1054" description="An unspecified toe." text="Toe"
+  code_term[en] "at1051" code="at1051" description="The lobe of an unspecified ear." text="Ear lobe"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/protocol/items[at1037]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/protocol/items[at1013]
+  rm_type="CLUSTER" node_id="at1013" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.device(-[a-zA-Z0-9_]+)*\\.v1"] slot_excludes=[".*"]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.device(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[".*"] raw_include_count=1
+  term[en] "at1013" code="at1013" description="Details about the device used to measure the pulse rate or heart rate." text="Device"
+
+node /content[openEHR-EHR-OBSERVATION.pulse.v2]/protocol/items[at1056]
+  rm_type="CLUSTER" node_id="at1056" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at1056" code="at1056" comment="For example: local information requirements or additional metadata to align with FHIR or CIMI equivalents." description="Additional information required to capture local content or to align with other reference models/formalisms." text="Extension"
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]
+  rm_type="OBSERVATION" node_id="at0000" archetype_id="openEHR-EHR-OBSERVATION.pulse_oximetry.v1" node_name="" occurrences=0..* slot=false
+  term[en] "at0000" code="at0000" description="Blood oxygen and related measurements, measured by pulse oximetry or pulse CO-oximetry." text="Pulse oximetry"
+  binding terminology="SNOMED-CT" node_or_path="at0000" target_terminology="SNOMED-CT(2003)" target_code="364090009"
+  attr "data" rm_type="HISTORY" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "protocol" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "encoding" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "subject" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/data
+  rm_type="HISTORY" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="@ internal @" text="Event Series"
+  attr "events" rm_type="EVENT" cardinality=multiple existence=0..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "origin" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/data/events[at0002]
+  rm_type="EVENT" node_id="at0002" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[en] "at0002" code="at0002" description="Default, unspecified point in time or interval event which may be explicitly defined in a template or at run-time." text="Any event"
+  attr "data" rm_type="T" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "state" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/data/events[at0002]/data
+  rm_type="ITEM_TREE" node_id="at0003" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0003" code="at0003" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=8
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/data/events[at0002]/data/items[at0006]
+  rm_type="ELEMENT" node_id="at0006" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0006" code="at0006" comment="SpO₂ is defined as the percentage of oxyhaemoglobin (HbO₂) to the total concentration of haemoglobin (HbO₂ + deoxyhaemoglobin) in peripheral blood." description="The saturation of oxygen in the peripheral blood, measured via pulse oximetry." text="SpO₂"
+  binding terminology="SNOMED-CT" node_or_path="at0006" target_terminology="SNOMED-CT" target_code="431314004"
+  binding terminology="LOINC" node_or_path="at0006" target_terminology="LOINC" target_code="59408-5"
+  binding terminology="SNOMED-CT" node_or_path="at0006" target_terminology="SNOMED-CT" target_code="276888009"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/data/events[at0002]/data/items[at0006]/value
+  rm_type="DV_PROPORTION" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "numerator" rm_type="Real" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "type" rm_type="Integer" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "denominator" rm_type="Real" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/data/events[at0002]/data/items[at0006]/value/numerator
+  rm_type="REAL" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CReal{Range:constraints.NumericRange{Lower:0 Upper:100 LowerInclusive:true UpperInclusive:true LowerUnbounded:false UpperUnbounded:false} List:[] Default:nil}
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/data/events[at0002]/data/items[at0006]/value/type
+  rm_type="INTEGER" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CInteger{Range:constraints.NumericRange{Lower:0 Upper:0 LowerInclusive:false UpperInclusive:false LowerUnbounded:true UpperUnbounded:true} List:[2] Default:nil}
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/data/events[at0002]/data/items[at0044]
+  rm_type="ELEMENT" node_id="at0044" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0044" code="at0044" description="The oxygen content of the peripheral blood, calculated based on pulse oximetry and pulse CO-oximetry." text="SpOC"
+  binding terminology="LOINC" node_or_path="at0044" target_terminology="LOINC" target_code="57800-5"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/data/events[at0002]/data/items[at0044]/value
+  rm_type="DV_QUANTITY" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.DvQuantity{Units:[constraints.QuantityUnit{Units:"ml/dl" Magnitude:constraints.NumericRange{Lower:0 Upper:0 LowerInclusive:true UpperInclusive:false LowerUnbounded:false UpperUnbounded:true} Precision:constraints.NumericRange{Lower:0 Upper:0 LowerInclusive:false UpperInclusive:false LowerUnbounded:true UpperUnbounded:true}}] Property:constraints.CodedTermRef{Terminology:"openehr" CodeString:"119"} PropertyUnits:["g/(100.ml)" "g/L" "mg/L" "[pH]" "ug/L" "ng/L" "10*9/L" "{copies}/mL" "{copies}/ug" "{log_copies}/mL" "10*3{Copies}/mL" "pmol/8.10*8{RBC}"]}
+  attr "magnitude" rm_type="Real" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "units" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/data/events[at0002]/data/items[at0045]
+  rm_type="ELEMENT" node_id="at0045" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0045" code="at0045" description="The saturation of carboxyhaemoglobin in the peripheral blood, measured via pulse CO-oximetry." text="SpCO"
+  binding terminology="LOINC" node_or_path="at0045" target_terminology="LOINC" target_code="86904-0"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/data/events[at0002]/data/items[at0045]/value
+  rm_type="DV_PROPORTION" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "numerator" rm_type="Real" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "type" rm_type="Integer" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "denominator" rm_type="Real" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/data/events[at0002]/data/items[at0045]/value/numerator
+  rm_type="REAL" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CReal{Range:constraints.NumericRange{Lower:0 Upper:100 LowerInclusive:true UpperInclusive:true LowerUnbounded:false UpperUnbounded:false} List:[] Default:nil}
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/data/events[at0002]/data/items[at0045]/value/type
+  rm_type="INTEGER" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CInteger{Range:constraints.NumericRange{Lower:0 Upper:0 LowerInclusive:false UpperInclusive:false LowerUnbounded:true UpperUnbounded:true} List:[2] Default:nil}
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/data/events[at0002]/data/items[at0046]
+  rm_type="ELEMENT" node_id="at0046" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0046" code="at0046" description="The saturation of methaemoglobin in the peripheral blood, measured via pulse CO-oximetry." text="SpMet"
+  binding terminology="LOINC" node_or_path="at0046" target_terminology="LOINC" target_code="2614-6"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/data/events[at0002]/data/items[at0046]/value
+  rm_type="DV_PROPORTION" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "numerator" rm_type="Real" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "type" rm_type="Integer" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "denominator" rm_type="Real" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/data/events[at0002]/data/items[at0046]/value/numerator
+  rm_type="REAL" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CReal{Range:constraints.NumericRange{Lower:0 Upper:100 LowerInclusive:true UpperInclusive:true LowerUnbounded:false UpperUnbounded:false} List:[] Default:nil}
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/data/events[at0002]/data/items[at0046]/value/type
+  rm_type="INTEGER" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CInteger{Range:constraints.NumericRange{Lower:0 Upper:0 LowerInclusive:false UpperInclusive:false LowerUnbounded:true UpperUnbounded:true} List:[2] Default:nil}
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/data/events[at0002]/data/items[at0054]
+  rm_type="CLUSTER" node_id="at0054" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.waveform(-[a-zA-Z0-9_]+)*\\.v0|openEHR-EHR-CLUSTER\\.waveform(-[a-zA-Z0-9_]+)*\\.v1"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.waveform(-[a-zA-Z0-9_]+)*\\.v0|openEHR-EHR-CLUSTER\\.waveform(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[] raw_include_count=1
+  term[en] "at0054" code="at0054" description="A waveform reading associated with the oximetry measurement." text="Waveform"
+  binding terminology="SNOMED-CT" node_or_path="at0054" target_terminology="SNOMED-CT" target_code="277923006"
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/data/events[at0002]/data/items[at0060]
+  rm_type="CLUSTER" node_id="at0060" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.multimedia(-[a-zA-Z0-9_]+)*\\.v0|openEHR-EHR-CLUSTER\\.multimedia(-[a-zA-Z0-9_]+)*\\.v1"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.multimedia(-[a-zA-Z0-9_]+)*\\.v0|openEHR-EHR-CLUSTER\\.multimedia(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[] raw_include_count=1
+  term[en] "at0060" code="at0060" description="Details of a series of oximetry readings, other than waveforms, expressed as a multimedia image or series of images. Waveforms should be recorded using the Waveform slot and associated cluster archetype." text="Multimedia image"
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/data/events[at0002]/data/items[at0058]
+  rm_type="ELEMENT" node_id="at0058" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[en] "at0058" code="at0058" comment="Coding with a terminology is preferred, if possible. For example, normal oxygen saturation or hypoxaemia." description="Single word, phrase or brief description which represents the clinical meaning and significance of the measurements." text="Interpretation"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/data/events[at0002]/data/items[at0058]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/data/events[at0002]/data/items[at0036]
+  rm_type="ELEMENT" node_id="at0036" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0036" code="at0036" description="A text comment about the pulse oximetry result." text="Comment"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/data/events[at0002]/data/items[at0036]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/data/events[at0002]/state
+  rm_type="ITEM_TREE" node_id="at0014" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0014" code="at0014" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=3
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/data/events[at0002]/state/items[at0034]
+  rm_type="CLUSTER" node_id="at0034" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.level_of_exertion(-[a-zA-Z0-9_]+)*\\.v0|openEHR-EHR-CLUSTER\\.level_of_exertion(-[a-zA-Z0-9_]+)*\\.v1"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.level_of_exertion(-[a-zA-Z0-9_]+)*\\.v0|openEHR-EHR-CLUSTER\\.level_of_exertion(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[] raw_include_count=1
+  term[en] "at0034" code="at0034" description="Details about physical activity undertaken at the time of measurement." text="Exertion"
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/data/events[at0002]/state/items[at0015]
+  rm_type="CLUSTER" node_id="at0015" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.inspired_oxygen(-[a-zA-Z0-9_]+)*\\.v1"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.inspired_oxygen(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[] raw_include_count=1
+  term[en] "at0015" code="at0015" comment="Assumed values of 21% oxygen concentration, Fi0₂ of 0.21 and oxygen flow rate of 0 l/min or 0 ml/min." description="Details of the amount of oxygen available to the subject at the time of observation." text="Inspired oxygen"
+  binding terminology="SNOMED-CT" node_or_path="at0015" target_terminology="SNOMED-CT" target_code="16206004"
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/data/events[at0002]/state/items[at0016]
+  rm_type="ELEMENT" node_id="at0016" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[en] "at0016" code="at0016" comment="For example, motion, pain, poor perfusion, infant feeding, peripheral hypothermia, sedation." description="Comment on and record other incidental factors that may be affect interpretation of the observation." text="Confounding factors"
+  binding terminology="SNOMED-CT" node_or_path="at0016" target_terminology="SNOMED-CT" target_code="271626009"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/data/events[at0002]/state/items[at0016]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/protocol
+  rm_type="ITEM_TREE" node_id="at0007" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0007" code="at0007" description="@ internal @" text="List"
+  binding terminology="SNOMED-CT" node_or_path="at0007" target_terminology="SNOMED-CT" target_code="248585001"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=4
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/protocol/items[at0009]
+  rm_type="ELEMENT" node_id="at0009" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0009" code="at0009" comment="For example: Right index finger, left earlobe. Coding with a terminology is preferred, if possible." description="The site of the measurement sensor." text="Sensor site"
+  binding terminology="LOINC" node_or_path="at0009" target_terminology="LOINC" target_code="20081-6"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/protocol/items[at0009]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/protocol/items[at0061]
+  rm_type="ELEMENT" node_id="at0061" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0061" code="at0061" description="Sensor site relative to the ductus arteriosus in neonates, to determine whether the blood supply to limb of the sensor site is pre- or post-ductal in cases of patent ductus arteriosus." text="Pre/post-ductal"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/protocol/items[at0061]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/protocol/items[at0061]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0062" "at0063" "at0064"]}
+  code_term[en] "at0062" code="at0062" description="The sensor site is pre-ductal." text="Pre-ductal"
+  code_term[en] "at0063" code="at0063" description="The sensor site is post-ductal." text="Post-ductal"
+  code_term[en] "at0064" code="at0064" description="Unable to assess whether the sensor site is pre- or post-ductal." text="Indeterminate"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/protocol/items[at0018]
+  rm_type="CLUSTER" node_id="at0018" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.device(-[a-zA-Z0-9_]+)*\\.v1"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.device(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[] raw_include_count=1
+  term[en] "at0018" code="at0018" description="Details of the non-invasive oximetry device used." text="Oximetry device"
+  binding terminology="SNOMED-CT" node_or_path="at0018" target_terminology="SNOMED-CT" target_code="448703006"
+  binding terminology="SNOMED-CT" node_or_path="at0018" target_terminology="SNOMED-CT" target_code="386616007"
+
+node /content[openEHR-EHR-OBSERVATION.pulse_oximetry.v1]/protocol/items[at0059]
+  rm_type="CLUSTER" node_id="at0059" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0059" code="at0059" comment="e.g. Local hospital departmental infomation or additional metadata to align with HL7 or CDISC equivalents." description="Additional information required to capture local context or to align with other reference models/formalisms." text="Extension"
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]
+  rm_type="OBSERVATION" node_id="at0000" archetype_id="openEHR-EHR-OBSERVATION.respiration.v2" node_name="" occurrences=0..* slot=false
+  term[en] "at0000" code="at0000" description="The characteristics of spontaneous breathing by an individual." text="Respiration"
+  binding terminology="SNOMED-CT" node_or_path="at0000" target_terminology="SNOMED-CT(2003)" target_code="364090009"
+  attr "data" rm_type="HISTORY" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "protocol" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "encoding" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "subject" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/data
+  rm_type="HISTORY" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="@ internal @" text="history"
+  attr "events" rm_type="EVENT" cardinality=multiple existence=0..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "origin" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/data/events[at0002]
+  rm_type="EVENT" node_id="at0002" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[en] "at0002" code="at0002" description="Default, unspecified point in time or interval event which may be explicitly defined in a template or at run-time." text="Any event"
+  attr "data" rm_type="T" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "state" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/data/events[at0002]/data
+  rm_type="ITEM_TREE" node_id="at0003" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0003" code="at0003" description="@ internal @" text="List"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=7
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/data/events[at0002]/data/items[at0062]
+  rm_type="ELEMENT" node_id="at0062" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0062" code="at0062" comment="This data element may be useful in extreme situations where a formal measurement of respiration rate is not possible. For example: a subject is unconscious and distant to the observer, such as trapped in a car or has fallen down a cliff. Presence of respiration can be implied if the 'Rate' >0 breaths/min." description="Observation of spontaneous respiration." text="Presence"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/data/events[at0002]/data/items[at0062]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/data/events[at0002]/data/items[at0062]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0063" "at0064"]}
+  code_term[en] "at0063" code="at0063" description="Respiratory movements are observed." text="Present"
+  code_term[en] "at0064" code="at0064" description="Respiratory movements are not detected on observation." text="Not detected"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/data/events[at0002]/data/items[at0004]
+  rm_type="ELEMENT" node_id="at0004" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0004" code="at0004" description="The frequency of spontaneous breathing." text="Rate"
+  binding terminology="SNOMED-CT" node_or_path="at0004" target_terminology="SNOMED-CT(2003)" target_code="271649006"
+  binding terminology="LNC205" node_or_path="at0004" target_terminology="LNC205" target_code="8310-5"
+  binding terminology="SNOMED-CT" node_or_path="at0004" target_terminology="SNOMED-CT" target_code="386725007"
+  binding terminology="SNOMED-CT" node_or_path="at0004" target_terminology="SNOMED-CT" target_code="271625008"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/data/events[at0002]/data/items[at0004]/value
+  rm_type="DV_QUANTITY" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.DvQuantity{Units:[constraints.QuantityUnit{Units:"/min" Magnitude:constraints.NumericRange{Lower:0 Upper:200 LowerInclusive:true UpperInclusive:true LowerUnbounded:false UpperUnbounded:false} Precision:constraints.NumericRange{Lower:0 Upper:0 LowerInclusive:true UpperInclusive:true LowerUnbounded:false UpperUnbounded:false}}] Property:constraints.CodedTermRef{Terminology:"openehr" CodeString:"382"} PropertyUnits:["/min" "Hz" "kHz" "MHz" "mHz"]}
+  attr "magnitude" rm_type="Real" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "units" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/data/events[at0002]/data/items[at0005]
+  rm_type="ELEMENT" node_id="at0005" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0005" code="at0005" description="The regularity of spontaneous breathing." text="Regularity"
+  binding terminology="SNOMED-CT" node_or_path="at0005" target_terminology="SNOMED-CT(2003)" target_code="271650006"
+  binding terminology="SNOMED-CT" node_or_path="at0005" target_terminology="SNOMED-CT" target_code="278907009"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/data/events[at0002]/data/items[at0005]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/data/events[at0002]/data/items[at0005]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0006" "at0007"]}
+  code_term[en] "at0006" code="at0006" description="The breathing pattern is regular." text="Regular"
+  code_term[en] "at0007" code="at0007" description="The breathing pattern is not regular." text="Irregular"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/data/events[at0002]/data/items[at0016]
+  rm_type="ELEMENT" node_id="at0016" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0016" code="at0016" description="The depth of spontaneous breathing." text="Depth"
+  binding terminology="SNOMED-CT" node_or_path="at0016" target_terminology="SNOMED-CT" target_code="271626009"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/data/events[at0002]/data/items[at0016]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/data/events[at0002]/data/items[at0016]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0017" "at0018" "at0019" "at0025"]}
+  code_term[en] "at0017" code="at0017" description="Normal depth of breathing." text="Normal"
+  code_term[en] "at0018" code="at0018" description="Shallow depth of breathing." text="Shallow"
+  code_term[en] "at0019" code="at0019" description="Deep breathing." text="Deep"
+  code_term[en] "at0025" code="at0025" description="Variable depth of breathing." text="Variable"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/data/events[at0002]/data/items[at0024]
+  rm_type="ELEMENT" node_id="at0024" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0024" code="at0024" comment="For example: noting respiratory distress, use of accessory muscles or intermittent apnoea; noting characteristics such as stridor, sighing, grunting, groaning, gasping. \nConducting a full respiratory examination, then some of these findings might be more appropriately recorded as part of examination findings." description="A narrative description about the spontaneous breathing of the individual." text="Clinical description"
+  binding terminology="SNOMED-CT" node_or_path="at0024" target_terminology="SNOMED-CT" target_code="703852005"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/data/events[at0002]/data/items[at0024]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/data/events[at0002]/data/items[at0009]
+  rm_type="ELEMENT" node_id="at0009" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[en] "at0009" code="at0009" comment="Coding with a terminology is preferred, where possible. For example: Normal breathing; Evidence of respiratory distress; Kussmaul's respiration; Cheyne-Stokes respiration; or Apnoeic episodes. Multiple statements are allowed." description="Single word, phrase or brief description which represents the clinical meaning and significance of the respiration findings." text="Clinical interpretation"
+  binding terminology="LOINC" node_or_path="at0009" target_terminology="LOINC" target_code="20081-6"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/data/events[at0002]/data/items[at0009]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/data/events[at0002]/data/items[at0070]
+  rm_type="ELEMENT" node_id="at0070" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0070" code="at0070" description="Additional narrative about the respirations, not captured in other fields." text="Comment"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/data/events[at0002]/data/items[at0070]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/data/events[at0002]/state
+  rm_type="ITEM_TREE" node_id="at0022" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0022" code="at0022" description="@ internal @" text="List"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=4
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/data/events[at0002]/state/items[at0065]
+  rm_type="ELEMENT" node_id="at0065" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0065" code="at0065" description="The body position of the individual during the observation." text="Body position"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/data/events[at0002]/state/items[at0065]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/data/events[at0002]/state/items[at0065]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0066" "at0067" "at0068" "at0069" "at0071"]}
+  code_term[en] "at0066" code="at0066" description="The individual was standing, walking or running." text="Standing/upright"
+  code_term[en] "at0067" code="at0067" description="The individual was sitting (for example, on a bed or chair)." text="Sitting"
+  code_term[en] "at0068" code="at0068" description="The individual was reclining at an approximate angle of 45 degrees, with the legs elevated to the level of the pelvis." text="Reclining"
+  code_term[en] "at0069" code="at0069" description="The individual was lying on their back." text="Lying"
+  code_term[en] "at0071" code="at0071" description="The individual was lying on their front." text="Prone"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/data/events[at0002]/state/items[at0056]
+  rm_type="ELEMENT" node_id="at0056" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[en] "at0056" code="at0056" comment="For example: level of anxiety, pain, feeding in infants, tracheostomy." description="Identification of any issues or incidental factors that may impact on interpretation of the observation." text="Confounding factors"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/data/events[at0002]/state/items[at0056]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/data/events[at0002]/state/items[at0055]
+  rm_type="CLUSTER" node_id="at0055" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.inspired_oxygen(-[a-zA-Z0-9_]+)*\\.v1"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.inspired_oxygen(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[] raw_include_count=1
+  term[en] "at0055" code="at0055" comment="Assumed values of 21% oxygen concentration, Fi02 of 0.21 and oxygen flow rate of 0 l/min or 0 ml/min." description="Details of the amount of oxygen being delivered to the individual at the time of observation." text="Inspired oxygen"
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/data/events[at0002]/state/items[at0037]
+  rm_type="CLUSTER" node_id="at0037" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER\\.level_of_exertion(-[a-zA-Z0-9_]+)*\\.v0|openEHR-EHR-CLUSTER\\.level_of_exertion(-[a-zA-Z0-9_]+)*\\.v1"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER\\.level_of_exertion(-[a-zA-Z0-9_]+)*\\.v0|openEHR-EHR-CLUSTER\\.level_of_exertion(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[] raw_include_count=1
+  term[en] "at0037" code="at0037" comment="The individual's level of exertion during, or just prior to, the observation." description="Details about physical exertion being undertaken during the examination." text="Exertion"
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/protocol
+  rm_type="ITEM_TREE" node_id="at0057" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0057" code="at0057" description="@ internal @" text="Tree"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.respiration.v2]/protocol/items[at0058]
+  rm_type="CLUSTER" node_id="at0058" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=[".*"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=[".*"] excludes=[] raw_include_count=1
+  term[en] "at0058" code="at0058" comment="For example: local information requirements or additional metadata to align with FHIR." description="Additional information required to capture local context or to align with other reference models/formalisms." text="Extension"
+
+# walked nodes=185

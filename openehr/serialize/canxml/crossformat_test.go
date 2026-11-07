@@ -176,7 +176,10 @@ func TestCrossFormatXMLFixtureRoundTrip(t *testing.T) {
 
 // normaliseJSON parses data, strips map entries whose value is nil
 // (the SDK treats null and absent equivalently on decode and emits
-// absent on encode), and recursively normalises nested structures.
+// absent on encode) or an empty array (canonical XML writes no element
+// for an empty container, REQ-056, so the XML leg reads a present empty
+// list, such as an ITEM_TREE's "items": [], back as absent), and
+// recursively normalises nested structures.
 func normaliseJSON(data []byte) (any, error) {
 	var v any
 	if err := json.Unmarshal(data, &v); err != nil {
@@ -185,7 +188,8 @@ func normaliseJSON(data []byte) (any, error) {
 	return stripNulls(v), nil
 }
 
-// stripNulls recursively removes nil-valued entries from maps.
+// stripNulls recursively removes nil-valued and empty-array entries from
+// maps.
 func stripNulls(v any) any {
 	switch x := v.(type) {
 	case map[string]any:
@@ -195,7 +199,7 @@ func stripNulls(v any) any {
 				continue
 			}
 			cleaned := stripNulls(val)
-			if cleaned == nil {
+			if arr, ok := cleaned.([]any); cleaned == nil || ok && len(arr) == 0 {
 				continue
 			}
 			out[k] = cleaned

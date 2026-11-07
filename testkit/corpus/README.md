@@ -139,6 +139,16 @@ A document then had to carry those structures, and an empty `items` list, even w
 This copy gives them the Reference Model's existence, 0..1.
 `blood_pressure_strict_existence` keeps the export's reading: it is the export's blood pressure OBSERVATION alone, each existence as exported, so the generator, validator and codec tests of a list required by its existence alone still have a corpus template.
 
+### CaboLabs (openEHR-SDK)
+
+**License:** Apache 2.0 — [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md), which pins the commit and each file's git blob.
+
+| Template id | OPT | JSON | XML |
+|---|---|:---:|:---:|
+| `Vital signs monitoring` | yes | yes | — |
+
+An Ocean Template Designer export from another author than `vital_signs`, on the current CKM archetypes: blood_pressure.v2, body_temperature.v2, pulse.v2, pulse_oximetry.v1 and respiration.v2 directly under the COMPOSITION's `content`, with a local `COMPOSITION.vital_signs_monitoring.v1`. Its composition holds all five OBSERVATIONs, and the protocol of its respiration OBSERVATION carries a present, empty `items`.
+
 ### CODE24 (Cadasto)
 
 **License:** MIT — [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md).
