@@ -35,6 +35,7 @@ func TestREQ056_XMLOneRoot(t *testing.T) {
 		"text after a comment":           `<!-- note -->` + xmlPlanted,
 		"text after a PI":                `<?pi data?>` + xmlPlanted,
 		"stray end element":              `</extra>`,
+		"markup it cannot read":          `<1>`,
 		"document type after the root":   `<!DOCTYPE extra>`,
 		"unclosed second root":           `<extra>`,
 		"second root after a comment":    `<!-- note --><extra/>`,
@@ -70,8 +71,8 @@ func TestREQ056_XMLOneRoot(t *testing.T) {
 		for name, tail := range refused {
 			t.Run(mode+"/refused/"+name, func(t *testing.T) {
 				_, reported, err := decode(root + tail)
-				if !errors.Is(err, canxml.ErrInvalidShape) {
-					t.Fatalf("canxml.Unmarshal(root + %q) err = %v; want errors.Is(_, canxml.ErrInvalidShape)", tail, err)
+				if !errors.Is(err, canxml.ErrInvalidShape) || !errors.Is(err, canxml.ErrNotWellFormed) {
+					t.Fatalf("canxml.Unmarshal(root + %q) err = %v; want errors.Is(_, canxml.ErrInvalidShape) and errors.Is(_, canxml.ErrNotWellFormed)", tail, err)
 				}
 				if errors.Is(err, canxml.ErrUnknownElement) {
 					t.Errorf("canxml.Unmarshal(root + %q) err = %v; a second root is malformed input, not unmatched content", tail, err)
@@ -125,9 +126,9 @@ func TestREQ056_XMLOneRootAfterFailedRoot(t *testing.T) {
 // document type declaration, as malformed input. The refusal wraps
 // canxml.ErrInvalidShape, carries none of the content, and is not unmatched
 // content. A processing instruction whose target is xml in any letter case is
-// the XML declaration only at the start: a second one, one after other
-// markup, one in the document type's internal subset, or one in capitals is
-// refused, and the same bytes in a literal or a comment of that subset pass.
+// the XML declaration only at the very start, after a byte order mark at
+// most: one after whitespace, a second one, one after other markup, one in
+// the document type's internal subset, or one in capitals is refused, and the same bytes in a literal or a comment of that subset pass.
 // A UTF-8 byte order mark at the very
 // start is the document's encoding signature, not content, and is accepted.
 // canxml.Decoder, which reads a stream of values, is unchanged.
@@ -144,39 +145,39 @@ func TestREQ056_XMLBeforeRoot(t *testing.T) {
 	const bom = "\ufeff"
 
 	refused := map[string]string{
-		"text":                             xmlPlanted,
-		"text after the XML declaration":   `<?xml version="1.0"?>` + xmlPlanted,
-		"text after a comment":             `<!-- note -->` + xmlPlanted,
-		"text after a PI":                  `<?pi data?>` + xmlPlanted,
-		"text after the document type":     `<!DOCTYPE dv_count>` + xmlPlanted,
-		"CDATA section holding text":       `<![CDATA[` + xmlPlanted + `]]>`,
-		"second document type declaration": `<!DOCTYPE dv_count><!DOCTYPE extra>`,
-		"other markup declaration":         `<!ELEMENT extra ANY>`,
-		"stray end element":                `</extra>`,
-		"byte order mark after whitespace": " " + bom,
-		"text after a byte order mark":     bom + xmlPlanted,
-		"no-break space":                   "\u00a0",
-		"second XML declaration":           `<?xml version="1.0"?><?xml version="1.0"?>`,
-		"XML declaration after a comment":  `<!-- note --><?xml version="1.0"?>`,
-		"XML declaration after a PI":       `<?pi data?><?xml version="1.0"?>`,
-		"xml target in capitals":           `<?XML pi data?>`,
-		"xml target in the document type":  `<!DOCTYPE dv_count [<?xml pi data?>]>`,
+		"text":                                                   xmlPlanted,
+		"text after the XML declaration":                         `<?xml version="1.0"?>` + xmlPlanted,
+		"text after a comment":                                   `<!-- note -->` + xmlPlanted,
+		"text after a PI":                                        `<?pi data?>` + xmlPlanted,
+		"text after the document type":                           `<!DOCTYPE dv_count>` + xmlPlanted,
+		"CDATA section holding text":                             `<![CDATA[` + xmlPlanted + `]]>`,
+		"second document type declaration":                       `<!DOCTYPE dv_count><!DOCTYPE extra>`,
+		"other markup declaration":                               `<!ELEMENT extra ANY>`,
+		"stray end element":                                      `</extra>`,
+		"byte order mark after whitespace":                       " " + bom,
+		"text after a byte order mark":                           bom + xmlPlanted,
+		"no-break space":                                         "\u00a0",
+		"second XML declaration":                                 `<?xml version="1.0"?><?xml version="1.0"?>`,
+		"XML declaration after a comment":                        `<!-- note --><?xml version="1.0"?>`,
+		"XML declaration after a space":                          " " + `<?xml version="1.0"?>`,
+		"XML declaration after a line feed":                      "\n" + `<?xml version="1.0"?>`,
+		"XML declaration after a byte order mark and whitespace": bom + "\n " + `<?xml version="1.0"?>`,
+		"XML declaration after a PI":                             `<?pi data?><?xml version="1.0"?>`,
+		"xml target in capitals":                                 `<?XML pi data?>`,
+		"xml target in the document type":                        `<!DOCTYPE dv_count [<?xml pi data?>]>`,
 	}
 	accepted := map[string]string{
-		"nothing":         "",
-		"XML declaration": `<?xml version="1.0" encoding="UTF-8"?>`,
-		// XML 1.0 puts the declaration at the very start; the codec also
-		// reads it where only whitespace comes before it (wire.md § REQ-056).
-		"XML declaration after whitespace": "\n " + `<?xml version="1.0"?>`,
-		"whitespace":                       " \n\t\r\n",
-		"comment":                          `<!-- note -->`,
-		"processing instruction":           `<?pi data?>`,
-		"document type":                    `<!DOCTYPE dv_count>`,
-		"document type with subset":        `<!DOCTYPE dv_count [<!ENTITY e "v">]>`,
-		"xml target in a subset literal":   `<!DOCTYPE dv_count [<!ENTITY e "<?xml v?>">]>`,
-		"xml target in a subset comment":   `<!DOCTYPE dv_count [<!-- <?xml v?> -->]>`,
-		"byte order mark":                  bom,
-		"target that starts with xml":      `<?xml version="1.0"?><?xml-stylesheet href="a.xsl"?>`,
+		"nothing":                        "",
+		"XML declaration":                `<?xml version="1.0" encoding="UTF-8"?>`,
+		"whitespace":                     " \n\t\r\n",
+		"comment":                        `<!-- note -->`,
+		"processing instruction":         `<?pi data?>`,
+		"document type":                  `<!DOCTYPE dv_count>`,
+		"document type with subset":      `<!DOCTYPE dv_count [<!ENTITY e "v">]>`,
+		"xml target in a subset literal": `<!DOCTYPE dv_count [<!ENTITY e "<?xml v?>">]>`,
+		"xml target in a subset comment": `<!DOCTYPE dv_count [<!-- <?xml v?> -->]>`,
+		"byte order mark":                bom,
+		"target that starts with xml":    `<?xml version="1.0"?><?xml-stylesheet href="a.xsl"?>`,
 		"the whole prolog": bom + `<?xml version="1.0"?>` + "\n<!-- a -->\n" + `<!DOCTYPE dv_count SYSTEM "x.dtd">` +
 			"\n<?pi x?>\n<!-- b -->\n",
 	}
@@ -199,8 +200,8 @@ func TestREQ056_XMLBeforeRoot(t *testing.T) {
 		for name, head := range refused {
 			t.Run(mode+"/refused/"+name, func(t *testing.T) {
 				_, reported, err := decode(head + root)
-				if !errors.Is(err, canxml.ErrInvalidShape) {
-					t.Fatalf("canxml.Unmarshal(%q + root) err = %v; want errors.Is(_, canxml.ErrInvalidShape)", head, err)
+				if !errors.Is(err, canxml.ErrInvalidShape) || !errors.Is(err, canxml.ErrNotWellFormed) {
+					t.Fatalf("canxml.Unmarshal(%q + root) err = %v; want errors.Is(_, canxml.ErrInvalidShape) and errors.Is(_, canxml.ErrNotWellFormed)", head, err)
 				}
 				if errors.Is(err, canxml.ErrUnknownElement) {
 					t.Errorf("canxml.Unmarshal(%q + root) err = %v; content before the root is malformed input, not unmatched content", head, err)
@@ -295,8 +296,8 @@ func TestREQ056_XMLTargetInsideTheRoot(t *testing.T) {
 		for name, in := range refused {
 			t.Run(mode+"/refused/"+name, func(t *testing.T) {
 				err := decode(in, new(rm.DVText))
-				if !errors.Is(err, canxml.ErrInvalidShape) || errors.Is(err, canxml.ErrUnknownElement) {
-					t.Fatalf("%s(%s) = %v; want an error that wraps canxml.ErrInvalidShape and not canxml.ErrUnknownElement", mode, in, err)
+				if !errors.Is(err, canxml.ErrInvalidShape) || !errors.Is(err, canxml.ErrNotWellFormed) || errors.Is(err, canxml.ErrUnknownElement) {
+					t.Fatalf("%s(%s) = %v; want an error that wraps canxml.ErrInvalidShape and canxml.ErrNotWellFormed, and not canxml.ErrUnknownElement", mode, in, err)
 				}
 				for _, leak := range []string{"version", "pi data"} {
 					if strings.Contains(err.Error(), leak) {

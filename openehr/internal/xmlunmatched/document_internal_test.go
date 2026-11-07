@@ -183,11 +183,12 @@ func TestREQ056_ReadPrologXMLTarget(t *testing.T) {
 // decode a document a second time, through a decoder that refuses a
 // processing instruction whose target is xml inside the root: such bytes past
 // the start, in a comment too, but not the XML declaration, after a byte order
-// mark and whitespace as well, and not a target that only starts with xml.
+// mark as well, and not a target that only starts with xml. A declaration
+// after whitespace is past the start; Unmarshal's prolog check refuses such a
+// document before it gets here.
 //
-// Can-fail control: count the whitespace before the declaration as content
-// past the start, and the rows with the declaration after whitespace report
-// true.
+// Can-fail control: skip the whitespace before the declaration, as the check
+// once did, and the rows with the declaration after whitespace report false.
 func TestREQ056_XMLTargetPastStart(t *testing.T) {
 	for _, tc := range []struct {
 		name, data string
@@ -197,8 +198,9 @@ func TestREQ056_XMLTargetPastStart(t *testing.T) {
 		{"whitespace only", " \n", false},
 		{"no declaration", `<a/>`, false},
 		{"the declaration", `<?xml version="1.0"?><a/>`, false},
-		{"the declaration after whitespace", "\n " + `<?xml version="1.0"?><a/>`, false},
-		{"the declaration after a byte order mark and whitespace", "\ufeff\n" + `<?xml version="1.0"?><a/>`, false},
+		{"the declaration after a byte order mark", "\ufeff" + `<?xml version="1.0"?><a/>`, false},
+		{"a declaration after whitespace", "\n " + `<?xml version="1.0"?><a/>`, true},
+		{"a declaration after a byte order mark and whitespace", "\ufeff\n" + `<?xml version="1.0"?><a/>`, true},
 		{"a target that starts with xml", `<?xml version="1.0"?><a><?xml-stylesheet href="a.xsl"?></a>`, false},
 		{"one inside the root", `<a><?xml version="1.0"?></a>`, true},
 		{"one after the declaration and whitespace", "\n" + `<?xml version="1.0"?><a><?XML?></a>`, true},
