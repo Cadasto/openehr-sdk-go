@@ -922,7 +922,7 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 #### PROBE-050 — OTel span carries openEHR attributes
 
 - **Title:** Every outgoing request opens an OTel span with `openehr.spec_version` and a sanitised URL.
-- **Preconditions:** OTel `TracerProvider` injected in context.
+- **Preconditions:** An OTel `TracerProvider` given to `transport.WithTracerProvider`.
 - **Wire assertion:** Captured span has the expected attribute set; URL does not contain the bearer token.
 - **Modes:** Sandbox.
 - **Status:** Draft.
@@ -930,8 +930,8 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 
 #### PROBE-051 — No-OTel is a silent no-op
 
-- **Title:** Absence of a `TracerProvider` in context produces no error, no warning, and no allocated spans.
-- **Preconditions:** Default context.
+- **Title:** With no `TracerProvider` given to `transport.WithTracerProvider` and none set globally, a request produces no error, no warning, and no allocated spans.
+- **Preconditions:** A client built without `transport.WithTracerProvider`, and no global provider set.
 - **Wire assertion:** Request succeeds; no global state mutation.
 - **Modes:** Sandbox.
 - **Status:** Implemented (Sandbox) — covered by the `transport` unit tests.
