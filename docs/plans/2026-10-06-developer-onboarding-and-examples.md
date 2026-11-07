@@ -5,7 +5,7 @@ kind: plan
 # Plan: developer onboarding and example readability, the parts still open
 
 **Date:** 2026-10-06, refreshed 2026-11-07.
-**Status:** Draft. Carried forward from a read-only developer-experience audit of 2026-10-04. The refresh of 2026-11-07 delivered the small tasks and removed them from this plan: the two documented failing runs and the `validate-composition` fixture claim are pinned by tests, the SMART stub checks the PKCE proof, `canonical_json` takes an optional path, `ehr_create`, `contribution-build` and the quick-start REST snippets set deadlines, the README's catalogue claim is true, the learning order is one list, prose uses one flag spelling, the homepage's first action runs an offline example, the package map links examples, and the per-example Definition of Done lives in [ai-workflow.md § Examples](../ai-workflow.md#examples). What follows is still open.
+**Status:** Draft. Carried forward from a read-only developer-experience audit of 2026-10-04. The refresh of 2026-11-07 delivered the small tasks and removed them from this plan. Tests now hold the two documented failing runs and the `validate-composition` fixture claim, the SMART stub checks the PKCE proof, `canonical_json` takes an optional path, and `ehr_create`, `contribution-build` and the quick-start REST snippets set deadlines. In the docs, the README's catalogue claim is true, the learning order is one list, prose uses one flag spelling, the homepage's first action runs an offline example, and the package map links examples. The per-example Definition of Done lives in [ai-workflow.md § Examples](../ai-workflow.md#examples). What follows is still open.
 **Covers:** no requirement. This is documentation and example work, on the maintenance lane ([two lanes](../development-process.md#two-lanes)), unless a step changes a public behaviour or a normative statement. A step that does goes through `/sdd-specify` first.
 **Defers:** an example for every public function, which was never the aim; anything that needs a new requirement.
 
@@ -17,7 +17,7 @@ Make the move from "I found this SDK" to "I built a correct integration" short a
 
 The readers in mind are the people who build on the SDK rather than on openEHR itself: an MCP server that forwards a caller's token, a federative client that talks to several repositories, a load or seeding tool, an application with a SMART sign-in, and a pipeline that validates data in CI. They follow one path: decode and validate offline, then connect, save and query, then authenticate.
 
-What is left is the front door (the public site) and the shape of the heaviest examples. The answer is not an example per function. It is to teach the few interaction patterns developers reuse across packages, and to teach them once.
+What is left is the front door (the public site) and the shape of the heaviest examples. The aim is to teach, once each, the few interaction patterns developers reuse across packages.
 
 ## Phase 1: the site as the front door
 

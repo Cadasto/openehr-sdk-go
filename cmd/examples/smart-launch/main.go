@@ -191,7 +191,9 @@ func run() error {
 	fmt.Println("OK: standalone SMART PKCE launch flow completed (in-process stub)")
 	// From here the Source is an auth.TokenSource holding these tokens: pass
 	// it to transport.New with transport.WithTokenSource, and every REST
-	// call carries the access token, refreshed before it expires.
+	// call carries the access token. The Source refreshes it before it
+	// expires because this launch asked for a refresh token
+	// (auth.ScopeOfflineAccess).
 	return nil
 }
 
