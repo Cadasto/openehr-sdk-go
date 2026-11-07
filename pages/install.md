@@ -17,12 +17,12 @@ Add the module, pin a tag, then pick a path.
 
 ## Add the module
 
-The current release is `v0.42.0`. The SDK is pre-1.0, so pin an exact tag: a
-minor release can change the public API. The version policy is
+The SDK is pre-1.0, so pin an exact tag, as the command below does: a minor
+release can change the public API. The version policy is
 [docs/releases.md](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/releases.md).
 
 ```bash
-go get github.com/cadasto/openehr-sdk-go@v0.46.0
+go get github.com/cadasto/openehr-sdk-go@v0.47.0
 ```
 
 To run the bundled examples, or to work on the SDK itself, clone the

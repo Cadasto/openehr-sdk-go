@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.47.0] - 2026-11-07
+
+Forty-seventh `v0.x` minor: canonical XML keeps empty strings as canonical JSON does and marks input that is not well-formed, FLAT and STRUCTURED handle reused siblings told apart by their names, operational templates read faster, and the testkit corpus gains sixteen templates. **Breaking:** the canjson and canxml report options pass `Pointer` and `Path` values written on demand, and canonical XML refuses white space before the XML declaration.
+
 ### Added
 
 - **Canonical XML** gains `WithStringText`, which keeps a string sent empty or as white space as canonical JSON does, and `ErrNotWellFormed`, which marks input that is not well-formed XML (REQ-056, REQ-175).
