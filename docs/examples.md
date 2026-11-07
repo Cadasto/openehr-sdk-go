@@ -644,7 +644,7 @@ The fake backend answers the way an openEHR server does: `201 Created`, a `Locat
 
 1. Build a `discovery.ServiceCatalog` (static, or resolved from a Platform base URL).
 2. `transport.New(catalog, transport.WithHTTPClient(yourClient))`; the SDK never allocates an `*http.Client`, so connection pooling, TLS and timeouts stay under your control.
-3. Call leaf clients (`ehr.Create`, `query.Execute`, …) with a `context.Context`.
+3. Call leaf clients (`ehr.Create`, `query.Execute`, …) with a `context.Context` that carries a deadline (`context.WithTimeout`), so a server that stops answering cannot hold your program.
 
 To hit a real backend, swap the catalog base URL and add `transport.WithTokenSource`. See [quick-start.md](quick-start.md#path-b--rest-client-live-or-mocked-backend).
 
@@ -681,7 +681,7 @@ OK: the captured request body is byte-identical to the built body
 1. `contribution.NewBuilder()`, then declare the batch audit once: committer, system id, and the batch `change_type` (which is *never* derived from the versions).
 2. Accumulate one `Change` per version: `contribution.Creation(payload)`, or `Amendment` / `Modification` / `Deletion` with the preceding version uid. Each is generic over the four versionable RM types, so a wrong payload type is a compile error.
 3. `Build()` once. It returns a `*contribution.Submission` that has already passed `Validate`, or every accumulated error joined.
-4. `contribution.Commit(ctx, client, ehrID, submission)`.
+4. `contribution.Commit(ctx, client, ehrID, submission)`, with a deadline on `ctx` (`context.WithTimeout`).
 
 Per-version overrides (`WithLifecycleState`, `WithVersionCommitter`, `WithVersionDescription`, `WithVersionSystemID`, `WithVersionUID`) refine what a version would otherwise inherit from the batch audit.
 

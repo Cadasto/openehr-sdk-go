@@ -133,10 +133,12 @@ c, err := transport.New(cat, transport.WithHTTPClient(b.HTTPClient()))
 if err != nil {
 	log.Fatal(err)
 }
+ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+defer cancel()
 created, meta, err := ehr.Create(ctx, c)
 ```
 
-`ehr` is the leaf client `openehr/client/ehr`. `created` is the decoded `*rm.EHR`, and `meta` carries the response headers such as `Location`.
+`ehr` is the leaf client `openehr/client/ehr`. `created` is the decoded `*rm.EHR`, and `meta` carries the response headers such as `Location`. The deadline bounds the call, so a server that stops answering cannot hold your program; give every REST call one.
 
 To run the same call without importing `sandbox/`, use the [`ehr_create`](../cmd/examples/ehr_create/main.go) example. It targets a throwaway handler:
 
@@ -176,6 +178,9 @@ For an app that acts for a signed-in user, run a SMART-on-openEHR launch with `a
 When one process serves many users, attach a different token to each call through the context:
 
 ```go
+// r is the incoming request: its context ends when the caller goes away.
+ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+defer cancel()
 ctx = auth.WithTokenSource(ctx, perRequestTokenSource)
 created, meta, err := ehr.Create(ctx, c)
 ```
