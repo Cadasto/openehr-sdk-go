@@ -8,6 +8,19 @@
 2. **Check [`docs/specifications/`](docs/specifications/)**, the source of truth for what the SDK must do. Expect RFC-2119 keywords, REQ/PROBE/STRAND identifiers, and traceability.
 3. **Read [`docs/roadmap.md`](docs/roadmap.md)** to see what has landed and what is planned. If your contribution overlaps with a plan in [`docs/plans/`](docs/plans/), coordinate via the issue tracker first.
 
+Where the project's own documents live:
+
+| Doc | What it holds |
+|---|---|
+| [docs/specifications/](docs/specifications/) | The normative specs: requirements (REQ), conformance probes (PROBE) and open research strands (STRAND) |
+| [docs/specifications/REQ.md](docs/specifications/REQ.md) | The requirement registry, each REQ linked to its topic spec |
+| [docs/specifications/traceability.yaml](docs/specifications/traceability.yaml) | The machine-readable map from each REQ to its packages, probes and tests |
+| [docs/architecture.md](docs/architecture.md) | The design narrative, with dependency diagrams |
+| [docs/adr/](docs/adr/) | Closed architectural decisions; open questions stay in [research-strands.md](docs/specifications/research-strands.md) until an ADR lands |
+| [docs/development-process.md](docs/development-process.md) | How work flows: the spec-first ladder and its gates |
+| [docs/ci.md](docs/ci.md) | The CI gate and the checks to run before a pull request |
+| [docs/ai-workflow.md](docs/ai-workflow.md) | Conventions for AI assistants: tooling, openEHR lookups, example-doc upkeep |
+
 ## How to contribute
 
 ### Reporting a bug
@@ -28,7 +41,7 @@
 2. **Run `make ci` locally** before opening the PR. CI replicates the gate ([`docs/ci.md`](docs/ci.md)).
 3. Leave [`CHANGELOG.md`](CHANGELOG.md) to the maintainers. They curate it on request or when a release is cut, not in each feature PR ([releases.md § CHANGELOG](docs/releases.md#changelog)). Call out any consumer-visible change in the PR description so it can be folded in.
 4. If you add or change a REQ-marked behaviour, update [`docs/specifications/traceability.yaml`](docs/specifications/traceability.yaml) in the same PR (`make spec-check` enforces this).
-5. Cite REQ-NNN / PROBE-NNN in commit messages, tests and maintainer comments, but not in godoc: package docs and doc comments on exported identifiers are written for SDK users. REQs are stable identifiers, so never renumber one.
+5. Cite REQ-NNN / PROBE-NNN in commit messages, tests and maintainer comments, never in what SDK users read: godoc, examples, README files and the user docs ([AGENTS.md § Spec-driven workflow](AGENTS.md#spec-driven-workflow-agents) has the full list). REQs are stable identifiers, so never renumber one.
 6. **New or changed `cmd/examples/`**: update [`docs/examples.md`](docs/examples.md) and [`cmd/examples/doc.go`](cmd/examples/doc.go) in the same PR; touch [`docs/quick-start.md`](docs/quick-start.md) when the onboarding path changes. See [ai-workflow.md § Examples](docs/ai-workflow.md#examples).
 7. Keep PRs **scoped to one logical change**. Small PRs are easier to review and get merged sooner.
 

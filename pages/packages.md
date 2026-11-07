@@ -6,22 +6,18 @@ description: >-
 
 # Packages
 
-The module path is `github.com/cadasto/openehr-sdk-go`. The layout below is
-the published one, described in
-[docs/specifications/module-layout.md](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/specifications/module-layout.md).
-API detail is on [pkg.go.dev](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go).
+The module path is `github.com/cadasto/openehr-sdk-go`. API detail is on [pkg.go.dev](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go).
 
 These tables name the packages a consumer imports directly. Internal
-packages and a few narrower helpers are left out; the layout document has the
-full tree. The
+packages and a few narrower helpers are left out; pkg.go.dev lists every
+package. The
 [roadmap](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/roadmap.md)
-records which parts have landed and which are planned, with their `REQ`
-identifiers.
+records which parts have landed and which are planned.
 
 ## Building blocks (no HTTP)
 
-None of these import `transport/` or `auth/`. That independence is REQ-013 in
-[module-layout.md](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/specifications/module-layout.md#req-013--building-block-independence).
+None of these import `transport/` or `auth/`, directly or through another
+package.
 
 | Import | Role |
 |---|---|
