@@ -839,16 +839,9 @@ The `state`, the verifier and `expires_at` differ on every run (shown as `…` a
 4. On the redirect callback, retrieve the stored `AuthorizationRequest` by the `state` in the callback query and delete it in the same operation (the program's `sessionStore.take`), so a replayed callback finds nothing.
 5. Pass the whole callback query (`r.URL.Query()` in your handler) and the stored request to `CompleteAuthorization`. Before any token-endpoint call it checks the `state` again (CSRF guard), checks an RFC 9207 `iss` parameter against the server the user was sent to, and turns an `error` parameter into `ErrAuthorizationRejected`. It then sends the code with the `code_verifier` to the token endpoint (PKCE proof).
 
-The program stops once it holds the tokens. In your app, the `Source` now holds them and is an `auth.TokenSource`, so hand it to the REST transport for your CDR. Every call then carries the access token, and the source refreshes it before it expires:
+The program stops once it holds the tokens. In your app, the `Source` now holds them and is an `auth.TokenSource`, so hand it to the REST transport for your CDR with `transport.WithTokenSource` and `transport.WithReauthOn401`, as [service-auth](#service-auth) does with its own source. Every call then carries the access token. After a 401 that reports `invalid_token`, or names no error, the transport fetches a fresh token and sends the call once more.
 
-```go
-// catalog is the one discovery resolved; hc is the *http.Client the Source uses.
-c, err := transport.New(catalog,
-	transport.WithHTTPClient(hc),
-	transport.WithTokenSource(source),
-	transport.WithReauthOn401(source), // one fresh token when the server answers 401
-)
-```
+The source refreshes the access token before it expires only when the server issued a refresh token, which this program asks for with the `offline_access` scope. Without one, a call after the token expires fails with `auth.ErrReauthRequired`, and the user has to launch again.
 
 See [specifications/auth.md § PKCE flow](specifications/auth.md#req-061--pkce-flow) for the normative rules.
 
