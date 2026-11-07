@@ -94,11 +94,14 @@ var requiredBodies = []string{
 // What a visit writes), so a template whose kept optional archetype holds
 // no ELEMENT gets a body with none by design: clinical_content_validation,
 // whose content builds only that root, a SECTION.validation_section_test.v0
-// with no items. A listed template that stops being hollow under Medium
-// fails the ratchet, and so does an unlisted one that becomes hollow, as an
-// unlisted row does.
+// with no items. generic_ehr_status.v1 and generic_folder.v1 constrain no
+// ELEMENT at all, so their body is hollow under every policy. A listed
+// template that stops being hollow under Medium fails the ratchet, and so
+// does an unlisted one that becomes hollow, as an unlisted row does.
 var mediumHollowBodies = []string{
 	"templates/clinical_content_validation",
+	"templates/generic_ehr_status.v1",
+	"templates/generic_folder.v1",
 }
 
 // corpusRatchet is the failure set measured on this tree. Policy and fill
@@ -114,8 +117,10 @@ var mediumHollowBodies = []string{
 // optional archetype use under an attribute, and reaches the TestPerson.v2
 // identifier clusters, the clinical_content_validation EVALUATION and each
 // of the four named SECTION.adhoc.v1 roots of Corona_Anamnese, whose roots
-// all validate. Under Large no template's body is hollow: a hollow_body
-// failure there fails the ratchet.
+// all validate. Under Large no template's body is hollow but those of
+// generic_ehr_status.v1 and generic_folder.v1, which constrain no ELEMENT by
+// design and have their hollow_body rows: any other hollow_body failure
+// there fails the ratchet.
 // The builder builds on Large when no WithPolicy is given, so its rows are
 // Large rows.
 //
@@ -147,6 +152,10 @@ var mediumHollowBodies = []string{
 // the text/plain default, so Media_type_valid (REQ-112 Coded invariants)
 // breaks.
 var corpusRatchet = []ratchetFailure{
+	{template: "templates/generic_ehr_status.v1", entry: "generate", policy: "large", fill: "example", reason: "hollow_body:/"},
+	{template: "templates/generic_ehr_status.v1", entry: "generate", policy: "large", fill: "random", reason: "hollow_body:/"},
+	{template: "templates/generic_folder.v1", entry: "generate", policy: "large", fill: "example", reason: "hollow_body:/"},
+	{template: "templates/generic_folder.v1", entry: "generate", policy: "large", fill: "random", reason: "hollow_body:/"},
 	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"},
 	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"},
 	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"},

@@ -1,0 +1,20 @@
+# compiled tree of templates/generic_ehr_status.v1.opt
+template_id="generic_ehr_status.v1" concept="Generic EHR status" language="en" uid="70c19cf1-96fe-40ea-ae17-e7effd31896b" num_nodes=2
+
+node /
+  rm_type="EHR_STATUS" node_id="at0000" archetype_id="openEHR-EHR-EHR_STATUS.generic.v1" node_name="" occurrences=1..1 slot=false
+  term[en] "at0000" code="at0000" description="The status of an EHR: its subject, whether it may be queried and modified, and other details." text="EHR Status"
+  attr "other_details" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "subject" rm_type="PARTY_SELF" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "is_queryable" rm_type="Boolean" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "is_modifiable" rm_type="Boolean" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /other_details
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="Further details about the EHR status, as a tree of items." text="Other details"
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+# walked nodes=2
