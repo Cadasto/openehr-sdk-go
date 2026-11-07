@@ -156,6 +156,48 @@ func TestStubTokenChecksPKCE(t *testing.T) {
 	}
 }
 
+// TestStubCodeIsOneUse checks that the stub's token endpoint accepts a code
+// once, whatever the outcome of that first exchange: a second exchange of the
+// same code with the right verifier is refused with invalid_grant, after a
+// refused first attempt as after a successful one.
+func TestStubCodeIsOneUse(t *testing.T) {
+	tests := []struct {
+		name          string
+		firstVerifier string // sent with the first exchange
+		firstStatus   int
+	}{
+		{name: "after a successful exchange", firstVerifier: rfcVerifier, firstStatus: http.StatusOK},
+		{name: "after a refused exchange", firstVerifier: otherVerifier, firstStatus: http.StatusBadRequest},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(newStubServer().mux)
+			defer server.Close()
+
+			status, code := authorize(t, server, "state-0123456789", rfcChallenge, "S256")
+			if status != http.StatusOK {
+				t.Fatalf("GET /authorize with an S256 challenge: status %d, want %d", status, http.StatusOK)
+			}
+			if status, body := postToken(t, server, tokenForm(code, tc.firstVerifier)); status != tc.firstStatus {
+				t.Fatalf("first POST /token for code %q with code_verifier=%q: status %d, body %s; want %d",
+					code, tc.firstVerifier, status, body, tc.firstStatus)
+			}
+
+			status, body := postToken(t, server, tokenForm(code, rfcVerifier))
+			var answer struct {
+				Error string `json:"error"`
+			}
+			if err := json.Unmarshal([]byte(body), &answer); err != nil {
+				t.Fatalf("second POST /token for code %q: status %d, body is not JSON: %v", code, status, err)
+			}
+			if status != http.StatusBadRequest || answer.Error != "invalid_grant" {
+				t.Errorf("second POST /token for code %q with the right verifier: status %d, error %q; want status %d, error %q",
+					code, status, answer.Error, http.StatusBadRequest, "invalid_grant")
+			}
+		})
+	}
+}
+
 // TestCompleteAuthorizationRefusesWrongVerifier checks what an app sees when
 // the stub refuses its verifier: CompleteAuthorization fails with an error
 // that unwraps to an *auth.OAuth2Error whose Code is invalid_grant.
