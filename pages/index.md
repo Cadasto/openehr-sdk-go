@@ -24,8 +24,8 @@ and an AQL builder and validator.
 
 <div class="home-cta" markdown="1">
 
-[Install](install.md){ .md-button .md-button--primary }
-[View on GitHub](https://github.com/cadasto/openehr-sdk-go){ .md-button }
+[Run an offline example](examples.md#canonical_json){ .md-button .md-button--primary }
+[Install](install.md){ .md-button }
 
 </div>
 
