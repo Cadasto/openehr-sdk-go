@@ -94,7 +94,9 @@ func (t *Tracker) enter(start xml.StartElement, c *Class) error {
 // A member is left out when the element has no child element of that name
 // and no XML attribute of it among the class's attribute members; when its
 // child carries `xsi:nil="true"`; or when its child is a primitive element
-// whose text is empty or XML whitespace only. Nothing inside a nilled
+// with no text, or a string element whose text is XML whitespace only,
+// unless the decode keeps the string's text ([Tracker.KeepStringText]). A
+// Character of one space is a value. Nothing inside a nilled
 // element is reported: the member is reported once, by its parent, as a
 // null is in canonical JSON. A struct element with no content is a value,
 // and so is an entry of a Hash member, whatever its text, and an element the
@@ -110,8 +112,9 @@ func (t *Tracker) ReportMissing(fn func(pointer string)) {
 // ReportPresence makes the decodes of t pass every member a document sends
 // without a value to fn, once each, as the member's element closes, so in
 // document order: a member of a class whose element carries `xsi:nil="true"`
-// (or `1`), nilled set, or is a primitive element whose text is empty or XML
-// whitespace only, mandatory or optional alike. Each is named by its JSON
+// (or `1`), nilled set, or is a primitive element with no text, or a string
+// element whose text is XML whitespace only, mandatory or optional alike; a
+// string whose text the decode keeps ([Tracker.KeepStringText]) included. Each is named by its JSON
 // Pointer, as [Tracker.ReportMissing] names a member, such as
 // `/content/0/data/events/0/data/items/0/value/precision`. Nothing inside a
 // nilled element is reported. An element the decoder skips or drops, such as
@@ -172,7 +175,11 @@ func (t *Tracker) closing(n int) {
 		if t.presence != nil && !p.nilled {
 			t.sentMember(n, "", f.nilled)
 		}
-		return
+		// A string whose text the decode keeps is sent empty and still
+		// carries a value, as the empty string does in canonical JSON.
+		if !f.kept {
+			return
+		}
 	}
 	if i := slices.Index(p.class.Required, f.name); i >= 0 {
 		p.seen |= 1 << i

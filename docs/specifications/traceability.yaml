@@ -743,6 +743,7 @@ requirements:
       - openehr/serialize/canxml/reused_list_test.go
       - openehr/serialize/canxml/roundtrip_test.go
       - openehr/serialize/canxml/stream_decoder_test.go
+      - openehr/serialize/canxml/string_text_test.go
       - openehr/serialize/canxml/unmatched_test.go
       - openehr/serialize/canxml/xsd_prefix_test.go
       - testkit/conformance/crossformat/census_test.go
@@ -2676,6 +2677,7 @@ requirements:
       - openehr/serialize/canjson/missing_test.go
       - openehr/serialize/canxml/missing_test.go
       - openehr/serialize/canxml/presence_test.go
+      - openehr/serialize/canxml/string_text_test.go
       - openehr/validation/missing_members_test.go
 
   - id: REQ-176

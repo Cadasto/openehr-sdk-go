@@ -21,8 +21,9 @@ const NSXMI = "http://www.omg.org/XMI"
 // DecoderOption configures a decode, through [Unmarshal] or a [Decoder].
 // [WithUnmatched] and [WithStrict] say what happens to content the decode
 // does not read; [WithMissing] reports the members the input leaves out, and
-// [WithPresence] those it sends without a value; [WithMaxDepth] refuses an
-// element nested too deep.
+// [WithPresence] those it sends without a value; [WithStringText] keeps the
+// text of a string member sent empty or as whitespace; [WithMaxDepth] refuses
+// an element nested too deep.
 // [WithRelaxedTypeDispatch] names relaxed polymorphic dispatch; it is
 // accepted but not yet enforced, so dispatch stays strict.
 type DecoderOption func(*decoderConfig)
@@ -36,6 +37,7 @@ type decoderConfig struct {
 	maxDepth            int // 0 for no limit
 	relaxedTypeDispatch bool
 	strict              bool
+	stringText          bool
 }
 
 // newDecoderConfig applies opts in order, skipping a nil option.
@@ -64,10 +66,10 @@ func init() {
 }
 
 // tracked reports whether the decode reports or refuses unmatched content,
-// or reports missing members or members sent without a value: each needs the
-// decode to follow the elements it reads.
+// reports missing members or members sent without a value, or keeps a
+// string's text: each needs the decode to follow the elements it reads.
 func (c decoderConfig) tracked() bool {
-	return c.unmatched != nil || c.strict || c.missing != nil || c.presence != nil
+	return c.unmatched != nil || c.strict || c.missing != nil || c.presence != nil || c.stringText
 }
 
 // tracker returns the tracker of a decode with c's options, and nil for a
@@ -79,6 +81,9 @@ func (c decoderConfig) tracker() *xmlunmatched.Tracker {
 	t := xmlunmatched.NewTracker(c.unmatched, c.strict)
 	t.ReportMissing(c.missing)
 	t.ReportPresence(reportPresence(c.presence))
+	if c.stringText {
+		t.KeepStringText()
+	}
 	t.LimitDepth(c.maxDepth)
 	return t
 }
@@ -458,7 +463,7 @@ func (f failedReader) Read([]byte) (int, error) { return 0, f.err }
 // Decode reads the next XML element from the stream and stores it
 // in v. Errors follow the same classification as [Unmarshal], with one
 // difference: a Decoder given none of [WithUnmatched], [WithStrict],
-// [WithMissing] and [WithPresence] does not name the path of the elements it
+// [WithMissing], [WithPresence] and [WithStringText] does not name the path of the elements it
 // reads, so the
 // [DecodeError] for the text of a primitive element that does not decode as
 // its type names the element alone, such as "/is_queryable", inside the
@@ -489,8 +494,9 @@ func (f failedReader) Read([]byte) (int, error) { return 0, f.err }
 // precedes each one, as encoding/xml does. [Unmarshal], which is given a
 // whole document, is the call that holds it to one root element and checks
 // what comes before and after it. Inside the value, a Decoder given
-// [WithUnmatched], [WithStrict], [WithMissing], [WithPresence] or a positive
-// [WithMaxDepth] refuses a processing instruction whose target is xml, which
+// [WithUnmatched], [WithStrict], [WithMissing], [WithPresence],
+// [WithStringText] or a positive [WithMaxDepth] refuses a processing
+// instruction whose target is xml, which
 // XML reserves for the declaration at the start of a document, with
 // [ErrInvalidShape]; one given none of them may read past it.
 func (d *Decoder) Decode(v any) error {
