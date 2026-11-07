@@ -181,8 +181,8 @@ var Probe089Inputs = []Probe089Case{
 		Name: "event_context_optionals",
 		Rows: []string{"EVENT_CONTEXT: _end_time", "EVENT_CONTEXT: _location"},
 		Keys: map[string]any{
-			// ADR 0016: the EVENT_CONTEXT optionals ride this grammar at their
-			// real paths rather than gaining `ctx/` short forms.
+			// The EVENT_CONTEXT optionals ride this grammar at their real paths
+			// rather than gaining `ctx/` short forms.
 			probe089Context + "/_end_time": "2021-12-21T15:19:31.649613+01:00",
 			probe089Context + "/_location": "microbiology lab 2",
 			probe089Qty + "|magnitude":     65.9,
@@ -357,8 +357,8 @@ var Probe089Inputs = []Probe089Case{
 		},
 	},
 	{
-		// ADR 0029: the composer's real path carries the whole composer in the
-		// party grammar. Its name joins its reference and identifiers there,
+		// The composer's real path carries the whole composer in the party
+		// grammar. Its name joins its reference and identifiers there,
 		// and no ctx/ composer key is written for it.
 		Name: "composer_referenced_party_identified",
 		Rows: []string{"COMPOSITION: composer at its real path (PARTY_IDENTIFIED: |name, external_ref, _identifier:N)"},
@@ -568,8 +568,8 @@ var Probe089Refusals = []Probe089Refusal{
 	{
 		// Not a family at all. `_identifier:N` is reached only *inside* a party,
 		// so an ENTRY owner names no family — and a typo must not be mistaken
-		// for one. The codec does not read it, so it is unmatched content
-		// (REQ-170): refused under strict, ignored and reported by default.
+		// for one. The codec does not read it, so it is unmatched content:
+		// refused under strict, ignored and reported by default.
 		Name:      "unknown_family",
 		Keys:      map[string]any{probe089Obs + "/_nonsense|id": "x"},
 		Want:      simplified.ErrUnknownPath,
