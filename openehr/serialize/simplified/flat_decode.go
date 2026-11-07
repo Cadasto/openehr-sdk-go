@@ -3157,7 +3157,7 @@ func selectElem(cur map[string]any, attr, elemType, pred string, name map[string
 			el["archetype_node_id"] = pred
 		}
 		if name != nil {
-			el["name"] = cloneJSON(name)
+			el["name"] = deepCopyJSON(name)
 			el[gapFilled] = true
 		}
 		arr = append(arr, el)
@@ -3192,27 +3192,6 @@ func namedOneOf(name map[string]any, names []string) bool {
 	}
 	v, _ := name["value"].(string)
 	return slices.Contains(names, v)
-}
-
-// cloneJSON returns a copy of v, a value decoded from JSON or built for
-// canjson, that shares no map or slice with it.
-func cloneJSON(v any) any {
-	switch x := v.(type) {
-	case map[string]any:
-		m := make(map[string]any, len(x))
-		for k, e := range x {
-			m[k] = cloneJSON(e)
-		}
-		return m
-	case []any:
-		a := make([]any, len(x))
-		for i, e := range x {
-			a[i] = cloneJSON(e)
-		}
-		return a
-	default:
-		return v
-	}
 }
 
 // concreteType resolves the RM type to instantiate for attr on parentType,
