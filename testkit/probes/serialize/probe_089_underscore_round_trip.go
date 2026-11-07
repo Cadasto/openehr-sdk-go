@@ -332,7 +332,7 @@ var Probe089Inputs = []Probe089Case{
 		Name: "entry_participation_subject_provider",
 		Rows: []string{
 			"ENTRY: _other_participation:N",
-			"ENTRY: subject (PARTY_PROXY leaf, REQ-053 closure)",
+			"ENTRY: subject (PARTY_PROXY leaf)",
 			"ENTRY: _provider",
 		},
 		Keys: map[string]any{
