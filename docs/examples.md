@@ -817,7 +817,7 @@ step 1: Source built (public client, PKCE, standalone)
 step 2: BeginAuthorization → state="…"  verifier="…"
 step 3: authorize URL built (len=391)
 step 4: AuthorizationRequest stored in session map (key="…")
-step 5: redirect received  code="stub-code-…"  state="…"
+step 5: redirect received  code="stub-code-1"  state="…"
 step 6: AuthorizationRequest retrieved from session map (state validated)
 step 7: authorization completed, code exchanged for tokens
   access_token : stub-acc…

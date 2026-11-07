@@ -269,8 +269,9 @@ func openAuthorizeURL(ctx context.Context, client *http.Client, authorizeURL str
 type stubServer struct {
 	mux *http.ServeMux
 
-	mu    sync.Mutex
-	codes map[string]string // code → the PKCE challenge it was issued for
+	mu     sync.Mutex
+	issued int               // codes issued so far, which numbers the next one
+	codes  map[string]string // code → the PKCE challenge it was issued for
 }
 
 func newStubServer() *stubServer {
@@ -313,12 +314,11 @@ func (s *stubServer) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "code_challenge_method must be S256", http.StatusBadRequest)
 		return
 	}
-	// A predictable code keeps the output readable; real ones are random.
-	// OAuth 2.0 sets no minimum length for state, so a short one is kept whole.
-	code := "stub-code-" + state[:min(len(state), 8)]
-
 	// The challenge is kept with the code, for the token endpoint to check.
+	// A numbered code keeps the output readable; real ones are random.
 	s.mu.Lock()
+	s.issued++
+	code := fmt.Sprintf("stub-code-%d", s.issued)
 	s.codes[code] = challenge
 	s.mu.Unlock()
 

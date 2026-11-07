@@ -20,6 +20,9 @@ import (
 const (
 	rfcVerifier  = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
 	rfcChallenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+	// otherVerifier and otherChallenge are a second pair, for a second launch.
+	otherVerifier  = "another-verifier-0123456789-0123456789-01234"
+	otherChallenge = "FquQ9bii1jAW7uLcxzAdAgjkH6pFSqn4bBqPvQKcjAg"
 	// emptyVerifierChallenge is the S256 challenge of the empty string.
 	emptyVerifierChallenge = "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
 )
@@ -65,8 +68,8 @@ func TestStubAuthorizeRequiresS256(t *testing.T) {
 }
 
 // TestStubAuthorizeAcceptsShortState checks that the stub issues a code for a
-// state shorter than the eight characters it takes for the code; the SDK's
-// states are longer, but OAuth 2.0 sets no minimum.
+// state of three characters; the SDK's states are longer, but OAuth 2.0 sets
+// no minimum.
 func TestStubAuthorizeAcceptsShortState(t *testing.T) {
 	server := httptest.NewServer(newStubServer().mux)
 	defer server.Close()
@@ -74,6 +77,26 @@ func TestStubAuthorizeAcceptsShortState(t *testing.T) {
 	status, code := authorize(t, server, "abc", rfcChallenge, "S256")
 	if status != http.StatusOK || code == "" {
 		t.Errorf("GET /authorize with state %q: status %d, code %q; want %d and a code", "abc", status, code, http.StatusOK)
+	}
+}
+
+// TestStubCodesAreDistinct checks that two launches whose states share their
+// first characters get codes of their own, each exchanged with the verifier
+// of its own challenge.
+func TestStubCodesAreDistinct(t *testing.T) {
+	server := httptest.NewServer(newStubServer().mux)
+	defer server.Close()
+
+	_, first := authorize(t, server, "shared-prefix-1", rfcChallenge, "S256")
+	_, second := authorize(t, server, "shared-prefix-2", otherChallenge, "S256")
+	if first == second {
+		t.Fatalf("GET /authorize for two states: both got code %q, want two codes", first)
+	}
+	for code, verifier := range map[string]string{first: rfcVerifier, second: otherVerifier} {
+		if status, body := postToken(t, server, tokenForm(code, verifier)); status != http.StatusOK {
+			t.Errorf("POST /token for code %q with its own verifier: status %d, body %s; want %d",
+				code, status, body, http.StatusOK)
+		}
 	}
 }
 
@@ -91,7 +114,7 @@ func TestStubTokenChecksPKCE(t *testing.T) {
 	}{
 		{name: "matching verifier", challenge: rfcChallenge, verifier: rfcVerifier, wantStatus: http.StatusOK},
 		{
-			name: "wrong verifier", challenge: rfcChallenge, verifier: "another-verifier-0123456789-0123456789-01234",
+			name: "wrong verifier", challenge: rfcChallenge, verifier: otherVerifier,
 			wantStatus: http.StatusBadRequest, wantError: "invalid_grant",
 		},
 		// The challenge of the empty string, so only the check for a missing
@@ -110,16 +133,7 @@ func TestStubTokenChecksPKCE(t *testing.T) {
 			if status != http.StatusOK {
 				t.Fatalf("GET /authorize with an S256 challenge: status %d, want %d", status, http.StatusOK)
 			}
-			form := url.Values{
-				"grant_type":   {"authorization_code"},
-				"code":         {code},
-				"redirect_uri": {redirectURI},
-				"client_id":    {clientID},
-			}
-			if tc.verifier != "" {
-				form.Set("code_verifier", tc.verifier)
-			}
-			status, body := postToken(t, server, form)
+			status, body := postToken(t, server, tokenForm(code, tc.verifier))
 
 			var answer struct {
 				Error       string `json:"error"`
@@ -219,6 +233,21 @@ func authorize(t *testing.T, server *httptest.Server, state, challenge, method s
 		t.Fatalf("decode the authorize answer: %v", err)
 	}
 	return resp.StatusCode, grant.Code
+}
+
+// tokenForm is an authorization_code grant for code, carrying verifier as the
+// code_verifier unless it is empty.
+func tokenForm(code, verifier string) url.Values {
+	form := url.Values{
+		"grant_type":   {"authorization_code"},
+		"code":         {code},
+		"redirect_uri": {redirectURI},
+		"client_id":    {clientID},
+	}
+	if verifier != "" {
+		form.Set("code_verifier", verifier)
+	}
+	return form
 }
 
 // postToken posts form to the stub's token endpoint and returns the status
