@@ -37,7 +37,7 @@ composition: archetype_node_id=openEHR-EHR-COMPOSITION.encounter.v1
 OK: canonical-JSON Composition decoded from body_weight.json
 ```
 
-`archetype_node_id` names the archetype the document is built on, `language` and `territory` are codes with the terminology they come from, `category` is the composition category, and `content items` counts the entries the document carries. The [examples catalogue](docs/examples.md) has a program of this size for each SDK surface (validate a composition against a template, build and lint AQL, create an EHR through the REST client, run a SMART launch), each with a note on what to copy into your own application.
+`archetype_node_id` names the archetype the document is built on, `language` and `territory` are codes with the terminology they come from, `category` is the composition category, and `content items` counts the entries the document carries. The [examples catalogue](docs/examples.md) has more programs of this size. They cover the offline workflows, such as validating a composition against a template and building and linting AQL. They also cover REST calls for EHRs, compositions, AQL queries, templates and contributions, and two ways to authenticate: a SMART launch and client credentials. Each comes with a note on what to copy into your own application.
 
 To use it in your own project, pin an exact tag. The SDK is pre-1.0, so a minor release can change the public API:
 
@@ -83,7 +83,7 @@ Start with [quick-start.md](docs/quick-start.md), then the runnable catalog in [
 | Doc | What it covers |
 |---|---|
 | [docs/quick-start.md](docs/quick-start.md) | Install, toolchain setup, and the ways to integrate the SDK |
-| [docs/examples.md](docs/examples.md) | The runnable example programs, one per SDK surface |
+| [docs/examples.md](docs/examples.md) | The runnable example programs: the offline workflows, the main REST calls, a SMART launch and client credentials |
 | [docs/roadmap.md](docs/roadmap.md) | What has landed and what is planned |
 | [docs/releases.md](docs/releases.md) | Version policy and how releases are cut |
 | [CHANGELOG.md](CHANGELOG.md) | Release log |
