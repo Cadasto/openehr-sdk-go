@@ -1,6 +1,6 @@
 package simplified
 
-// REQ-116 / REQ-053 — FLAT decode through a name-pinned container.
+// REQ-111 / REQ-053 — FLAT decode through a name-pinned container.
 //
 // Regression guard: after Phase 3 the WebTemplate carries name-predicated
 // aqlPaths, but decode's placeLeaf rebuilds its lookup prefixes in the bare
@@ -68,7 +68,7 @@ func TestUnmarshalFlatPinnedContainer(t *testing.T) {
 		t.Errorf("archetype_node_id = %q, want openEHR-EHR-EVALUATION.absence.v2", got)
 	}
 	// WithTemplate repopulates LOCATABLE.name from the template-level pinned
-	// name (REQ-116) — not the archetype concept term ("Absence of information").
+	// name (REQ-111) — not the archetype concept term ("Absence of information").
 	if got := eval.Name.GetValue(); got != "Unbekannte Diagnose" {
 		t.Errorf("decoded name = %q, want the pinned %q", got, "Unbekannte Diagnose")
 	}
@@ -93,7 +93,7 @@ func TestUnmarshalFlatPinnedContainer(t *testing.T) {
 	}
 }
 
-// TestUnmarshalFlatNamedReusedSiblingsCorona — REQ-053, REQ-116: corona's four
+// TestUnmarshalFlatNamedReusedSiblingsCorona — REQ-053, REQ-111: corona's four
 // SECTION.adhoc.v1 siblings share one bare path and are told apart by the
 // names they pin. A key through one of them decodes into a SECTION carrying
 // that sibling's name, and keys through two of them into two SECTIONs, never
@@ -246,7 +246,7 @@ func siblingComposition(items ...rm.ContentItem) *rm.Composition {
 	}
 }
 
-// TestMarshalFlatNamedReusedSiblings — REQ-053, REQ-116: reused siblings that
+// TestMarshalFlatNamedReusedSiblings — REQ-053, REQ-111: reused siblings that
 // pin distinct names resolve by those names, so each instance is written under
 // its own sibling's id alone, whether one sibling or both hold one, and decodes
 // back into an instance of that name. An instance whose name none of them pins
@@ -309,7 +309,7 @@ func TestMarshalFlatNamedReusedSiblings(t *testing.T) {
 	})
 }
 
-// TestFlatReusedSiblingEscapedNames — REQ-053, REQ-116: a pinned name holding
+// TestFlatReusedSiblingEscapedNames — REQ-053, REQ-111: a pinned name holding
 // a quote, a closing bracket or a backslash, which the Web Template escapes in
 // its aqlPath, still tells reused siblings apart: each instance encodes under
 // its own sibling's id and decodes back into an instance of that name.
@@ -348,7 +348,7 @@ func TestFlatReusedSiblingEscapedNames(t *testing.T) {
 	}
 }
 
-// TestUnmarshalFlatNamedReusedSiblingSparseIndexRefused — REQ-053, REQ-116:
+// TestUnmarshalFlatNamedReusedSiblingSparseIndexRefused — REQ-053, REQ-111:
 // placement fills the slots before a reused sibling's :index with members that
 // carry its name, so a later key of that sibling finds them; one no key
 // reaches is still a phantom of a sparse :index, refused as any other is.
@@ -391,7 +391,7 @@ func TestUnmarshalFlatNamedReusedSiblingSparseIndexRefused(t *testing.T) {
 	})
 }
 
-// TestFlatReusedSiblingPinningNoName — REQ-053, REQ-116: beside a reused
+// TestFlatReusedSiblingPinningNoName — REQ-053, REQ-111: beside a reused
 // sibling that pins a name, the one that pins none stands for every instance
 // carrying no name its sibling pins. Encode writes each instance under the
 // sibling it belongs to, and decode places each key back into an instance of
@@ -494,7 +494,7 @@ func namedElement(name, text string) *rm.Element {
 	return &rm.Element{ArchetypeNodeID: "at0002", Name: rm.DVText{Value: name}, Value: &rm.DVText{Value: text}}
 }
 
-// TestMarshalFlatUnnamedSiblingLeavesTheNamedInstance — REQ-053, REQ-116,
+// TestMarshalFlatUnnamedSiblingLeavesTheNamedInstance — REQ-053, REQ-111,
 // REQ-140: beside a reused sibling that pins a name, the one that pins none
 // does not take the named sibling's instance, whether it occurs at most once
 // or repeats, has no FLAT spelling, or is reached by a STRING leaf whose path
@@ -594,7 +594,7 @@ func TestMarshalFlatUnnamedSiblingLeavesTheNamedInstance(t *testing.T) {
 	}
 }
 
-// TestWalkAQLGivesNoSiblingsNameToTheUnnamedSibling — REQ-053, REQ-116: a
+// TestWalkAQLGivesNoSiblingsNameToTheUnnamedSibling — REQ-053, REQ-111: a
 // member decode builds for a reused sibling that pins no name does not take,
 // from the template, a name a sibling beside it pins: encode would read the
 // member back as that sibling's. A name no sibling pins it does take.
@@ -632,7 +632,7 @@ func TestWalkAQLGivesNoSiblingsNameToTheUnnamedSibling(t *testing.T) {
 }
 
 // TestUnmarshalFlatNamedSiblingsOnOneSingleValuedAttribute — REQ-053,
-// REQ-116: two named siblings that stand on one single-valued attribute, an
+// REQ-111: two named siblings that stand on one single-valued attribute, an
 // OBSERVATION's protocol, cannot both be in a composition. A body with keys
 // under both is refused rather than merged into one protocol, which encode
 // would read back under one sibling only; a body with keys under one decodes

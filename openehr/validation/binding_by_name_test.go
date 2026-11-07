@@ -1,6 +1,6 @@
 package validation_test
 
-// binding_by_name_test.go: REQ-102 (Structural — binding items), REQ-116,
+// binding_by_name_test.go: REQ-102 (Structural — binding items), REQ-111,
 // REQ-168 — where several OPT children of a multi-valued attribute carry
 // one archetype id, as when a template reuses an archetype under distinct
 // template-level names, an item binds to the child whose pinned name equals
@@ -72,7 +72,7 @@ func emptyLanguage(itemPath string) []string {
 	return []string{"code_not_in_value_set " + itemPath + "/language", "required " + itemPath + "/language"}
 }
 
-// REQ-102, REQ-116 — items whose names are the names the template pins bind
+// REQ-102, REQ-111 — items whose names are the names the template pins bind
 // to the children that pin them, whatever their order, so a correct
 // composition passes. The name is read from a DV_TEXT or a DV_CODED_TEXT, by
 // value or by pointer, as the walk reads the name it checks.
@@ -100,7 +100,7 @@ func TestValidateComposition_REQ102_REQ116_SharedIDBindsByPinnedName(t *testing.
 	}
 }
 
-// REQ-102, REQ-116 — an item bound by its pinned name is written with that
+// REQ-102, REQ-111 — an item bound by its pinned name is written with that
 // name, so a defect inside it is reported at the name-predicated path of
 // the child it binds to, whichever position it holds.
 func TestValidateComposition_REQ102_REQ116_BoundNameReachesItemPath(t *testing.T) {
@@ -203,7 +203,7 @@ func TestValidateComposition_REQ102_UnmatchedNameBindsToFirstNamedChild(t *testi
 	}
 }
 
-// REQ-107, REQ-102, REQ-116 — the generator's output for a template that
+// REQ-107, REQ-102, REQ-111 — the generator's output for a template that
 // reuses one archetype under several names, or beside a reuse that pins no
 // name, validates against that template with no issue, under both policies.
 // The corpus cannot show this: no corpus composition has two items with one

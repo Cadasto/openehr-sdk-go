@@ -1,13 +1,13 @@
 package lint
 
-// pathshape_internal_test.go: white-box pins for REQ-164 § The conservative
-// segment walk. REQ-164 § Acceptance requires the walk's silent stops to be
+// pathshape_internal_test.go: white-box pins for REQ-161 § The conservative
+// segment walk. REQ-161 § Acceptance requires the walk's silent stops to be
 // pinned BY NAME rather than left to a general property, and from outside the
 // package every stop looks the same — silence. These tests name each one, so
 // removing a guard fails a test instead of merely swapping one silent stop for
 // another.
 //
-// The walk's own verdict is what a later REQ-164 check reads
+// The walk's own verdict is what a later REQ-161 check reads
 // (aql_fanout_path_grain asks the divergence question of this same walk), so
 // the shape of that verdict is pinned here too.
 //
@@ -73,7 +73,7 @@ func TestSegmentWalkTypesEverySegmentItCan(t *testing.T) {
 	}
 }
 
-// TestSegmentWalkStopsAtTheGenericParameterByName pins the stop REQ-164
+// TestSegmentWalkStopsAtTheGenericParameterByName pins the stop REQ-161
 // § Acceptance names explicitly. `EVENT.data` is literally typed `T` on the
 // pinned tables, which is not a class of the universe, so the walk cannot
 // descend — and it MUST record that it could not, rather than that the pin
@@ -330,7 +330,7 @@ func TestContainsChainOrdersFlattenedSiblings(t *testing.T) {
 // included. Appending that sibling regardless would put it beside a node it
 // does not follow, and the redundant-step check would then ask the relation
 // about a parent/child pair the query never spelled — a wrong finding, not a
-// missed one, which is the direction REQ-164 forbids.
+// missed one, which is the direction REQ-161 forbids.
 func TestContainsChainTruncatesAtADeepStop(t *testing.T) {
 	junction := parse.Containment{Children: []parse.Containment{
 		{Class: parse.ClassExpr{RMType: "OBSERVATION", Alias: "o"}},
@@ -359,7 +359,7 @@ func TestContainsChainTruncatesAtADeepStop(t *testing.T) {
 // TestContainsChainStopsByName pins each of the three chain stops separately.
 // From outside the package they all look alike — silence — so a guard swapped
 // for another would pass the external suite unnoticed (the same reasoning the
-// walk's own stops are pinned by name for, REQ-164 § Acceptance).
+// walk's own stops are pinned by name for, REQ-161 § Acceptance).
 func TestContainsChainStopsByName(t *testing.T) {
 	seed := []parse.ClassExpr{{RMType: "EHR", Alias: "e"}}
 	for _, tc := range []struct {

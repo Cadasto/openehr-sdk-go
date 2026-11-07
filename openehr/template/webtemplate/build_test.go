@@ -182,13 +182,13 @@ func refTree(t *testing.T, ref map[string]any) map[string]any {
 
 // Both parity tests index nodes by aqlPath; siblings sharing a path (one
 // at-code cloned under a Multiple attribute) would silently collapse into
-// one entry. Since REQ-116 Phase 3 the name predicate separates exactly
+// one entry. Since REQ-111 Phase 3 the name predicate separates exactly
 // that class — the archetype-reuse-under-slot templates — so indexing by
 // path is now sound for the reuse oracles too, not just constrain_test.
 
 // parityFixtures are the vendored references PROBE-075 asserts against.
 // constrain_test pins no node name (104 nodes, zero name predicates);
-// Corona_Anamnese and GECCO_Diagnose are the REQ-116 oracles, added in
+// Corona_Anamnese and GECCO_Diagnose are the REQ-111 oracles, added in
 // Phase 4 once name-derived ids and predicated paths made them buildable.
 var parityFixtures = []string{referenceStem, "Corona_Anamnese", "GECCO_Diagnose"}
 

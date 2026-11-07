@@ -7,12 +7,12 @@ import (
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
-// REQ-116 (Phase 0) / PROBE-075 — the vendored REQ-116 oracle OPTs compile.
+// REQ-111 (Phase 0) / PROBE-075 — the vendored REQ-111 oracle OPTs compile.
 //
 // Corona_Anamnese is the archetype-reuse-under-slot regression guard: four
 // SECTION.adhoc.v1 siblings (and, one level down, eight reused screening
 // OBSERVATIONs under Symptome) produce repeated AQL paths that only shared-path
-// admission lets through — legal per REQ-116, where registerPath's duplicate
+// admission lets through — legal per REQ-111, where registerPath's duplicate
 // rejection is REQ-111. Previously this class was claimed to compile with no
 // in-tree guard.
 //
@@ -29,7 +29,7 @@ func TestCompile_WebTemplateOracleOPTs(t *testing.T) {
 		templateID string
 		// wantPaths are compiled paths that must resolve, with their
 		// expected RM type — the fixture's load-bearing structure, in the
-		// reference's name-predicated spelling (REQ-116 Phase 3).
+		// reference's name-predicated spelling (REQ-111 Phase 3).
 		wantPaths map[string]string
 		// goneePath is the pre-Phase-3 bare spelling of a path that now
 		// carries a predicate. It must NOT resolve: the whole point of the
@@ -96,7 +96,7 @@ func TestCompile_WebTemplateOracleOPTs(t *testing.T) {
 	}
 }
 
-// REQ-116 Phase 3 — the four reused SECTION.adhoc.v1 siblings each occupy
+// REQ-111 Phase 3 — the four reused SECTION.adhoc.v1 siblings each occupy
 // their own compiled path, and byPath resolves each to the node whose name
 // the predicate carries. Before Phase 3 all four collided and byPath kept
 // only the first; this is the DoD assertion for the phase, and the
@@ -132,7 +132,7 @@ func TestCompile_CoronaSiblingsResolveDistinctly(t *testing.T) {
 	}
 }
 
-// REQ-116 Phase 3 / REQ-111 — name predicates must not turn the shared-path
+// REQ-111 Phase 3 / REQ-111 — name predicates must not turn the shared-path
 // admission into dead code. Genuine AOM 1.4 alternatives still produce
 // repeated paths (a DV_TEXT and a DV_CODED_TEXT alternative both landing on
 // .../value), which only dupDepth admits — and they carry no name, so no

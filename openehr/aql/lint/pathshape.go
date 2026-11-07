@@ -1,8 +1,8 @@
 package lint
 
-// pathshape.go: the REQ-164 path-shape check group — Layer 2's third group,
+// pathshape.go: the REQ-161 path-shape check group — Layer 2's third group,
 // AST-only (no CDR, no OPT), and the second direct consumer of the pinned BMM
-// in this package (REQ-164 § The conservative segment walk; the first is
+// in this package (REQ-161 § The conservative segment walk; the first is
 // [versionedObjectIssues]'s VERSIONED_OBJECT conformance question).
 //
 // It carries the segment WALKER — the shared machinery that types an
@@ -10,7 +10,7 @@ package lint
 // checks that read it: aql_path_repeating_unpredicated, over every clause's
 // paths, and aql_fanout_path_grain, over the projected ones. The walk runs ONCE
 // per path ([walkPaths]) and both checks read the same verdicts, which is what
-// REQ-164 § The conservative segment walk means by their sharing one walk. That
+// REQ-161 § The conservative segment walk means by their sharing one walk. That
 // per-path verdict ([pathShape]) records which segments are multi-valued, which
 // carry a predicate, and where the walk stopped.
 //
@@ -35,9 +35,9 @@ import (
 
 // walkStop names why [segmentWalker.walk] ended before typing every segment.
 // Every non-[stopNone] value is SILENT: no issue on the stopping segment and
-// none on any segment beyond it (REQ-164 § The conservative segment walk).
+// none on any segment beyond it (REQ-161 § The conservative segment walk).
 // The reason is recorded rather than collapsed to a bare "stopped" flag so a
-// test can pin each stop BY NAME, as REQ-164 § Acceptance requires, and so a
+// test can pin each stop BY NAME, as REQ-161 § Acceptance requires, and so a
 // later check reading the same walk can tell "the pin says no" from "the pin
 // cannot say".
 type walkStop int
@@ -58,7 +58,7 @@ const (
 	// not a class of the pinned universe — a BMM generic parameter (EVENT.data
 	// is literally typed `T`) or a foundation type (Real, String) — so nothing
 	// below it can be typed. REQ-048 leaves generic-parameter resolution out
-	// of scope, and REQ-164 § Out of scope keeps it there.
+	// of scope, and REQ-161 § Out of scope keeps it there.
 	stopTypeOutsideUniverse
 )
 
@@ -93,7 +93,7 @@ type segmentShape struct {
 	// type (the type inside the list), which is what the walk descends into.
 	RMType string
 	// Predicated is true when the segment carries predicate text. PRESENCE
-	// only: the content is never judged (REQ-164 § Path-shape checks — whether
+	// only: the content is never judged (REQ-161 § Path-shape checks — whether
 	// a node id is the RIGHT one is Layer 3's question).
 	Predicated bool
 	// Container is the pin's multiplicity verdict ([rminfo.Lookup.IsContainer]).
@@ -133,7 +133,7 @@ func (s pathShape) offending() []segmentShape {
 //
 // It reads [pathShape.Typed] through [pathShape.offending], so a segment the
 // walk never typed can never answer yes: everything at or beyond a silent stop
-// is simply absent, which is the bound REQ-164 § The conservative segment walk
+// is simply absent, which is the bound REQ-161 § The conservative segment walk
 // puts on this check's reach. Segments typed BEFORE a stop do participate,
 // which is the same paragraph's explicit ruling — a path that stops at
 // `EVENT.data`'s generic `T` still carries its typed `HISTORY.events` into the
@@ -204,7 +204,7 @@ func knownClasses(look rminfo.Lookup) map[string]bool {
 }
 
 // walk types p's segments from the class its alias binds, stopping SILENTLY at
-// the first step the pin cannot type (REQ-164 § The conservative segment
+// the first step the pin cannot type (REQ-161 § The conservative segment
 // walk). It never guesses and never descends a sibling: a false Warning on a
 // legal path is worse than a missed one, because the consumer running this in
 // CI cannot tell them apart — the same policy [pathDivergence] applies at
@@ -263,8 +263,8 @@ func (w *segmentWalker) walk(p parse.IdentifiedPath) pathShape {
 	return sh
 }
 
-// pathShapeIssues runs the REQ-164 path-shape group. The five codes are
-// emitted in the order REQ-164 § Path-shape checks catalogues them —
+// pathShapeIssues runs the REQ-161 path-shape group. The five codes are
+// emitted in the order REQ-161 § Path-shape checks catalogues them —
 // aql_path_repeating_unpredicated, then aql_paging_no_order_by, then
 // aql_select_no_alias, then aql_fanout_path_grain, then
 // aql_contains_redundant_step — because they answer questions of different
@@ -283,12 +283,12 @@ func (w *segmentWalker) walk(p parse.IdentifiedPath) pathShape {
 // consult NO relation, in two pairs: the two codes the segment walk feeds
 // (aql_path_repeating_unpredicated, aql_fanout_path_grain) ask class facts of
 // the pinned RM — attribute typing and multiplicity — which no caller-supplied
-// containment relation may answer differently (REQ-164 § The conservative
+// containment relation may answer differently (REQ-161 § The conservative
 // segment walk); the two parse-only codes (aql_paging_no_order_by,
 // aql_select_no_alias) consult no RM fact at all.
 //
 // The group is ungated — every code in it is Warning, so none can flip
-// [Result.OK] (REQ-164 § Always on, never gated).
+// [Result.OK] (REQ-161 § Always on, never gated).
 func pathShapeIssues(doc *parse.Document, md Metadata, q *aql.Query, rel *contain.TypeRelation) []Issue {
 	walked := walkPaths(md)
 	var issues []Issue
@@ -316,7 +316,7 @@ type walkedPath struct {
 // document order.
 //
 // Both RM-fact checks in the group read this result rather than walking again.
-// REQ-164 § The conservative segment walk says the repeating-segment check and
+// REQ-161 § The conservative segment walk says the repeating-segment check and
 // aql_fanout_path_grain's divergence test "share one walk", and sharing the
 // RESULT is what makes that true by construction: the two checks cannot drift
 // into answering two walks that merely look alike, and a path is typed once
@@ -338,7 +338,7 @@ func walkPaths(md Metadata) []walkedPath {
 // ([Metadata.Paths], which is [parse.Document.Paths]). The clause scope is a
 // MUST, not an optimisation skipped: a WHERE filter or an ORDER BY key over an
 // unconstrained repeating segment carries the same which-occurrence ambiguity
-// a projected path does (REQ-164 § Path-shape checks).
+// a projected path does (REQ-161 § Path-shape checks).
 //
 // Its whole input is [walkPaths]'s output — the query's paths, already typed
 // against the class each alias binds — and no other part of the document.
@@ -365,7 +365,7 @@ func repeatingSegmentIssues(walked []walkedPath) []Issue {
 
 // pagingIssues raises aql_paging_no_order_by: a row-bounded query with no
 // `ORDER BY` leaves its page boundary to the engine, so successive pages MAY
-// repeat or drop rows (REQ-164 § Path-shape checks).
+// repeat or drop rows (REQ-161 § Path-shape checks).
 //
 // AT MOST ONE issue per query, whichever channels carried the bound, because
 // the defect is the missing total order and there is only ever one of those.
@@ -385,7 +385,7 @@ func repeatingSegmentIssues(walked []walkedPath) []Issue {
 // A query whose ONLY row bound is a deprecated `TOP` raises nothing here, and
 // needs no guard to: HasLimit is false and, with no envelope bound, no channel
 // fires. aql_deprecated_top already carries the ORDER BY remedy for that
-// clause, and one defect gets one finding (REQ-164 § No double-reporting).
+// clause, and one defect gets one finding (REQ-161 § No double-reporting).
 //
 // No Span: neither channel has a position to point at. [parse.Document]
 // records the LIMIT clause's presence but not its place, and the envelope is
@@ -427,7 +427,7 @@ func pagingIssues(doc *parse.Document, q *aql.Query) []Issue {
 // selectAliasIssues raises aql_select_no_alias once per projection item that
 // carries no `AS` alias: a stored-query contract and every column-addressed
 // result reader depend on stable column names, and an unaliased column's name
-// is engine-defined (REQ-164 § Path-shape checks).
+// is engine-defined (REQ-161 § Path-shape checks).
 //
 // It reads the STRUCTURED projection ([parse.Document.Query]) because the flat
 // lint view cannot answer the question: [parse.Document.SelectAliases] lists
@@ -441,7 +441,7 @@ func pagingIssues(doc *parse.Document, q *aql.Query) []Issue {
 // TWO exemptions, and only two:
 //
 //   - a `*` item, which has nothing to alias — that shape is REQ-109's
-//     aql_select_star, and REQ-164 § No double-reporting gives it to that code.
+//     aql_select_star, and REQ-161 § No double-reporting gives it to that code.
 //     A BARE `SELECT *` never reaches the loop at all, since it leaves Items
 //     empty by construction; the mixed `SELECT *, col` form carries the star as
 //     an item, and it is skipped here.
@@ -511,7 +511,7 @@ func selectItemSite(item parse.SelectItem) (string, Span) {
 // after the divergence. That is the Cartesian-product shape — the two branches
 // repeat independently, and how many rows the engine returns for it is
 // undefined (SPECQUERY-9), which is the fact Detail states exactly as its
-// sibling aql_fanout_row_grain does (REQ-164 § Path-shape checks).
+// sibling aql_fanout_row_grain does (REQ-161 § Path-shape checks).
 //
 // PROJECTION ONLY, unlike its group-mate the repeating-segment check, which is
 // required to read every clause. The two are asking different questions: an
@@ -537,7 +537,7 @@ func selectItemSite(item parse.SelectItem) (string, Span) {
 // segment walk keeps this group's reading of a predicate to PRESENCE: a check
 // that had to tell `[at0001]` from `[at0002]` to place a divergence would be
 // judging content. Reading names alone also errs silent, which is the direction
-// REQ-164 requires where a fact is not provable.
+// REQ-161 requires where a fact is not provable.
 //
 // Each MUST NOT of the catalogue row falls out of that, with no arm of its own:
 //
@@ -632,7 +632,7 @@ func commonPrefixLen(a, b parse.IdentifiedPath) int {
 }
 
 // redundantStepIssues raises aql_contains_redundant_step: a CONTAINS operand
-// whose removal provably changes nothing (REQ-164 § Path-shape checks). ALL
+// whose removal provably changes nothing (REQ-161 § Path-shape checks). ALL
 // five conditions must hold, and each is a separate arm below:
 //
 //   - it is NOT the FROM root — a root anchors the tree, it is not a step;
@@ -659,7 +659,7 @@ func commonPrefixLen(a, b parse.IdentifiedPath) int {
 // consumer overlay edge states a containment route fact, and a route round the
 // via is exactly what retires a proof — so consulting the default instead would
 // raise a false finding on the dialect deployment REQ-160 § Extensibility
-// exists to serve. This is the one REQ-164 code a supplied relation governs. Of
+// exists to serve. This is the one REQ-161 code a supplied relation governs. Of
 // the other four, the TWO the segment walk feeds
 // (aql_path_repeating_unpredicated, aql_fanout_path_grain) ask class questions —
 // attribute typing and multiplicity — that no relation may answer differently;
@@ -676,7 +676,7 @@ func commonPrefixLen(a, b parse.IdentifiedPath) int {
 //
 // A VERSIONED_OBJECT-conforming operand is SKIPPED whole: REQ-161's
 // aql_versioned_object_unreferenced owns that shape, and this code is the
-// general case yielding to the specific (REQ-164 § No double-reporting). The
+// general case yielding to the specific (REQ-161 § No double-reporting). The
 // conformance question is asked of [conformsToVersionedObject] — the pinned
 // BMM, not rel — for the reason [versionedObjectIssues] gives: no relation a
 // caller can obtain answers an IS-A question differently.
@@ -765,7 +765,7 @@ func redundantStepIssues(doc *parse.Document, md Metadata, rel *contain.TypeRela
 //
 //   - a JUNCTION ([isJunction]) — every operand inside a containment junction
 //     is silent (removing one changes the junction's arity, which the relation
-//     alone cannot prove inert, REQ-164 § Path-shape checks), and so is the
+//     alone cannot prove inert, REQ-161 § Path-shape checks), and so is the
 //     operand ABOVE it, whose single child class the pair question needs and
 //     which a junction does not supply;
 //   - NEGATED — every operand under a negation is silent for the twin reason:

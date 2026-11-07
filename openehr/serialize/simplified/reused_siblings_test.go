@@ -1,6 +1,6 @@
 package simplified_test
 
-// REQ-053 / REQ-116 — reused siblings that pinned names tell apart encode to
+// REQ-053 / REQ-111 — reused siblings that pinned names tell apart encode to
 // FLAT and STRUCTURED, each under its own id, and decode back into the RM
 // instance that carries the sibling's name.
 
@@ -89,7 +89,7 @@ func eventNames(t *testing.T, comp *rm.Composition) []string {
 	return names
 }
 
-// TestREQ053ReusedSiblingEventsRoundTrip — REQ-053, REQ-116: a composition
+// TestREQ053ReusedSiblingEventsRoundTrip — REQ-053, REQ-111: a composition
 // holding both named EVENT siblings encodes, in FLAT and in STRUCTURED, each
 // event's values under its own sibling's ids, and decodes, with and without
 // the template, back into an event carrying that sibling's name, in template
@@ -154,7 +154,7 @@ func TestREQ053ReusedSiblingEventsRoundTrip(t *testing.T) {
 	}
 }
 
-// TestREQ053ReusedSiblingEventsDecodeIntoTheirOwnEvent — REQ-053, REQ-116: a
+// TestREQ053ReusedSiblingEventsDecodeIntoTheirOwnEvent — REQ-053, REQ-111: a
 // FLAT key under one named sibling lands in the event carrying that sibling's
 // name, created with it when absent, even where a key of the other sibling
 // sorts first; the events then stand in template order.
@@ -204,7 +204,7 @@ func TestREQ053ReusedSiblingEventsDecodeIntoTheirOwnEvent(t *testing.T) {
 	}
 }
 
-// TestREQ053ReusedSiblingItemNamesDecodeWithTemplate — REQ-053, REQ-116: below
+// TestREQ053ReusedSiblingItemNamesDecodeWithTemplate — REQ-053, REQ-111: below
 // each of two named EVENT siblings, the ITEM_TREE at0003 and the ELEMENT at0004
 // pin names of their own: 'Tree A' and 'Text A' in the first event, 'Tree B'
 // and 'Text B' in the second. Written as FLAT or STRUCTURED and decoded with
@@ -309,7 +309,7 @@ func TestREQ053ReusedSiblingItemNamesDecodeWithTemplate(t *testing.T) {
 	}
 }
 
-// TestREQ053WithTemplateNameFallsBackToTheBareAlias — REQ-053, REQ-116: where
+// TestREQ053WithTemplateNameFallsBackToTheBareAlias — REQ-053, REQ-111: where
 // the Web Template spells a node with a pinned name the compiled template
 // holds at no such path, here 'Text A2' for the first event's ELEMENT, which
 // the compiled template pins 'Text A', a WithTemplate decode names the node
@@ -358,7 +358,7 @@ func TestREQ053WithTemplateNameFallsBackToTheBareAlias(t *testing.T) {
 	}
 }
 
-// TestREQ053ReusedSiblingOrdinalTerminology — REQ-053, REQ-116: where the
+// TestREQ053ReusedSiblingOrdinalTerminology — REQ-053, REQ-111: where the
 // ELEMENT at0004 of each named EVENT sibling is a C_DV_ORDINAL whose one pair
 // codes X1 at 1, in local in 'First event' and in SNOMED-CT in 'Second
 // event', a WithTemplate decode of a reader-shaped body, |code, |value and
@@ -433,7 +433,7 @@ func jsonEqual(t *testing.T, a, b any) bool {
 	return string(mustJSON(t, a)) == string(mustJSON(t, b))
 }
 
-// TestREQ053CoronaLargeRoundTripValidates — REQ-053, REQ-116: corona's
+// TestREQ053CoronaLargeRoundTripValidates — REQ-053, REQ-111: corona's
 // skeleton under Large holds a member of every one of its reused siblings,
 // four SECTIONs of one archetype and the OBSERVATIONs each of them reuses.
 // Written as FLAT or STRUCTURED and decoded with the template, it validates

@@ -257,11 +257,11 @@ func Lint(doc *parse.Document, opts *Options) Result {
 	// Options.Relation selects the pinned RM rather than switching the group
 	// off.
 	issues = append(issues, semanticIssues(doc, opts.Relation)...)
-	// The Layer-2 path-shape group (REQ-164) is ungated too, and for a
+	// The Layer-2 path-shape group (REQ-161) is ungated too, and for a
 	// stronger reason: it has no input to gate on. Every fact it reads is in
 	// the query text, the pinned BMM, or a relation that defaults when absent,
 	// and every code it raises is Warning, so it can never turn a passing
-	// result into a failing one (REQ-164 § Always on, never gated). opts.Query
+	// result into a failing one (REQ-161 § Always on, never gated). opts.Query
 	// reaches it for the same reason it reaches the shape group:
 	// aql_paging_no_order_by has a second row-bound channel in the request
 	// envelope, which a nil Query leaves invisible — that is the ENVELOPE ARM

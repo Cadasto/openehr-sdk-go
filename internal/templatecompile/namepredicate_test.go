@@ -6,7 +6,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 )
 
-// REQ-116 — NamePredicate is the single quoting rule both path builders
+// REQ-111 — NamePredicate is the single quoting rule both path builders
 // share, so its escape behaviour is pinned here once. The backslash cases
 // matter even though no vendored name carries one: unescaped, a name ending
 // in `\` would emit `,'…\'` whose closing quote every `\'`-honouring

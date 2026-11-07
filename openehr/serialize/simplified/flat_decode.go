@@ -1278,7 +1278,7 @@ func unmarshalObject(data []byte) (map[string]any, error) {
 // resolveLeaf walks the Web Template by FLAT segment ids to the leaf node,
 // collecting, for each ancestor that carries an archetype node id, its flat
 // :index (predIndex) and Web Template rmType (predType) — both keyed by the
-// **bare** spelling of the ancestor's AQLPath (REQ-116 name predicates
+// **bare** spelling of the ancestor's AQLPath (REQ-111 name predicates
 // stripped), because placeLeaf rebuilds those lookup prefixes bare. Keying
 // by the predicated spelling made every lookup under a name-pinned container
 // miss, so concreteType fell back to a default RM type — wrong _type
@@ -1314,7 +1314,7 @@ func resolveLeaf(wt *webtemplate.WebTemplate, segs []flatSeg, sib *reusedSibling
 			return nil, nil, nil, errSingleValuedIndex(seg)
 		}
 		if sib.isShared(next) {
-			// Reused siblings (REQ-116) that no pinned name tells apart share
+			// Reused siblings (REQ-111) that no pinned name tells apart share
 			// this resolution path, and placement walks it: distinct
 			// siblings' instances would collapse onto one list slot — a
 			// silent merge of one sibling's data into another. Refuse rather
@@ -1352,7 +1352,7 @@ func resolveLeaf(wt *webtemplate.WebTemplate, segs []flatSeg, sib *reusedSibling
 var errSegNotFound = errors.New("segment not found")
 
 // aqlSeg is one canonical-path segment: an attribute name, an optional node
-// predicate (archetype id or at-code) and an optional REQ-116 name.
+// predicate (archetype id or at-code) and an optional REQ-111 name.
 type aqlSeg struct {
 	attr string
 	pred string
@@ -1366,7 +1366,7 @@ type aqlSeg struct {
 
 // parseAQL splits a canonical aqlPath into attribute+predicate segments. The
 // predicate is taken as a bare node id (archetype id or at-code), and a
-// REQ-116 name predicate ([at0001,'Reaction details']) goes to the name
+// REQ-111 name predicate ([at0001,'Reaction details']) goes to the name
 // apart from it, which is both a correctness and a parsing requirement:
 //
 //   - archetype_node_id must carry the bare id — a name predicate constrains
@@ -1481,7 +1481,7 @@ func walkAQLKeyed(compJSON map[string]any, aqlPath, namePath string, predIndex m
 	// (templatecompile's convention), with the name namePath pins there, the
 	// key of the WithTemplate [templateIndex], which also answers every entry
 	// under its bare spelling. aqlPath keeps a name only where it tells reused
-	// siblings apart (REQ-116), and there the member is chosen by that name
+	// siblings apart (REQ-111), and there the member is chosen by that name
 	// too, and created with it; where a reused sibling pins no name among
 	// siblings that pin one, the member is chosen among those carrying none of
 	// their names (sib).
@@ -1555,7 +1555,7 @@ func walkAQLKeyed(compJSON map[string]any, aqlPath, namePath string, predIndex m
 				(pinned == nil && slices.Contains(excluded, nameValue(obj))) {
 				// Two Web Template nodes stand for this one single-valued
 				// attribute (an ACTION's ism_transition[at0005] and [at0006],
-				// or two reused siblings, REQ-116: each pinning its name, or
+				// or two reused siblings, REQ-111: each pinning its name, or
 				// one pinning none beside one whose name the object carries).
 				// Merging their keys into one object would re-encode them under
 				// one node only, moving the other's keys there (REQ-053).
@@ -2197,7 +2197,7 @@ func rmattrOwnerAt(wt *webtemplate.WebTemplate, compJSON map[string]any, base st
 	return rmattrOwner{kind: kind, leaf: leaf, resolve: walk(ownerAql, ownerNames, predIndex, predType)}, nil
 }
 
-// bareAQLPath strips REQ-116 name predicates from a compiled AQL path,
+// bareAQLPath strips REQ-111 name predicates from a compiled AQL path,
 // turning `/content[…SECTION.adhoc.v1,'Symptome']` back into
 // `/content[…SECTION.adhoc.v1]`. Embedded `\'` escapes are honoured.
 //
@@ -2237,7 +2237,7 @@ func bareAQLPath(p string) string {
 // the facts the formats do not carry and the template determines, per archetype
 // node. Each is keyed by the node's compiled aqlPath, which keeps a predicate
 // only on container attributes and which [walkAQL] rebuilds as it walks, and
-// again by that path's bare spelling (REQ-116 name predicates removed), which
+// again by that path's bare spelling (REQ-111 name predicates removed), which
 // answers where decode's key names no node the template indexes
 // ([templateIndex.indexed]).
 //
@@ -2605,7 +2605,7 @@ func templateIndexFor(c *templatecompile.Compiled) *templateIndex {
 
 // buildTemplateIndex walks the compiled template and indexes each archetype
 // node's RM type and its LOCATABLE name — the template-level node name where
-// the OPT pins one (REQ-116: that pinned value IS the node's modelled name, and
+// the OPT pins one (REQ-111: that pinned value IS the node's modelled name, and
 // it is what the reference materialises), else the node-id term rubric in the
 // default language, read from the node's nearest enclosing archetype root
 // alone, as the Web Template builder and the generator read it: a node whose
@@ -2871,7 +2871,7 @@ func carriedByEmptyStructure(attr string) bool {
 //
 // The structure's name is read under its path with the names the template
 // pins on the way kept (named): a member's name stays in its predicate where
-// the index holds a node at that spelling. Below reused siblings (REQ-116),
+// the index holds a node at that spelling. Below reused siblings (REQ-111),
 // one structure can pin a name its namesake below the other sibling does not
 // pin, and the bare path would give it the rubric the two share.
 func rebuildEmptyStructures(compJSON map[string]any, tmpl *templateIndex) {
@@ -2987,7 +2987,7 @@ func phantomKeysOnly(m map[string]any) bool {
 //
 // The walk descends only into the nodes whose path the Web Template accounts
 // for: no node below any other one is a member it places. Reused siblings that
-// their pinned names tell apart (sib, REQ-116) each take their own place, and a
+// their pinned names tell apart (sib, REQ-111) each take their own place, and a
 // member stands for one of them by its name.
 func orderByTemplate(compJSON map[string]any, wt *webtemplate.WebTemplate, sib *reusedSiblings) {
 	rank := templateRanks(wt, sib)
@@ -3125,7 +3125,7 @@ func templateRanks(wt *webtemplate.WebTemplate, sib *reusedSiblings) map[string]
 // the flat :index for a repeatable node; 0 otherwise). Distinct sibling node
 // ids get distinct elements even without an explicit index.
 //
-// name, where not nil, is the name of a reused sibling (REQ-116): only the
+// name, where not nil, is the name of a reused sibling (REQ-111): only the
 // elements whose name has its value count, and an element created here gets
 // it. An element created only to fill the slots before idx carries that name
 // too, so a later key of the same sibling finds it, and it is marked

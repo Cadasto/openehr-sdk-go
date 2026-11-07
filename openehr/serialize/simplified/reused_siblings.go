@@ -1,6 +1,6 @@
 package simplified
 
-// REQ-053 / REQ-116 — reused siblings: Web Template nodes that share a node id
+// REQ-053 / REQ-111 — reused siblings: Web Template nodes that share a node id
 // under one parent. Where pinned names tell them apart, encode and decode carry
 // the names into resolution and placement; where nothing tells them apart, both
 // refuse data there.
@@ -19,7 +19,7 @@ import (
 // reusedSiblings is what the codec reads about reused siblings from one Web
 // Template.
 //
-// The Web Template writes a pinned name into a node's aqlPath (REQ-116), and
+// The Web Template writes a pinned name into a node's aqlPath (REQ-111), and
 // the codec resolves a node by its *resolution path*: the aqlPath with only
 // the names that tell reused siblings apart. Siblings are the nodes under one
 // parent that share an attribute and a node id. Where two or more of them are

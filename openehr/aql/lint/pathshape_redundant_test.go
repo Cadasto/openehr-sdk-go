@@ -1,9 +1,9 @@
 package lint_test
 
-// pathshape_redundant_test.go: REQ-164 § Path-shape checks —
+// pathshape_redundant_test.go: REQ-161 § Path-shape checks —
 // aql_contains_redundant_step, the group's one code that asks the REQ-160
 // relation a question. It is the general case of REQ-161's
-// aql_versioned_object_unreferenced, and REQ-164 § No double-reporting has the
+// aql_versioned_object_unreferenced, and REQ-161 § No double-reporting has the
 // general case yield to the specific; both directions of that yielding carry a
 // named row here.
 //
@@ -29,17 +29,17 @@ import (
 
 const redundantCode = "aql_contains_redundant_step"
 
-// witnessRedundant is the firing witness REQ-164 § Path-shape checks names
+// witnessRedundant is the firing witness REQ-161 § Path-shape checks names
 // outright: `c` is unreferenced and predicate-less, and every EHR -> OBSERVATION
 // containment route passes a COMPOSITION, so the step provably does nothing.
 //
 // The projection is aliased and lands on a single-valued attribute, so the
-// query carries no OTHER REQ-164 defect and its whole result stays legible; the
+// query carries no OTHER REQ-161 defect and its whole result stays legible; the
 // EHR root supplies the identifiable scope that keeps aql_from_archetype off it.
 const witnessRedundant = "SELECT o/name/value AS n " +
 	"FROM EHR e CONTAINS COMPOSITION c CONTAINS OBSERVATION o"
 
-// witnessAvoidable is the same shape over an AVOIDABLE intermediate — REQ-164's
+// witnessAvoidable is the same shape over an AVOIDABLE intermediate — REQ-161's
 // own silence witness. Dropping `SECTION s` admits observations that sit
 // directly in a composition's content, so the step narrows the result and is
 // not redundant.
@@ -71,7 +71,7 @@ func silentOnRedundant(t *testing.T, q string, opts *lint.Options) {
 
 // --- Firing rules ------------------------------------------------------------
 
-// TestRedundantStepFiresOnTheSpecWitness pins the whole finding on REQ-164's
+// TestRedundantStepFiresOnTheSpecWitness pins the whole finding on REQ-161's
 // own example: the Span covers the offending class token, Path names it, Detail
 // names the pair the proof was asked about, the severity is Warning, and the
 // result carries nothing else — the query's only defect is the one step.
@@ -89,7 +89,7 @@ func TestRedundantStepFiresOnTheSpecWitness(t *testing.T) {
 		t.Errorf("Issue.Path = %q, want %q", got[0].Path, want)
 	}
 	if got[0].Severity != lint.Warning {
-		t.Errorf("severity = %v, want warning (REQ-164 § Path-shape checks)", got[0].Severity)
+		t.Errorf("severity = %v, want warning (REQ-161 § Path-shape checks)", got[0].Severity)
 	}
 	// Detail names the PAIR the relation was asked about, which is what lets a
 	// reader check the claim without re-deriving the containment tree.
@@ -159,7 +159,7 @@ func TestRedundantStepFiresOnAnAnonymousOperand(t *testing.T) {
 // step is inert because the version tier is the ONLY route from a container to
 // its payload (REQ-160 § Overlay edges). It also records a deliberate
 // coexistence: a bare VERSION operand carries aql_version_no_predicate too
-// (REQ-161, SPECPR-481). REQ-164 § No double-reporting fixes ONE owner between
+// (REQ-161, SPECPR-481). REQ-161 § No double-reporting fixes ONE owner between
 // this code and aql_versioned_object_unreferenced only — these two report
 // DIFFERENT defects (an unstated version tier, and a step that does nothing),
 // and stating the tier silences both, since a version predicate is a
@@ -188,7 +188,7 @@ func TestRedundantStepFiresOnAVersionTierStep(t *testing.T) {
 
 // --- Silence rules (one named row per near miss) -----------------------------
 
-// TestRedundantStepSilentOnAnAvoidableIntermediate is REQ-164 § Acceptance's
+// TestRedundantStepSilentOnAnAvoidableIntermediate is REQ-161 § Acceptance's
 // avoidable near-miss, and the substance of the whole rule: the guidance
 // sentence this check comes from ("containment is minimal") would flag this
 // query, and would be wrong. Dropping `SECTION s` widens the result.
@@ -200,7 +200,7 @@ func TestRedundantStepSilentOnAnAvoidableIntermediate(t *testing.T) {
 	}
 }
 
-// TestRedundantStepSilentOnALeaf is REQ-164 § Acceptance's leaf near-miss: an
+// TestRedundantStepSilentOnALeaf is REQ-161 § Acceptance's leaf near-miss: an
 // unreferenced leaf is an existence filter and does work, so it is never
 // redundant however unreferenced and predicate-less it is. Both leaf spellings
 // are rows — the leaf of a two-operand FROM, and the leaf of a longer chain.
@@ -300,7 +300,7 @@ func TestRedundantStepSilentOnAReferencedOperand(t *testing.T) {
 
 // TestRedundantStepSilentInsideAJunction pins the junction rule: removing an
 // operand from a junction changes the junction's arity, which the relation
-// alone cannot prove inert (REQ-164 § Path-shape checks). Three spellings,
+// alone cannot prove inert (REQ-161 § Path-shape checks). Three spellings,
 // because the operand can sit on either side of the junction.
 func TestRedundantStepSilentInsideAJunction(t *testing.T) {
 	t.Parallel()
@@ -373,7 +373,7 @@ func voRedundantRelation() *contain.TypeRelation {
 	return contain.Default().WithOverlay(contain.Edge{From: "SITE", To: "VERSIONED_COMPOSITION"})
 }
 
-// TestRedundantStepYieldsToTheVersionedObjectCode is REQ-164 § No
+// TestRedundantStepYieldsToTheVersionedObjectCode is REQ-161 § No
 // double-reporting, in the direction that matters: an operand whose class
 // conforms to VERSIONED_OBJECT keeps REQ-161's aql_versioned_object_unreferenced
 // and MUST NOT also raise this group's code. The general case yields to the
@@ -401,7 +401,7 @@ func TestRedundantStepYieldsToTheVersionedObjectCode(t *testing.T) {
 
 // --- Relation supply ---------------------------------------------------------
 
-// TestRedundantStepReadsTheSuppliedRelation pins the one REQ-164 code
+// TestRedundantStepReadsTheSuppliedRelation pins the one REQ-161 code
 // Options.Relation governs. A consumer overlay edge states a containment ROUTE
 // fact, and a route round the step is exactly what retires the proof — so a
 // dialect deployment that files observations outside compositions must not be

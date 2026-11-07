@@ -27,7 +27,7 @@ func keys(issues []Issue) []string {
 	return out
 }
 
-// REQ-102 § RM floor, § Issue paths; REQ-112; REQ-116; REQ-171 § One walk —
+// REQ-102 § RM floor, § Issue paths; REQ-112; REQ-111; REQ-171 § One walk —
 // through Validate, the empty language of two OBSERVATIONs that reuse one
 // archetype under the names Erste and Zweite is reported once at each, as
 // the RM's `required`, beside the coded rule's own code: at the

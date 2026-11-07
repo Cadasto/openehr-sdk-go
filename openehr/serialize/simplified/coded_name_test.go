@@ -1,6 +1,6 @@
 package simplified_test
 
-// REQ-053, REQ-116 — the formats have no key for a node's name below the root,
+// REQ-053, REQ-111 — the formats have no key for a node's name below the root,
 // so a WithTemplate decode names each node it rebuilds from the template.
 // Where the template constrains the name as a DV_CODED_TEXT and determines
 // its code and its text, decode gives the node that coded name; everywhere
@@ -160,7 +160,7 @@ func editValues(t *testing.T, edits ...valuesEdit) editedValues {
 	return editedValues{wt: wt, compiled: compiled, comp: comp}
 }
 
-// TestREQ053CodedNameRules — REQ-053, REQ-116: decode gives a node a coded
+// TestREQ053CodedNameRules — REQ-053, REQ-111: decode gives a node a coded
 // name only where the template constrains the name as a DV_CODED_TEXT, through
 // one child or alternatives that agree, whose one C_CODE_PHRASE, or the one
 // a C_CODE_REFERENCE carries (REQ-103), lists one code, or several of which

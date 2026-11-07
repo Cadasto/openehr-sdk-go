@@ -273,7 +273,7 @@ func Probe097SemanticLint(c SemanticCorpus) (Result, error) { // PROBE-097 (REQ-
 		// instruction for whoever reads this failure, not a runtime branch:
 		// WantCodes is the caller's baseline, and this loop never moves it.
 		// (A LATER requirement may re-baseline that table deliberately — see
-		// probe028Cases, which REQ-164 § Additivity moved — which is a change
+		// probe028Cases, which REQ-161 § Additivity moved — which is a change
 		// to what the caller passes in, not to what this guard does.)
 		if msg := runLintCase(tc); msg != "" {
 			failures = append(failures, fmt.Sprintf("additivity/%s: %s", tc.Name, msg))

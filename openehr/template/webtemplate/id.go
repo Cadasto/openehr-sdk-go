@@ -65,7 +65,7 @@ func termText(n *templatecompile.CompiledNode) string {
 }
 
 // idOf resolves a node's web id: the template-level node name the OPT pins
-// on it (REQ-116) if any, else the archetype concept term, else the RM
+// on it (REQ-111) if any, else the archetype concept term, else the RM
 // attribute name that reached it, else the RM type — all sanitised. The
 // fallback applies after sanitisation, so a punctuation-only display
 // name (which sanitises to "") still yields a usable FLAT-path segment.

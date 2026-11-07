@@ -162,7 +162,7 @@ func TestValidate_REQ110_REQ112_EveryEntryIncludesRMFloor(t *testing.T) {
 	}
 }
 
-// REQ-102, REQ-112, REQ-116 — inside template validation the RM rules run in
+// REQ-102, REQ-112, REQ-111 — inside template validation the RM rules run in
 // the walk that binds the template, so an RM finding inside an item bound by
 // its pinned name carries that name in its predicate. The RM rules alone
 // bind no OPT node and write the item's position. The defect sits below the

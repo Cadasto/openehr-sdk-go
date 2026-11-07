@@ -46,7 +46,7 @@ func encodeFlat(comp *rm.Composition, wt *webtemplate.WebTemplate) (map[string]a
 	if err := emitContext(out, comp, root.ID); err != nil {
 		return nil, err
 	}
-	// Reused siblings (REQ-116) that pinned names tell apart resolve by those
+	// Reused siblings (REQ-111) that pinned names tell apart resolve by those
 	// names. Where every sibling pins one, an item carrying none of them is
 	// refused first, since no sibling would claim it. Siblings nothing tells
 	// apart are refused in emitNode once data resolves at them.
@@ -228,7 +228,7 @@ var ctxOnlyLeafPaths = map[string]bool{
 // recurses into its children; a value leaf maps its datatype to suffix keys.
 // Absent optional nodes resolve to nothing and are silently skipped.
 //
-// sib says which reused siblings (REQ-116) their pinned names tell apart: a
+// sib says which reused siblings (REQ-111) their pinned names tell apart: a
 // node is resolved by its resolution path, which keeps exactly those names.
 // For siblings that nothing tells apart, the same RM instance answers to
 // *every* sibling — with data present, one sibling's values would be emitted
@@ -244,7 +244,7 @@ func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, res
 	// value leaf and must be emitted (bare/suffixed or |raw), not dropped.
 	isLeaf := !isContainer && (len(node.Inputs) > 0 || isValueLeafType(rmType))
 	// Resolution against the RM instance keys on archetype_node_id, so a
-	// REQ-116 name predicate the Web Template carries is dropped here, except
+	// REQ-111 name predicate the Web Template carries is dropped here, except
 	// where it tells reused siblings apart. rmpath honours a `node,'name'`
 	// predicate, which filters instances by their runtime LOCATABLE.name. For
 	// a node alone at its bare path that is an over-constraint: the template

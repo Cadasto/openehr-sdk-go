@@ -199,7 +199,7 @@ func loadOPT(t *testing.T, name string) []byte {
 // happened.
 //
 // The baseline was pre-REQ-161 and gained nothing from that requirement. It
-// took its one re-baseline from REQ-164 § Additivity: `valid.aql` and
+// took its one re-baseline from REQ-161 § Additivity: `valid.aql` and
 // `missing_archetype.aql` each project a column with no `AS` alias — a defect
 // those queries genuinely carry — so each gained aql_select_no_alias and
 // nothing else. Neither carries an unpredicated repeating segment (valid.aql
@@ -278,7 +278,7 @@ func TestProbe028DetectsCodeDrift(t *testing.T) {
 // REQ-161 linter gains no REQ-161 code — the controller's own precomputed
 // prediction, recorded in docs/specifications/conformance.md's PROBE-097 row
 // as "no re-baseline required". That claim still holds over the corpus as it
-// stands: probe028Cases has since taken a REQ-164 re-baseline (an unaliased
+// stands: probe028Cases has since taken a REQ-161 re-baseline (an unaliased
 // projection on two fixtures), and no REQ-161 code is among what it gained.
 //
 // Arm (c), REQ-161 § Builder adapter: for every corpus query expressible through the
@@ -1025,12 +1025,12 @@ func TestProbe097RequiresEveryCorpusArm(t *testing.T) {
 	}
 }
 
-// --- PROBE-099 — REQ-164 path-shape lint corpus -----------------------------
+// --- PROBE-099 — REQ-161 path-shape lint corpus -----------------------------
 //
-// PROBE-097's structure minus its read/write-parity arm: every REQ-164 code is
+// PROBE-097's structure minus its read/write-parity arm: every REQ-161 code is
 // read-side only, so there is no builder analogue to compare against.
 //
-// Arm (a): each of the five REQ-164 codes fires on a corpus query built to carry
+// Arm (a): each of the five REQ-161 codes fires on a corpus query built to carry
 // exactly that defect, with Warning severity and a span on the offending
 // construct — and stays silent on a near miss. The three firing rows the wire
 // assertion names are claimed by name (the audit's two
@@ -1038,7 +1038,7 @@ func TestProbe097RequiresEveryCorpusArm(t *testing.T) {
 // witness), as are the fifteen negatives it names.
 //
 // Arm (b): the PROBE-028 corpus ([probe028Cases], the same three fixtures
-// TestProbe028AQLLint wires) re-run under the completed REQ-164 linter. Two of
+// TestProbe028AQLLint wires) re-run under the completed REQ-161 linter. Two of
 // the three gained aql_select_no_alias — a defect those queries genuinely carry
 // — which is the deliberate, recorded re-baseline REQ-161 § Additivity defines,
 // recorded in conformance.md's PROBE-099 entry.
@@ -1062,14 +1062,14 @@ const (
 )
 
 // probe099VersionTierRow is the one shipping fire row whose result is NOT
-// REQ-164-only: a bare VERSION operand carries REQ-161's
+// REQ-161-only: a bare VERSION operand carries REQ-161's
 // aql_version_no_predicate beside this group's finding. The guard control for
 // the group-only accounting addresses it by name.
 const probe099VersionTierRow = "redundant version-tier step, with the REQ-161 advisory riding along"
 
 // probe099FireCases is PROBE-099 arm (a)'s firing table: at least one row per
-// REQ-164 code, plus the three rows the wire assertion names explicitly.
-// Severities are REQ-164 § Path-shape checks, verbatim: all five codes are
+// REQ-161 code, plus the three rows the wire assertion names explicitly.
+// Severities are REQ-161 § Path-shape checks, verbatim: all five codes are
 // Warnings, which is what keeps Result.OK() true on a group-only result.
 func probe099FireCases() []aqlprobes.PathShapeFireCase {
 	return []aqlprobes.PathShapeFireCase{
@@ -1078,7 +1078,7 @@ func probe099FireCases() []aqlprobes.PathShapeFireCase {
 			// OBSERVATION.data types to HISTORY (single-valued), HISTORY.events
 			// to EVENT as a container, and EVENT.data is the BMM generic
 			// parameter `T`, where the walk stops. The unaliased column is a
-			// second, genuine REQ-164 defect of the same query.
+			// second, genuine REQ-161 defect of the same query.
 			Name:      "the audit's unpredicated repeating-segment projection",
 			Query:     "SELECT o/data/events/data/items/value/magnitude FROM EHR e CONTAINS OBSERVATION o[" + probe099ObsArch + "]",
 			Code:      codePathRepeatingUnpredicated,
@@ -1133,7 +1133,7 @@ func probe099FireCases() []aqlprobes.PathShapeFireCase {
 			SpanNth:  1,
 		},
 		{
-			// REQ-164 § The conservative segment walk's named firing witness:
+			// REQ-161 § The conservative segment walk's named firing witness:
 			// the two paths diverge AT the alias, with an unpredicated container
 			// on each branch (HISTORY.events and LOCATABLE.links). The two
 			// repeating-segment findings are the fan-out's PREMISE, not a
@@ -1150,7 +1150,7 @@ func probe099FireCases() []aqlprobes.PathShapeFireCase {
 			SpanNth:  1,
 		},
 		{
-			// REQ-164's own redundant-step example: `c` is unreferenced and
+			// REQ-161's own redundant-step example: `c` is unreferenced and
 			// predicate-less, and every EHR -> OBSERVATION containment route
 			// passes a COMPOSITION.
 			Name:     "an unavoidable unreferenced intermediate",
@@ -1163,11 +1163,11 @@ func probe099FireCases() []aqlprobes.PathShapeFireCase {
 		},
 		{
 			// The same unavoidable intermediate, judged over a SUPPLIED
-			// relation (the one REQ-164 code a relation governs). The overlay
+			// relation (the one REQ-161 code a relation governs). The overlay
 			// edge is deliberately inert — EHR -> VERSIONED_PARTY adds no route
 			// among the query's classes — so the finding is the one the default
 			// relation already gives, and what the row adds is the corpus-level
-			// restatement of REQ-164 § Always on, never gated: supplying a
+			// restatement of REQ-161 § Always on, never gated: supplying a
 			// relation governs this check, it does not mute it. The axis is
 			// pinned spelling-by-spelling at unit level, by
 			// TestRedundantStepReadsTheSuppliedRelation in
@@ -1223,10 +1223,10 @@ func probe099FireCases() []aqlprobes.PathShapeFireCase {
 			// The version tier is the only route from a container to its
 			// payload, so the unstated-tier step is inert. It records a
 			// deliberate coexistence: a bare VERSION operand also carries
-			// REQ-161's aql_version_no_predicate, which REQ-164 § No
+			// REQ-161's aql_version_no_predicate, which REQ-161 § No
 			// double-reporting leaves standing — the two report DIFFERENT
 			// defects. That bystander is what makes this the one shipping row
-			// whose result is not REQ-164-only.
+			// whose result is not REQ-161-only.
 			Name: probe099VersionTierRow,
 			Query: "SELECT c/name/value AS n FROM VERSIONED_COMPOSITION vo[uid/value='x'] " +
 				"CONTAINS VERSION v CONTAINS COMPOSITION c",
@@ -1248,11 +1248,11 @@ func probe099FireCases() []aqlprobes.PathShapeFireCase {
 const probe099DiscriminatingRelationRow = "near miss: a redundant step silenced by a discriminating supplied relation"
 
 // probe099SilentCases is PROBE-099 arm (a)'s near-miss table — at least one row
-// per REQ-164 code, and the fifteen negatives the wire assertion names.
+// per REQ-161 code, and the fifteen negatives the wire assertion names.
 //
 // ForCode / Negative are not decoration: they are what the probe's completeness
 // guards count, so the near-miss half of arm (a) cannot shrink below "one
-// silence row per REQ-164 code, and all fifteen named negatives" while still
+// silence row per REQ-161 code, and all fifteen named negatives" while still
 // reporting pass. Keeps is what makes a YIELDING near miss non-vacuous — three
 // of these are not "nothing fires" but "another code owns this shape".
 func probe099SilentCases() []aqlprobes.PathShapeSilentCase {
@@ -1302,7 +1302,7 @@ func probe099SilentCases() []aqlprobes.PathShapeSilentCase {
 			Negative: aqlprobes.NegAliasedProjection,
 		},
 		{
-			// The star has nothing to alias; REQ-164 § No double-reporting gives
+			// The star has nothing to alias; REQ-161 § No double-reporting gives
 			// that shape to REQ-109's aql_select_star. The MIXED spelling is
 			// used so the star is a projection item the check actually sees and
 			// skips, rather than one a bare SELECT * never records.
@@ -1359,7 +1359,7 @@ func probe099SilentCases() []aqlprobes.PathShapeSilentCase {
 			Negative: aqlprobes.NegUnreferencedLeaf,
 		},
 		{
-			// REQ-164 § No double-reporting: the general case yields to the
+			// REQ-161 § No double-reporting: the general case yields to the
 			// specific. The overlay is what makes the skip observable — on the
 			// default relation no VERSIONED_* class is ever unavoidable, so a
 			// row without it would pass with the guard deleted.
@@ -1445,14 +1445,14 @@ func probe099SilentCases() []aqlprobes.PathShapeSilentCase {
 
 // probe099AdditivityCases is PROBE-099 arm (b): PROBE-028's own corpus
 // ([probe028Cases], shared with TestProbe028AQLLint as noted there), re-run
-// under the completed REQ-164 linter.
+// under the completed REQ-161 linter.
 //
 // Unlike PROBE-097 arm (b), this one DID re-baseline: valid.aql and
 // missing_archetype.aql each project a column with no AS alias — a defect those
 // queries genuinely carry — so each gained aql_select_no_alias and nothing else,
 // while bad_syntax.aql gained nothing at all (it fails at Layer 1, so Layer 2
 // never runs). That re-baseline is recorded in conformance.md's PROBE-099 entry,
-// as REQ-164 § Additivity requires; probe028Cases carries it in the table
+// as REQ-161 § Additivity requires; probe028Cases carries it in the table
 // itself.
 func probe099AdditivityCases(t *testing.T) []aqlprobes.LintCase {
 	t.Helper()
@@ -1544,7 +1544,7 @@ func TestProbe099GuardsCanFail(t *testing.T) {
 			want: `fire: no fire case claims the "audit: the LIMIT-without-ORDER BY query" row`,
 		},
 		{
-			// Arm (a), fire half: the group-only accounting behind REQ-164
+			// Arm (a), fire half: the group-only accounting behind REQ-161
 			// § Acceptance's OK() claim. Keeping only the version-tier row —
 			// whose result carries REQ-161's advisory too — leaves no row able
 			// to make that claim.
@@ -1627,7 +1627,7 @@ func TestProbe099GuardsCanFail(t *testing.T) {
 		},
 		{
 			// Arm (a), silence half: the vacuous-silence hole — a row whose
-			// query fails Layer 1 never reaches a REQ-164 check, so its
+			// query fails Layer 1 never reaches a REQ-161 check, so its
 			// nil-vs-nil comparison would assert nothing.
 			name: "a silence row asserts silence on a query that never parsed",
 			mutate: func(_ *testing.T, c *aqlprobes.PathShapeCorpus) {
@@ -1636,7 +1636,7 @@ func TestProbe099GuardsCanFail(t *testing.T) {
 					Query: "SELECT o/name/value AS n FROM OBSERVATION o CONTAINS", // dangling CONTAINS
 				})
 			},
-			want: "silent/never parsed: query never reached the REQ-164 checks (aql_syntax)",
+			want: "silent/never parsed: query never reached the REQ-161 checks (aql_syntax)",
 		},
 		{
 			// Arm (a), silence half: the comparison itself.

@@ -164,7 +164,7 @@ func TestDefaultOverlayEndpointsPinKnown(t *testing.T) {
 func TestUnavoidableDoesNotPoisonTheMemo(t *testing.T) {
 	r := build(rminfo.Default, defaultOverlays())
 	if !r.Unavoidable("EHR", "COMPOSITION", "OBSERVATION") {
-		t.Fatal("premise gone: the relation no longer proves the REQ-164 witness, so this test proves nothing")
+		t.Fatal("premise gone: the relation no longer proves the REQ-161 witness, so this test proves nothing")
 	}
 
 	v, ok := r.memo[1].Load("EHR")

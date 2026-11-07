@@ -31,7 +31,7 @@ func TestRegisterPath_DuplicateFromDifferentAttribute(t *testing.T) {
 	}
 }
 
-// REQ-116 — two nodes may legally share an AQL path: AOM 1.4
+// REQ-111 — two nodes may legally share an AQL path: AOM 1.4
 // C_SINGLE_ATTRIBUTE alternatives, and sibling nodes carrying the same
 // node_id. Their descendants then share paths too, but sit under different
 // attribute objects (one per parent), so the currentAttr test cannot admit

@@ -354,9 +354,9 @@ func TestLintPathUnderParamArchetypeClean(t *testing.T) {
 	}
 }
 
-// REQ-164 re-baseline: the bare-alias projection carries no AS alias, so this
+// REQ-161 re-baseline: the bare-alias projection carries no AS alias, so this
 // query now raises aql_select_no_alias — the deliberate, recorded re-baseline
-// REQ-164 § Additivity defines. What the case exists to pin is unchanged and
+// REQ-161 § Additivity defines. What the case exists to pin is unchanged and
 // is asserted in full: an archetype the template DOES carry raises no Layer-3
 // code, and the result stays OK.
 func TestLintArchetypeInTemplateClean(t *testing.T) {
@@ -776,7 +776,7 @@ func TestLintTopWithLimitUnchangedByEnvelope(t *testing.T) {
 
 	// Both channels at once: the landed codes keep their order and the new one
 	// follows them WITHIN THE SHAPE GROUP's TOP run — not at the end of the
-	// result, since the REQ-164 path-shape group is emitted after the whole
+	// result, since the REQ-161 path-shape group is emitted after the whole
 	// shape group. Spelled out in full rather than appended to base: where a
 	// code lands is part of the contract, and an appended want would have
 	// re-baselined itself silently when that group landed.

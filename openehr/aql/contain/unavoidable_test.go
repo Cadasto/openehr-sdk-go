@@ -1,7 +1,7 @@
 package contain_test
 
 // unavoidable_test.go: TypeRelation.Unavoidable — the reachability-avoiding-a-
-// vertex query the redundant containment step of REQ-164 § Path-shape checks
+// vertex query the redundant containment step of REQ-161 § Path-shape checks
 // names, asked in REQ-160 § Reachability semantics' route vocabulary.
 //
 // The rows are acceptance-style, like TestCanContainAcceptanceTable's: each is
@@ -30,7 +30,7 @@ func TestUnavoidableAcceptanceTable(t *testing.T) {
 		// --- Proved: every route passes the via ---------------------------
 		{
 			"EHR", "COMPOSITION", "OBSERVATION", true,
-			"REQ-164's own witness: every EHR -> OBSERVATION route passes a COMPOSITION",
+			"REQ-161's own witness: every EHR -> OBSERVATION route passes a COMPOSITION",
 		},
 		{
 			"EHR", "COMPOSITION", "INSTRUCTION", true,
@@ -52,7 +52,7 @@ func TestUnavoidableAcceptanceTable(t *testing.T) {
 		// --- Not proved: a route goes round the via -----------------------
 		{
 			"EHR", "SECTION", "OBSERVATION", false,
-			"REQ-164's own silence witness: an observation directly in a composition's content needs no section",
+			"REQ-161's own silence witness: an observation directly in a composition's content needs no section",
 		},
 		{
 			"COMPOSITION", "SECTION", "OBSERVATION", false,

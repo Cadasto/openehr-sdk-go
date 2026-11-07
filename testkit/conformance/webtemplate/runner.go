@@ -61,7 +61,7 @@ func NewTargetFromOPT(path string) (*Target, error) {
 	}
 	w, err := wt.Build(c)
 	if err != nil {
-		// Until REQ-116 landed the name-derived id + ordinal fallback, this
+		// Until REQ-111 landed the name-derived id + ordinal fallback, this
 		// was ErrIDCollision and the whole probe was blocked on it.
 		return nil, fmt.Errorf("build corpus Web Template: %w", err)
 	}

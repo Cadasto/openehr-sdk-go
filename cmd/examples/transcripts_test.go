@@ -110,7 +110,7 @@ const exampleTimeout = 2 * time.Minute
 // docs/examples.md against a real run of the program it documents.
 //
 // The catalog's transcripts are load-bearing developer documentation, and they
-// have drifted silently before — REQ-164's new path-shape codes changed the
+// have drifted silently before — REQ-161's new path-shape codes changed the
 // lint-aql output without anything failing. AGENTS.md requires cmd/examples/
 // docs to move in the same PR as the program; this test is the mechanical half
 // of that rule, and needs no CI wiring beyond `go test ./...`.
