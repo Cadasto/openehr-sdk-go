@@ -32,8 +32,8 @@ import (
 // this sentinel.
 var ErrInvalidShape = xmlunmatched.ErrInvalidShape
 
-// ErrNotWellFormed classifies a refusal of input that is not well-formed XML
-// but that encoding/xml reads without a syntax error:
+// ErrNotWellFormed classifies the decode's own refusal of input that is not
+// well-formed XML, apart from the syntax errors encoding/xml reports:
 //
 //   - an element that carries one attribute twice, by its name as written or
 //     as the namespaces in scope resolve it;
@@ -41,9 +41,10 @@ var ErrInvalidShape = xmlunmatched.ErrInvalidShape
 //     anywhere but the XML declaration at the very start, after a UTF-8 byte
 //     order mark at most, whether before, inside or after the root;
 //   - content before or after the root element that XML does not allow
-//     there, such as text, an end element or a second root, apart from
-//     markup before the root that encoding/xml cannot read, which may be
-//     the root's own start tag.
+//     there, such as text, an end element, a second root or markup
+//     encoding/xml cannot read after the root, apart from such markup before
+//     the root with nothing refused before it, which may be the root's own
+//     start tag.
 //
 // Each such refusal wraps [ErrInvalidShape] as well, so a check against that
 // sentinel keeps matching it. The error names the rule the input breaks and

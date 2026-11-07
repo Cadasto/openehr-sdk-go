@@ -74,7 +74,9 @@ const inputBufferMax = 4 << 20
 // an error that wraps [canxml.ErrInvalidShape] and [canxml.ErrNotWellFormed]
 // and carries none of it, and so is an element that carries one attribute
 // twice, outside what the default mode leaves out unread. Markup before the
-// root that encoding/xml cannot read fails as its *xml.SyntaxError. The root element may have any name, so a document whose root is
+// root that encoding/xml cannot read fails as its *xml.SyntaxError, unless
+// content [canxml.Unmarshal] refuses comes before it, which both modes then
+// refuse. The root element may have any name, so a document whose root is
 // `<OPERATIONAL_TEMPLATE>` reads as one whose root is `<template>`. An input
 // with no root element, empty or holding only a declaration, comments,
 // whitespace or text, is refused with an error that wraps

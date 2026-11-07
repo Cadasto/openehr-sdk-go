@@ -149,9 +149,9 @@ func errAfterRoot() error {
 // returns it.
 func ContentAfterRoot() error { return errAfterRoot() }
 
-// ErrNotWellFormed classifies the refusal of input that is not well-formed XML
-// and that encoding/xml reads without a syntax error. It is re-exported as
-// canxml.ErrNotWellFormed, where it is documented.
+// ErrNotWellFormed classifies the decode's own refusal of input that is not
+// well-formed XML, apart from the syntax errors encoding/xml reports. It is
+// re-exported as canxml.ErrNotWellFormed, where it is documented.
 var ErrNotWellFormed = errors.New("canxml: XML not well-formed")
 
 // notWellFormed is the cause of a refusal of input that is not well-formed
