@@ -101,12 +101,34 @@ func TestREQ108_REQ052_OnePassGivesUpOnAReportPastItsBudget(t *testing.T) {
 	}
 }
 
+// heldBytes returns what the one pass counts against its budget for the
+// calls log holds, as logHooks writes them: heldPerCall bytes for each call,
+// and for each node of its pointer that no earlier call's pointer holds,
+// heldPerNode bytes and the node's text. The node of an array position, a
+// segment of digits only, holds no text.
+func heldBytes(log []string) int {
+	made := make(map[string]bool)
+	held := 0
+	for _, c := range log {
+		_, p, _ := strings.Cut(c, " ")
+		held += heldPerCall
+		for end := len(p); end > 0 && !made[p[:end]]; end = strings.LastIndexByte(p[:end], '/') {
+			made[p[:end]] = true
+			held += heldPerNode
+			if seg := p[strings.LastIndexByte(p[:end], '/')+1 : end]; strings.Trim(seg, "0123456789") != "" {
+				held += len(seg)
+			}
+		}
+	}
+	return held
+}
+
 // TestREQ108_REQ052_OnePassBudget pins the budget the one pass holds hook
 // calls to (REQ-108): the larger of 64 KiB and the document's length, each
 // call counted as 16 bytes plus 48 bytes and the text's length for each node
-// of its pointer the pass made for it. A report just under it completes in
-// one pass, one call more gives the pass up, and either way Walk reports what
-// walkIndexed reports (REQ-052).
+// of its pointer the pass made for it. A report of unmatched or of missing
+// members just under it completes in one pass, one call more gives the pass
+// up, and either way Walk reports what walkIndexed reports (REQ-052).
 func TestREQ108_REQ052_OnePassBudget(t *testing.T) {
 	m, err := Default()
 	if err != nil {
@@ -116,28 +138,34 @@ func TestREQ108_REQ052_OnePassBudget(t *testing.T) {
 	// digits, a pointer of one node of its own whose text is the member's
 	// name.
 	underFloor := budgetFloor / (heldPerCall + heldPerNode + len("x00000"))
+	// Each ELEMENT of an unnested CLUSTER that leaves out both its mandatory
+	// members is reported twice, as "/items/<n>/name" and
+	// "/items/<n>/archetype_node_id": a node for each member's name and one
+	// for the ELEMENT's position, which holds no text, under the one node of
+	// "items" all the ELEMENTs share.
+	perElement := 2*heldPerCall + 3*heldPerNode + len("name") + len("archetype_node_id")
+	elementsUnderFloor := (budgetFloor - heldPerNode - len("items")) / perElement
 	cases := []struct {
-		name        string
-		strays, pad int
-		once        bool
+		name                  string
+		elements, strays, pad int
+		once                  bool
 	}{
 		{name: "just under 64 KiB", strays: underFloor, once: true},
 		{name: "just over 64 KiB", strays: underFloor + 1, once: false},
 		{name: "over 64 KiB, under the document's length", strays: 2 * underFloor, pad: 2 * budgetFloor, once: true},
 		{name: "over the document's length", strays: 4 * underFloor, pad: 2 * budgetFloor, once: false},
+		{name: "missing members, just under 64 KiB", elements: elementsUnderFloor, once: true},
+		{name: "missing members, just over 64 KiB", elements: elementsUnderFloor + 1, once: false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			doc := clusterDoc(0, 0, tc.strays, tc.pad)
+			doc := clusterDoc(0, tc.elements, tc.strays, tc.pad)
 			root := Root{Type: "CLUSTER"}
 			var want []string
 			if err := m.walkIndexed(doc, root, logHooks(&want)); err != nil {
 				t.Fatalf("walkIndexed: %v", err)
 			}
-			var held int
-			for _, p := range want {
-				held += heldPerCall + heldPerNode + len(strings.TrimPrefix(p, "unmatched /"))
-			}
+			held := heldBytes(want)
 			budget := max(budgetFloor, len(doc))
 			if (held <= budget) != tc.once {
 				t.Fatalf("the case holds %d bytes against a budget of %d: it does not test what its name says", held, budget)

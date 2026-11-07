@@ -135,9 +135,9 @@ func (m *Model) walkOnce(data []byte, root Root, h Hooks) (calls []call, ok bool
 
 const (
 	// holdFloor is the least budget, in bytes, of the calls the one pass
-	// holds ([Model.walkOnce]). Real documents stay far below it: the
-	// largest report of a corpus composition holds under 1 KiB, and under
-	// 46 KiB with a member no RM class has added to every object.
+	// holds ([Model.walkOnce]). Real documents stay below it: the largest
+	// report of a corpus composition holds under 2 KiB, and under 57 KiB
+	// with a member no RM class has added to every object.
 	holdFloor = 64 << 10
 	// callBytes is what a held call counts for beside the nodes of its
 	// pointer: a call's own size on a 64-bit platform.
