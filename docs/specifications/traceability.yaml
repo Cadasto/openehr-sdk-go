@@ -2500,11 +2500,12 @@ requirements:
     canonical: docs/specifications/wire.md#req-170--unmatched-content-on-decode
     status: draft
     implementation: landed
-    packages: [openehr/serialize/canjson, internal/rmjsonwalk, openehr/serialize/canxml, openehr/internal/xmlunmatched, internal/bmmgen, openehr/rm, openehr/aom/aom14, openehr/serialize/simplified, testkit/expectedform]
+    packages: [openehr/serialize/canjson, internal/rmjsonwalk, openehr/serialize/canxml, openehr/internal/xmlunmatched, internal/reportpath, internal/bmmgen, openehr/rm, openehr/aom/aom14, openehr/serialize/simplified, testkit/expectedform]
     probes: [PROBE-086, PROBE-105, PROBE-030]
     tests:
       - internal/bmmgen/render_jsonhooks_test.go
       - internal/bmmgen/render_xmlunmar_unmatched_test.go
+      - internal/reportpath/reportpath_test.go
       - internal/rmjsonwalk/bindings_internal_test.go
       - internal/rmjsonwalk/root_internal_test.go
       - internal/rmjsonwalk/root_test.go
@@ -2664,11 +2665,12 @@ requirements:
     canonical: docs/specifications/wire.md#req-175--missing-members-on-decode
     status: draft
     implementation: landed
-    packages: [openehr/serialize/canjson, openehr/serialize/canxml, internal/rmjsonwalk, openehr/internal/xmlunmatched, openehr/internal/decodeopts, internal/bmmgen, openehr/rm, openehr/aom/aom14, openehr/validation]
+    packages: [openehr/serialize/canjson, openehr/serialize/canxml, internal/rmjsonwalk, openehr/internal/xmlunmatched, internal/reportpath, openehr/internal/decodeopts, internal/bmmgen, openehr/rm, openehr/aom/aom14, openehr/validation]
     probes: [PROBE-110, PROBE-081]
     tests:
       - internal/bmmgen/render_xmlunmar_class_test.go
       - internal/bmmgen/render_xmlunmar_unmatched_test.go
+      - internal/reportpath/reportpath_test.go
       - internal/rmjsonwalk/walk_once_internal_test.go
       - openehr/aom/aom14/symbol_value_xml_test.go
       - openehr/client/ehr/contribution/submission_decode_test.go

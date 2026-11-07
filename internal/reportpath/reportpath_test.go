@@ -1,5 +1,10 @@
 package reportpath_test
 
+// reportpath_test.go: REQ-170 and REQ-175 (wire.md § REQ-170 *Report*,
+// § REQ-175 *Identification*). A node writes the JSON Pointer or XML path
+// text the report options pass, shares the nodes of the path before it, and
+// keeps its text once a later sibling is made.
+
 import (
 	"bytes"
 	"encoding/json/jsontext"
