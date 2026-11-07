@@ -211,38 +211,11 @@ func TestValidate_REQ102_ListExistenceAsksForTheContainerOnly(t *testing.T) {
 	}
 }
 
-// vitalSignsAbsentLists returns the identity keys of the `required`
-// findings the vendored vital_signs.json draws from vital_signs.opt for the
-// lists it leaves out (REQ-102, issue 341): the state and protocol items of
-// nine structures, each at existence 1..1 and cardinality 0..* (or 0..1).
-// The two heart-rate OBSERVATIONs share an archetype id, so their paths are
-// positional.
-func vitalSignsAbsentLists() []string {
-	const (
-		bp   = "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]"
-		temp = "/content[openEHR-EHR-OBSERVATION.body_temperature.v1]"
-		resp = "/content[openEHR-EHR-OBSERVATION.respiration.v1]"
-	)
-	return []string{
-		"required " + bp + "/data/events[at0006]/state/items template existence",
-		"required " + bp + "/protocol/items template existence",
-		"required " + temp + "/data/events[at0003]/state/items template existence",
-		"required " + temp + "/protocol/items template existence",
-		"required /content[3]/data/events[at0003]/state/items template existence",
-		"required /content[3]/protocol/items template existence",
-		"required /content[4]/data/events[at0003]/state/items template existence",
-		"required /content[4]/protocol/items template existence",
-		"required " + resp + "/data/events[at0002]/state/items template existence",
-	}
-}
-
 // REQ-102 — the vendored vital_signs.json, demo data, carries no state or
-// protocol items where vital_signs.opt gives those lists existence 1..1 and
-// cardinality 0..* (or 0..1): the template asks for no member there, but its
-// existence asks for the container, which the sample leaves out (issue 341),
-// so the sample draws `required` at each of those nine lists beside its
-// magnitude and units issues.
-func TestValidateComposition_REQ102_CorpusVitalSignsListsWithNoMember(t *testing.T) {
+// protocol items, and vital_signs.opt leaves those lists optional, as it does
+// the state and protocol that hold them (existence 0..1), so the sample
+// draws only its magnitude and units issues.
+func TestValidateComposition_REQ102_CorpusVitalSignsListsAreOptional(t *testing.T) {
 	t.Parallel()
 	c := mustCompile(t, "vital_signs")
 	raw, err := os.ReadFile(fixtures.CompositionJSON("vital_signs"))
@@ -255,14 +228,48 @@ func TestValidateComposition_REQ102_CorpusVitalSignsListsWithNoMember(t *testing
 	}
 	const bp = "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events[at0006]/data/items"
 	const temp = "/content[openEHR-EHR-OBSERVATION.body_temperature.v1]/data/events[at0003]/data/item/value"
-	want := append([]string{
+	want := []string{
 		"primitive_out_of_range " + bp + "[at0004]/value template out_of_range",
 		"primitive_unit_unknown " + bp + "[at0005]/value template unit_unknown",
 		"primitive_unit_unknown " + temp + " template unit_unknown",
-	}, vitalSignsAbsentLists()...)
+	}
 	slices.Sort(want)
 	r := validation.ValidateComposition(&comp, c)
 	if got := identityKeys(r.Issues); !slices.Equal(got, want) {
 		t.Errorf("ValidateComposition(vital_signs.json) issues = %q, want %q", got, want)
+	}
+}
+
+// REQ-102 — blood_pressure_strict_existence, the blood pressure OBSERVATION of
+// vital_signs.opt as Ocean Template Designer exported it, gives the items of
+// the event's state and of the protocol an existence of 1..1 at a
+// cardinality of 0..*, with no child or slots only (issue 341). Its Large
+// instance writes both lists present and empty and validates clean; with
+// both lists left out it draws `required` at each, since the existence asks
+// for the list whatever its counts ask.
+func TestValidateJSON_REQ102_StrictExistenceAbsentListsAreRequired(t *testing.T) {
+	t.Parallel()
+	c := mustCompile(t, "blood_pressure_strict_existence")
+	root, err := generateExample(t, c)
+	if err != nil {
+		t.Fatalf("Generate(blood_pressure_strict_existence, Large): %v", err)
+	}
+	raw, err := canjson.Marshal(root)
+	if err != nil {
+		t.Fatalf("canjson.Marshal(generated root): %v", err)
+	}
+	if r := validation.ValidateJSON(raw, new(rm.Composition), c); !r.OK {
+		t.Fatalf("precondition: ValidateJSON(generated root) issues = %q, want none", identityKeys(r.Issues))
+	}
+	doc := rewriteJSON(t, string(raw), dropped("/content/0/data/events/0/state/items", "/content/0/protocol/items"))
+	const bp = "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]"
+	want := []string{
+		"required " + bp + "/data/events[at0006]/state/items template existence",
+		"required " + bp + "/protocol/items template existence",
+	}
+	slices.Sort(want)
+	r := validation.ValidateJSON(doc, new(rm.Composition), c)
+	if got := identityKeys(r.Issues); !slices.Equal(got, want) {
+		t.Errorf("ValidateJSON(generated root without its state and protocol items) issues = %q, want %q", got, want)
 	}
 }

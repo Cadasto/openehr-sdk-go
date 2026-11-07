@@ -1,0 +1,117 @@
+# compiled tree of templates/blood_pressure_strict_existence.opt
+template_id="blood_pressure_strict_existence" concept="blood_pressure_strict_existence" language="en" uid="c591cea2-5261-54c6-bd7f-74592b1322aa" num_nodes=14
+template_binding terminology="SNOMED-CT" node_or_path="at0013" target_terminology="SNOMED-CT" target_code="246153002"
+template_binding terminology="SNOMED-CT" node_or_path="at0003" target_terminology="SNOMED-CT" target_code="364090009"
+template_binding terminology="SNOMED-CT" node_or_path="at0004" target_terminology="SNOMED-CT" target_code="163030003"
+template_binding terminology="SNOMED-CT" node_or_path="at0005" target_terminology="SNOMED-CT" target_code="163031004"
+template_binding terminology="SNOMED-CT" node_or_path="at0000" target_terminology="SNOMED-CT" target_code="163020007"
+
+node /
+  rm_type="COMPOSITION" node_id="at0000" archetype_id="openEHR-EHR-COMPOSITION.encounter.v1" node_name="" occurrences=1..1 slot=false
+  term[en] "at0000" code="at0000" description="Generic encounter or progress note composition" text="Encounter"
+  binding terminology="SNOMED-CT" node_or_path="at0000" target_terminology="SNOMED-CT" target_code="163020007"
+  attr "category" rm_type="DV_CODED_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "content" rm_type="CONTENT_ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "territory" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "composer" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /category
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /category/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"openehr" CodeList:["433"]}
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v1]
+  rm_type="OBSERVATION" node_id="at0000" archetype_id="openEHR-EHR-OBSERVATION.blood_pressure.v1" node_name="" occurrences=0..* slot=false
+  term[en] "at0000" code="at0000" description="The measurement by any means (invasive or non-invasive) of systemic arterial blood pressure which is deemed to represent the actual systemic blood pressure" text="Blood Pressure"
+  binding terminology="SNOMED-CT" node_or_path="at0000" target_terminology="SNOMED-CT" target_code="163020007"
+  attr "data" rm_type="HISTORY" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "protocol" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "encoding" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "subject" rm_type="PARTY_PROXY" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data
+  rm_type="HISTORY" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="history Structural node" text="history"
+  attr "events" rm_type="EVENT" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "origin" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events[at0006]
+  rm_type="EVENT" node_id="at0006" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[en] "at0006" code="at0006" description="other event in event history" text="any event"
+  attr "data" rm_type="T" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "state" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events[at0006]/data
+  rm_type="ITEM_LIST" node_id="at0003" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0003" code="at0003" description="@ internal @" text="blood pressure"
+  binding terminology="SNOMED-CT" node_or_path="at0003" target_terminology="SNOMED-CT" target_code="364090009"
+  attr "items" rm_type="ELEMENT" cardinality=multiple existence=1..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events[at0006]/data/items[at0004]
+  rm_type="ELEMENT" node_id="at0004" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0004" code="at0004" description="Peak systemic arterial blood pressure over one cycle - measured in systolic or contraction phase of the heart cycle" text="Systolic"
+  binding terminology="SNOMED-CT" node_or_path="at0004" target_terminology="SNOMED-CT" target_code="163030003"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events[at0006]/data/items[at0004]/value
+  rm_type="DV_QUANTITY" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.DvQuantity{Units:[constraints.QuantityUnit{Units:"mm[Hg]" Magnitude:constraints.NumericRange{Lower:0 Upper:1000 LowerInclusive:true UpperInclusive:false LowerUnbounded:false UpperUnbounded:false} Precision:constraints.NumericRange{Lower:0 Upper:0 LowerInclusive:true UpperInclusive:true LowerUnbounded:false UpperUnbounded:false}}] Property:constraints.CodedTermRef{Terminology:"openehr" CodeString:"125"} PropertyUnits:["N/m2" "atm" "bar" "cm[H2O]" "daPa" "dyn/cm2" "[ft_i'H2O]" "[in_i'Hg]" "[in_i'H2O]" "kg/m2" "kPa" "[lbf_av]/[ft_i]2" "[psi]" "mbar" "mm[Hg]" "mm[H20]" "Pa" "([lb_av].[ft_i]/s2)/[sft_i]" "[ston_av]/[sin_i]"]}
+  attr "magnitude" rm_type="Real" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "units" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events[at0006]/data/items[at0005]
+  rm_type="ELEMENT" node_id="at0005" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0005" code="at0005" description="Minimum systemic arterial blood pressure over one cycle - measured in the diastolic or relaxation phase" text="Diastolic"
+  binding terminology="SNOMED-CT" node_or_path="at0005" target_terminology="SNOMED-CT" target_code="163031004"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events[at0006]/data/items[at0005]/value
+  rm_type="DV_QUANTITY" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.DvQuantity{Units:[constraints.QuantityUnit{Units:"mm[Hg]" Magnitude:constraints.NumericRange{Lower:0 Upper:1000 LowerInclusive:true UpperInclusive:false LowerUnbounded:false UpperUnbounded:false} Precision:constraints.NumericRange{Lower:0 Upper:0 LowerInclusive:true UpperInclusive:true LowerUnbounded:false UpperUnbounded:false}}] Property:constraints.CodedTermRef{Terminology:"openehr" CodeString:"125"} PropertyUnits:["N/m2" "atm" "bar" "cm[H2O]" "daPa" "dyn/cm2" "[ft_i'H2O]" "[in_i'Hg]" "[in_i'H2O]" "kg/m2" "kPa" "[lbf_av]/[ft_i]2" "[psi]" "mbar" "mm[Hg]" "mm[H20]" "Pa" "([lb_av].[ft_i]/s2)/[sft_i]" "[ston_av]/[sin_i]"]}
+  attr "magnitude" rm_type="Real" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "units" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events[at0006]/state
+  rm_type="ITEM_LIST" node_id="at0007" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0007" code="at0007" description="@ internal @" text="state structure"
+  attr "items" rm_type="ELEMENT" cardinality=multiple existence=1..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=0
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/protocol
+  rm_type="ITEM_TREE" node_id="at0011" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0011" code="at0011" description="list structure" text="list structure"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/protocol/items[at1025]
+  rm_type="CLUSTER" node_id="at1025" archetype_id="" node_name="" occurrences=none slot=true
+  slot_includes=["openEHR-EHR-CLUSTER.device(-[a-zA-Z0-9_]+)*\\.v1"] slot_excludes=[]
+  slot_rules rm_type="CLUSTER" includes=["openEHR-EHR-CLUSTER.device(-[a-zA-Z0-9_]+)*\\.v1"] excludes=[] raw_include_count=1
+  term[en] "at1025" code="at1025" description="Details about sphygmomanometer or other device used to measure the blood pressure" text="Device"
+
+# walked nodes=14

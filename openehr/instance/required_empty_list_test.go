@@ -73,35 +73,32 @@ func checkPresentEmpty(t *testing.T, call, where string, s rm.ItemStructure, js 
 	}
 }
 
-// vitalSignsRequiredLists names, per OBSERVATION archetype of the vital_signs
-// template, the node id of the protocol and of each event's state that the
-// template requires (existence 1..1) and whose items it requires by their
-// existence alone (existence 1..1, cardinality 0..*, no child or slots
-// only), so the walk gives them no member. "" names none: respiration has no
-// protocol. These are the seven containers issue 341 reports.
-var vitalSignsRequiredLists = map[string]struct{ protocol, state string }{
-	"openEHR-EHR-OBSERVATION.blood_pressure.v1":   {protocol: "at0011", state: "at0007"},
-	"openEHR-EHR-OBSERVATION.body_temperature.v1": {protocol: "at0020", state: "at0029"},
-	"openEHR-EHR-OBSERVATION.heart_rate.v1":       {protocol: "at0010", state: "at0012"},
-	"openEHR-EHR-OBSERVATION.respiration.v1":      {state: "at0022"},
+// strictExistenceLists names, per OBSERVATION archetype of the
+// blood_pressure_strict_existence template, the node id of the protocol and of
+// each event's state that the template requires (existence 1..1) and whose
+// items it requires by their existence alone (existence 1..1, cardinality
+// 0..*, no child or slots only), so the walk gives them no member. The
+// template is the blood pressure OBSERVATION of vital_signs.opt as Ocean
+// Template Designer exported it, where issue 341 found these containers.
+var strictExistenceLists = map[string]struct{ protocol, state string }{
+	"openEHR-EHR-OBSERVATION.blood_pressure.v1": {protocol: "at0011", state: "at0007"},
 }
 
-// TestREQ107_VitalSignsRequiredItemListsArePresentAndEmpty is the REQ-107
-// check of What a visit writes on vital_signs (issue 341): a list the
-// template requires by its existence is there even with no member, so each
-// protocol and event state that vitalSignsRequiredLists names holds a
-// present empty items, which canonical JSON writes as "items":[]. Large
-// builds all four OBSERVATIONs, so all seven containers are checked there;
-// Medium builds the blood_pressure one; Required builds none, since the
-// template leaves its content optional, and
+// TestREQ107_StrictExistenceItemListsArePresentAndEmpty is the REQ-107
+// check of What a visit writes on blood_pressure_strict_existence (issue 341):
+// a list the template requires by its existence is there even with no
+// member, so the protocol and each event state that strictExistenceLists
+// names hold a present empty items, which canonical JSON writes as
+// "items":[]. Large and Medium build the OBSERVATION; Required builds none,
+// since the template leaves its content optional, and
 // TestREQ107_RequiredEmptyItemListIsPresent covers that policy. Every root
 // passes the template validator and the RM floor, under every policy and
 // both value fills.
-func TestREQ107_VitalSignsRequiredItemListsArePresentAndEmpty(t *testing.T) {
-	c := compileFixture(t, "vital_signs")
+func TestREQ107_StrictExistenceItemListsArePresentAndEmpty(t *testing.T) {
+	c := compileFixture(t, "blood_pressure_strict_existence")
 	for _, policy := range everyPolicy {
 		for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
-			call := fmt.Sprintf("Generate(vital_signs, %v, %v)", policy, fill)
+			call := fmt.Sprintf("Generate(blood_pressure_strict_existence, %v, %v)", policy, fill)
 			comp := generateComposition(t, c, instance.Options{
 				Policy:      policy,
 				ValueFill:   fill,
@@ -122,7 +119,7 @@ func TestREQ107_VitalSignsRequiredItemListsArePresentAndEmpty(t *testing.T) {
 					t.Fatalf("%s content[%d] = %T, want an archetyped OBSERVATION", call, i, item)
 				}
 				id := obs.ArchetypeDetails.ArchetypeID.Value
-				want, known := vitalSignsRequiredLists[id]
+				want, known := strictExistenceLists[id]
 				if !known {
 					t.Fatalf("%s content[%d] is %s, which the test does not know", call, i, id)
 				}
@@ -139,8 +136,8 @@ func TestREQ107_VitalSignsRequiredItemListsArePresentAndEmpty(t *testing.T) {
 					checkPresentEmpty(t, call, fmt.Sprintf("%s/data/events[%d]/state", where, j), eventState(ev), jsonObject(events[j]["state"]), want.state)
 				}
 			}
-			if policy == instance.Large && len(seen) != len(vitalSignsRequiredLists) {
-				t.Errorf("%s builds the OBSERVATIONs %v, want all %d", call, seen, len(vitalSignsRequiredLists))
+			if policy != instance.Required && len(seen) != len(strictExistenceLists) {
+				t.Errorf("%s builds the OBSERVATIONs %v, want all %d", call, seen, len(strictExistenceLists))
 			}
 			if res := validation.ValidateComposition(comp, c); !res.OK {
 				t.Errorf("ValidateComposition(%s) OK = false: %v", call, res.Issues)

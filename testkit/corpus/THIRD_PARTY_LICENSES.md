@@ -80,9 +80,30 @@ Licensed under the Apache License, Version 2.0 (full text: licenses/Apache-2.0.t
 
 **Modifications:** `BMI.opt` has its leading byte-order mark and CRLF line endings removed; its content is otherwise identical. The ten files under `ehrbase-service/` are unmodified upstream bytes, byte-order marks included; only their file names change, to their template ids.
 
+## CaboLabs/openEHR-SDK
+
+**Source:** https://github.com/CaboLabs/openEHR-SDK  
+**Pinned commit:** `de0e2e9fd6f6b2da22ca178ff6dba02f4d70dd4c` (`master`)  
+**Path within source:** `src/main/resources/`
+
+```
+Licensed under the Apache License, Version 2.0 (full text: licenses/Apache-2.0.txt)
+```
+
+The repository's `LICENSE` names no copyright holder; the project is published by CaboLabs.
+
+**Vendored:** the `Vital signs monitoring` template and its composition, both unmodified upstream bytes (the OPT keeps its byte-order mark and CRLF line endings):
+
+| File | Upstream path | Git blob |
+|---|---|---|
+| `templates/Vital signs monitoring.opt` | `opts/com.cabolabs.openehr_opt.namespaces.default/vital_signs_monitoring.opt` | `17c59506ab63e17e27c55ca2d507af2e6c932248` |
+| `compositions/Vital signs monitoring.json` | `canonical_json/vital_signs_monitoring.json` | `0616434f3b27360cf700289ffce027a95d3423c7` |
+
+To refresh, copy both files from a checkout of a newer commit and update the commit and blobs here; `git hash-object --no-filters` gives a file's blob.
+
 ## CODE24 (Cadasto)
 
-**Files:** CODE24-sourced templates under `templates/` paired with `compositions/` (see [README.md](README.md)), including the OPT-only `Referral Request.v1`; benchmark `vital_signs` and `clinical_notes.v0` (made by Medblocks together with CODE24). The `alternative_types.en.v1` and `BMI` compositions are CODE24's, but their OPTs are EHRbase's (above). `body_weight.opt` has its authoring tool's account id replaced by `user=redacted`; nothing else in it is edited. `clinical_notes.v0.opt`, an Archetype Designer export that another tool later re-serialised, has that tool's changes undone where they break the schema: the root carries no `xsi:type` (it had `OPT`, a type no schema defines), the XML declaration is back, and `match_negated` follows `existence` again instead of preceding `rm_attribute_name`; nothing else in it is edited.
+**Files:** CODE24-sourced templates under `templates/` paired with `compositions/` (see [README.md](README.md)), including the OPT-only `Referral Request.v1`; benchmark `vital_signs` and `clinical_notes.v0` (made by Medblocks together with CODE24). The `alternative_types.en.v1` and `BMI` compositions are CODE24's, but their OPTs are EHRbase's (above). `body_weight.opt` has its authoring tool's account id replaced by `user=redacted`; nothing else in it is edited. `clinical_notes.v0.opt`, an Archetype Designer export that another tool later re-serialised, has that tool's changes undone where they break the schema: the root carries no `xsi:type` (it had `OPT`, a type no schema defines), the XML declaration is back, and `match_negated` follows `existence` again instead of preceding `rm_attribute_name`; nothing else in it is edited. `vital_signs.opt`, an Ocean Template Designer export, has two edits. Its four empty `xs:boolean` interval flags are spelt `true`. The existence of each OBSERVATION's `protocol`, each event's `state` and their `items` is 0..1, the Reference Model's, where the export wrote 1..1. `blood_pressure_strict_existence.opt` is that export's blood pressure OBSERVATION alone, with each existence as exported, under its own template id and uid.
 
 **License:** MIT
 
