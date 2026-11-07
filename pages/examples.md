@@ -31,6 +31,9 @@ This is the smallest building-block program in the repository. It decodes a
 canonical-JSON Composition from the fixtures into a typed `rm.Composition`,
 without importing transport or auth.
 
+Clone the repository first, as [Install](install.md#add-the-module) shows,
+then run this from the root of the clone:
+
 ```bash
 go run ./cmd/examples/canonical_json
 ```
