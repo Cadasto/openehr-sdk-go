@@ -922,11 +922,7 @@ When writing your own tests, prefer importing fixtures from `testkit` rather tha
 
 ## Maintaining this catalog
 
-Agents and contributors: when you add or materially change an example under `cmd/examples/`, update this file, [`cmd/examples/doc.go`](../cmd/examples/doc.go), and [`quick-start.md`](quick-start.md) (if onboarding changes) in the **same PR**. Checklist: [ai-workflow.md § Examples](ai-workflow.md#examples).
-
-[`cmd/examples/transcripts_test.go`](../cmd/examples/transcripts_test.go) checks the **Sample output:** blocks named in its allowlist against real program runs. That allowlist alone decides which blocks are checked, and its exclusion census accounts for every other example. A deliberate output change therefore means regenerating the block verbatim from `go run ./cmd/examples/<name>`, not editing it by hand.
-
-An example that gains a verbatim sample-output block must be added to that allowlist in the same PR. `TestSampleMarkerCensus` fails the build if a section publishes a bare sample-output marker without an allowlist entry, so an unlisted block cannot go unverified. The one recorded exception is smart-launch, whose PKCE state, verifier, and `expires_at` differ every run: `bareMarkerException` in that test names it, and the test also fails if that exception ever outlives the marker it excuses.
+When you add or change an example, [ai-workflow.md § Examples](ai-workflow.md#examples) lists the documents to keep in step and the tests that hold them to real runs.
 
 ---
 

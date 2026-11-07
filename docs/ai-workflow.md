@@ -85,9 +85,11 @@ An example change is done, beyond `make ci` and `make docs-check`, when:
 - its flags are spelled with one dash (`-corpus`), in prose, run commands and comments alike;
 - its errors are wrapped and classified through the SDK's public error contracts;
 - no secret and no value that changes between runs (a token, a PKCE verifier, a uid, a timestamp) is copied into a document;
-- its output is compared by a transcript or mirror test, or its exclusion records why not ([examples.md § Maintaining this catalog](examples.md#maintaining-this-catalog)).
+- its output is compared by a transcript or mirror test, or its exclusion records why not (**Transcripts**, below).
 
 **One copy, compared.** examples.md is canonical, its learning order included; the README and the site show shorter copies. When an example's output appears in another prominent place, add that place to `mirrors` in [`mirrors_test.go`](../cmd/examples/mirrors_test.go), which also holds the site's learning order to the catalogue's. A snippet that cannot be compared mechanically names its source program in a comment and is a Go `Example` or a transcript test with deterministic output. Never copy a whole program into several documents.
+
+**Transcripts.** [`transcripts_test.go`](../cmd/examples/transcripts_test.go) checks the **Sample output:** blocks of examples.md that its allowlist names against real runs. That allowlist alone decides which blocks are checked, and its exclusion census accounts for every other example. A deliberate output change therefore means copying the block again from `go run ./cmd/examples/<name>`, not editing it by hand. An example that gains a verbatim sample-output block joins the allowlist in the same PR: `TestSampleMarkerCensus` fails on a bare sample-output marker with no allowlist entry. The one recorded exception is smart-launch, whose PKCE state, verifier and `expires_at` differ every run. `bareMarkerException` names it, and the test fails if that exception outlives the marker it excuses.
 
 ## Hooks
 
