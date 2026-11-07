@@ -799,7 +799,7 @@ The second query is the same query without its `Bind` calls. Its text still name
 
 ### smart-launch
 
-**Purpose:** Walk through a standalone SMART-on-openEHR launch for a public client: the OAuth 2.0 authorization-code flow with PKCE, which is how a browser-based or native app that cannot keep a client secret obtains an access token. The program plays every party in turn (the app, the user's browser, and the authorization server) against an in-process stub, so it needs no account, no secret and no network. `go test ./cmd/examples/smart-launch` runs the same flow.
+**Purpose:** Walk through a standalone SMART-on-openEHR launch for a public client: the OAuth 2.0 authorization-code flow with PKCE, which is how a browser-based or native app that cannot keep a client secret obtains an access token. The program plays every party in turn (the app, the user's browser, and the authorization server) against an in-process stub, so it needs no account, no secret and no network. `go test ./cmd/examples/smart-launch` runs the same flow and the stub's PKCE refusals.
 
 The one thing to take away is where the `AuthorizationRequest` lives. It carries the CSRF `state` and the PKCE `code_verifier`, both created before the redirect and both needed after it, as well as the nonce and the issuer the answer is checked against, so your app has to store it across the redirect and look it up again on the callback. Everything else is one SDK call per step.
 
@@ -828,7 +828,7 @@ step 7: authorization completed, code exchanged for tokens
 OK: standalone SMART PKCE launch flow completed (in-process stub)
 ```
 
-The `state`, the verifier and `expires_at` differ on every run (shown as `…` above), so this block is not compared verbatim. The authorize URL carries the client id, the redirect URI, the scopes, the audience, the state and the PKCE challenge, plus a nonce because the scopes include `openid`. It never carries the verifier. SMART requires the audience (`aud`); `NewFromCatalog` sets it to the catalog's Platform base URL, and a static catalog stands in for discovery here because the stub publishes no discovery document. The stub skips the login screen and grants at once; a real server also hashes the `code_verifier` it receives on the token endpoint against the `code_challenge` it saw on `/authorize`, which is the PKCE proof.
+The `state`, the verifier and `expires_at` differ on every run (shown as `…` above), so this block is not compared verbatim. The authorize URL carries the client id, the redirect URI, the scopes, the audience, the state and the PKCE challenge, plus a nonce because the scopes include `openid`. It never carries the verifier. SMART requires the audience (`aud`); `NewFromCatalog` sets it to the catalog's Platform base URL, and a static catalog stands in for discovery here because the stub publishes no discovery document. The stub skips the login screen and grants at once, but it checks the PKCE proof as a real server does. On `/authorize` it requires a `code_challenge` made with the `S256` method and keeps it with the code it issues. On the token endpoint it hashes the `code_verifier` (SHA-256, then unpadded base64url) and compares the result with that challenge. A missing or wrong verifier gets an OAuth2 `invalid_grant` error. For a wrong one, `CompleteAuthorization` returns an error that `errors.AsType[*auth.OAuth2Error]` unwraps to that code.
 
 **What to copy into your app:**
 
@@ -837,6 +837,17 @@ The `state`, the verifier and `expires_at` differ on every run (shown as `…` a
 3. Persist the `AuthorizationRequest` in a session store keyed by `state` **before** redirecting the user.
 4. On the redirect callback, retrieve the stored `AuthorizationRequest` by the `state` in the callback query and delete it in the same operation (the program's `sessionStore.take`), so a replayed callback finds nothing.
 5. Pass the whole callback query (`r.URL.Query()` in your handler) and the stored request to `CompleteAuthorization`. Before any token-endpoint call it checks the `state` again (CSRF guard), checks an RFC 9207 `iss` parameter against the server the user was sent to, and turns an `error` parameter into `ErrAuthorizationRejected`. It then sends the code with the `code_verifier` to the token endpoint (PKCE proof).
+
+The program stops once it holds the tokens. In your app, the `Source` now holds them and is an `auth.TokenSource`, so hand it to the REST transport for your CDR. Every call then carries the access token, and the source refreshes it before it expires:
+
+```go
+// catalog is the one discovery resolved; hc is the *http.Client the Source uses.
+c, err := transport.New(catalog,
+	transport.WithHTTPClient(hc),
+	transport.WithTokenSource(source),
+	transport.WithReauthOn401(source), // one fresh token when the server answers 401
+)
+```
 
 See [specifications/auth.md § PKCE flow](specifications/auth.md#req-061--pkce-flow) for the normative rules.
 
