@@ -64,6 +64,19 @@ func TestStubAuthorizeRequiresS256(t *testing.T) {
 	}
 }
 
+// TestStubAuthorizeAcceptsShortState checks that the stub issues a code for a
+// state shorter than the eight characters it takes for the code; the SDK's
+// states are longer, but OAuth 2.0 sets no minimum.
+func TestStubAuthorizeAcceptsShortState(t *testing.T) {
+	server := httptest.NewServer(newStubServer().mux)
+	defer server.Close()
+
+	status, code := authorize(t, server, "abc", rfcChallenge, "S256")
+	if status != http.StatusOK || code == "" {
+		t.Errorf("GET /authorize with state %q: status %d, code %q; want %d and a code", "abc", status, code, http.StatusOK)
+	}
+}
+
 // TestStubTokenChecksPKCE checks that the stub's token endpoint exchanges a
 // code only for the verifier whose S256 hash is the challenge /authorize
 // stored, and refuses any other with an OAuth2 invalid_grant error that does

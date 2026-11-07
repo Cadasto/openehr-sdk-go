@@ -314,7 +314,8 @@ func (s *stubServer) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// A predictable code keeps the output readable; real ones are random.
-	code := "stub-code-" + state[:8]
+	// OAuth 2.0 sets no minimum length for state, so a short one is kept whole.
+	code := "stub-code-" + state[:min(len(state), 8)]
 
 	// The challenge is kept with the code, for the token endpoint to check.
 	s.mu.Lock()
