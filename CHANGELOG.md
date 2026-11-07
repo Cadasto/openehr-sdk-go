@@ -11,14 +11,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - **Canonical XML** gains `WithStringText`, which keeps a string sent empty or as white space as canonical JSON does, and `ErrNotWellFormed`, which marks input that is not well-formed XML (REQ-056, REQ-175).
-- **The testkit corpus** gains ten pinned EHRbase server test templates and three vital-signs templates by other authors, from CaboLabs, CKM and Ripple, the first with its own composition (PROBE-111, REQ-056).
+- **The testkit corpus** gains ten EHRbase server test templates, four vital-signs templates (CaboLabs with its own composition, CKM, Ripple, and IDCR on current CKM archetypes) and generic FOLDER and EHR_STATUS templates (PROBE-111, REQ-056).
 
 ### Changed
 
 - **Breaking: the report options** of canjson and canxml pass a `Pointer` or `Path` value written on demand instead of a string, so a report's memory no longer grows with the document's depth (REQ-170, REQ-175).
 - **Breaking: canonical XML** refuses white space before the XML declaration, as the operational template reader does in strict mode, and no longer reports a one-space TERM_MAPPING `match` as missing or empty (REQ-056, REQ-111, REQ-175).
-- **FLAT and STRUCTURED** encode and decode reused siblings that differ only by their template names, such as two named events, where encode failed on a path resolving to both (REQ-053, REQ-116, REQ-140).
+- **FLAT and STRUCTURED** encode and decode reused siblings that differ only by their template names, such as two named events, where encode failed on a path resolving to both (REQ-053, REQ-111, REQ-140).
 - **The corpus template `vital_signs`** takes the RM's 0..1 existence on its protocol, state and their items, and its exported 1..1 form stays as `blood_pressure_strict_existence`.
+- **The operational template reader** decides on its second, tolerant reading from the tokens its first decode reads instead of scanning the document's bytes, so a read takes 4% to 12% less time (REQ-111).
+- **The minimum `go-jose/v4`** moves to v4.1.8, which adds ML-DSA signatures; the `auth/` and `smart/` layers sign and verify as before.
 
 ## [0.46.0] - 2026-11-06
 
