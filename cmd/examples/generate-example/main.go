@@ -124,7 +124,7 @@ const defaultPolicy = "medium"
 func parsePolicy(name string) (instance.Policy, error) {
 	p, err := instance.ParsePolicy(name)
 	if err != nil {
-		return 0, fmt.Errorf("--policy (want required, minimal, medium, large or complete): %w", err)
+		return 0, fmt.Errorf("-policy (want required, minimal, medium, large or complete): %w", err)
 	}
 	return p, nil
 }
