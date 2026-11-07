@@ -455,20 +455,18 @@ func elementSiblingWT(pinA, pinB string) *webtemplate.WebTemplate {
 	}}
 }
 
-// activitySiblingWT is a minimal WebTemplate whose one INSTRUCTION holds two
-// reused ACTIVITY siblings, at0001 pinning the names pinA and pinB, none
-// where empty: a and b, each holding its STRING leaf action_archetype_id.
-func activitySiblingWT(pinA, pinB string) *webtemplate.WebTemplate {
+// stringLeafSiblingWT is a minimal WebTemplate whose one INSTRUCTION holds
+// two STRING leaves, a and b, on the action_archetype_id of reused ACTIVITY
+// siblings, at0001 pinning the names pinA and pinB, none where empty. The
+// tree holds no node for the ACTIVITYs, so each leaf's path crosses its
+// sibling's segment.
+func stringLeafSiblingWT(pinA, pinB string) *webtemplate.WebTemplate {
 	const ins = "/content[openEHR-EHR-INSTRUCTION.test.v1]"
-	activity := func(id, pin string) *webtemplate.Node {
-		path := ins + "/activities[" + tcimpl.NamePredicate("at0001", pin) + "]"
+	leaf := func(id, pin string) *webtemplate.Node {
 		return &webtemplate.Node{
-			ID: id, RMType: "ACTIVITY", NodeID: "at0001", Max: 1, AQLPath: path,
-			Children: []*webtemplate.Node{{
-				ID: "action_archetype_id", RMType: "STRING", Max: 1,
-				AQLPath: path + "/action_archetype_id",
-				Inputs:  []webtemplate.Input{{Type: "TEXT"}},
-			}},
+			ID: id, RMType: "STRING", Max: 1,
+			AQLPath: ins + "/activities[" + tcimpl.NamePredicate("at0001", pin) + "]/action_archetype_id",
+			Inputs:  []webtemplate.Input{{Type: "TEXT"}},
 		}
 	}
 	return &webtemplate.WebTemplate{Tree: &webtemplate.Node{
@@ -476,7 +474,7 @@ func activitySiblingWT(pinA, pinB string) *webtemplate.WebTemplate {
 		Children: []*webtemplate.Node{{
 			ID: "ins", RMType: "INSTRUCTION", NodeID: "openEHR-EHR-INSTRUCTION.test.v1", Max: 1,
 			AQLPath:  ins,
-			Children: []*webtemplate.Node{activity("a", pinA), activity("b", pinB)},
+			Children: []*webtemplate.Node{leaf("a", pinA), leaf("b", pinB)},
 		}},
 	}}
 }
@@ -499,7 +497,8 @@ func namedElement(name, text string) *rm.Element {
 // TestMarshalFlatUnnamedSiblingLeavesTheNamedInstance — REQ-053, REQ-116,
 // REQ-140: beside a reused sibling that pins a name, the one that pins none
 // does not take the named sibling's instance, whether it occurs at most once
-// or repeats, has no FLAT spelling, or holds a STRING leaf. The named
+// or repeats, has no FLAT spelling, or is reached by a STRING leaf whose path
+// crosses it. The named
 // instance, and the underscore attributes of the ELEMENT a collapsed leaf
 // hides, are written under the sibling that pins its name alone; an instance
 // carrying no name the siblings pin is written under the one that pins none.
@@ -560,8 +559,8 @@ func TestMarshalFlatUnnamedSiblingLeavesTheNamedInstance(t *testing.T) {
 			want: map[string]any{"root/ev/a": "ay"},
 		},
 		{
-			name: "ACTIVITY siblings holding a STRING leaf",
-			wt:   activitySiblingWT("A", ""),
+			name: "STRING leaves on ACTIVITY siblings",
+			wt:   stringLeafSiblingWT("A", ""),
 			comp: siblingComposition(&rm.Instruction{
 				ArchetypeNodeID: "openEHR-EHR-INSTRUCTION.test.v1",
 				Name:            rm.DVText{Value: "ins"},
@@ -569,7 +568,7 @@ func TestMarshalFlatUnnamedSiblingLeavesTheNamedInstance(t *testing.T) {
 					ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "A"}, ActionArchetypeID: "openEHR-EHR-ACTION.test.v1",
 				}},
 			}),
-			want: map[string]any{"root/ins/a/action_archetype_id": "openEHR-EHR-ACTION.test.v1"},
+			want: map[string]any{"root/ins/a": "openEHR-EHR-ACTION.test.v1"},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
