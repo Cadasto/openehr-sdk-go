@@ -102,7 +102,7 @@ func TestREQ176_REQ041_OperatorAndDefinedObjectTakeTheSchemaForm(t *testing.T) {
 	}
 	doc := `<c_complex_object` + nsOpenEHR + `><rm_type_name>ELEMENT</rm_type_name><node_id>at0001</node_id><assumed_value>x</assumed_value></c_complex_object>`
 	var reported []string
-	if err := canxml.Unmarshal([]byte(doc), new(aom14.CComplexObject), canxml.WithUnmatched(func(p string) { reported = append(reported, p) })); err != nil {
+	if err := canxml.Unmarshal([]byte(doc), new(aom14.CComplexObject), canxml.WithUnmatched(func(p canxml.Path) { reported = append(reported, p.String()) })); err != nil {
 		t.Fatalf("canxml.Unmarshal(C_COMPLEX_OBJECT with assumed_value, report) = %v; want nil", err)
 	}
 	if want := []string{"/c_complex_object[1]/assumed_value[1]"}; !slices.Equal(reported, want) {

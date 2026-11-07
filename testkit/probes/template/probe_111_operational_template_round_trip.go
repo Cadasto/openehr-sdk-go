@@ -167,7 +167,7 @@ func probe111RoundTrip(body []byte, decode probe111Decoder) (Result, error) {
 
 	var unmatched []string
 	var first aom14.OperationalTemplate
-	if err := decode(body, &first, canxml.WithUnmatched(func(p string) { unmatched = append(unmatched, p) })); err != nil {
+	if err := decode(body, &first, canxml.WithUnmatched(func(p canxml.Path) { unmatched = append(unmatched, p.String()) })); err != nil {
 		return fail("decode: %v", err)
 	}
 	if len(unmatched) > 0 {
@@ -183,7 +183,7 @@ func probe111RoundTrip(body []byte, decode probe111Decoder) (Result, error) {
 		return fail("encode: %v", err)
 	}
 	var second aom14.OperationalTemplate
-	if err := decode(out, &second, canxml.WithUnmatched(func(p string) { unmatched = append(unmatched, p) })); err != nil {
+	if err := decode(out, &second, canxml.WithUnmatched(func(p canxml.Path) { unmatched = append(unmatched, p.String()) })); err != nil {
 		return fail("decode of the re-encoded document: %v", err)
 	}
 	if len(unmatched) > 0 {

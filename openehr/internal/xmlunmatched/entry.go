@@ -4,7 +4,6 @@ import (
 	"encoding/xml"
 	"errors"
 	"slices"
-	"strings"
 )
 
 // DecodeEntry decodes the element start opens, one entry of a `Hash` member,
@@ -110,19 +109,32 @@ func DecodeEntryKeyedBy[V any](dec *xml.Decoder, start *xml.StartElement, keyOf 
 // closed, tells whether the entry repeats an earlier one, whose element is
 // then one unmatched item and whose content counts for nothing. A hold inside
 // another adds what it releases to the outer one.
+//
+// The pointer of a member inside the entry is named under the entry's key,
+// which may lie anywhere in the value. So the pointer nodes made for the
+// entries open meanwhile wait for their keys ([Tracker.pointerPath]), and get
+// them once the outermost hold ends, when every such entry has closed and
+// before anything held is passed on.
 func (t *Tracker) holdEntry(read func() error) ([]heldItem, error) {
 	outer := t.held
 	var held []heldItem
 	t.held = &held
 	err := read()
 	t.held = outer
+	if outer == nil {
+		for _, k := range t.pending {
+			k.node.SetToken(k.key())
+		}
+		clear(t.pending)
+		t.pending = t.pending[:0]
+	}
 	return held, err
 }
 
 // release applies the decode's policy to what [Tracker.holdEntry] held, in
 // document order: to an unmatched item as [Tracker.unmatched] does, so a
 // strict decode refuses the first, and passes a missing member or a member
-// sent without a value to its report, its pointer written now that the
+// sent without a value to its report, its pointer complete now that the
 // entry's key is known. Inside another hold, it adds them to that hold.
 func (t *Tracker) release(held []heldItem) error {
 	for _, it := range held {
@@ -130,9 +142,9 @@ func (t *Tracker) release(held []heldItem) error {
 		case (it.missing || it.sent) && t.held != nil:
 			*t.held = append(*t.held, it)
 		case it.missing:
-			t.missing(it.pointer.String())
+			t.missing(it.path)
 		case it.sent:
-			t.presence(it.pointer.String(), it.nilled)
+			t.presence(it.path, it.nilled)
 		default:
 			if err := t.unmatched(it.path, it.foreign); err != nil {
 				return err
@@ -210,7 +222,7 @@ func decodeEntryValue(dec *xml.Decoder, start *xml.StartElement, v any) error {
 func putEntry[V any](t *Tracker, at place, start *xml.StartElement, m *map[string]V, key string, keyed bool, v V) error {
 	if !keyed {
 		if t != nil {
-			return t.fail(t.closedPath(at), errEntryNoKey)
+			return t.fail(t.closedPath(at).String(), errEntryNoKey)
 		}
 		return primitiveFailure("/"+start.Name.Local, errEntryNoKey)
 	}
@@ -224,7 +236,3 @@ func putEntry[V any](t *Tracker, at place, start *xml.StartElement, m *map[strin
 // errEntryNoKey is the refusal of a Hash entry with no key: no key attribute,
 // or a value whose own key is empty.
 var errEntryNoKey = errors.New("a Hash entry has no key")
-
-// pointerKey escapes key as one reference token of a JSON Pointer (RFC 6901):
-// `~` as `~0` and `/` as `~1`.
-var pointerKey = strings.NewReplacer("~", "~0", "/", "~1")

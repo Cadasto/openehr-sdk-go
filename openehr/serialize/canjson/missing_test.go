@@ -85,7 +85,7 @@ func rewrite(t *testing.T, doc string, edits map[string]string) []byte {
 func decodeMissing(into func() any, in []byte, opts ...canjson.DecoderOption) (any, []string, error) {
 	var got []string
 	v := into()
-	opts = append(opts, canjson.WithMissing(func(p string) { got = append(got, p) }))
+	opts = append(opts, canjson.WithMissing(func(p canjson.Pointer) { got = append(got, p.String()) }))
 	err := canjson.Unmarshal(in, v, opts...)
 	return v, got, err
 }
@@ -383,8 +383,8 @@ func TestREQ175_WithUnmatchedAndWithMissingShareOnePass(t *testing.T) {
 	const in = `{"_type":"DV_CODED_TEXT","x-a":"` + plantedValue + `","defining_code":{"_type":"CODE_PHRASE","x-b":1,"code_string":"c"},"x-c":1}`
 	var log []string
 	err := canjson.Unmarshal([]byte(in), new(rm.DVCodedText),
-		canjson.WithUnmatched(func(p string) { log = append(log, "unmatched "+p) }),
-		canjson.WithMissing(func(p string) { log = append(log, "missing "+p) }),
+		canjson.WithUnmatched(func(p canjson.Pointer) { log = append(log, "unmatched "+p.String()) }),
+		canjson.WithMissing(func(p canjson.Pointer) { log = append(log, "missing "+p.String()) }),
 	)
 	if err != nil {
 		t.Fatalf("canjson.Unmarshal(WithUnmatched, WithMissing) = %v; want nil", err)
@@ -428,7 +428,7 @@ func TestREQ175_NilMissingIsNoOption(t *testing.T) {
 	if !errors.Is(err, canjson.ErrInvalidShape) {
 		t.Errorf("Decoder(WithMissing(nil)).Decode(%s) err = %v; want the shape failure first, as with no options", shapeFirst, err)
 	}
-	err = canjson.NewDecoder(strings.NewReader(shapeFirst), canjson.WithMissing(func(string) {})).Decode(new(rm.DVQuantity))
+	err = canjson.NewDecoder(strings.NewReader(shapeFirst), canjson.WithMissing(func(canjson.Pointer) {})).Decode(new(rm.DVQuantity))
 	if se, ok := errors.AsType[*jsontext.SyntacticError](err); !ok || se == nil || errors.Is(err, canjson.ErrInvalidShape) {
 		t.Errorf("Decoder(WithMissing).Decode(%s) err = %v; want the malformed bytes reported, with no canjson.ErrInvalidShape: the value is read whole first", shapeFirst, err)
 	}
@@ -440,7 +440,7 @@ func TestREQ175_NilMissingIsNoOption(t *testing.T) {
 func TestREQ175_DecoderReportsPerValue(t *testing.T) {
 	stream := `{"_type":"DV_TEXT"} {"_type":"DV_QUANTITY","units":"kg","magnitude":null}`
 	var got []string
-	dec := canjson.NewDecoder(strings.NewReader(stream), canjson.WithMissing(func(p string) { got = append(got, p) }), canjson.WithStrict())
+	dec := canjson.NewDecoder(strings.NewReader(stream), canjson.WithMissing(func(p canjson.Pointer) { got = append(got, p.String()) }), canjson.WithStrict())
 	var text rm.DVText
 	if err := dec.Decode(&text); err != nil {
 		t.Fatalf("Decode(first value) = %v; want nil", err)
@@ -478,7 +478,7 @@ func TestREQ175_ConcurrentDecodesKeepTheirOwnReports(t *testing.T) {
 				t.Parallel()
 				for range 200 {
 					var got []string
-					err := canjson.Unmarshal([]byte(in), new(rm.DVQuantity), canjson.WithMissing(func(p string) { got = append(got, p) }))
+					err := canjson.Unmarshal([]byte(in), new(rm.DVQuantity), canjson.WithMissing(func(p canjson.Pointer) { got = append(got, p.String()) }))
 					if err != nil {
 						t.Fatalf("canjson.Unmarshal(WithMissing) = %v; want nil", err)
 					}

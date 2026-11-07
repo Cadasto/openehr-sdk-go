@@ -334,7 +334,7 @@ func assertPrimitiveFailure(t *testing.T, call string, err error, tc primitiveCa
 // and the Decoder with options name the slot.
 func TestREQ052_XMLPrimitiveFailureIsAValueFreeDecodeError(t *testing.T) {
 	tracked := map[string][]canxml.DecoderOption{
-		"WithUnmatched": {canxml.WithUnmatched(func(string) {})},
+		"WithUnmatched": {canxml.WithUnmatched(func(canxml.Path) {})},
 		"WithStrict":    {canxml.WithStrict()},
 	}
 	for _, tc := range primitiveCases(t) {

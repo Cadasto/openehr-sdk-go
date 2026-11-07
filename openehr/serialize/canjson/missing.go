@@ -27,7 +27,9 @@ package canjson
 // "/content/0/data/events/0/data/items/0/value/magnitude": the attribute's
 // name under the pointer of the object that lacks it, each item of a list by
 // its position counted from 0 and each entry of a `Hash` by its key. The
-// pointer carries no value from the input. The members of one object are
+// pointer is a [Pointer], which writes its text only when asked, so a caller
+// that only counts the members pays nothing for the text. It carries no value
+// from the input. The members of one object are
 // reported as the object is read to its end, in the order the RM declares
 // the attributes (an ancestor's before the class's own), so the members of
 // the objects inside it come first.
@@ -43,6 +45,6 @@ package canjson
 // "Missing members").
 //
 // A nil fn is the same as leaving the option out.
-func WithMissing(fn func(pointer string)) DecoderOption {
+func WithMissing(fn func(p Pointer)) DecoderOption {
 	return func(c *decoderConfig) { c.missing = fn }
 }

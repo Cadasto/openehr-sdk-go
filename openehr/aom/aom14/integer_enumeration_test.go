@@ -47,7 +47,7 @@ func operatorJSON(value string) string {
 func jsonDecodeModes() map[string][]canjson.DecoderOption {
 	return map[string][]canjson.DecoderOption{
 		"default": nil,
-		"report":  {canjson.WithUnmatched(func(string) {})},
+		"report":  {canjson.WithUnmatched(func(canjson.Pointer) {})},
 		"strict":  {canjson.WithStrict()},
 	}
 }

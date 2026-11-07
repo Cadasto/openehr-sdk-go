@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/internal/reportpath"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
@@ -164,7 +165,7 @@ func TestREQ176_EntryKeyAttributeNotReported(t *testing.T) {
 		`</holder>`
 	var got entryHolder
 	var paths []string
-	tr := NewTracker(func(p string) { paths = append(paths, p) }, false)
+	tr := NewTracker(func(p *reportpath.Node) { paths = append(paths, p.String()) }, false)
 	if err := tr.Decode(tr.NewDecoder(strings.NewReader(doc)), &got); err != nil {
 		t.Fatalf("Decode = %v; want nil", err)
 	}
@@ -250,8 +251,10 @@ func TestREQ176_EntryValueFailureNamesNoValue(t *testing.T) {
 // refuses it.
 var entryModes = map[string]func(doc string, v any) error{
 	"default": func(doc string, v any) error { return Unmarshal([]byte(doc), v, nil) },
-	"report":  func(doc string, v any) error { return Unmarshal([]byte(doc), v, NewTracker(func(string) {}, false)) },
-	"strict":  func(doc string, v any) error { return Unmarshal([]byte(doc), v, NewTracker(nil, true)) },
+	"report": func(doc string, v any) error {
+		return Unmarshal([]byte(doc), v, NewTracker(func(*reportpath.Node) {}, false))
+	},
+	"strict": func(doc string, v any) error { return Unmarshal([]byte(doc), v, NewTracker(nil, true)) },
 }
 
 // TestREQ176_REQ170_EntryRepeatedKeyUnmatched pins that a Hash entry whose key
@@ -324,7 +327,7 @@ func TestREQ176_REQ170_EntryRepeatedKeyUnmatched(t *testing.T) {
 			}
 			var reported entryHolder
 			var paths []string
-			if err := Unmarshal([]byte(doc), &reported, NewTracker(func(p string) { paths = append(paths, p) }, false)); err != nil || !reflect.DeepEqual(reported, tc.want) {
+			if err := Unmarshal([]byte(doc), &reported, NewTracker(func(p *reportpath.Node) { paths = append(paths, p.String()) }, false)); err != nil || !reflect.DeepEqual(reported, tc.want) {
 				t.Errorf("report decode = %#v, %v; want %#v, the earlier entry kept", reported, err, tc.want)
 			}
 			if want := []string{tc.path}; !slices.Equal(paths, want) {
@@ -363,8 +366,8 @@ func TestREQ176_REQ170_LanguageKeyedEntryContentKept(t *testing.T) {
 		`<details extra="y"><note/><language>de</language></details>` +
 		`<other/></holder>`
 	var got []string
-	tr := NewTracker(func(p string) { got = append(got, "unmatched "+p) }, false)
-	tr.ReportMissing(func(p string) { got = append(got, "missing "+p) })
+	tr := NewTracker(func(p *reportpath.Node) { got = append(got, "unmatched "+p.String()) }, false)
+	tr.ReportMissing(func(p *reportpath.Node) { got = append(got, "missing "+p.String()) })
 	var v entryHolder
 	if err := tr.Decode(tr.NewDecoder(strings.NewReader(doc)), &v); err != nil {
 		t.Fatalf("Decode = %v; want nil", err)
@@ -403,7 +406,7 @@ func TestREQ176_REQ170_LanguageKeyedEntryContentKept(t *testing.T) {
 	}
 	var paths []string
 	doc = `<holder ` + xmlnsDecl + `><author id="a">A</author><details><note/><purpose>q</purpose></details></holder>`
-	err := Unmarshal([]byte(doc), new(entryHolder), NewTracker(func(p string) { paths = append(paths, p) }, false))
+	err := Unmarshal([]byte(doc), new(entryHolder), NewTracker(func(p *reportpath.Node) { paths = append(paths, p.String()) }, false))
 	if de, ok := errors.AsType[*typereg.DecodeError](err); !ok || de == nil || de.Path != "/holder[1]/details[1]" || !errors.Is(err, ErrInvalidShape) {
 		t.Errorf("report decode of an entry with no language = %v; want ErrInvalidShape naming /holder[1]/details[1]", err)
 	}

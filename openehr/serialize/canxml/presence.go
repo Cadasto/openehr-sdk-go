@@ -1,6 +1,10 @@
 package canxml
 
-import "strconv"
+import (
+	"strconv"
+
+	"github.com/cadasto/openehr-sdk-go/internal/reportpath"
+)
 
 // Presence is the form in which a document sends a member without a value,
 // as [WithPresence] reports it.
@@ -62,8 +66,10 @@ func (p Presence) String() string {
 // closes, so in document order, with its JSON Pointer (RFC 6901) in the
 // canonical-JSON form of the instance, from the root of the value, as
 // [WithMissing] names a member, such as
-// "/content/0/data/events/0/data/items/0/value/precision". The pointer
-// carries no value from the input. A mandatory member sent without a value
+// "/content/0/data/events/0/data/items/0/value/precision". The pointer is a
+// [Pointer], which writes its text only when asked, so a caller that only
+// counts the members pays nothing for the text. It carries no value from the
+// input. A mandatory member sent without a value
 // is reported by both options, by one pointer, and an absent one by
 // [WithMissing] alone.
 //
@@ -80,21 +86,21 @@ func (p Presence) String() string {
 // The option applies to [Unmarshal] and to a [Decoder] from [NewDecoder],
 // where each value's pointers are relative to that value. A nil fn is the
 // same as leaving the option out.
-func WithPresence(fn func(pointer string, p Presence)) DecoderOption {
+func WithPresence(fn func(p Pointer, pr Presence)) DecoderOption {
 	return func(c *decoderConfig) { c.presence = fn }
 }
 
 // reportPresence adapts fn to the tracker's hook, which says whether the
 // member was nilled.
-func reportPresence(fn func(pointer string, p Presence)) func(pointer string, nilled bool) {
+func reportPresence(fn func(p Pointer, pr Presence)) func(pointer *reportpath.Node, nilled bool) {
 	if fn == nil {
 		return nil
 	}
-	return func(pointer string, nilled bool) {
+	return func(pointer *reportpath.Node, nilled bool) {
 		if nilled {
-			fn(pointer, PresenceNil)
+			fn(Pointer{node: pointer}, PresenceNil)
 			return
 		}
-		fn(pointer, PresenceEmpty)
+		fn(Pointer{node: pointer}, PresenceEmpty)
 	}
 }

@@ -225,7 +225,7 @@ func validateExample(cc *compiler, tplFile string, ex exampleRecord, doc []byte)
 		return rec
 	}
 	var unmatched []string
-	root, err := decodeRoot(doc, canjson.WithUnmatched(func(p string) { unmatched = append(unmatched, p) }))
+	root, err := decodeRoot(doc, canjson.WithUnmatched(func(p canjson.Pointer) { unmatched = append(unmatched, p.String()) }))
 	rec.Unmatched = unmatched
 	if err != nil {
 		rec.Stage, rec.Error = "decode", err.Error()

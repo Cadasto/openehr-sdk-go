@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/internal/reportpath"
 	"github.com/cadasto/openehr-sdk-go/internal/rmjsonwalk"
 )
 
@@ -18,8 +19,8 @@ func missing(t *testing.T, doc string, root rmjsonwalk.Root) []string {
 		t.Fatalf("Default(): %v", err)
 	}
 	var got []string
-	err = m.Walk([]byte(doc), root, rmjsonwalk.Hooks{Missing: func(p string) error {
-		got = append(got, p)
+	err = m.Walk([]byte(doc), root, rmjsonwalk.Hooks{Missing: func(p *reportpath.Node) error {
+		got = append(got, p.String())
 		return nil
 	}})
 	if err != nil {
@@ -281,8 +282,8 @@ func TestREQ175_WalkServesBothHooksInOnePass(t *testing.T) {
 	const doc = `{"_type":"DV_CODED_TEXT","x-a":1,"defining_code":{"_type":"CODE_PHRASE","x-b":1,"code_string":"c"},"x-c":1}`
 	var log []string
 	err = m.Walk([]byte(doc), rmjsonwalk.Root{}, rmjsonwalk.Hooks{
-		Unmatched: func(p string) error { log = append(log, "unmatched "+p); return nil },
-		Missing:   func(p string) error { log = append(log, "missing "+p); return nil },
+		Unmatched: func(p *reportpath.Node) error { log = append(log, "unmatched "+p.String()); return nil },
+		Missing:   func(p *reportpath.Node) error { log = append(log, "missing "+p.String()); return nil },
 	})
 	if err != nil {
 		t.Fatalf("Walk(%s) error: %v", doc, err)
@@ -312,8 +313,8 @@ func TestREQ175_WalkWithNilHooksReportsNothing(t *testing.T) {
 		t.Errorf("Walk(%s, no hooks) error = %v, want nil", doc, err)
 	}
 	var got []string
-	err = m.Walk([]byte(doc), rmjsonwalk.Root{}, rmjsonwalk.Hooks{Missing: func(p string) error {
-		got = append(got, p)
+	err = m.Walk([]byte(doc), rmjsonwalk.Root{}, rmjsonwalk.Hooks{Missing: func(p *reportpath.Node) error {
+		got = append(got, p.String())
 		return nil
 	}})
 	if err != nil {
@@ -336,8 +337,8 @@ func TestREQ175_MissingStopsAtTheHooksError(t *testing.T) {
 	}
 	stop := errors.New("stop")
 	var got []string
-	err = m.Walk([]byte(`{"_type":"DV_QUANTITY"}`), rmjsonwalk.Root{}, rmjsonwalk.Hooks{Missing: func(p string) error {
-		got = append(got, p)
+	err = m.Walk([]byte(`{"_type":"DV_QUANTITY"}`), rmjsonwalk.Root{}, rmjsonwalk.Hooks{Missing: func(p *reportpath.Node) error {
+		got = append(got, p.String())
 		return stop
 	}})
 	if err != stop { //nolint:errorlint // identity by design: the hook's own error comes back unwrapped

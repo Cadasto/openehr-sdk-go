@@ -30,7 +30,7 @@ const (
 func decodeModes(reported *[]string) map[string][]canxml.DecoderOption {
 	return map[string][]canxml.DecoderOption{
 		"default": nil,
-		"report":  {canxml.WithUnmatched(func(p string) { *reported = append(*reported, p) })},
+		"report":  {canxml.WithUnmatched(func(p canxml.Path) { *reported = append(*reported, p.String()) })},
 		"strict":  {canxml.WithStrict()},
 	}
 }
@@ -121,7 +121,7 @@ func TestREQ176_CodePhraseTakesTheSchemaForm(t *testing.T) {
 
 	doc := `<c_code_phrase` + nsOpenEHR + `><rm_type_name>CODE_PHRASE</rm_type_name><terminology_id><value>local</value></terminology_id><reference>ac0001</reference></c_code_phrase>`
 	var reported []string
-	if err := canxml.Unmarshal([]byte(doc), new(aom14.CCodePhrase), canxml.WithUnmatched(func(p string) { reported = append(reported, p) })); err != nil {
+	if err := canxml.Unmarshal([]byte(doc), new(aom14.CCodePhrase), canxml.WithUnmatched(func(p canxml.Path) { reported = append(reported, p.String()) })); err != nil {
 		t.Fatalf("canxml.Unmarshal(reference, report) = %v; want nil", err)
 	}
 	if want := []string{"/c_code_phrase[1]/reference[1]"}; !slices.Equal(reported, want) {

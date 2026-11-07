@@ -178,8 +178,8 @@
 //
 // By default the decoder ignores unmatched content: the value holds the
 // rest of the input and none of it. [WithUnmatched] passes each item, in
-// document order, to a caller function as its path from the root of the
-// value, such as "/composition[1]/content[2]/x-note[1]",
+// document order, to a caller function as a [Path], its path from the root
+// of the value, such as "/composition[1]/content[2]/x-note[1]",
 // "/composition[1]/language[2]", "/composition[1]/@x-flag" or
 // "/ehr_status[1]/subject[1]/text()", the last naming the text of an
 // element, one item however many runs of text it holds; the path names the
@@ -236,9 +236,9 @@
 // decode streams: the members of one element as the element closes, in the
 // order the RM declares the attributes (an ancestor's before the class's
 // own), so the members of the elements inside it come first. The decode
-// returns the same value as the default. The member is named by its JSON
-// Pointer (RFC 6901) in the canonical-JSON form of the instance, from the
-// root of the value, such as
+// returns the same value as the default. The member is named by a
+// [Pointer], its JSON Pointer (RFC 6901) in the canonical-JSON form of the
+// instance, from the root of the value, such as
 // "/content/0/data/events/0/data/items/0/value/magnitude": the attribute's
 // name under the pointer of the element that lacks it, each child element
 // of a multi-valued attribute by its position among its same-named

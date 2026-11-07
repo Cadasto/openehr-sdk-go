@@ -39,7 +39,7 @@ func sentEmpty(pointer string) sent { return sent{pointer, canxml.PresenceEmpty}
 func decodeXMLPresence(into func() any, in []byte, opts ...canxml.DecoderOption) (any, []sent, error) {
 	var got []sent
 	v := into()
-	opts = append(opts, canxml.WithPresence(func(p string, s canxml.Presence) { got = append(got, sent{p, s}) }))
+	opts = append(opts, canxml.WithPresence(func(p canxml.Pointer, s canxml.Presence) { got = append(got, sent{p.String(), s}) }))
 	err := canxml.Unmarshal(in, v, opts...)
 	return v, got, err
 }
@@ -218,7 +218,7 @@ func TestREQ175_XMLPresenceReportsMembersSentWithoutAValue(t *testing.T) {
 			}
 
 			var both []string
-			_, beside, err := decodeXMLPresence(into, in, canxml.WithMissing(func(p string) { both = append(both, p) }), canxml.WithStrict())
+			_, beside, err := decodeXMLPresence(into, in, canxml.WithMissing(func(p canxml.Pointer) { both = append(both, p.String()) }), canxml.WithStrict())
 			if err != nil && !errors.Is(err, canxml.ErrUnknownElement) {
 				t.Fatalf("canxml.Unmarshal(WithPresence, WithMissing, WithStrict) = %v; want nil, or the refusal of unmatched content", err)
 			}
@@ -335,7 +335,7 @@ func TestREQ175_XMLPresenceAOM14(t *testing.T) {
 func TestREQ175_XMLPresenceDecoderReportsPerValue(t *testing.T) {
 	stream := `<dv_text ` + ucNS + `><value></value></dv_text> <dv_quantity ` + ucNS + `><magnitude>1</magnitude><units>kg</units><precision xsi:nil="true"/></dv_quantity>`
 	var got []sent
-	dec := canxml.NewDecoder(strings.NewReader(stream), canxml.WithPresence(func(p string, s canxml.Presence) { got = append(got, sent{p, s}) }))
+	dec := canxml.NewDecoder(strings.NewReader(stream), canxml.WithPresence(func(p canxml.Pointer, s canxml.Presence) { got = append(got, sent{p.String(), s}) }))
 	if err := dec.Decode(new(rm.DVText)); err != nil {
 		t.Fatalf("Decode(first value) = %v; want nil", err)
 	}
@@ -363,7 +363,7 @@ func TestREQ175_XMLPresenceDecoderListPositionsPerValue(t *testing.T) {
 	stream := `<cluster ` + ucNS + `><x:items xmlns:x="urn:example:ext"/>` + item + `</cluster>` +
 		`<cluster ` + ucNS + `>` + item + `</cluster>`
 	var got []sent
-	dec := canxml.NewDecoder(strings.NewReader(stream), canxml.WithPresence(func(p string, s canxml.Presence) { got = append(got, sent{p, s}) }))
+	dec := canxml.NewDecoder(strings.NewReader(stream), canxml.WithPresence(func(p canxml.Pointer, s canxml.Presence) { got = append(got, sent{p.String(), s}) }))
 	for i := range 2 {
 		got = nil
 		var v rm.Cluster
@@ -394,7 +394,7 @@ func TestREQ175_XMLNilPresenceIsNoOption(t *testing.T) {
 		return err.Error()
 	}
 	plain := decode()
-	if tracked := decode(canxml.WithPresence(func(string, canxml.Presence) {})); tracked == plain {
+	if tracked := decode(canxml.WithPresence(func(canxml.Pointer, canxml.Presence) {})); tracked == plain {
 		t.Fatalf("Decoder(WithPresence(fn)).Decode = %q, the plain decoder's; want the tracked decode's path", tracked)
 	}
 	if got := decode(canxml.WithPresence(nil)); got != plain {

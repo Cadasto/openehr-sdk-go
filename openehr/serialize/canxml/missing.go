@@ -46,11 +46,13 @@ package canxml
 // [WithUnmatched] reports: a missing member is a member of the instance,
 // not an item of the document, so both codecs name it one way and a
 // consumer of either format hands the validators one list. The pointer
-// carries no value from the input. The members of one element are reported
-// as the element closes, in the order the RM declares the attributes (an
-// ancestor's before the class's own), so the members of the elements inside
-// it come first. Nothing inside a nilled element is reported: the member is
-// reported once, by its parent, as a `null` is in canonical JSON.
+// is a [Pointer], which writes its text only when asked, so a caller that
+// only counts the members pays nothing for the text. It carries no value
+// from the input. The members of one element are reported as the element
+// closes, in the order the RM declares the attributes (an ancestor's before
+// the class's own), so the members of the elements inside it come first.
+// Nothing inside a nilled element is reported: the member is reported once,
+// by its parent, as a `null` is in canonical JSON.
 //
 // The check runs as the decode streams, in the pass that serves
 // [WithUnmatched], so the two options may be combined, each with its own
@@ -66,6 +68,6 @@ package canxml
 // The option applies to [Unmarshal] and to a [Decoder] from [NewDecoder],
 // where each value's pointers are relative to that value. A nil fn is the
 // same as leaving the option out.
-func WithMissing(fn func(pointer string)) DecoderOption {
+func WithMissing(fn func(p Pointer)) DecoderOption {
 	return func(c *decoderConfig) { c.missing = fn }
 }

@@ -118,7 +118,7 @@ func TestREQ176_REQ175_SymbolValueIsNotMissing(t *testing.T) {
 			doc := `<` + class + ` xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><value>1</value>` +
 				tc.symbol + `</` + class + `>`
 			var missing []string
-			report := canxml.WithMissing(func(p string) { missing = append(missing, p) })
+			report := canxml.WithMissing(func(p canxml.Pointer) { missing = append(missing, p.String()) })
 			into := map[string]any{"ordinal": new(aom14.Ordinal), "scale": new(aom14.Scale)}[class]
 			if err := canxml.Unmarshal([]byte(doc), into, report); err != nil {
 				t.Fatalf("%s, %s: canxml.Unmarshal = %v", class, tc.name, err)

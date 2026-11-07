@@ -84,7 +84,7 @@ var modes = map[string][]canxml.DecoderOption{
 func readAs(t *testing.T, data []byte, want *aom14.OperationalTemplate, opts ...canxml.DecoderOption) []string {
 	t.Helper()
 	var unmatched []string
-	opts = append(slices.Clone(opts), canxml.WithUnmatched(func(path string) { unmatched = append(unmatched, path) }))
+	opts = append(slices.Clone(opts), canxml.WithUnmatched(func(path canxml.Path) { unmatched = append(unmatched, path.String()) }))
 	got, err := aom14.ReadOperationalTemplate(bytes.NewReader(data), opts...)
 	if err != nil {
 		t.Fatalf("ReadOperationalTemplate: %v", err)
@@ -1232,8 +1232,8 @@ func TestREQ111_ReaderReportsEachItemOnce(t *testing.T) {
 			t.Parallel()
 			var unmatched, missing []string
 			_, err := aom14.ReadOperationalTemplate(bytes.NewReader(readerFixture(t, name)),
-				canxml.WithUnmatched(func(path string) { unmatched = append(unmatched, path) }),
-				canxml.WithMissing(func(pointer string) { missing = append(missing, pointer) }))
+				canxml.WithUnmatched(func(path canxml.Path) { unmatched = append(unmatched, path.String()) }),
+				canxml.WithMissing(func(pointer canxml.Pointer) { missing = append(missing, pointer.String()) }))
 			if err != nil {
 				t.Fatalf("ReadOperationalTemplate: %v", err)
 			}
@@ -1255,8 +1255,8 @@ func TestREQ111_ReaderReportsEachItemOnce(t *testing.T) {
 			`<attributes><rm_attribute_name>b</rm_attribute_name><existence><lower>0</lower><upper>1</upper></existence></attributes>`)
 		var unmatched, missing []string
 		_, err := aom14.ReadOperationalTemplate(strings.NewReader(doc),
-			canxml.WithUnmatched(func(path string) { unmatched = append(unmatched, path) }),
-			canxml.WithMissing(func(pointer string) { missing = append(missing, pointer) }))
+			canxml.WithUnmatched(func(path canxml.Path) { unmatched = append(unmatched, path.String()) }),
+			canxml.WithMissing(func(pointer canxml.Pointer) { missing = append(missing, pointer.String()) }))
 		if err != nil {
 			t.Fatalf("ReadOperationalTemplate: %v", err)
 		}

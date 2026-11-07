@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/cadasto/openehr-sdk-go/internal/reportpath"
 )
 
 // TestREQ170_TrackerPaths pins the path arithmetic of a tracked decode: one
@@ -122,13 +124,13 @@ func (*readsNothing) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) erro
 // registered and the in-progress count is back at zero, so an untracked
 // decode skips the lookup again and no decoder is kept alive.
 func TestREQ170_TrackedDecodeUnregisters(t *testing.T) {
-	decode := func(doc string, report func(string), strict bool) error {
+	decode := func(doc string, report func(*reportpath.Node), strict bool) error {
 		tr := NewTracker(report, strict)
 		return tr.Decode(tr.NewDecoder(strings.NewReader(doc)), new(readsNothing))
 	}
 	const doc = `<r a="1"><x/></r>`
 	var got []string
-	if err := decode(doc, func(p string) { got = append(got, p) }, false); err != nil {
+	if err := decode(doc, func(p *reportpath.Node) { got = append(got, p.String()) }, false); err != nil {
 		t.Fatalf("Decode(reporting) = %v; want nil", err)
 	}
 	if want := []string{"/r[1]/@a", "/r[1]/x[1]"}; !slices.Equal(got, want) {
@@ -137,7 +139,7 @@ func TestREQ170_TrackedDecodeUnregisters(t *testing.T) {
 	if err := decode(doc, nil, true); !errors.Is(err, ErrUnknownElement) {
 		t.Errorf("Decode(strict) = %v; want a refusal wrapping ErrUnknownElement", err)
 	}
-	if err := decode(`<r><x>`, func(string) {}, false); err == nil {
+	if err := decode(`<r><x>`, func(*reportpath.Node) {}, false); err == nil {
 		t.Error("Decode(truncated document) = nil; want a syntax error")
 	}
 	if n := tracking.Load(); n != 0 {
@@ -210,7 +212,7 @@ func (*elementsOnly) UnmarshalXML(dec *xml.Decoder, _ xml.StartElement) error {
 func TestREQ170_TextInElementContent(t *testing.T) {
 	const doc = "<r>t1<x>t2</x>t3<x> \t\r\n</x><x>t4<y>t5</y>t6<![CDATA[t7]]></x><![CDATA[t8]]></r>"
 	var got []string
-	tr := NewTracker(func(p string) { got = append(got, p) }, false)
+	tr := NewTracker(func(p *reportpath.Node) { got = append(got, p.String()) }, false)
 	if err := tr.Decode(tr.NewDecoder(strings.NewReader(doc)), new(elementsOnly)); err != nil {
 		t.Fatalf("Decode(reporting) = %v; want nil", err)
 	}
@@ -255,7 +257,7 @@ func (*textBeforeRoot) UnmarshalXML(dec *xml.Decoder, _ xml.StartElement) error 
 // nothing.
 func TestREQ170_TextBeforeNoElement(t *testing.T) {
 	var got []string
-	tr := NewTracker(func(p string) { got = append(got, p) }, true)
+	tr := NewTracker(func(p *reportpath.Node) { got = append(got, p.String()) }, true)
 	if err := tr.Decode(tr.NewDecoder(strings.NewReader("<r><x/></r>")), new(textBeforeRoot)); err != nil {
 		t.Errorf("Decode(strict) = %v; want nil: no element holds the text", err)
 	}

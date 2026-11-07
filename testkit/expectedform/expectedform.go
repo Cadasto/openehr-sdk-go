@@ -74,6 +74,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cadasto/openehr-sdk-go/internal/reportpath"
 	"github.com/cadasto/openehr-sdk-go/internal/rmjsonwalk"
 	"github.com/cadasto/openehr-sdk-go/internal/rmlists"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
@@ -180,8 +181,8 @@ func transform(input []byte, rootShape rmjsonwalk.Root, full bool) ([]byte, erro
 		return nil, errors.New("expectedform: the document is not a JSON object")
 	}
 	w.unmatched = map[string]bool{}
-	err = w.model.Unmatched(input, rootShape, func(pointer string) error {
-		w.unmatched[pointer] = true
+	err = w.model.Unmatched(input, rootShape, func(pointer *reportpath.Node) error {
+		w.unmatched[pointer.String()] = true
 		return nil
 	})
 	if err != nil {

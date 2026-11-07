@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/internal/reportpath"
 	"github.com/cadasto/openehr-sdk-go/internal/rmjsonwalk"
 )
 
@@ -18,8 +19,8 @@ func unmatched(t *testing.T, doc string, root rmjsonwalk.Root) []string {
 		t.Fatalf("Default(): %v", err)
 	}
 	var got []string
-	err = m.Unmatched([]byte(doc), root, func(p string) error {
-		got = append(got, p)
+	err = m.Unmatched([]byte(doc), root, func(p *reportpath.Node) error {
+		got = append(got, p.String())
 		return nil
 	})
 	if err != nil {
@@ -255,8 +256,8 @@ func TestUnmatchedStopsAtTheReportsError(t *testing.T) {
 	}
 	stop := errors.New("stop")
 	var got []string
-	err = m.Unmatched([]byte(`{"_type":"DV_TEXT","x-a":1,"value":"v","x-b":2}`), rmjsonwalk.Root{}, func(p string) error {
-		got = append(got, p)
+	err = m.Unmatched([]byte(`{"_type":"DV_TEXT","x-a":1,"value":"v","x-b":2}`), rmjsonwalk.Root{}, func(p *reportpath.Node) error {
+		got = append(got, p.String())
 		return stop
 	})
 	if err != stop { //nolint:errorlint // identity by design: the report's own error comes back unwrapped
@@ -275,7 +276,7 @@ func TestUnmatchedReportsMalformedInput(t *testing.T) {
 		t.Fatalf("Default(): %v", err)
 	}
 	for _, doc := range []string{`{"_type":"DV_TEXT","value":`, `{"value":1,"value":2}`} {
-		err := m.Unmatched([]byte(doc), rmjsonwalk.Root{Type: "DV_TEXT"}, func(string) error { return nil })
+		err := m.Unmatched([]byte(doc), rmjsonwalk.Root{Type: "DV_TEXT"}, func(*reportpath.Node) error { return nil })
 		if err == nil {
 			t.Errorf("Unmatched(%s) error = nil, want jsontext's refusal", doc)
 		}

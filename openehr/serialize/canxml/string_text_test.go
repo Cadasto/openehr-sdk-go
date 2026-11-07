@@ -111,8 +111,8 @@ func TestREQ056_REQ175_WithStringTextKeepsAStringsText(t *testing.T) {
 		var sent []string
 		opts := []canxml.DecoderOption{
 			canxml.WithStringText(),
-			canxml.WithMissing(func(p string) { missing = append(missing, p) }),
-			canxml.WithPresence(func(p string, pr canxml.Presence) { sent = append(sent, p+" "+pr.String()) }),
+			canxml.WithMissing(func(p canxml.Pointer) { missing = append(missing, p.String()) }),
+			canxml.WithPresence(func(p canxml.Pointer, pr canxml.Presence) { sent = append(sent, p.String()+" "+pr.String()) }),
 		}
 		if err := canxml.Unmarshal(blankName, new(rm.Composition), opts...); err != nil {
 			t.Fatal(err)
@@ -219,8 +219,8 @@ func TestREQ175_XMLWhiteSpaceCharacterCarriesAValue(t *testing.T) {
 	} {
 		var missing, sent []string
 		opts := append([]canxml.DecoderOption{
-			canxml.WithMissing(func(p string) { missing = append(missing, p) }),
-			canxml.WithPresence(func(p string, pr canxml.Presence) { sent = append(sent, p+" "+pr.String()) }),
+			canxml.WithMissing(func(p canxml.Pointer) { missing = append(missing, p.String()) }),
+			canxml.WithPresence(func(p canxml.Pointer, pr canxml.Presence) { sent = append(sent, p.String()+" "+pr.String()) }),
 		}, tc.opts...)
 		var m rm.TermMapping
 		if err := canxml.Unmarshal([]byte(doc), &m, opts...); err != nil {

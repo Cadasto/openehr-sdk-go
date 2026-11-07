@@ -84,8 +84,8 @@ func itemModes(t *testing.T) map[string]func([]byte, any) error {
 	decoder := func(opts ...canxml.DecoderOption) func([]byte, any) error {
 		return func(data []byte, v any) error { return canxml.NewDecoder(bytes.NewReader(data), opts...).Decode(v) }
 	}
-	report := canxml.WithUnmatched(func(p string) { t.Errorf("reported unmatched %s; want nothing", p) })
-	missing := canxml.WithMissing(func(p string) { t.Errorf("reported missing %s; want nothing", p) })
+	report := canxml.WithUnmatched(func(p canxml.Path) { t.Errorf("reported unmatched %s; want nothing", p.String()) })
+	missing := canxml.WithMissing(func(p canxml.Pointer) { t.Errorf("reported missing %s; want nothing", p.String()) })
 	return map[string]func([]byte, any) error{
 		"Unmarshal":               unmarshal(),
 		"Unmarshal WithUnmatched": unmarshal(report),

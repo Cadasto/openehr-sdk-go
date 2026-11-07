@@ -43,7 +43,7 @@ func SkipNil(dec *xml.Decoder, start xml.StartElement) (bool, error) {
 				return true, err
 			}
 		case xml.StartElement:
-			if err := t.unmatched(t.path(), isForeign(tk.Name)); err != nil {
+			if err := t.unmatched(t.elemPath(len(t.open)), isForeign(tk.Name)); err != nil {
 				return true, err
 			}
 			if err := dec.Skip(); err != nil {

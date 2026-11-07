@@ -44,7 +44,7 @@ func compositionWith(nameType, composerType string) []byte {
 func TestREQ176_REQ056_TypeAliasDispatch(t *testing.T) {
 	modes := map[string][]canxml.DecoderOption{
 		"default": nil,
-		"report":  {canxml.WithUnmatched(func(p string) { t.Errorf("reported %s; want nothing", p) })},
+		"report":  {canxml.WithUnmatched(func(p canxml.Path) { t.Errorf("reported %s; want nothing", p.String()) })},
 		"strict":  {canxml.WithStrict()},
 	}
 	for mode, opts := range modes {
