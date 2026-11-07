@@ -309,6 +309,55 @@ func TestREQ053ReusedSiblingItemNamesDecodeWithTemplate(t *testing.T) {
 	}
 }
 
+// TestREQ053WithTemplateNameFallsBackToTheBareAlias — REQ-053, REQ-116: where
+// the Web Template spells a node with a pinned name the compiled template
+// holds at no such path, here 'Text A2' for the first event's ELEMENT, which
+// the compiled template pins 'Text A', a WithTemplate decode names the node
+// from the bare alias, the rubric the two events' ELEMENTs share, rather than
+// leaving it with no name.
+func TestREQ053WithTemplateNameFallsBackToTheBareAlias(t *testing.T) {
+	opt, err := readOPTFile("testdata/named_sibling_items.opt")
+	if err != nil {
+		t.Fatalf("readOPTFile: %v", err)
+	}
+	wt, compiled := compileTemplate(t, "sdk_named_sibling_items.v1", opt)
+	body, err := simplified.MarshalFlat(skeletonOf(t, compiled, instance.Large), wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat: %v", err)
+	}
+	renamed := 0
+	var rename func(n *webtemplate.Node)
+	rename = func(n *webtemplate.Node) {
+		if p := strings.ReplaceAll(n.AQLPath, ",'Text A']", ",'Text A2']"); p != n.AQLPath {
+			n.AQLPath = p
+			renamed++
+		}
+		for _, ch := range n.Children {
+			rename(ch)
+		}
+	}
+	rename(wt.Tree)
+	if renamed == 0 {
+		t.Fatal("no Web Template node pins 'Text A'")
+	}
+	back, err := simplified.UnmarshalFlat(body, wt, simplified.WithTemplate(compiled))
+	if err != nil {
+		t.Fatalf("UnmarshalFlat: %v", err)
+	}
+	const path = namedEventsEvents + "[at0002,'First event']/data[at0003]/items[at0004]"
+	item, err := rmpath.ItemAtPath(back, path)
+	if err != nil {
+		t.Fatalf("ItemAtPath(%s): %v", path, err)
+	}
+	l, ok := item.(rm.Locatable)
+	if !ok {
+		t.Fatalf("%s is a %T", path, item)
+	}
+	if got := rm.DVTextValueOf(l.GetName()); got != "Text" {
+		t.Errorf("%s is named %q, want the shared rubric %q", path, got, "Text")
+	}
+}
+
 // TestREQ053ReusedSiblingOrdinalTerminology — REQ-053, REQ-116: where the
 // ELEMENT at0004 of each named EVENT sibling is a C_DV_ORDINAL whose one pair
 // codes X1 at 1, in local in 'First event' and in SNOMED-CT in 'Second
