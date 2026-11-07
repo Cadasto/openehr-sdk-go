@@ -199,7 +199,7 @@ var Recorded = map[string]map[Leg]Record{
 			Reason: "Choice element: the template lets media_file/created hold a DV_DATE_TIME or a DV_INTERVAL; upstream " +
 				"spells the value created/date_time_value, the SDK's Web Template keeps one value leaf, created. " +
 				"ctx/location: upstream spells EVENT_CONTEXT.location ctx/location, which the hold-out removes, and " +
-				"the codec writes context/_location (ADR 0016). ENTRY language and encoding: the upstream FLAT omits " +
+				"the codec writes context/_location. ENTRY language and encoding: the upstream FLAT omits " +
 				"them on document_attachment and FLAT encode writes them (4 keys).",
 		},
 		LegFlatCanonical: {
@@ -210,9 +210,9 @@ var Recorded = map[string]map[Leg]Record{
 				"FLAT gives ctx/time and context/start_time different values, decode refuses the pair and the " +
 				"harness removes ctx/time; the start time left agrees with the canonical. ctx/setting: the FLAT " +
 				"writes ctx/setting as bare text, the setting without the |code and |value the codec reads it as, " +
-				"which decode refuses in every mode as a missing required suffix (REQ-170); the harness removes it, " +
+				"which decode refuses in every mode as a missing required suffix; the harness removes it, " +
 				"so decode fills the default 238 other care against the canonical 228 primary medical care. " +
-				"ctx/location: the codec does not read ctx/location (it reads context/_location, ADR 0016), so the " +
+				"ctx/location: the codec does not read ctx/location (it reads context/_location), so the " +
 				"location is missing. Choice element: decode does not read media_file/created/date_time_value " +
 				"(the SDK spells it created), so the media_file cluster lacks its created element (6 leaves). " +
 				"RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (4 leaves).",
@@ -227,7 +227,7 @@ var Recorded = map[string]map[Leg]Record{
 		LegStructuredFlat: {
 			Outcome: Outcome{Compared: 29, Extra: 1, Excluded: 1},
 			Reason: "ctx/location: the upstream FLAT spells the location ctx/location, which the hold-out removes, " +
-				"while the upstream STRUCTURED spells it context/_location (ADR 0016), which decodes and re-encodes, " +
+				"while the upstream STRUCTURED spells it context/_location, which decodes and re-encodes, " +
 				"so only our side carries it. Excluded: one family drops out of both sides of the comparison: " +
 				"decode reports media_file/created/date_time_value (choice element) as unmatched content.",
 		},
@@ -348,15 +348,15 @@ var Recorded = map[string]map[Leg]Record{
 				"and time (1) and the identifier keys (4), refused, and " +
 				"choice/quantity_value|magnitude and |unit (2) and the bare proportion_any (1), reported as " +
 				"unmatched content, as follows. Web Template projection: decode refuses the ACTION's in-context " +
-				"ism_transition and time in every mode as RM data it would otherwise drop or replace (REQ-170), so " +
+				"ism_transition and time in every mode as RM data it would otherwise drop or replace, so " +
 				"the decoded ACTION has an empty current_state (3 leaves) and the context start time as its time. " +
 				"party reference type: the upstream FLAT writes no composer|type, so decode gives the composer's " +
 				"reference the type PARTY against the canonical's PERSON. DV_IDENTIFIER: the FLAT writes the id as the bare value, and " +
 				"decode refuses the four identifier keys as missing the required |id, so the identifier element " +
 				"is missing. Choice element: decode does not read choice/quantity_value (the SDK spells it choice), " +
 				"so the choice element is missing. DV_PROPORTION: decode reports the bare proportion_any, the " +
-				"derived magnitude, as unmatched content, and reads |type 1.0 as the Integer 1 (wire.md " +
-				"§ Floating-point precision). Upstream conversion differences: a DV_URI and the proportion's " +
+				"derived magnitude, as unmatched content, and reads |type 1.0 as the Integer 1. " +
+				"Upstream conversion differences: a DV_URI and the proportion's " +
 				"precision only the canonical carries, and duration_any (P1Y2M10DT2H30M against PT30M). Upstream " +
 				"date and time spelling: the canonical writes dates in the basic format (20190114) and date-times " +
 				"with a comma and +00:00, the FLAT in the extended format with a full stop and Z (6 leaves). " +
