@@ -29,10 +29,10 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 | consult_record | flat-canonical | compared 150, missing 7, extra 0, altered 6, excluded 4 |
 | consult_record | flat-structured | compared 40, missing 12, extra 5, altered 0, excluded 0 |
 | consult_record | structured-flat | compared 29, missing 0, extra 1, altered 0, excluded 1 |
-| corona | canonical-flat | refused |
-| corona | flat-canonical | compared 641, missing 565, extra 0, altered 2, excluded 94 |
+| corona | canonical-flat | compared 104, missing 0, extra 0, altered 1, excluded 0 |
+| corona | flat-canonical | compared 641, missing 0, extra 0, altered 15, excluded 0 |
 | corona | flat-structured | compared 113, missing 0, extra 0, altered 0, excluded 0 |
-| corona | structured-flat | compared 10, missing 0, extra 0, altered 0, excluded 94 |
+| corona | structured-flat | compared 104, missing 0, extra 0, altered 0, excluded 0 |
 | ehrn_abdm | canonical-flat | compared 31, missing 1, extra 1, altered 0, excluded 0 |
 | ehrn_abdm | flat-canonical | compared 150, missing 6, extra 0, altered 4, excluded 1 |
 | family_history | json-xml | compared 95, missing 0, extra 0, altered 0, excluded 0 |
@@ -173,32 +173,26 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 
 ### canonical-flat
 
-- Outcome: refused
-- Error: `FLAT encode: simplified: resolve "/content[openEHR-EHR-SECTION.adhoc.v1]": rmpath: path resolves to multiple items: "/content[openEHR-EHR-SECTION.adhoc.v1]" (2 items)`
-- Recorded as an error containing `path resolves to multiple items: "/content[openEHR-EHR-SECTION.adhoc.v1]"`
-- Reason: reused archetype siblings: the symptome and risikogebiet sections both reuse openEHR-EHR-SECTION.adhoc.v1 under content, and FLAT encode refuses the path that resolves to both.
+- Outcome: compared 104, missing 0, extra 0, altered 1, excluded 0
+- Reason: Upstream number spelling: the upstream FLAT writes the body temperature's magnitude as 39.0, where the codec writes 39.
+- Altered (1):
+  - `bericht/symptome/körpertemperatur/temperatur|magnitude`: reference `39.0`, ours `39`
 
 ### flat-canonical
 
-- Outcome: compared 641, missing 565, extra 0, altered 2, excluded 94
-- Reason: reused archetype siblings: decode refuses every key under the symptome and risikogebiet sections (the 94 excluded keys, 70 and 24), so both sections are missing from the decoded composition. RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (2 leaves).
-- Missing (565, first 10 shown):
-  - `/content/1/_type`
-  - `/content/1/archetype_details/_type`
-  - `/content/1/archetype_details/archetype_id/_type`
-  - `/content/1/archetype_details/archetype_id/value`
-  - `/content/1/archetype_details/rm_version`
-  - `/content/1/archetype_node_id`
-  - `/content/1/items/0/_type`
-  - `/content/1/items/0/archetype_details/_type`
-  - `/content/1/items/0/archetype_details/archetype_id/_type`
-  - `/content/1/items/0/archetype_details/archetype_id/value`
-- Altered (2):
+- Outcome: compared 641, missing 0, extra 0, altered 15, excluded 0
+- Reason: RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (15 leaves).
+- Altered (15, first 10 shown):
   - `/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
   - `/content/0/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
-- Reducing decode removed 94 keys from the upstream FLAT:
-  - 70: `simplified: "<key>": simplified: path not in web template: FLAT id "symptome" reaches one of several reused siblings sharing the path "/content[openEHR-EHR-SECTION.adhoc.v1]" - not yet decodable (see deviations.md)`
-  - 24: `simplified: "<key>": simplified: path not in web template: FLAT id "risikogebiet" reaches one of several reused siblings sharing the path "/content[openEHR-EHR-SECTION.adhoc.v1]" - not yet decodable (see deviations.md)`
+  - `/content/1/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
+  - `/content/1/items/0/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
+  - `/content/1/items/1/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
+  - `/content/1/items/2/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
+  - `/content/1/items/3/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
+  - `/content/1/items/4/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
+  - `/content/1/items/5/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
+  - `/content/1/items/6/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
 
 ### flat-structured
 
@@ -206,14 +200,7 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 
 ### structured-flat
 
-- Outcome: compared 10, missing 0, extra 0, altered 0, excluded 94
-- Reason: reused archetype siblings: the symptome and risikogebiet sections both reuse openEHR-EHR-SECTION.adhoc.v1 under content, and decode refuses every key under them on both sides (the 94 excluded keys of the upstream FLAT, 70 and 24), so both sections drop out of the comparison and the 10 keys compared are what remains.
-- Reducing decode removed 94 keys from the upstream FLAT:
-  - 70: `simplified: "<key>": simplified: path not in web template: FLAT id "symptome" reaches one of several reused siblings sharing the path "/content[openEHR-EHR-SECTION.adhoc.v1]" - not yet decodable (see deviations.md)`
-  - 24: `simplified: "<key>": simplified: path not in web template: FLAT id "risikogebiet" reaches one of several reused siblings sharing the path "/content[openEHR-EHR-SECTION.adhoc.v1]" - not yet decodable (see deviations.md)`
-- Reducing decode removed 94 keys from the flattened upstream STRUCTURED:
-  - 70: `simplified: "<key>": simplified: path not in web template: FLAT id "symptome" reaches one of several reused siblings sharing the path "/content[openEHR-EHR-SECTION.adhoc.v1]" - not yet decodable (see deviations.md)`
-  - 24: `simplified: "<key>": simplified: path not in web template: FLAT id "risikogebiet" reaches one of several reused siblings sharing the path "/content[openEHR-EHR-SECTION.adhoc.v1]" - not yet decodable (see deviations.md)`
+- Outcome: compared 104, missing 0, extra 0, altered 0, excluded 0
 
 ## ehrn_abdm
 

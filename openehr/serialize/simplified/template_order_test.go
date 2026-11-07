@@ -138,7 +138,7 @@ func TestREQ053DecodeOrderKeepsUnmodelledMembers(t *testing.T) {
 			map[string]any{"_type": "LINK", "type": map[string]any{"value": "a"}},
 		},
 	}
-	orderByTemplate(tree, wt)
+	orderByTemplate(tree, wt, reusedSiblingsOf(wt))
 	if got, want := listIDs(tree, "content"), []string{"openEHR-EHR-SECTION.conformance_section.v0", "openEHR-EHR-SECTION.unmodelled.v0"}; !slices.Equal(got, want) {
 		t.Errorf("content = %v, want the modelled member first %v", got, want)
 	}

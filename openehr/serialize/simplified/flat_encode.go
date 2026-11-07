@@ -46,11 +46,16 @@ func encodeFlat(comp *rm.Composition, wt *webtemplate.WebTemplate) (map[string]a
 	if err := emitContext(out, comp, root.ID); err != nil {
 		return nil, err
 	}
-	// Reused siblings (REQ-116) share one bare path, and resolution below
-	// keys on the bare spelling — emitNode refuses to emit through them.
-	ambiguous := ambiguousBarePaths(wt)
+	// Reused siblings (REQ-116) that pinned names tell apart resolve by those
+	// names. Where every sibling pins one, an item carrying none of them is
+	// refused first, since no sibling would claim it. Siblings nothing tells
+	// apart are refused in emitNode once data resolves at them.
+	sib := reusedSiblingsOf(wt)
+	if err := sib.refuseUnclaimedItems(comp); err != nil {
+		return nil, err
+	}
 	for _, ch := range root.Children {
-		if err := emitNode(out, ch, root.ID, comp, root.AQLPath, ambiguous); err != nil {
+		if err := emitNode(out, ch, root.ID, comp, sib.nodePath(root), sib); err != nil {
 			return nil, err
 		}
 	}
@@ -217,20 +222,20 @@ var ctxOnlyLeafPaths = map[string]bool{
 	"/context/setting":    true,
 }
 
-// emitNode resolves node against resolveRoot (whose canonical path is
+// emitNode resolves node against resolveRoot (whose resolution path is
 // resolveRootAql) and writes FLAT entries under flatPrefix. A repeating node
 // enumerates its instances and stamps a zero-based :index; a container
 // recurses into its children; a value leaf maps its datatype to suffix keys.
 // Absent optional nodes resolve to nothing and are silently skipped.
 //
-// ambiguous holds the bare spellings claimed by several reused siblings
-// (REQ-116). Resolution strips the name predicate, so for such a node the
-// same RM instance answers to *every* sibling — with data present, one
-// sibling's values would be emitted under all sibling ids, silently
-// misattributed. emitNode refuses instead; a node in the ambiguous set that
-// resolves to nothing is still skipped like any absent optional, so
-// compositions that do not touch the reused region keep encoding.
-func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, resolveRoot rm.Locatable, resolveRootAql string, ambiguous map[string]bool) error {
+// sib says which reused siblings (REQ-116) their pinned names tell apart: a
+// node is resolved by its resolution path, which keeps exactly those names.
+// For siblings that nothing tells apart, the same RM instance answers to
+// *every* sibling — with data present, one sibling's values would be emitted
+// under all sibling ids, silently misattributed. emitNode refuses those
+// instead; such a node that resolves to nothing is still skipped like any
+// absent optional, so compositions that do not touch them keep encoding.
+func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, resolveRoot rm.Locatable, resolveRootAql string, sib *reusedSiblings) error {
 	rmType := nodeRMType(node)
 	isContainer := len(node.Children) > 0
 	// A value leaf normally carries input descriptors, but the Web Template emits
@@ -238,27 +243,31 @@ func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, res
 	// CODE_PHRASE pair, …); any childless node of a value leaf type is still a
 	// value leaf and must be emitted (bare/suffixed or |raw), not dropped.
 	isLeaf := !isContainer && (len(node.Inputs) > 0 || isValueLeafType(rmType))
-	// Resolution against the RM instance keys on archetype_node_id, so the
-	// REQ-116 name predicate the Web Template now carries is dropped here.
-	// rmpath *does* honour a `node,'name'` predicate, which would filter
-	// instances by their runtime LOCATABLE.name — an over-constraint: the
-	// template pins the name a node is *modelled* with, while encoding must
-	// emit whatever instance sits at that node id. Leaving it in silently
-	// drops values whose stored name differs, breaking the FLAT round-trip.
-	// The prefix trim runs first: both paths are the Web Template's
-	// predicated spelling, so they only line up before stripping.
-	relPath := bareAQLPath(strings.TrimPrefix(node.AQLPath, resolveRootAql))
+	// Resolution against the RM instance keys on archetype_node_id, so a
+	// REQ-116 name predicate the Web Template carries is dropped here, except
+	// where it tells reused siblings apart. rmpath honours a `node,'name'`
+	// predicate, which filters instances by their runtime LOCATABLE.name. For
+	// a node alone at its bare path that is an over-constraint: the template
+	// pins the name a node is *modelled* with, while encoding must emit
+	// whatever instance sits at that node id, and keeping it would silently
+	// drop values whose stored name differs. For reused siblings the name is
+	// the only thing that tells which instance is whose: a sibling that pins
+	// none takes every instance the others' names leave (sc.itemsAt), and where
+	// each pins one, an instance carrying none of their names is refused before
+	// the walk (refuseUnclaimedItems).
+	relPath := strings.TrimPrefix(sib.nodePath(node), resolveRootAql)
+	sc := scope{root: resolveRoot, path: resolveRootAql, sib: sib}
 	if !isContainer && !isLeaf {
 		// A childless node carrying no value inputs and no RM type this codec
 		// spells: nothing to write, unless the composition holds a value there.
-		return refuseUnspelledNode(flatPrefix+"/"+node.ID, rmType, resolveRoot, relPath)
+		return refuseUnspelledNode(flatPrefix+"/"+node.ID, rmType, sc, relPath)
 	}
 	if isLeaf && ctxOnlyLeafPaths[bareAQLPath(node.AQLPath)] {
 		return nil
 	}
 	if isLeaf && rmType == stringLeafType {
 		// An RM String attribute is single-valued, so the leaf takes no :index.
-		return emitStringLeaf(out, flatPrefix+"/"+node.ID, resolveRoot, relPath)
+		return emitStringLeaf(out, flatPrefix+"/"+node.ID, sc, relPath)
 	}
 
 	if node.Max != 1 {
@@ -271,20 +280,20 @@ func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, res
 		// onto every :index. It also misses an ELEMENT carrying only a
 		// `_null_flavour`, which has no value to resolve at all.
 		if !isContainer {
-			owners, err := repeatingLeafOwners(resolveRoot, relPath)
+			owners, err := repeatingLeafOwners(sc, relPath)
 			if err != nil {
 				return err
 			}
 			if len(owners) > 0 {
-				return emitRepeatingLeafOwners(out, node, flatPrefix, owners, ambiguous)
+				return emitRepeatingLeafOwners(out, node, flatPrefix, owners, sib)
 			}
 		}
-		vals, err := rmpath.ItemsAtPath(resolveRoot, relPath)
+		vals, err := sc.itemsAt(relPath)
 		if err != nil {
 			return skipNotFound(err, relPath)
 		}
 		if len(vals) > 0 {
-			if err := refuseReusedSibling(node, ambiguous); err != nil {
+			if err := refuseReusedSibling(node, sib); err != nil {
 				return err
 			}
 		}
@@ -296,7 +305,7 @@ func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, res
 		idx := 0
 		for _, v := range vals {
 			sub := make(map[string]any)
-			if err := emitValue(sub, node, flatPrefix+"/"+node.ID+":"+strconv.Itoa(idx), v, isContainer, resolveRoot, resolveRootAql, ambiguous); err != nil {
+			if err := emitValue(sub, node, flatPrefix+"/"+node.ID+":"+strconv.Itoa(idx), v, isContainer, resolveRoot, resolveRootAql, sib); err != nil {
 				return err
 			}
 			if len(sub) == 0 {
@@ -307,7 +316,7 @@ func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, res
 		}
 		return nil
 	}
-	v, err := itemAtPath(resolveRoot, relPath)
+	v, err := sc.itemAt(relPath)
 	if err != nil {
 		if !errors.Is(err, rmpath.ErrPathNotFound) {
 			return fmt.Errorf("simplified: resolve %q: %w", relPath, err)
@@ -321,22 +330,22 @@ func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, res
 			return nil
 		}
 		sub := make(map[string]any)
-		if err := emitLeafOwnerRMAttrs(sub, node, flatPrefix+"/"+node.ID, resolveRoot, resolveRootAql); err != nil {
+		if err := emitLeafOwnerRMAttrs(sub, node, flatPrefix+"/"+node.ID, resolveRoot, resolveRootAql, sib); err != nil {
 			return err
 		}
 		if len(sub) == 0 {
 			return nil
 		}
-		if err := refuseReusedSibling(node, ambiguous); err != nil {
+		if err := refuseReusedSibling(node, sib); err != nil {
 			return err
 		}
 		maps.Copy(out, sub)
 		return nil
 	}
-	if err := refuseReusedSibling(node, ambiguous); err != nil {
+	if err := refuseReusedSibling(node, sib); err != nil {
 		return err
 	}
-	return emitValue(out, node, flatPrefix+"/"+node.ID, v, isContainer, resolveRoot, resolveRootAql, ambiguous)
+	return emitValue(out, node, flatPrefix+"/"+node.ID, v, isContainer, resolveRoot, resolveRootAql, sib)
 }
 
 // refuseUnspelledNode is the encode backstop for a childless Web Template node
@@ -353,8 +362,8 @@ func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, res
 // resolves every node the Web Template builder emits, which
 // webtemplate.TestWebTemplatePathsResolveViaRmpath enforces for every vendored
 // OPT.
-func refuseUnspelledNode(flatPath, rmType string, root rm.Locatable, relPath string) error {
-	vals, err := rmpath.ItemsAtPath(root, relPath)
+func refuseUnspelledNode(flatPath, rmType string, sc scope, relPath string) error {
+	vals, err := sc.itemsAt(relPath)
 	if err != nil {
 		return skipNotFound(err, relPath)
 	}
@@ -398,20 +407,38 @@ func isZeroRMValue(v any) bool {
 }
 
 // refuseReusedSibling fails encoding when node is one of several reused
-// siblings (its bare path is claimed more than once) and data resolved at it:
-// the instance cannot be attributed to this sibling id versus the others, so
-// emitting would alias one sibling's data under every sibling's FLAT id. The
-// wrapped sentinel is rmpath.ErrPathAmbiguous — the ambiguity is real, it
-// just lives across template nodes rather than across RM instances.
-func refuseReusedSibling(node *webtemplate.Node, ambiguous map[string]bool) error {
-	if node.NodeID == "" {
+// siblings that no pinned name tells apart (they share its resolution path)
+// and data resolved at it: the instance cannot be attributed to this sibling
+// id versus the others, so emitting would alias one sibling's data under
+// every sibling's FLAT id. The wrapped sentinel is rmpath.ErrPathAmbiguous —
+// the ambiguity is real, it just lives across template nodes rather than
+// across RM instances.
+func refuseReusedSibling(node *webtemplate.Node, sib *reusedSiblings) error {
+	if !sib.isShared(node) {
 		return nil
 	}
-	bare := bareAQLPath(node.AQLPath)
-	if !ambiguous[bare] {
-		return nil
-	}
-	return fmt.Errorf("simplified: FLAT id %q is one of several reused siblings sharing the path %q — not yet encodable (see deviations.md): %w", node.ID, bare, rmpath.ErrPathAmbiguous)
+	return fmt.Errorf("simplified: FLAT id %q is one of several reused siblings sharing the path %q — not yet encodable (see deviations.md): %w", node.ID, sib.nodePath(node), rmpath.ErrPathAmbiguous)
+}
+
+// scope is an RM instance encode resolves Web Template nodes against: root,
+// the resolution path of the node it stands for ([reusedSiblings]), and the
+// template's reused siblings, which say how to resolve a path below it.
+type scope struct {
+	root rm.Locatable
+	path string
+	sib  *reusedSiblings
+}
+
+// itemsAt resolves rel, a resolution path relative to the scope's root, as
+// [rmpath.ItemsAtPath] does ([reusedSiblings.itemsAt]).
+func (sc scope) itemsAt(rel string) ([]any, error) {
+	return sc.sib.itemsAt(sc.root, sc.path, rel)
+}
+
+// itemAt resolves rel, a resolution path relative to the scope's root, as
+// [itemAtPath] does ([reusedSiblings.itemAt]).
+func (sc scope) itemAt(rel string) (any, error) {
+	return sc.sib.itemAt(sc.root, sc.path, rel)
 }
 
 // itemAtPath is [rmpath.ItemAtPath] for the encoder, which reads a path that
@@ -449,17 +476,17 @@ func skipNotFound(err error, relPath string) error {
 // which node was resolved; they carry through when a container is not itself
 // Locatable (e.g. EVENT_CONTEXT), so its children resolve from that ancestor by
 // their full relative paths rather than being dropped.
-func emitValue(out map[string]any, node *webtemplate.Node, flatPath string, v any, isContainer bool, ancestorRoot rm.Locatable, ancestorAql string, ambiguous map[string]bool) error {
+func emitValue(out map[string]any, node *webtemplate.Node, flatPath string, v any, isContainer bool, ancestorRoot rm.Locatable, ancestorAql string, sib *reusedSiblings) error {
 	if isContainer {
 		root, rootAql := ancestorRoot, ancestorAql
 		loc, isLocatable := v.(rm.Locatable)
 		if isLocatable {
 			// A Locatable container becomes the new resolution root for its
 			// children (each repeatable instance is resolved independently).
-			root, rootAql = loc, node.AQLPath
+			root, rootAql = loc, sib.nodePath(node)
 		}
 		for _, ch := range node.Children {
-			if err := emitNode(out, ch, flatPath, root, rootAql, ambiguous); err != nil {
+			if err := emitNode(out, ch, flatPath, root, rootAql, sib); err != nil {
 				return err
 			}
 		}
@@ -475,7 +502,7 @@ func emitValue(out map[string]any, node *webtemplate.Node, flatPath string, v an
 	if err := leafToFlat(out, flatPath, v, nodeRMType(node), leafListOpen(node)); err != nil {
 		return err
 	}
-	return emitLeafOwnerRMAttrs(out, node, flatPath, ancestorRoot, ancestorAql)
+	return emitLeafOwnerRMAttrs(out, node, flatPath, ancestorRoot, ancestorAql, sib)
 }
 
 // emitLeafOwnerRMAttrs writes the REQ-140 underscore attributes of the LOCATABLE
@@ -490,13 +517,13 @@ func emitValue(out map[string]any, node *webtemplate.Node, flatPath string, v an
 // `language`, an ISM_TRANSITION member, ACTIVITY `timing`), and that enclosing
 // node emits its own attributes at its own FLAT path — so emitting here too
 // would double-spell them.
-func emitLeafOwnerRMAttrs(out map[string]any, node *webtemplate.Node, flatPath string, ancestorRoot rm.Locatable, ancestorAql string) error {
-	rel := bareAQLPath(strings.TrimPrefix(node.AQLPath, ancestorAql))
+func emitLeafOwnerRMAttrs(out map[string]any, node *webtemplate.Node, flatPath string, ancestorRoot rm.Locatable, ancestorAql string, sib *reusedSiblings) error {
+	rel := strings.TrimPrefix(sib.nodePath(node), ancestorAql)
 	ownerRel, isElementValue := strings.CutSuffix(rel, "/value")
 	if !isElementValue || ownerRel == "" {
 		return nil
 	}
-	owner, err := itemAtPath(ancestorRoot, ownerRel)
+	owner, err := sib.itemAt(ancestorRoot, ancestorAql, ownerRel)
 	if err != nil {
 		return skipNotFound(err, ownerRel)
 	}
@@ -510,12 +537,12 @@ func emitLeafOwnerRMAttrs(out map[string]any, node *webtemplate.Node, flatPath s
 // collapsed leaf, or nil when the node is not one — a childless leaf sitting on
 // a non-LOCATABLE attribute (`context/start_time`, an ISM_TRANSITION member,
 // ACTIVITY `timing`) has no ELEMENT owner and keeps the plain value walk.
-func repeatingLeafOwners(resolveRoot rm.Locatable, relPath string) ([]any, error) {
+func repeatingLeafOwners(sc scope, relPath string) ([]any, error) {
 	ownerRel, isElementValue := strings.CutSuffix(relPath, "/value")
 	if !isElementValue || ownerRel == "" {
 		return nil, nil
 	}
-	owners, err := rmpath.ItemsAtPath(resolveRoot, ownerRel)
+	owners, err := sc.itemsAt(ownerRel)
 	if err != nil {
 		return nil, skipNotFound(err, ownerRel)
 	}
@@ -530,7 +557,7 @@ func repeatingLeafOwners(resolveRoot rm.Locatable, relPath string) ([]any, error
 // emitRepeatingLeafOwners writes one :index per resolved ELEMENT instance: its
 // collapsed value — absent when the ELEMENT carries only a `_null_flavour` —
 // followed by that same instance's underscore attributes.
-func emitRepeatingLeafOwners(out map[string]any, node *webtemplate.Node, flatPrefix string, owners []any, ambiguous map[string]bool) error {
+func emitRepeatingLeafOwners(out map[string]any, node *webtemplate.Node, flatPrefix string, owners []any, sib *reusedSiblings) error {
 	// The :index counts emitted instances, not RM list positions — an instance
 	// contributing no FLAT key is omitted without consuming an index, for the
 	// reason spelled out in emitNode.
@@ -549,9 +576,9 @@ func emitRepeatingLeafOwners(out map[string]any, node *webtemplate.Node, flatPre
 		if len(sub) == 0 {
 			continue
 		}
-		// Refused on the first actual **emission**: a node in the ambiguous set
-		// that contributes no key is skipped like any absent optional, so a
-		// composition that never touches the reused region still encodes. Owners
+		// Refused on the first actual **emission**: a reused sibling no name
+		// tells apart that contributes no key is skipped like any absent
+		// optional, so a composition that never touches it still encodes. Owners
 		// existing is not enough — a degenerate ELEMENT carrying neither a value
 		// nor an underscore attribute writes nothing and must not trip the guard.
 		// Pinned by TestRepeatingLeafOwnersRefuseReusedSiblingOnFirstEmission.
@@ -560,7 +587,7 @@ func emitRepeatingLeafOwners(out map[string]any, node *webtemplate.Node, flatPre
 		// still trips on resolution (`len(vals) > 0`, emitNode). Both are safe —
 		// nothing emitted means nothing misattributed — but the two arms do not
 		// yet state one rule; aligning them is a follow-up, not this fix.
-		if err := refuseReusedSibling(node, ambiguous); err != nil {
+		if err := refuseReusedSibling(node, sib); err != nil {
 			return err
 		}
 		maps.Copy(out, sub)

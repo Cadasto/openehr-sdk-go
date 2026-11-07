@@ -151,7 +151,8 @@ var (
 	// (an invalid, out-of-bound or sparse :index, including on a `_family:N`
 	// list, an index past :0 on a single-valued attribute, a slot conflict
 	// between two keys, a key that walks through one of several reused
-	// siblings, or the decoded-node budget), and for keys that each resolve
+	// siblings that no pinned name tells apart, or the decoded-node budget),
+	// and for keys that each resolve
 	// but cannot be honoured at once: two accepted spellings of one
 	// composition-metadata field that disagree, a ctx/composer_self of true
 	// beside a composer name, identifier or relationship (a PARTY_SELF has

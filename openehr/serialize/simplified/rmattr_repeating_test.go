@@ -255,13 +255,15 @@ func TestRepeatingLeafOwnersRefuseReusedSiblingOnFirstEmission(t *testing.T) {
 		ID: "reused", RMType: "DV_TEXT", NodeID: "at0001", Min: 0, Max: -1,
 		AQLPath: "/content[openEHR-EHR-OBSERVATION.x.v1]/data[at0001]/items[at0002]/value",
 	}
-	ambiguous := map[string]bool{bareAQLPath(node.AQLPath): true}
+	// The node is one of several reused siblings that no pinned name tells
+	// apart: another node shares its resolution path.
+	sib := &reusedSiblings{shared: map[string]bool{bareAQLPath(node.AQLPath): true}}
 
 	t.Run("owners that emit nothing do not trip it", func(t *testing.T) {
 		out := map[string]any{}
 		// Two ELEMENTs carrying neither a value nor an underscore attribute.
 		owners := []any{&rm.Element{}, &rm.Element{}}
-		if err := emitRepeatingLeafOwners(out, node, "root", owners, ambiguous); err != nil {
+		if err := emitRepeatingLeafOwners(out, node, "root", owners, sib); err != nil {
 			t.Fatalf("err = %v, want nil for owners contributing no key", err)
 		}
 		if len(out) != 0 {
@@ -275,7 +277,7 @@ func TestRepeatingLeafOwnersRefuseReusedSiblingOnFirstEmission(t *testing.T) {
 			Value:        "unknown",
 			DefiningCode: rm.CodePhrase{CodeString: "253", TerminologyID: rm.TerminologyID{Value: "openehr"}},
 		}}}
-		err := emitRepeatingLeafOwners(out, node, "root", owners, ambiguous)
+		err := emitRepeatingLeafOwners(out, node, "root", owners, sib)
 		if !errors.Is(err, rmpath.ErrPathAmbiguous) {
 			t.Fatalf("err = %v, want ErrPathAmbiguous", err)
 		}

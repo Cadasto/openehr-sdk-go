@@ -1505,14 +1505,23 @@ func TestREQ170IntervalEventAndObservationAttrsRefused(t *testing.T) {
 			assertUnmatched(t, wt, rmattrBody(map[string]any{key: "x"}), key)
 		})
 	}
-	// A key that walks through one of several reused siblings is left to the
-	// refusal that path gets, before any in-context rule could name it.
+	// A key that walks through one of several reused siblings that no pinned
+	// name tells apart is left to the refusal that path gets, before any
+	// in-context rule could name it. Under siblings their names tell apart, the
+	// in-context rule applies as under any other node.
 	t.Run("keys under a reused sibling", func(t *testing.T) {
-		reused := twoReusedObservationWT()
-		for _, key := range []string{"root/a/history_origin", "root/a/any_event:0/width"} {
-			err := refusedInEveryMode(t, reused, map[string]any{"ctx/language": "en", "ctx/territory": "NL", key: "x"})
-			if !errors.Is(err, ErrUnknownPath) || !strings.Contains(err.Error(), "reused siblings") {
-				t.Errorf("%s: err = %v, want the reused-siblings refusal", key, err)
+		for _, tc := range []struct {
+			pinA, pinB, want string
+		}{
+			{"", "", "reused siblings"},
+			{"A", "B", "in-context spelling"},
+		} {
+			reused := twoReusedObservationWT(tc.pinA, tc.pinB)
+			for _, key := range []string{"root/a/history_origin", "root/a/any_event:0/width"} {
+				err := refusedInEveryMode(t, reused, map[string]any{"ctx/language": "en", "ctx/territory": "NL", key: "x"})
+				if !errors.Is(err, ErrUnknownPath) || !strings.Contains(err.Error(), tc.want) {
+					t.Errorf("%s, pinned names %q and %q: err = %v, want the %s refusal", key, tc.pinA, tc.pinB, err, tc.want)
+				}
 			}
 		}
 	})
@@ -1570,11 +1579,14 @@ func editWTNode(t *testing.T, wt *webtemplate.WebTemplate, flat string, edit fun
 }
 
 // twoReusedObservationWT is a minimal Web Template with two reused OBSERVATION
-// siblings — one archetype id, distinct pinned names 'A'/'B' — each holding an
-// EVENT, the shape [twoSiblingWT] gives EVALUATIONs.
-func twoReusedObservationWT() *webtemplate.WebTemplate {
+// siblings — one archetype id, pinning the names pinA and pinB, none where
+// empty — each holding an EVENT, the shape [twoSiblingWT] gives EVALUATIONs.
+func twoReusedObservationWT(pinA, pinB string) *webtemplate.WebTemplate {
 	obs := func(id, pin string) *webtemplate.Node {
-		base := "/content[openEHR-EHR-OBSERVATION.test.v1,'" + pin + "']"
+		base := "/content[openEHR-EHR-OBSERVATION.test.v1]"
+		if pin != "" {
+			base = "/content[openEHR-EHR-OBSERVATION.test.v1,'" + pin + "']"
+		}
 		return &webtemplate.Node{
 			ID: id, RMType: "OBSERVATION", NodeID: "openEHR-EHR-OBSERVATION.test.v1", Max: 1, AQLPath: base,
 			Children: []*webtemplate.Node{{
@@ -1585,7 +1597,7 @@ func twoReusedObservationWT() *webtemplate.WebTemplate {
 	}
 	return &webtemplate.WebTemplate{Tree: &webtemplate.Node{
 		ID: "root", RMType: "COMPOSITION", NodeID: "openEHR-EHR-COMPOSITION.t.v1",
-		Children: []*webtemplate.Node{obs("a", "A"), obs("b", "B")},
+		Children: []*webtemplate.Node{obs("a", pinA), obs("b", pinB)},
 	}}
 }
 

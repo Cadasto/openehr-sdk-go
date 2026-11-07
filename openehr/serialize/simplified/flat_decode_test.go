@@ -168,7 +168,7 @@ func TestResolveLeafPositionalPredicates(t *testing.T) {
 	wt := &webtemplate.WebTemplate{Tree: &webtemplate.Node{ID: "root", Children: []*webtemplate.Node{obs}}}
 
 	segs := []flatSeg{{"root", -1}, {"obs", 2}, {"ev", 5}, {"val", -1}}
-	node, predIndex, predType, err := resolveLeaf(wt, segs, ambiguousBarePaths(wt))
+	node, predIndex, predType, err := resolveLeaf(wt, segs, reusedSiblingsOf(wt))
 	if err != nil || node != leaf {
 		t.Fatalf("resolveLeaf: err=%v node=%v", err, node)
 	}
@@ -255,7 +255,7 @@ func TestCtxDefaultsAreGroupMembersWithPinnedRubrics(t *testing.T) {
 func TestWalkAQLRefusesScalarSlot(t *testing.T) {
 	t.Run("scalar slot refused and kept", func(t *testing.T) {
 		comp := map[string]any{"language": "en"}
-		_, _, err := walkAQL(comp, "/language/code_string", nil, nil, nil, nil)
+		_, _, err := walkAQL(comp, "/language/code_string", "/language/code_string", nil, nil, nil, nil, nil)
 		if !errors.Is(err, ErrUnknownPath) {
 			t.Fatalf("walkAQL through a scalar slot = %v, want ErrUnknownPath", err)
 		}
@@ -265,7 +265,7 @@ func TestWalkAQLRefusesScalarSlot(t *testing.T) {
 	})
 	t.Run("absent slot gets an object", func(t *testing.T) {
 		comp := map[string]any{}
-		cur, attr, err := walkAQL(comp, "/language/code_string", nil, nil, nil, nil)
+		cur, attr, err := walkAQL(comp, "/language/code_string", "/language/code_string", nil, nil, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("walkAQL through an absent slot: %v", err)
 		}

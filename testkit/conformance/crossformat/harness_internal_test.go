@@ -163,18 +163,20 @@ const motherPointer = "/content/0/data/items/0/items/1/value/value"
 // number of upstream FLAT keys the reducing decode removed, the keys removed
 // from the STRUCTURED side are kept apart and not counted, the other legs
 // remove nothing, and a refused leg carries no count but keeps the refusals
-// made before it. corona structured-flat removes keys from both sides. No
-// corpus leg is refused after the reducing decode removed keys, so a
-// synthetic set, [refusedAfterRemoval], runs through [Run] with the corpus
-// and carries such a refused flat-canonical leg.
+// made before it. No corpus leg is refused after the reducing decode removed
+// keys, and none removes keys from both sides, so two synthetic sets run
+// through [Run] with the corpus: [refusedAfterRemoval] carries such a refused
+// flat-canonical leg, and [reducedOnBothSides] a structured-flat leg that
+// removes keys from both sides.
 func TestProbe105ExcludedCountsTheUpstreamFlat(t *testing.T) {
 	sets, err := fixtures.ListCrossFormatSets()
 	if err != nil {
 		t.Fatalf("ListCrossFormatSets() error = %v", err)
 	}
 	synthetic, planted := refusedAfterRemoval(t, sets)
+	reduced := reducedOnBothSides(t, sets)
 	seen := map[string]LegResult{}
-	for _, set := range append(slices.Clip(sets), synthetic) {
+	for _, set := range append(slices.Clip(sets), synthetic, reduced) {
 		res, err := Run(set)
 		if err != nil {
 			t.Fatalf("Run(%s) error = %v", set.Name, err)
@@ -208,10 +210,76 @@ func TestProbe105ExcludedCountsTheUpstreamFlat(t *testing.T) {
 		t.Errorf("%s flat-canonical refusals = %+v, want the one that removed %s before the leg was refused",
 			synthetic.Name, refused.Refusals, planted)
 	}
-	both := seen["corona "+string(LegStructuredFlat)]
+	both := seen[reduced.Name+" "+string(LegStructuredFlat)]
 	if len(both.Refusals) == 0 || len(both.StructuredRefusals) == 0 || both.Outcome.Excluded != keysRemoved(both.Refusals) {
-		t.Errorf("corona structured-flat = %+v, removed %d upstream FLAT and %d STRUCTURED keys; want both sides reduced and only the FLAT side counted",
-			both.Outcome, keysRemoved(both.Refusals), keysRemoved(both.StructuredRefusals))
+		t.Errorf("%s structured-flat = %+v, removed %d upstream FLAT and %d STRUCTURED keys; want both sides reduced and only the FLAT side counted",
+			reduced.Name, both.Outcome, keysRemoved(both.Refusals), keysRemoved(both.StructuredRefusals))
+	}
+}
+
+// reducedOnBothSides builds a set whose structured-flat leg removes a key from
+// both sides. It takes the files of the first corpus set that runs the leg and
+// plants, in its FLAT and in its STRUCTURED, one key under a second instance
+// of the template root, which decode refuses as a path the Web Template does
+// not have, naming it, so the reducing decode removes it from each side and
+// decodes the rest.
+func reducedOnBothSides(t *testing.T, sets []fixtures.CrossFormatSet) fixtures.CrossFormatSet {
+	t.Helper()
+	i := slices.IndexFunc(sets, func(s fixtures.CrossFormatSet) bool {
+		return slices.Contains(Legs(s), LegStructuredFlat)
+	})
+	if i < 0 {
+		t.Fatal("no corpus set runs the structured-flat leg")
+	}
+	base := sets[i]
+	target, err := webtemplate.NewTargetFromOPT(base.OPT)
+	if err != nil {
+		t.Fatalf("NewTargetFromOPT(%s) error = %v", base.OPT, err)
+	}
+	planted := target.Root + ":1/no_such_node"
+	readFlat := func(path string, convert func([]byte) ([]byte, error)) map[string]any {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("ReadFile(%s) error = %v", path, err)
+		}
+		if convert != nil {
+			if raw, err = convert(raw); err != nil {
+				t.Fatalf("flatten %s: %v", path, err)
+			}
+		}
+		var m map[string]any
+		if err := json.Unmarshal(raw, &m); err != nil {
+			t.Fatalf("decode %s: %v", path, err)
+		}
+		m[planted] = "x"
+		return m
+	}
+	write := func(name string, body []byte) string {
+		path := filepath.Join(t.TempDir(), name)
+		if err := os.WriteFile(path, body, 0o600); err != nil {
+			t.Fatalf("WriteFile(%s) error = %v", path, err)
+		}
+		return path
+	}
+	flat, err := json.Marshal(readFlat(base.FLAT, nil))
+	if err != nil {
+		t.Fatalf("json.Marshal(FLAT) error = %v", err)
+	}
+	flattened, err := json.Marshal(readFlat(base.STRUCTURED, simplified.StructuredToFlat))
+	if err != nil {
+		t.Fatalf("json.Marshal(flattened STRUCTURED) error = %v", err)
+	}
+	structured, err := simplified.FlatToStructured(flattened)
+	if err != nil {
+		t.Fatalf("FlatToStructured() error = %v", err)
+	}
+	return fixtures.CrossFormatSet{
+		Name:          "reduced on both sides (" + base.Name + ")",
+		OPT:           base.OPT,
+		CanonicalJSON: base.CanonicalJSON,
+		CanonicalXML:  base.CanonicalXML,
+		FLAT:          write("flat.json", flat),
+		STRUCTURED:    write("structured.json", structured),
 	}
 }
 

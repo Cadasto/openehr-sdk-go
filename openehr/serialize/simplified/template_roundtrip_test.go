@@ -553,9 +553,9 @@ func TestREQ053WithTemplateRoundTripKeepsInContextIsmTransition(t *testing.T) {
 // template rebuilds the symbol in local, as the reference does; a WithTemplate
 // decode gives it the terminology of the template's C_DV_ORDINAL pair with that
 // code and value, so a template whose ordinals are coded outside local decodes
-// to the value it lists. The pair is looked up by the leaf's path without the
-// names it carries, a |raw ordinal keeps its own terminology, and a pair the
-// template gives two terminologies stays local.
+// to the value it lists. The pair is found below a node the template names,
+// a |raw ordinal keeps its own terminology, and a pair the template gives two
+// terminologies stays local.
 func TestREQ053WithTemplateOrdinalTerminology(t *testing.T) {
 	const (
 		id         = "Test_dv_ordinal_with_constraints.v0"
