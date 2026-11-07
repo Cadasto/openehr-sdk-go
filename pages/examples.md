@@ -135,12 +135,14 @@ go build ./cmd/examples/...
 
 If you are new to the SDK, try them in this order:
 
-1. Decode canonical JSON
-2. Validate JSON against the RM and a template
-3. Create an EHR
-4. Manage a template on the server
-5. Save, read and update a Composition
-6. Build an AQL query
-7. Execute an AQL query
-8. Run a SMART PKCE launch
-9. Authenticate a backend service
+1. Decode canonical JSON (`canonical_json`)
+2. Read an operational template (`opt-parse`)
+3. Validate JSON against the RM and a template (`validate-from-json`)
+4. Synthesise a Composition from a template (`generate-example`)
+5. Create an EHR (`ehr_create`)
+6. Manage a template on the server (`definition-lifecycle`)
+7. Save, read and update a Composition (`composition-crud`)
+8. Build an AQL query (`aql-build`)
+9. Execute an AQL query (`query-execute`)
+10. Run a SMART PKCE launch (`smart-launch`)
+11. Authenticate a backend service (`service-auth`)
