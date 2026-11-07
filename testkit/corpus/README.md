@@ -277,6 +277,10 @@ The Corona pair is the largest fixture in the repo. That size is the cost of gua
 | `sdk_crosscheck_unwritten.v1` | Two ISM_TRANSITION alternatives of one ACTION, each constraining `name`, which the RM class does not have. An ELEMENT's `null_flavor`, spelt as in US English. An optional `feeder_audit` and `links`, which the generator has no writer for. |
 | `sdk_crosscheck_siblings.v1` | Two uses of one OBSERVATION archetype under `content` that pin no name. Two ELEMENTs of one node id that pin no name and whose values differ in type. |
 | `sdk_crosscheck_padded.v1` | `rm_type_name` and `rm_attribute_name` values broken onto a second line, as a pretty-printer that wraps long lines writes them. |
+| `generic_ehr_status.v1` | An EHR_STATUS root on `openEHR-EHR-EHR_STATUS.generic.v1`, the archetype id EHRbase gives an EHR_STATUS by default, with an optional `other_details` ITEM_TREE whose items it leaves open. |
+| `generic_folder.v1` | A FOLDER root on `openEHR-EHR-FOLDER.generic.v1`, the archetype id EHRbase gives a folder, with an optional `details` ITEM_TREE whose items it leaves open, and its sub-folders and items left open too. |
+
+The two generic templates are the corpus's first FOLDER and EHR_STATUS roots. EHRbase and FerroEHR accept both uploads and store every instance the generator writes for them, but neither checks an EHR_STATUS or a FOLDER against its template, so the SDK's own validator is what holds such an instance to them.
 
 ### ITS-REST
 

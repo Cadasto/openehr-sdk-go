@@ -71,8 +71,10 @@ const encodedRoot = "COMPOSITION"
 // expected to have. A template rooted anywhere else, or an entry whose OPT is
 // now rooted at a COMPOSITION, fails the guard instead of passing as a skip.
 var nonCompositionRoots = map[string]string{
-	"Address.v2.opt":    "ADDRESS",
-	"TestPerson.v2.opt": "PERSON",
+	"Address.v2.opt":            "ADDRESS",
+	"TestPerson.v2.opt":         "PERSON",
+	"generic_ehr_status.v1.opt": "EHR_STATUS",
+	"generic_folder.v1.opt":     "FOLDER",
 }
 
 // refusedOPTs are the vendored OPTs a build step refuses, each with the step

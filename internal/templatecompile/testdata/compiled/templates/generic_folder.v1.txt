@@ -1,0 +1,17 @@
+# compiled tree of templates/generic_folder.v1.opt
+template_id="generic_folder.v1" concept="Generic folder" language="en" uid="be12920b-8f93-4839-a0aa-2d1efbb23035" num_nodes=2
+
+node /
+  rm_type="FOLDER" node_id="at0000" archetype_id="openEHR-EHR-FOLDER.generic.v1" node_name="" occurrences=1..1 slot=false
+  term[en] "at0000" code="at0000" description="A folder that groups versioned items of an EHR, and further folders." text="Folder"
+  attr "details" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="Further details about the folder, as a tree of items." text="Details"
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+# walked nodes=2
