@@ -16,10 +16,10 @@ The "clinical modeling" band sits above the openEHR Reference Model and below th
 ## REQ-176 — ADL 1.4 operational template model
 
 The SDK **MUST** provide, in its AOM 1.4 package, generated types for the ADL 1.4 operational template as the AM Release-1.4 `Template.xsd` defines it, `OPERATIONAL_TEMPLATE` at the root, with the canonical-XML codec of [wire.md § REQ-056](wire.md#req-056) and the canonical-JSON codec of [wire.md § REQ-052](wire.md#req-052), so a consumer reads an OPT into typed values that carry everything the document carries and writes it back.
-The types come from the SDK-authored root schema [bmm-conformance.md § SDK-authored root schemas](bmm-conformance.md#sdk-authored-root-schemas) describes, which declares the operational template classes and includes the RM target's root, so that `AUTHORED_RESOURCE`, which `ARCHETYPE` inherits, takes its RM `common.resource` form by the include merge of [bmm-conformance.md § REQ-045](bmm-conformance.md#req-045--bmm-loader-is-a-building-block).
+The types come from the SDK-authored root schema [reference-model.md § SDK-authored root schemas](reference-model.md#sdk-authored-root-schemas) describes, which declares the operational template classes and includes the RM target's root, so that `AUTHORED_RESOURCE`, which `ARCHETYPE` inherits, takes its RM `common.resource` form by the include merge of [reference-model.md § REQ-045](reference-model.md#req-045--bmm-loader-is-a-building-block).
 `OPERATIONAL_TEMPLATE` inherits from no class: it declares its own members, in the order and with the types `Template.xsd` gives them, not the `AUTHORED_RESOURCE` ones, so it has `language` and not `original_language`, and no `translations`.
 The model is what the compile step of [§ REQ-111](#req-111--public-compiled-template-bridge) reads, so that the compiled template can carry what an OPT says ([ADR 0035](../adr/0035-compile-step-reads-operational-template-model.md)).
-`aom14.ReadOperationalTemplate` reads an untrusted OPT into the model within the bounds of [§ REQ-108](#req-108--untrusted-document-bounds).
+`aom14.ReadOperationalTemplate` reads an untrusted OPT into the model within the bounds of [§ REQ-108](#req-108--untrusted-document-bounds), with the tolerances of § *What the reader tolerates*.
 
 ### Round trip
 
@@ -34,7 +34,7 @@ The encoder writes a `Hash` member's entries in ascending order of their keys, s
 
 ### Shapes the pinned BMM lacks
 
-The root restates each AOM 1.4 class whose AM Release-1.4 schema type differs from the pinned BMM in the schema type's form ([bmm-conformance.md § SDK-authored root schemas](bmm-conformance.md#sdk-authored-root-schemas)): `C_QUANTITY_ITEM` gains `precision`, and `assumed_value`, `Any` on `C_DEFINED_OBJECT` in the BMM, takes the schema's type on each class, `CODE_PHRASE` on `C_CODE_PHRASE` and `DV_QUANTITY` on `C_DV_QUANTITY` among them.
+The root restates each AOM 1.4 class whose AM Release-1.4 schema type differs from the pinned BMM in the schema type's form ([reference-model.md § SDK-authored root schemas](reference-model.md#sdk-authored-root-schemas)): `C_QUANTITY_ITEM` gains `precision`, and `assumed_value`, `Any` on `C_DEFINED_OBJECT` in the BMM, takes the schema's type on each class, `CODE_PHRASE` on `C_CODE_PHRASE` and `DV_QUANTITY` on `C_DV_QUANTITY` among them.
 The shapes the schema types alone do not settle:
 
 - The model's two integer enumerations, `OPERATOR_KIND` on `EXPR_OPERATOR.operator` and the type of `timezone_validity` on `C_DATE`, `C_TIME` and `C_DATE_TIME`, are written as their integer codes: as element text in canonical XML, such as `2007` or `1001`, and as a JSON number of the same value in canonical JSON.
@@ -52,6 +52,49 @@ The shapes the schema types alone do not settle:
   The encoder writes that `value` only when it is non-empty, so a symbol read with no `value` or an empty one is written with none.
   A `SCALE` is read with its `value` and `symbol` in either order, as `OpenehrProfile.xsd` admits them and Archetype Designer writes the symbol first, and is written with its `value` first, the order of `ORDINAL` and of the RM's `DV_SCALE`.
 - `xsi:type="T_ARCHETYPE_ROOT"`, which some exporters write for the same shape where openEHR [`Template.xsd`](https://github.com/openEHR/specifications-ITS-XML/blob/master/components/AM/Release-1.4/Template.xsd) defines only `C_ARCHETYPE_ROOT`, reads as `C_ARCHETYPE_ROOT`, with its archetype id, term definitions and subtree, in every mode, so a strict decode does not refuse it; it is written as `C_ARCHETYPE_ROOT`.
+
+### What the reader tolerates
+
+In every mode, `aom14.ReadOperationalTemplate` reads:
+
+- a document that starts with a UTF-8 byte-order mark;
+- an element in the `http://schemas.openehr.org/v2` namespace, which the pinned AM Release-1.4 schemas declare, as the element of that name in the `http://schemas.openehr.org/v1` namespace canonical XML reads ([wire.md § REQ-056](wire.md#req-056));
+- a `C_BOOLEAN` whose `true_valid` or `false_valid` is absent or empty, with that flag true;
+- an `assumed_value` of a `C_BOOLEAN`, `C_INTEGER` or `C_REAL` that is not a value of its type, and one of a `C_DV_QUANTITY` that the model cannot hold, as absent, an assumed boolean written `t` or `f` among them, and one written in another case, such as `tRuE`, as its value;
+- a `C_DV_QUANTITY` magnitude or precision bound that is not a number, as unbounded on its side;
+- a `C_INTEGER` range bound or a precision bound written as a decimal number, as the integer bound that admits the same integers, a lower bound rounded up and an upper one down, and a lower bound of negative infinity, an upper one of positive infinity, or one that is not a number (`NaN`), which bounds no integer, as unbounded on its side;
+- a bound written on a side marked unbounded, which it leaves out;
+- an empty `timezone_validity`, as absent.
+
+In its default mode it also reads these shapes, which its strict mode refuses:
+
+- an `<attributes>`, `<children>` or `<item>` inside `<definition>` with no type in the XSI namespace: such an `<attributes>` as `C_MULTIPLE_ATTRIBUTE` with its cardinality where it carries a `<cardinality>` and as `C_SINGLE_ATTRIBUTE` otherwise, such a `<children>` as `C_ARCHETYPE_ROOT` where it carries an archetype id and as `C_COMPLEX_OBJECT` otherwise, and such an `<item>` as no constraint, losing any constraint its type would have carried;
+- a `<children>` or the `<definition>` whose `xsi:type` names no AOM 1.4 class, or a class it cannot hold such as `C_SINGLE_ATTRIBUTE` other than the classes of a `<definition>` it refuses in every mode (below), as a `C_COMPLEX_OBJECT` leaf with the `rm_type_name`, `node_id` and `occurrences` it carries and none of its attributes;
+- a `C_INTEGER` or `C_REAL` list entry or range bound that is not a number of its type, an empty one among them, the entry left out and the bound read as unbounded on its side;
+- a `timezone_validity` that names no `VALIDITY_KIND`, as absent.
+
+It reads as well, in its default mode:
+
+- an `xsi:type` inside `<definition>` with white space around it, as the name without it;
+- an `<item>` of a `C_PRIMITIVE_OBJECT` whose type names no `C_PRIMITIVE` class and none of `C_CODE_PHRASE`, `C_DV_QUANTITY`, `C_DV_ORDINAL`, `CONSTRAINT_REF` and `C_PRIMITIVE_OBJECT`, as no constraint;
+- an element in a namespace other than none, v1 and v2, the root and the XSI namespace among them, as the v1 one, a type attribute keeping its XSI namespace;
+- a `<children>` typed `C_COMPLEX_OBJECT` that carries an archetype id, as `C_ARCHETYPE_ROOT`;
+- a `<children>` typed with a `C_PRIMITIVE` class, as a `C_PRIMITIVE_OBJECT` leaf that carries it;
+- an `<item>` typed `C_CODE_PHRASE`, `C_DV_QUANTITY`, `C_DV_ORDINAL` or `CONSTRAINT_REF`, as the object that holds it, of the item's class, and one typed `C_PRIMITIVE_OBJECT` as the item it holds;
+- a `C_REAL` value, or a `C_DV_QUANTITY` magnitude bound, that Go's float parse reads and XML Schema's `double` does not, such as `Inf`, `0x1p-2` or more digits than a `double` holds, as the number Go reads;
+- content before the root element that `encoding/xml` reads, such as text or a CDATA section, and a directive (`<!…>`) or a processing instruction whose target is `xml`, in any letter case, after it, each of which it reads past.
+
+What a tolerance leaves out, such as the attributes of that leaf, is unmatched content, which the report option of [wire.md § REQ-170](wire.md#req-170--unmatched-content-on-decode) reports.
+Content the reader refuses before or after the root element, in either mode, and an element that carries one attribute twice outside what a tolerance leaves out are not well-formed XML: the error wraps `canxml.ErrNotWellFormed` as well as `canxml.ErrInvalidShape`, as for `canxml.Unmarshal` ([wire.md § REQ-056](wire.md#req-056)).
+Markup before the root that `encoding/xml` cannot read fails as its `*xml.SyntaxError` instead, unless content `canxml.Unmarshal` refuses comes before it: the reader then refuses that content in either mode.
+The reader refuses, in every mode, four readings, the first three with an error wrapping `canxml.ErrInvalidShape`:
+
+- an integer that the model's `Integer`, 32 bits as openEHR's is, cannot hold;
+- a `match_negated` of true, which AOM 1.4 cannot express (§ *Shapes the pinned BMM lacks*);
+- an integer bound of positive infinity on a lower side or negative infinity on an upper one, which admits no integer;
+- a `<definition>` typed `ARCHETYPE_SLOT`, or with a class that carries a primitive constraint ([§ REQ-103](#req-103--primitive-constraint-introspection)), a `C_PRIMITIVE` class such as `C_STRING`, one of `C_CODE_PHRASE`, `C_DV_QUANTITY`, `C_DV_ORDINAL` and `CONSTRAINT_REF`, or a `C_PRIMITIVE_OBJECT` whose items carry such a constraint, which the model's definition, a `C_ARCHETYPE_ROOT`, cannot hold, with a `*canxml.DecodeError` of the definition that wraps `typereg.ErrTypeMismatch`.
+
+A `canxml` decode called directly has none of these tolerances.
 
 ### Out of scope
 
@@ -80,7 +123,7 @@ The size limit **MUST** be 32 MiB for an OPT, an uploaded template and a BMM doc
   An input with no root element is refused with an error wrapping `io.ErrUnexpectedEOF`, not a bare `io.EOF`.
 - The element limit is the depth limit counted in the model's XML elements, with the root element at depth 1.
   It is 320 = 2 × 128 + 64: an `<attributes>` and a `<children>` for each of the 128 levels below the definition, and 64 for the root `<template>`, its `<definition>` and the deepest content one constraint object holds, such as an assumed value or an expression tree.
-  The deepest of the 84 corpus OPTs nests 11 levels and 26 elements.
+  The deepest corpus OPT nests 11 levels and 26 elements.
 - A caller that decodes an OPT with `canxml.Unmarshal` or a `canxml.Decoder` itself gets neither limit unless it applies them.
 
 ### Canonical-XML decode depth (`openehr/serialize/canxml/`)
@@ -146,6 +189,7 @@ Each type implements the sealed interface `constraints.PrimitiveConstraint`:
 ```go
 type PrimitiveConstraint interface {
     Validate(value any) []Violation
+    ExampleValue() any         // § Example value emission
     isPrimitive()              // unexported — closes the interface
 }
 ```
@@ -205,7 +249,7 @@ Concretely:
   A date, a time or a date-time is compared with a bound at the precision the two share: field by field from the largest down, over the fields both carry, the seconds with their fraction.
   The first field that differs decides, and two values equal on every shared field are equal.
   A bound so covers the whole period it names: `2021-05` lies within `1900..2021` and outside `1900..<2021`.
-  A time or a date-time is ordered against a bound as [§ REQ-112](#req-112--template-less-reference-model-validation-floor) *DV_INTERVAL* orders two DV_TIME or two DV_DATE_TIME values: at that shared precision when the two are written with one zone designator, or both with none; as instants, each read in UTC by the `magnitude()` of [REQ-123](rm-functions.md#req-123--temporal-data-value-helpers), in which a partial value stands for the start of the period it names, when both carry a zone and the designators differ; and not at all when one carries a zone and the other does not, so such a bound draws no `CodeOutOfRange`.
+  A time or a date-time is ordered against a bound as [§ REQ-112](#req-112--template-less-reference-model-validation-floor) *DV_INTERVAL* orders two DV_TIME or two DV_DATE_TIME values: at that shared precision when the two are written with one zone designator, or both with none; as instants, each read in UTC by the `magnitude()` of [REQ-123](reference-model.md#req-123--temporal-data-value-helpers), in which a partial value stands for the start of the period it names, when both carry a zone and the designators differ; and not at all when one carries a zone and the other does not, so such a bound draws no `CodeOutOfRange`.
   So a `CTime` with the range `>09:30:00+02:00` admits `08:00:00Z`, which is 10:00 at `+02:00`, and `09:00:00`, which has no zone.
   ADL 1.4 asks a closed interval to give a zone on both bounds or on neither (*Intervals*); the SDK does not check that, and orders the value against each bound on its own.
   A bound that the ISO 8601 parse of the constrained type refuses is a value strict mode refuses: `Compile` reads that side as unbounded by default and refuses the bound, with an error wrapping `ErrInvalidInput`, given `templatecompile.WithStrict`; on a `TemporalRange` built in code, such a bound on a side that is not unbounded is malformed (below).
@@ -217,7 +261,7 @@ Concretely:
   `constraints.CodePhraseOf` returns the code phrase constraint a `CodePhrase` or a `CodeReference` carries, so a consumer with no use for the reference set reads the two alike: the validator, the example generator, the Web Template builder and the FLAT decode read a `C_CODE_REFERENCE` as its code phrase constraint.
 - `DvQuantity.Validate` accepts a `constraints.QuantityValue` `{Magnitude, Units, Precision}` triple.
   It **MUST** judge units by `Units` where that list is non-empty and by `PropertyUnits` only where it is empty, reporting a value whose units the list in force does not hold as a `CodeUnitUnknown`: with entries listed, a value whose units no entry lists is refused and `PropertyUnits` is not consulted, so a listed unit the property does not admit is accepted; with an empty `Units` list, a value whose units are not in a non-empty `PropertyUnits` is refused, as the specifications-CNF conformance schedule's case `CONT-DV_QUANTITY-validate_property` rejects `mg` under the property `openehr::122` (length); with both empty, any units are accepted.
-  The compile step **MUST** fill `PropertyUnits` when `Property` is an `openehr` code that the property-unit table of [rm-modeling.md § REQ-034](rm-modeling.md#openehr-terminology-vocabulary-req-034) (TERM `PropertyUnitData.xml`) lists, with that property's UCUM units, its primary units first and each part in source order, and **MUST** leave it empty for any other terminology or code.
+  The compile step **MUST** fill `PropertyUnits` when `Property` is an `openehr` code that the property-unit table of [reference-model.md § REQ-034](reference-model.md#openehr-terminology-vocabulary-req-034) (TERM `PropertyUnitData.xml`) lists, with that property's UCUM units, its primary units first and each part in source order, and **MUST** leave it empty for any other terminology or code.
   The table is closed: a UCUM code that measures the property but that the table does not list for it is a `CodeUnitUnknown`, such as `ml` under `openehr::129` (volume), where the table lists `mL`.
   With an empty `Units` list, `ExampleValue` returns magnitude 0 in the first entry of `PropertyUnits`, or `{0, "1"}` when that is empty too.
 - `CDvOrdinal.Validate` accepts either an `int` (ordinal value) or a `constraints.OrdinalSymbol` `(value, symbol)` pair.
@@ -248,7 +292,7 @@ The class of each `Violation` field, and where the value goes, are in [§ REQ-16
 
 ### Numeric range
 
-`NumericRange` is the inclusive / exclusive interval shape used by `CInteger`, `CReal`, `DvQuantity.Magnitude`, and `DvQuantity.Precision`:
+`NumericRange` is the inclusive / exclusive interval shape used by `CInteger`, `CReal`, and the `Magnitude` and `Precision` of each `DvQuantity` entry (`QuantityUnit`):
 
 - `Lower` / `Upper` (float64; lossless for INTEGER up to 2^53)
 - `LowerInclusive` / `UpperInclusive` (a flag the OPT omits is read by [wire.md § REQ-169](wire.md#req-169--interval-boundary-flag-defaults): true on a bounded side, false on an unbounded one; a caller building a range sets the flags itself, since the struct's zero value is *exclusive* on both sides)
@@ -364,7 +408,7 @@ Two limits remain: a round-tripped `DV_INTERVAL` with no bound present carries n
 
 The validator treats the **compiled OPT as authoritative for structure** and the **composition as the instance under test**.
 Structural traversal is template-driven: for each compiled OPT node, the walker reads the corresponding RM property by `rm_attribute_name`, enforces existence / cardinality / alternatives, and recurses into matched RM children.
-A declared attribute no instance can carry is left out, as [§ REQ-171 *One walk*](#req-171--validation-engine) says.
+A declared attribute no instance can carry is left out, as [§ REQ-171 *One walk*](#one-walk) says.
 `Issue.Path` is written by § Issue paths below.
 Composition-supplied predicates never form lookup keys, so missing nodes are reported instead of silently bypassed.
 
@@ -379,7 +423,7 @@ Composition-supplied predicates never form lookup keys, so missing nodes are rep
 | **Structural — alternatives (C_SINGLE_ATTRIBUTE)** | The value is checked against the attribute's child constraints. The children are alternatives, only one of which the value needs to match (ADL 1.4 *cADL*, *Single-valued Attributes*; AOM 1.4 `C_SINGLE_ATTRIBUTE`, whose children are alternative object constraints). Binding prefers the most specific child, in three tiers: a child whose `RMTypeName` equals the value's RM type (for a round-tripped bare `DV_INTERVAL`, the parameterised type its bounds give; one with no bound present has no parameter, so only a bare `DV_INTERVAL` child names its type, and a `DV_INTERVAL<T>` child admits it in the third tier, as § *Roots beyond COMPOSITION* says); then a child naming the AOM 1.4 primitive short name whose canonical DV wrapper the value is; then a child the type only conforms to by BMM descent, or an untyped child. Within the first tier that admits the value, validators **MUST** bind it to a child under whose constraints it validates, where one does, and otherwise to the first child of that tier, reporting the findings it draws there. A value validates under a child when walking it under that child reports no finding that makes `Result.OK` false and, at a slot child, the slot's assertions admit its archetype id; the walk tries the children in OPT order and binds to the first under which the value validates. This trial is the validators' alone: the builder ([§ REQ-101](#req-101--generic-opt-driven-composition-builder) *Type enforcement*) and the generator ([§ REQ-107](#req-107--template-driven-rm-instance-example-generator) *What a visit writes*) bind by the tiers alone, to the first child of the first tier that admits the type. When no tier admits the value: exactly one child → `rm_type_mismatch`; two or more children → `alternative_mismatch` |
 | **Structural — RM type match** | the RM instance's concrete type conforms to the OPT child's `RMTypeName`: equal to it, or a descendant of it in the pinned RM BMM's class hierarchy, whether that ancestor is abstract or concrete (a `DV_CODED_TEXT` satisfies `DV_TEXT`, a `PARTY_REF` satisfies `OBJECT_REF`). A `DV_INTERVAL<T>` child matches a typed instantiation `DV_INTERVAL<U>` whose parameter `U` is `T` or descends from it, so `DV_INTERVAL<DV_COUNT>` matches a `DV_INTERVAL<DV_QUANTIFIED>` child, and a round-tripped interval that decodes as the bare `DV_INTERVAL` by the runtime types of its bounds, each present bound having to be a `T` or of a class that descends from it; an AOM 1.4 primitive short name admits its canonical DV wrapper, the type the [REQ-107](#req-107--template-driven-rm-instance-example-generator) generator builds for it (`DURATION` → `DV_DURATION`, `DATE` → `DV_DATE`, `TIME` → `DV_TIME`, `DATE_TIME` → `DV_DATE_TIME`, `BOOLEAN` → `DV_BOOLEAN`, `INTEGER` → `DV_COUNT`). Single-child attributes surface failures as `rm_type_mismatch` at the attribute path |
 | **Identity — archetype / node id pinning** | LOCATABLE.archetype_node_id is checked against the matched OPT child's `ArchetypeID()` (for archetype roots) or `NodeID()` (for inner at-codes) |
-| **Structural — binding items (C_MULTIPLE_ATTRIBUTE)** | A LOCATABLE item binds among the non-slot children whose `ArchetypeID()` (archetype root) or `NodeID()` equals its `archetype_node_id`, else to the first slot whose assertions admit that id. Where two or more non-slot children carry the id, as when a template reuses one archetype under several template-level names ([REQ-116](#req-116--template-level-node-naming-and-name-predicated-paths)), the item's `name` value ranks them: first those whose pinned name equals it; failing any, those that pin no name; failing any, all of them. The item binds among the children of the first rank that holds one. Among the children of one rank, validators **MUST** bind the item to a child that has room and under whose constraints the item validates, as *Structural — alternatives* reads it, where one does; failing that, to the first of them that has room; failing that, to the first of them, whose occurrences or name constraint then reports the mismatch. The walk tries them in OPT order and binds to the first that has room and under which the item validates. A child has room while the items of the same list bound to it before, in item order, number fewer than its occurrences upper bound; one that states no upper bound always has room. The item's `name` decides the binding only and never reaches a path or a message ([REQ-168](#req-168--value-free-validation-diagnostics)). Items that are not a LOCATABLE bind by RM type (§ *Items that are not a LOCATABLE*) |
+| **Structural — binding items (C_MULTIPLE_ATTRIBUTE)** | A LOCATABLE item binds among the non-slot children whose `ArchetypeID()` (archetype root) or `NodeID()` equals its `archetype_node_id`, else to the first slot whose assertions admit that id. Where two or more non-slot children carry the id, as when a template reuses one archetype under several template-level names ([§ REQ-111 § Node names and name predicates](#node-names-and-name-predicates)), the item's `name` value ranks them: first those whose pinned name equals it; failing any, those that pin no name; failing any, all of them. The item binds among the children of the first rank that holds one. Among the children of one rank, validators **MUST** bind the item to a child that has room and under whose constraints the item validates, as *Structural — alternatives* reads it, where one does; failing that, to the first of them that has room; failing that, to the first of them, whose occurrences or name constraint then reports the mismatch. The walk tries them in OPT order and binds to the first that has room and under which the item validates. A child has room while the items of the same list bound to it before, in item order, number fewer than its occurrences upper bound; one that states no upper bound always has room. The item's `name` decides the binding only and never reaches a path or a message ([REQ-168](#req-168--value-free-validation-diagnostics)). Items that are not a LOCATABLE bind by RM type (§ *Items that are not a LOCATABLE*) |
 | **Primitive constraints** | REQ-103 `PrimitiveConstraint.Validate` runs at every primitive leaf the OPT declares; bound to the RM value found by the structural walk. A part of a value that the RM rules report as absent or empty is theirs to report, not the constraint's: the RM's `required` at that part stands for the constraint's finding there, beside any finding of an RM rule's own (§ REQ-112 *Coded invariants*; [§ REQ-171](#req-171--validation-engine) *One finding per defect*). The parts are the `code_string` of a CODE_PHRASE, a DV_CODED_TEXT's defining code included, whose terminology the constraint still judges; the `units` of a DV_QUANTITY, which leaves the constraint nothing to judge, its ranges being per unit; the `value` of the DV_DATE, DV_TIME, DV_DATE_TIME or DV_DURATION an AOM 1.4 short name binds; and the code string of a DV_ORDINAL's `symbol`, when the validator passes the `value` alone for the constraint to judge. When the walk stops before the RM rules report the part, at the depth limit or the visit limit, the constraint judges it as it judges any value, so the part is reported either way. The constraint **MUST** still judge a CODE_PHRASE's terminology; a DV_ORDINAL's `value`, which the validator passes alone when the RM rules report the symbol's code string; a part the RM rules let be blank, such as a DV_SCALE symbol's `code_string`; and a part the RM does not require, such as an optional String, which it judges as any value. At a DV_ORDINAL bound to a `C_DV_ORDINAL` whose symbol's defining code carries a code string, a symbol that does not match its value **MUST** be reported: the validator passes the `value` and that code together as one `constraints.OrdinalSymbol`; a code that names no terminology matches a listed pair under § REQ-103's rule, and the RM rules report the missing terminology. A `CONSTRAINT_REF` leaf constrains nothing the walker can check locally, so the walker still checks the RM-mandatory attributes of the value it binds there (a CODE_PHRASE's `terminology_id` and `code_string`), as at a node the OPT leaves unconstrained |
 | **Slot fit — assertion grammar** | § REQ-103 *Slot assertions*: `CompiledNode.AllowsArchetypeID` (includes / excludes with RM-type-prefix fallback when no includes parsed) |
 | **Extra RM nodes not declared in OPT** | not flagged |
@@ -407,11 +451,11 @@ Composition-supplied predicates never form lookup keys, so missing nodes are rep
 | `is_archetype_root` | an absent or `null` `archetype_details` on an archetype-root node (REQ-112 floor) |
 | `rm_version_valid` | an empty `ARCHETYPED.rm_version`, and one the document leaves out or sends as `null` on a value validated with no report of missing members; with the report it is `required` instead ([§ *Value-typed mandatory presence*](#value-typed-mandatory-presence)) |
 | `code_not_in_value_set` | a coded attribute outside the openEHR terminology group or code set its RM invariant names, reported at the CODE_PHRASE the invariant reads (REQ-112 floor, *Coded invariants*) |
-| `max_depth` | the walk hit its recursion-depth limit ([§ REQ-171 *One walk*](#req-171--validation-engine)) |
-| `max_nodes` | the walk hit its per-call visit limit and stopped ([§ REQ-171 *One walk*](#req-171--validation-engine)) |
-| `cyclic_value` | a value that contains itself, reported where it recurs ([§ REQ-171 *One walk*](#req-171--validation-engine), REQ-112 *Driver*) |
+| `max_depth` | the walk hit its recursion-depth limit ([§ REQ-171 *Cycles and limits*](#cycles-and-limits)) |
+| `max_nodes` | the walk hit its per-call visit limit and stopped ([§ REQ-171 *Cycles and limits*](#cycles-and-limits)) |
+| `cyclic_value` | a value that contains itself, reported where it recurs ([§ REQ-171 *Cycles and limits*](#cycles-and-limits)) |
 | `invalid_shape` | input that does not decode into the root handed to `ValidateJSON`, `ValidateXML`, their `Validator` methods or the deprecated `ValidateRMEHRStatusBytes`: malformed canonical JSON or XML, or a JSON root that is not an object (REQ-112 floor, *Value-typed mandatory presence*) |
-| `rm_type_unknown` | a Go value outside the v2 closed RM set handed to `ValidateRM` (REQ-112 floor) |
+| `rm_type_unknown` | a Go value handed to `ValidateRM` whose type is no RM type the type registry knows (REQ-112 floor) |
 | `nil_root` / `nil_folder` / `nil_ehr_status` / `nil_ehr_access` / `nil_party` | global guards: a nil argument to `ValidateRM` or a typed RM-floor wrapper (REQ-112 floor) |
 | `nil_composition` / `nil_template` | global guards — caller supplied a nil argument |
 
@@ -419,13 +463,13 @@ Existence and child-count cardinality are **independent constraints** on a list:
 So a multi-valued attribute with `existence.lower ≥ 1` and `cardinality.lower ≥ 1` whose list is present and empty fails both, and validators **MUST** report both `required` and `cardinality` at its path, as collect-all makes natural; a consumer that de-duplicates for display can treat the pair as one failure at that path.
 A list's own `cardinality` is also reported, where it fails, while the list holds an item.
 Validators **MUST NOT** report it while the list is absent, nor while the list is present and empty and the template leaves it optional by its existence (*A mandatory child under an optional list* below).
-A list the template requires by its existence, its existence lower bound bounded and at least 1, that the instance does not carry, absent as [§ REQ-171 *Structural access*](#req-171--validation-engine) reads presence, fails existence alone: there is no container to count, so the `occurrences` of its children **MUST NOT** be reported either.
+A list the template requires by its existence, its existence lower bound bounded and at least 1, that the instance does not carry, absent as [§ REQ-171 *Structural access*](#structural-access) reads presence, fails existence alone: there is no container to count, so the `occurrences` of its children **MUST NOT** be reported either.
 
 #### An existence lower bound alone asks for no member
 
 On a multi-valued attribute, existence says whether the container exists and cardinality how many members it holds (ADL 1.4, *Attribute constraints*, *Existence*), so a container with no member meets an existence lower bound of 1 where the counts allow none (AOM 1.4, `C_MULTIPLE_ATTRIBUTE`: existence "says whether the container object will be there (at all)", cardinality "how many items" the container holds).
-A list the instance does not carry is no container, so it fails that existence whatever its counts ask: validators **MUST** report `required` on the template layer, rule `existence`, at the path of a multi-valued attribute whose existence lower bound is bounded and at least 1 and whose list is absent, as [§ REQ-171 *Structural access*](#req-171--validation-engine) reads presence, and nothing for its children's `occurrences` or its own `cardinality` (above).
-Canonical JSON can carry such a list with no member: it writes `ITEM_LIST.items`, `ITEM_TREE.items` and `ITEM_TABLE.rows` present and empty ([bmm-conformance.md § Property → Go field](bmm-conformance.md#property--go-field)).
+A list the instance does not carry is no container, so it fails that existence whatever its counts ask: validators **MUST** report `required` on the template layer, rule `existence`, at the path of a multi-valued attribute whose existence lower bound is bounded and at least 1 and whose list is absent, as [§ REQ-171 *Structural access*](#structural-access) reads presence, and nothing for its children's `occurrences` or its own `cardinality` (above).
+Canonical JSON can carry such a list with no member: it writes `ITEM_LIST.items`, `ITEM_TREE.items` and `ITEM_TABLE.rows` present and empty ([reference-model.md § Property → Go field](reference-model.md#property--go-field)).
 Two readings cannot carry it: canonical XML writes no element for an empty list ([wire.md § REQ-056](wire.md#req-056)), and a FLAT or STRUCTURED decode without the template has no key for a structure with no member ([wire.md § REQ-053](wire.md#req-053)), so a document read from either with such a list holding no member draws `required` there.
 A FLAT or STRUCTURED decode given the template rebuilds a required structure with no member with its list present and empty where the generator writes it so ([wire.md § REQ-053](wire.md#req-053)).
 Validators **MUST NOT** report `required` on the template layer for the existence of a multi-valued attribute whose list is present and empty, unless the template asks for a member there.
@@ -448,7 +492,7 @@ A list the template prohibits (*Structural — prohibited attributes* above) lea
 The children of a list the OPT writes as a single-valued attribute, as some OPTs write a `COMPOSITION`'s `content` under a `C_SINGLE_ATTRIBUTE`, are alternatives that attribute's existence decides (§ REQ-107 *Visit rule*), so an absent such list draws nothing from them.
 An absent list holds no item, so each such child whose occurrences lower bound is bounded and at least 1 draws its occurrences finding, `cardinality` with rule `occurrences`, at the path § *Issue paths* writes for a node the OPT requires and the instance lacks: the child's own predicate below the list's path, or the list's path for a child that declares no id.
 ADL 1.4 calls such a child mandatory in its container and leaves an optional container to its existence; that the child also asks for its container is the reading § REQ-107 *Visit rule* chooses, so that a list `Generate` leaves out under `Required` that the template leaves optional by its existence is one validators accept as absent.
-On a list the template leaves optional by its existence, the list's own `cardinality` is not reported when the list is absent, since ADL 1.4 makes such a container "optional, but if present" bound by its cardinality (*Cardinality*), nor when it is present and empty, since canonical XML writes no element for an empty list ([wire.md § REQ-056](wire.md#req-056)) and canonical JSON leaves out a present empty optional list other than those [bmm-conformance.md § Property → Go field](bmm-conformance.md#property--go-field) names ([wire.md § REQ-052](wire.md#req-052), *An absent mandatory member*): an absent and an empty optional list draw the same template findings, as they do on existence.
+On a list the template leaves optional by its existence, the list's own `cardinality` is not reported when the list is absent, since ADL 1.4 makes such a container "optional, but if present" bound by its cardinality (*Cardinality*), nor when it is present and empty, since canonical XML writes no element for an empty list ([wire.md § REQ-056](wire.md#req-056)) and canonical JSON leaves out a present empty optional list other than those [reference-model.md § Property → Go field](reference-model.md#property--go-field) names ([wire.md § REQ-052](wire.md#req-052), *An absent mandatory member*): an absent and an empty optional list draw the same template findings, as they do on existence.
 
 **Open multi-valued attributes** — when a C_MULTIPLE_ATTRIBUTE declares no `<children>` (the OPT pinned only existence / cardinality, not membership), validators MUST accept any RM item under that attribute without firing `slot_fill`.
 The constraint surface is the attribute itself; the items inside are unconstrained.
@@ -468,13 +512,13 @@ The template-driven validators (this REQ) and the floor ([REQ-112](#req-112--tem
 An item's predicate is:
 
 - `[atNNNN]`, its `archetype_node_id` (an archetype id on an archetype root), when no other item of the same attribute carries that id;
-- `[atNNNN, 'name']` when another item shares the id and the OPT node the item binds to pins a name ([REQ-116](#req-116--template-level-node-naming-and-name-predicated-paths)) that tells it apart, the name single-quoted with `'` and `\` escaped by a backslash;
+- `[atNNNN, 'name']` when another item shares the id and the OPT node the item binds to pins a name ([§ REQ-111 § Node names and name predicates](#node-names-and-name-predicates)) that tells it apart, the name single-quoted with `'` and `\` escaped by a backslash;
 - `[n]`, the item's 1-based position in the attribute, in every other case: an item with no `archetype_node_id`, or one whose id is shared and whose OPT node pins no telling name.
 
-An entry of a hash attribute ([§ REQ-171 *Structural access*](#req-171--validation-engine)) **MUST** be written `[n]`, its 1-based position in ascending key order, never with its key: a key is instance data, and the quoted-key form ODIN shows in its examples (`["en"]`) would carry it into the path.
+An entry of a hash attribute ([§ REQ-171 *Structural access*](#structural-access)) **MUST** be written `[n]`, its 1-based position in ascending key order, never with its key: a key is instance data, and the quoted-key form ODIN shows in its examples (`["en"]`) would carry it into the path.
 
 A node the OPT requires and the instance lacks is written with the OPT child's own predicate, since no item exists to number; a child that declares no id has none and is written at the attribute's path.
-The floor binds no OPT node, so on its own it never writes a name predicate; inside a template-driven validation the RM rules run in the walk that binds the template ([§ REQ-171 *One walk*](#req-171--validation-engine)), so a node they judge carries the path that walk wrote for it, its name predicate included.
+The floor binds no OPT node, so on its own it never writes a name predicate; inside a template-driven validation the RM rules run in the walk that binds the template ([§ REQ-171 *One walk*](#one-walk)), so a node they judge carries the path that walk wrote for it, its name predicate included.
 
 A path carries no value from the instance, as [REQ-168](#req-168--value-free-validation-diagnostics) requires of every value-free field: a name predicate is always a name the OPT pins, never the instance's own `name`.
 A path with no positional predicate is a valid AQL path; the AQL grammar has no positional predicate, so one with `[n]` is an openEHR path but not AQL.
@@ -482,7 +526,7 @@ A path with no positional predicate is a valid AQL path; the AQL grammar has no 
 ### RM floor
 
 Every entry point of this REQ, `ValidateComposition`, `Validate` and the typed wrappers of § *Roots beyond COMPOSITION*, **MUST** apply the [REQ-112](#req-112--template-less-reference-model-validation-floor) rules in the walk that applies the template and return their findings in the same `Result` ([ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md), [ADR 0027](../adr/0027-template-admission-before-rm-rules.md)): on every node the template admits, the nodes it does not constrain included, and on no content it refuses.
-[§ REQ-171 *One walk*](#req-171--validation-engine) orders the steps at each node and says which layer reports an attribute both layers find missing or empty, so that absence is one finding; an RM rule's own finding at the same path, such as a code outside its terminology group, is reported beside it.
+[§ REQ-171 *One walk*](#one-walk) orders the steps at each node and says which layer reports an attribute both layers find missing or empty, so that absence is one finding; an RM rule's own finding at the same path, such as a code outside its terminology group, is reported beside it.
 No option leaves the RM rules out of these entry points; `ValidateRM` and its typed wrappers are the entries for the RM rules alone.
 
 ### Sentinels
@@ -515,7 +559,7 @@ Global guard codes (`nil_composition`, `nil_template`) return `nil` from `Issue.
 ### Out of scope (this REQ)
 
 - **AQL lint** (`ValidateAQL`) — a separate entry point under REQ-109; it does not change the composition-validation surface.
-- **Validating wire bytes / canonical JSON** — callers decode first, validate second ([REQ-013](module-layout.md#req-013--building-block-independence)).
+- **Decoding wire bytes** — `ValidateComposition` takes a decoded value; the decode-aware entries `ValidateJSON` and `ValidateXML` are [§ REQ-112](#value-typed-mandatory-presence)'s.
 - **External terminology lookup** — value-set membership against SNOMED CT / LOINC / external services.
   REQ-103 closed-code-list checking is the v1 ceiling.
 - **A coded text's `value` against its code's term text** — no RM invariant ties a DV_CODED_TEXT's `value` to the term text of its `defining_code`, so the template validator does not compare them, although some CDRs do; the generator writes the term text ([§ REQ-107](#req-107--template-driven-rm-instance-example-generator)).
@@ -554,7 +598,7 @@ const (
     Large                  // every attribute the visit rule allows, a member of each optional archetype and of each use of one
 
     Minimal  = Required // alias
-    Complete = Large    // alias, until a complete level of its own lands
+    Complete = Large    // alias
 )
 
 func ParsePolicy(name string) (Policy, error)
@@ -598,7 +642,7 @@ An empty `Options.Language` **SHOULD** be read as `Compiled.Language()`, and as 
 
 #### Visit rule
 
-Under every policy, `Generate` does not visit an attribute that no serialization carries, a BMM function among them, the set `rminfo.IsNonStorableAttr` names and [§ REQ-112 *Driver*](#driver) lists; an attribute the compile marks as one the node's RM class does not have (`CompiledAttribute.NotInRM`, [§ REQ-111](#req-111--public-compiled-template-bridge) *Attributes the RM does not have*), such as `ISM_TRANSITION.name`, whatever existence the OPT gives it, since no instance can carry it and the template validator leaves it out and lists its path in its coverage ([§ REQ-171 *One walk*](#req-171--validation-engine)); a DV_MULTIMEDIA's `data`, whose octets bind to no OPT child ([§ REQ-102](#req-102--composition-validation) *A mandatory child under an optional list*) and which *RM defaults* below write instead; or a locatable's `uid`, which *Identity* below governs.
+Under every policy, `Generate` does not visit an attribute that no serialization carries, a BMM function among them, the set `rminfo.IsNonStorableAttr` names and [§ REQ-112 *Driver*](#driver) lists; an attribute the compile marks as one the node's RM class does not have (`CompiledAttribute.NotInRM`, [§ REQ-111](#req-111--public-compiled-template-bridge) *Attributes the RM does not have*), such as `ISM_TRANSITION.name`, whatever existence the OPT gives it, since no instance can carry it and the template validator leaves it out and lists its path in its coverage ([§ REQ-171 *One walk*](#one-walk)); a DV_MULTIMEDIA's `data`, whose octets bind to no OPT child ([§ REQ-102](#req-102--composition-validation) *A mandatory child under an optional list*) and which *RM defaults* below write instead; or a locatable's `uid`, which *Identity* below governs.
 Under every policy, `Generate` does not visit an attribute the generator has no writer for (§ [Exceptions and known gaps](#exceptions-and-known-gaps), *Known gap: attributes the generator cannot write*) unless it is required, as defined below, by more than its cardinality lower bound alone, which does not ask for the container (below), and is not a list that only its existence asks a member of (*What a visit writes*), which is left out (*Known gap: required lists canonical JSON cannot carry empty*); where the walk would visit one, `Generate` returns the error § [Errors](#errors) names for it, since a root without it would fail the template validator.
 An OPT child is *allowed* unless its occurrences upper bound is 0, and the OPT *prohibits* an attribute whose existence upper bound is 0, or that has at least one OPT child and allows none of them; `Generate` does not visit an attribute the OPT prohibits unless an RM rule needs it (§ [Precedence](#precedence)), though it writes such a list present and empty where its existence asks for it (*What a visit writes*).
 Wherever this requirement says the BMM marks an attribute mandatory, it reads the BMM on the class the walk builds for the attribute's node: a concrete descendant for a node that names an abstract class (*What a visit writes*), and the type *Generic and untyped types* gives an untyped one.
@@ -621,7 +665,7 @@ Under `Required`, it **MUST** visit every other attribute that is required, exce
 Under every policy, `Generate` **MUST** write a `COMPOSITION`'s `context`, the one exception to those three rules, and build it under the OPT's constraints as `Medium` does.
 A cardinality lower bound counts the members of a container that exists and does not ask for the container, which its existence decides (AOM 1.4, *Attribute Node Types*: existence "says whether the container object will be there (at all)", cardinality "how many items" the container holds; ADL 1.4, *Cardinality*: "optional, but if present, is a container").
 So `Required` leaves out an optional list that only its cardinality asks a member of, such as a `COMPOSITION`'s `content` at existence `0..1` and cardinality `1..*` whose children are all optional, and the bound counts the members of a list `Required` visits for another reason (*What a visit writes*).
-The three follow the levels of the ITS-REST template example's `detail_level` ([`definition-validation.openapi.yaml`](../../resources/its-rest/definition-validation.openapi.yaml)): `Required` builds its `required` level, the data points the template makes mandatory and a composition's `context`; `Medium` its `medium` level, with at most one optional archetype under an attribute (*What a visit writes*); and `Large` a member of every optional archetype the template names that needs no undescribed content (§ [Slot fills](#slot-fills)), and of every use of one, named or not, short of the `complete` level; until that level lands, `Complete` is another name for `Large` (§ [Primitive-leaf value fill](#primitive-leaf-value-fill), *Deferred*).
+The three follow the levels of the ITS-REST template example's `detail_level` ([`definition-validation.openapi.yaml`](../../resources/its-rest/definition-validation.openapi.yaml)): `Required` builds its `required` level, the data points the template makes mandatory and a composition's `context`; `Medium` its `medium` level, with at most one optional archetype under an attribute (*What a visit writes*); and `Large` a member of every optional archetype the template names that needs no undescribed content (§ [Slot fills](#slot-fills)), and of every use of one, named or not, short of the `complete` level; `Complete` is another name for `Large` (§ [Primitive-leaf value fill](#primitive-leaf-value-fill), *The `Complete` level*).
 An attribute the BMM marks mandatory that a compiled node does not carry, as under `templatecompile.WithoutImplicitAttributes`, is visited as if the node carried it with no OPT child.
 
 #### What a visit writes
@@ -641,7 +685,7 @@ So `CLUSTER.items` at cardinality `3..*` over an `at0001` at occurrences `1..1` 
 Only where no allowed child has room, as in an OPT whose cardinality lower bound exceeds what its children's occurrences allow (§ [Exceptions and known gaps](#exceptions-and-known-gaps)), is the member one of its first allowed child, past that child's occurrences.
 Where only its existence asks for that member, because the BMM does not mark the attribute mandatory, neither its cardinality lower bound nor the occurrences lower bound of a child it allows is bounded and at least 1, and it is not a list that [§ REQ-102](#req-102--composition-validation) *An existence lower bound alone asks for no member* names as one the RM makes non-empty once present, the top-up takes only its first source, a member of the first allowed child with room that needs no undescribed content and whose identity no earlier sibling with room carries, and the attribute gets no member where it has no such child, since, as that section says, a present list with no member meets its existence.
 Such a list is still there: existence says whether the container is there at all, and cardinality how many members it holds (AOM 1.4, *Attribute Node Types*).
-So a list whose existence lower bound is bounded and at least 1, that the walk visits or the OPT prohibits by prohibiting every child of it, and that the walk gives no member, this way or any other, **MUST** be written present and empty where canonical JSON carries an empty list, which [bmm-conformance.md § Property → Go field](bmm-conformance.md#property--go-field) names, namely `ITEM_LIST.items`, `ITEM_TREE.items` and `ITEM_TABLE.rows`, and is left out otherwise (*Known gap: required lists canonical JSON cannot carry empty*).
+So a list whose existence lower bound is bounded and at least 1, that the walk visits or the OPT prohibits by prohibiting every child of it, and that the walk gives no member, this way or any other, **MUST** be written present and empty where canonical JSON carries an empty list, which [reference-model.md § Property → Go field](reference-model.md#property--go-field) names, namely `ITEM_LIST.items`, `ITEM_TREE.items` and `ITEM_TABLE.rows`, and is left out otherwise (*Known gap: required lists canonical JSON cannot carry empty*).
 A list the RM makes non-empty once present does not meet its existence with no member.
 A HISTORY's `events`, while the HISTORY has no `summary`, are left to § [Precedence](#precedence) 2, which gives a HISTORY left with neither one of them.
 Any other such list whose existence lower bound is bounded and at least 1 is topped up to one member from the sources above, as a list its cardinality asks a member of is, so that it holds a member or `Generate` returns the error § [Errors](#errors) names for the member it cannot build: `ErrArchetypeIDMissing` for an object of an archetype-root class the OPT names no archetype id for, and `ErrSlotFillUnsupported` for a slot whose includes cannot be satisfied.
@@ -704,7 +748,7 @@ A locatable's `name` coded so, whose `value` a `C_STRING` constrains and whose `
 Under every policy, the generator **SHOULD** give a `uid`, from `Options.UIDSource` or from its random fallback when `UIDSource` is nil, to a locatable it writes only where the OPT requires its `uid` (an existence lower bound of at least 1), and to no other locatable, a `COMPOSITION`, an ENTRY, a `GENERIC_ENTRY`, a `PARTY` and a `PARTY_RELATIONSHIP` included, as a slot fill and a locatable built from a BMM type are: the server that stores a top-level object gives it its version id, and the RM recommends that a top-level object's `uid` copy that id, while paths, not uids, identify the nodes inside it, so the `uid` "will usually be empty in most EHR data" (RM Common IM, *Unique Node Identification*).
 That a `PARTY` and a `PARTY_RELATIONSHIP` are left without a `uid`, as a `COMPOSITION` and an ENTRY are, is the reading this specification chooses, so that the server that stores a generated object assigns its id; a `PARTY` then breaks `Uid_mandatory` until it does (§ [Exceptions and known gaps](#exceptions-and-known-gaps)).
 When an `OBJECT_REF` the generator writes, a `PARTY_RELATIONSHIP`'s `source` and `target` included, carries no id value, the generator **SHOULD** give the id a value in its class's form, so that the reference's mandatory id holds a well-formed value: the value of a uid drawn the same way for a HIER_OBJECT_ID, a GENERIC_ID, a TEMPLATE_ID or a TERMINOLOGY_ID; that value followed by `::example::1`, a creating system `example` and the first trunk version, for an OBJECT_VERSION_ID; and `openEHR-EHR-CLUSTER.example.v1` for an ARCHETYPE_ID.
-Every `ARCHETYPED` the generator writes **MUST** carry `rm.Release`, the RM release the SDK is generated from, as its `rm_version` ([bmm-conformance.md § Generator output conventions](bmm-conformance.md#generator-output-conventions)).
+Every `ARCHETYPED` the generator writes **MUST** carry `rm.Release`, the RM release the SDK is generated from, as its `rm_version` ([reference-model.md § Generator output conventions](reference-model.md#generator-output-conventions)).
 The template root's `ARCHETYPED`, when it has one, **MUST** carry the template id, and the generator **MUST NOT** write the template id in any other.
 
 #### Reproducible uids
@@ -825,7 +869,7 @@ A DV_MULTIMEDIA's `data` is an array of octets that no OPT child describes, so t
 
 #### Known gap: required lists canonical JSON cannot carry empty
 
-A list the OPT requires by its existence that the walk gives no member is left out where canonical JSON cannot carry it empty, which is any list but those [bmm-conformance.md § Property → Go field](bmm-conformance.md#property--go-field) names (§ Contract *What a visit writes*).
+A list the OPT requires by its existence that the walk gives no member is left out where canonical JSON cannot carry it empty, which is any list but those [reference-model.md § Property → Go field](reference-model.md#property--go-field) names (§ Contract *What a visit writes*).
 Among the lists that cannot is a list the RM keeps non-empty once present other than those [§ REQ-112 *Non-empty lists*](#req-112--template-less-reference-model-validation-floor) evaluates, such as `PARTY.contacts`, `ACTOR.roles` or `ENTRY.other_participations`.
 Validators report such a list `required` ([§ REQ-102](#req-102--composition-validation)), so a root that leaves one out is outside § Contract *Output*.
 
@@ -848,12 +892,10 @@ The SDK **MUST** offer two fills, and read a `ValueFill` other than `RandomFill`
 A `Source` is not safe for concurrent use, so each concurrent `Generate` takes its own source, or leaves it `nil` for the concurrency-safe global.
 The composition builder surfaces the seam as `composition.WithValueFill` / `composition.WithValueSource`.
 
-#### Deferred
+#### The `Complete` level
 
 `Complete` is an alias of `Large`.
-A complete level of its own, the ITS-REST `detail_level=complete` (every data point the template allows, as reference guidance, not expected to be committable), is planned but not delivered and not a priority; when it lands, `Complete` becomes its own value.
-That level is **not** part of the v1 `Policy` contract.
-Tracked in the roadmap.
+The ITS-REST `detail_level=complete` level, every data point the template allows as reference guidance and not expected to be committable, is not part of the `Policy` contract.
 
 ### Trust model
 
@@ -916,8 +958,8 @@ Two entry points:
 ### Contract
 
 - **Composition-specific options** — `WithLanguage(code)`, `WithTerritory(code)`, `WithComposer(p)`, `WithCategory(c)`, `WithNow(t)`.
-  The first four translate to fields on `instance.Options` and pin `Composition.language` / `.territory` / `.composer` / `.category`.
-  `WithNow` injects the clock used for `EVENT.time` and `EventContext.start_time` defaults so tests stay deterministic.
+  The first three translate to fields on `instance.Options` and pin `Composition.language` / `.territory` / `.composer`; `WithCategory` sets `Composition.category` on the generated skeleton, over any category the OPT declares.
+  `WithNow` injects the clock used for `EVENT.time` and `EVENT_CONTEXT.start_time` defaults so tests stay deterministic.
 - **Uid source** — `WithUIDSource(src)` **MUST** pass `src` to `instance.Options.UIDSource`, for `NewSkeleton` and `NewBuilder` alike, so every uid the skeleton carries comes from `src` ([§ REQ-107](#req-107--template-driven-rm-instance-example-generator) *Identity*); a nil `src`, or no `WithUIDSource`, leaves the generator's random fallback in force.
   With `instance.UIDsFrom` on a fixed source, `WithNow` and, under `instance.RandomFill`, `WithValueSource`, a skeleton is reproducible as REQ-107 *Reproducible uids* says.
 - **Skeleton policy** — `WithPolicy(p)` selects the [§ REQ-107](#req-107--template-driven-rm-instance-example-generator) `instance.Policy` `NewSkeleton` passes to `instance.Generate`.
@@ -948,7 +990,6 @@ The builder's own part is to translate its options into `instance.Options` and t
 ### Out of scope
 
 - **Per-template generated Go structs.** v1 stays generic — consumers do not import codegen'd vital-signs structs through this package.
-  OET-driven authoring is a follow-up.
 - **FLAT / STRUCTURED ingest.** Caller decodes externally (REQ-053) and feeds the resulting `*rm.Composition` through validation.
 - **Slot resolution against a federated archetype repository.** Same compromise as REQ-102 / REQ-107: pinned slot fills come from the OPT.
 - **Encoding to wire bytes.** Callers run `canjson.Marshal` / `canxml.Marshal` themselves ([REQ-013](module-layout.md#req-013--building-block-independence)).
@@ -981,7 +1022,7 @@ Recording a decline never widens the profile: admitting an engine extension is a
 
 - Empty / whitespace-only input **MUST** yield code `aql_empty` (before parse).
 - Input that does not parse as `selectQuery` per the profile **MUST** yield code `aql_syntax`.
-- The `aql_syntax` `Detail` **SHOULD** carry the parser's `line:column` when the parser reports a position, and **SHOULD NOT** invent one when it does not, because a reader takes a printed coordinate for a real one: a `parse.SyntaxError` whose `Position` is zero prints no `0:0` from `Error()`, and its `Detail` carries no `L:C:` prefix.
+- The `aql_syntax` `Detail` **SHOULD** carry the parser's `line:column` when the parser reports a position, and **SHOULD NOT** invent one when it does not, because a reader takes a printed coordinate for a real one: a `parse.SyntaxError` whose `Pos` is zero prints no `0:0` from `Error()`, and its `Detail` carries no `L:C:` prefix.
 - `parse.Parse` returns a `*parse.SyntaxError` wrapping the building-block sentinel `aql.ErrSyntax`; the `validation.ValidateAQL` bridge maps `aql_syntax` / `aql_empty` to `validation.ErrAQLSyntax` via `Issue.Err()`.
 
 ### Layer 2 — Shape (AST walk, no CDR)
@@ -992,7 +1033,7 @@ Recording a decline never widens the profile: admitting an engine extension is a
 | Identifiable scope | `aql_from_archetype` | Warning | FROM/CONTAINS **SHOULD** name ≥1 archetype HRID, `$param` archetype predicate, `VERSION` operand, or `EHR` root; otherwise the query scans broadly. |
 | Bound parameters | `aql_unbound_param` | Error | When linting an `aql.Query`, every `$name` referenced **MUST** have a key in `Query.Parameters`. |
 | Unused parameters | `aql_unused_param` | Warning | A `Query.Parameters` key never referenced is advisory. |
-| Deprecated `TOP` | `aql_deprecated_top` | Warning | A `SELECT TOP` clause **SHOULD** be replaced by `LIMIT` with `ORDER BY`: the modifier is deprecated from QUERY Release-1.1.0 and slated for removal ([§ REQ-113 § The `TOP` carrier](#req-113--execution-oriented-parsed-aql-ast)). Fires once per query carrying a `TOP`. |
+| Deprecated `TOP` | `aql_deprecated_top` | Warning | A `SELECT TOP` clause **SHOULD** be replaced by `LIMIT` with `ORDER BY`: the modifier is deprecated from QUERY Release-1.1.0 and slated for removal ([§ REQ-113 § The `TOP` carrier](#the-top-carrier)). Fires once per query carrying a `TOP`. |
 | `TOP` with `LIMIT` | `aql_top_with_limit` | Error | A query **MUST NOT** use `TOP` and the `LIMIT` clause together (QUERY Release-1.1.0 § 4.4.3). Fires in addition to `aql_deprecated_top`. |
 | `TOP` with envelope `fetch` | `aql_top_with_fetch` | Error | A query carrying `TOP` **MUST NOT** also carry the request envelope's row limit: the openEHR Query API's common parameters state that `fetch` cannot be combined with AQL-top. Reachable only when the caller supplies `Options.Query`, and keyed on its `Fetch` alone: an `Offset` **MUST NOT** raise it, the exclusion naming the row limit only. Fires in addition to `aql_deprecated_top`. `Build()` also refuses an envelope `Offset` beside a `TOP` ([§ REQ-163](#req-163--aql-write-side-expressivity-parity)), because it declines to author two row bounds; the lint reads a query it did not author, so it reports only the exclusion the Query API states. |
 | Bare / mixed `SELECT *` | `aql_select_star` | Warning | A projection carrying a `*` item **SHOULD** raise this code, and `COUNT(*)` **MUST NOT**: it uses the SDK-AQL-002 relaxation, and official QUERY 1.1.0's only use of `*` is `COUNT(*)`. |
@@ -1002,7 +1043,7 @@ The other half of each pair is read from its own channel: the in-text `LIMIT` cl
 
 SELECT-present-with-≥1-projection and FROM-present are guaranteed by a successful parse (the grammar requires both), so they raise no Layer-2 issue.
 
-Layer 2 additionally carries the semantic and portability check groups of [§ REQ-161](#req-161--aql-semantic-and-portability-lint) and the path-shape group of [§ REQ-164](#req-164--aql-path-shape-and-paging-lint), additive codes whose severities and firing rules are specified once there.
+Layer 2 additionally carries the semantic, portability and path-shape check groups of [§ REQ-161](#req-161--aql-semantic-and-portability-lint), whose codes, severities and firing rules are specified once there.
 
 Two grammar-admitted, server-executable shapes resolve without `aql_unknown_alias`:
 
@@ -1039,7 +1080,7 @@ A path through a non-mandatory RM attribute the OPT did not constrain can still 
 ### Value-free lint diagnostics
 
 `lint.Issue` names a finding's location by quoting it: `Detail` is free text and `Path` is a path spelling.
-Its fields **MUST** follow the two-class rule of [§ REQ-113 § Value-free structured drop records](#value-free-structured-drop-records), classed as follows:
+Its fields follow the two-class rule of [§ REQ-168 § The two field classes](#the-two-field-classes), classed as follows:
 
 | Field | Class |
 |---|---|
@@ -1060,14 +1101,14 @@ It **MUST** be the same type as the drop record's span (`lint.Span` re-exports `
 - **CDR-grade path resolution**: full AQL-path-to-canonical-path mapping (node-id-on-structural-attribute vs canonical placement) is PROBE-021 territory; Layer 3 is best-effort, hence `aql_path_not_in_template` is a Warning.
 - **Re-emission / pretty-printing**: canonical re-emission from the structured AST is [§ REQ-113](#req-113--execution-oriented-parsed-aql-ast)'s `(*parse.Query).Emit`.
 
-- **Probes:** PROBE-028 — lint fixed query strings against the grammar profile (+ a compiled OPT for Layer 3) and assert a stable issue-code multiset; [PROBE-107](conformance.md#probe-107--upstream-aql-suite-admissibility-corpus) — every query the vendored upstream suites send and an engine answers parses under the profile, or is a recorded decline.
+- **Probes:** PROBE-028 — lint fixed query strings against the grammar profile (+ a compiled OPT for Layer 3) and assert a stable issue-code multiset; [PROBE-107](conformance.md#probe-107--upstream-aql-suite-admissibility-corpus) — every query the vendored upstream suites send and an engine answers parses under the profile, or is a recorded decline; [PROBE-096](conformance.md#probe-096--aql-value-free-structured-diagnostics) — the lint issue's value-free fields carry no query text, and its span is the drop record's span type.
 
 ## REQ-111 — Public compiled-template bridge
 
-The compiled-template form (`templatecompile.Compiled`) is the argument every template-driven entry point takes: the composition builder (REQ-101, `NewBuilder` and `NewSkeleton`), the RM instance synthesiser (REQ-107, `Generate`), the validator (REQ-102, `Validate` and its typed wrappers), and the AQL static lint (REQ-109, `lint.Options.Compiled`).
+The compiled-template form (`templatecompile.Compiled`) is the argument the template-driven entry points take, among them the composition builder (REQ-101, `NewBuilder` and `NewSkeleton`), the RM instance synthesiser (REQ-107, `Generate`), the validator (REQ-102, `Validate` and its typed wrappers), and the AQL static lint (REQ-109, `lint.Options.Compiled`).
 
 The SDK **MUST** ship a public constructor that turns an OPT, read into the operational template model of [§ REQ-176](#req-176--adl-14-operational-template-model), into that compiled form without exposing any `internal/` package, so external consumers can drive the full read → compile → build → validate pipeline through public packages alone.
-`aom14.ReadOperationalTemplate` reads an untrusted OPT within the bounds of [§ REQ-108](#req-108--untrusted-document-bounds).
+The reader's tolerances are [§ REQ-176 § What the reader tolerates](#what-the-reader-tolerates)'s, and its bounds [§ REQ-108](#req-108--untrusted-document-bounds)'s.
 
 ### Surface
 
@@ -1108,8 +1149,13 @@ Everything reachable as a method on `Compiled` / `CompiledNode` / `CompiledAttri
 
 ### Reading the model
 
-`aom14.ReadOperationalTemplate` and `Compile`, each in its default mode, **MUST** read and compile every OPT that [§ REQ-176](#req-176--adl-14-operational-template-model) *Round trip* names, and every OPT that differs from one only in the shapes *What the reader tolerates* and *What the compile step tolerates* name below, as those paragraphs read each shape, except a template that holds one of the four readings the reader refuses in every mode (an integer the model cannot hold, a `match_negated` of true, an infinite integer bound that admits no integer and a `<definition>` typed as a slot or with the class of a primitive constraint), a template the compile step refuses (two nodes under different attributes that share an AQL path ([§ REQ-116](#req-116--template-level-node-naming-and-name-predicated-paths)), or a refusal in the `Compile` list below, a definition that names no RM type among them), and a document past the bounds of [§ REQ-108](#req-108--untrusted-document-bounds).
-Given `canxml.WithStrict`, the reader, and given `templatecompile.WithStrict`, the compile step, **MUST** refuse each of these shapes and values, which the default mode reads in the weaker form the paragraphs below give:
+`aom14.ReadOperationalTemplate` and `Compile`, each in its default mode, **MUST** read and compile every OPT that [§ REQ-176](#req-176--adl-14-operational-template-model) *Round trip* names, and every OPT that differs from one only in the shapes [§ REQ-176 § What the reader tolerates](#what-the-reader-tolerates) and § *What the compile step tolerates* below name, as those sections read each shape, except:
+
+- a template that holds one of the four readings the reader refuses in every mode (an integer the model cannot hold, a `match_negated` of true, an infinite integer bound that admits no integer, and a `<definition>` typed as a slot or with the class of a primitive constraint);
+- a template the compile step refuses: two nodes under different attributes that share an AQL path (§ *Node names and name predicates*), or a refusal in the `Compile` list below, a definition that names no RM type among them;
+- a document past the bounds of [§ REQ-108](#req-108--untrusted-document-bounds).
+
+Given `canxml.WithStrict`, the reader, and given `templatecompile.WithStrict`, the compile step, **MUST** refuse each of these shapes and values, which the default mode reads in the weaker form [§ REQ-176 § What the reader tolerates](#what-the-reader-tolerates) and § *What the compile step tolerates* give:
 
 - a `<children>` whose `xsi:type` names no AOM 1.4 class and that carries nested `<attributes>`, which the default mode reads as a leaf and so drops a subtree: the reader refuses it;
 - an `<attributes>` or `<children>` inside `<definition>`, or an `<item>` of a `C_PRIMITIVE_OBJECT`, that carries no `type` attribute in the XSI namespace (`http://www.w3.org/2001/XMLSchema-instance`), whether it has no `type`, an empty one, or one whose prefix is bound to another namespace, such as a misspelt one: the reader refuses it.
@@ -1118,7 +1164,7 @@ Given `canxml.WithStrict`, the reader, and given `templatecompile.WithStrict`, t
 - the constraint values [§ REQ-103](#req-103--primitive-constraint-introspection) *Validate contract* names: a `timezone_validity` that names no `VALIDITY_KIND`, which the reader refuses, and the compile step where a model built in code holds one; and a mandatory `timezone_validity` on a `C_DATE` and a temporal range bound that is not ISO 8601 text of its type, which the compile step refuses.
 
 The compile step refuses each with an error wrapping `ErrInvalidInput`.
-The reader's strict decode refuses as well what canonical XML's strict decode refuses, an unknown `xsi:type` and unmatched content among it ([wire.md § REQ-170](wire.md#req-170--unmatched-content-on-decode)), and keeps the tolerances below that hold in every mode.
+The reader's strict decode refuses as well what canonical XML's strict decode refuses, an unknown `xsi:type` and unmatched content among it ([wire.md § REQ-170](wire.md#req-170--unmatched-content-on-decode)), and keeps the tolerances that hold in every mode.
 § *Recorded compiled trees* holds both to this.
 `Compile` **MUST**:
 
@@ -1128,7 +1174,7 @@ The reader's strict decode refuses as well what canonical XML's strict decode re
   Every other attribute name is kept as written;
 - read each identifier the OPT writes, each `rm_attribute_name`, `rm_type_name` and `node_id`, and the `<value>` of an `archetype_id` or a `template_id`, and each code, terminology id, list entry and term text, without its leading and trailing white space, as Unicode defines it (XML's space, tab, carriage return and line feed among it).
   A pretty-printed OPT can break the line inside such an element, writing `<rm_attribute_name>defining_code` with `</rm_attribute_name>` on the next line, and no identifier holds white space at either end, so one that holds only white space reads as an empty one.
-  The model's decode reads an `xsi:type` as written, and the reader in its default mode without white space around it (below);
+  The model's decode reads an `xsi:type` as written, and the reader in its default mode without white space around it ([§ REQ-176 § What the reader tolerates](#what-the-reader-tolerates));
 - close each `occurrences`, `existence` and `cardinality` interval into a `Multiplicity`, which counts whole items, closed on each bounded side: an excluded end becomes the closed end it denotes (`0..<3` is `0..2`, `>0..*` is `1..*`), and an unbounded side keeps no bound whatever its included flag says.
   A numeric range keeps its included flags as `NumericRange` does, and a temporal range as `TemporalRange` does ([§ REQ-103](#req-103--primitive-constraint-introspection));
 - refuse, with an error wrapping `ErrInvalidInput`, a model with no `template_id`, or with no `definition` or one that names no RM type, and an interval that is inverted, that closing leaves empty, such as `>2..<3`, or whose excluded end denotes a closed end the model's 32-bit `Integer` cannot hold (`>` its largest value on a lower side, `<` its smallest on an upper one), on every platform.
@@ -1142,22 +1188,11 @@ The compile step reads the class of a node with no `rm_type_name` as the type of
 So it marks, types, flags as mandatory (`CompiledAttribute.Required`) and injects the attributes of such a node as it does those of a node that names that type, and the node's own RM type stays empty.
 A definition that names no type is no definition, which the compile step refuses (above).
 
-#### What the reader tolerates
-
-In every mode, `aom14.ReadOperationalTemplate` reads a document that starts with a UTF-8 byte-order mark; an element in the `http://schemas.openehr.org/v2` namespace, which the pinned AM Release-1.4 schemas declare, as the element of that name in the `http://schemas.openehr.org/v1` namespace canonical XML reads ([wire.md § REQ-056](wire.md#req-056)); a `C_BOOLEAN` whose `true_valid` or `false_valid` is absent or empty, with that flag true; an `assumed_value` of a `C_BOOLEAN`, `C_INTEGER` or `C_REAL` that is not a value of its type, and one of a `C_DV_QUANTITY` that the model cannot hold, as absent, an assumed boolean written `t` or `f` among them, and one written in another case, such as `tRuE`, as its value; a `C_DV_QUANTITY` magnitude or precision bound that is not a number, as unbounded on its side; a `C_INTEGER` range bound or a precision bound written as a decimal number, as the integer bound that admits the same integers, a lower bound rounded up and an upper one down, and a lower bound of negative infinity, an upper one of positive infinity, or one that is not a number (`NaN`), which bounds no integer, as unbounded on its side; a bound written on a side marked unbounded, which it leaves out; and an empty `timezone_validity`, as absent.
-In its default mode it also reads these shapes, which its strict mode refuses: an `<attributes>`, `<children>` or `<item>` inside `<definition>` with no type in the XSI namespace, such an `<attributes>` as `C_MULTIPLE_ATTRIBUTE` with its cardinality where it carries a `<cardinality>` and as `C_SINGLE_ATTRIBUTE` otherwise, such a `<children>` as `C_ARCHETYPE_ROOT` where it carries an archetype id and as `C_COMPLEX_OBJECT` otherwise, and such an `<item>` as no constraint, losing any constraint its type would have carried; a `<children>` or the `<definition>` whose `xsi:type` names no AOM 1.4 class, or a class it cannot hold such as `C_SINGLE_ATTRIBUTE` other than the classes of a `<definition>` it refuses in every mode (below), as a `C_COMPLEX_OBJECT` leaf with the `rm_type_name`, `node_id` and `occurrences` it carries and none of its attributes; a `C_INTEGER` or `C_REAL` list entry or range bound that is not a number of its type, an empty one among them, the entry left out and the bound read as unbounded on its side; and a `timezone_validity` that names no `VALIDITY_KIND`, as absent.
-It reads as well, in its default mode: an `xsi:type` inside `<definition>` with white space around it, as the name without it; an `<item>` of a `C_PRIMITIVE_OBJECT` whose type names no `C_PRIMITIVE` class and none of `C_CODE_PHRASE`, `C_DV_QUANTITY`, `C_DV_ORDINAL`, `CONSTRAINT_REF` and `C_PRIMITIVE_OBJECT`, as no constraint; an element in a namespace other than none, v1 and v2, the root and the XSI namespace among them, as the v1 one, a type attribute keeping its XSI namespace; a `<children>` typed `C_COMPLEX_OBJECT` that carries an archetype id, as `C_ARCHETYPE_ROOT`; a `<children>` typed with a `C_PRIMITIVE` class, as a `C_PRIMITIVE_OBJECT` leaf that carries it; an `<item>` typed `C_CODE_PHRASE`, `C_DV_QUANTITY`, `C_DV_ORDINAL` or `CONSTRAINT_REF`, as the object that holds it, of the item's class, and one typed `C_PRIMITIVE_OBJECT` as the item it holds; a `C_REAL` value, or a `C_DV_QUANTITY` magnitude bound, that Go's float parse reads and XML Schema's `double` does not, such as `Inf`, `0x1p-2` or more digits than a `double` holds, as the number Go reads; and content before the root element that `encoding/xml` reads, such as text or a CDATA section, and a directive (`<!…>`) or a processing instruction whose target is `xml`, in any letter case, after it, each of which it reads past.
-What a tolerance leaves out, such as the attributes of that leaf, is unmatched content, which the report option of [wire.md § REQ-170](wire.md#req-170--unmatched-content-on-decode) reports.
-Content the reader refuses before or after the root element, in either mode, and an element that carries one attribute twice outside what a tolerance leaves out are not well-formed XML: the error wraps `canxml.ErrNotWellFormed` as well as `canxml.ErrInvalidShape`, as for `canxml.Unmarshal` ([wire.md § REQ-056](wire.md#req-056)).
-Markup before the root that `encoding/xml` cannot read fails as its `*xml.SyntaxError` instead, unless content `canxml.Unmarshal` refuses comes before it: the reader then refuses that content in either mode.
-The reader refuses, in every mode, four readings: an integer that the model's `Integer`, 32 bits as openEHR's is, cannot hold; a `match_negated` of true, which AOM 1.4 cannot express ([§ REQ-176](#req-176--adl-14-operational-template-model) *Shapes the pinned BMM lacks*); and an integer bound of positive infinity on a lower side or negative infinity on an upper one, which admits no integer, each with an error wrapping `canxml.ErrInvalidShape`; and a `<definition>` typed `ARCHETYPE_SLOT`, or with a class that carries a primitive constraint ([§ REQ-103](#req-103--primitive-constraint-introspection)), a `C_PRIMITIVE` class such as `C_STRING`, one of `C_CODE_PHRASE`, `C_DV_QUANTITY`, `C_DV_ORDINAL` and `CONSTRAINT_REF`, or a `C_PRIMITIVE_OBJECT` whose items carry such a constraint, which the model's definition, a `C_ARCHETYPE_ROOT`, cannot hold, with a `*canxml.DecodeError` of the definition that wraps `typereg.ErrTypeMismatch`.
-A `canxml` decode called directly has none of these tolerances.
-
 #### What the compile step tolerates
 
-In its default mode `Compile` reads these values the model holds in a weaker form: a `CONSTRAINT_REF` with no or a blank `reference`, with an empty `Reference`; a `timezone_validity` that names no `VALIDITY_KIND`, which only a model built in code holds since the reader leaves one out (above), a mandatory one on a `C_DATE`, and a temporal range bound that is not ISO 8601 text of its type, each as [§ REQ-103](#req-103--primitive-constraint-introspection) *Validate contract* says; and a `C_PRIMITIVE_OBJECT` with no `item`, as no constraint.
+In its default mode `Compile` reads these values the model holds in a weaker form: a `CONSTRAINT_REF` with no or a blank `reference`, with an empty `Reference`; a `timezone_validity` that names no `VALIDITY_KIND`, which only a model built in code holds since the reader leaves one out ([§ REQ-176 § What the reader tolerates](#what-the-reader-tolerates)), a mandatory one on a `C_DATE`, and a temporal range bound that is not ISO 8601 text of its type, each as [§ REQ-103](#req-103--primitive-constraint-introspection) *Validate contract* says; and a `C_PRIMITIVE_OBJECT` with no `item`, as no constraint.
 With `templatecompile.WithStrict` it refuses each, and a default value that addresses no node (below), with an error wrapping `ErrInvalidInput`.
-In every mode it refuses a model whose constraint objects nest deeper than the depth limit of [§ REQ-108](#req-108--untrusted-document-bounds), which only a model built in code, or decoded with `canxml` directly, can reach.
+In every mode it refuses a model nested deeper than [§ REQ-108 § Compile step and path lookup](#compile-step-and-path-lookup-openehrtemplatecompile) allows.
 
 The compile step builds each primitive constraint from the model's primitive classes, and each slot's rules from its includes and excludes ([§ REQ-103](#req-103--primitive-constraint-introspection)).
 An `ARCHETYPE_SLOT` with no `node_id` takes as the predicate of its AQL path segment the archetype-id pattern of its first include, as its slot rules read it.
@@ -1167,17 +1202,18 @@ The compiled template carries as well:
 
 - a `C_CODE_REFERENCE`, as a `constraints.CodeReference` primitive constraint ([§ REQ-103](#req-103--primitive-constraint-introspection));
 - each default value of the template's `<constraints>`, the `default_value` of a `T_COMPLEX_OBJECT`, on the compiled node that its `T_ATTRIBUTE`'s `differential_path` and `rm_attribute_name` address: the first child, under the attribute of that name on the node the path reaches, of the `T_COMPLEX_OBJECT`'s RM type, or of its default value's RM type where it names none, a child's generic parameters set aside, so `DV_INTERVAL` matches `DV_INTERVAL<DV_COUNT>`.
-  `Compiled.Resolve` resolves a path that opens with the definition's archetype id in brackets from the rest, and one that opens with `/` from the definition's root, except that a segment's predicate may also carry a name, `[at0004, 'Systolic']` or `[at0004 and name/value='Systolic']`, which matches a node of that node id or archetype id whose template-level name ([§ REQ-116](#req-116--template-level-node-naming-and-name-predicated-paths)) is that name, each run of white space inside the predicate read as one space; `template.ParsePath` reads no name predicate.
+  The compile step walks the `differential_path` from the definition's root, past the definition's archetype id in brackets where the path opens with it, by the rules `Compiled.Resolve` applies (§ *Path lookup*).
+  Unlike `Resolve`, it also reads a name in a segment's predicate, `[at0004, 'Systolic']` or `[at0004 and name/value='Systolic']`, which matches a node of that node id or archetype id whose template-level name (§ *Node names and name predicates*) is that name, each run of white space inside the predicate read as one space; `template.ParsePath` reads no name predicate.
   A default value whose path opens otherwise, or that reaches no node, no attribute of that name or no child of that RM type, addresses no node: `Compile` skips it, and refuses it with `templatecompile.WithStrict` (above).
   It skips, and refuses with `templatecompile.WithStrict`, a default value it cannot hold as canonical JSON in the same way, such as a `NaN` magnitude.
   `CompiledNode.DefaultValue` returns a placed default value, a new value on each call; a `T_COMPLEX_OBJECT` with no `default_value` places nothing.
 
 ### Recorded compiled trees
 
-Every OPT of the test corpus, of the parity fixtures and of the reader's fixtures **MUST** be read by `aom14.ReadOperationalTemplate` and compiled by `Compile`, both in their default mode, to the compiled tree recorded for it, node by node and attribute by attribute: each node's AQL path, RM type, node id, archetype id, node name, occurrences, slot rules, primitive constraint, default value, terms and bindings, and each attribute's name, RM type, existence, cardinality and marks.
-The trees were recorded in v0.45.0, while the reader and the compile step read each of these OPTs as `template.ParseOPT`, deprecated in 0.45.0 and removed in 0.46.0, read it, but for the `C_CODE_REFERENCE` and the default values that parser did not read and the cardinality of an `<attributes>` with no type (§ *Reading the model*).
-Each OPT of the exception fixtures holds one of the four readings the reader refuses or one of the compile step's own grounds, two nodes under different attributes that share an AQL path ([§ REQ-116](#req-116--template-level-node-naming-and-name-predicated-paths)) or a definition that names no RM type, and **MUST** be refused with the error § *Reading the model* gives that reading: the reader's error for the four readings, and one wrapping `ErrInvalidInput` from `Compile` for the two grounds.
-The parity fixtures are OPTs the SDK writes, at least one for each reading § *Reading the model* tolerates and each default-value placement it names, and the exception fixtures hold at least one OPT for each reading and ground refused.
+A test reads every OPT of the test corpus, of the parity fixtures and of the reader's fixtures with `aom14.ReadOperationalTemplate` and compiles it with `Compile`, both in their default mode, and compares the result with the compiled tree recorded for it, node by node and attribute by attribute: each node's AQL path, RM type, node id, archetype id, node name, occurrences, slot rules, primitive constraint, default value, terms and bindings, and each attribute's name, RM type, existence, cardinality and marks.
+The parity fixtures are OPTs the SDK writes, at least one for each reading § *Reading the model* and [§ REQ-176 § What the reader tolerates](#what-the-reader-tolerates) tolerate and each default-value placement § *Reading the model* names.
+Each OPT of the exception fixtures holds one of the four readings the reader refuses or one of the compile step's own grounds, two nodes under different attributes that share an AQL path (§ *Node names and name predicates*) or a definition that names no RM type, and the test checks that it is refused with the error § *Reading the model* gives that reading: the reader's error for the four readings, and one wrapping `ErrInvalidInput` from `Compile` for the two grounds.
+The exception fixtures hold at least one OPT for each reading and ground refused.
 
 ### Path lookup
 
@@ -1188,7 +1224,7 @@ The parity fixtures are OPTs the SDK writes, at least one for each reading § *R
 - Optional **archetype node predicate** on a segment: `/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]` or `/items[at0001]`.
 - Multiple predicates on the same segment are not supported in v1 (no `[at0001,name="Systolic"]`).
 - A trailing slash is not permitted.
-- AQL projection syntax (`/value/magnitude`, `[name='...']`) is not part of this grammar: that surface belongs to `openehr/aql/`.
+- AQL name predicates (`[name='...']`) are not part of this grammar: that surface belongs to `openehr/aql/`.
 
 `Compiled.Resolve` **MUST** resolve a path that `template.ParsePath` reads by walking the compiled tree from its root, attribute by attribute:
 
@@ -1196,7 +1232,7 @@ The parity fixtures are OPTs the SDK writes, at least one for each reading § *R
 - A segment's predicate matches a child whose `NodeID` or `ArchetypeID` equals it.
 - A segment without a predicate takes the attribute's first child, in document order.
   With `templatecompile.WithStrictPaths` it returns an error wrapping `template.ErrAmbiguousPath` where the attribute has more than one child; without the option it never returns `template.ErrAmbiguousPath`.
-- A segment that matches nothing, an unknown attribute or an unmatched predicate, returns an error wrapping both `template.ErrPathNotFound` and `templatecompile.ErrPathNotFound`, as does a walk deeper than the depth limit of [§ REQ-108](#req-108--untrusted-document-bounds).
+- A segment that matches nothing, an unknown attribute or an unmatched predicate, returns an error wrapping both `template.ErrPathNotFound` and `templatecompile.ErrPathNotFound`, as does the depth refusal of [§ REQ-108 § Compile step and path lookup](#compile-step-and-path-lookup-openehrtemplatecompile).
 
 `Compiled.ValidatePath` is `Resolve` without the node, a shorthand for a code generator's precondition.
 `Compiled.NodeAt` stays the lookup of an AQL path by the exact text the compile step wrote.
@@ -1221,7 +1257,7 @@ The class is read without generic parameters; the properties are those the compi
 `ISM_TRANSITION.name` is one.
 `EVENT.offset`, a function, is not, and nor is `ITEM_STRUCTURE.items`, a property of the descendants `ITEM_TREE` and `ITEM_LIST`.
 The compile **MUST NOT** mark an attribute of a class the lookup does not know, any attribute when the lookup gives no class hierarchy, or an attribute it injects.
-No instance of the node's class can carry a marked attribute, so the model's reader refuses no OPT that declares one, in either mode, and the validators leave it out ([§ REQ-171 *One walk*](#req-171--validation-engine)) and list it in `Coverage` ([§ REQ-171 *Coverage*](#req-171--validation-engine)).
+No instance of the node's class can carry a marked attribute, so the model's reader refuses no OPT that declares one, in either mode, and the validators leave it out ([§ REQ-171 *One walk*](#one-walk)) and list it in `Coverage` ([§ REQ-171 *Coverage*](#coverage)).
 
 ### Placement (ADR 0010)
 
@@ -1230,7 +1266,31 @@ The constructor lives in the sibling package `openehr/templatecompile`, not in `
 1. **Import cycle.** The compile engine imports `openehr/template`; a `Compile` inside `openehr/template` would import the engine, forming `template → templatecompile → template`.
 2. **The import rule of `openehr/template`.** Compilation needs `openehr/rm/rminfo` and the model in `openehr/aom/aom14`, which [module-layout.md § REQ-013](module-layout.md#req-013--building-block-independence) keeps out of `openehr/template`'s import closure.
 
-[ADR 0010](../adr/0010-public-compiled-template-bridge.md) records the placement, which replaced [ADR 0005](../adr/0005-compiled-template-foundation.md) §C2's `template.Compile` / `template.Compiled` proposal.
+[ADR 0010](../adr/0010-public-compiled-template-bridge.md) records the placement.
+
+### Node names and name predicates
+
+An OPT node may pin its runtime `LOCATABLE.name` by constraining the `name` attribute to a fixed value — in ADL 1.4 XML, a `C_STRING` whose raw wire `list` holds **exactly one non-blank entry** (`<item xsi:type="C_STRING"><list>Husten</list></item>`), taken trimmed, and whose list is closed.
+Fixedness is a property of what the OPT declared, so it is judged on the wire list *before* any blank-entry normalisation: a multi-entry list is a choice even when all but one entry is blank, and a lone blank entry pins nothing.
+An open list fixes nothing either: a one-entry list whose `list_open` is true admits names outside it, so it pins no name.
+`list_open` is read as [§ REQ-103](#req-103--primitive-constraint-introspection) reads it for `CString.ListOpen`, so an absent element leaves the list closed.
+This **template-level node name** is distinct from the *archetype's* concept term: a template that fills a slot with the same archetype more than once gives each occurrence its own name, while the archetype concept is identical across all of them.
+It is the only thing that distinguishes those siblings, and both the reference WebTemplate `id` ([§ REQ-106](#req-106--webtemplate-json-export)) and the AQL paths addressing them depend on it.
+
+The SDK **MUST** read the template-level node name, carry it through the compiled tree so consumers of the public bridge can read it (`CompiledNode.NodeName`), and use it as the disambiguator described below.
+Where a node constrains no fixed name, the SDK **MUST** treat the name as absent rather than substituting the archetype concept term.
+
+#### Name predicates in AQL paths
+
+An AQL node predicate **MAY** carry a name alongside the archetype node id — `[openEHR-EHR-SECTION.adhoc.v1,'Symptome']` — which is how openEHR addresses one of several siblings that share an archetype node id.
+
+Where a node pins a template-level name, the compiled AQL path **MUST** carry the name predicate on that node's segment.
+The trigger is the **pinned name alone**, not sibling collision: the reference emits the predicate on every named node — including a sole child, and siblings whose archetype node ids already differ — so a rule conditioned on siblings sharing a node id emits too few.
+Where a node pins **no** name, the SDK **MUST NOT** invent a predicate; this includes siblings that share an archetype node id and pin no distinct names, which legitimately share a path and are distinguished positionally, and whose compiled form **MUST** retain each of them rather than discarding the collision.
+
+Path shape is consumed by the instance generator ([REQ-107](#req-107--template-driven-rm-instance-example-generator)) and FLAT/STRUCTURED path resolution ([REQ-053](wire.md#req-053)).
+Composition validation does not consume it: its `Issue.Path` follows [REQ-102](#req-102--composition-validation) § Issue paths, which writes a name predicate only where siblings share an archetype id.
+The two archetype-reuse oracles of [§ REQ-106](#req-106--webtemplate-json-export)'s PROBE-075, `Corona_Anamnese` and `GECCO_Diagnose`, hold this rule against their vendored reference goldens.
 
 - **Probes:** PROBE-022 (path lookup against a fixture OPT); the builder round-trip is PROBE-023.
 
@@ -1254,7 +1314,7 @@ func Build(c *templatecompile.Compiled, opts ...Option) (*WebTemplate, error)
 // Marshal is Build followed by deterministic JSON encoding.
 func Marshal(c *templatecompile.Compiled, opts ...Option) ([]byte, error)
 
-type Option func(*config) // reserved — no options in the current slice (single-language compiled input; fixed schema version)
+type Option func(*config) // reserved: takes no options yet (single-language compiled input; fixed schema version)
 ```
 
 `Build` returns the typed tree for callers that post-process before encoding; `Marshal` is the common path.
@@ -1277,11 +1337,11 @@ The node `id` is the FLAT-path segment consumers bind to, so its stability and c
 The `id` **MUST** mirror the locked EHRbase reference: a lower-snake sanitisation of the node's default-language display name.
 The exact normalisation is **derived from the vendored reference fixture**; a scheme of the SDK's own would break FLAT-path interoperability with existing tooling.
 
-For a node that pins a **template-level name**, that name is the display name the `id` derives from — not the archetype's concept term, which is shared by every occurrence of a reused archetype and so cannot distinguish siblings; see [REQ-116](#req-116--template-level-node-naming-and-name-predicated-paths), which owns the naming rule.
+For a node that pins a **template-level name**, that name is the display name the `id` derives from — not the archetype's concept term, which is shared by every occurrence of a reused archetype and so cannot distinguish siblings; see [§ REQ-111 § Node names and name predicates](#node-names-and-name-predicates), which owns the naming rule.
 
 A pinned name is the disambiguator wherever one exists, so no suffixing is needed for it — and none appears in any vendored reference golden.
 Where siblings would **still** collide — no pinned name, and one shared display name, as two ELEMENTs both sanitising to `dv_text` do in the upstream FLAT-conformance template — the export **MUST** apply the reference's ordinal fallback: the first claimant keeps the bare `id` and the second and later claimants take the next **free** ordinal spelling (`dv_text`, `dv_text2`, `dv_text3`) — "free" because a sibling may legitimately sanitise to `dv_text2` on its own, and renaming onto it would recreate the collision.
-The two-claimant spelling is fixed by the reference, not chosen: the upstream FLAT bodies for that template key those two nodes `…/conformance_action/dv_text` and `…/conformance_action/dv_text2`; the next-free extension beyond it is this SDK's conservative reading, pinned by table test.
+The two-claimant spelling is fixed by the reference, not chosen: the upstream FLAT bodies for that template key those two nodes `…/conformance_action/dv_text` and `…/conformance_action/dv_text2`; the next-free extension beyond it is this SDK's conservative reading.
 Emitting duplicate sibling `id`s is **never** permitted; an export that still cannot make siblings unique **MUST** fail with a typed error rather than emit an ambiguous tree.
 
 ### `inputs` (core clinical subset)
@@ -1299,43 +1359,16 @@ Any structural difference on that pinned surface is a failure; the following cat
 3. **Input-content omissions** — `defaultValue`; DV_DURATION per-field ranges; DV_QUANTITY `precision`; per-unit and multi-unit magnitude validation; list `label` for external-terminology codes; `localizedLabels` and per-item `termBindings`.
 4. **Local terminology** — `terminology` is emitted only for external bindings (e.g. `openehr`); the archetype-internal `local` value is omitted, mirroring the reference.
 5. **Fixture-outlier `min` on in-context leaves** — where a vendored golden marks synthesized RM-attribute leaves `min=1` and the OPT constrains no `existence`, the export **MAY** emit `min=0`: the `GECCO_Diagnose` golden is the sole such outlier across the three vendored references (14 nodes), and the other two agree with `min=0`.
-   Tolerated by pinned count, not waived.
 
-The exact per-field enumeration behind these categories — the informative catalogue pinned by the parity tests — is maintained in [`openehr/template/webtemplate/deviations.md`](../../openehr/template/webtemplate/deviations.md) beside those tests.
-This section is the normative contract; that file elaborates it.
+An informative per-field catalogue behind these categories ships with the package; this section is the contract.
 
 The media type for the format is `application/openehr.wt+json` (documented for consumers).
 Emitting the export over a REST endpoint / content negotiation is **out of scope** for this REQ — the package produces the bytes only.
 Also out of scope: the WebTemplate → OPT round-trip (the format is lossy by design); the Better camelCase `id` variant; multi-version output; and the shared simplified-template model abstraction.
 
-Templates that **reuse one archetype under a multi-valued slot** (name-distinguished instances) **are exported**: the compiled template keeps shared-path subtrees, and node identity comes from the template-level node name, with `aqlPath` carrying the matching name predicate ([REQ-116](#req-116--template-level-node-naming-and-name-predicated-paths), [ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md)), so each reused sibling is distinct by construction instead of colliding on the shared concept term.
+Templates that **reuse one archetype under a multi-valued slot** (name-distinguished instances) **are exported**: the compiled template keeps shared-path subtrees, and node identity comes from the template-level node name, with `aqlPath` carrying the matching name predicate ([§ REQ-111 § Node names and name predicates](#node-names-and-name-predicates), [ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md)), so each reused sibling is distinct by construction instead of colliding on the shared concept term.
 
-- **Probes:** PROBE-075, structural parity against three vendored EHRbase references: `constrain_test` and the two archetype-reuse oracles of REQ-116 ([conformance.md](conformance.md)).
-
-## REQ-116 — Template-level node naming and name-predicated paths
-
-An OPT node may pin its runtime `LOCATABLE.name` by constraining the `name` attribute to a fixed value — in ADL 1.4 XML, a `C_STRING` whose raw wire `list` holds **exactly one non-blank entry** (`<item xsi:type="C_STRING"><list>Husten</list></item>`), taken trimmed, and whose list is closed.
-Fixedness is a property of what the OPT declared, so it is judged on the wire list *before* any blank-entry normalisation: a multi-entry list is a choice even when all but one entry is blank, and a lone blank entry pins nothing.
-An open list fixes nothing either: a one-entry list whose `list_open` is true admits names outside it, so it pins no name.
-`list_open` is read as [§ REQ-103](#req-103--primitive-constraint-introspection) reads it for `CString.ListOpen`, so an absent element leaves the list closed.
-This **template-level node name** is distinct from the *archetype's* concept term: a template that fills a slot with the same archetype more than once gives each occurrence its own name, while the archetype concept is identical across all of them.
-It is the only thing that distinguishes those siblings, and both the reference WebTemplate `id` (REQ-106) and the AQL paths addressing them depend on it.
-
-The SDK **MUST** read the template-level node name, carry it through the compiled tree so consumers of the public bridge can read it ([REQ-111](#req-111--public-compiled-template-bridge)), and use it as the disambiguator described below.
-Where a node constrains no fixed name, the SDK **MUST** treat the name as absent rather than substituting the archetype concept term.
-
-### Name predicates in AQL paths
-
-An AQL node predicate **MAY** carry a name alongside the archetype node id — `[openEHR-EHR-SECTION.adhoc.v1,'Symptome']` — which is how openEHR addresses one of several siblings that share an archetype node id.
-
-Where a node pins a template-level name, the compiled AQL path **MUST** carry the name predicate on that node's segment.
-The trigger is the **pinned name alone**, not sibling collision: the reference emits the predicate on every named node — including a sole child, and siblings whose archetype node ids already differ — so a rule conditioned on siblings sharing a node id emits too few.
-Where a node pins **no** name, the SDK **MUST NOT** invent a predicate; this includes siblings that share an archetype node id and pin no distinct names, which legitimately share a path and are distinguished positionally, and whose compiled form **MUST** retain each of them rather than discarding the collision.
-
-Path shape is consumed by the instance generator ([REQ-107](#req-107--template-driven-rm-instance-example-generator)) and FLAT/STRUCTURED path resolution ([REQ-053](wire.md#req-053)).
-Composition validation does not consume it: its `Issue.Path` follows [REQ-102](#req-102--composition-validation) § Issue paths, which writes a name predicate only where siblings share an archetype id.
-
-- **Probes:** PROBE-075: the two archetype-reuse oracles, `Corona_Anamnese` and `GECCO_Diagnose`, build a Web Template whose node `id` and `aqlPath` sets match their vendored reference goldens, within the documented deviations.
+- **Probes:** PROBE-075, structural parity against three vendored EHRbase references: `constrain_test` and the two archetype-reuse oracles, `Corona_Anamnese` and `GECCO_Diagnose`, whose node `id` and `aqlPath` sets match their goldens within the documented deviations ([conformance.md](conformance.md)); [PROBE-086](conformance.md#probe-086--upstream-flat-serialisation-parity), upstream FLAT serialisation parity.
 
 ## REQ-112 — Template-less Reference Model validation floor
 
@@ -1343,14 +1376,14 @@ The validators of REQ-102 are **template-driven**: every entry point takes a `*t
 A consumer that persists RM roots binding to no operational template (FOLDER, EHR_STATUS, EHR_ACCESS, and untemplated demographic PARTY on a write path) needs another way to assert RM conformance.
 A strict `canjson` typed decode proves JSON↔type correctness but **not** RM invariants: mandatory-attribute omissions decode cleanly, as do `DV_INTERVAL` lower>upper, empty `CODE_PHRASE.code_string`, and `DV_QUANTITY.precision < -1`.
 
-The SDK **MUST** expose a **template-less RM validation floor** beneath the OPT-driven path — an entry point that walks any RM root with the BMM as its sole driver and reports `Issue`s for (a) RM-mandatory attribute breaches and (b) per-RM-type invariants on the leaves it touches.
+The SDK **MUST** expose a **template-less RM validation floor** beneath the OPT-driven path — an entry point that walks any RM root with the BMM as its sole driver and reports `Issue`s for (a) RM-mandatory attribute breaches and (b) per-RM-type invariants on every node it visits.
 The OPT-driven path stays the authoritative template-conformance layer; this floor is what runs when no template applies.
 The template-driven entry points include this floor ([§ REQ-102](#req-102--composition-validation) *RM floor*, [ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md)), so a template-valid result is also RM-valid; this floor's own entries run it alone, for a root no template applies to.
 
 ### Surface
 
 ```go
-// Generic entry — any RM concrete in the v2 closed set.
+// Generic entry: any RM value the type registry knows.
 func ValidateRM(root any, opts ...ValidateOption) Result
 
 // Typed convenience wrappers (delegate to ValidateRM):
@@ -1378,17 +1411,17 @@ The typed wrappers carry the nil-guard contract of [§ REQ-102](#req-102--compos
 A nil guard is a global issue, so its `Path` **MUST** be empty, as on the template-driven guards; `rm_type_unknown` stays at `/`, the root it could not descend.
 For a non-nil root, `ValidateRM` and the typed wrappers return what a `Validator` built with no options returns from `Validate(root, nil)` ([§ REQ-171](#req-171--validation-engine) *Surface*); a nil root draws the entry's own guard.
 A caller who needs other limits builds a `Validator`.
-A Go value outside the v2 closed RM set surfaces `rm_type_unknown` at `/`; the floor cannot descend further but does not panic.
+A Go value whose type is no RM type the type registry knows surfaces `rm_type_unknown` at `/`; the floor cannot descend further but does not panic.
 
 ### Driver
 
-The floor is the walk of [§ REQ-171 *One walk*](#req-171--validation-engine) with no template: every attribute is unconstrained, so the walk applies the RM rules alone.
+The floor is the walk of [§ REQ-171 *One walk*](#one-walk) with no template: every attribute is unconstrained, so the walk applies the RM rules alone.
 It reads values through the generated attribute access of § REQ-171 *Structural access* and takes the structural knowledge from `openehr/rm/rminfo` for the pinned Reference Model.
 The RM rules **MUST** read the pinned Reference Model's facts whatever `rminfo.Lookup` compiled a template: a lookup given to `templatecompile.WithRMInfo` changes which attributes the compiled template carries, not which attributes the RM makes mandatory.
 
 - `RequiredAttributes(rmType)` drives the per-node required-set check.
   A single-valued attribute absent (or typed-nil) emits `required`; a multi-valued attribute absent emits `required`, present-but-empty emits `cardinality`.
-  An item of a list that holds no RM value, a nil element or a nil pointer, **MUST** be reported as `required` at the item's own path, on the RM layer with the rule `mandatory`, not walked, and counted toward its list, so a list that holds only such items is present and not empty, and toward the visit limit as one visit, so an item past that limit is reported as `max_nodes` and ends the walk like any value (§ REQ-171 *One walk*).
+  An item of a list that holds no RM value, a nil element or a nil pointer, **MUST** be reported as `required` at the item's own path, on the RM layer with the rule `mandatory`, not walked, and counted toward its list, so a list that holds only such items is present and not empty, and toward the visit limit as one visit, so an item past that limit is reported as `max_nodes` and ends the walk like any value ([§ REQ-171 *Cycles and limits*](#cycles-and-limits)).
   A JSON `null` item decodes to a nil element in a list whose items are polymorphic or held by pointer, such as CLUSTER `items`; in a list of items held by value, such as LOCATABLE `links`, it decodes to an empty item, which the walk enters like any other and reports by its missing attributes.
   The check leaves out an attribute that no serialization carries ([§ REQ-171](#req-171--validation-engine) *One walk*), the set `rminfo.IsNonStorableAttr` names: every BMM function, which the RM computes, and RESOURCE_DESCRIPTION `parent_resource`, the back-reference to the resource that holds the description, whose type AUTHORED_RESOURCE has no concrete class, so no value can be held there.
   A function of a class is one the pinned BMM declares on the class or on an ancestor that is a property neither of the class nor of any class descending from it, such as EVENT `offset`, DV_QUANTITY `is_integral` and DV_DURATION `magnitude`; DV_QUANTITY `magnitude`, which DV_QUANTITY declares as a property, is not, and nor is DV_AMOUNT `magnitude`, which its descendant DV_QUANTITY declares as one.
@@ -1398,26 +1431,20 @@ The RM rules **MUST** read the pinned Reference Model's facts whatever `rminfo.L
   BASE `Interval` defines `lower_unbounded` / `upper_unbounded` as marking that boundary open (-infinity / +infinity), so an open side carries no bound value, and every BASE invariant that reads a bound (`Limits_consistent`, `Limits_comparable`) is guarded by the flags.
   The walk therefore skips an open side whose bound is empty, as [wire.md § REQ-052](wire.md#req-052) defines "empty" (`rm.IsEmptyIntervalBound`), the reading [wire.md § REQ-140](wire.md#req-140--underscore-prefixed-rm-attributes) gives a concrete-typed bound.
   A non-empty bound on an open side is walked like any bound.
-- A value the walk reaches again inside itself, on the path it is walking, is a cycle: each place it recurs is reported as `cyclic_value` at that path and not descended into.
-  A value it reaches again by another path, a pointer shared between two attributes, is validated at each place, so a defect in it is reported at each path ([§ REQ-171 *One walk*](#req-171--validation-engine)).
-  A decoded document holds neither; only a value built in Go can.
-  A value held by value whose list shares its own backing array is no cycle the walk can recognise, so the walk also stops after a number of visits per call, reporting `max_nodes` once at the path where it stops.
-  Past a nesting depth the walk does not descend, and reports `max_depth` once per walk, at the first path where it stopped, as § REQ-171 *One walk* requires.
-  A decoded document can reach either limit: a large one the visit limit, a deeply nested one the depth limit.
-  Both limits are the `Limits` of [§ REQ-171 *Surface*](#req-171--validation-engine), with its defaults, and each path where one stopped the walk is listed in `Coverage.Stopped`.
+- A cycle, a value shared between two attributes, and the walk's depth and visit limits are handled as [§ REQ-171 *Cycles and limits*](#cycles-and-limits) says.
 
 ### Per-RM-type invariant catalogue
 
-The floor **MUST** report every invariant the inventory of [§ REQ-171 *Where the RM rules come from*](#req-171--validation-engine) classifies as evaluated, on every node of a class subject to it that the walk visits, reading it as the entries below say, with the code `rm_invariant` unless an entry names a code of its own.
+The floor **MUST** report every invariant the inventory of [§ REQ-171 *Where the RM rules come from*](#where-the-rm-rules-come-from) classifies as evaluated, on every node of a class subject to it that the walk visits, reading it as the entries below say, with the code `rm_invariant` unless an entry names a code of its own.
 Beside the structural required-set walk above, the entries cover the node-level and leaf invariants that the canjson lenient decode accepts but the RM forbids:
 
 - **CODE_PHRASE** — `code_string` non-empty (`Code_string_valid`).
-  The required-set walk decides this invariant, as § REQ-171 *Where the RM rules come from* says of one another check already decides: an empty `code_string` is an absent RM-mandatory attribute, reported once, as `required` at `…/code_string` with the rule `mandatory`, and not again at the CODE_PHRASE ([§ REQ-171](#req-171--validation-engine) *One finding per defect*).
+  The required-set walk decides this invariant, as § REQ-171 *Where the RM rules come from* says of an invariant another check already decides: an empty `code_string` is an absent RM-mandatory attribute, reported once, as `required` at `…/code_string` with the rule `mandatory`, and not again at the CODE_PHRASE ([§ REQ-171](#req-171--validation-engine) *One finding per defect*).
   A CODE_PHRASE at a mandatory attribute whose terminology is empty too is itself absent (§ REQ-171 *Structural access*), reported as `required` at its own path and not entered.
   The one exception is a DV_SCALE's `symbol`: the RM lets a scale value that has no code carry a `symbol` with its `terminology_id` and a blank `code_string`, so the floor **MUST NOT** report a blank `code_string` on a DV_SCALE `symbol.defining_code`, in either form.
   A DV_ORDINAL's `symbol` has no such allowance.
 - **DV_QUANTITY** — `precision`, when set, ≥ -1: per the RM, -1 means no limit (any number of decimal places), so only `precision < -1` is out of range.
-- **DV_DATE_TIME / DV_DATE / DV_TIME / DV_DURATION** — `Value_valid`: `value` is a valid ISO 8601 value of its type as the [REQ-123](rm-functions.md#req-123--temporal-data-value-helpers) parse reads it, that is the type's BASE predicate (`valid_iso8601_date_time`, `valid_iso8601_date`, `valid_iso8601_time`, `valid_iso8601_duration`) with the deviations REQ-123 names.
+- **DV_DATE_TIME / DV_DATE / DV_TIME / DV_DURATION** — `Value_valid`: `value` is a valid ISO 8601 value of its type as the [REQ-123](reference-model.md#req-123--temporal-data-value-helpers) parse reads it, that is the type's BASE predicate (`valid_iso8601_date_time`, `valid_iso8601_date`, `valid_iso8601_time`, `valid_iso8601_duration`) with the deviations REQ-123 names.
   The floor reports a non-empty `value` that parse refuses, a placeholder such as `example` included, as `rm_invariant` on the node.
   An empty `value`, which is also what a JSON `null` decodes to, is an absent RM-mandatory attribute that the required-set walk reports once, as `required` at `…/value`, and this entry does not report it ([§ REQ-171](#req-171--validation-engine) *One finding per defect*).
 - **ELEMENT** — `Inv_null_flavour_indicated` (`is_null() xor null_flavour = Void`, where `is_null()` means there is no `value`): exactly one of `value` and `null_flavour` is present.
@@ -1456,11 +1483,11 @@ Beside the structural required-set walk above, the entries cover the node-level 
 - **TERM_MAPPING** — the floor **MUST** report a `match` outside `{'>', '=', '<', '?'}` (`term_mapping_match`) as an invariant violation on the mapping node itself, so the check fires for a mapping under a DV_TEXT / DV_CODED_TEXT `mappings` container, for one nested under a mapping's own `purpose`, and for a TERM_MAPPING handed to `ValidateRM` as the root.
   The RM-mandatory `match` and `target` (CODE_PHRASE) fall under the required-set walk, and `target`'s and `purpose`'s own invariants apply inside each mapping; an empty `match` therefore reports both `required` and `term_mapping_match` at the same path.
 - **Non-empty lists** — `COMPOSITION.Content_valid`, `EVENT_CONTEXT.Participations_validity`, `INSTRUCTION.Activities_valid`, `SECTION.Items_valid` and `ATTESTATION.Items_valid` each read `x /= Void implies not x.is_empty` for the list `x` they name: `content`, `participations`, `activities`, and `items` on the last two.
-  The floor reports such a list that is present and holds no item, presence as [§ REQ-171 *Structural access*](#req-171--validation-engine) reads it, as `rm_invariant` at the list's own path (`…/context/participations`), with the invariant as its `Rule`, as it reports a present-but-empty `mappings`, and not an absent one.
+  The floor reports such a list that is present and holds no item, presence as [§ REQ-171 *Structural access*](#structural-access) reads it, as `rm_invariant` at the list's own path (`…/context/participations`), with the invariant as its `Rule`, as it reports a present-but-empty `mappings`, and not an absent one.
   `HISTORY.Events_valid` reads `(events /= Void and then not events.is_empty) or summary /= Void`: the floor reports a HISTORY whose `events` is absent or holds no item and whose `summary` is absent as `rm_invariant` at the HISTORY's own path, as it reports the other rules of this catalogue over more than one attribute, `Basic_validity` and `Inv_null_flavour_indicated`, at their node, and not one that carries an event or a summary.
   Under a template, an existence lower bound of 1 or more on one of these lists asks for a member ([§ REQ-102](#req-102--composition-validation) *An existence lower bound alone asks for no member*), and the template's finding at a list's path or below it, or, for a HISTORY's `events`, at or below its `summary`, stands for the rule that reads it there ([§ REQ-171](#req-171--validation-engine) *One finding per defect*).
 - **LOCATABLE links and EVENT_CONTEXT location** — `LOCATABLE.Links_valid` and `EVENT_CONTEXT.location_valid` each read `x /= Void implies not x.is_empty` for the attribute `x` they name, `links` and `location`.
-  The floor reports a `links` that is present and holds no item, on every LOCATABLE it visits, and a `location` that is present and empty, as `rm_invariant` at the attribute's own path (`…/links`, `…/context/location`), with the invariant as its `Rule`, and not an absent one; presence is as [§ REQ-171 *Structural access*](#req-171--validation-engine) reads it, so an absent key and a JSON `null` are both absent, and only a decoded `"links":[]` or `"location":""` is present and empty.
+  The floor reports a `links` that is present and holds no item, on every LOCATABLE it visits, and a `location` that is present and empty, as `rm_invariant` at the attribute's own path (`…/links`, `…/context/location`), with the invariant as its `Rule`, and not an absent one; presence is as [§ REQ-171 *Structural access*](#structural-access) reads it, so an absent key and a JSON `null` are both absent, and only a decoded `"links":[]` or `"location":""` is present and empty.
   `links` is not one of the lists the *Non-empty lists* entry evaluates, so under a template an existence lower bound on it asks for no member ([§ REQ-102](#req-102--composition-validation) *An existence lower bound alone asks for no member*), and the finding is the RM rule's own, as it is with no template.
   The diagnostic names the class and the attribute, never a value ([§ REQ-168](#req-168--value-free-validation-diagnostics)).
 - **DV_EHR_URI** — `Scheme_valid` (`scheme.is_equal (Ehr_scheme)`): the scheme of the `value` is `ehr`.
@@ -1471,14 +1498,14 @@ Beside the structural required-set walk above, the entries cover the node-level 
 - **Archetype roots (`Is_archetype_root`)** — the class-level `Is_archetype_root` invariant fixes `is_archetype_root` true on every class whose BMM declares it, and together with `LOCATABLE.Archetyped_valid` (`is_archetype_root xor archetype_details = Void`) that makes `archetype_details` mandatory on those nodes even though LOCATABLE declares it 0..1; `Archetyped_valid` alone does not, since a non-root node with no details satisfies it.
   The declaring classes are COMPOSITION, EHR_ACCESS, EHR_STATUS, PARTY (with its concrete descendants PERSON, ORGANISATION, GROUP, AGENT, ROLE) and ENTRY (with its concrete descendants ADMIN_ENTRY, OBSERVATION, EVALUATION, INSTRUCTION, ACTION).
   The floor **MUST** report an absent or `null` `archetype_details` as `is_archetype_root` at `…/archetype_details` on a node of such a class, and on no other: classes that declare no `Is_archetype_root` (FOLDER, PARTY_RELATIONSHIP, EXTRACT, GENERIC_ENTRY, the demographic parts PARTY_IDENTITY, CONTACT, ADDRESS and CAPABILITY, and the data-structure classes) leave the attribute optional.
-  This positive set is closed: the floor takes it from the `Is_archetype_root` entries of the inventory of [§ REQ-171 *Where the RM rules come from*](#req-171--validation-engine), and the [REQ-107](#req-107--template-driven-rm-instance-example-generator) generator from a closed list held equal to it and to the vendored BMM's `Is_archetype_root` declarations, so a BMM bump that adds a root class fails the build ([ADR 0001](../adr/0001-bmm-version-bump-runbook.md)).
+  This positive set is closed: the floor takes it from the `Is_archetype_root` entries of the inventory of [§ REQ-171 *Where the RM rules come from*](#where-the-rm-rules-come-from), and the [REQ-107](#req-107--template-driven-rm-instance-example-generator) generator from a closed list held equal to it and to the vendored BMM's `Is_archetype_root` declarations, so a BMM bump that adds a root class fails the build ([ADR 0001](../adr/0001-bmm-version-bump-runbook.md)).
   This is a class invariant of the object, not a storage rule, so it holds for a detached object exactly as for a persisted one.
   Rules that need stored history (`VERSIONED_COMPOSITION.Archetype_node_id_valid`) and requiring `ARCHETYPED.template_id` (0..1 in the RM) stay out of scope.
 - **ARCHETYPED** — wherever an `archetype_details` node is present, on any LOCATABLE, its two RM-mandatory attributes `archetype_id` (`ARCHETYPE_ID`) and `rm_version` (`String`) are value-typed, so the value-based walk cannot tell absent from `null` from empty (they decode to the same zero value).
-  On a value validated with no report of missing members, the value-based entries (`ValidateRM` and the typed sugars) **MUST** report an empty `archetype_id.value` as `required` at `…/archetype_details/archetype_id/value` (SDK policy: `OBJECT_ID.value` is RM-mandatory with no non-empty invariant, the `clinical_notes.v0` precedent) and an empty `rm_version` as `rm_version_valid` (`Rm_version_valid: not rm_version.is_empty`) at `…/archetype_details/rm_version`; absent and `null` decode to the same zero values and are reported the same way, and an ARCHETYPED handed to `ValidateRM` as the root is checked the same way, with the findings at `/archetype_id/value` and `/rm_version`.
+  On a value validated with no report of missing members, the value-based entries (`ValidateRM` and the typed sugars) **MUST** report an empty `archetype_id.value` as `required` at `…/archetype_details/archetype_id/value` (SDK policy: `OBJECT_ID.value` is RM-mandatory and has no non-empty invariant of its own) and an empty `rm_version` as `rm_version_valid` (`Rm_version_valid: not rm_version.is_empty`) at `…/archetype_details/rm_version`; absent and `null` decode to the same zero values and are reported the same way, and an ARCHETYPED handed to `ValidateRM` as the root is checked the same way, with the findings at `/archetype_id/value` and `/rm_version`.
   With a decode's report of missing members, an absent or `null` member is `required` at the member itself, `…/archetype_details/archetype_id` or `…/archetype_details/rm_version`, with nothing below it (§ *Value-typed mandatory presence* below).
   Validating the `ARCHETYPE_ID` grammar is out of scope for this catalogue.
-- **Coded invariants** — the floor evaluates each RM invariant in the table below, which ties a coded attribute to a group or a code set of the openEHR terminology, on every node of the listed classes it visits, taking the group, the code set and the membership verdict from the [REQ-034](rm-modeling.md#openehr-terminology-vocabulary-req-034) accessor.
+- **Coded invariants** — the floor evaluates each RM invariant in the table below, which ties a coded attribute to a group or a code set of the openEHR terminology, on every node of the listed classes it visits, taking the group, the code set and the membership verdict from the [REQ-034](reference-model.md#openehr-terminology-vocabulary-req-034) accessor.
   An optional attribute is checked only when present, ELEMENT's `null_flavour` only when the ELEMENT has no `value` (the RM states `Inv_null_flavour_valid` as `is_null implies …`), and PARTICIPATION's `function` only when it is a DV_CODED_TEXT (`Function_valid`'s own guard).
 
   | Class | Invariant | Attribute | Group or code set |
@@ -1521,7 +1548,7 @@ The floor walks it as a bound but does not report the contradiction.
 
 #### What the floor does not evaluate
 
-Every invariant of the pinned RM and BASE BMMs that the floor does not evaluate is an entry of the inventory of [§ REQ-171 *Where the RM rules come from*](#req-171--validation-engine), with its reason: among them BASE `Interval.Limits_comparable`, which `DV_INTERVAL.Limits_consistent` restates and the floor evaluates on a DV_INTERVAL as the *DV_INTERVAL* entry says, but on no BASE `Proper_interval` or `Point_interval`, whose bounds the SDK leaves untyped; and the coded invariants of the change-control and resource-description classes, which the *Coded invariants* table leaves out.
+Every invariant of the pinned RM and BASE BMMs that the floor does not evaluate is an entry of the inventory of [§ REQ-171 *Where the RM rules come from*](#where-the-rm-rules-come-from), with its reason: among them BASE `Interval.Limits_comparable`, which `DV_INTERVAL.Limits_consistent` restates and the floor evaluates on a DV_INTERVAL as the *DV_INTERVAL* entry says, but on no BASE `Proper_interval` or `Point_interval`, whose bounds the SDK leaves untyped; and the coded invariants of the change-control and resource-description classes, which the *Coded invariants* table leaves out.
 A result lists those of the classes it visited in `Coverage.Unevaluated`.
 The inventory classifies `DV_INTERVAL.Limits_consistent` as evaluated, but the floor leaves parts of it unchecked: the `units_system` of two DV_QUANTITY; the comparability of two DV_ORDINAL or DV_SCALE, which the RM leaves undefined; and the order of a pair it reads as strictly comparable but cannot order, one that holds a DV_PROPORTION with a zero denominator or a temporal value the REQ-123 parse refuses, or a zoned DV_TIME or DV_DATE_TIME against one without a zone.
 
@@ -1544,7 +1571,7 @@ The required-set walk reads presence from the decoded Go value, as [§ REQ-171 *
 What the walk cannot detect is an omitted **value-typed** mandatory attribute whose zero value is itself a valid value: a number or a boolean, such as `DV_QUANTITY.magnitude`, `DV_COUNT.magnitude`, `DV_BOOLEAN.value` or `DV_PROPORTION.denominator`, and a value struct, such as `EHR_STATUS.subject` (typed `rm.PartySelf`, whose only field is optional, so an omitted subject and a valid bare `{"_type":"PARTY_SELF"}` decode to the identical zero value) and an ARCHETYPED's `archetype_id` and `rm_version`.
 Interface-, pointer- and slice-typed mandatories are unaffected, nil being a reliable absence signal, as are the value-level invariants, which inspect fields rather than presence.
 
-The floor closes this by reading what the decode found missing, which the codecs report as [wire.md § REQ-175](wire.md#req-175--missing-members-on-decode) defines: every RM-mandatory member a document leaves out or sends as `null` (canonical JSON) or as `xsi:nil` or an empty primitive element (canonical XML), each identified by its JSON Pointer in the canonical-JSON form of the instance, in both formats ([ADR 0033](../adr/0033-missing-members-reported-by-decoders.md)).
+The floor closes this by reading what the decode found missing, the report of missing members [wire.md § REQ-175](wire.md#req-175--missing-members-on-decode) defines ([ADR 0033](../adr/0033-missing-members-reported-by-decoders.md)).
 
 - Every value-based entry, `ValidateRM`, `Validate` and `Validator.Validate`, **MUST** accept such a report through `WithMissing`, a trailing option, so a caller that decodes with a codec's report option hands the pointers on and validates once; the typed sugars take none and are for a value with no report.
   A nil option, an empty list and a repeated option are read as the union of what was given.
@@ -1559,11 +1586,11 @@ The floor closes this by reading what the decode found missing, which the codecs
 - A pointer that names no attribute the walk visits draws no finding: a node the template refused, a node past a limit, which `Coverage.Stopped` lists, a node the walk does not enter.
   The walk reports what it visits.
   A pointer into a value held by a `Hash` is matched by the entry's key, and one into a list by the item's position.
-- A value built in Go has no report, so a by-value mandatory member left unset there reads as present, as today; only a decode can say what a document said.
+- A value built in Go has no report, so a by-value mandatory member left unset there reads as present; only a decode can say what a document said.
   The typed wrappers and `ValidateRM` without the option keep that blind spot, which their godoc names.
 - On `ValidateJSON` and `ValidateXML`, input that does not decode into `root`, malformed input, a canonical-JSON document whose root is not an object, a canonical-XML document with content before or after its root element or a root that fails its decode, **MUST** surface a single `invalid_shape` at `/` and a not-OK `Result`, with the decode error, whose text may quote the input, in the issue's `Value` and not in its `Detail` ([§ REQ-168](#req-168--value-free-validation-diagnostics)); JSON `null` raises no decode error, so its issue's `Value` is empty.
   A nil `root`, or one that is no registered RM value, draws the entry's `nil_root` or `rm_type_unknown` guard, as `ValidateRM` does.
-- `ValidateRMEHRStatusBytes(data)` is kept as `ValidateJSON(data, new(rm.EHRStatus), nil)` and is deprecated: an omitted or `null` `subject` is `required` at `/subject`, a supplied subject, even the bare form, **MUST NOT** draw a `required`, and its former root-only scope is gone, since presence is now read at every level.
+- `ValidateRMEHRStatusBytes(data)` is kept as `ValidateJSON(data, new(rm.EHRStatus), nil)` and is deprecated: an omitted or `null` `subject` is `required` at `/subject`, a supplied subject, even the bare form, **MUST NOT** draw a `required`, and presence is read at every level.
 
 - **Probes:** PROBE-077 (every invariant the inventory classifies as evaluated, on every registered class subject to it, with a breaking and a conforming value); PROBE-081 (the EHR_STATUS root: `subject` and the ARCHETYPED keys); PROBE-110 (missing members at every level, in both canonical formats, and the validators' one answer).
 
@@ -1571,21 +1598,23 @@ The floor closes this by reading what the decode found missing, which the codecs
 
 ## REQ-168 — Value-free validation diagnostics
 
-A `constraints.Violation`, and an `Issue` from the instance validators, **MUST NOT** repeat the value under validation outside their value-bearing field (§ Field classes).
-Both travel to places a caller does not choose for clinical data: an HTTP error body, a log line, a monitoring event.
-The values they describe are clinical data (a date of birth, a measured magnitude, a free-text name), so a message that quotes one carries it to each of those places, in callers that never meant to send it.
-[§ REQ-113 § Value-free structured drop records](#value-free-structured-drop-records) holds the AQL diagnostics to this line, and [REQ-093](transport.md#req-093--openehr-error-envelope-mapping) holds the transport errors to it.
-This requirement applies it to [§ REQ-103](#req-103--primitive-constraint-introspection)'s `Violation` and to the `Issue` that [§ REQ-102](#req-102--composition-validation) and [§ REQ-112](#req-112--template-less-reference-model-validation-floor) return; the `Issue` that `ValidateAQL` returns keeps [§ REQ-109](#req-109--aql-static-lint)'s classification.
-The value stays reachable through `Value.Reveal()` ([§ The redacting carrier](#the-redacting-carrier)).
+A diagnostic **MUST NOT** carry a submitted value (§ Submitted values and structure) outside a field its type names value-bearing (§ Field classes).
+The rule binds [§ REQ-103](#req-103--primitive-constraint-introspection)'s `Violation`, the `Issue` that [§ REQ-102](#req-102--composition-validation) and [§ REQ-112](#req-112--template-less-reference-model-validation-floor) return, and the AQL diagnostics: the `lint.Issue` of [§ REQ-109](#req-109--aql-static-lint), which the `Issue` that `ValidateAQL` returns carries over, and the drop record of [§ REQ-113](#value-free-structured-drop-records).
+Diagnostics travel to places a caller does not choose for clinical data: an HTTP error body, a log line, a monitoring event.
+The values they describe are clinical data (a date of birth, a measured magnitude, a free-text name), and an AQL literal can be one, so a message that quotes one carries it to each of those places, in callers that never meant to send it.
+A consumer whose refusal reasons may name structure but never a value would otherwise discard the diagnostics wholesale, and its clients would get a generic refusal where the SDK knew what was wrong and where.
+[REQ-093](transport.md#req-093--openehr-error-envelope-mapping) holds the transport errors to the same line.
+On a `Violation` and an instance validator's `Issue` the value stays reachable through `Value.Reveal()` ([§ The redacting carrier](#the-redacting-carrier)).
 
 ### Submitted values and structure
 
 A **submitted value** is data taken from the input under validation:
 
 - for `PrimitiveConstraint.Validate`, the argument and each of its fields: a `QuantityValue`'s magnitude, units and precision, a `CodedTermRef`'s terminology and code, an `OrdinalSymbol`'s value and symbol;
-- for the instance validators, the content of a data value or a primitive attribute in the instance (a `value`, `magnitude`, `units`, `precision`, `numerator` or `denominator`, an interval bound, a `CODE_PHRASE`'s terminology and code, a `TERM_MAPPING`'s `match`), and the text of an error raised while decoding the instance.
+- for the instance validators, the content of a data value or a primitive attribute in the instance (a `value`, `magnitude`, `units`, `precision`, `numerator` or `denominator`, an interval bound, a `CODE_PHRASE`'s terminology and code, a `TERM_MAPPING`'s `match`), and the text of an error raised while decoding the instance;
+- for the AQL linter and parser, any source text of the query, a path spelling included, since a path carries its own predicates ([§ REQ-109 § Value-free lint diagnostics](#value-free-lint-diagnostics)).
 
-**Structure** is not a submitted value: RM type and attribute names, archetype and node ids, a path, a child count, the Go type name of a wrong-typed argument, and the constraint itself (its allowed list, range, pattern, units and terminology), which comes from the template rather than the instance.
+**Structure** is not a submitted value: RM type and attribute names, archetype and node ids, a path an instance validator writes, a child count, the Go type name of a wrong-typed argument, and the constraint itself (its allowed list, range, pattern, units and terminology), which comes from the template rather than the instance.
 Naming the clause a value failed lets a reader infer something about the value: that it lies outside a range, which units entry it matched, which of the two booleans it was.
 That inference is what a diagnostic is for, and it is not an echo.
 Copying the value, or any part of it, is.
@@ -1594,7 +1623,18 @@ Copying the value, or any part of it, is.
 
 A field's class is fixed by its type and, for an `Issue`, by the entry point that returned it, which a consumer knows because it made the call.
 It never depends on an issue's content.
-The godoc of each type states its fields' classes, so a consumer reads them on the type it holds ([§ REQ-113](#value-free-structured-drop-records)):
+
+#### The two field classes
+
+Each field of a diagnostic **MUST** be in exactly one of two classes, and the godoc of the type a consumer holds names each field's class:
+
+| Class | Rule |
+|---|---|
+| **Value-free** | **MUST NOT** carry a submitted value, in any circumstance: a field that cannot say a thing without the value says less (a zero span, an unclassified kind, a structural wording) and never falls back to quoting it |
+| **Value-bearing** | **MAY** carry a submitted value or a query spelling; a disclosure boundary treats it accordingly |
+
+What cannot be said without the value goes in a value-bearing field, or nowhere.
+The classes of the validators' fields:
 
 | Type and entry point | Value-free | Value-bearing |
 |---|---|---|
@@ -1602,7 +1642,7 @@ The godoc of each type states its fields' classes, so a consumer reads them on t
 | `validation.Issue` from the REQ-102 entry points and the REQ-112 floor entries | `Path`, `Code`, `Layer`, `Rule`, `Detail`, `Severity` | `Value` |
 | `validation.Issue` from `ValidateAQL` and `ValidateAQLWithTypeRelation` | `Code`, `Layer`, `Rule`, `Severity`, which carry no source text ([§ REQ-109 § Value-free lint diagnostics](#value-free-lint-diagnostics)) | `Detail` and `Path`, as § REQ-109 classifies them |
 
-A value-free field does not fall back to quoting the value where a value-free wording is hard to find ([§ REQ-113](#value-free-structured-drop-records)'s no-fallback clause): what cannot be said without the value goes in `Value`, or nowhere.
+The `lint.Issue` fields are classed in [§ REQ-109 § Value-free lint diagnostics](#value-free-lint-diagnostics), and the drop record's in [§ REQ-113 § Value-free structured drop records](#value-free-structured-drop-records).
 
 ### The redacting carrier
 
@@ -1668,7 +1708,7 @@ The empty-`Value` cases (`CodeWrongType`, an unparseable pattern, an absence, an
 ### Out of scope
 
 - Errors the codecs return as `error` values; [wire.md](wire.md) governs their text.
-- `lint.Issue` and the AQL drop records, which [§ REQ-109](#req-109--aql-static-lint) and [§ REQ-113](#req-113--execution-oriented-parsed-aql-ast) govern.
+- A redacting carrier on `lint.Issue` and the AQL drop record: the lint issue's query spellings stay in `Detail` and `Path`, and the drop record has no value-bearing field.
 - Redaction policy for structure.
   Whether an archetype id or a path is sensitive in a deployment is the consumer's decision.
 
@@ -1706,7 +1746,7 @@ func WithLimits(l Limits) Option
 - The zero `Validator` and a nil `*Validator` **MUST** behave as one built with no options.
 - The value **MUST** hold no per-call state after `New`, so one instance serves every goroutine of a server ([idiom.md § Concurrency](idiom.md#concurrency-req-026)); the compiled template is built once per template and shared.
   What belongs to one call, a decode's report of missing members, travels as a trailing `ValidateOption` of the call, never as a setting of the value.
-- `Validate` **MUST** accept any RM value the registry knows ([rm-modeling.md § REQ-040](rm-modeling.md#type-registry-req-040)) and, given a nil `c`, apply the RM rules alone, so a root that binds to no template is validated by the same walk.
+- `Validate` **MUST** accept any RM value the registry knows ([reference-model.md § REQ-040](reference-model.md#type-registry-req-040)) and, given a nil `c`, apply the RM rules alone, so a root that binds to no template is validated by the same walk.
 - The package-level entry points of § REQ-102 and § REQ-112 **MUST** behave as a `Validator` built with no options, keeping their nil guards: `Validate(root, nil)` still reports `nil_template`, and `ValidateRM` is the package-level entry for the RM rules alone, returning for a root the issues `Validate(root, nil)` on a `Validator` returns.
 
 ### One walk
@@ -1747,9 +1787,16 @@ A member a decode reports missing (§ REQ-112 *Value-typed mandatory presence*) 
 
 An RM rule's own finding at the same path, such as a code outside its terminology group, is a second defect, reported beside the first.
 
-A Go value reached from two places **MUST** be validated at each place, against each place's template node, so a defect at the second place is reported at the second path.
-A value that contains itself is a cycle, reported where it recurs and not entered, as § REQ-112 *Driver* says; the engine detects it on the active ancestry alone and keeps no record of values it has finished.
-At the depth limit the engine **MUST** stop descending and report `max_depth` once per walk, at the first path where it stopped, and at the visit limit stop and report `max_nodes` once, at the path where it stopped; *Coverage* lists both.
+#### Cycles and limits
+
+A Go value reached from two places, a pointer shared between two attributes, **MUST** be validated at each place, against each place's template node, so a defect at the second place is reported at the second path.
+A value the walk reaches again inside itself, on the path it is walking, is a cycle: each place it recurs is reported as `cyclic_value` at that path and not entered.
+The engine detects a cycle on the active ancestry alone and keeps no record of values it has finished.
+A decoded document holds neither a cycle nor a shared value; only a value built in Go can.
+A value held by value whose list shares its own backing array is no cycle the walk can recognise, which the visit limit bounds.
+At the depth limit the engine **MUST** stop descending and report `max_depth` once per walk, at the first path where it stopped, and at the visit limit stop and report `max_nodes` once, at the path where it stopped.
+A decoded document can reach either limit: a large one the visit limit, a deeply nested one the depth limit.
+Both limits are the `Limits` of *Surface*, with its defaults, and *Coverage* lists each path where one stopped the walk in `Coverage.Stopped`.
 
 #### Trials
 
@@ -1859,7 +1906,7 @@ A coverage path is written by § REQ-102 *Issue paths* and is value-free.
 - Policy beyond the limits: descent under refused content, a severity policy per rule, a partial-instance mode: [STRAND-16](research-strands.md#strand-16--validator-policy-beyond-the-limits).
 - An external terminology service behind the seam; rendering an issue path as a Web Template id or a FLAT key; the interval representation.
 
-- **Probes:** PROBE-077 (the invariant matrix over the inventory); PROBE-025, PROBE-026 and PROBE-074 (the issue-code multisets).
+- **Probes:** PROBE-077 (the invariant matrix over the inventory).
 
 ---
 
@@ -1879,10 +1926,10 @@ The sealed `SelectExpr`, `WhereExpr` and `Value` sets grow additively, so a cons
 ```go
 // Package github.com/cadasto/openehr-sdk-go/openehr/aql/parse
 
-// Tier 2 — the target read AST.
 func ParseQuery(q string) (*Query, error)              // (*Query, aql.ErrIncompleteAST) on catalogue gap
 func (d *Document) Query() *Query                       // best-effort partial AST
 func (d *Document) QueryErr() error                     // aql.ErrIncompleteAST diagnostic, nil otherwise
+func (d *Document) Dropped() []DroppedConstruct         // § Value-free structured drop records
 
 type Query struct {
     Select  SelectClause
@@ -1912,20 +1959,26 @@ type SelectClause struct {
     Distinct bool
     Star     bool
     Items    []SelectItem
+    Top      *aql.TopClause                             // nil when no TOP; § The TOP carrier
 }
 type SelectItem  struct { Expr SelectExpr; Alias string }
 type SelectExpr  interface{ isSelectExpr() }
 type PathExpr    struct { IdentifiedPath }
 type FunctionCall struct { Name string; Args []SelectExpr; Distinct, Star bool; Raw string }
+type LiteralExpr struct { Value aql.Value; Raw string } // § Projection source text
+type StarExpr    struct{}                               // a `*` beside column items
 
 // FROM / CONTAINS — nested containment tree
-type FromClause   struct { Root ClassExpr; Contains *Containment }
+type FromClause   struct { Root ClassExpr; Contains *Containment; Junction *Containment } // Junction: a FROM-root junction
 type Containment  struct { Class ClassExpr; Children []Containment; ChildJoin ContainsJoin; Negated bool }
 type ContainsJoin int  // ContainsAnd / ContainsOr
 
 // ORDER BY
 type OrderTerm struct { Path IdentifiedPath; Dir OrderDir }
 type OrderDir  int  // OrderAsc / OrderDesc
+
+// Drop records — § Value-free structured drop records
+type DroppedConstruct struct { Kind ConstructKind; Clause Clause; Span Span }
 ```
 
 For a query parsed from `src`, `src[Start:End]` of each `ClauseSpans` field is that clause's text: from the first byte of its keyword to just past its last token, with `WhereExpr` the condition after `WHERE`, `Limit` ending before any `OFFSET`, and surrounding whitespace, comments and a trailing `--` outside every span.
@@ -1933,8 +1986,7 @@ For a query parsed from `src`, `src[Start:End]` of each `ClauseSpans` field is t
 The shared `aql.Value` vocabulary also carries `aql.NullValue`, a typed NULL, so the unquoted `NULL` keyword round-trips without colliding with a `StringValue{"NULL"}`.
 `aql.ErrIncompleteAST` is the sentinel `ParseQuery` and `Document.QueryErr` surface, and `(*Query).Emit` returns it for an AST from an incomplete extraction (§ Catalogue and residual).
 
-Tier 1, the cheap interim, exposes the validated ANTLR tree via `(*Document).Tree` (return type `gen.ISelectQueryContext`, explicitly unstable).
-It removes the re-parse cost for consumers already recursing the generated parser but does not solve the generated-coupling concern; Tier 2 is the stable read AST.
+`(*Document).Tree` is deprecated: it returns the generated ANTLR context (`gen.ISelectQueryContext`), which can change shape on any grammar regeneration, and stays as a raw-tree escape hatch; `Query` and `Query.Spans` are the stable read surface.
 
 The construction side carries `aql.NotExpr`, `aql.ExistsExpr`, `aql.MatchesExpr` and `aql.LikeExpr` (with their `Not` / `Exists` / `Matches` / `Like` constructors), so the parser populates the same shapes the Builder constructs.
 `aql.FormatWhere` renders a `WhereExpr` in canonical form, and `(*Query).Emit` renders `WHERE` through it.
@@ -1952,19 +2004,8 @@ Two path-bearing sub-structures are exposed as parsed structure, not only raw te
   `ParsedPath.Raw` **MUST** equal `Path`.
 
 The shared path vocabulary, `aql.IdentifiedPath` and `aql.PathSegment`, lives in `openehr/aql` so that `aql.Comparison` can carry it.
-`parse.IdentifiedPath` embeds `aql.IdentifiedPath` and adds the parse-only `Clause` and source `Position` (promoted fields keep existing access unchanged); `parse.PathSegment` re-exports `aql.PathSegment`.
-Emission uses `Comparison.Path` and the verbatim class `Predicate`, so the structured fields leave the round-trip property below unaffected.
-
-### Round-trip property
-
-For any AQL query the parser accepts and the catalogue models:
-
-```
-Emit(ParseQuery(Emit(ParseQuery(x)))) == Emit(ParseQuery(x))
-```
-
-The first emit normalises whitespace, keyword casing, optional defaults (ASC), and clause ordering against the canonical write form; the second parse-emit **MUST** be a fixed point.
-This is the buildable-grammar equivalent of [PROBE-020](conformance.md#probe-020--aql-builder-string-stability), held by [PROBE-080](conformance.md#probe-080--aql-parseemit-round-trip-property).
+`parse.IdentifiedPath` embeds `aql.IdentifiedPath`, whose fields it promotes, and adds the parse-only `Clause` and source `Pos`; `parse.PathSegment` re-exports `aql.PathSegment`.
+Emission reads none of the structured fields ([§ REQ-119 § Emission ignores the structured model](#emission-ignores-the-structured-model)).
 
 ### Trust model
 
@@ -2074,15 +2115,14 @@ Shrinking the set (a `PathValue` carrier for the path operand, a node-code value
 `parse.ClassExpr`'s own fields (`Archetype`, `ParamArchetype`, `Predicate`, `PredicateComparison`) stay the only carrier of the class-position predicate: its three admissible top-level forms already map onto them, and a second carrier derived from the same source node would drift.
 The structured model sits at the path-segment position only.
 
-#### Emission ignores the structured model
+#### What the model leaves out
 
-`Emit` **MUST NOT** read it: § REQ-119's round trip renders `Raw`, so a consumer mutating the model cannot change what is emitted.
-
+Emission does not read the model ([§ REQ-119 § Emission ignores the structured model](#emission-ignores-the-structured-model)).
 **Out of scope.** A carrier for the `VERSION` class predicate keywords (`LATEST_VERSION` / `ALL_VERSIONS`): `versionPredicate` is a different production with a different accept set.
 Validating the predicate sub-grammar ([§ REQ-119 § Out of scope](#req-119--re-parseable-canonical-aql-emission)), since structuring what the parser accepted is not deciding what to accept.
 Rewriting or normalising `Raw`, which stays verbatim.
 The builder side: `aql.Builder` writes predicates from typed inputs ([§ REQ-163](#req-163--aql-write-side-expressivity-parity)).
-And a disclosure policy over the components: each component is individually addressable so a consumer applies its own policy, and the SDK's own diagnostics follow § Value-free structured drop records.
+And a disclosure policy over the components: each component is individually addressable so a consumer applies its own policy, and the SDK's own diagnostics follow [§ REQ-168](#req-168--value-free-validation-diagnostics).
 
 ### Comparability
 
@@ -2095,22 +2135,8 @@ Callers compare built query strings.
 
 ### Value-free structured drop records
 
-A diagnostic is useful only if a consumer can act on it without republishing the query it came from.
-The drop channel names the offending construct by quoting its source text into `aql.ErrIncompleteAST`, and [§ REQ-109](#req-109--aql-static-lint)'s lint issue quotes in its value-bearing fields too.
-A consumer whose refusal reasons may name structure (an operator, a clause, a path shape) but never a value, because an AQL literal can be a payload value no quoting masks, would otherwise discard the diagnostics wholesale, and its clients would get a generic refusal where the SDK knew what was wrong and where.
-The field rule below is stated once, here, and binds both surfaces.
-
-#### The two field classes
-
-Each field of a diagnostic surface **MUST** be in exactly one of two classes, and the godoc of the type a consumer holds names each field's class:
-
-| Class | Rule |
-|---|---|
-| **Value-free** | **MUST NOT** carry source text, in any circumstance: a record that cannot be attributed reports that (a zero span, an unclassified kind) and never falls back to quoting the source |
-| **Value-bearing** | **MAY** embed query spellings; a disclosure boundary treats them accordingly |
-
-For the drop record, the construct kind, the clause and the source span are all value-free; it has no value-bearing field.
-[§ REQ-109 § Value-free lint diagnostics](#value-free-lint-diagnostics) classes the lint issue's fields against this same table: one rule, two surfaces.
+The drop channel names the offending construct by quoting its source text into `aql.ErrIncompleteAST`.
+The drop record names it without quoting, under the two-class rule of [§ REQ-168 § The two field classes](#the-two-field-classes): the construct kind, the clause and the source span are all value-free, and the record has no value-bearing field.
 
 #### The drop record
 
@@ -2132,22 +2158,38 @@ An existing exhaustive switch over `Clause` meets each new member as a case it d
 
 #### The span
 
-The span **MUST** be a start and an end `parse.Position` (`{Line, Col}`, the package's one positional vocabulary, already on `SyntaxError` and every AST node) over the exact input handed to the parser, pointing at the offending construct rather than at its enclosing clause, and zero when the construct cannot be attributed.
+The span **MUST** be a start and an end `parse.Position` (`{Line, Col}`, the vocabulary of `SyntaxError.Pos` and of the `Pos` a class expression and an identified path carry) over the exact input handed to the parser, pointing at the offending construct rather than at its enclosing clause, and zero when the construct cannot be attributed.
 A caller holding the input can then quote the construct under its own policy.
 
 Structured diagnostics for the simplified-format codecs ([§ REQ-053](wire.md#req-053)) are a separate surface and out of scope here, and so is redaction policy: what counts as a value is the consumer's decision, and this section guarantees only that the value-free fields carry none.
 
-- **Probes:** [PROBE-080](conformance.md#probe-080--aql-parseemit-round-trip-property) (the round-trip property), [PROBE-082](conformance.md#probe-082--aql-structured-path-access-standing-predicate--where-path) (structured path access), [PROBE-087](conformance.md#probe-087--aql-structured-ast-catalogue-completeness) (the catalogue, the `TOP` carrier and projection source text), [PROBE-095](conformance.md#probe-095--aql-predicate-structuring) (predicate structuring), [PROBE-096](conformance.md#probe-096--aql-value-free-structured-diagnostics) (value-free diagnostics).
+- **Probes:** [PROBE-080](conformance.md#probe-080--aql-parseemit-round-trip-property) (the catalogue under the parse/emit round trip of [§ REQ-119](#round-trip-property)), [PROBE-082](conformance.md#probe-082--aql-structured-path-access-standing-predicate--where-path) (structured path access), [PROBE-087](conformance.md#probe-087--aql-structured-ast-catalogue-completeness) (the catalogue, the `TOP` carrier and projection source text), [PROBE-095](conformance.md#probe-095--aql-predicate-structuring) (predicate structuring), [PROBE-096](conformance.md#probe-096--aql-value-free-structured-diagnostics) (value-free diagnostics).
 
 ## REQ-119 — Re-parseable canonical AQL emission
 
-[PROBE-021](conformance.md#probe-021--aql-parse-error-mapping) pins that the typed builders cannot emit syntactically invalid AQL (the write-side complement of [§ REQ-055](wire.md#req-055--wire-boundary)'s canonical form), and [§ REQ-113](#req-113--execution-oriented-parsed-aql-ast) makes `(*Query).Emit` a fixed point of the parse/emit round trip.
+[PROBE-021](conformance.md#probe-021--aql-parse-error-mapping) pins that the typed builders cannot emit syntactically invalid AQL (the write-side complement of [§ REQ-055](wire.md#req-055--wire-boundary)'s canonical form), and § Round-trip property makes `(*Query).Emit` of [§ REQ-113](#req-113--execution-oriented-parsed-aql-ast)'s AST a fixed point of the parse/emit round trip.
 Both are stated over the *shapes* the catalogue models.
 This requirement binds the value positions inside those shapes and the text a write path splices in verbatim, so that a consumer gets one guarantee, *what this SDK writes, it can read back*, rather than one that holds per clause and lapses per literal.
 
 Two failure modes run through it.
 Emitting text the parser **rejects** is loud: the caller gets an error the moment the query is read back.
 Emitting text the parser **accepts as something else** is silent, invisible to every round-trip, golden and parser check downstream, and it is the only reason to refuse an operand that would otherwise be valid AQL.
+
+### Round-trip property
+
+For any AQL query the parser accepts and the catalogue of [§ REQ-113](#catalogue-and-residual) models:
+
+```
+Emit(ParseQuery(Emit(ParseQuery(x)))) == Emit(ParseQuery(x))
+```
+
+The first emit normalises whitespace, keyword casing, optional defaults (ASC), and clause ordering against the canonical write form; the second parse-emit **MUST** be a fixed point.
+This is the buildable-grammar equivalent of [PROBE-020](conformance.md#probe-020--aql-builder-string-stability), held by [PROBE-080](conformance.md#probe-080--aql-parseemit-round-trip-property).
+
+### Emission ignores the structured model
+
+`Emit` **MUST NOT** read the structured predicate model of [§ REQ-113 § Structured node predicates](#structured-node-predicates): it renders `Raw`, so a consumer mutating the model cannot change what is emitted.
+It renders a comparison's path from `Comparison.Path` and a class predicate from the verbatim `ClassExpr.Predicate`, never from the structured fields of [§ REQ-113 § Structured path access](#structured-path-access), so those fields leave § Round-trip property unaffected.
 
 ### The emission closure property
 
@@ -2205,7 +2247,7 @@ Each is derived from the vendored grammar profile (`resources/aql/grammar/active
 #### Verbatim text on the read side
 
 `aql.IdentifiedPath.Raw`, `aql.PathSegment.Predicate` and `parse.ClassExpr.Predicate` report what was written, trivia included.
-The SDK **MUST** expose its own trivia model as `aql.StripPredicateTrivia`, for a consumer that compares that text rather than re-emitting it, so that the consumer does not model the lexer's skipped trivia a second time; the structured predicates of [§ REQ-113 § Structured node predicates](#req-113--execution-oriented-parsed-aql-ast) let most consumers compare components instead.
+The SDK **MUST** expose its own trivia model as `aql.StripPredicateTrivia`, for a consumer that compares that text rather than re-emitting it, so that the consumer does not model the lexer's skipped trivia a second time; the structured predicates of [§ REQ-113 § Structured node predicates](#structured-node-predicates) let most consumers compare components instead.
 
 ### Single-token identifier positions
 
@@ -2324,7 +2366,7 @@ Whether the specification requires an engine to *reject* an RM-impossible contai
 #### A nil relation is the default relation, on the receiver too
 
 Every seam that *takes* a relation reads nil as the default ([REQ-161 § Relation supply](#relation-supply) states that half, for the entry points that run the semantic group).
-The relation's own **methods MUST read a nil receiver the same way**, returning what the default relation would return rather than dereferencing it: nil is caller-constructible and documented, so panicking on it is what [idiom.md § No panics](idiom.md#errors-req-025) forbids, and a nil that means "the default" when passed but panics when used would be one spelling with two meanings.
+The relation's own **methods MUST read a nil receiver the same way**, returning what the default relation would return rather than dereferencing it: nil is caller-constructible and documented, so panicking on it is what [idiom.md § No panics](idiom.md#no-panics) forbids, and a nil that means "the default" when passed but panics when used would be one spelling with two meanings.
 This holds for the extension method as much as for the verdict methods: a consumer that conditionally extends a relation it might not hold (`var rel *TypeRelation; …; rel = rel.WithOverlay(e)`) writes the shape the nil convention invites.
 A nil relation is therefore **not** the *zero* relation: the zero value is a real relation that knows no classes and answers UnknownClass for every one (§ Verdicts), a different answer rather than the same one reached differently.
 
@@ -2334,7 +2376,7 @@ The relation answers two questions — **operand containability** (may this clas
 
 Beside the two verdict questions the relation answers one reachability query that yields no verdict: `Unavoidable(anc, via, desc)` reports whether every containment route from `anc` to `desc` passes through `via`.
 It is computed over the same overlaid graph as the verdicts, so a consumer overlay changes its answer, and like every other method it reads a nil receiver as the default relation.
-Its consumer is [REQ-164](#req-164--aql-path-shape-and-paging-lint)'s `aql_contains_redundant_step`.
+Its consumer is `aql_contains_redundant_step` ([§ REQ-161 § Path-shape checks](#path-shape-checks)).
 
 #### Admissible is route-existence, not a claim of RM truth
 
@@ -2387,7 +2429,7 @@ They take part in the same reachability closure as the derived edges.
 | Edge | Verdict contribution | Basis |
 |---|---|---|
 | `EHR` → `COMPOSITION`, `EHR_STATUS`, `FOLDER`, `EHR_ACCESS`, **and those four payload families' `VERSIONED_*` and `VERSION` tier** | Admissible | RM EHR IM: the EHR references its versioned objects — ehr_access, ehr_status, directory (folders) and compositions — so those four families are `EHR`'s **direct** overlay endpoints; the EHR IM versions no parties, so the demographic family is not a direct endpoint (a deployment that wants demographic containment adds a consumer edge, § Extensibility). Onward reachability through the shared, family-agnostic `VERSION` node may still resolve a hub-mediated cross-family route Admissible — deliberate, bounded looseness, never a false Error (§ Overlay edges, the family-agnostic note). `FROM EHR e CONTAINS …` is the specification's own canonical example shape and consensus engine behaviour. |
-| For each **payload family** X in {`COMPOSITION`, `EHR_STATUS`, `EHR_ACCESS`, `FOLDER`, `PARTY`} — the payload classes of the concrete `VERSIONED_*` containers the pinned BMM ships — the pair of edges `VERSIONED_X` → `VERSION` and `VERSION` → `X` | Admissible | Version-tier mechanics are RM facts for every pin-shipped container (RM common IM version tier; the EHR IM's versioned objects; `VERSIONED_PARTY` is the demographic IM's, shipped by the pin), and the QUERY grammar admits the operands while CDR practice resolves them. `VERSION.data` is generic — in the pinned tables `ORIGINAL_VERSION.data` is literally typed `T`, and [REQ-048](bmm-conformance.md#req-048--rm-meta-model-introspection-surface) leaves generic-parameter resolution out of scope — so the payload pairing is **cited overlay data reviewed on a BMM pin bump** ([ADR 0001](../adr/0001-bmm-version-bump-runbook.md) drift triage), not derivable from `rminfo`. |
+| For each **payload family** X in {`COMPOSITION`, `EHR_STATUS`, `EHR_ACCESS`, `FOLDER`, `PARTY`} — the payload classes of the concrete `VERSIONED_*` containers the pinned BMM ships — the pair of edges `VERSIONED_X` → `VERSION` and `VERSION` → `X` | Admissible | Version-tier mechanics are RM facts for every pin-shipped container (RM common IM version tier; the EHR IM's versioned objects; `VERSIONED_PARTY` is the demographic IM's, shipped by the pin), and the QUERY grammar admits the operands while CDR practice resolves them. `VERSION.data` is generic — in the pinned tables `ORIGINAL_VERSION.data` is literally typed `T`, and [REQ-048](reference-model.md#req-048--rm-meta-model-introspection-surface) leaves generic-parameter resolution out of scope — so the payload pairing is **cited overlay data reviewed on a BMM pin bump** ([ADR 0001](../adr/0001-bmm-version-bump-runbook.md) drift triage), not derivable from `rminfo`. |
 | `FOLDER` → `COMPOSITION` | **ByReference** | `FOLDER.items: List<OBJECT_REF>`; engines that support it resolve the reference hop — engine-specific, verify before use. (`FOLDER → FOLDER` is by-value and needs no overlay.) |
 | `FOLDER` → `VERSIONED_COMPOSITION` | **ByReference** | RM Common IM, directory package: a folder's items are "references to other (usually versioned) objects", `VERSIONED_COMPOSITION` its worked example. The hop lands on the version tier, so `FOLDER CONTAINS VERSION` and `FOLDER CONTAINS VERSIONED_COMPOSITION` resolve **ByReference** through the version-tier edges above, as the `FOLDER → COMPOSITION` shorthand above does for the payload. Onward through the family-agnostic `VERSION` node every other payload family resolves ByReference from `FOLDER` too, and a version-tier class reaches `VERSIONED_COMPOSITION` through a folder version's `FOLDER`: `VERSIONED_FOLDER CONTAINS VERSIONED_COMPOSITION` is a real reference chain, `VERSIONED_PARTY CONTAINS VERSIONED_COMPOSITION` a cross-family over-admission — the same bounded looseness as the hub's, never a false Error. |
 
@@ -2396,7 +2438,7 @@ Because `VERSION.data` is generic (one RM class for every payload), a bare `VERS
 The relation therefore **MAY** over-admit a rare cross-family version-tier pair rather than assert an impossibility it cannot cheaply prove: because the shared node offers a plain (non-reference) exit to *any* payload family, a route with no ByReference edge exists, and the route-closure rule (§ Reachability semantics) yields **Admissible** for both `VERSIONED_FOLDER CONTAINS COMPOSITION` (route `VERSIONED_FOLDER → VERSION → COMPOSITION`) and a hub-mediated `EHR … PARTY` pair.
 This looseness is deliberate and bounded: it is a *missed defect*, never a false Error ([§ REQ-161 § Flagging policy](#flagging-policy)), and it never contradicts the EHRbase-compatibility guard below.
 What waits for its own requirement is a **family-precise** profile that would refuse these pairs, and shipped demographic containment edges (§ Out of scope, § Extensibility).
-The version-tier overlay set is pin-reviewed data that follows the pin: a test fails when the family enumeration and `ConcreteDescendants("VERSIONED_OBJECT")` diverge, so a pin that adds a versioned container fails until its family edges are carried, and the `VERSIONED_<CLASS>` naming convention that test uses to pair a container with its payload class is never used in the relation.
+The version-tier overlay set is pin-reviewed data that follows the pin: a test fails when the family enumeration and `ConcreteDescendants("VERSIONED_OBJECT")` diverge, so a pin that adds a versioned container fails until its family edges are carried; the relation never derives a container's payload class by stripping the `VERSIONED_` prefix.
 
 Under the default relation nothing contains `EHR`: a pair with `EHR` as the descendant **MUST** verdict Never, and no reference hop beyond the table above is admitted.
 The default relation expresses the openEHR RM and specifications only, never one vendor's storage model: **an RM-valid pair that a conformant engine (EHRbase among them) admits MUST NOT verdict Never.** An engine admits a pair when it answers the query with the rows the pair selects.
@@ -2405,7 +2447,7 @@ A pair an engine accepts but answers with no rows is consistent with Never (the 
 ### Archetype/class conformance
 
 For a class expression carrying a literal archetype predicate, the HRID's type segment (`openEHR-<pkg>-<TYPE>.<concept>.vN`) **MUST** conform to the declared class (ConformsTo, case-insensitive): `ENTRY o[openEHR-EHR-OBSERVATION.…]` conforms; `EVALUATION o[openEHR-EHR-OBSERVATION.…]` does not.
-The HRID is decomposed by [REQ-120](rm-functions.md#req-120--rm-identifier-parsing-and-derivation)'s canonical parser, `rm.ParseArchetypeID`, with no second lexical logic here.
+The HRID is decomposed by [REQ-120](reference-model.md#req-120--rm-identifier-parsing-and-derivation)'s canonical parser, `rm.ParseArchetypeID`, with no second lexical logic here.
 HRID token shape is grammar-guaranteed on parsed input; an unparseable HRID reaching the relation directly, or a declared class or type segment the relation does not know, **MUST** yield **UnknownClass**, never a false mismatch: a mismatch is only ever asserted between two known classes.
 
 ### Extensibility
@@ -2450,10 +2492,20 @@ The version tier of every pin-shipped `VERSIONED_*` container, `VERSIONED_PARTY`
 
 ## REQ-161 — AQL semantic and portability lint
 
-REQ-109's Layer 2 **MUST** carry two additive check groups: **semantic checks** backed by the REQ-160 relation (RM-impossible shapes a CDR will typically accept and answer with zero rows), and **portability checks** for behaviours the QUERY specification leaves open (each citing the open specification question or community source where one exists).
-The layer contract is preserved: AST walk, collect-all, no CDR, no OPT; the relation is derived in-process from the pinned BMM.
+REQ-109's Layer 2 **MUST** carry three additive check groups, each specified below:
+
+- **semantic checks**, backed by the REQ-160 relation: RM-impossible shapes a CDR will typically accept and answer with zero rows;
+- **portability checks**, for behaviours the QUERY specification leaves open, each citing the open specification question or community source where one exists;
+- **path-shape checks**, for authoring rules the other groups do not reach: an identified path stepping through an unconstrained **repeating** RM attribute, a **row-bounded** query with no total order, an **unaliased** projection, the *path* source of engine-defined row multiplicity, and a **containment step that provably does nothing**.
+
+The layer contract is preserved: AST walk, collect-all, no CDR, no OPT ([§ REQ-109 § Layer 2](#layer-2--shape-ast-walk-no-cdr)).
+The relation and the RM facts the path-shape checks read are derived in-process from the pinned BMM, the latter through `openehr/rm/rminfo` ([REQ-048](reference-model.md#req-048--rm-meta-model-introspection-surface)), so the checks need no input beyond what Layer 2 already takes.
+Each path-shape rule is stated as a rule by the openEHR authoring guidance and is decidable from the query text plus the pin; path shape is otherwise covered only by the OPT-gated Layer 3.
+The codes reuse the REQ-109 issue model verbatim ([§ REQ-109 § Value-free lint diagnostics](#value-free-lint-diagnostics)), with `Span` on the offending class expression, path segment, projection item or path, as each catalogue row states.
 
 ### Checks
+
+The semantic and portability catalogue:
 
 | Check | Code | Severity | Rule |
 |---|---|---|---|
@@ -2464,7 +2516,7 @@ The layer contract is preserved: AST walk, collect-all, no CDR, no OPT; the rela
 | Containment by reference | `aql_containment_by_reference` | Warning | A pair whose REQ-160 pair verdict is **ByReference** **MUST** raise this code — Warning, because the hop is engine-specific: verify against the target CDR. |
 | `VERSION` without predicate | `aql_version_no_predicate` | Warning | A `VERSION` class expression carrying no version predicate **MUST** raise this code: the default is unspecified ([SPECPR-481](https://openehr.atlassian.net/browse/SPECPR-481)), so portable queries **SHOULD** state `[LATEST_VERSION]` / `[ALL_VERSIONS]` explicitly. |
 | Unreferenced `VERSIONED_OBJECT` | `aql_versioned_object_unreferenced` | Warning | An operand **MUST** raise this code exactly when its class conforms to `VERSIONED_OBJECT` (REQ-160 § Containable operands: conformance, not a name list), it carries **no class-position predicate** of its own, and its alias roots no identified path outside FROM/CONTAINS: the step is redundant unless container-level attributes are read ([Discourse #14186](https://discourse.openehr.org/t/aql-versionedobject-grammar/14186)). A **class-position predicate** is any bracket the operand carries in class position, a standing predicate or an archetype predicate, and any one of them suppresses the code, because each selects the container and so is itself a container-level attribute read. The motivating shape is `… CONTAINS VERSIONED_COMPOSITION vo[uid/value=$vo] CONTAINS VERSION v[ALL_VERSIONS]`, the canonical *all versions of one composition* query, where the step does work although no identified path names its alias. A class-position predicate is not an identified path, so "outside FROM/CONTAINS" answers *referenced*, never *redundant*. |
-| Engine-defined row grain | `aql_fanout_row_grain` | Warning | **MUST** fire exactly when an `AND` containment junction that no inherited negation covers has two or more **projected** aliases among its class-expression **leaves**: the class expressions reached by flattening nested `AND` junctions, descending into neither an `OR` junction nor a negated node. An alias is **projected** when it roots at least one SELECT column, **or** when the projection carries a `*` item in any form (bare `SELECT *`, mixed `SELECT *, col`): a star projects **every** alias bound in FROM/CONTAINS, because the engine returns a column per alias, and a star roots no identified path, so a SELECT-column-only reading would exempt the shape where the question is most live. Negation is inherited downward and alternation is not: a `NOT CONTAINS` at any depth above an `AND` junction, including through an intervening un-negated `OR`, covers it, because a `NOT CONTAINS` collapses to a boolean filter on the parent row and multiplies nothing inside its excluded subtree, while an un-negated `AND` nested under an un-negated `OR` is covered by nothing and fires. So the code stays silent on an `AND` junction with one projected alias, on an `OR` junction with two (under named columns and under `SELECT *` alike, since alternation selects rows and does not multiply them), on `NOT CONTAINS (A AND B)`, and on `NOT CONTAINS (B OR (D AND E))`. Possibility is sign-blind and row multiplicity is not, which is why `aql_impossible_containment` checks a `NOT CONTAINS` pair and this code does not. `Detail` states that row multiplicity for this shape is engine-defined (result-shape semantics are an open specification question, SPECQUERY-9). This code covers the **junction** source of engine-defined row multiplicity; the **path** source, two projected paths on one alias descending through different repeating scopes, is `aql_fanout_path_grain` ([§ REQ-164](#req-164--aql-path-shape-and-paging-lint)). |
+| Engine-defined row grain | `aql_fanout_row_grain` | Warning | **MUST** fire exactly when an `AND` containment junction that no inherited negation covers has two or more **projected** aliases among its class-expression **leaves**: the class expressions reached by flattening nested `AND` junctions, descending into neither an `OR` junction nor a negated node. An alias is **projected** when it roots at least one SELECT column, **or** when the projection carries a `*` item in any form (bare `SELECT *`, mixed `SELECT *, col`): a star projects **every** alias bound in FROM/CONTAINS, because the engine returns a column per alias, and a star roots no identified path, so a SELECT-column-only reading would exempt the shape where the question is most live. Negation is inherited downward and alternation is not: a `NOT CONTAINS` at any depth above an `AND` junction, including through an intervening un-negated `OR`, covers it, because a `NOT CONTAINS` collapses to a boolean filter on the parent row and multiplies nothing inside its excluded subtree, while an un-negated `AND` nested under an un-negated `OR` is covered by nothing and fires. So the code stays silent on an `AND` junction with one projected alias, on an `OR` junction with two (under named columns and under `SELECT *` alike, since alternation selects rows and does not multiply them), on `NOT CONTAINS (A AND B)`, and on `NOT CONTAINS (B OR (D AND E))`. Possibility is sign-blind and row multiplicity is not, which is why `aql_impossible_containment` checks a `NOT CONTAINS` pair and this code does not. `Detail` states that row multiplicity for this shape is engine-defined (result-shape semantics are an open specification question, SPECQUERY-9). It covers the **junction** source of engine-defined row multiplicity (§ No double-reporting). |
 
 An operand whose verdict is **UnknownClass** or whose containability is **Never** **MUST** suppress the pair checks (`aql_impossible_containment`, `aql_containment_by_reference`) for every pair it participates in.
 An archetype predicate whose declared class or HRID type segment is UnknownClass raises no `aql_archetype_class_mismatch`, since the class expression already carries `aql_unknown_rm_class` through the class-token or the type-segment arm, and REQ-160 § Archetype/class conformance yields no mismatch on an unknown name: one finding per defect, and no Error built on an unknown name.
@@ -2474,13 +2526,40 @@ A **FROM root** whose REQ-160 containability verdict is Never (`FROM DV_TEXT t �
 The boundary binds that one code, not the root generally: a root's archetype predicate is checked by `aql_archetype_class_mismatch` exactly as a `CONTAINS` operand's would be, because that check is orthogonal to operand role, and an *unknown* root still raises `aql_unknown_rm_class` (unknown is not wrong).
 
 The SDK adjudicates **no row semantics**: it does not deduplicate, reason about expected row counts, or refuse a row shape.
-The two fan-out advisories, `aql_fanout_row_grain` above and `aql_fanout_path_grain` in [§ REQ-164](#req-164--aql-path-shape-and-paging-lint), are the entire footprint.
+The two fan-out advisories, `aql_fanout_row_grain` above and `aql_fanout_path_grain` (§ Path-shape checks), are the entire footprint.
+
+### Path-shape checks
+
+| Check | Code | Severity | Rule |
+|---|---|---|---|
+| Unconstrained repeating segment | `aql_path_repeating_unpredicated` | Warning | An identified path segment **MUST** raise this code exactly when it types to a **multi-valued** RM attribute (`rminfo` `IsContainer`) and carries **no predicate** of any kind (a node id, a name and a standing comparison all count: presence suffices and content is **not** judged, § The conservative segment walk), once per offending segment, with `Span` on that segment, in **every** identified path the document records (`SELECT`, `WHERE` and `ORDER BY` alike, `parse.Document.Paths`): a `WHERE` filter or an `ORDER BY` key over an unconstrained repeating segment leaves the same which-occurrence question to the engine as a projected path. Whether `[at0006]` is the *right* node id is a template question owned by Layer 3's `aql_path_not_in_template`. |
+| Row bound without a total order | `aql_paging_no_order_by` | Warning | A query **MUST** raise this code exactly when it carries a **row bound** and no `ORDER BY`, at most once per query, `Detail` naming the channel(s) that carried the bound. A row bound is the **in-text** `LIMIT` clause (`parse.Document.HasLimit`; the profile's `limitClause` admits no `OFFSET` without a `LIMIT`, so keying on `LIMIT` misses no in-text spelling) or a supplied `Options.Query` whose `Fetch` **or** `Offset` is non-zero. Without a total order a page boundary is engine-defined, so successive pages can repeat or drop rows. A nil `Options.Query` leaves the envelope arm unable to fire, as it leaves the parameter-binding checks ([§ REQ-109 § Issue model and entry points](#issue-model-and-entry-points)), and a deprecated `TOP` is not a row bound here, because `aql_deprecated_top` already carries the `ORDER BY` remedy for that clause and one defect gets one finding. The envelope arm reads `Offset` as well as `Fetch`, unlike `aql_top_with_fetch`'s fetch-only scope: that code reports an exclusion the Query API *states*, while this one reports an unstable page boundary, which an offset into an unordered result produces on its own. |
+| Unaliased projection | `aql_select_no_alias` | Warning | A `SELECT` item **MUST** raise this code exactly when it is not a `*` item and carries no `AS` alias, once per item, with `Span` on the item where the item has a position of its own (a bare path) and the **zero `Span`** otherwise (a function-call or literal item, which `Detail`'s item ordinal locates instead), REQ-109's answer for an issue not attributable to a position ([§ REQ-109 § Value-free lint diagnostics](#value-free-lint-diagnostics)). A stored-query contract and every column-addressed result reader depend on stable column names, and an unaliased column's name is engine-defined. A `*` item is REQ-109's `aql_select_star`; a **bare alias** item (`SELECT o`) is **not** exempt, because it names no column either. |
+| Path row grain | `aql_fanout_path_grain` | Warning | A query **MUST** raise this code exactly when two projected identified paths rooted on the **same** alias diverge after their longest common prefix, **each** passing at least one unpredicated multi-valued segment at or after the divergence: the Cartesian-product shape, whose row multiplicity is engine-defined (result-shape semantics are an open specification question, SPECQUERY-9), which `Detail` states as its sibling's does. It fires **once per alias**, not once per pair: the first offending pair in document order fixes the `Span` (the later path of that pair) and is named in `Detail`, so a wide projection yields one advisory rather than a quadratic report. So it stays silent on two paths whose multi-valued segments are all in their **common prefix** (one repeating scope, no product), on a pair in which **either** path predicates every multi-valued segment at or after the divergence, on paths rooted on **different** aliases (the junction question, `aql_fanout_row_grain`), and on a bare `SELECT *`, which projects no identified path (the star's row-grain question belongs to the junction code). |
+| Redundant containment step | `aql_contains_redundant_step` | Warning | A `CONTAINS` operand **MUST** raise this code exactly when **all** of the following hold: it is **not** the FROM root; it is **not** a leaf of the containment tree; it carries **no class-position predicate** of any kind, archetype, standing or version (`parse.ClassExpr.HasPredicate` false); its alias roots **no** identified path outside FROM/CONTAINS; it sits inside no containment **junction** and under no **negation**; its class does not conform to `VERSIONED_OBJECT` (§ No double-reporting); and its class is **unavoidable** under the REQ-160 relation, every containment route from its parent operand's class to its child operand's class passing through it. Removing such a step provably changes no result: `EHR e CONTAINS COMPOSITION c CONTAINS OBSERVATION o` with `c` unreferenced, where every EHR→OBSERVATION route passes `COMPOSITION`. The rule is narrower than the guidance sentence it comes from ("containment is minimal"), and the narrowing is its substance: an **avoidable** intermediate narrows the result (removing `SECTION s` from `… CONTAINS SECTION s CONTAINS OBSERVATION o` admits observations outside sections), an unreferenced **leaf** is an existence filter, and inside a junction or under a negation removing the step changes the junction's arity or the excluded set, which the relation alone cannot prove inert. |
+
+### The conservative segment walk
+
+The repeating-segment check, and the divergence test `aql_fanout_path_grain` builds on it, share one walk.
+It starts at the class the path's alias binds (`parse.Document.Classes`), types each step through `rminfo`'s flattened attribute typing, and reads multiplicity from `IsContainer`.
+Segment predicate presence is read from the verbatim `parse.PathSegment` predicate text ([§ REQ-113](#req-113--execution-oriented-parsed-aql-ast)): presence only, never content, so no predicate spelling has to be understood for the check to be sound.
+
+The walk ends **silently**, with no issue on that segment and none on any segment beyond it, at the first step it cannot type, and never guesses or descends a sibling.
+It stops at a **class the pin does not know** (the alias's own class included); at an **attribute the pin does not declare** on the current class, own or inherited; at an attribute whose declared type is **not a class of the universe**, which includes a BMM **generic parameter** (on the current pin `EVENT.data` is typed `T`, exactly as `ORIGINAL_VERSION.data` is, and [REQ-048](reference-model.md#req-048--rm-meta-model-introspection-surface) leaves generic-parameter resolution out of scope; [§ REQ-160 § Overlay edges](#overlay-edges-default-relation) records the same fact); and at a **`$param` archetype scope**, whose extent the CDR resolves at execution, the skip [§ REQ-109 § Layer 3](#layer-3--path--template-only-when-a-compiled-opt-is-supplied) and § Checks apply for the same reason.
+This is the Layer-3 false-positive policy applied to a check that needs no OPT: a false Warning on a legal path is worse than a missed one, because the consumer that runs this in CI cannot tell them apart.
+
+**The walk's reach on the current pin is bounded, and the bound is a property of the pin, not of this contract.** `OBSERVATION/data` types to `HISTORY` (single-valued) and `HISTORY/events` to `EVENT` as a container, the anchor case, which fires when unpredicated; the walk then stops at `EVENT/data`'s generic `T`.
+A path continuing `…/items/value/magnitude` therefore raises one issue, on `events`, and not one per repeating segment further down.
+The bound narrows where `aql_fanout_path_grain` can be witnessed without disabling it: on that canonical shape the one reachable container (`events`) sits in the two paths' common prefix, so a firing pair is one whose repeating segments are typed before the stop.
+`SELECT o/data/events/time, o/links/meaning/value` diverges at the alias with an unpredicated container on each branch (`HISTORY.events` and `LOCATABLE.links`) and fires.
+Widening the reach means carrying the RM's generic constraints as cited data in the BMM band, not changing this check (§ Out of scope).
 
 ### Flagging policy
 
-The semantic checks are **conservative**: a false **Error** is worse than a missed defect, so the layer flags only what the pinned BMM and overlays prove.
+The checks are **conservative**: a false **Error** is worse than a missed defect, so the semantic checks flag only what the pinned BMM and overlays prove.
 An **Error** code (`aql_impossible_containment`, `aql_contains_not_containable`, `aql_archetype_class_mismatch`) **MUST** fire only on a verdict the relation proves, so where the relation is deliberately loose (the family-agnostic `VERSION` hub, REQ-160 § Overlay edges) the layer raises no Error the relation does not support.
 An unknown name is **not** an error: it **MUST** surface as the `aql_unknown_rm_class` **Warning**, never as silence and never as an Error.
+Every path-shape code is a **Warning**, and where a fact is not provable from the query text plus the pin, a path-shape check **MUST** stay silent rather than guess (§ The conservative segment walk).
 This policy is the canonical home of the rule that uncertainty stays out of Error, which ADR 0017 cites.
 
 ### Relation supply
@@ -2489,37 +2568,63 @@ This policy is the canonical home of the rule that uncertainty stays out of Erro
 A caller with dialect overlay edges (REQ-160 § Extensibility) lints without false findings.
 Because adding a field breaks positional struct literals ([idiom.md § Public-API stability](idiom.md#public-api-stability)), callers **SHOULD** construct `lint.Options` field by name.
 
-Every entry point that runs the REQ-161 group **MUST** offer this supply, or the escape hatch reaches only the callers who bypass the seams: the read side through `lint.Options`, the write side through `(*aql.Builder).VerifyContainment` (§ Builder adapter), and the validation seam through `validation.ValidateAQLWithTypeRelation` (REQ-109 § Issue model and entry points), whose no-relation form `ValidateAQL(q, c)` **MUST** be exactly the nil call.
-A relation is supplied, never gated: nil **MUST** select the REQ-160 default at every one of them, and never switches the group off.
+Every entry point that runs the semantic group **MUST** offer this supply, or the escape hatch reaches only the callers who bypass the seams: the read side through `lint.Options`, the write side through `(*aql.Builder).VerifyContainment` (§ Builder adapter), and the validation seam through `validation.ValidateAQLWithTypeRelation` (REQ-109 § Issue model and entry points), whose no-relation form `ValidateAQL(q, c)` **MUST** be exactly the nil call.
+A relation is supplied, never gated: nil **MUST** select the REQ-160 default at every one of them, and never switches a group off.
 
-A supplied relation governs the containment questions only: the five containment codes above and [§ REQ-164](#req-164--aql-path-shape-and-paging-lint)'s `aql_contains_redundant_step`.
+A supplied relation governs the containment questions only: the five containment codes of § Checks and `aql_contains_redundant_step` (§ Path-shape checks).
+`aql_contains_redundant_step` asks a containment-route question, which is what an overlay edge states, so it **MUST** be asked of the relation **in use**: consulting the default instead would raise a false finding on the dialect deployment [§ REQ-160 § Extensibility](#extensibility) exists to serve.
 An overlay **MUST NOT** retire a Layer-1 syntax finding, a Layer-2 shape or parameter-binding finding ([§ REQ-109 § Layer 2](#layer-2--shape-ast-walk-no-cdr)), or a Layer-3 template finding.
-A portability finding and the other path-shape findings are out of its reach as well, because their checks put no question to the relation: the three portability advisories consult none, and `aql_versioned_object_unreferenced` reads `VERSIONED_OBJECT` conformance from the pinned BMM directly, a class fact no supplied relation answers differently.
+The other findings of this requirement are out of its reach as well, because their checks put no question to the relation: `aql_version_no_predicate` and `aql_versioned_object_unreferenced` ask class questions of the pinned BMM directly, such as `VERSIONED_OBJECT` conformance, which no supplied relation answers differently, and `aql_fanout_row_grain` reads the query's own shape; the segment walk's two codes ask class questions of the pin, and `aql_paging_no_order_by` and `aql_select_no_alias` are parse-only.
 The scope is by code, not by layer: the containment codes are themselves Layer 2 (REQ-109 § Layer 2).
 
-### Additivity
+### Always on, never gated
 
-The codes reuse the REQ-109 issue model verbatim: `Code` / `Severity` / `Span` value-free, `Detail` / `Path` value-bearing ([§ REQ-109 § Value-free lint diagnostics](#value-free-lint-diagnostics)), with `Span` on the offending class expression or path.
-A check group added to Layer 2 changes no existing code, severity, `Detail` text or `Result.OK()` semantic.
-It re-baselines [PROBE-028](conformance.md#probe-028--aql-lint-stability)'s corpus only where a corpus query genuinely carries a newly checked defect, as a deliberate re-baseline recorded in the probe's catalogue entry; a query carrying no such defect keeps its issue-code multiset unchanged ([PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus)'s additivity guard holds this for the codes above).
-A query the new checks legitimately flag, e.g. `OBSERVATION CONTAINS COMPOSITION`, gains its code; that is the feature, not an additivity breach.
+The path-shape codes are all Warnings, so none of them flips `Result.OK()` ([§ REQ-109 § Issue model and entry points](#issue-model-and-entry-points)).
+They **MUST** run whenever Layer 2 runs, with no option to enable them, as the semantic and portability groups do: a caller who does not want one filters the result by `Code`, which is value-free and stable, and a caller who gates CI on Warnings has opted into exactly this class of advice.
+An `Options` field switching the group on would buy nothing, since the group has no Error member to hold back, and would give a nilable `Options` field a third meaning beside `Relation`, which selects a default, and `Compiled` and `Query`, which gate checks that have no input without them.
+
+### No double-reporting
+
+The guidance rules and the **two** documented sources of engine-defined row multiplicity are each covered by exactly one code.
+Where a shape could attract two, this section fixes the owner:
+
+- `aql_versioned_object_unreferenced` **owns** the unreferenced version container: an operand whose class conforms to `VERSIONED_OBJECT` ([§ REQ-160 § Containable operands](#containable-operands): conformance, not a name list) keeps that code and draws no `aql_contains_redundant_step`, the specific case winning over the general one.
+- `aql_fanout_row_grain` owns the **junction** source and `aql_fanout_path_grain` the **path** source, two projected paths on one alias descending through different repeating scopes.
+  The two are disjoint by construction: the first needs two projected aliases under one `AND` junction, the second two projected paths under one alias.
+- `aql_path_repeating_unpredicated` (multiplicity, no OPT) and `aql_path_not_in_template` (Layer-3 membership, OPT-gated) report **different** defects and can both fire on one path; neither suppresses the other.
+- `aql_deprecated_top` / `aql_top_with_limit` / `aql_top_with_fetch` (REQ-109) own the deprecated `TOP` clause, including its `ORDER BY` remedy, so `aql_paging_no_order_by` stays off a `TOP`-only query (§ Path-shape checks).
+- `aql_select_star` (REQ-109) owns the `*` item.
 
 ### Builder adapter
 
-The write side **MUST** offer the same semantic judgement as the read side, opt-in: `(*aql.Builder).VerifyContainment` walks the builder's own FROM root and containment algebra (junctions and `NOT CONTAINS` included), with no emission and no re-parse, and reports the containment findings of the catalogue above (`aql_impossible_containment`, `aql_contains_not_containable`, `aql_archetype_class_mismatch`, `aql_unknown_rm_class`, `aql_containment_by_reference`).
+The write side **MUST** offer the same semantic judgement as the read side, opt-in: `(*aql.Builder).VerifyContainment` walks the builder's own FROM root and containment algebra (junctions and `NOT CONTAINS` included), with no emission and no re-parse, and reports the containment findings of § Checks (`aql_impossible_containment`, `aql_contains_not_containable`, `aql_archetype_class_mismatch`, `aql_unknown_rm_class`, `aql_containment_by_reference`).
 It takes a nilable REQ-160 relation (nil is the default, § Relation supply), and each code's severity and firing rule are the catalogue's; this section adds none.
 
 - A finding **MUST** carry exactly a value-free `Code` and a value-bearing `Detail` (which may quote class names and HRIDs), mirroring the REQ-109 field classification, and no `Span`, `Path` or severity field: a builder tree has no source text to point into, and severity is looked up per code in the catalogue.
 - Verification **MUST** stay opt-in: `Build()` never runs it, so a query carrying a Never pair still builds.
 - **Read/write parity:** for a query expressible through the builder, the verification's code multiset **MUST** equal the containment-check subset of `lint.LintString` over the emitted text: one rule engine shared by both adapters, so they cannot drift.
 
+### Path-shape acceptance
+
+Every path-shape firing rule and silence rule has a named test, and each guard a test that fails when it is removed.
+The corpus carries three firing witnesses: the unpredicated repeating-segment projection over an `OBSERVATION` alias, a `LIMIT 50 OFFSET 100` query with no `ORDER BY`, and a repeating unpredicated segment whose path appears only in `WHERE`, which an implementation narrowed to the projection fails.
+The silence direction has a row per near-miss, so an over-firing linter cannot pass: a predicated repeating segment; `ORDER BY` beside a `LIMIT`; a nil `Options.Query`; a `TOP`-only row bound; an aliased projection item; a `*` item; two projected paths whose repeating segments are all in their common prefix; two projected paths on different aliases; an avoidable unreferenced intermediate; an unreferenced leaf; and a `VERSIONED_OBJECT`-conforming operand, which carries `aql_versioned_object_unreferenced` and not `aql_contains_redundant_step`.
+The walk's silent stops are pinned by name (an unknown alias class, an attribute the pin does not declare, the generic-parameter stop at `EVENT.data`, a `$param` archetype scope), severity is pinned per code, and a `Result` carrying only path-shape findings reports `OK()` true.
+[PROBE-099](conformance.md#probe-099--aql-path-shape-lint-corpus) carries the corpus, mirroring [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus)'s per-code positive and negative near-miss structure.
+
 ### Out of scope
 
-Engine-capability findings (valid AQL a particular engine does not implement) are a deferred per-engine-profile concern; terminology, function signatures, and `ORDER BY` type checking remain out of scope as in REQ-109.
+Engine-capability findings (valid AQL a particular engine does not implement) are a deferred per-engine-profile concern; terminology, function signatures, and `ORDER BY` type checking remain out of scope as in REQ-109, and so do OPT-aware path checking and node-id correctness, which are Layer 3's.
 
 Widening `aql_contains_not_containable` to the FROM-root anchor position is also out of scope (§ Checks): the catalogue scopes that code to a `CONTAINS` operand, and a root-position finding would need its own catalogue row, severity and span rule rather than a re-pointed existing code.
 
-- **Probes:** [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus) (its read/write parity arm included); PROBE-028 re-baseline where applicable
+- **Resolving a BMM generic parameter to its RM constraint.** The RM constrains the generic the pinned tables carry as `T`, but the pin does not express the constraint and REQ-048 does not resolve it, so the walk stops there (§ The conservative segment walk).
+  Widening the reach would be **cited data in the BMM band**, reviewed on a pin bump like REQ-160's overlay table, and is its own requirement, not a change to this check.
+- **Rewriting a query.** No suggested alias, no suggested predicate, no auto-fix: these codes advise, they never author.
+  `Detail` names the defect and its location, and no lint code edits or emits AQL.
+- **Any promotion of the path-shape checks to Error severity**, and any option gating them (§ Always on, never gated).
+
+- **Probes:** [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus) (the semantic and portability corpus, its read/write parity arm included); [PROBE-099](conformance.md#probe-099--aql-path-shape-lint-corpus) (the path-shape corpus)
 
 ## REQ-163 — AQL write-side expressivity parity
 
@@ -2545,7 +2650,7 @@ The grammar takes a parenthesised group as a whole `containsExpr` alternative (`
 ### The `TOP` clause and the row-bound channels
 
 `aql.Builder` constructs the deprecated `SELECT TOP n [FORWARD|BACKWARD]` in its plain and directed forms, so a consumer can author the shape for a corpus, a migration or a round-trip fixture without hand-assembling AQL text.
-The vocabulary is the shared `aql.TopClause` ([§ REQ-113 § The `TOP` carrier](#req-113--execution-oriented-parsed-aql-ast)), and its godoc states the upstream deprecation and names the in-text `LIMIT` with `ORDER BY` as the replacement.
+The vocabulary is the shared `aql.TopClause` ([§ REQ-113 § The `TOP` carrier](#the-top-carrier)), and its godoc states the upstream deprecation and names the in-text `LIMIT` with `ORDER BY` as the replacement.
 
 - A negative `TOP` count **MUST** fail `Build()` with an error wrapping `aql.ErrInvalidQuery`: the profile's `top` production admits no sign, so a negative count could only emit text the parser rejects.
 - A query has three row-bound channels: in-text `LIMIT` / `OFFSET`, the request envelope (`Query.Fetch` / `Query.Offset`), and `TOP`, itself an in-text row bound.
@@ -2555,7 +2660,7 @@ The vocabulary is the shared `aql.TopClause` ([§ REQ-113 § The `TOP` carrier](
 
 `versionPredicate : LATEST_VERSION | ALL_VERSIONS | standardPredicate`.
 The write side **MUST** carry that position as a **sealed sum** in `openehr/aql`, in the package's existing `aql.Value` / `parse.SelectExpr` style (an unexported marker method), with **exactly three** shapes: the two keywords, and one `standardPredicate` comparison carrying `aql.Comparison` rather than a second, structurally identical vocabulary.
-The production is a fixed three-way choice that does not recurse into its own position, the property [§ REQ-119 § The class predicate positions](#req-119--re-parseable-canonical-aql-emission) relies on to decide the position in one pass; a fourth shape would be a grammar change, not an extension.
+The production is a fixed three-way choice that does not recurse into its own position, the property [§ REQ-119 § The class predicate positions](#the-class-predicate-positions) relies on to decide the position in one pass; a fourth shape would be a grammar change, not an extension.
 
 The predicate reaches a class expression through a **`VERSION`-fixed constructor** (`aql.Version(alias, pred)`), so the RM type at that position is the SDK's spelling and never a caller string.
 Absence stays legal: a `VERSION` class with no predicate **MUST** stay buildable, since REQ-161 advises on it with a Warning and does not refuse it.
@@ -2598,9 +2703,9 @@ In this carrier the spelling *is* the carrier: the builder's class model has no 
 `parse.SelectClause` is the **reference shape**, and the write side **MUST** mirror it rather than grow a second projection vocabulary: a clause-level `Distinct` flag and star form, an ordered item list, and per item an expression plus an optional `AS` alias, over a sealed expression vocabulary of a path, a function or aggregate call (name, arguments, `DISTINCT` and star flags), a literal, and a star item.
 `columnExpr : identifiedPath | primitive | aggregateFunctionCall | functionCall`, and as on the read side one call type models both call productions, so a shape rule written once binds both carriers.
 
-The rules that already govern a projected item bind the builder unchanged ([§ REQ-119 § Canonical value spellings](#req-119--re-parseable-canonical-aql-emission)): `aql.ValidateSelectFuncName` holds the projected name (the aggregates are admissible in `SELECT` and in no value position); `COUNT` takes `DISTINCT? identifiedPath` or a bare `*` and never a star beside arguments; `MIN` / `MAX` / `SUM` / `AVG` take exactly one identified path; no other projected call carries `DISTINCT` or a star; `TERMINOLOGY` keeps its fixed arity and argument type; a bare parameter is **not** a projection while a parameter inside a projected call's arguments is; and an `AS` alias is a single-token identifier position held to `aql.ValidateIdentifier`.
+The rules that already govern a projected item bind the builder unchanged ([§ REQ-119 § Canonical value spellings](#canonical-value-spellings)): `aql.ValidateSelectFuncName` holds the projected name (the aggregates are admissible in `SELECT` and in no value position); `COUNT` takes `DISTINCT? identifiedPath` or a bare `*` and never a star beside arguments; `MIN` / `MAX` / `SUM` / `AVG` take exactly one identified path; no other projected call carries `DISTINCT` or a star; `TERMINOLOGY` keeps its fixed arity and argument type; a bare parameter is **not** a projection while a parameter inside a projected call's arguments is; and an `AS` alias is a single-token identifier position held to `aql.ValidateIdentifier`.
 
-`Build()` **MUST** refuse, with an error wrapping `aql.ErrInvalidQuery`, a typed construction the grammar does not admit at the position it renders: a call-shaped `Lit` (`literalColumn` is `columnExpr`'s `primitive` alternative, `Fn` being the call route), an aggregate-shaped argument inside `Fn` (aggregates are admitted as a top-level `columnExpr` alone), a function-shaped comparison operand in either bracket carrier (`pathPredicateOperand : primitive | objectPath | PARAMETER | ID_CODE | AT_CODE` has no `functionCall`), and a `VersionPredicate` shape outside the three § The version-predicate carrier seals, reachable by embedding the exported interface, which is refused rather than panicking ([idiom.md § No panics](idiom.md#errors-req-025)).
+`Build()` **MUST** refuse, with an error wrapping `aql.ErrInvalidQuery`, a typed construction the grammar does not admit at the position it renders: a call-shaped `Lit` (`literalColumn` is `columnExpr`'s `primitive` alternative, `Fn` being the call route), an aggregate-shaped argument inside `Fn` (aggregates are admitted as a top-level `columnExpr` alone), a function-shaped comparison operand in either bracket carrier (`pathPredicateOperand : primitive | objectPath | PARAMETER | ID_CODE | AT_CODE` has no `functionCall`), and a `VersionPredicate` shape outside the three § The version-predicate carrier seals, reachable by embedding the exported interface, which is refused rather than panicking ([idiom.md § No panics](idiom.md#no-panics)).
 
 #### Read-side mirror duty
 
@@ -2613,26 +2718,28 @@ Identity is the right bar: the read side re-emits a class bracket verbatim and n
 `aql.Col(path)` renders its argument into the projection list verbatim, with no check beyond emptiness, so `Col("COUNT(x) AS n")` builds, and `Col("a, b")` would build into two projections.
 Two rules settle it, opposite in direction because the two failure modes are.
 
-**1.
-`Col` keeps its signature and its leniency.** A `Col` whose text re-parses as a **single** projected item *and* introduces **no clause-level flag the builder did not record** (a function call, an aliased item, a path) **MUST** be accepted: it is loud, ordinary AQL that says what the caller wrote, and refusing it would break callers for no correctness gain.
+#### `Col` keeps its signature and its leniency
+
+A `Col` whose text re-parses as a **single** projected item *and* introduces **no clause-level flag the builder did not record** (a function call, an aliased item, a path) **MUST** be accepted: it is loud, ordinary AQL that says what the caller wrote, and refusing it would break callers for no correctness gain.
 This applies § REQ-119's own rule, that refusal is reserved for the silent-substitution mode.
 The typed constructors above are the recommended route and their godoc says so; `Col` is not deprecated.
 
-**2.
-`Build()` verifies the projection it emitted.** `Build()` reads the emitted `SELECT` clause back once and refuses, as [§ REQ-119 § Emission verified after emission](#req-119--re-parseable-canonical-aql-emission) requires, a projection whose structure changed: a `Col` whose text splits into two or more items, spills out of `SELECT` into another clause, or adds a clause-level flag is the silent mode, valid AQL asking a different question.
+#### `Build()` verifies the projection it emitted
+
+`Build()` reads the emitted `SELECT` clause back as [§ REQ-119 § Emission verified after emission](#emission-verified-after-emission) requires.
+For the projection, a different query is a `Col` whose text splits into two or more items, spills out of `SELECT` into another clause, or adds a clause-level flag: the silent mode, valid AQL asking a different question.
 The compared structure **MUST** include the item count, each item's `AS` alias and the clause-level flags (`DISTINCT`, and the deprecated `TOP` with its `FORWARD` / `BACKWARD` direction, which `top : TOP INTEGER direction?` consumes into the clause as `selectClause` consumes `DISTINCT`), compared after factoring out the encodings the emitted text erases: a sole unaliased star item and the bare `SELECT *` flag are one encoding, path text enters its slot with edge whitespace trimmed, and a closed top-level comment run reads as whitespace.
 A `Col` text that leaves a lexical region **open** where the clause ends (a string literal, a comment run, a bracket or a parenthesis) **MUST** be refused, even where it would read back unchanged: what closes the region is the text after the projection, so the same text is a loud error in one query and a silent substitution in the next.
 No typed constructor produces such a region, so the refusal reaches only a legacy `Col` carrying half a token.
 
 So `Col("COUNT(c/uid/value) AS n")` and `Col("-- note\nc/uid/value")` are accepted, while `Col("DISTINCT c/uid/value")` (one item plus an unrecorded `DISTINCT`), `Col("a, b")` (two items), `Col("BACKWARD c/uid/value")` beside a recorded `Top(5)` (one item plus an unrecorded direction, a byte-stable query for the *last* five rows), `Col("-- x\n*")` (the parser reads the bare star form, the builder recorded one non-star item) and a `Col` leaving a region open are refused.
-The refusal follows the value-free rule of [§ REQ-119 § The emission closure property](#req-119--re-parseable-canonical-aql-emission): it names the item index and the clause, never the projection text or the parser's own message.
+The refusal follows the value-free rule of [§ REQ-119 § The emission closure property](#the-emission-closure-property): it names the item index and the clause, never the projection text or the parser's own message.
 
 `openehr/aql` cannot import `openehr/aql/parse`, which imports it, so `Build()` reaches this decision by its own reading of the clause, with the parser as the reference the tests confront it with; the choice of means never weakens the exactness above.
-The version and standing brackets are not part of this check: neither carrier takes bracket text, both rendering `<path> <op> <value>` from a typed comparison under their own guards, so the projection is the one clause a caller's own free text still enters.
 
 ### Canonical spellings for the new constructs
 
-These spellings are **additions** to the canonical write form whose home is [§ REQ-055](wire.md#req-055--wire-boundary), not amendments to it: no rule there changes and no existing golden is rewritten.
+These spellings extend the canonical write form whose home is [§ REQ-055](wire.md#req-055--wire-boundary).
 Each is what `(*parse.Query).Emit` produces at that position, and any other spelling would break the mirror duty's byte identity.
 `Build()` and `Emit` **MUST** emit the spellings in this table:
 
@@ -2654,12 +2761,6 @@ Each is what `(*parse.Query).Emit` produces at that position, and any other spel
 | An aggregate's `DISTINCT` argument | `COUNT(DISTINCT c/uid/value)` — uppercase, one space after; arguments comma-separated with one space after each comma, the spelling REQ-055 rule 5 fixes for the item list. |
 | Star | `COUNT(*)` with no padding; a sole unaliased star item emits as the bare `SELECT *` form, which is how it re-parses. |
 
-### Additivity
-
-No [§ REQ-161](#req-161--aql-semantic-and-portability-lint) code, severity or `Detail` text changes, and verification stays opt-in and reports the containment codes only ([§ REQ-161 § Builder adapter](#builder-adapter)).
-What changes is **reachability**: shapes that were builder-inexpressible become buildable, so [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus) arm (c) gains rows and its catalogue caveat narrows.
-The additions extend [PROBE-088](conformance.md#probe-088--aql-builder-containment-and-paging-stability)'s fixture set rather than re-baselining it.
-
 ### Acceptance
 
 Each new construct is tested to build, emit and pass the identity round trip `Build → ParseQuery → Emit`, and the verb functions and the struct builder emit the same strings for it.
@@ -2671,106 +2772,15 @@ Each `Col` shape above has its own row with its expected verdict, one per region
 
 - **A FROM-root standing predicate.** [§ REQ-055](wire.md#req-055--wire-boundary) rule 6 keeps the `WHERE <alias>/ehr_id/value = $param` form deliberately, noting the `EHR e[ehr_id/value=$param]` spelling is equally valid AQL and not what the builders emit.
   This REQ adds the standing predicate to `CONTAINS` operands and does not disturb that choice.
-- **A FROM-root archetype predicate** — separately unreachable and recorded in PROBE-097; unchanged here.
+- **A FROM-root archetype predicate** — separately unreachable and recorded in PROBE-097.
 - **A FROM-root version predicate** — the third spelling of the same position, and deferred with the other two so the deferral is one fact rather than a list that reads short.
   `Builder.From` takes an RM type and an alias and nothing else, so the root carries no bracket in ANY spelling: `FROM VERSION v` builds and stays predicate-less, and `aql.Version` places its bracket on a `CONTAINS` operand.
   This is what [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus) records as the residual unreachable shape.
 - **A FROM-root containment junction** (`FROM COMPOSITION c1 OR COMPOSITION c2`, which the read side models via `parse.FromClause.Junction`): the builder keeps a single root class until a consumer needs write-side root junctions, so `Builder.From` / `Builder.FromEHR` take one class and a builder-emitted FROM root is never parenthesised.
-- **A parameterised `TOP`.** `top : TOP INTEGER direction?` admits no `PARAMETER` ([§ REQ-113 § The `TOP` carrier](#req-113--execution-oriented-parsed-aql-ast)), so there is nothing to add.
+- **A parameterised `TOP`.** `top : TOP INTEGER direction?` admits no `PARAMETER` ([§ REQ-113 § The `TOP` carrier](#the-top-carrier)), so there is nothing to add.
 - **The class position's other bracket alternatives** — a `nodePredicate` junction, a node id, a name slot, a regex match.
-  All are legal AQL that [§ REQ-113 § Structured node predicates](#req-113--execution-oriented-parsed-aql-ast) already structures on the read side and that no builder carrier spells.
+  All are legal AQL that [§ REQ-113 § Structured node predicates](#structured-node-predicates) already structures on the read side and that no builder carrier spells.
   Adding them is a widening of the write vocabulary and rides its own requirement; until then the read/write parity this REQ establishes is bounded by the `standardPredicate` and `archetypePredicate` alternatives, and § The standing-predicate carrier says so.
 - **Deprecating or narrowing `Col`.** Settled the other way above, deliberately.
 
 - **Probes:** [PROBE-088](conformance.md#probe-088--aql-builder-containment-and-paging-stability) (the builder golden set and its refusals); [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus) arm (c) (the read/write parity corpus).
-
-## REQ-164 — AQL path-shape and paging lint
-
-[§ REQ-109](#req-109--aql-static-lint)'s Layer 2 **MUST** carry a third additive check group, **path-shape checks**: five codes covering authoring rules the other groups do not reach, namely an identified path stepping through an unconstrained **repeating** RM attribute, a **row-bounded** query with no total order, an **unaliased** projection, the *path* source of engine-defined row multiplicity, and a **containment step that provably does nothing**.
-The layer contract is preserved and not restated: AST walk, collect-all, no CDR, no OPT ([§ Layer 2](#layer-2--shape-ast-walk-no-cdr)).
-The RM facts come from the pinned BMM through `openehr/rm/rminfo` ([REQ-048](bmm-conformance.md#req-048--rm-meta-model-introspection-surface)), the same pin [§ REQ-160](#req-160--aql-containment-admissibility-relation)'s relation is derived from, so no new input is needed to run any of these checks.
-
-Each rule below is stated as a rule by the openEHR authoring guidance and is decidable from the query text plus the pin.
-Path shape is otherwise covered only by the OPT-gated Layer 3.
-The consumers are the ones [§ REQ-109 § Layer 2](#layer-2--shape-ast-walk-no-cdr) already serves: anyone holding a query string, most valuably CI over a stored-query catalogue.
-
-### Path-shape checks
-
-| Check | Code | Severity | Rule |
-|---|---|---|---|
-| Unconstrained repeating segment | `aql_path_repeating_unpredicated` | Warning | An identified path segment **MUST** raise this code exactly when it types to a **multi-valued** RM attribute (`rminfo` `IsContainer`) and carries **no predicate** of any kind (a node id, a name and a standing comparison all count: presence suffices and content is **not** judged, § The conservative segment walk), once per offending segment, with `Span` on that segment, in **every** identified path the document records (`SELECT`, `WHERE` and `ORDER BY` alike, `parse.Document.Paths`): a `WHERE` filter or an `ORDER BY` key over an unconstrained repeating segment leaves the same which-occurrence question to the engine as a projected path. Whether `[at0006]` is the *right* node id is a template question owned by Layer 3's `aql_path_not_in_template`. |
-| Row bound without a total order | `aql_paging_no_order_by` | Warning | A query **MUST** raise this code exactly when it carries a **row bound** and no `ORDER BY`, at most once per query, `Detail` naming the channel(s) that carried the bound. A row bound is the **in-text** `LIMIT` clause (`parse.Document.HasLimit`; the profile's `limitClause` admits no `OFFSET` without a `LIMIT`, so keying on `LIMIT` misses no in-text spelling) or a supplied `Options.Query` whose `Fetch` **or** `Offset` is non-zero. Without a total order a page boundary is engine-defined, so successive pages can repeat or drop rows. A nil `Options.Query` leaves the envelope arm unable to fire, as it leaves the parameter-binding checks ([§ REQ-109 § Issue model and entry points](#issue-model-and-entry-points)), and a deprecated `TOP` is not a row bound here, because `aql_deprecated_top` already carries the `ORDER BY` remedy for that clause and one defect gets one finding. The envelope arm reads `Offset` as well as `Fetch`, unlike `aql_top_with_fetch`'s fetch-only scope: that code reports an exclusion the Query API *states*, while this one reports an unstable page boundary, which an offset into an unordered result produces on its own. |
-| Unaliased projection | `aql_select_no_alias` | Warning | A `SELECT` item **MUST** raise this code exactly when it is not a `*` item and carries no `AS` alias, once per item, with `Span` on the item where the item has a position of its own (a bare path) and the **zero `Span`** otherwise (a function-call or literal item, which `Detail`'s item ordinal locates instead), REQ-109's answer for an issue not attributable to a position ([§ REQ-109 § Value-free lint diagnostics](#value-free-lint-diagnostics)). A stored-query contract and every column-addressed result reader depend on stable column names, and an unaliased column's name is engine-defined. A `*` item is REQ-109's `aql_select_star`; a **bare alias** item (`SELECT o`) is **not** exempt, because it names no column either. |
-| Path row grain | `aql_fanout_path_grain` | Warning | A query **MUST** raise this code exactly when two projected identified paths rooted on the **same** alias diverge after their longest common prefix, **each** passing at least one unpredicated multi-valued segment at or after the divergence: the Cartesian-product shape, whose row multiplicity is engine-defined (result-shape semantics are an open specification question, SPECQUERY-9), which `Detail` states as its sibling's does. It fires **once per alias**, not once per pair: the first offending pair in document order fixes the `Span` (the later path of that pair) and is named in `Detail`, so a wide projection yields one advisory rather than a quadratic report. So it stays silent on two paths whose multi-valued segments are all in their **common prefix** (one repeating scope, no product), on a pair in which **either** path predicates every multi-valued segment at or after the divergence, on paths rooted on **different** aliases (the junction question, `aql_fanout_row_grain`, REQ-161), and on a bare `SELECT *`, which projects no identified path (the star's row-grain question belongs to the junction code). The two codes are disjoint by construction: this one needs two paths under one alias, that one two projected aliases under one `AND` junction. |
-| Redundant containment step | `aql_contains_redundant_step` | Warning | A `CONTAINS` operand **MUST** raise this code exactly when **all** of the following hold: it is **not** the FROM root; it is **not** a leaf of the containment tree; it carries **no class-position predicate** of any kind, archetype, standing or version (`parse.ClassExpr.HasPredicate` false); its alias roots **no** identified path outside FROM/CONTAINS; it sits inside no containment **junction** and under no **negation**; its class does not conform to `VERSIONED_OBJECT` (§ No double-reporting); and its class is **unavoidable** under the REQ-160 relation, every containment route from its parent operand's class to its child operand's class passing through it. Removing such a step provably changes no result: `EHR e CONTAINS COMPOSITION c CONTAINS OBSERVATION o` with `c` unreferenced, where every EHR→OBSERVATION route passes `COMPOSITION`. The rule is narrower than the guidance sentence it comes from ("containment is minimal"), and the narrowing is its substance: an **avoidable** intermediate narrows the result (removing `SECTION s` from `… CONTAINS SECTION s CONTAINS OBSERVATION o` admits observations outside sections), an unreferenced **leaf** is an existence filter, and inside a junction or under a negation removing the step changes the junction's arity or the excluded set, which the relation alone cannot prove inert. |
-
-Every code above is **Warning** and every rule is **conservative**: where a fact is not provable from the query text plus the pin, the check **MUST** stay silent rather than guess.
-[§ REQ-161 § Flagging policy](#flagging-policy) is the canonical home of that rule for Errors; this group has no Error-severity member.
-
-### The conservative segment walk
-
-The repeating-segment check, and the divergence test `aql_fanout_path_grain` builds on it, share one walk.
-It starts at the class the path's alias binds (`parse.Document.Classes`), types each step through `rminfo`'s flattened attribute typing, and reads multiplicity from `IsContainer`.
-Segment predicate presence is read from the verbatim `parse.PathSegment` predicate text ([§ REQ-113](#req-113--execution-oriented-parsed-aql-ast)): presence only, never content, so no predicate spelling has to be understood for the check to be sound.
-
-The walk ends **silently**, with no issue on that segment and none on any segment beyond it, at the first step it cannot type, and never guesses or descends a sibling.
-It stops at a **class the pin does not know** (the alias's own class included); at an **attribute the pin does not declare** on the current class, own or inherited; at an attribute whose declared type is **not a class of the universe**, which includes a BMM **generic parameter** (on the current pin `EVENT.data` is typed `T`, exactly as `ORIGINAL_VERSION.data` is, and [REQ-048](bmm-conformance.md#req-048--rm-meta-model-introspection-surface) leaves generic-parameter resolution out of scope; [§ REQ-160 § Overlay edges](#overlay-edges-default-relation) records the same fact); and at a **`$param` archetype scope**, whose extent the CDR resolves at execution, the skip [§ REQ-109 § Layer 3](#layer-3--path--template-only-when-a-compiled-opt-is-supplied) and [§ REQ-161 § Checks](#checks) apply for the same reason.
-This is the Layer-3 false-positive policy applied to a check that needs no OPT: a false Warning on a legal path is worse than a missed one, because the consumer that runs this in CI cannot tell them apart.
-
-**The walk's reach on the current pin is bounded, and the bound is a property of the pin, not of this contract.** `OBSERVATION/data` types to `HISTORY` (single-valued) and `HISTORY/events` to `EVENT` as a container, the anchor case, which fires when unpredicated; the walk then stops at `EVENT/data`'s generic `T`.
-A path continuing `…/items/value/magnitude` therefore raises one issue, on `events`, and not one per repeating segment further down.
-The bound narrows where `aql_fanout_path_grain` can be witnessed without disabling it: on that canonical shape the one reachable container (`events`) sits in the two paths' common prefix, so a firing pair is one whose repeating segments are typed before the stop.
-`SELECT o/data/events/time, o/links/meaning/value` diverges at the alias with an unpredicated container on each branch (`HISTORY.events` and `LOCATABLE.links`) and fires.
-Widening the reach means carrying the RM's generic constraints as cited data in the BMM band, not changing this check (§ Out of scope).
-
-The walk's two codes and the two parse-only codes (`aql_paging_no_order_by`, `aql_select_no_alias`) put no question to the relation.
-`aql_contains_redundant_step` asks a containment-route question, which is what an overlay edge states, so it **MUST** be asked of the relation **in use** ([§ REQ-161 § Relation supply](#relation-supply)): consulting the default instead would raise a false finding on the dialect deployment [§ REQ-160 § Extensibility](#extensibility) exists to serve.
-That is governance, not gating: nil selects the default relation (§ Always on, never gated).
-
-### Always on, never gated
-
-All five codes are Warnings, so none of them flips `Result.OK()` ([§ REQ-109 § Issue model and entry points](#issue-model-and-entry-points)).
-They **MUST** run whenever Layer 2 runs, with no option to enable them: a caller who does not want one filters the result by `Code`, which is value-free and stable, and a caller who gates CI on Warnings has opted into exactly this class of advice.
-An `Options` field switching the group on would buy nothing, since the group has no Error member to hold back, and would give a nilable `Options` field a third meaning beside `Relation`, which selects a default, and `Compiled` and `Query`, which gate checks that have no input without them.
-
-### No double-reporting
-
-The four guidance rules and the **two** documented sources of engine-defined row multiplicity are each covered by exactly one code.
-Where a shape could attract two, this section fixes the owner:
-
-- `aql_versioned_object_unreferenced` (REQ-161) **owns** the unreferenced version container: an operand whose class conforms to `VERSIONED_OBJECT` ([§ REQ-160 § Containable operands](#containable-operands): conformance, not a name list) keeps that code and draws no `aql_contains_redundant_step`.
-  The REQ-164 check is the general case of the REQ-161 one, so the general case yields to the specific.
-- `aql_fanout_row_grain` (REQ-161) owns the **junction** source; `aql_fanout_path_grain` owns the **path** source.
-  REQ-161's catalogue row carries the boundary sentence and neither row restates the other's rule.
-- `aql_path_repeating_unpredicated` (multiplicity, no OPT) and `aql_path_not_in_template` (Layer-3 membership, OPT-gated) report **different** defects and can both fire on one path; neither suppresses the other.
-- `aql_deprecated_top` / `aql_top_with_limit` / `aql_top_with_fetch` (REQ-109) own the deprecated `TOP` clause, including its `ORDER BY` remedy, so `aql_paging_no_order_by` stays off a `TOP`-only query (§ Path-shape checks).
-- `aql_select_star` (REQ-109) owns the `*` item.
-
-### Additivity
-
-- No REQ-109 or REQ-161 **code, severity, `Detail` text, `Span` rule or `Result.OK()` semantic** changes, and no entry point changes.
-  REQ-161's catalogue carries one scope-boundary sentence on its `aql_fanout_row_grain` row, and no rule.
-- The issue model is REQ-109's ([§ REQ-109 § Value-free lint diagnostics](#value-free-lint-diagnostics)), with `Span` on the offending segment, projection item, path or class expression as each row above states.
-- The PROBE-028 re-baseline follows [§ REQ-161 § Additivity](#additivity), and is recorded in [PROBE-099](conformance.md#probe-099--aql-path-shape-lint-corpus)'s catalogue entry.
-- Consumers gating CI on Warnings see new findings on unchanged queries; that is the feature, and the per-code filter is the opt-out (§ Always on, never gated).
-  No finding of this group can turn a passing result into a failing one.
-
-### Acceptance
-
-Every firing rule and every silence rule above has a named test, and each guard a test that fails when it is removed.
-The corpus carries three firing witnesses: the unpredicated repeating-segment projection over an `OBSERVATION` alias, a `LIMIT 50 OFFSET 100` query with no `ORDER BY`, and a repeating unpredicated segment whose path appears only in `WHERE`, which an implementation narrowed to the projection fails.
-The silence direction has a row per near-miss, so an over-firing linter cannot pass: a predicated repeating segment; `ORDER BY` beside a `LIMIT`; a nil `Options.Query`; a `TOP`-only row bound; an aliased projection item; a `*` item; two projected paths whose repeating segments are all in their common prefix; two projected paths on different aliases; an avoidable unreferenced intermediate; an unreferenced leaf; and a `VERSIONED_OBJECT`-conforming operand, which carries REQ-161's code and not this group's.
-The walk's silent stops are pinned by name (an unknown alias class, an attribute the pin does not declare, the generic-parameter stop at `EVENT.data`, a `$param` archetype scope), severity is pinned per code, and a `Result` carrying only this group's findings reports `OK()` true.
-[PROBE-099](conformance.md#probe-099--aql-path-shape-lint-corpus) carries the corpus, mirroring [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus)'s per-code positive and negative near-miss structure.
-
-### Out of scope
-
-- **OPT-aware path checking and node-id correctness**: Layer 3's, and unchanged; terminology and function-signature checking stay out, per [§ REQ-109](#req-109--aql-static-lint) and § REQ-161 § Out of scope.
-- **Resolving a BMM generic parameter to its RM constraint.** The RM constrains the generic the pinned tables carry as `T`, but the pin does not express the constraint and REQ-048 does not resolve it, so the walk stops there (§ The conservative segment walk).
-  Widening the reach would be **cited data in the BMM band**, reviewed on a pin bump like REQ-160's overlay table, and is its own requirement, not a change to this check.
-- **Row-semantics adjudication**, as [§ REQ-161 § Checks](#checks) states it: the two fan-out advisories are the entire footprint.
-- **Rewriting a query.** No suggested alias, no suggested predicate, no auto-fix: these codes advise, they never author.
-  `Detail` names the defect and its location, and nothing in this group edits or emits AQL.
-- **Any promotion of these checks to Error severity**, and any option gating them (§ Always on, never gated).
-
-- **Probes:** [PROBE-099](conformance.md#probe-099--aql-path-shape-lint-corpus)

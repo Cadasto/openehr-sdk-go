@@ -136,6 +136,10 @@ Its rules moved to [clinical-modeling.md § REQ-111](clinical-modeling.md#req-11
 
 Its rules moved to [clinical-modeling.md § REQ-102](clinical-modeling.md#req-102--composition-validation) *Roots beyond COMPOSITION*.
 
+## REQ-116 — Template-level node naming and name-predicated paths
+
+Its rules are now [clinical-modeling.md § REQ-111](clinical-modeling.md#req-111--public-compiled-template-bridge) *[Node names and name predicates](clinical-modeling.md#node-names-and-name-predicates)*.
+
 ## REQ-117 — AQL expression-catalogue completion
 
 Its rules moved to [clinical-modeling.md § REQ-113](clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) (the read-side catalogue and its residual), [clinical-modeling.md § REQ-109](clinical-modeling.md#req-109--aql-static-lint) (alias resolution in the lint) and [clinical-modeling.md § REQ-163](clinical-modeling.md#req-163--aql-write-side-expressivity-parity) (the builder's containment algebra and in-text paging).
@@ -155,6 +159,10 @@ The contribution read moved to [wire.md § REQ-174](wire.md#req-174--versioned-o
 ## REQ-162 — Builder containment verification
 
 Its rules moved to [clinical-modeling.md § REQ-161 § Builder adapter](clinical-modeling.md#builder-adapter).
+
+## REQ-164 — AQL path-shape and paging lint
+
+Its checks are now [clinical-modeling.md § REQ-161](clinical-modeling.md#req-161--aql-semantic-and-portability-lint) *[Path-shape checks](clinical-modeling.md#path-shape-checks)*.
 
 ## REQ-172 — Typed 2xx body-read failure
 
