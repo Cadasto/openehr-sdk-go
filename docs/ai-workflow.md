@@ -77,7 +77,17 @@ The full editing rules (idiomatic surface, the `cadasto/` boundary contract, and
 
 ## Examples
 
-When you add, rename, remove, or materially change a [`cmd/examples/`](../cmd/examples/) program, keep its docs in sync **in the same PR**. That means [`cmd/examples/doc.go`](../cmd/examples/doc.go), [examples.md](examples.md), and, when the onboarding path changes, [quick-start.md](quick-start.md). See also [AGENTS.md § Spec-driven workflow](../AGENTS.md#spec-driven-workflow-agents). If `doc.go` and the markdown disagree, the runnable code wins.
+When you add, rename, remove, or materially change a [`cmd/examples/`](../cmd/examples/) program, keep its docs in sync **in the same PR**. That means [`cmd/examples/doc.go`](../cmd/examples/doc.go), [examples.md](examples.md), the site's [examples page](../pages/examples.md) and [package map](../pages/packages.md), and, when the onboarding path changes, [quick-start.md](quick-start.md). See also [AGENTS.md § Spec-driven workflow](../AGENTS.md#spec-driven-workflow-agents). If `doc.go` and the markdown disagree, the runnable code wins.
+
+An example change is done, beyond `make ci` and `make docs-check`, when:
+
+- the program imports public packages only, runs offline by default, and opens with its purpose and its exact run commands;
+- its flags are spelled with one dash (`-corpus`), in prose, run commands and comments alike;
+- its errors are wrapped and classified through the SDK's public error contracts;
+- no secret and no value that changes between runs (a token, a PKCE verifier, a uid, a timestamp) is copied into a document;
+- its output is compared by a transcript or mirror test, or its exclusion records why not ([examples.md § Maintaining this catalog](examples.md#maintaining-this-catalog)).
+
+**One copy, compared.** examples.md is canonical, its learning order included; the README and the site show shorter copies. When an example's output appears in another prominent place, add that place to `mirrors` in [`mirrors_test.go`](../cmd/examples/mirrors_test.go), which also holds the site's learning order to the catalogue's. A snippet that cannot be compared mechanically names its source program in a comment and is a Go `Example` or a transcript test with deterministic output. Never copy a whole program into several documents.
 
 ## Hooks
 
