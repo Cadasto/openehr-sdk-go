@@ -361,7 +361,7 @@ Thirtieth `v0.x` minor: the SMART client completes the authorization itself, ver
 - **openEHR scope syntax (REQ-165).** `auth.OpenEHRScope` builds SMART on openEHR resource scopes and `auth.ParseOpenEHRScope` reads them; a malformed scope fails with `auth.ErrInvalidScope`.
 - **Discovery keeps the Platform base URL apart from the OIDC issuer (REQ-070, REQ-073, ADR 0023).** A Platform whose authorization server lives elsewhere now resolves, and its issuer is checked against the issuer's own OpenID configuration unless the caller passes `WithoutOpenIDConfigurationCheck`.
 - **Cross-format parity probe (REQ-080, PROBE-105).** Ten vendored upstream sets give one composition in canonical JSON, canonical XML, FLAT and STRUCTURED, and PROBE-105 runs the SDK codecs across them and records each difference with its cause.
-- **Fixture corpus provenance corrected.** The vendored fixtures' sources, pins, counts and licence notes are corrected, one upstream fixture is refreshed, and an authoring account id is redacted from an OPT.
+- **Fixture corpus provenance corrected.** The vendored fixtures' sources, pins, counts and licence notes are corrected, and one upstream fixture is refreshed.
 
 ### Changed
 
