@@ -8,7 +8,7 @@ If you are new to the SDK, run `go run ./cmd/examples/canonical_json` and then f
 
 The 21 runnable programs under [`cmd/examples/`](../cmd/examples/) cover the major offline clinical-modeling and AQL workflows. They also cover REST calls for EHRs, compositions, AQL queries, templates and contributions, and two ways to authenticate: a SMART launch for an app with a signed-in user, and client credentials for a service with no user. They are **reference shapes**. Production tools (benchmark harnesses, MCP servers, federators) live in their own repositories but follow the same patterns. Each entry below ends with a **What to copy into your app** note. If you are here to build something, read that part.
 
-Each entry says what the program shows, which packages it uses, how to run it, and what the output means. Fixture paths resolve relative to the source file, so `go run ./cmd/examples/<name>` works from any working directory inside a clone. Build them all with `make build` (or `go build ./cmd/examples/...`).
+Each entry says what the program shows, which packages it uses, how to run it, and what the output means. A program finds its bundled fixtures from anywhere in a clone, and a file path you pass it resolves from the working directory. Build them all with `make build` (or `go build ./cmd/examples/...`).
 
 A few openEHR terms recur throughout. A **COMPOSITION** is the top-level clinical document. An **OPT** (operational template) is the deployable form of a template: every archetype it uses, flattened into one XML file with the template's constraints applied; it fixes which archetypes, nodes and value constraints a composition may contain. **Canonical JSON** is the openEHR REST wire format for those documents. **AQL** (Archetype Query Language) is the openEHR query language. A **Web Template** is the JSON form of a compiled OPT that form renderers and the FLAT / STRUCTURED simplified formats work from. The **RM floor** is the check against the Reference Model's own rules. The template-driven validators (`validation.ValidateComposition` and its siblings) include it; `validation.ValidateRM` runs it alone, for a root no template applies to.
 
@@ -54,11 +54,12 @@ The Packages column lists the SDK packages each program imports, by short name (
 
 ```bash
 go run ./cmd/examples/canonical_json
+go run ./cmd/examples/canonical_json composition.json
 ```
 
 **Packages:** `openehr/rm`, `openehr/serialize/canjson` (plus `testkit/fixtures`, which locates the fixture)
 
-**Fixture:** `testkit/corpus/compositions/body_weight.json`
+**Fixture:** `testkit/corpus/compositions/body_weight.json` by default; name a canonical-JSON COMPOSITION file to decode that one instead
 
 **Sample output:**
 
@@ -74,7 +75,7 @@ OK: canonical-JSON Composition decoded from body_weight.json
 
 `archetype_node_id` names the archetype the document is built on. `language` and `territory` are CODE_PHRASE values: a code plus the terminology it comes from. `category` is the composition category from the openEHR terminology, and `content items` counts the entries (observations, evaluations, ...) the document carries.
 
-**What to copy into your app:** `canjson.Unmarshal(body, &composition)` into an `rm.Composition`. The codec reads the `_type` discriminator on every object and fills the matching `rm` struct, polymorphic children included, so you never switch on `_type` yourself. A decode error means the bytes are not well-formed canonical JSON; report it before any template gets involved.
+**What to copy into your app:** `canjson.Unmarshal(body, &composition)` into an `rm.Composition`. The codec reads the `_type` discriminator on every object and fills the matching `rm` struct, polymorphic children included, so you never switch on `_type` yourself. A decode error means the bytes are not well-formed canonical JSON; report it before any template gets involved. A member held as an interface, such as `Name`, is nil when the document leaves it out, so check it before calling its methods.
 
 ---
 
@@ -269,27 +270,40 @@ With `-corpus` validation reports 3 issues, one `path [code] detail` line each: 
 ```bash
 go run ./cmd/examples/generate-example
 go run ./cmd/examples/generate-example \
-  --opt testkit/corpus/templates/vital_signs.opt \
-  --territory NL \
-  --composer-name "Test Composer" \
-  --policy large
+  -opt testkit/corpus/templates/vital_signs.opt \
+  -territory NL \
+  -composer-name "Test Composer" \
+  -policy large
 ```
 
 **Flags:**
 
 | Flag | Default | Values |
 |---|---|---|
-| `--opt` | `vital_signs.opt` fixture | Path to an ADL 1.4 OPT |
-| `--policy` | `medium` | `required` builds only the data points the template makes mandatory and a composition's context: it builds an optional list where the list holds a mandatory item, and leaves one out where only the list's minimum item count asks for an item; `medium` also builds every attribute the template constrains, with at most one optional archetype under each, the first whose content the template describes; `large` builds every attribute and a member of every optional archetype the template names, each of several uses of one archetype included, named or not. `minimal` is another name for `required`, and `complete` for `large` for now. Case does not matter. `required` and `medium` are the ITS-REST template example's `detail_level` levels of those names; `large` stops short of its `complete` level. No policy builds an optional node whose only content the template leaves undescribed, such as a cluster that holds nothing but an open slot, nor an optional structure that would hold no item, such as a protocol whose tree holds nothing but an open slot. No policy writes a `uid` the template does not require, on a composition, an entry or a party alike, so the server that stores the document gives it its id. Under each of them every primitive leaf holds its example value |
-| `--territory` | `NL` | ISO 3166-1 code; a COMPOSITION root requires one |
-| `--composer-name` | `Example Composer` | Name recorded as the composition's composer |
+| `-opt` | `vital_signs.opt` fixture | Path to an ADL 1.4 OPT |
+| `-policy` | `medium` | `required`, `medium` or `large`, listed below; `minimal` is another name for `required`, and `complete` for `large` for now. Case does not matter |
+| `-territory` | `NL` | ISO 3166-1 code; a COMPOSITION root requires one |
+| `-composer-name` | `Example Composer` | Name recorded as the composition's composer |
+
+The policies:
+
+- `required` builds only the data points the template makes mandatory and a composition's context, and builds an optional list where the list holds a mandatory item, not where only the list's minimum item count asks for an item.
+- `medium` also builds every attribute the template constrains, with at most one optional archetype under each, the first whose content the template describes.
+- `large` builds every attribute and a member of every optional archetype the template names, each of several uses of one archetype included, named or not.
+
+`required` and `medium` are the ITS-REST template example's `detail_level` levels of those names; `large` stops short of its `complete` level. Under every policy:
+
+- No optional node is built whose only content the template leaves undescribed, such as a cluster that holds nothing but an open slot.
+- No optional structure is built that would hold no item, such as a protocol whose tree holds nothing but an open slot.
+- No `uid` is written that the template does not require, on a composition, an entry or a party alike, so the server that stores the document gives it its id.
+- Every primitive leaf holds its example value.
 
 **Packages:** `openehr/aom/aom14`, `openehr/templatecompile`, `openehr/instance`, `openehr/rm`, `openehr/serialize/canjson`. **No `internal/` import.**
 
 The output is one line of JSON. Each run gets a wall-clock context start time, and fresh ids wherever it writes one, so two runs are never byte-identical; that is why this entry shows no sample block. Pipe the output to a file or into `validate-from-json` to see that generated data passes validation, the template constraints and the RM floor:
 
 ```bash
-go run ./cmd/examples/generate-example --policy medium > /tmp/generated.json
+go run ./cmd/examples/generate-example -policy medium > /tmp/generated.json
 go run ./cmd/examples/validate-from-json /tmp/generated.json testkit/corpus/templates/vital_signs.opt
 ```
 
@@ -643,7 +657,7 @@ The fake backend answers the way an openEHR server does: `201 Created`, a `Locat
 
 1. Build a `discovery.ServiceCatalog` (static, or resolved from a Platform base URL).
 2. `transport.New(catalog, transport.WithHTTPClient(yourClient))`; the SDK never allocates an `*http.Client`, so connection pooling, TLS and timeouts stay under your control.
-3. Call leaf clients (`ehr.Create`, `query.Execute`, …) with a `context.Context`.
+3. Call leaf clients (`ehr.Create`, `query.Execute`, …) with a `context.Context` that carries a deadline (`context.WithTimeout`), so a server that stops answering cannot hold your program.
 
 To hit a real backend, swap the catalog base URL and add `transport.WithTokenSource`. See [quick-start.md](quick-start.md#path-b--rest-client-live-or-mocked-backend).
 
@@ -680,7 +694,7 @@ OK: the captured request body is byte-identical to the built body
 1. `contribution.NewBuilder()`, then declare the batch audit once: committer, system id, and the batch `change_type` (which is *never* derived from the versions).
 2. Accumulate one `Change` per version: `contribution.Creation(payload)`, or `Amendment` / `Modification` / `Deletion` with the preceding version uid. Each is generic over the four versionable RM types, so a wrong payload type is a compile error.
 3. `Build()` once. It returns a `*contribution.Submission` that has already passed `Validate`, or every accumulated error joined.
-4. `contribution.Commit(ctx, client, ehrID, submission)`.
+4. `contribution.Commit(ctx, client, ehrID, submission)`, with a deadline on `ctx` (`context.WithTimeout`).
 
 Per-version overrides (`WithLifecycleState`, `WithVersionCommitter`, `WithVersionDescription`, `WithVersionSystemID`, `WithVersionUID`) refine what a version would otherwise inherit from the batch audit.
 
@@ -799,7 +813,7 @@ The second query is the same query without its `Bind` calls. Its text still name
 
 ### smart-launch
 
-**Purpose:** Walk through a standalone SMART-on-openEHR launch for a public client: the OAuth 2.0 authorization-code flow with PKCE, which is how a browser-based or native app that cannot keep a client secret obtains an access token. The program plays every party in turn (the app, the user's browser, and the authorization server) against an in-process stub, so it needs no account, no secret and no network. `go test ./cmd/examples/smart-launch` runs the same flow.
+**Purpose:** Walk through a standalone SMART-on-openEHR launch for a public client: the OAuth 2.0 authorization-code flow with PKCE, which is how a browser-based or native app that cannot keep a client secret obtains an access token. The program plays every party in turn (the app, the user's browser, and the authorization server) against an in-process stub, so it needs no account, no secret and no network. `go test ./cmd/examples/smart-launch` runs the same flow and the stub's PKCE refusals.
 
 The one thing to take away is where the `AuthorizationRequest` lives. It carries the CSRF `state` and the PKCE `code_verifier`, both created before the redirect and both needed after it, as well as the nonce and the issuer the answer is checked against, so your app has to store it across the redirect and look it up again on the callback. Everything else is one SDK call per step.
 
@@ -816,7 +830,7 @@ step 1: Source built (public client, PKCE, standalone)
 step 2: BeginAuthorization → state="…"  verifier="…"
 step 3: authorize URL built (len=391)
 step 4: AuthorizationRequest stored in session map (key="…")
-step 5: redirect received  code="stub-code-…"  state="…"
+step 5: redirect received  code="stub-code-1"  state="…"
 step 6: AuthorizationRequest retrieved from session map (state validated)
 step 7: authorization completed, code exchanged for tokens
   access_token : stub-acc…
@@ -828,7 +842,7 @@ step 7: authorization completed, code exchanged for tokens
 OK: standalone SMART PKCE launch flow completed (in-process stub)
 ```
 
-The `state`, the verifier and `expires_at` differ on every run (shown as `…` above), so this block is not compared verbatim. The authorize URL carries the client id, the redirect URI, the scopes, the audience, the state and the PKCE challenge, plus a nonce because the scopes include `openid`. It never carries the verifier. SMART requires the audience (`aud`); `NewFromCatalog` sets it to the catalog's Platform base URL, and a static catalog stands in for discovery here because the stub publishes no discovery document. The stub skips the login screen and grants at once; a real server also hashes the `code_verifier` it receives on the token endpoint against the `code_challenge` it saw on `/authorize`, which is the PKCE proof.
+The `state`, the verifier and `expires_at` differ on every run (shown as `…` above), so this block is not compared verbatim. The authorize URL carries the client id, the redirect URI, the scopes, the audience, the state and the PKCE challenge, plus a nonce because the scopes include `openid`. It never carries the verifier. SMART requires the audience (`aud`); `NewFromCatalog` sets it to the catalog's Platform base URL, and a static catalog stands in for discovery here because the stub publishes no discovery document. The stub skips the login screen and grants at once, but it checks the PKCE proof as a real server does. On `/authorize` it requires a `code_challenge` made with the `S256` method and keeps it with the code it issues. On the token endpoint it hashes the `code_verifier` (SHA-256, then unpadded base64url) and compares the result with that challenge. A missing or wrong verifier gets an OAuth2 `invalid_grant` error. For a wrong one, `CompleteAuthorization` returns an error that `errors.AsType[*auth.OAuth2Error]` unwraps to that code.
 
 **What to copy into your app:**
 
@@ -837,6 +851,10 @@ The `state`, the verifier and `expires_at` differ on every run (shown as `…` a
 3. Persist the `AuthorizationRequest` in a session store keyed by `state` **before** redirecting the user.
 4. On the redirect callback, retrieve the stored `AuthorizationRequest` by the `state` in the callback query and delete it in the same operation (the program's `sessionStore.take`), so a replayed callback finds nothing.
 5. Pass the whole callback query (`r.URL.Query()` in your handler) and the stored request to `CompleteAuthorization`. Before any token-endpoint call it checks the `state` again (CSRF guard), checks an RFC 9207 `iss` parameter against the server the user was sent to, and turns an `error` parameter into `ErrAuthorizationRejected`. It then sends the code with the `code_verifier` to the token endpoint (PKCE proof).
+
+The program stops once it holds the tokens. In your app, the `Source` now holds them and is an `auth.TokenSource`, so hand it to the REST transport for your CDR with `transport.WithTokenSource` and `transport.WithReauthOn401`, as [service-auth](#service-auth) does with its own source. Every call then carries the access token. After a 401 that reports `invalid_token`, or names no error, the transport fetches a fresh token and sends the call once more.
+
+The source refreshes the access token before it expires only when the server issued a refresh token, which this program asks for with the `offline_access` scope. Without one, a call after the token expires fails with `auth.ErrReauthRequired`, and the user has to launch again.
 
 See [specifications/auth.md § PKCE flow](specifications/auth.md#req-061--pkce-flow) for the normative rules.
 
@@ -904,11 +922,7 @@ When writing your own tests, prefer importing fixtures from `testkit` rather tha
 
 ## Maintaining this catalog
 
-Agents and contributors: when you add or materially change an example under `cmd/examples/`, update this file, [`cmd/examples/doc.go`](../cmd/examples/doc.go), and [`quick-start.md`](quick-start.md) (if onboarding changes) in the **same PR**. Checklist: [ai-workflow.md § Examples](ai-workflow.md#examples).
-
-[`cmd/examples/transcripts_test.go`](../cmd/examples/transcripts_test.go) checks the **Sample output:** blocks named in its allowlist against real program runs. That allowlist alone decides which blocks are checked, and its exclusion census accounts for every other example. A deliberate output change therefore means regenerating the block verbatim from `go run ./cmd/examples/<name>`, not editing it by hand.
-
-An example that gains a verbatim sample-output block must be added to that allowlist in the same PR. `TestSampleMarkerCensus` fails the build if a section publishes a bare sample-output marker without an allowlist entry, so an unlisted block cannot go unverified. The one recorded exception is smart-launch, whose PKCE state, verifier, and `expires_at` differ every run: `bareMarkerException` in that test names it, and the test also fails if that exception ever outlives the marker it excuses.
+When you add or change an example, [ai-workflow.md § Examples](ai-workflow.md#examples) lists the documents to keep in step and the tests that hold them to real runs.
 
 ---
 

@@ -9,10 +9,10 @@
 //
 //	go run ./cmd/examples/generate-example
 //	go run ./cmd/examples/generate-example \
-//	    --opt testkit/corpus/templates/vital_signs.opt \
-//	    --territory NL \
-//	    --composer-name "Test Composer" \
-//	    --policy large
+//	    -opt testkit/corpus/templates/vital_signs.opt \
+//	    -territory NL \
+//	    -composer-name "Test Composer" \
+//	    -policy large
 //
 // The output is one line of JSON; pipe it to a file or into validate-from-json.
 // Each run gets fresh uids and a wall-clock context start time.
@@ -106,11 +106,11 @@ func run() error {
 	return nil
 }
 
-// defaultPolicy is the --policy default, the instance package's default
+// defaultPolicy is the -policy default, the instance package's default
 // level.
 const defaultPolicy = "medium"
 
-// parsePolicy reads the --policy text with instance.ParsePolicy, which
+// parsePolicy reads the -policy text with instance.ParsePolicy, which
 // takes the names required, minimal, medium, large and complete in any
 // case. Required, and minimal with it, builds only the data points the
 // template makes mandatory and a composition's context, the ITS-REST
@@ -124,7 +124,7 @@ const defaultPolicy = "medium"
 func parsePolicy(name string) (instance.Policy, error) {
 	p, err := instance.ParsePolicy(name)
 	if err != nil {
-		return 0, fmt.Errorf("--policy (want required, minimal, medium, large or complete): %w", err)
+		return 0, fmt.Errorf("-policy (want required, minimal, medium, large or complete): %w", err)
 	}
 	return p, nil
 }

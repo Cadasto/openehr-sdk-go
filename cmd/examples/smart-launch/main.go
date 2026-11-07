@@ -11,14 +11,17 @@
 // call per step.
 //
 // It runs offline: an in-process stub plays the authorization server, so no
-// account, secret or network is needed. `go test ./cmd/examples/smart-launch`
-// runs the same flow.
+// account, secret or network is needed. The stub checks the PKCE proof as a
+// real server does, so a lost or wrong verifier fails the launch here too.
+// `go test ./cmd/examples/smart-launch` runs the same flow.
 //
 //	go run ./cmd/examples/smart-launch
 package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -166,7 +169,8 @@ func run() error {
 	// user who declined, fails with ErrAuthorizationRejected. Then it posts
 	// the code together with the PKCE verifier to the token endpoint. The
 	// server hashes the verifier and checks it against the challenge it saw
-	// in step 5; that is the PKCE proof.
+	// in step 5; that is the PKCE proof. A wrong verifier fails here with an
+	// error that unwraps to an *auth.OAuth2Error whose Code is "invalid_grant".
 	token, tokenResp, err := source.CompleteAuthorization(ctx, callback, storedReq)
 	if err != nil {
 		return fmt.Errorf("CompleteAuthorization: %w", err)
@@ -185,6 +189,9 @@ func run() error {
 		fmt.Printf("  ehrId        : %s\n", tokenResp.EHRID)
 	}
 	fmt.Println("OK: standalone SMART PKCE launch flow completed (in-process stub)")
+	// From here the Source is an auth.TokenSource holding these tokens: pass
+	// it to transport.New with transport.WithTokenSource, and every REST
+	// call carries the access token, refreshed before it expires.
 	return nil
 }
 
@@ -255,13 +262,16 @@ func openAuthorizeURL(ctx context.Context, client *http.Client, authorizeURL str
 
 // stubServer is a minimal authorization server, just enough to complete one
 // launch:
-//   - GET  /authorize issues a one-use code bound to the state it was given.
-//   - POST /token     accepts that code once and returns a canned token.
+//   - GET  /authorize requires an S256 PKCE challenge and issues a one-use
+//     code bound to it.
+//   - POST /token     accepts that code once, with the verifier the
+//     challenge was made from, and returns a canned token.
 type stubServer struct {
 	mux *http.ServeMux
 
-	mu    sync.Mutex
-	codes map[string]string // code → state
+	mu     sync.Mutex
+	issued int               // codes issued so far, which numbers the next one
+	codes  map[string]string // code → the PKCE challenge it was issued for
 }
 
 func newStubServer() *stubServer {
@@ -292,11 +302,24 @@ func (s *stubServer) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing state", http.StatusBadRequest)
 		return
 	}
-	// A predictable code keeps the output readable; real ones are random.
-	code := "stub-code-" + state[:8]
-
+	// The stub requires PKCE, as a server for public clients should, and
+	// only its S256 method. RFC 7636 makes plain the method when none is
+	// named, and a plain challenge is the verifier itself, sent in the URL.
+	challenge := query.Get("code_challenge")
+	if challenge == "" {
+		http.Error(w, "missing code_challenge", http.StatusBadRequest)
+		return
+	}
+	if query.Get("code_challenge_method") != "S256" {
+		http.Error(w, "code_challenge_method must be S256", http.StatusBadRequest)
+		return
+	}
+	// The challenge is kept with the code, for the token endpoint to check.
+	// A numbered code keeps the output readable; real ones are random.
 	s.mu.Lock()
-	s.codes[code] = state
+	s.issued++
+	code := fmt.Sprintf("stub-code-%d", s.issued)
+	s.codes[code] = challenge
 	s.mu.Unlock()
 
 	w.Header().Set("Content-Type", "application/json")
@@ -304,10 +327,10 @@ func (s *stubServer) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]string{"code": code, "state": state})
 }
 
-// handleToken is the token endpoint. It checks the grant type and that the
-// code was issued and not used before, then returns a canned token. A real
-// server also hashes the code_verifier from the form and compares it with the
-// code_challenge it saw on /authorize; the stub skips that check.
+// handleToken is the token endpoint. It checks the grant type, that the code
+// was issued and not used before, and the PKCE proof, then returns a canned
+// token. It refuses a grant with an OAuth2 error body (RFC 6749 §5.2), which
+// the SDK returns as an *auth.OAuth2Error.
 func (s *stubServer) handleToken(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -324,20 +347,32 @@ func (s *stubServer) handleToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if form.Get("grant_type") != "authorization_code" {
-		http.Error(w, "unsupported grant_type", http.StatusBadRequest)
+		writeOAuthError(w, "unsupported_grant_type", "only authorization_code is supported")
 		return
 	}
 	code := form.Get("code")
 
 	s.mu.Lock()
-	_, ok := s.codes[code]
+	challenge, ok := s.codes[code]
 	if ok {
-		delete(s.codes, code) // one use only
+		delete(s.codes, code) // one use only, whatever the outcome below
 	}
 	s.mu.Unlock()
 
 	if !ok {
-		http.Error(w, "unknown code", http.StatusBadRequest)
+		writeOAuthError(w, "invalid_grant", "unknown or used code")
+		return
+	}
+	// The PKCE proof (RFC 7636 §4.6): only the app that made the verifier
+	// can send one whose hash is the challenge, so a stolen code is useless
+	// alone. The refusal never repeats the verifier.
+	verifier := form.Get("code_verifier")
+	if verifier == "" {
+		writeOAuthError(w, "invalid_grant", "missing code_verifier")
+		return
+	}
+	if s256Challenge(verifier) != challenge {
+		writeOAuthError(w, "invalid_grant", "code_verifier does not match code_challenge")
 		return
 	}
 	// The canned response mirrors a real SMART-on-openEHR deployment:
@@ -356,6 +391,22 @@ func (s *stubServer) handleToken(w http.ResponseWriter, r *http.Request) {
 		"scope":         scope,
 		"ehrId":         "00000000-0000-0000-0000-000000000001",
 	})
+}
+
+// s256Challenge returns the S256 code challenge of verifier:
+// BASE64URL(SHA256(verifier)), unpadded (RFC 7636 §4.2).
+func s256Challenge(verifier string) string {
+	sum := sha256.Sum256([]byte(verifier))
+	return base64.RawURLEncoding.EncodeToString(sum[:])
+}
+
+// writeOAuthError refuses a token request the way RFC 6749 §5.2 describes:
+// status 400 and a JSON body naming the error.
+func writeOAuthError(w http.ResponseWriter, code, description string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusBadRequest)
+	// An encode failure would surface as a decode error in the SDK.
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": code, "error_description": description})
 }
 
 // preview returns the first eight characters of a secret followed by an
