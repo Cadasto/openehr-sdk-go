@@ -427,7 +427,7 @@ func unresolvedStep(root rm.Locatable, p string) string {
 
 // pathSeg is one segment of an aqlPath: its attribute, the node id or
 // archetype id its predicate names (pred), and the predicate as written
-// (whole), which also carries a REQ-116 name where the path pins one.
+// (whole), which also carries a REQ-111 name where the path pins one.
 type pathSeg struct {
 	raw, attr, pred, whole string
 }
@@ -469,7 +469,7 @@ func splitPath(p string) []pathSeg {
 	return out
 }
 
-// barePath strips the REQ-116 name predicates (`[at0001,'Name']` →
+// barePath strips the REQ-111 name predicates (`[at0001,'Name']` →
 // `[at0001]`), as the FLAT encoder does before it resolves a node: the
 // instance built here is matched by archetype_node_id alone.
 func barePath(p string) string {

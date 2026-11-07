@@ -22,7 +22,7 @@ The Reference Model's own invariants reference the first two: `AUDIT_DETAILS.Cha
 The terminology is small, closed, and versioned with the specifications. The SDK carries it
 the way it carries the BMM: pinned in-tree and used as a generator input. It is not
 fetched at build time and not looked up in a terminology service at run time. Contract:
-[`../../docs/specifications/rm-modeling.md § openEHR terminology vocabulary (REQ-034)`](../../docs/specifications/rm-modeling.md#openehr-terminology-vocabulary-req-034).
+[`../../docs/specifications/reference-model.md § openEHR terminology vocabulary (REQ-034)`](../../docs/specifications/reference-model.md#openehr-terminology-vocabulary-req-034).
 
 > **For AI agents and contributors:** these XML files are the source of truth for openEHR
 > codes and rubrics and for the external code sets. Read them to *check* the pin, not to
@@ -84,7 +84,7 @@ It lives in-tree rather than behind an upstream URL for the same three reasons t
 | Consumer | Relationship |
 |---|---|
 | `openehr/terminology` | The generated, stdlib-only accessor. It exposes every group and code set of this pin as typed, closed, source-ordered values: groups with code → rubric, rubric → code, and membership lookups; code sets with membership lookups and the issuer and external id the pin gives each; plus the pinned release version; and the property-unit table, with each property's UCUM units in source order, the primary ones marked (§ REQ-034). |
-| `cmd/termgen` | The generator: reads the three files of this pin, emits those tables. `make termgen` regenerates them; `make termgen-check` fails the gate when they drift from any of the files, as the drift check of the BMM-generated code does ([REQ-041](../../docs/specifications/bmm-conformance.md#req-041--pinned-bmm-sources)). |
+| `cmd/termgen` | The generator: reads the three files of this pin, emits those tables. `make termgen` regenerates them; `make termgen-check` fails the gate when they drift from any of the files, as the drift check of the BMM-generated code does ([REQ-041](../../docs/specifications/reference-model.md#req-041--pinned-bmm-sources)). |
 
 The generator and the accessor land with the rest of the REQ-034 work; this pin is their
 only input. Nothing else in the SDK parses these XML files at build or run time.
@@ -129,6 +129,6 @@ upstream ([AGENTS.md](../../AGENTS.md) § Gotchas); re-sync instead.
 
 ## References
 
-- Normative contract: [`rm-modeling.md § openEHR terminology vocabulary (REQ-034)`](../../docs/specifications/rm-modeling.md#openehr-terminology-vocabulary-req-034).
+- Normative contract: [`reference-model.md § openEHR terminology vocabulary (REQ-034)`](../../docs/specifications/reference-model.md#openehr-terminology-vocabulary-req-034).
 - Sync script: [`../../scripts/sync-terminology.sh`](../../scripts/sync-terminology.sh) (`sync` / `check` / `verify`).
 - Upstream specification: openEHR *Terminology* (TERM) component, <https://specifications.openehr.org/releases/TERM/>.

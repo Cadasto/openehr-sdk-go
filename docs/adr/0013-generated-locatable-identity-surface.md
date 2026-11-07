@@ -131,7 +131,7 @@ reduced set.
 - **Naming:** the `Get<Field>` prefix trades Effective Go's omit-`Get` guideline for
   collision-freedom, mechanical derivability, and consistency with the existing
   `*Like`-interface accessors — a deliberate, house-precedented choice.
-- **Spec impact:** `rm-modeling.md` prose (REQ-031 layering, REQ-040 registry — which gains a
+- **Spec impact:** `reference-model.md` prose (REQ-031 layering, REQ-040 registry — which gains a
   reverse direction, REQ-043 mapping rules) must be updated in the same PR as the generator
   change; `traceability.yaml` gains the ADR references on those REQ entries at implementation.
 - **Risk accepted:** if a future BMM class legitimately needs different identity semantics

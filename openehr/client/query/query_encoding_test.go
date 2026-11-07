@@ -1,6 +1,6 @@
 package query_test
 
-// query_encoding_test.go — REQ-095. An ad-hoc AQL query sent with WithGET must
+// query_encoding_test.go — REQ-050. An ad-hoc AQL query sent with WithGET must
 // reach the wire with every space as %20, as the pinned OAS `q` parameter
 // (`style: form`, RFC 6570 form-style expansion) requires. A `+` is a space
 // only to an HTML-form decoder; a server that percent-decodes by RFC 3986

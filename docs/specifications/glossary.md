@@ -13,10 +13,10 @@ Terms used in the SDK specifications, source code, and AI-agent prompts. When a 
 ## openEHR core
 
 **Reference Model (RM)**
-The information model that defines the abstract data structures of openEHR — `LOCATABLE`, `PATHABLE`, `COMPOSITION`, `OBSERVATION`, `EVALUATION`, `INSTRUCTION`, `ACTION`, `DATA_VALUE` and its specialisations, the demographic `PARTY` hierarchy, etc. Authoritative definition: openEHR Reference Model specification. In this SDK the RM Go types are **generated** from the pinned `openehr_rm_*.bmm.json` schema (REQ-041).
+The information model that defines the abstract data structures of openEHR — `LOCATABLE`, `PATHABLE`, `COMPOSITION`, `OBSERVATION`, `EVALUATION`, `INSTRUCTION`, `ACTION`, `DATA_VALUE` and its specialisations, the demographic `PARTY` hierarchy, etc. Authoritative definition: openEHR Reference Model specification. In this SDK the RM Go types are **generated** from the SDK-authored RM root over the pinned `openehr_rm_*.bmm.json` schema (REQ-041).
 
 **BMM (Basic Meta-Model)**
-The openEHR meta-model that describes information models (RM, AM, BASE, LANG, TERM) as a compact, computable alternative to UML/XMI. Defined in the openEHR LANG specification. In this SDK the BMM files in [`../resources/bmm/`](../../resources/bmm) are the source of truth for the openEHR domain model; see [bmm-conformance.md](bmm-conformance.md).
+The openEHR meta-model that describes information models (RM, AM, BASE, LANG, TERM) as a compact, computable alternative to UML/XMI. Defined in the openEHR LANG specification. In this SDK the BMM files in [`../resources/bmm/`](../../resources/bmm) are the source of truth for the openEHR domain model; see [reference-model.md](reference-model.md).
 
 **P_BMM**
 The persistence (serialisation) form of BMM — typically a JSON document (the `.bmm.json` files in [`../resources/bmm/`](../../resources/bmm)) keyed by `schema_id` (e.g. `openehr_rm_1.2.0`). On-disk attribute names appear as `P_BMM_*` (e.g. `P_BMM_SINGLE_PROPERTY`, `P_BMM_CONTAINER_TYPE`, `P_BMM_GENERIC_PROPERTY`); the in-memory model uses the abstract `BMM_*` equivalents.
@@ -58,7 +58,7 @@ A path-keyed, value-flat serialization optimised for end-user input forms — ke
 A nested-JSON serialization that preserves RM structure but omits `_type` discriminators where the path is unambiguous. Intermediate between canonical JSON and FLAT.
 
 **ITS-REST**
-"Implementation Technology Specification — REST" — the openEHR REST API specification family. The SDK targets the `1.1.0` release line; the term "REST" without further qualification in these specs refers to ITS-REST. The per-endpoint **OpenAPI YAML** files at `github.com/openEHR/specifications-ITS-REST` are the authoritative source for paths, parameters, and status codes (REQ-095).
+"Implementation Technology Specification — REST" — the openEHR REST API specification family. The SDK targets the `1.1.0` release line; the term "REST" without further qualification in these specs refers to ITS-REST. The per-endpoint **OpenAPI YAML** files at `github.com/openEHR/specifications-ITS-REST` are the authoritative source for paths, parameters, and status codes (REQ-050).
 
 **ItemTags / `openehr-item-tag`**
 A small key-value annotation surface attached to versioned resources, introduced in openEHR REST 1.1.0. The SDK exposes it under `openehr/client/ehr/itemtags/` and carries the `openehr-item-tag` header (REQ-059) on the relevant operations.
@@ -118,10 +118,10 @@ The SMART-on-openEHR configuration document advertised by the deployment — typ
 An executable assertion that the SDK exercises against the sandbox transport, a replayed recording, or a live deployment (REQ-082), to verify wire-level conformance to openEHR REST + SMART-on-openEHR. Each probe has a stable `PROBE-NNN` ID (see [conformance.md](conformance.md)). The shared result type and runner live in [`testkit/probe`](../../testkit/probe/).
 
 **Building-block use case**
-A consumer that imports one core package (`openehr/rm`, `openehr/serialize`, `openehr/validation`, `openehr/aql` models-only, `openehr/template`, `openehr/terminology`) without constructing an authenticated client. The SDK's surface MUST support this (REQ-013).
+A consumer that imports one of the building blocks [module-layout.md § REQ-013](module-layout.md#req-013--building-block-independence) lists, such as `openehr/rm`, `openehr/serialize` or `openehr/validation`, without constructing an authenticated client.
 
 **Sandbox**
-The in-memory `http.RoundTripper` that backs REQ-082's Sandbox mode ([`sandbox.Backend`](../../sandbox/doc.go)), injected as the `*http.Client` Transport so production leaf clients run unchanged. No network listener and no credentials. EHR create/get/head are implemented; remaining resources follow as httptest handlers are retired.
+The in-memory `http.RoundTripper` that backs REQ-082's Sandbox mode ([`sandbox.Backend`](../../sandbox/doc.go)), injected as the `*http.Client` Transport so production leaf clients run unchanged. No network listener and no credentials. It serves the EHR resource built in, and any other route through scripted handlers.
 
 **Testkit**
 The package tree `testkit/` carrying the conformance probes (`testkit/probes/`), the shared result type and catalog runner (`testkit/probe/`), vendored fixture documents (`testkit/corpus/`), fixture-path resolution (`testkit/fixtures/`), and corpus-scale conformance harnesses (`testkit/conformance/`). Cassette-mode HAR recordings (ADR 0020) live under `testkit/recordings/`; `cmd/probe-record` captures them and `testkit/probe` replays them.
@@ -137,16 +137,16 @@ A package-tree boundary that nothing on the upstream side may import from. The `
 An openEHR-conformant backend the SDK talks to over openEHR REST.
 
 **Cadasto Extra API**
-A Cadasto-specific REST surface that complements openEHR REST — convenience aggregates, deployment-specific endpoints. Client lives in `cadasto/extra`.
+A Cadasto-specific REST surface that complements openEHR REST — convenience aggregates, deployment-specific endpoints. Reserved for a client in `cadasto/extra`, which holds no code yet.
 
 **Datamap (V2)**
 A Cadasto-specific payload format for reading and writing clinical and demographic data (compositions, demographic parties, EHR status) without building Reference Model instances. It has no openEHR spec: its wire contract is the Cadasto platform API ([REQ-083](conformance.md#req-083--cadasto-platform-api-conformance)). The SDK targets **Datamap V2**; older versions are out of scope. `cadasto/datamap` is reserved for its codec, which [REQ-058](module-layout.md#req-058--datamap-v2) specifies for compositions and parties.
 
 **MPI (Master Patient Index)**
-Identity resolution and patient-merging across deployments. The SDK exposes a preview shape in `cadasto/mpi/`; the full design is the subject of a separate research strand.
+Identity resolution and patient-merging across deployments. `cadasto/mpi/` is reserved for a preview search surface and holds no code yet; the full design is the subject of a separate research strand.
 
 **Care aggregates**
-Cadasto's opinionated application-level aggregates over EHR + Demographic resources — `Patient`, `User`, `CaseLoad`, `CareTeam`, `Episode`. Live in `cadasto/care/`.
+Cadasto's opinionated application-level aggregates over EHR + Demographic resources — `Patient`, `User`, `CaseLoad`, `CareTeam`, `Episode`. Reserved for `cadasto/care/`, which holds no code yet.
 
 **Federator**
 A consumer pattern: multiple SDK clients pointed at multiple openEHR backends, with per-node spec pinning, partial-failure semantics, and a merge / authority policy. The SDK provides the per-node primitives; the federation policy is bespoke per deployment.
@@ -154,12 +154,6 @@ A consumer pattern: multiple SDK clients pointed at multiple openEHR backends, w
 ---
 
 ## Conformance and sources
-
-**Cadasto SDK Specification proposal**
-The pre-implementation design document for this SDK, maintained alongside Cadasto architectural sources. Its content is reflected in this `docs/specifications/` tree; this tree is the day-to-day source of truth.
-
-**Conformance probe**
-The openEHR wire-conformance assertion behind a stable `PROBE-NNN`: a single-definition check that the SDK's wire output conforms to the openEHR spec against a reference deployment ([conformance.md](conformance.md)).
 
 ---
 

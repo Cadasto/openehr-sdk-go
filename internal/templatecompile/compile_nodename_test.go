@@ -7,7 +7,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
-// REQ-116 (Phase 2) / REQ-111 — the template-level node name survives
+// REQ-111 (Phase 2) / REQ-111 — the template-level node name survives
 // compile on the plain-ComplexObject path. The root here carries no
 // archetype id, so descend takes the C_COMPLEX_OBJECT case, not the
 // archetype root's.
@@ -46,7 +46,7 @@ func TestCompile_NodeNameCarriedComplexObject(t *testing.T) {
 	}
 }
 
-// REQ-116 (Phase 2) / REQ-111 — the names of reused archetype roots
+// REQ-111 (Phase 2) / REQ-111 — the names of reused archetype roots
 // survive compile on the ArchetypeRoot path. byArchetypeID retains all
 // four SECTION.adhoc.v1 siblings even though byPath keeps only the
 // first, so each sibling's distinct name is reachable post-compile —

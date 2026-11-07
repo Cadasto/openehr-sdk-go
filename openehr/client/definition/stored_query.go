@@ -259,7 +259,7 @@ func parseStoredQueryLocation(loc string) (name, version string, ok bool) {
 	// Tolerate absolute and relative forms. Strip scheme+host if present,
 	// then take the last two non-empty path segments — `{name}` and
 	// `{version}` — decoding each below (the server MAY percent-encode the
-	// Location; the client itself now sends the raw id — REQ-095). The
+	// Location; the client itself now sends the raw id — REQ-050). The
 	// segments come from the escaped path, never u.Path, which url.Parse
 	// has already decoded: decoding that again turns a literal `%` the
 	// server sent as `%25` into another character. A value url.Parse
@@ -291,7 +291,7 @@ func parseStoredQueryLocation(loc string) (name, version string, ok bool) {
 		return "", "", false
 	}
 	// Decode each segment exactly once: a server MAY percent-encode the
-	// Location even though the client sends the raw id (REQ-095). A segment
+	// Location even though the client sends the raw id (REQ-050). A segment
 	// that is not a valid escape sequence is kept as it stands.
 	n, err := url.PathUnescape(clean[qi+1])
 	if err != nil {

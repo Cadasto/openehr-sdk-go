@@ -9,7 +9,7 @@ import (
 
 // TestVersionedObjectContainerOpsFailLoud asserts the out-of-scope
 // VERSIONED_OBJECT container operations remain fail-loud panic stubs
-// (server-mediated, not in-memory — REQ-122), so they aren't mistaken
+// (server-mediated, not in-memory — REQ-120), so they aren't mistaken
 // for a silent zero-value.
 func TestVersionedObjectContainerOpsFailLoud(t *testing.T) {
 	defer func() {
@@ -25,7 +25,7 @@ func TestVersionedObjectContainerOpsFailLoud(t *testing.T) {
 	_ = vo.VersionCount()
 }
 
-// REQ-122 — version-control derived helper.
+// REQ-120 — version-control derived helper.
 
 func TestVersionIsBranch(t *testing.T) {
 	branch := rm.OriginalVersion[any]{UID: rm.ObjectVersionID{Value: "obj::sys::1.1.1"}}

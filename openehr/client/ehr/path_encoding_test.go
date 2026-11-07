@@ -1,6 +1,6 @@
 package ehr_test
 
-// path_encoding_test.go — REQ-095. Regression proof for the previously-latent
+// path_encoding_test.go — REQ-050. Regression proof for the previously-latent
 // EHR client: a path parameter carrying a percent-encodable character reaches
 // the wire encoded exactly once (the client interpolates the raw id; the
 // transport is the single canonical encoder). Real EHR ids are UUIDs with no

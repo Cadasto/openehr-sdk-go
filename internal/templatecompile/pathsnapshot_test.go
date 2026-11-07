@@ -1,6 +1,6 @@
 package templatecompile_test
 
-// REQ-116 Phase 3 — the compiled-path regression guard.
+// REQ-111 Phase 3 — the compiled-path regression guard.
 //
 // Emitting name predicates changes compiled AQL paths, and those paths
 // are consumed by validation, instance generation and
@@ -9,7 +9,7 @@ package templatecompile_test
 // template-level node name anywhere — and snapshots both halves:
 //
 //   - no-name.txt   templates pinning no name. These paths MUST stay
-//     byte-identical across the whole of REQ-116. A diff here is a
+//     byte-identical across the whole of REQ-111. A diff here is a
 //     regression, never an expected delta.
 //   - pins-name.txt templates pinning at least one name. These paths
 //     are expected to gain predicates in Phase 3; the diff on this file
@@ -109,14 +109,14 @@ func TestCompiledPathSnapshot(t *testing.T) {
 	}{
 		{
 			file: "no-name.txt",
-			header: "# REQ-116 compiled-path snapshot — templates pinning NO node name.\n" +
-				"# These paths must stay byte-identical for the whole of REQ-116:\n" +
+			header: "# REQ-111 compiled-path snapshot — templates pinning NO node name.\n" +
+				"# These paths must stay byte-identical for the whole of REQ-111:\n" +
 				"# a diff here is a regression, not an expected delta.\n",
 			body: &withoutName,
 		},
 		{
 			file: "pins-name.txt",
-			header: "# REQ-116 compiled-path snapshot — templates pinning at least one node name.\n" +
+			header: "# REQ-111 compiled-path snapshot — templates pinning at least one node name.\n" +
 				"# Phase 3 adds name predicates to these paths; the diff on this file\n" +
 				"# is the deliberately recorded delta.\n",
 			body: &withName,
@@ -145,7 +145,7 @@ func TestCompiledPathSnapshot(t *testing.T) {
 			}
 			if !bytes.Equal(got.Bytes(), want) {
 				t.Errorf("compiled paths differ from %s.\n"+
-					"If this is no-name.txt, a template that pins no name changed shape — that is a REQ-116 regression.\n"+
+					"If this is no-name.txt, a template that pins no name changed shape — that is a REQ-111 regression.\n"+
 					"Regenerate with: go test ./internal/templatecompile/ -run TestCompiledPathSnapshot -update",
 					golden)
 			}

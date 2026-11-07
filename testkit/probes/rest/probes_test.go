@@ -129,7 +129,7 @@ func writeJSON(body string) http.HandlerFunc {
 	}
 }
 
-func TestProbe102SystemCapabilities(t *testing.T) { // PROBE-102, REQ-095
+func TestProbe102SystemCapabilities(t *testing.T) { // PROBE-102, REQ-050
 	b, snap := capturing(t, nil, writeJSON(capsBody))
 	r, err := restprobes.Probe102SystemCapabilities(t.Context(), newClient(t, b), snap)
 	if err != nil {
@@ -285,7 +285,7 @@ const (
 	probe104Format     = definition.FormatADL14
 )
 
-func TestProbe104DefinitionExample(t *testing.T) { // PROBE-104, REQ-095
+func TestProbe104DefinitionExample(t *testing.T) { // PROBE-104, REQ-050
 	b, snap := capturing(t, nil, writeJSON(exampleCompositionBody))
 	r, err := restprobes.Probe104DefinitionExample(t.Context(), newClient(t, b), snap, probe104TemplateID, probe104Format)
 	if err != nil {
@@ -413,7 +413,7 @@ func decodeStatus(t *testing.T) *rm.EHRStatus {
 	return &st
 }
 
-func TestProbe060EHRCreationRoundTrip(t *testing.T) { // PROBE-060, REQ-095
+func TestProbe060EHRCreationRoundTrip(t *testing.T) { // PROBE-060, REQ-050
 	b, snap := ehrRoundTripBackend(t, ehrStatusJSON, true, nil)
 	r, err := restprobes.Probe060EHRCreationRoundTrip(t.Context(), newClient(t, b), snap, decodeStatus(t))
 	if err != nil {

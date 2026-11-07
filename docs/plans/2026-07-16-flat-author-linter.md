@@ -144,7 +144,7 @@ Author the canonical contract first, so Phases 1–3 cite an existing REQ rather
 - [clinical-modeling.md § REQ-109](../specifications/clinical-modeling.md#req-109--aql-static-lint) — the lint/issue-model precedent this mirrors
 - [wire.md § REQ-053](../specifications/wire.md#req-053) — FLAT codec (decode path; the linter is pre-decode)
 - [clinical-modeling.md § REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export) — path-enumeration source
-- [use-cases.md § Synthetic data seeder](../specifications/use-cases.md#synthetic-data-seeder) — FLAT-emit validation
+- [scope.md § Synthetic data seeder](../specifications/scope.md#synthetic-data-seeder) — FLAT-emit validation
 
 ## References
 

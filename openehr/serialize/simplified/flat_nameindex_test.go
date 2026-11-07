@@ -1,7 +1,7 @@
 package simplified
 
-// REQ-053 / REQ-116 — the FLAT decode name index must keep answering to the
-// bare (un-predicated) path spelling after REQ-116 Phase 3 started emitting
+// REQ-053 / REQ-111 — the FLAT decode name index must keep answering to the
+// bare (un-predicated) path spelling after REQ-111 Phase 3 started emitting
 // name predicates on compiled paths.
 //
 // Decode composes its lookup key from the incoming FLAT segments, which key

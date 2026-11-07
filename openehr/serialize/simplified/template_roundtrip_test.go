@@ -430,7 +430,7 @@ func nameAt(t *testing.T, comp *rm.Composition, path string) (map[string]any, bo
 	return name, ok
 }
 
-// TestREQ053WithTemplateRebuildsCodedName — REQ-053, REQ-116: FLAT has no key
+// TestREQ053WithTemplateRebuildsCodedName — REQ-053, REQ-111: FLAT has no key
 // for a node's name below the root, so a WithTemplate decode names the node
 // from the template. Where the template constrains the name as a
 // DV_CODED_TEXT and determines its code and text, decode rebuilds that coded

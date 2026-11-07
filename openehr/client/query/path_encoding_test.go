@@ -1,6 +1,6 @@
 package query_test
 
-// path_encoding_test.go — REQ-095. A stored-query qualified name with an
+// path_encoding_test.go — REQ-050. A stored-query qualified name with an
 // encodable character must reach the wire single-encoded: the transport is the
 // single canonical path encoder, so the client interpolates the raw name and
 // does not pre-escape it (which would double-encode).

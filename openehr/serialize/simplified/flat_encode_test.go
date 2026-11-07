@@ -88,7 +88,7 @@ func TestMarshalFlatDVTextLeaf(t *testing.T) {
 	// as a bare (suffix-less) FLAT entry. The event contributes no segment of
 	// its own: this fixture's EVENT can occur at most once, and the reference
 	// lifts such a degenerate wrapper rather than emitting a node for it
-	// (REQ-116 Phase 4, webtemplate.isCollapsedEvent) — a repeating event
+	// (REQ-111 Phase 4, webtemplate.isCollapsedEvent) — a repeating event
 	// keeps its segment, as `any_event` does in the upstream FLAT corpus.
 	const key = "minimal/minimal:0/text"
 	v, ok := m[key]

@@ -17,7 +17,7 @@ corpus/
   submissions/{name}.json             # CONTRIBUTION POST wire (inline ORIGINAL_VERSION)
   its_rest/                           # ITS-REST / discovery wire
   webtemplate/{template-id}.opt       # OPT + EHRbase reference WebTemplate
-    | {template-id}.webtemplate.json  #   golden (PROBE-075 / REQ-116 oracles)
+    | {template-id}.webtemplate.json  #   golden (PROBE-075 / REQ-111 oracles)
   flat-conformance/                   # pinned upstream FLAT corpus (PROBE-086)
     MANIFEST.txt                      #   commit pin + per-file sha256
     templates/{name}.opt
@@ -224,8 +224,8 @@ Two OPTs in this table are not CODE24's. `alternative_types.en.v1` is byte-ident
 | Template id | Role | Size (OPT + golden) |
 |---|---|---|
 | `constrain_test` | PROBE-075 parity oracle (104/104). Pins **no** node name, so its golden carries **0** name predicates | 444 KB + 139 KB |
-| `Corona_Anamnese` | REQ-116 oracle. It was the loud mode (`Build` → `ErrIDCollision`: four `SECTION.adhoc.v1` siblings; eight reused screening OBSERVATIONs under Symptome). Its golden carries 350 name-predicate segments over 213 `aqlPath`s. Since REQ-116 Phase 4 it builds and holds **230/230** structural parity | 1.2 MB + 230 KB |
-| `GECCO_Diagnose` | REQ-116 oracle, silent mode. It always built, but it emitted bare paths where its golden carries 30 name-predicate segments over 24 `aqlPath`s (its three `/content` children have **distinct** archetype ids and are all predicated). Since REQ-116 Phase 4: **34/34** structural parity. The residuals are the golden's own `min=1` outlier (14 nodes) and 1 input delta, both documented | 210 KB + 73 KB |
+| `Corona_Anamnese` | REQ-111 oracle. It was the loud mode (`Build` → `ErrIDCollision`: four `SECTION.adhoc.v1` siblings; eight reused screening OBSERVATIONs under Symptome). Its golden carries 350 name-predicate segments over 213 `aqlPath`s. Since REQ-111 Phase 4 it builds and holds **230/230** structural parity | 1.2 MB + 230 KB |
+| `GECCO_Diagnose` | REQ-111 oracle, silent mode. It always built, but it emitted bare paths where its golden carries 30 name-predicate segments over 24 `aqlPath`s (its three `/content` children have **distinct** archetype ids and are all predicated). Since REQ-111 Phase 4: **34/34** structural parity. The residuals are the golden's own `min=1` outlier (14 nodes) and 1 input delta, both documented | 210 KB + 73 KB |
 
 The Corona pair is the largest fixture in the repo. That size is the cost of guarding the archetype-reuse-under-slot class with the real reference fixture instead of a synthetic cut-down.
 

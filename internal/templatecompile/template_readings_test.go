@@ -180,7 +180,7 @@ func nameAttribute(children ...string) string {
 }
 
 // TestREQ116_REQ111_CompileReadsTheTemplateLevelNodeName pins the node name
-// the compile step carries (§ REQ-111, the reading § REQ-116 gives): the one
+// the compile step carries (§ REQ-111, the reading § REQ-111 gives): the one
 // non-blank entry, trimmed, of a closed C_STRING list on the name's value,
 // judged on the list as the OPT writes it, the first alternative that pins
 // one winning. A choice, a blank entry, an open list, a pattern and an absent

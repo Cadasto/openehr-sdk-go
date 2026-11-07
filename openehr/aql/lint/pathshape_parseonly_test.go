@@ -1,6 +1,6 @@
 package lint_test
 
-// pathshape_parseonly_test.go: REQ-164 § Path-shape checks — the group's two
+// pathshape_parseonly_test.go: REQ-161 § Path-shape checks — the group's two
 // PARSE-ONLY codes, aql_paging_no_order_by and aql_select_no_alias. Neither
 // consults the pinned BMM, so neither has a walk or a silent stop to pin;
 // what they have instead is two channels (the paging check) and two exemptions
@@ -29,13 +29,13 @@ import (
 
 // pagedQuery is the audit's second verified-silent query: a row
 // bound with no total order, which the shipped v0.22.0 linter answered clean
-// (REQ-164 § Acceptance). The projection is aliased so the row is about the
+// (REQ-161 § Acceptance). The projection is aliased so the row is about the
 // paging code alone.
 const pagedQuery = "SELECT o/name/value AS name FROM OBSERVATION o[" + obsArch + "] " +
 	"LIMIT 50 OFFSET 100"
 
 // envelope is a request envelope carrying the given row bound — the second
-// channel aql_paging_no_order_by reads (REQ-164 § Path-shape checks).
+// channel aql_paging_no_order_by reads (REQ-161 § Path-shape checks).
 func envelope(fetch, offset int) *lint.Options {
 	q := aql.NewQuery("")
 	q.Fetch, q.Offset = fetch, offset
@@ -44,7 +44,7 @@ func envelope(fetch, offset int) *lint.Options {
 
 // --- aql_paging_no_order_by: firing rules ------------------------------------
 
-// TestPagingNoOrderByFiresOnTheAuditQuery is REQ-164 § Acceptance's second
+// TestPagingNoOrderByFiresOnTheAuditQuery is REQ-161 § Acceptance's second
 // named row: the audit's `LIMIT 50 OFFSET 100` query with no ORDER BY now
 // warns. ONE finding over the whole result, so a second code would mean this
 // group over-reaches on a query carrying exactly one defect.
@@ -56,7 +56,7 @@ func TestPagingNoOrderByFiresOnTheAuditQuery(t *testing.T) {
 	}
 	iss := res.Issues[0]
 	if iss.Severity != lint.Warning {
-		t.Errorf("severity = %v, want warning (REQ-164 § Path-shape checks)", iss.Severity)
+		t.Errorf("severity = %v, want warning (REQ-161 § Path-shape checks)", iss.Severity)
 	}
 	// The channel that carried the bound is named, which is the only thing
 	// distinguishing the two arms for a reader.
@@ -71,7 +71,7 @@ func TestPagingNoOrderByFiresOnTheAuditQuery(t *testing.T) {
 // TestPagingNoOrderByFiresFromTheEnvelopeAlone is the envelope arm's positive:
 // the AQL text carries no row bound at all, and the bound arrives on
 // [lint.Options.Query] — the same channel the parameter-binding checks read.
-// Fetch and Offset each carry it on their own: REQ-164 § Path-shape checks
+// Fetch and Offset each carry it on their own: REQ-161 § Path-shape checks
 // reads Offset too, deliberately unlike aql_top_with_fetch's fetch-only scope,
 // because an offset into an unordered result is an unstable page boundary by
 // itself.
@@ -183,7 +183,7 @@ func TestPagingNoOrderBySilentWithoutAnyRowBound(t *testing.T) {
 	}
 }
 
-// TestPagingNoOrderBySilentWithoutAnEnvelope is REQ-164 § Acceptance's nil-
+// TestPagingNoOrderBySilentWithoutAnEnvelope is REQ-161 § Acceptance's nil-
 // Query near miss: with no envelope supplied the envelope arm cannot fire,
 // exactly as it leaves the parameter-binding checks unable to. A zero-VALUED
 // envelope is the same answer for the same reason — Fetch and Offset unset
@@ -213,7 +213,7 @@ func TestPagingNoOrderBySilentWithoutAnEnvelope(t *testing.T) {
 	}
 }
 
-// TestPagingNoOrderBySilentOnATopOnlyBound is REQ-164 § No double-reporting:
+// TestPagingNoOrderBySilentOnATopOnlyBound is REQ-161 § No double-reporting:
 // a query whose ONLY row bound is the deprecated TOP clause keeps
 // aql_deprecated_top, which already carries the ORDER BY remedy, and does not
 // also collect this code — one defect gets one finding.
@@ -263,7 +263,7 @@ func TestSelectNoAliasFiresOncePerUnaliasedItem(t *testing.T) {
 	}
 }
 
-// TestSelectNoAliasFiresOnABareAlias pins REQ-164 § Path-shape checks'
+// TestSelectNoAliasFiresOnABareAlias pins REQ-161 § Path-shape checks'
 // explicit non-exemption: `SELECT o` names no column either, and the engine
 // picks that column's name as freely as it picks a path's.
 func TestSelectNoAliasFiresOnABareAlias(t *testing.T) {
@@ -336,7 +336,7 @@ func TestSelectNoAliasOrdinalCountsTheStar(t *testing.T) {
 }
 
 // TestSelectNoAliasFiresOnTheFixtureProjections is the PROBE-028 re-baseline
-// recorded at the unit level (REQ-164 § Additivity): both fixture queries
+// recorded at the unit level (REQ-161 § Additivity): both fixture queries
 // project a column with no AS alias, so each genuinely carries this defect and
 // gains exactly this code. probe028Cases carries the same fact at the probe
 // level; this row is what fails first if the rule behind it moves.
@@ -386,7 +386,7 @@ func TestSelectNoAliasSilentOnAliasedProjection(t *testing.T) {
 }
 
 // TestSelectNoAliasSilentOnAStarItem is the `*` near miss: there is nothing to
-// alias, and REQ-164 § No double-reporting gives that shape to REQ-109's
+// alias, and REQ-161 § No double-reporting gives that shape to REQ-109's
 // aql_select_star. Both spellings of a star are covered — the bare form, which
 // carries no projection item at all, and the mixed form, which does.
 func TestSelectNoAliasSilentOnAStarItem(t *testing.T) {
@@ -408,7 +408,7 @@ func TestSelectNoAliasSilentOnAStarItem(t *testing.T) {
 
 // --- ungated, and OK() ------------------------------------------------------
 
-// TestParseOnlyChecksAreUngated pins REQ-164 § Always on, never gated for the
+// TestParseOnlyChecksAreUngated pins REQ-161 § Always on, never gated for the
 // two parse-only codes: no Options field switches either off. Options.Relation
 // governs neither — neither check consults an RM fact at all — and
 // Options.Query is a CHANNEL for the paging check, never a gate: supplying one

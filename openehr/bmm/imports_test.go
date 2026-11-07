@@ -7,7 +7,7 @@ import (
 )
 
 // TestBMMForbiddenImports guards REQ-013 (docs/specifications/module-layout.md
-// § REQ-013) and REQ-045 (docs/specifications/bmm-conformance.md § REQ-045)
+// § REQ-013) and REQ-045 (docs/specifications/reference-model.md § REQ-045)
 // for openehr/bmm: validators, archetype tools and code generators import the
 // loader without transport, auth or any HTTP machinery. Two rules hold for the
 // package and what it pulls in:

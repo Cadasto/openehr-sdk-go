@@ -540,7 +540,7 @@ func TestListStoredQueriesEmptyJSONArray(t *testing.T) {
 }
 
 // TestListStoredQueriesZoneLessSaved pins the `saved` arm of the tolerance
-// — the keyed REQ-095 exception, since `saved` is pinned `format:
+// — the keyed REQ-050 exception, since `saved` is pinned `format:
 // date-time`: a zone-less value decodes as UTC rather than failing the
 // whole list (REQ-144).
 func TestListStoredQueriesZoneLessSaved(t *testing.T) {

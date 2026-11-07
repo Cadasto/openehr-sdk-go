@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-// REQ-116 / REQ-106 — the ordinal fallback renames later claimants to the
+// REQ-111 / REQ-106 — the ordinal fallback renames later claimants to the
 // next *free* spelling. A plain per-id counter would rename the third of
 // [x, x2, x] to the already-taken x2 and trip ErrIDCollision on a template
 // the reference can export.

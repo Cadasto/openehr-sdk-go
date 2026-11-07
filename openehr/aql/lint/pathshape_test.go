@@ -1,7 +1,7 @@
 package lint_test
 
-// pathshape_test.go: REQ-164 § Path-shape checks — the repeating-segment
-// check aql_path_repeating_unpredicated, and REQ-164 § The conservative
+// pathshape_test.go: REQ-161 § Path-shape checks — the repeating-segment
+// check aql_path_repeating_unpredicated, and REQ-161 § The conservative
 // segment walk's four silent stops as they are OBSERVABLE from outside the
 // package (each stop's identity is pinned in pathshape_internal_test.go).
 //
@@ -40,7 +40,7 @@ import (
 // The archetype predicates keep aql_from_archetype off these queries, so a
 // count assertion over the whole result stays about the code under test.
 //
-// The three REQ-164 code names are declared here, together, and shared across
+// The three REQ-161 code names are declared here, together, and shared across
 // the group's other test files — pathshape_parseonly_test.go takes pagingCode
 // and aliasCode, pathshape_fanout_test.go takes repCode, and the two archetype
 // ids reach all four files. The group's whole-result assertions name each
@@ -57,7 +57,7 @@ const (
 
 // auditQuery is the audit's verified-silent projection: an
 // unpredicated repeating-segment path over an OBSERVATION alias, which the
-// shipped v0.22.0 linter answered clean (REQ-164 § Acceptance).
+// shipped v0.22.0 linter answered clean (REQ-161 § Acceptance).
 const auditQuery = "SELECT o/data/events/data/items/value/magnitude " +
 	"FROM EHR e CONTAINS OBSERVATION o[" + obsArch + "]"
 
@@ -101,14 +101,14 @@ func spannedSegments(t *testing.T, q string) []string {
 
 // --- Firing rules ------------------------------------------------------------
 
-// TestPathRepeatingUnpredicatedFiresOnTheAuditQuery is REQ-164 § Acceptance's
+// TestPathRepeatingUnpredicatedFiresOnTheAuditQuery is REQ-161 § Acceptance's
 // first named row: the audit's verified-silent projection now warns.
 //
 // ONE finding, on `events`. The path names three further repeating segments in
 // its text, and the walk reaches none of them: `OBSERVATION.data` types to
 // HISTORY (single-valued), `HISTORY.events` to EVENT as a container — this
 // finding — and `EVENT.data` is the BMM generic parameter `T`, where the walk
-// stops (REQ-164 § The conservative segment walk, and
+// stops (REQ-161 § The conservative segment walk, and
 // TestPathRepeatingUnpredicatedStopsAtTheGenericParameter below).
 func TestPathRepeatingUnpredicatedFiresOnTheAuditQuery(t *testing.T) {
 	t.Parallel()
@@ -121,13 +121,13 @@ func TestPathRepeatingUnpredicatedFiresOnTheAuditQuery(t *testing.T) {
 		t.Errorf("span covers %q, want the offending segment %q", seg, "events")
 	}
 	if got[0].Severity != lint.Warning {
-		t.Errorf("severity = %v, want warning (REQ-164 § Path-shape checks)", got[0].Severity)
+		t.Errorf("severity = %v, want warning (REQ-161 § Path-shape checks)", got[0].Severity)
 	}
 	if want := "o/data/events/data/items/value/magnitude"; got[0].Path != want {
 		t.Errorf("Issue.Path = %q, want the offending path %q", got[0].Path, want)
 	}
 	// The whole result, not just this code: the audit query carries exactly
-	// two REQ-164 defects — this one and an unaliased projection — so a third
+	// two REQ-161 defects — this one and an unaliased projection — so a third
 	// finding would mean this group over-reaches. Named in full and in order,
 	// not counted, so a code SWAP fails here too.
 	if want := []string{repCode, aliasCode}; !slices.Equal(codes(res), want) {
@@ -135,7 +135,7 @@ func TestPathRepeatingUnpredicatedFiresOnTheAuditQuery(t *testing.T) {
 	}
 }
 
-// TestPathRepeatingUnpredicatedFiresOnAWhereOnlyPath is REQ-164 § Acceptance's
+// TestPathRepeatingUnpredicatedFiresOnAWhereOnlyPath is REQ-161 § Acceptance's
 // clause-scope witness: the offending path appears ONLY in WHERE. An
 // implementation narrowed to the projection fails here — the SELECT path of
 // this query (`o/name/value`) is entirely single-valued.
@@ -282,12 +282,12 @@ func TestPathRepeatingUnpredicatedValueFreeFields(t *testing.T) {
 	}
 }
 
-// TestPathShapeGroupIsUngated pins REQ-164 § Always on, never gated: the group
+// TestPathShapeGroupIsUngated pins REQ-161 § Always on, never gated: the group
 // runs whenever Layer 2 runs, with no option to enable it. The three Options
 // spellings a caller can reach must all yield the same finding — including a
 // supplied Relation, which governs no ATTRIBUTE question: typing and
 // multiplicity are class facts of the pinned RM, and an overlay edge states a
-// containment ROUTE fact, never an attribute one (REQ-164 § The conservative
+// containment ROUTE fact, never an attribute one (REQ-161 § The conservative
 // segment walk). The group's one route-question code,
 // aql_contains_redundant_step, does read the supplied relation — that is
 // pathshape_redundant_test.go's TestRedundantStepReadsTheSuppliedRelation, and
@@ -323,7 +323,7 @@ func TestPathShapeGroupIsUngated(t *testing.T) {
 	}
 }
 
-// TestPathShapeFindingsKeepResultOK pins REQ-164 § Acceptance's severity row:
+// TestPathShapeFindingsKeepResultOK pins REQ-161 § Acceptance's severity row:
 // a Result carrying only this group's findings reports OK() true, so a
 // consumer that gated on OK() before this group existed sees no change.
 func TestPathShapeFindingsKeepResultOK(t *testing.T) {
@@ -340,14 +340,14 @@ func TestPathShapeFindingsKeepResultOK(t *testing.T) {
 
 // --- Silence rules (one named row per near miss) -----------------------------
 
-// TestPathRepeatingUnpredicatedSilentOnPredicatedSegments is REQ-164
+// TestPathRepeatingUnpredicatedSilentOnPredicatedSegments is REQ-161
 // § Acceptance's predicated-segment near miss. ANY predicate suppresses the
 // finding: presence suffices and content is never judged — whether `[at0006]`
 // is the RIGHT node id is Layer 3's question
 // (aql_path_not_in_template), not this check's.
 //
 // The first row is PROBE-028's valid.aql fixture verbatim, which is why that
-// probe's baseline gains no repeating-segment code (REQ-164 § Additivity; the
+// probe's baseline gains no repeating-segment code (REQ-161 § Additivity; the
 // unaliased-projection code it does gain is pinned in
 // TestSelectNoAliasFiresOnTheFixtureProjections).
 func TestPathRepeatingUnpredicatedSilentOnPredicatedSegments(t *testing.T) {
@@ -455,7 +455,7 @@ func TestPathRepeatingUnpredicatedSilentOnUndeclaredAttribute(t *testing.T) {
 }
 
 // TestPathRepeatingUnpredicatedStopsAtTheGenericParameter is the fourth named
-// silent stop, and REQ-164 § Acceptance names it explicitly: `EVENT.data` is
+// silent stop, and REQ-161 § Acceptance names it explicitly: `EVENT.data` is
 // literally typed `T` on the pinned tables, and the class-graph requirement leaves generic-
 // parameter resolution out of scope, so the walk stops there.
 //

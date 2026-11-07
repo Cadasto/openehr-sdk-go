@@ -11,15 +11,15 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/lint"
 )
 
-// PROBE-099 — the REQ-164 path-shape lint corpus.
+// PROBE-099 — the REQ-161 path-shape lint corpus.
 //
-// PROBE-097's structure MINUS its read/write-parity arm: every REQ-164 code is
+// PROBE-097's structure MINUS its read/write-parity arm: every REQ-161 code is
 // read-side only, so there is no builder analogue for a parity arm to compare
 // against. What is left is arm (a), the per-code firing rows and the negative
 // near misses, and arm (b), the additivity guard that re-runs PROBE-028's
 // fixture corpus.
 //
-// The five REQ-164 codes are spelled here independently of openehr/aql/lint's
+// The five REQ-161 codes are spelled here independently of openehr/aql/lint's
 // own strings, for the reason PROBE-097 spells its codes independently:
 // a probe that imported the constants it is pinning would pass through a rename
 // that broke every consumer.
@@ -31,7 +31,7 @@ const (
 	codeContainsRedundantStep     = "aql_contains_redundant_step"
 )
 
-// pathShapeCodesAll is the full REQ-164 catalogue — arm (a)'s universe. Both
+// pathShapeCodesAll is the full REQ-161 catalogue — arm (a)'s universe. Both
 // arm-(a) runners filter a [lint.Result] down to this set, and both arm-(a)
 // completeness guards enumerate it, so a code dropped from this list is a code
 // PROBE-099 stops demanding corpus rows for. A package-level var for the reason
@@ -39,7 +39,7 @@ const (
 //
 // Arm (b) does NOT consult it: runLintCase (probe_028_aql_lint.go) compares the
 // FULL issue-code multiset against the case's WantCodes, with no filter and no
-// catalogue — which is what makes a gained REQ-164 code visible there as a
+// catalogue — which is what makes a gained REQ-161 code visible there as a
 // baseline break rather than as a silently tolerated addition.
 var pathShapeCodesAll = []string{
 	codePathRepeatingUnpredicated, codePagingNoOrderBy, codeSelectNoAlias,
@@ -262,7 +262,7 @@ type PathShapeCorpus struct {
 // Probe099PathShapeLint runs every row of both arms and aggregates all failures
 // into one [Result] (collect-all, like [Probe097SemanticLint]: a single early
 // failure would hide the rest of the corpus from the report).
-func Probe099PathShapeLint(c PathShapeCorpus) (Result, error) { // PROBE-099 (REQ-164)
+func Probe099PathShapeLint(c PathShapeCorpus) (Result, error) { // PROBE-099 (REQ-161)
 	r := Result{Probe: "PROBE-099"}
 	if len(c.Fire) == 0 || len(c.Silent) == 0 || len(c.Additivity) == 0 {
 		return r, errors.New("PROBE-099: all three corpus fields (Fire, Silent, Additivity) are required")
@@ -286,7 +286,7 @@ func Probe099PathShapeLint(c PathShapeCorpus) (Result, error) { // PROBE-099 (RE
 		}
 	}
 	// The per-code coverage guard, mirroring PROBE-097's: a Fire row deleted
-	// from the corpus (or never added for a new REQ-164 code) leaves this probe
+	// from the corpus (or never added for a new REQ-161 code) leaves this probe
 	// green as long as the surviving rows still pass on their own — the
 	// len(c.Fire) == 0 check above only catches an EMPTY corpus.
 	for _, code := range pathShapeCodes() {
@@ -299,7 +299,7 @@ func Probe099PathShapeLint(c PathShapeCorpus) (Result, error) { // PROBE-099 (RE
 			failures = append(failures, fmt.Sprintf("fire: no fire case claims the %q row; the PROBE-099 wire assertion names it explicitly", row))
 		}
 	}
-	// REQ-164 § Acceptance's severity row, enforced rather than assumed: a
+	// REQ-161 § Acceptance's severity row, enforced rather than assumed: a
 	// Result carrying ONLY this group's findings reports OK() true. Each fire
 	// row asserts it for itself when its whole result is group-only
 	// ([runPathShapeFire]); this is the guard that at least one row IS, so the
@@ -325,7 +325,7 @@ func Probe099PathShapeLint(c PathShapeCorpus) (Result, error) { // PROBE-099 (RE
 	// The mirror of the fire coverage guard, for the half of arm (a) that
 	// asserts SILENCE — the half that can go dark quietly, since a deleted near
 	// miss leaves every surviving row passing on its own. An over-firing linter
-	// MUST NOT ship green (REQ-164 § Acceptance, and the REQ-119 lesson it
+	// MUST NOT ship green (REQ-161 § Acceptance, and the REQ-119 lesson it
 	// cites), which a firing-only corpus cannot tell.
 	for _, code := range pathShapeCodes() {
 		if !silentCodes[code] {
@@ -340,10 +340,10 @@ func Probe099PathShapeLint(c PathShapeCorpus) (Result, error) { // PROBE-099 (RE
 
 	for _, tc := range c.Additivity {
 		// runLintCase (probe_028_aql_lint.go) is the additivity guard itself: it
-		// asserts the FULL issue-code multiset, so a REQ-164 code gained on a
-		// fixture that carries no REQ-164 defect breaks the baseline here. The
+		// asserts the FULL issue-code multiset, so a REQ-161 code gained on a
+		// fixture that carries no REQ-161 defect breaks the baseline here. The
 		// codes two of these fixtures DO gain are a deliberate, recorded
-		// re-baseline (REQ-164 § Additivity, recorded in conformance.md's
+		// re-baseline (REQ-161 § Additivity, recorded in conformance.md's
 		// PROBE-099 entry) — a change to what the caller passes in, not to what
 		// this guard does.
 		if msg := runLintCase(tc); msg != "" {
@@ -379,8 +379,8 @@ func pathShapeOptions(fetch, offset int, rel *contain.TypeRelation) *lint.Option
 
 // runPathShapeFire runs one arm-(a) firing row.
 //
-// groupOnly reports whether the row's WHOLE result was REQ-164 findings — which
-// is the condition under which this row could assert REQ-164 § Acceptance's
+// groupOnly reports whether the row's WHOLE result was REQ-161 findings — which
+// is the condition under which this row could assert REQ-161 § Acceptance's
 // OK() claim, and which the caller counts so the claim cannot go untested
 // corpus-wide.
 func runPathShapeFire(tc PathShapeFireCase) (msg string, groupOnly bool) {
@@ -420,13 +420,13 @@ func runPathShapeFire(tc PathShapeFireCase) (msg string, groupOnly bool) {
 			return fmt.Sprintf("%s span = %+v, want %+v (on %q)", tc.Code, iss.Span, want, tc.SpanText), false
 		}
 	}
-	// Group-only means every finding in the result belongs to REQ-164, which is
-	// the shape REQ-164 § Acceptance's OK() claim is about. Where a code from
+	// Group-only means every finding in the result belongs to REQ-161, which is
+	// the shape REQ-161 § Acceptance's OK() claim is about. Where a code from
 	// the static lint or the semantic and portability lint rides along, OK() is
 	// that code's business and this row says nothing about it.
 	groupOnly = len(res.Issues) == len(got)
 	if groupOnly && !res.OK() {
-		return "OK() = false on a result carrying only REQ-164 findings; every code in the group is Warning", true
+		return "OK() = false on a result carrying only REQ-161 findings; every code in the group is Warning", true
 	}
 	return "", groupOnly
 }
@@ -441,7 +441,7 @@ func runPathShapeFire(tc PathShapeFireCase) (msg string, groupOnly bool) {
 func runPathShapeSilent(tc PathShapeSilentCase) string {
 	res := lint.LintString(tc.Query, pathShapeOptions(tc.Fetch, tc.Offset, tc.Relation))
 	if code := layer1Code(res); code != "" {
-		return fmt.Sprintf("query never reached the REQ-164 checks (%s): a silence row MUST assert silence on a query that actually linted, not on one Layer 1 rejected (query %q)",
+		return fmt.Sprintf("query never reached the REQ-161 checks (%s): a silence row MUST assert silence on a query that actually linted, not on one Layer 1 rejected (query %q)",
 			code, tc.Query)
 	}
 	got := filterCodes(res, pathShapeCodes())

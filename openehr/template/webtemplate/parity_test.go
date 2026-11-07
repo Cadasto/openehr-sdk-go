@@ -21,7 +21,7 @@ const referenceDir = "../../../testkit/corpus/webtemplate"
 // stem — the historical single oracle, kept as the default other tests
 // load. constrain_test pins no template-level node name anywhere, so its
 // golden carries zero name predicates across all 104 nodes, which is why
-// it reached parity before REQ-116 existed. Since REQ-116 landed the
+// it reached parity before REQ-111 existed. Since REQ-111 landed the
 // matrix is parityFixtures (build_test.go): this stem plus the two
 // name-pinning oracles Corona_Anamnese and GECCO_Diagnose.
 const referenceStem = "constrain_test"

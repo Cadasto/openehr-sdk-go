@@ -105,7 +105,7 @@ func TestUpdateAuditMarshalChangeTypeDVCodedText(t *testing.T) {
 // the marshalled payload — it is a server-assigned field and MUST NOT appear
 // on the write path.
 //
-// REQ-095: the pinned OpenAPI UpdateAudit schema leaves time_committed to the
+// REQ-050: the pinned OpenAPI UpdateAudit schema leaves time_committed to the
 // server, so the write payload must not carry it.
 func TestUpdateAuditNoTimeCommitted(t *testing.T) {
 	b, err := json.Marshal(newUpdateAudit())

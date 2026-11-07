@@ -2,18 +2,18 @@
 kind: specification
 ---
 
-# Authentication
+# Authentication and service discovery
 
 **Status:** Draft
 
-Normative contract for the `auth/` package family and the application-level `smart/` package. Covers REQ-060 through REQ-069 (REQ-065 is retired), REQ-165 and REQ-167.
+Normative contract for the `auth/` package family, the application-level `smart/` package and service discovery in `smart/discovery`. Covers REQ-060 to REQ-064, REQ-068, REQ-069, REQ-165 and REQ-167, and discovery's REQ-070 to REQ-073 ([§ Service discovery](#service-discovery)). REQ-065 and REQ-067 are retired, and caller attribution (REQ-066) is in [transport.md](transport.md#req-066--caller-attribution).
 
 The SDK supports authenticated requests through a layered model:
 
 ```
 Application
    └─→ smart/                          (application-level launch context)
-   └─→ auth/<provider>/                (concrete provider — SMART, ClientCreds, JWTBearer)
+   └─→ auth/<provider>/                (concrete provider — SMART, ClientCreds, JWTBearer, Basic)
                   └─→ auth/            (generic TokenSource + OAuth2 primitives)
 ```
 
@@ -21,10 +21,10 @@ The boundary between layers is **the generic `TokenSource` abstraction** — pro
 
 ## Canonical sources
 
-The SMART-on-openEHR authentication model in this SDK is derived from two primary specifications:
+The SMART-on-openEHR authentication and discovery model in this SDK is derived from two primary specifications:
 
-- **openEHR SMART App Launch** — [https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html](https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html) — defines openEHR-specific extensions: the `services` discovery map, `launch/patient`, `launch/episode`, `ehrId`, `episodeId` claims, and the `org.openehr.rest` service identifier.
-- **HL7 FHIR SMART App Launch v2.2** — [https://hl7.org/fhir/smart-app-launch/](https://hl7.org/fhir/smart-app-launch/) — defines the PKCE flow, scopes and launch context (including `offline_access`, `online_access`, `launch`, `launch/patient`), client-confidential-asymmetric (`private_key_jwt`), Backend Services, and JWKS rotation.
+- **openEHR SMART App Launch** — [https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html](https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html) — defines openEHR-specific extensions: the SMART discovery document's shape for openEHR deployments with its `services` map, `launch/patient`, `launch/episode`, the `ehrId` and `episodeId` claims, and the `org.openehr.rest` service identifier.
+- **HL7 FHIR SMART App Launch v2.2** — [https://hl7.org/fhir/smart-app-launch/](https://hl7.org/fhir/smart-app-launch/) — defines the `/.well-known/smart-configuration` endpoint and its metadata fields, the PKCE flow, scopes and launch context (including `offline_access`, `online_access`, `launch`, `launch/patient`), client-confidential-asymmetric (`private_key_jwt`), Backend Services, and JWKS rotation.
 
 See also [ADR 0009](../adr/0009-smart-auth-library-scope.md) for the dependency and library-scope decisions underpinning this implementation.
 
@@ -66,7 +66,7 @@ Rules:
 
 Printing or logging a value of the `auth/` packages, of `smart`, of `smart/discovery` or of `transport` that holds a credential **MUST NOT** show the credential, with any `fmt` verb (`%v`, `%+v`, `%#v`, `%s` and `%d` included) or any `log/slog` handler. This covers `auth.Token` and the source `auth.StaticTokenSource` returns; `Config`, `TokenResponse` (with the token members of its `Raw`), `TokenChange`, `PKCEPair`, `AuthorizationRequest` and `*Source` in `auth/smart`; `Config` and `*Source` in `auth/clientcreds`; `Config`, `*ClaimsSigner` and `*Source` in `auth/jwtbearer`; `*Source` in `auth/basic`; `*LaunchContext` and `*PrincipalIdentity` in `smart` (with the token members of their `Raw`); `*Client` in `transport`, which shows only the base URL of its catalog, never its token source or reauther; and `*ServiceCatalog`, `ServiceEntry`, `AuthEndpoints` and `StaticConfig` in `smart/discovery`, whose credential is the password a URL they hold can carry. A credential that is set prints as `[redacted]`, an empty one as empty, and the password in any URL the type holds, in a field or in the `iss`, `fhirUser` or `smart_style_url` member of a `Raw`, is masked; a token member of a `smart` `Raw` prints as `[redacted]` whenever it is present. The other fields, such as the token type, expiry, scope, issuer, client ID and URLs, stay visible. `fmt` answers `%p` without calling a method, so `%p` of a value that is not a pointer prints its fields and is outside this rule. A `smart.LaunchContext` or `smart.PrincipalIdentity` value copied out of its pointer prints as the pointer does, but the `log/slog` JSON handler encodes its fields, tokens included, so logging such a value through that handler is outside this rule too: log the pointer. The JSON encoding of these types is unchanged and carries the credential, so an application can store a token, a `TokenChange` or an `AuthorizationRequest` and read it back.
 
-The coalesced refresh in `auth/smart`, `auth/clientcreds` and `auth/jwtbearer` is race-free: the goroutine that refreshes stores the token before it closes the channel the other callers wait on, so under the Go memory model every waiter reads the stored result. A waiter whose own context is still live tries again when the refresh panicked, and, in `auth/clientcreds` and `auth/jwtbearer`, when it failed only because the refreshing caller's context ended ([idiom.md § Concurrency](idiom.md#concurrency-req-026)). The refresh of `auth/smart` runs on a goroutine of its own that the starting caller's context does not end ([§ REQ-063](#req-063--token-refresh)), so it does not fail that way. Discovery resolution (`smart/discovery`) coalesces the same way.
+The coalesced refresh in `auth/smart`, `auth/clientcreds` and `auth/jwtbearer` is race-free: the goroutine that refreshes stores the token before it closes the channel the other callers wait on, so under the Go memory model every waiter reads the stored result. When a waiter tries again is [idiom.md § Concurrency (REQ-026)](idiom.md#concurrency-req-026)'s rule.
 
 #### Credential-bearing requests
 
@@ -74,7 +74,7 @@ The token, refresh and revocation requests of `auth/smart`, `auth/clientcreds` a
 
 The SDK sends each of these requests with a copy of the injected client whose redirect policy returns a 3xx response instead of following it, and leaves the injected client as it is. The copy keeps the injected client's `Transport`, `Jar` and `Timeout`, so it stays within [REQ-021](idiom.md#http-client-injection-req-021).
 
-### Provider sub-packages
+#### Provider sub-packages
 
 `auth/` does not contain provider implementations. Each provider is a sub-package, as [module-layout.md § Boundary rules](module-layout.md#boundary-rules) lays out:
 
@@ -87,7 +87,7 @@ The SDK sends each of these requests with a copy of the injected client whose re
 
 Further providers, such as plain OIDC or a session cookie, can be added as sub-packages without changing the `TokenSource` contract.
 
-### Per-request TokenSource
+#### Per-request TokenSource
 
 Some use cases — most notably an MCP server forwarding an incoming caller's token — need to attach a per-request `TokenSource` rather than configuring one at client-construction time:
 
@@ -98,6 +98,43 @@ func TokenSourceFromContext(ctx context.Context) (TokenSource, bool)
 ```
 
 The `transport/` package **MUST** check the context for a per-request `TokenSource` and prefer it over the client-default `TokenSource` when present.
+
+#### Error mapping
+
+Auth errors **MUST** surface as typed sentinels. The shared classes live in
+package `auth`, and the SMART-launch sentinels in package `auth/smart`:
+
+```go
+// package auth — shared across all providers
+var (
+    ErrInvalidConfig        = errors.New("auth: invalid configuration")
+    ErrTokenExchangeFailed  = errors.New("auth: token exchange failed")
+    ErrRefreshFailed        = errors.New("auth: token refresh failed")
+    ErrReauthRequired       = errors.New("auth: re-authentication required")
+    ErrJWKSValidationFailed = errors.New("auth: JWKS validation failed")
+    ErrInvalidScope         = errors.New("auth: invalid scope") // REQ-165
+    ErrRevocationFailed     = errors.New("auth: token revocation failed")
+)
+
+// package smart — SMART App Launch specific
+var (
+    ErrLaunchInvalidState     = errors.New("SMART launch: state mismatch")
+    ErrLaunchIssuerMismatch   = errors.New("SMART launch: authorization response issuer mismatch")
+    ErrAuthorizationRejected  = errors.New("SMART launch: authorization rejected")
+    ErrLaunchIssuerNotAllowed = errors.New("SMART launch: issuer not allowed")
+    ErrLaunchInvalidRequest   = errors.New("SMART launch: invalid launch request")
+)
+```
+
+A PKCE `code_verifier` mismatch is **not** a separate client-side sentinel: the
+verifier is sent to the token endpoint, and a mismatch is rejected **server-side**,
+surfacing as `auth.ErrTokenExchangeFailed`. Token-exchange, refresh and revocation failures
+are wrapped in `*auth.ExchangeError`, which carries the HTTP `StatusCode`, the
+parsed RFC 6749 `OAuth2` envelope, and a `Terminal()` predicate (4xx
+`invalid_grant`/`invalid_client`/`invalid_token`) that drives refresh-token
+clearing (REQ-063).
+
+Consumers detect classes with `errors.Is`, and read the status and the OAuth2 error with `errors.AsType[*auth.ExchangeError]`.
 
 ## SMART flows
 
@@ -217,7 +254,7 @@ The launch mode follows from the configuration at construction time. An applicat
 
 The flow (standalone launch, summarised):
 
-1. **Discovery.** Fetch the SMART configuration document from the Platform base URL's well-known URL (see [service-discovery.md](service-discovery.md)). Extract `authorization_endpoint`, `token_endpoint`, `jwks_uri`, `registration_endpoint` (if dynamic registration is used), and `scopes_supported`.
+1. **Discovery.** Fetch the SMART configuration document from the Platform base URL's well-known URL (see [§ Service discovery](#service-discovery)). Extract `authorization_endpoint`, `token_endpoint`, `jwks_uri`, `registration_endpoint` (if dynamic registration is used), and `scopes_supported`.
 2. **PKCE pair.** Generate a `code_verifier` (cryptographically random, 43–128 chars per RFC 7636) and derive `code_challenge` = `S256(code_verifier)`.
 3. **Authorization request.** Redirect the user to `authorization_endpoint` with `response_type=code`, `client_id`, `redirect_uri`, `scope` (for openEHR resources, the [REQ-165](#req-165--openehr-scope-syntax) shape `<compartment>/<resource>-<pattern>.<permissions>`, e.g. `patient/composition-*.rs`), `aud` (the Platform base URL, which is the `iss` of an embedded launch, or an explicit audience identifier), `state`, `code_challenge`, `code_challenge_method=S256`, plus SMART-specific `launch` parameter if EHR-launch.
 4. **Authorization response.** Receive the redirect at the redirect URI and complete it with `CompleteAuthorization` (§ Completing the authorization below), which checks `state`, the RFC 9207 `iss` and an error response before any token-endpoint call.
@@ -251,7 +288,7 @@ When `AuthorizeURL` is given a `launch` value, the request's `scope` **MUST** co
 
 #### Embedded launch
 
-`auth/smart` **MUST** provide `ParseEHRLaunch(query url.Values, allow func(iss string) bool) (EHRLaunch, error)`, which reads the `iss` and `launch` parameters a Launcher appends to the app's launch URL. It **MUST** fail with `ErrLaunchInvalidRequest` when `iss` is missing or not an absolute URL with a host, or `launch` is missing, without consulting `allow`. Otherwise it **MUST** fail with `ErrLaunchIssuerNotAllowed` when `allow` is nil or returns false for `iss`, so a client never resolves discovery for a Platform it has not chosen to trust. `EHRLaunch.Issuer` is the Platform base URL to resolve ([service-discovery.md § REQ-070](service-discovery.md#req-070)), and the caller passes `EHRLaunch.Launch` unchanged to `AuthorizeURL`.
+`auth/smart` **MUST** provide `ParseEHRLaunch(query url.Values, allow func(iss string) bool) (EHRLaunch, error)`, which reads the `iss` and `launch` parameters a Launcher appends to the app's launch URL. It **MUST** fail with `ErrLaunchInvalidRequest` when `iss` is missing or not an absolute URL with a host, or `launch` is missing, without consulting `allow`. Otherwise it **MUST** fail with `ErrLaunchIssuerNotAllowed` when `allow` is nil or returns false for `iss`, so a client never resolves discovery for a Platform it has not chosen to trust. `EHRLaunch.Issuer` is the Platform base URL to resolve ([§ REQ-070](#req-070)), and the caller passes `EHRLaunch.Launch` unchanged to `AuthorizeURL`.
 
 ### REQ-062 — JWKS rotation
 
@@ -339,7 +376,7 @@ type ReautherFunc func(ctx context.Context) error
 func (f ReautherFunc) Reauth(ctx context.Context) error { return f(ctx) }
 ```
 
-It lets a closure, such as a discovery-catalog refresh ([service-discovery.md § REQ-071](service-discovery.md#req-071)), serve as a `Reauther` without `transport/` importing `smart/discovery`.
+It lets a closure, such as a discovery-catalog refresh ([§ REQ-071](#req-071)), serve as a `Reauther` without `transport/` importing `smart/discovery`.
 
 #### Transport 401 hook
 
@@ -415,15 +452,13 @@ A refresh response can leave members out: OpenID Connect Core 1.0 §12.2 lets a 
 
 The `EHRID` and `EpisodeID` fields are populated from the `ehrId` and `episodeId` token claims defined in the canonical openEHR SMART App Launch specification. The SMART-compat extras (`Intent`, `SMARTStyleURL`, `NeedPatientBanner`, `Tenant`) are populated when present. All of these fields are also available untyped via `Raw`.
 
-## Platform principal claims
-
-### REQ-067
+#### Platform principal claims
 
 When the token-endpoint response or ID token carries platform-issued principal claims, the SDK **MUST** surface them on `LaunchContext` (or the equivalent for non-SMART providers) verbatim:
 
 ```go
 type LaunchContext struct {
-    // ... fields from REQ-064 above ...
+    // ... the fields above ...
 
     // Platform-issued principal claims (when present; nil when absent).
     Principal *PrincipalIdentity
@@ -445,47 +480,11 @@ const (
 )
 ```
 
-Rules:
+Its rules:
 
 - The SDK **MUST NOT** coerce the principal type — if the claim is missing or carries an unrecognised value, `Type` is `PrincipalTypeUnknown` and consumers handle it.
 - The SDK **MUST NOT** invent a `Principal` value when no claim is present — `LaunchContext.Principal` is `nil` in that case.
 - Claim names (`principal_uid`, `principal_type`) are configurable via `smart.WithPrincipalClaimNames(...)` when building a `LaunchContext`. Principal claims are read from the validated ID token when present, otherwise from the token-endpoint JSON body (`TokenResponse.Raw`).
-
-## AI caller attribution
-
-### REQ-066
-
-When the SDK is consumed by an AI-facing surface (MCP server, agent integration), the consumer can record AI-mediated provenance on outgoing requests: which agent identifier acted, which model provider was involved, the upstream trace context.
-
-The SDK **MUST** provide an opt-in carriage path for this metadata. Two equivalent shapes:
-
-```go
-// Functional option at client construction.
-client, _ := transport.New(catalog,
-    transport.WithCallerAttribution(transport.CallerAttribution{
-        AgentID:       "mcp-claude-code/1.2.0",
-        ModelProvider: "anthropic",
-        // additional opaque attributes
-        Attributes: map[string]string{"orchestrator": "ralph-loop"},
-    }),
-)
-
-// Per-request via context (preferred for MCP servers handling diverse calls).
-ctx = transport.WithCallerAttributionCtx(ctx, transport.CallerAttribution{...})
-```
-
-Transport carriage:
-
-- The SDK **MUST** emit the attribution metadata as both:
-  - A configurable HTTP header (default: `X-Cadasto-Caller-Attribution`, value: JSON-encoded), and
-  - OTel span attributes (`caller.agent_id`, `caller.model_provider`, `caller.*`).
-- The mechanism **MUST** be **opt-in** — no defaults are sent automatically.
-- The SDK **MUST NOT** add a claim about the user to the attribution metadata.
-- Callers **SHOULD NOT** put personally identifying claims about the *user* in the attribution metadata, because it travels as a plain header and as span attributes into logs and traces; the user's identity flows through the token and claim path, not through caller attribution.
-
-This is the SDK's contribution to platform-side audit. The platform decides what to do with the metadata.
-
-## Per-client binding
 
 ## HTTP Basic on openEHR REST
 
@@ -523,9 +522,9 @@ client, _ := transport.New(catalog, transport.WithTokenSource(ts), ...)
 `auth/clientcreds` and `auth/jwtbearer` are simpler — no interactive flow, no launch context. They:
 
 - Implement `auth.TokenSource`.
-- Accept configuration via [functional options](idiom.md#functional-options): client ID, client secret (or signing key), token endpoint, scope, audience.
+- Take the token endpoint and the client's credential as arguments of `New` (`clientcreds.New(clientID, clientSecret, tokenURL, …)`, `jwtbearer.New(tokenURL, assertion, …)`), and further configuration, such as scope, audience or a client assertion source, as [functional options](idiom.md#functional-options).
 - Coalesce concurrent refreshes (REQ-026).
-- Map wire-level auth errors onto the `transport/` error hierarchy.
+- Report a failed token request as an `*auth.ExchangeError`, matched by the `auth` sentinels of [§ Error mapping](#error-mapping).
 
 ## Scope handling
 
@@ -564,42 +563,267 @@ func ParseOpenEHRScope(token string) (OpenEHRScope, bool)
 
 `ParseOpenEHRScope` **MUST** read one token with the same grammar: the compartment ends at the first `/`, the permissions start after the last `.`, and the resource ends at the first `-`, so dotted template ids and query names (`org.openehr::bloodpressure.v1`) survive. It **MUST** return `false`, never an error, for a token that is not an openEHR resource scope, such as `openid`, `launch/patient` or the SMART on FHIR scope `patient/Observation.rs`. `Token` and `ParseOpenEHRScope` **MUST NOT** interpret the wildcards in a pattern; their matching rules belong to the authorization server.
 
-## Error mapping
+## Service discovery
 
-Auth errors **MUST** surface as typed sentinels. The shared classes live in
-package `auth`, and the SMART-launch sentinels in package `auth/smart`:
+How the SDK resolves service base URLs from a SMART-on-openEHR deployment, and how non-discovering backends are supported.
+
+A SMART-on-openEHR deployment advertises **service base URLs** via a discovery document (canonical spec: [ITS-REST/development § SMART App Launch](https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html)). The relevant service identifiers for this SDK include `org.openehr.rest` (the openEHR REST API) plus deployment-specific identifiers for Cadasto Extra, Datamap, Admin, and other extras. On a Cadasto deployment, the same discovery document advertises **`org.openehr.rest`** *and* **`org.fhir.rest`** — the openEHR-side SDK consumes the former and ignores the latter, while a FHIR-side SDK does the reverse.
+
+The SDK treats discovery as a **first-class step**, not an implementation detail of constructor convenience.
+
+### ServiceCatalog
+
+#### REQ-070
+
+SDK constructors **MUST** accept a `smart/discovery.ServiceCatalog`, not a single base URL:
 
 ```go
-// package auth — shared across all providers
-var (
-    ErrInvalidConfig        = errors.New("auth: invalid configuration")
-    ErrTokenExchangeFailed  = errors.New("auth: token exchange failed")
-    ErrRefreshFailed        = errors.New("auth: token refresh failed")
-    ErrReauthRequired       = errors.New("auth: re-authentication required")
-    ErrJWKSValidationFailed = errors.New("auth: JWKS validation failed")
-    ErrInvalidScope         = errors.New("auth: invalid scope") // REQ-165
-    ErrRevocationFailed     = errors.New("auth: token revocation failed")
+// sketch
+package discovery
+
+import (
+    "context"
+    "net/url"
+    "time"
 )
 
-// package smart — SMART App Launch specific
-var (
-    ErrLaunchInvalidState     = errors.New("SMART launch: state mismatch")
-    ErrLaunchIssuerMismatch   = errors.New("SMART launch: authorization response issuer mismatch")
-    ErrAuthorizationRejected  = errors.New("SMART launch: authorization rejected")
-    ErrLaunchIssuerNotAllowed = errors.New("SMART launch: issuer not allowed")
-    ErrLaunchInvalidRequest   = errors.New("SMART launch: invalid launch request")
-)
+// ServiceCatalog is the resolved set of service base URLs for a SMART-on-openEHR
+// deployment, plus metadata for caching and refresh.
+type ServiceCatalog struct {
+    BaseURL    string                  // Platform base URL: the discovery root, and the "iss" of an embedded launch
+    Issuer     string                  // OIDC issuer: the document's "issuer", or BaseURL when the document declares none
+    Services   map[string]ServiceEntry // keyed by service identifier (e.g. "org.openehr.rest")
+    Auth       AuthEndpoints           // authorization_endpoint, token_endpoint, jwks_uri, registration_endpoint
+    ResolvedAt time.Time               // when the catalog was resolved
+    ExpiresAt  time.Time               // TTL deadline; zero = no TTL declared by source
+    ETag       string                  // for conditional refresh
+}
+
+type ServiceEntry struct {
+    ID            string   // canonical identifier (e.g. "org.openehr.rest")
+    BaseURL       *url.URL // resolved base URL
+    Version       string   // the entry's "version" member, verbatim
+    SpecVersion   string   // the non-canonical "spec_version" member, verbatim (tolerated, ADR 0008)
+    Description   string   // the entry's "description" member, verbatim
+    Documentation string   // the entry's "documentation" member, verbatim
+    OpenAPI       string   // the entry's "openapi" member, verbatim
+    Capabilities  []string // optional capability flags
+}
+
+type AuthEndpoints struct {
+    AuthorizationEndpoint *url.URL
+    TokenEndpoint         *url.URL
+    JWKSURI               *url.URL
+    RegistrationEndpoint  *url.URL // optional
+    // Optional endpoints — nil when absent; no error.
+    IntrospectionEndpoint *url.URL // RFC 7662; surfaced, not consumed
+    RevocationEndpoint    *url.URL // RFC 7009
+    ManagementEndpoint    *url.URL // SMART management endpoint
+    ScopesSupported       []string
+    ResponseTypesSupported []string
+    CodeChallengeMethodsSupported []string
+    GrantTypesSupported   []string
+    TokenEndpointAuthMethodsSupported          []string // auth/smart cross-check; NewFromCatalog method check (REQ-068)
+    TokenEndpointAuthSigningAlgValuesSupported []string // auth/smart and NewFromCatalog client-assertion alg check (REQ-068)
+    IDTokenSigningAlgValuesSupported           []string // ID-token verify allowlist, consumed by ValidateIDToken (REQ-062, REQ-064)
+    AuthorizationResponseIssParameterSupported bool     // RFC 9207 authorization_response_iss_parameter_supported (REQ-061)
+    Capabilities []string
+}
 ```
 
-A PKCE `code_verifier` mismatch is **not** a separate client-side sentinel: the
-verifier is sent to the token endpoint, and a mismatch is rejected **server-side**,
-surfacing as `auth.ErrTokenExchangeFailed`. Token-exchange, refresh and revocation failures
-are wrapped in `*auth.ExchangeError`, which carries the HTTP `StatusCode`, the
-parsed RFC 6749 `OAuth2` envelope, and a `Terminal()` predicate (4xx
-`invalid_grant`/`invalid_client`/`invalid_token`) that drives refresh-token
-clearing (REQ-063).
+`AuthEndpoints.Clone()` **MUST** return a copy that shares nothing with its receiver: each URL is a new value, its user information included, and each list a new slice, so an edit to one cannot reach the other. `NewStaticCatalog` **MUST** copy `StaticConfig.Auth` this way.
 
-Consumers detect classes via `errors.Is`. The underlying wire error is preserved via `errors.Unwrap`.
+Every typed client (`openehr/client/ehr`, `openehr/client/query`, `cadasto/extra`, etc.) resolves its base URL from the catalog by service ID, not from a top-level "base URL" config field.
+
+The catalog **MUST** carry the Platform base URL and the OIDC issuer as two values ([ADR 0023](../adr/0023-smart-platform-base-url-and-oidc-issuer.md)). `BaseURL` is the URL the document was resolved from: in SMART App Launch the embedded-launch `iss` parameter names this API base, not the OIDC issuer. `Issuer` is the document's `issuer` member, the value ID tokens are checked against; when the document declares no `issuer`, `Issuer` **MUST** equal `BaseURL`.
+
+Each `ServiceEntry` **MUST** surface the canonical `version`, `description`, `documentation` and `openapi` members of its `services` entry verbatim, empty when absent. The SDK **MUST NOT** fetch or validate the `documentation` and `openapi` links.
+
+##### Hand-built catalogs
+
+For non-discovering openEHR backends (a static EHRbase deployment, a Cadasto deployment with a pinned configuration, a local CDR for testing), consumers **MUST** be able to construct a `ServiceCatalog` directly without going through a discovery transport:
+
+```go
+catalog, err := discovery.NewStaticCatalog(discovery.StaticConfig{
+    Issuer: "https://ehrbase.example/",
+    Services: map[string]discovery.ServiceEntry{
+        "org.openehr.rest": {
+            ID:          "org.openehr.rest",
+            BaseURL:     discovery.MustParseURL("https://ehrbase.example/rest/openehr/v1"),
+            SpecVersion: "1.1.0",
+        },
+    },
+    Auth: discovery.AuthEndpoints{
+        // ... or zero value if backend doesn't use OAuth2
+    },
+})
+if err != nil {
+    return err // a missing Issuer, or a nil or relative service BaseURL
+}
+```
+
+The `NewStaticCatalog` constructor **MUST NOT** require a network round trip; the resulting catalog has `ResolvedAt = time.Now()` and takes `ExpiresAt` from `StaticConfig.ExpiresAt`, so it has no TTL unless the caller sets one. `StaticConfig.BaseURL` is optional: when empty, the catalog's `BaseURL` **MUST** equal `StaticConfig.Issuer`.
+
+### Resolution flow
+
+The full flow when discovery is in play:
+
+1. **Resolve.** On an explicit `(*discovery.Resolver).Resolve(ctx, baseURL)` (the transport only stores the catalog it is given), fetch the SMART configuration document at the Platform base URL's well-known URL, **`<base URL>/.well-known/smart-configuration`**, the well-known path appended to the base URL's own path. Parse it; validate the members REQ-072 requires and the openEHR-REST service catalog.
+2. **Cache.** Store the resolved `ServiceCatalog`. The cache **MAY** be in-process (default), file-backed, or an injected `Cache` interface (for distributed deployments).
+3. **Validate.** Confirm every service the client intends to use is advertised: `org.openehr.rest` for openEHR-REST consumers, the Cadasto-extra services for Cadasto clients ([§ REQ-072](#req-072)). Spec-version compatibility is checked **here**, not after the first request.
+4. **Route.** Each typed client resolves its base URL from the catalog by service ID at request time.
+5. **Refresh.** Triggered by:
+   - TTL expiry (`ExpiresAt` reached).
+   - A `401` on a previously working endpoint, when the consumer wires a catalog refresh into the transport ([§ REQ-071](#req-071)); the request is then retried once.
+   - An explicit call to `(*discovery.Resolver).Refresh(ctx, baseURL)` ([§ Refresh API](#refresh-api)).
+
+### Caching
+
+#### REQ-071
+
+The discovery cache **MUST**:
+
+- Honour the TTL declared in the discovery response. The declared TTL follows [RFC 9111](https://www.rfc-editor.org/rfc/rfc9111.html): it is 0 when `Cache-Control` carries `no-store` or `no-cache`, else the `Cache-Control` `max-age` in seconds, else the time from `Date`, or from receipt without one, to `Expires`, where a past or invalid `Expires` declares 0; a TTL of 0 leaves the entry stale at once. When the response declares none, a default TTL applies, which **SHOULD** be 15 minutes, so a change a Platform makes to its document reaches its clients within that time.
+- Honour `ETag` / `If-None-Match` for conditional refresh: a `304 Not Modified` to a conditional request renews the cached entry's TTL from the TTL the `304` declares, or the default when it declares none, without replacing the body, and a `304 Not Modified` to a request without `If-None-Match` is a failed fetch ([§ Refresh API](#refresh-api)).
+- Coalesce concurrent resolution attempts (REQ-026): one caller fetches and the others wait. A caller **MUST** get an error that `errors.Is` matches to its own context's error when that context ends while it waits on a fetch another caller started, or when its context's end alone fails the fetch it started. Such a failure of the starting caller's context, or a panic in the fetch or in the `Cache` call that records its result, **MUST NOT** fail the callers that joined the fetch, nor make the resolver write or drop the cached entry, since it says nothing about the Platform: each joined caller whose own context is still live fetches again. The panic **MUST** reach the caller that started the fetch unchanged and leave no caller for that base URL waiting.
+- Key every entry by the Platform base URL the caller resolved, never by the document's `issuer` ([ADR 0023](../adr/0023-smart-platform-base-url-and-oidc-issuer.md)). A cached catalog whose `BaseURL` is not the base URL it is found under **MUST** be treated as absent: the resolver fetches with a plain request, as on a miss, and the result replaces the entry.
+- Return a fresh cached catalog only once it passes the calling resolver's REQ-072 checks and those REQ-073 checks that send no request (the issuer, the Platform base URL and the auth endpoints' `https` scheme), because one `Cache` may serve resolvers built with different options. A catalog that fails them **MUST** produce the `DiscoveryError` a new document would and stay cached: the failure says nothing new about the Platform. The OIDC cross-check is not run on a fresh hit; it runs when the document is fetched or renewed (REQ-073).
+
+**Known gap.** Through a shared `Cache`, a catalog that a resolver built with `WithoutOpenIDConfigurationCheck()` cached reaches a resolver that requires the OIDC cross-check unchecked, until the entry expires or is refreshed. Entries are keyed by the Platform base URL alone, so a catalog fetched from one resolver's `WithWellKnownPath` document likewise reaches a resolver configured with another path.
+
+The resolver closes the response body whatever the status, the `304` path included.
+
+The cache is refreshed on a wire `401` only when the consumer wires it, by passing an `auth.ReautherFunc` closure to `transport.WithReauthOn401`:
+
+```go
+transport.WithReauthOn401(auth.ReautherFunc(func(ctx context.Context) error {
+    _, err := resolver.Refresh(ctx, baseURL)
+    return err
+}))
+```
+
+The transport then calls the closure at most once per `Do` call and retries the request once; on a second `401` it surfaces `transport.ErrUnauthorized` ([§ REQ-063](#req-063--token-refresh)).
+
+Cache implementation:
+
+- The default cache is in-process.
+- A `Cache` interface **MAY** be injected for file-backed or distributed caching:
+
+```go
+type Cache interface {
+    Get(ctx context.Context, baseURL string) (*ServiceCatalog, bool)
+    Put(ctx context.Context, baseURL string, c *ServiceCatalog) error
+    Invalidate(ctx context.Context, baseURL string) error
+}
+```
+
+##### Refresh API
+
+Consumers **MUST** be able to trigger a refresh explicitly, with `(*discovery.Resolver).Refresh`:
+
+```go
+catalog, err := resolver.Refresh(ctx, baseURL) // baseURL is the Platform base URL
+```
+
+A refresh **MUST**:
+
+- Send a conditional request (`If-None-Match`) when the cached entry carries an `ETag`, and a plain request when it carries none, keeping that entry in place meanwhile.
+- On a `304 Not Modified` to a conditional request, re-run the REQ-072 checks and the REQ-073 trust checks, the OIDC cross-check included, on the cached document, and renew the cached entry's TTL without replacing its document (REQ-071); on a `200`, re-run the resolve / validate / cache pipeline and replace the entry; on a failure, invalidate the entry, except a failure that only the caller's own cancelled or expired context caused, and a panic (REQ-071). A `304 Not Modified` to a plain request is a failed fetch: no document came back.
+- Return the current catalog (or an error if resolution fails).
+
+A refresh does not hold up other requests beyond the coalescing window: they continue with the cached catalog until the refresh completes or fails. After a failed refresh the next request fetches again and reports the discovery error if that fetch fails too, unless only the refreshing caller's own context ended the refresh, or it panicked; neither of those makes the resolver write or drop the cached entry.
+
+### Validation
+
+#### REQ-072
+
+On every resolution and every refresh, the SDK **MUST**:
+
+- Verify required services are present. Missing required services **MUST** produce a typed `DiscoveryError` with the missing service IDs enumerated.
+- Verify spec-version compatibility of each required service; a service the caller does not require is not checked. The compared value is the service entry's `spec_version`. When the entry advertises none (absent or empty), the compared value is the entry's `version` if the caller has narrowed the accepted set with `WithAcceptedSpecVersions`, and otherwise there is none: the entry **MUST** pass, and its `version` **MUST NOT** be compared: absence is acceptable (ADR 0008), and a Platform advertises its own API version in `version`. The compared value **MUST** match the SDK's pinned target (REQ-050) or, when the caller sets `WithAcceptedSpecVersions`, one of the versions it names; that list replaces the pinned target, so a caller who still accepts the pin names it too. A mismatch **MUST** produce a typed `DiscoveryError`.
+- SMART App Launch 2.2.0 lists `token_endpoint` as required, and requires `issuer` when `capabilities` contains `sso-openid-connect`. The anonymous-only relaxation, and passing a document without `issuer`, are the SDK's own choice. A document that declares none of `authorization_endpoint`, `token_endpoint` or `jwks_uri`, and advertises none of `launch-ehr`, `launch-standalone` or `sso-openid-connect`, is an anonymous-only deployment and **MUST** pass. Otherwise `token_endpoint` **MUST** be present; `authorization_endpoint` **MUST** be present when `capabilities` contains `launch-ehr` or `launch-standalone`; `jwks_uri` **MUST** be present when `capabilities` contains `sso-openid-connect`. A document that omits a member it needs **MUST** produce `DiscoveryError{Reason: ReasonAuthEndpointsMissing}`. No other member is needed, and this rule **MUST NOT** refuse a document for any other missing member: neither a missing `issuer`, even with `sso-openid-connect`, nor a missing `authorization_endpoint` on a backend-only document.
+- Validate URL well-formedness. Malformed `BaseURL` / `AuthorizationEndpoint` / etc. **MUST** produce a typed `DiscoveryError`.
+
+Soft compatibility (forward-compatible spec micro-versions) **MAY** be allowed via a functional option:
+
+```go
+discovery.WithAcceptedSpecVersions("1.1.0", "1.1.1")
+```
+
+The default is **strict** — only the pinned version is accepted.
+
+---
+
+##### Errors
+
+```go
+type DiscoveryError struct {
+    Issuer          string // the Platform base URL the resolution was for
+    Reason          DiscoveryErrorReason
+    MissingServices []string // with ReasonMissingService
+    SpecVersionGot, SpecVersionWant string // with ReasonSpecVersionMismatch
+    Inner           error
+}
+
+type DiscoveryErrorReason string
+
+const (
+    ReasonFetchFailed          DiscoveryErrorReason = "fetch_failed"
+    ReasonParseError           DiscoveryErrorReason = "parse_error"
+    ReasonMissingService       DiscoveryErrorReason = "missing_service"
+    ReasonSpecVersionMismatch  DiscoveryErrorReason = "spec_version_mismatch"
+    ReasonMalformedURL         DiscoveryErrorReason = "malformed_url"
+    ReasonAuthEndpointsMissing DiscoveryErrorReason = "auth_endpoints_missing"
+    ReasonInsecureURL          DiscoveryErrorReason = "insecure_url"
+    ReasonIssuerMismatch       DiscoveryErrorReason = "issuer_mismatch"
+)
+
+func (e *DiscoveryError) Error() string
+func (e *DiscoveryError) Unwrap() error
+```
+
+Discovery errors **MUST** be distinguishable from wire errors: `errors.AsType[*discovery.DiscoveryError]` matches one, and `errors.AsType[*transport.WireError]` does not.
+
+### REQ-073 — Discovery trust posture
+
+SMART configuration documents and their auth endpoints are untrusted input until validated. On every resolution and refresh the SDK **MUST** apply the rules below, except on a fresh cache hit, which runs only the checks [§ REQ-071](#req-071) names. The plaintext warnings are not repeated on a hit either: they are logged when the document is fetched or a cached catalog is renewed on a `304`.
+
+- **Issuer ([ADR 0023](../adr/0023-smart-platform-base-url-and-oidc-issuer.md)).** When the fetched document declares an `"issuer"` member, the SDK **MUST** accept it as the catalog's `Issuer` whether or not it equals the Platform base URL, provided it is an absolute URL with the `https` scheme and no query or fragment (OIDC Core 1.0 §2). A malformed issuer **MUST** produce `DiscoveryError{Reason: ReasonMalformedURL}`; an `http` issuer **MUST** produce `DiscoveryError{Reason: ReasonInsecureURL}` unless the resolver is constructed with `WithAllowInsecure()`. The document's issuer **MUST NOT** replace the base URL: the base URL the caller resolved stays the catalog's `BaseURL` and its cache key.
+- **OIDC cross-check.** When the document declares an `issuer` that differs from the Platform base URL, the resolver **MUST**, whenever it fetches the document or renews a cached one on a `304`, fetch `<issuer>/.well-known/openid-configuration` (OIDC Discovery 1.0 §4, the path appended to the issuer's own path) and require its `issuer` member to equal the catalog's `Issuer` exactly (OIDC Discovery 1.0 §4.3) and, when both documents declare `jwks_uri`, the two values to be equal. A mismatch **MUST** produce `DiscoveryError{Reason: ReasonIssuerMismatch}`, and a failed fetch `DiscoveryError{Reason: ReasonFetchFailed}`; an OIDC document that does not parse, or names no `issuer`, is a failed fetch, not a mismatch. The resolver **MUST NOT** fetch the OIDC document when it is constructed with `WithoutOpenIDConfigurationCheck()`, or when the document declares no `issuer` or an `issuer` equal to the base URL.
+- **Platform base URL.** A plaintext Platform base URL **MUST** produce `DiscoveryError{Reason: ReasonInsecureURL}` unless the resolver is constructed with `WithAllowInsecure()`.
+- **HTTPS on auth endpoints.** `authorization_endpoint`, `token_endpoint`, `jwks_uri`, and `registration_endpoint` (when present) **MUST** use the `https` scheme unless the resolver is constructed with `WithAllowInsecure()`. Plaintext URLs **MUST** produce `DiscoveryError{Reason: ReasonInsecureURL}`. The `allowInsecure` path **MAY** log a warning instead of failing for development deployments.
+- **No downgrade on redirect.** While fetching the SMART configuration document or the OIDC document of the cross-check, the resolver **MUST NOT** follow a redirect to a URL whose scheme is not `https`, unless it is constructed with `WithAllowInsecure()`; such a redirect **MUST** produce `DiscoveryError{Reason: ReasonInsecureURL}`. Otherwise the injected client's own redirect policy applies.
+- **Plaintext warnings.** The resolver **SHOULD** log a warning when a catalog it resolved holds a plaintext `http` URL, a service's `services.<id>.baseUrl` or an auth endpoint accepted under `WithAllowInsecure()`, and when it fetched the SMART configuration document over `http`, a redirect to `http` included. A plaintext service URL is warned about, not refused: which deployments to talk to is the consumer's decision. A catalog built with `NewStaticCatalog` is not checked.
+
+The resolver does not require `jwks_uri` to share the issuer's host; the `https` scheme is the floor.
+
+### Surfaced authorization-server metadata
+
+The resolver parses and surfaces the following SMART authorization-server metadata fields onto `AuthEndpoints` (REQ-070). All fields are optional — absent fields resolve to nil/empty with no error.
+
+| Wire field | `AuthEndpoints` field | Notes |
+|---|---|---|
+| `introspection_endpoint` | `IntrospectionEndpoint *url.URL` | RFC 7662 token introspection, a resource-server operation; surfaced only |
+| `revocation_endpoint` | `RevocationEndpoint *url.URL` | RFC 7009 token revocation; `auth/smart.Source.Revoke` posts to it (REQ-167) |
+| `management_endpoint` | `ManagementEndpoint *url.URL` | SMART management endpoint |
+| `token_endpoint_auth_methods_supported` | `TokenEndpointAuthMethodsSupported []string` | Client-auth method list; feeds the `auth/smart` method cross-check and the `auth/clientcreds.NewFromCatalog` check (REQ-068) |
+| `token_endpoint_auth_signing_alg_values_supported` | `TokenEndpointAuthSigningAlgValuesSupported []string` | Client-assertion (client-auth) JWS alg list; checked by `auth/smart` and `auth/clientcreds.NewFromCatalog` (REQ-068) |
+| `authorization_response_iss_parameter_supported` | `AuthorizationResponseIssParameterSupported bool` | RFC 9207 §3; when true, `CompleteAuthorization` refuses a callback without `iss` (REQ-061) |
+| `id_token_signing_alg_values_supported` | `IDTokenSigningAlgValuesSupported []string` | Selects the **ID-token verify allowlist**: `auth/smart` applies it at the code exchange and on refresh, and a caller of `smart.ValidateIDToken` passes it through `smart.WithIDTokenSigningAlgs`, so verification constrains accepted signature algorithms (RS256/RS384/ES256/ES384); see [§ REQ-062](#req-062--jwks-rotation) and REQ-064 |
+
+These fields are **consumed**, not merely surfaced:
+
+- `id_token_signing_alg_values_supported` → the ID-token verifier's accepted-algorithm allowlist, which `auth/smart` applies itself.
+- `code_challenge_methods_supported` → `auth/smart.FromConfig` refuses a server whose non-empty list leaves out `S256`, the only PKCE method the SDK sends.
+- `grant_types_supported` → `auth/clientcreds.NewFromCatalog` refuses a server whose non-empty list leaves out `client_credentials`.
+- `token_endpoint_auth_methods_supported` → `auth/smart.FromConfig` cross-checks it against the configured credential's implied method (a mismatch is rejected with `auth.ErrInvalidConfig`), and `auth/clientcreds.NewFromCatalog` against the configured client-auth method ([§ Backend Services from a resolved catalog](#backend-services-from-a-resolved-catalog), REQ-068).
+- `authorization_response_iss_parameter_supported` → when true, `auth/smart.CompleteAuthorization` refuses a redirect without `iss` ([§ REQ-061](#req-061--pkce-flow), RFC 9207 §2.4).
+- `token_endpoint_auth_signing_alg_values_supported` → `auth/smart.FromConfig` checks the configured client-assertion algorithm against it ([§ REQ-068](#req-068--flow-and-launch-mode-coverage)), and `auth/clientcreds.NewFromCatalog` checks client assertions against it ([§ Backend Services from a resolved catalog](#backend-services-from-a-resolved-catalog), REQ-068).
+- `revocation_endpoint` → `auth/smart.Source.Revoke` signs out there (RFC 7009; REQ-167).
+
+The rest remain **surface-only** (populated but with no consuming logic wired): `management_endpoint` (no management client yet) and `introspection_endpoint` (introspection is a resource-server operation outside the SDK's client scope).
+
+The `smart/discovery` package also exports openEHR SMART capability string constants (`CapabilityContextOpenEHREHR`, `CapabilityContextOpenEHREpisode`, `CapabilityOpenEHRPermissionV1`, `CapabilityLaunchBase64JSON`) for consumers that need to branch on the `capabilities` array.
 
 ## What is NOT in scope here
 
@@ -608,3 +832,8 @@ Consumers detect classes via `errors.Is`. The underlying wire error is preserved
 - **Revocation policy** — when tokens expire or are revoked on the server is the deployment's decision; the SDK reacts to the resulting wire errors and offers only the client's own sign-out revocation (REQ-167).
 - **MTLS, FAPI, JAR / PAR** — out of v1 scope; future provider sub-packages could address them.
 - **Token introspection (RFC 7662)** — a resource-server operation, and the SDK is a client of authorization servers. Discovery still surfaces `introspection_endpoint` (REQ-070), but the SDK ships no introspection client.
+- **Service registration.** The SDK consumes discovery output; it does not publish or maintain the discovery document.
+- **DNS resolution caching.** That belongs to the injected `*http.Client`'s transport configuration.
+- **Health probing.** Discovery validates the catalog *structure*; whether the advertised endpoints are reachable is checked on first use, not at resolution time.
+- **Cross-Platform aggregation.** The federator use case constructs one client per Platform base URL ([scope.md § Federative API client](scope.md#federative-api-client)); the SDK does not aggregate catalogs across Platforms.
+- **FHIR-side service consumption.** Even when the discovery document advertises `org.fhir.rest`, the SDK ignores it. A sibling FHIR SDK consumes that service.

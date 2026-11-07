@@ -67,7 +67,7 @@ func Build(c *templatecompile.Compiled, opts ...Option) (*WebTemplate, error) {
 // order, so the result is deterministic.
 //
 // Ordinals are the reference's *last resort*, not its disambiguator of
-// choice: REQ-116's template-level node name does that job, and across the
+// choice: REQ-111's template-level node name does that job, and across the
 // corona / multi_occurrence / AlternativeEvents goldens no sibling group
 // carries a suffix, because each sibling pins a distinct name. The upstream
 // FLAT conformance corpus shows the fallback where names run out — that
@@ -230,7 +230,7 @@ func cloneRange(r *Range) *Range {
 // attribute children, with parentPath the accumulated aqlPath prefix, and
 // returns the extended slice.
 //
-// The LOCATABLE `name` attribute is skipped (REQ-116): when an OPT pins a
+// The LOCATABLE `name` attribute is skipped (REQ-111): when an OPT pins a
 // node's name it constrains that attribute, and walking it as data emitted
 // a spurious `…/name` DV_TEXT leaf the reference never has — the reference
 // carries the name *on* the node (its `id` and its aqlPath predicate),
@@ -435,7 +435,7 @@ func setNames(node *Node, c *templatecompile.CompiledNode, text string, cfg *con
 // c's node predicate. The predicate is c's archetype id if it is a
 // slot/archetype root, else its at-code, else there is none (RM-attribute
 // values carry no predicate). A node that pins a template-level name
-// carries it inside the same brackets (REQ-116) — the reference's
+// carries it inside the same brackets (REQ-111) — the reference's
 // `[archetype_id,'Name']` form. The path is built in one concatenation.
 //
 // This builder composes its own paths rather than reading

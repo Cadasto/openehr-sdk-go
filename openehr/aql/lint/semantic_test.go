@@ -760,8 +760,8 @@ func TestOptionsFieldsAreIndependent(t *testing.T) {
 // expectations below are the pre-REQ-161 outputs, written out in full rather
 // than diffed, so a new code leaking into a clean query fails here.
 //
-// Every row but one also carries `aql_select_no_alias` (REQ-164), added here
-// as the deliberate, recorded re-baseline REQ-164 § Additivity defines: none
+// Every row but one also carries `aql_select_no_alias` (REQ-161), added here
+// as the deliberate, recorded re-baseline REQ-161 § Additivity defines: none
 // of these projections writes an `AS` alias, so each genuinely carries that
 // defect. `SELECT *` is the exception — a star item has nothing to alias — and
 // the `LIMIT 10` row gains `aql_paging_no_order_by` on top, for the row bound

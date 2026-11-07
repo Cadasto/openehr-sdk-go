@@ -1,6 +1,6 @@
 package simplified
 
-// REQ-053, REQ-116 — the template index gives a node a coded name only where
+// REQ-053, REQ-111 — the template index gives a node a coded name only where
 // the template determines one for every node at the node's path: alternatives
 // and reused siblings that disagree leave the path with none, and the node
 // takes its DV_TEXT name.
@@ -111,7 +111,7 @@ func TestREQ053TemplateIndexCodedNameDisagreement(t *testing.T) {
 	}
 }
 
-// TestREQ053TemplateIndexCodedNameOfReusedSiblings — REQ-053, REQ-116: two
+// TestREQ053TemplateIndexCodedNameOfReusedSiblings — REQ-053, REQ-111: two
 // reused siblings of the ELEMENT at0016 share its bare path but are told apart
 // by their pinned names. Each keeps its own coded name under its compiled
 // path, but the bare spelling decode composes from FLAT cannot say which

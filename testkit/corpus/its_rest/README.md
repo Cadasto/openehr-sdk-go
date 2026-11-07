@@ -1,12 +1,12 @@
 # testkit/corpus/its_rest
 
-Vendored fixtures for openEHR REST 1.1.0 (REQ-050, REQ-095) and the SMART discovery contract (REQ-070..072). They are checked in so CI does not need a live deployment.
+Vendored fixtures for openEHR REST 1.1.0 (REQ-050) and the SMART discovery contract (REQ-070..072). They are checked in so CI does not need a live deployment.
 
 These are request and response **bodies**, not REQ-082 Cassette-mode recordings; see the [parent README](../README.md).
 
 ## Authoritative source
 
-Endpoint shapes track the upstream OpenAPI YAML (REQ-095):
+Endpoint shapes track the upstream OpenAPI YAML (REQ-050):
 
 ```
 https://github.com/openEHR/specifications-ITS-REST/tree/master/computable/OAS
@@ -48,7 +48,7 @@ The envelopes are deliberately small and language-agnostic openEHR wire records 
 
 ### `system/`
 
-Hand-crafted capabilities response matching the openEHR REST 1.1.0 System API shape (REQ-095). Its fields exercise `ServiceCapabilities` decode, including the `Extras` forward-compat path: `support_email`, `documentation_url` and `supported_formats` are deployment-specific, so they land in `Extras` instead of the typed fields.
+Hand-crafted capabilities response matching the openEHR REST 1.1.0 System API shape (REQ-050). Its fields exercise `ServiceCapabilities` decode, including the `Extras` forward-compat path: `support_email`, `documentation_url` and `supported_formats` are deployment-specific, so they land in `Extras` instead of the typed fields.
 
 | File | Notes |
 |---|---|
@@ -109,7 +109,7 @@ Hand-crafted to the ITS-REST OpenAPI shape for the five DEMOGRAPHIC party kinds 
 
 ## Coverage against the client surface
 
-What `openehr/client/*` decodes today, and whether a vendored body under this directory (or a sibling fixture tree) exercises it. This is the census behind REQ-095's `partial` (2026-09-05): the rows marked **gap** are what keeps it partial.
+What `openehr/client/*` decodes today, and whether a vendored body under this directory (or a sibling fixture tree) exercises it. This is the census behind REQ-050's `partial` (2026-09-05): the rows marked **gap** are what keeps it partial.
 
 | Client surface | Vendored body | Where |
 |---|---|---|

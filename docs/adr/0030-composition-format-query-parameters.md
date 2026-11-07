@@ -12,7 +12,7 @@ date: 2026-10-25
 - **Supersedes:** —
 - **Superseded by:** —
 - **Strand:** none — a direct decision.
-- **Amends:** [REQ-173](../specifications/wire.md#req-173--composition-representation-formats) (Composition representation formats), which states the rule, and [REQ-095](../specifications/wire.md#req-095) (OpenAPI authoritative source), which carries the fourth keyed exception.
+- **Amends:** [REQ-173](../specifications/wire.md#req-173--composition-representation-formats) (Composition representation formats), which states the rule, and REQ-095 (OpenAPI authoritative source), since retired into [REQ-050](../specifications/wire.md#the-openapi-files-are-authoritative), which carries the fourth keyed exception.
 - **Related:** [ADR 0026](0026-stored-query-paging-fields-only-when-set.md) and [ADR 0024](0024-contribution-deletion-without-data.md) (the keyed-exception form this one follows).
 
 ## Context
@@ -21,13 +21,13 @@ date: 2026-10-25
 
 **What is observed.** EHRbase's composition controller (its `rest-openehr` module at commit `580ea750b`, 2026-10-16) declares only the deprecated `.schema`-suffixed simplified media types among those it consumes and produces, so a request with the canonical FLAT or STRUCTURED type is not routed to it. It also selects a simplified format from a `format` query parameter beside `application/json`, and reads the template id of a simplified write from a `templateId` query parameter; it does not read the `openehr-template-id` header.
 
-**What binds the SDK.** [§ REQ-053](../specifications/wire.md#req-053) forbids emitting the deprecated `.schema`-suffixed types, and [§ REQ-095](../specifications/wire.md#req-095) refuses any departure from the pin that it does not name. So with media types alone, a FLAT or STRUCTURED write from the SDK does not reach such a deployment, and the caller is back to building the request by hand.
+**What binds the SDK.** [§ REQ-053](../specifications/wire.md#req-053) forbids emitting the deprecated `.schema`-suffixed types, and [§ REQ-095](../specifications/wire.md#the-openapi-files-are-authoritative) refuses any departure from the pin that it does not name. So with media types alone, a FLAT or STRUCTURED write from the SDK does not reach such a deployment, and the caller is back to building the request by hand.
 
 **Why this needs a decision.** The ways out are to emit the deprecated types, which § REQ-053 refuses; to send the parameter form, which § REQ-095 refuses unless it is keyed; or to leave such deployments to hand-built requests, which is the duplication issue #307 asks to remove.
 
 ## Decision
 
-**The composition leaf sends the `format` and `templateId` query parameters only when the caller opts in, beside the standard `openehr-template-id` header, and never sends the deprecated media types.** [§ REQ-173](../specifications/wire.md#req-173--composition-representation-formats) *The format query parameters* states the rule, and [§ REQ-095](../specifications/wire.md#req-095) lists it as its fourth keyed exception.
+**The composition leaf sends the `format` and `templateId` query parameters only when the caller opts in, beside the standard `openehr-template-id` header, and never sends the deprecated media types.** [§ REQ-173](../specifications/wire.md#req-173--composition-representation-formats) *The format query parameters* states the rule, and [§ REQ-095](../specifications/wire.md#the-openapi-files-are-authoritative) lists it as its fourth keyed exception.
 
 The exception is tied to the pin's current text. It lapses if the pin defines these parameters on the composition operations.
 

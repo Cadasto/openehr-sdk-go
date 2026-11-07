@@ -1,6 +1,6 @@
 package webtemplate_test
 
-// REQ-116 / PROBE-075 — the two vendored oracles for the sibling-naming
+// REQ-111 / PROBE-075 — the two vendored oracles for the sibling-naming
 // gap. Phase 0 vendored them and pinned the two failure modes (corona loud:
 // ErrIDCollision; GECCO silent: unpredicated aqlPaths and spurious name
 // leaves). Phases 3–4 closed both, and both fixtures have joined the
@@ -18,7 +18,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
-// REQ-116 acceptance — `conformance-ehrbase.de.v0` is vendored without a
+// REQ-111 acceptance — `conformance-ehrbase.de.v0` is vendored without a
 // WebTemplate golden (OPT + upstream FLAT bodies only), so its bar is
 // `Build` succeeding. It reaches the sibling-id problem by the third route:
 // two ELEMENTs under its ACTION both sanitise to `dv_text` (that OPT carries
@@ -50,13 +50,13 @@ func TestBuild_FlatConformanceOPTUsesOrdinalFallback(t *testing.T) {
 	}
 }
 
-// oracleGolden decodes a vendored REQ-116 oracle's reference WebTemplate.
+// oracleGolden decodes a vendored REQ-111 oracle's reference WebTemplate.
 // The parity fixture has loadReference; the oracles need it by template id.
 func oracleGolden(t *testing.T, templateID string) map[string]any {
 	t.Helper()
 	b, err := os.ReadFile(fixtures.WebTemplateReference(templateID))
 	if err != nil {
-		t.Fatalf("vendored oracle golden unreadable (REQ-116): %v", err)
+		t.Fatalf("vendored oracle golden unreadable (REQ-111): %v", err)
 	}
 	var m map[string]any
 	if err := json.Unmarshal(b, &m); err != nil {
@@ -125,7 +125,7 @@ func TestReferenceOracleGoldensLoad(t *testing.T) {
 // concept term, so Build refused to emit ambiguous duplicates
 // (ErrIDCollision on "screening-fragebogen_zur_symptomen_anzeichen").
 //
-// REQ-116 Phase 4 resolves it at the source: the id now comes from the
+// REQ-111 Phase 4 resolves it at the source: the id now comes from the
 // template-level node name, which is distinct per sibling by construction.
 // This asserts the *mechanism*, not just that Build stopped erroring —
 // whole-tree parity is TestStructuralParity/Corona_Anamnese.
@@ -133,7 +133,7 @@ func TestBuild_CoronaAnamneseSiblingsGetDistinctIDs(t *testing.T) {
 	c := compileFixture(t, fixtures.WebTemplateOpt("Corona_Anamnese"))
 	wt, err := webtemplate.Build(c)
 	if err != nil {
-		t.Fatalf("Build(Corona_Anamnese) err = %v, want nil — REQ-116 Phase 4 removes the id collision", err)
+		t.Fatalf("Build(Corona_Anamnese) err = %v, want nil — REQ-111 Phase 4 removes the id collision", err)
 	}
 
 	// The four reused SECTIONs: distinct ids, each sanitised from its pinned

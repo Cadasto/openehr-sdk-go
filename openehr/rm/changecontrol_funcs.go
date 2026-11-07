@@ -1,6 +1,6 @@
 package rm
 
-// REQ-122 — version-control derived helper.
+// REQ-120 — version-control derived helper.
 //
 // VERSION.is_branch is derived from the version's uid (true iff the
 // uid's version_tree_id is a branch, per REQ-120). The abstract
@@ -12,7 +12,7 @@ package rm
 // Version *container* management (VERSIONED_OBJECT operations, commit_*)
 // is out of scope and stays as fail-loud generated stubs: this SDK's
 // versioning is server-mediated over REST, not an in-memory container.
-// See docs/specifications/rm-functions.md § REQ-122 and ADR 0011.
+// See docs/specifications/reference-model.md § REQ-120 and ADR 0011.
 
 // IsBranch reports whether this version represents a branch, derived
 // from its uid's version_tree_id.

@@ -294,7 +294,7 @@ func textValue(name rm.DVTextLike) string {
 }
 
 // TestCassette_ReplaysEHRStatus_PROBE060_REQ095_REQ082 replays the EHR-status
-// recording (PROBE-060, REQ-082, REQ-095): create with a fixed initial
+// recording (PROBE-060, REQ-082, REQ-050): create with a fixed initial
 // status, then read that status back, checking the wire contract the
 // recording holds. An extra HEAD is unmatched.
 func TestCassette_ReplaysEHRStatus_PROBE060_REQ095_REQ082(t *testing.T) {
@@ -591,7 +591,7 @@ func dropResponseHeader(t *testing.T, e *probe.HAREntry, name string) {
 
 // TestCassette_ScenarioChecksFailOnAMutatedRecording_REQ082_REQ095_REQ094_REQ057
 // is the can-fail control for the scenario witnesses above (REQ-082,
-// REQ-095, REQ-094, REQ-057). Each row loads one recording, changes the
+// REQ-050, REQ-094, REQ-057). Each row loads one recording, changes the
 // one recorded value a check reads, replays the scenario against that
 // copy, and requires the error to name that check. With a check removed,
 // the replay no longer names it and that row fails.

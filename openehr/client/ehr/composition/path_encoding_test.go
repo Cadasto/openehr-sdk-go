@@ -1,6 +1,6 @@
 package composition_test
 
-// path_encoding_test.go — REQ-095. Regression proof for a two-parameter path:
+// path_encoding_test.go — REQ-050. Regression proof for a two-parameter path:
 // the ehr_id segment carrying a percent-encodable character reaches the wire
 // encoded exactly once, never double-encoded.
 

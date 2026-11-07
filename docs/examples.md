@@ -916,5 +916,5 @@ An example that gains a verbatim sample-output block must be added to that allow
 
 - [quick-start.md](quick-start.md): install, idioms, REST wiring
 - [architecture.md](architecture.md): package map and dependency rules
-- [specifications/use-cases.md](specifications/use-cases.md): benchmark, seeder, MCP, federator consumers
+- [specifications/scope.md](specifications/scope.md): benchmark, seeder, MCP, federator consumers
 - [roadmap.md](roadmap.md): what is landed vs planned

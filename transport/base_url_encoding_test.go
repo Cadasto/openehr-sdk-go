@@ -13,7 +13,7 @@ import (
 // receives when the service base URL carries an escaped byte. The base keeps
 // its own encoding, so an escaped "/" (%2F) in a tenant segment stays one
 // segment; the request path is encoded from its decoded form alone, so a
-// literal "%" in it is sent as %25 (REQ-150, REQ-095). A base with no
+// literal "%" in it is sent as %25 (REQ-150, REQ-050). A base with no
 // special encoding is sent as before.
 func TestREQ150_BaseURLKeepsItsOwnEncoding(t *testing.T) {
 	t.Parallel()

@@ -121,7 +121,7 @@ func TestProbe106(t *testing.T) {
 }
 
 // TestProbe008 runs PROBE-008 and asserts platform principal claims
-// surface verbatim, with absent claims surfacing as nil (REQ-067).
+// surface verbatim, with absent claims surfacing as nil (REQ-064).
 func TestProbe008(t *testing.T) {
 	r, err := probes.Probe008PrincipalClaimsVerbatim(context.Background())
 	assertPass(t, r, err)

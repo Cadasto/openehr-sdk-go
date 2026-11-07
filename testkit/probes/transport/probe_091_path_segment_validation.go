@@ -112,7 +112,7 @@ func Probe091PathSegmentValidation(ctx context.Context, c *transport.Client, cap
 	}
 
 	// The positive half. A well-formed openEHR identifier that merely needs
-	// percent-encoding MUST still reach the wire exactly once (REQ-095), and
+	// percent-encoding MUST still reach the wire exactly once (REQ-050), and
 	// the service root MUST still be reachable — REQ-150 carves it out
 	// explicitly because the System API's only operation is `OPTIONS /`.
 	before := requests()
@@ -126,7 +126,7 @@ func Probe091PathSegmentValidation(ctx context.Context, c *transport.Client, cap
 		r.Detail = fmt.Sprintf("a well-formed template id issued %d requests, want exactly 1", n)
 		return r, nil
 	}
-	// Encode-once (REQ-095): the space rides as %20, never %2520. Counting
+	// Encode-once (REQ-050): the space rides as %20, never %2520. Counting
 	// the request is not enough — a double-encoded path is still one request.
 	paths := captured()
 	escaped := paths[len(paths)-1]

@@ -6,7 +6,7 @@ kind: specification
 
 **Status:** Draft
 
-Open architectural questions that are **not yet decided** but are scoped, named, and tracked. Each strand resolves into an ADR (under `../docs/adr/`) and amends one or more REQs in [REQ.md](REQ.md).
+Open architectural questions that are **not yet decided** but are scoped, named, and tracked. Each strand resolves into an ADR (under `../adr/`) and amends one or more REQs in [REQ.md](REQ.md).
 
 A strand is not a `Draft` REQ — it is an open question whose answer cannot be predicted by reading the spec. Resolving a strand happens by:
 
@@ -49,7 +49,7 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 **Status:** Partially resolved.
 
-**Question:** The RM modeling rules in [rm-modeling.md](rm-modeling.md) (concrete structs + embedded base + interfaces + central type registry) need validation against the full RM 1.1.0-development surface, and the migrated codec path needs to stay within a performance budget. The codec choice itself — once framed as `encoding/json` vs `sonic` vs `easyjson` — is settled: [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md) adopts the standard library's `encoding/json/v2`.
+**Question:** The RM modeling rules in [reference-model.md](reference-model.md) (concrete structs with flattened ancestors, interfaces, and a central type registry) need validation against the full RM 1.2.0 surface, and the migrated codec path needs to stay within a performance budget. The codec choice itself — once framed as `encoding/json` vs `sonic` vs `easyjson` — is settled: [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md) adopts the standard library's `encoding/json/v2`.
 
 ### Resolved sub-questions
 
@@ -57,21 +57,7 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 |---|---|---|
 | Abstract generic `EVENT` polymorphism (`History.events`) | Promote `EVENT` to a Go interface; `POINT_EVENT` / `INTERVAL_EVENT` concrete; whitelist in generator | [ADR 0003](../adr/0003-rm-event-polymorphism.md) |
 | `Real` / `Integer` wire tolerance (quoted vs numeric JSON) | Strict encode, permissive decode via `rm.Real` / `rm.Integer` / `rm.Integer64` defined types | [ADR 0004](../adr/0004-numeric-wire-tolerance.md) |
-| Polymorphic round-trip fidelity (REQ-052/040) | Value-in-interface `_type` on encode via `openehr/internal/jsonpoly`; round-tripped `DV_INTERVAL<T>` validated from its bounds' runtime types; corpus round-trips byte-stable. **Superseded by the row below**: `jsonpoly` is retired and byte-stability withdrawn under [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md) | [PR 55](https://github.com/Cadasto/openehr-sdk-go/pull/55) |
 | `encoding/json/v2` as the canonical-JSON codec; encoded member order is not a contract | Migrate to standard-library v2; retire the generator's per-type `MarshalJSON` / `UnmarshalJSON` and `openehr/internal/jsonpoly`; `_type` first becomes a SHOULD and round-trip fidelity is asserted semantically rather than byte-wise | [ADR 0021](../adr/0021-json-member-order-not-a-contract.md), [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md) |
-
-### Still open
-
-- **Full RM inventory:** decode every BMM type through the registry; identify sites that resist the pattern (e.g. further `VERSION[T]` whitelist decisions beyond `EVENT`).
-- **Codec performance against the standard-library baseline:** with the codec settled by [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md), the open question is no longer which codec but whether the migrated path is within budget for seeder and benchmark workloads, measured against the retired generated marshalers on `openehr/serialize/canjson/bench_test.go` rather than against `sonic` or `easyjson`. A regression is a plan task, not a codec fork.
-- **Validation independence:** confirm `openehr/validation` can validate without taking on the codec's dependencies (REQ-013).
-
-**Evidence needed (remaining):**
-
-- Memory residency for the migrated `encoding/json/v2` path against the retired generated marshalers. Time and allocations are recorded in § Benchmark evidence below.
-- Document any remaining abstract-generic classes requiring ADR whitelist (generator policy today: `EVENT` only).
-
-The `encoding/json/v2` migration evidence — `_type`-first survival, polymorphic round-trip, generated / `jsonpoly` line count removed — is delivered and recorded in the ADR 0021/0022 sub-question row above and in [PR 171](https://github.com/Cadasto/openehr-sdk-go/pull/171); PROBE-030 / PROBE-038 assert the round trip semantically (typed deep comparison plus [wire-equivalence](conformance.md#terms)).
 
 ### Benchmark evidence
 
@@ -92,29 +78,29 @@ The PR 280 column is measured differently. Its baseline is `main` at `6f75aea3`,
 | `MarshalFlat` | +4.73% | not measured | ~ (-4.55%) | 1 103 / 1 193 / not measured |
 | `UnmarshalFlat` | +2.69% | not measured | ~ (-2.17%) | 2 962 / 2 884 / not measured |
 
-The budget line, set against v1 for the PR 171 and PR 174 runs: a benchmark regresses materially when its v2 time/op is more than 20 percent worse than v1 at p < 0.05. PR 171 crossed it once, on `DecodeDVQuantity`, where buffering, peeking and decoding each concrete value cost the most; PR 174 reads `_type` from the declared wire field after one decode and brings that benchmark under v1. PR 174 was measured on its branch before the rebase that merged it (`0fee2bb2`). The PR 280 column does not measure against v1, so it does not test the line again: it only lowers times on `main`, which already sat under it after PR 174.
+### Still open
 
-PR 280 cuts cost with no budget line crossed. It stops rebuilding the json/v2 options for every value, skips the bracket scan of a polymorphic slot too short to break the depth cap, reads a slot's `_type` from its bytes when `_type` is the first member instead of decoding the slot to find it, and makes the encoder copy each value once instead of allocating twice. The `_type` read covers `DecodePolymorphic` only. `Registry.Decode` keeps its peek, because its input has not been tokenised yet, and reading `_type` before the rest would report an unknown `_type` ahead of a syntax error later in the document.
+- **Full RM inventory:** decode every BMM type through the registry; identify sites that resist the pattern (e.g. further `VERSION[T]` whitelist decisions beyond `EVENT`).
+- **Codec performance against the standard-library baseline:** with the codec settled by [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md), the open question is no longer which codec but whether the migrated path is within budget for seeder and benchmark workloads, measured against the retired generated marshalers on `openehr/serialize/canjson/bench_test.go` rather than against `sonic` or `easyjson`. A regression is a plan task, not a codec fork.
 
-**Resolution form (remaining):** the full-inventory and performance sub-questions resolve through plan tasks and benchmarks, not a new ADR. The codec choice is already resolved by [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md) (which also touched the codegen policy in [ADR 0002](../adr/0002-bmm-codegen-decisions.md), since it changed what the generator emits); a future codec swap, were it revisited, would amend REQ-052 / REQ-053 and possibly REQ-040.
+**Evidence needed (remaining):**
 
-**Implementation gate:** Phase 1b — affects every read path in `openehr/client/*` and openEHR wire conformance ([conformance.md](conformance.md)).
+- Memory residency for the `encoding/json/v2` path against the retired generated marshalers.
+- Any further abstract-generic class that needs an ADR whitelist (the generator's policy today: `EVENT` only).
+
+The budget line: a benchmark regresses materially when its time/op is more than 20 percent worse than the retired generated marshalers' at p < 0.05, measured with `benchstat`. The codec benchmarks live beside the canonical-JSON codec, the type registry and the FLAT codec.
+
+**Resolution form (remaining):** the full-inventory and performance sub-questions resolve through benchmarks, not a new ADR; the codec choice is resolved by [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md).
 
 ---
 
 ## STRAND-05 — SMART-on-openEHR auth library
 
-**Status:** Resolved. See [ADR 0009](../adr/0009-smart-auth-library-scope.md).
+**Status:** Resolved by [ADR 0009](../adr/0009-smart-auth-library-scope.md).
 
-**Question (resolved):** There is no batteries-included Go substrate for OAuth2 / SMART-on-openEHR; implementing `auth/smart` is first-party work. What's the implementation plan and how is it validated?
+**Decision:** The SDK carries its own SMART-on-openEHR auth library across `auth/smart`, `auth/clientcreds`, `auth/jwtbearer`, `auth/basic` and `smart/discovery`, using `golang.org/x/oauth2`, `github.com/coreos/go-oidc/v3` and `github.com/go-jose/go-jose/v4` for the JOSE and OIDC cryptography, confined to `auth/` and `smart/`. Token introspection, a resource-server operation, is not part of it.
 
-**Decision summary:**
-
-- Built the full SMART-on-openEHR auth library across `auth/smart`, `auth/clientcreds`, `auth/jwtbearer`, `auth/basic`, `auth/introspect`, and `smart/discovery`. PR 210 later removed `auth/introspect` because token introspection is a resource-server operation outside the SDK's current client scope; discovery still surfaces `introspection_endpoint`. Four flows (PKCE public, confidential symmetric, confidential asymmetric `private_key_jwt`, Backend Services) and three launch modes (standalone, embedded, backend) are covered and exercised by PROBE-001..009.
-- Relaxed the OTel-only dependency rule: adopted `golang.org/x/oauth2`, `github.com/coreos/go-oidc/v3`, and `github.com/go-jose/go-jose/v4` (directly imported for JWS signing; also required by `go-oidc/v3`) for security-sensitive JOSE/OIDC crypto, scoped to `auth/` and `smart/`. Hand-rolling JWS signing and ID-token verification at the RS384/ES384/RS256/ES256 multi-alg level was rejected as a correctness and maintenance risk.
-- `auth.FromOAuth2TokenSource` adapter and an issuer-matching multi-EHR helper are recorded as available follow-ups (not built — no current consumer need). See ADR 0009 § (c).
-
-**Codified in:** [ADR 0009](../adr/0009-smart-auth-library-scope.md). Amends REQ-061..064.
+**Codified in:** [auth.md](auth.md).
 
 ---
 
@@ -128,12 +114,12 @@ PR 280 cuts cost with no budget line crossed. It stops rebuilding the json/v2 op
 
 **Evidence needed:**
 
-- Federator-style spike (Phase 3) running 4+ clients with both shared and independent transports.
+- A federator-style spike running 4+ clients with both shared and independent transports.
 - Measure: connection-establishment latency (cold), pool-exhaustion behaviour under load, failure isolation when one node is slow / unreachable.
 
 **Resolution form:** ADR-NNN documenting the recommendation and the override path. Amends REQ-021 if the default guidance becomes opinionated.
 
-**Implementation gate:** Phase 3 — federator implementation makes this decision real.
+**Implementation gate:** a federator implementation makes this decision real.
 
 ---
 
@@ -145,7 +131,7 @@ PR 280 cuts cost with no budget line crossed. It stops rebuilding the json/v2 op
 
 **Rationale:** Locked early to avoid late-cycle import-path churn.
 
-**Codified in:** REQ-001, REQ-004, REQ-005, [module-layout.md § Versioning](module-layout.md#versioning).
+**Codified in:** [module-layout.md § REQ-001](module-layout.md#req-001--module-path), [§ REQ-004](module-layout.md#req-004--semantic-versioning) and [§ The `internal/` boundary](module-layout.md#the-internal-boundary).
 
 ---
 
@@ -167,7 +153,7 @@ PR 280 cuts cost with no budget line crossed. It stops rebuilding the json/v2 op
 
 **Evidence needed:**
 
-- Adoption data after Phase 4 (Cadasto extras shipped).
+- Adoption data once the Cadasto extras ship.
 - A concrete consumer asking for an EHRbase-compatible build.
 
 **Resolution form:** ADR-NNN either confirming "keep together" or extracting. If extracting: package moves, module path for the sibling, semver implications for both modules.
@@ -180,23 +166,19 @@ PR 280 cuts cost with no budget line crossed. It stops rebuilding the json/v2 op
 
 ## STRAND-09 — ITS-REST conformance follow-ups
 
-**Status:** Resolved 2026-10-13: item 1 by the dedicated probes, item 2 by [ADR 0026](../adr/0026-stored-query-paging-fields-only-when-set.md). Opened by the ITS-REST conformance remediation ([PR 53](https://github.com/Cadasto/openehr-sdk-go/pull/53)).
+**Status:** Resolved by the dedicated REST probes (PROBE-062, PROBE-102, PROBE-103 and PROBE-104) and by [ADR 0026](../adr/0026-stored-query-paging-fields-only-when-set.md) for the stored-query paging fields.
 
-**Two follow-ups carried out of that plan:**
-
-1. **Dedicated REST conformance probes (resolved 2026-09-09).** The plan called for four `testkit/probes/rest/*` probes (audit-details header grammar, System `OPTIONS`, Admin bulk-delete, Definition `/example`). They are dedicated Sandbox probes in [`testkit/probes/rest/`](../../testkit/probes/rest/) — PROBE-062 (`openehr-audit-details` grammar + Contribution round-trip, REQ-059), PROBE-102 (System `OPTIONS`, REQ-095), PROBE-103 (Admin bulk-delete, REQ-099), PROBE-104 (Definition `/example`, REQ-095) — promoted from the package `httptest` request-capture assertions, each with can-fail controls. They follow the request-capture idiom (driven by their package tests against a `sandbox.Scripted` route with a captured-request accessor); wiring them into the REQ-082 runner's catalog-wide entries is open REQ-082 runner work, so the gate this item originally waited for is the dedicated catalog probe, not the runner. Affects REQ-059, REQ-095, REQ-099.
-
-2. **Stored-query `fetch` omission vs OpenAPI `required` (resolved 2026-10-13 by [ADR 0026](../adr/0026-stored-query-paging-fields-only-when-set.md)).** The pin's `Query` schema marks `offset`, `fetch` and `query_parameters` required, but `fetch` has no default ("depends on the implementation") and `fetch: 0` means zero rows. EHRbase refuses `offset` without `fetch` with `422` (2.35.1 on POST, 2026-09-09; 2.36.0 on POST and GET, [#261](https://github.com/Cadasto/openehr-sdk-go/issues/261)), which met the revisit condition this item set. Stored-query execution now sends each paging field only when the caller sets it, on both verbs ([§ REQ-057](wire.md#req-057) *Paging*), and the POST omission is keyed in [§ REQ-095](wire.md#req-095). Affects REQ-057, REQ-095.
+**Codified in:** [conformance.md](conformance.md) and [wire.md § REQ-057](wire.md#req-057) *Paging*.
 
 ---
 
 ## STRAND-10 — rmpath: one sentinel for two not-found conditions
 
-**Status:** Open — opened by the PROBE-086 review round ([PR 85](https://github.com/Cadasto/openehr-sdk-go/pull/85), follow-ups).
+**Status:** Open.
 
 **Question:** should `rmpath.ItemAtPath` distinguish *attribute unknown to the navigator* from *attribute known but unpopulated*, instead of returning `ErrPathNotFound` for both?
 
-**Why it's open:** the FLAT encoder treats resolution failure as an absent optional (`skipNotFound`), which is correct for the unpopulated case and silent data loss for the unknown-attribute case — the exact defect class PROBE-086 surfaced (`EVENT.time`, `INSTRUCTION.narrative`/`expiry_time`, `EVENT_CONTEXT.other_context`, `ACTIVITY.timing`). Because the encoder cannot tell the two conditions apart, the coverage rule in [rm-functions.md § REQ-121](rm-functions.md#req-121--locatable-path-read-access) is enforced by a hand-kept guard test and exemption list rather than derived from the API.
+**Why it's open:** the FLAT encoder treats resolution failure as an absent optional (`skipNotFound`), which is correct for the unpopulated case and silent data loss for the unknown-attribute case — the exact defect class PROBE-086 surfaced (`EVENT.time`, `INSTRUCTION.narrative`/`expiry_time`, `EVENT_CONTEXT.other_context`, `ACTIVITY.timing`). Because the encoder cannot tell the two conditions apart, the coverage rule in [reference-model.md § REQ-121](reference-model.md#req-121--locatable-path-read-access) is enforced by a hand-kept guard test and exemption list rather than derived from the API.
 
 **Resolution options:** a distinct sentinel (e.g. `ErrUnknownAttribute`) letting `skipNotFound` fail loudly on unmodelled attributes and retiring the exemption list; or keeping the single sentinel and the guard-test enforcement. The first adds an exported error to a landed surface ([idiom.md § API conventions](idiom.md#api-conventions) compatibility question); the second keeps the hazard class alive but contained.
 
@@ -208,27 +190,25 @@ PR 280 cuts cost with no budget line crossed. It stops rebuilding the json/v2 op
 
 ## STRAND-11 — Probe recording format: HAR or a purpose-built YAML
 
-**Status:** Resolved. See [ADR 0020](../adr/0020-cassette-recording-har.md).
+**Status:** Resolved by [ADR 0020](../adr/0020-cassette-recording-har.md).
 
-**Question (resolved):** what serialisation do Cassette-mode recordings use — the HTTP Archive standard (`.har`), or a purpose-built YAML schema of this SDK's own?
+**Decision:** Cassette recordings are HTTP Archive 1.2, with provenance and redaction attestation on `log` as a `_req082` object, so any HAR reader can replay them.
 
-**Decision summary:** Cassette recordings are HTTP Archive 1.2. Provenance and redaction attestation ride on `log` as a `_req082` object. The purpose-built YAML twin was rejected so a second implementation can replay the same recordings with any HAR reader. Evidence: the live EHRbase `POST /ehr` pair in [strand-11-evidence](../plans/strand-11-evidence/).
-
-**Codified in:** [ADR 0020](../adr/0020-cassette-recording-har.md). Amends REQ-082.
+**Codified in:** [conformance.md § REQ-082](conformance.md#req-082--runnability).
 
 ---
 
 ## STRAND-12 — BMM interface classes carry no `is_abstract` flag
 
-**Status:** Open — opened by the REQ-048 specification pass ([PR 113](https://github.com/Cadasto/openehr-sdk-go/pull/113)).
+**Status:** Open.
 
-**Question:** should the RM meta-model introspection surface ([REQ-048](bmm-conformance.md#req-048--rm-meta-model-introspection-surface)) report a `P_BMM_INTERFACE` class as abstract even though the pinned BMM sets no `is_abstract` flag on it — and is the missing flag an upstream BMM defect this SDK should raise per [REQ-041](bmm-conformance.md#req-041--pinned-bmm-sources)?
+**Question:** should the RM meta-model introspection surface ([REQ-048](reference-model.md#req-048--rm-meta-model-introspection-surface)) report a `P_BMM_INTERFACE` class as abstract even though the pinned BMM sets no `is_abstract` flag on it — and is the missing flag an upstream BMM defect this SDK should raise per [REQ-041](reference-model.md#req-041--pinned-bmm-sources)?
 
 **Why it's open:** six classes in REQ-048's universe carry no `is_abstract` flag: `MEASUREMENT_SERVICE`, `TERMINOLOGY_SERVICE`, `OPENEHR_CODE_SET_IDENTIFIERS`, `OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS`, and — the sharp cases — `CODE_SET_ACCESS` and `TERMINOLOGY_ACCESS`, which are `P_BMM_INTERFACE` declarations the generator renders as Go **interfaces**. Nothing can instantiate a Go interface, so the surface reports "not abstract" for a class that is unquestionably not instantiable, and a concrete-descendant expansion hands it back. REQ-041 settles the immediate behaviour — the BMM wins, the SDK reports the flag verbatim, and REQ-048 says so normatively — but it does not settle whether the *question* is the right one.
 
 **The trade-off:**
 
-- **Report the flag only** (today's behaviour). One rule, one source, no local model of instantiability; a caller needing the decodable set uses the [REQ-040 registry](rm-modeling.md#type-registry-req-040), which is the authority for what Go can construct. Against it: a caller who reads "not abstract" as "instantiable" is misled on six classes, and the surface offers no way to notice.
+- **Report the flag only** (today's behaviour). One rule, one source, no local model of instantiability; a caller needing the decodable set uses the [REQ-040 registry](reference-model.md#type-registry-req-040), which is the authority for what Go can construct. Against it: a caller who reads "not abstract" as "instantiable" is misled on six classes, and the surface offers no way to notice.
 - **Widen abstractness to cover BMM interfaces** — report `is_abstract || _type == P_BMM_INTERFACE`. Matches what the generator actually emits and what a caller means. Against it: it is the SDK second-guessing the BMM, which REQ-041 forbids as a general practice precisely because local corrections diverge silently from every other openEHR implementation reading the same file.
 - **Raise it upstream and keep reporting the flag** until the schema changes. Correct in the long run and costs nothing locally; the timescale is not ours to set.
 
@@ -242,9 +222,9 @@ PR 280 cuts cost with no budget line crossed. It stops rebuilding the json/v2 op
 
 ## STRAND-13 — Properties inherited from a primitive-mapped ancestor are dropped
 
-**Status:** Open — opened by [PROBE-094](conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm)'s attribute-set completeness arm ([REQ-048](bmm-conformance.md#req-048--rm-meta-model-introspection-surface) implementation).
+**Status:** Open.
 
-**Question:** when a `class_definitions` class inherits a property from a `primitive_types` ancestor that [§ Primitive type mapping](bmm-conformance.md#primitive-type-mapping) maps to a Go primitive, should the generator fold that property in — into the emitted struct, into the `rminfo` attribute tables, or into neither?
+**Question:** when a `class_definitions` class inherits a property from a `primitive_types` ancestor that [§ Primitive type mapping](reference-model.md#primitive-type-mapping) maps to a Go primitive, should the generator fold that property in — into the emitted struct, into the `rminfo` attribute tables, or into neither?
 
 **Why it's open:** the generator plans `primitive_types` entries mapped to a Go primitive as primitives, not as classes, so it never walks their properties. On the pinned schemas exactly one class is affected: `Iso8601_timezone` (a `class_definitions` entry, and so in REQ-048's class universe) inherits `value: String` — **mandatory** — from `Iso8601_type`, which maps to Go `string`. The result is consistent between the two SDK surfaces and inconsistent with the BMM: `rm.ISO8601Timezone` is emitted as an **empty struct**, and `rminfo` reports the class as carrying no attributes. The type cannot hold its own value, and nothing flagged it until PROBE-094 compared the shipped attribute sets against an independent BMM reduction.
 
@@ -258,35 +238,21 @@ This is a pre-existing emission gap, not a REQ-048 regression — REQ-048 only m
 
 **Evidence needed:** the census this strand cannot assume — every `class_definitions` class with a primitive-mapped ancestor that declares properties, across all primary schemas, not just the one the pinned RM reduction surfaces. Whether `Iso8601_timezone` is a one-off or the visible member of a family decides which option is affordable.
 
-**Evidence (2026-09-05 census):** `internal/bmmgen/primitive_ancestor_census_test.go` walks every `class_definitions` class in each of the six pinned schema roots (`base 1.3.0`, `rm 1.2.0`, `am 1.4.0`, `am 2.4.0`, `lang 1.1.0`, `term 3.1.0`) and lists each property reachable only through a primitive-mapped ancestor — a property the class or a non-primitive ancestor declares itself is planned and shipped, so it does not count. Result: **exactly one** — `Iso8601_timezone.value` via `Iso8601_type`, present in the five roots that include `base` (`term 3.1.0` includes no base schema and has no ISO 8601 classes). The four DV temporal types (`DV_DATE`, `DV_TIME`, `DV_DATE_TIME`, `DV_DURATION`) also descend from `Iso8601_type` but redeclare `value` on the class, which is why PROBE-094's reduction never flagged them and why the generated structs carry it. The set is pinned by the test, so growth is loud, and the evidence is guarded three ways: the root list is checked against the schemas actually vendored under `resources/bmm`, so a newly vendored schema cannot pass unwalked; the census logic runs on hand-built schemas covering transitive, shadowed, secondary and cyclic ancestry, so a traversal or filter regression cannot silently empty or inflate the result; and the four DV temporal types are pinned as excluded *because* they redeclare `value`, not because they are absent. What this settles: `Iso8601_timezone` is a one-off, not the visible member of a family — the fold-into-both option's blast radius is one generated struct and one `rminfo` row. What it does not settle: the fold itself, which remains an ADR amending § Mapping rules plus a regenerated tree; the strand stays open.
+**Evidence (census):** a census test in the generator walks every `class_definitions` class in each of the eight schema roots, the six pinned ones (`base 1.3.0`, `rm 1.2.0`, `am 1.4.0`, `am 2.4.0`, `lang 1.1.0`, `term 3.1.0`) and the two the SDK authors, and lists each property reachable only through a primitive-mapped ancestor — a property the class or a non-primitive ancestor declares itself is planned and shipped, so it does not count. Result: **exactly one** — `Iso8601_timezone.value` via `Iso8601_type`, present in the seven roots that include `base` (`term 3.1.0` includes no base schema and has no ISO 8601 classes). The four DV temporal types (`DV_DATE`, `DV_TIME`, `DV_DATE_TIME`, `DV_DURATION`) also descend from `Iso8601_type` but redeclare `value` on the class, which is why PROBE-094's reduction never flagged them and why the generated structs carry it. The set is pinned by the test, so growth is loud, and the evidence is guarded three ways: the root list is checked against the schemas actually vendored under `resources/bmm`, so a newly vendored schema cannot pass unwalked; the census logic runs on hand-built schemas covering transitive, shadowed, secondary and cyclic ancestry, so a traversal or filter regression cannot silently empty or inflate the result; and the four DV temporal types are pinned as excluded *because* they redeclare `value`, not because they are absent. What this settles: `Iso8601_timezone` is a one-off, not the visible member of a family — the fold-into-both option's blast radius is one generated struct and one `rminfo` row. What it does not settle: the fold itself, which remains an ADR amending § Mapping rules plus a regenerated tree; the strand stays open.
 
-**Resolution form:** an ADR amending the § Mapping rules inheritance rule, plus a regenerated tree, if either folding option wins; otherwise a documented mapping exemption. Until then the interim prohibition is [REQ-048 § The attribute tables are complete against the BMM](bmm-conformance.md#the-attribute-tables-are-complete-against-the-bmm)'s: the drop is pinned by name, cannot grow silently, and folding it in ahead of this strand fails [PROBE-094](conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm)'s completeness arm (`unshippedProperties`).
+**Resolution form:** an ADR amending the § Mapping rules inheritance rule, plus a regenerated tree, if either folding option wins; otherwise a documented mapping exemption. Until then the interim prohibition is [REQ-048 § The attribute tables are complete against the BMM](reference-model.md#the-attribute-tables-are-complete-against-the-bmm)'s: the drop is pinned by name, cannot grow silently, and folding it in ahead of this strand fails [PROBE-094](conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm)'s completeness arm (`unshippedProperties`).
 
-**Affects:** REQ-041, REQ-046, REQ-048.
+**Affects:** REQ-041, REQ-048.
 
 ---
 
 ## STRAND-14 — Should template-driven validation also run the RM-floor invariants?
 
-**Status:** Resolved 2026-10-11 by [ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md): template-driven validation includes the floor, each defect reported once, with no template-only option. Opened 2026-09-05 from the review round of the RM canonical-JSON fidelity work ([PR 145](https://github.com/Cadasto/openehr-sdk-go/pull/145)), whose plan text claimed `ValidateComposition` would report the new `TERM_MAPPING` invariants; it never has, and the claim was corrected in the plan rather than in code.
+**Status:** Resolved by [ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md).
 
-**Question:** should `ValidateComposition` and the other template-driven entry points ([REQ-102](clinical-modeling.md#req-102--composition-validation)) run the [REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor) per-type invariant catalogue as part of a template-driven pass, or stay exactly template conformance with the floor a separate call?
+**Decision:** Template-driven validation includes the RM-floor invariants, each defect reported once, with no template-only option.
 
-**Why it was open:** until ADR 0025 the two layers composed but did not chain. Template validity covers RM-mandatory presence, so a template-driven pass already reports the floor's (a) arm; the floor's (b) arm — `DV_INTERVAL` lower > upper, `TERM_MAPPING.match` outside its value set, `Mappings_valid`, `DV_QUANTITY.precision` and `DV_PROPORTION.precision` below -1 (-1 means no limit) — fired only through `ValidateRM`. A caller who ran only `ValidateComposition` could therefore commit an RM-invalid composition that was template-valid. Whether that was a gap or a deliberate separation of concerns was the fork.
-
-**The trade-off:**
-
-- **Chain the floor into the template-driven pass.** One call, no way to forget the floor; issue codes stay disjoint (`term_mapping_match` beside the template codes). Against it: `Result` grows for every existing caller, the template walker and the floor walker visit the tree twice (or the floor's checks are re-hosted inside the template walk), and some floor findings duplicate template findings on the same node.
-- **Keep them separate and document the composition.** No behaviour change; callers who want both call both, and § REQ-112 says so. Against it: the gap stays reachable by default, and the plan-text defect that opened this strand shows how easily the two are assumed to chain.
-- **Opt-in chaining** — an option on the template-driven entry points. Additive and reversible. Against it: two code paths to keep in agreement, and an option nobody sets is the second option under another name.
-
-**Evidence needed:** how often a template-valid, RM-invalid composition reaches a consumer in practice (a consuming CDR's validation pipeline is the first place to ask); the duplicate-issue rate if the floor is chained over the vendored composition corpus; the cost of a second walk at the benchmark harness's composition sizes.
-
-**Evidence so far (2026-10-01):** until [PR 196](https://github.com/Cadasto/openehr-sdk-go/pull/196), the SDK's own generator produced template-valid, RM-invalid compositions on the default path. Over the four corpus templates `vital_signs`, `Demonstration.v1`, `BMI` and `body_weight`, generated under both `Policy` values and both `ValueFill` values (16 runs) before that PR, `ValidateComposition` returned OK on all 16. `ValidateRM` reported no issue for `BMI` and `body_weight`, whose bodies carried placeholder `DV_DATE_TIME` values and unregistered ENTRY `language` and `encoding` codes, and only presence and cardinality issues for `vital_signs` and `Demonstration.v1`. Those presence and cardinality breaches are floor arm (a) findings the template pass missed as well. Most sit on nodes the OPT does not model (a state ELEMENT, a protocol CLUSTER, a slot filler). One does not: a DV_ORDINAL with no `symbol`, a mandatory attribute, on a node whose `C_DV_ORDINAL` list pairs each value with a coded symbol. So the premise above, that a template-driven pass already reports arm (a), fails even on nodes a template models. An independent CDR that enforces RM invariants on commit refused the v0.28.0 bodies of all six templates it was tried with. PR 196 removed those defects, and one more RM-invalid shape showed in the same 16 runs: ELEMENTs that carry neither `value` nor `null_flavour`, or both, which break `ELEMENT.Inv_null_flavour_indicated`. Both validators passed them then, because the floor did not evaluate that rule; the floor now reports it and the generator no longer emits it. This was evidence for the fork, not a resolution: fixing the generator did not chain the floor into the template pass.
-
-**Resolution:** [ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md) took the first option: the template-driven entry points chain the floor, and an issue both walks report at one path with one code appears once. It amends REQ-102 (its § RM floor and its entry points beyond composition) and REQ-112's composition sentence. Over the corpus, no floor finding survived beside a template finding with a different code at the same path, and the chained cost is about the sum of the two walks.
-
-**Affects:** REQ-102, REQ-112.
+**Codified in:** [clinical-modeling.md § REQ-102](clinical-modeling.md#req-102--composition-validation) and [§ REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor).
 
 ---
 
@@ -319,7 +285,7 @@ This is a pre-existing emission gap, not a REQ-048 regression — REQ-048 only m
 
 ## STRAND-16 — Validator policy beyond the limits
 
-**Status:** Open. Opened 2026-10-13, after [PR 256](https://github.com/Cadasto/openehr-sdk-go/pull/256).
+**Status:** Open.
 
 **Question:** which settings, beyond the depth and visit limits, does the validator of [REQ-171](clinical-modeling.md#req-171--validation-engine) take as options, and which stay outside the SDK as the caller's policy over a result?
 
@@ -341,23 +307,11 @@ Three candidates are named and none is built:
 
 ## STRAND-17 — The OPT parser and the generated operational template model
 
-**Status:** Resolved 2026-11-03 by [ADR 0035](../adr/0035-compile-step-reads-operational-template-model.md): the compile step reads the generated model, and `template.ParseOPT` and its tree are deprecated when it does, in 0.45.0, and removed in 0.46.0; path lookup runs over the compiled template, the REQ-108 bounds reach the model's reader in the same change (the maintainer's amendment of the same day), and the new path reads every OPT the parser's default mode reads but one holding an integer past the 32-bit range, a `match_negated` of true, an infinite integer bound that admits no integer, or a `<definition>` the parser reads as a slot or a primitive constraint (the amendment of 2026-11-04); the removal retires REQ-100 into REQ-111 and replaces the parity check against the parser with the compiled trees recorded while it held (the amendment of 2026-11-05); the amendments are in ADR 0035's header. Opened 2026-11-02, with [ADR 0034](../adr/0034-sdk-authored-root-schemas.md).
+**Status:** Resolved by [ADR 0035](../adr/0035-compile-step-reads-operational-template-model.md).
 
-**Question:** once [REQ-176](clinical-modeling.md#req-176--adl-14-operational-template-model)'s generated types read an OPT losslessly, what becomes of [REQ-100](retired-requirements.md#req-100--adl-14-operational-template-opt-parse-and-paths)'s parser, `template.ParseOPT`: does it stay an independent reader, is it rebuilt as a view over the generated model, or does a converter outside `openehr/template` map one to the other?
+**Decision:** The compile step reads the generated operational template model, which is the SDK's one OPT reader, and path lookup runs over the compiled template.
 
-**Why it was open:** the parser is a projection built for path resolution and template compilation, with about twenty consumers across the compile, validation, the instance generator, the Web Template builder, FLAT and the examples, and it is tuned as a hot path. It loses what the model keeps: the description's details, `view`, `constraints`, `component_ontologies`, the root `ontology`, `C_CODE_REFERENCE.referenceSetUri`, `T_COMPLEX_OBJECT.default_value` and `translations`. Rebuilding it on the model would amend [REQ-013](module-layout.md#req-013--building-block-independence)'s row for `openehr/template`, which keeps the RM and AOM types out of its closure, and would put the generated decoders' cost on every compile.
-
-**The trade-off:**
-
-- **Two readers.** The parser stays as it is; a consumer that needs the whole document decodes it with the model. Against it: two readers of one format, each with its own tolerances.
-- **A view over the model.** The parser decodes with the model and projects. Against it: the REQ-013 row, the decode cost on the compile path, and the parser's tolerances (an unknown child type admitted as a leaf, `null_flavor`) restated on the model.
-- **A converter.** A package outside `openehr/template` maps a decoded `OPERATIONAL_TEMPLATE` to the parser's tree and back. Against it: a third representation to keep in step.
-
-**Evidence needed:** the decode cost of the generated model on the corpus against `ParseOPT`'s, on the compile benchmarks; which consumers need what the parser loses; and whether the parser's tolerances can be stated on the model without weakening [REQ-170](wire.md#req-170--unmatched-content-on-decode).
-
-**Resolution:** [ADR 0035](../adr/0035-compile-step-reads-operational-template-model.md) amends REQ-176, and with the switch REQ-100, REQ-103, REQ-107, REQ-108, REQ-111, REQ-116 and REQ-013's `openehr/template` and `openehr/templatecompile` rows.
-
-**Affects:** REQ-013, REQ-100, REQ-103, REQ-107, REQ-108, REQ-111, REQ-116, REQ-176.
+**Codified in:** [clinical-modeling.md § REQ-111](clinical-modeling.md#req-111--public-compiled-template-bridge) and [§ REQ-176](clinical-modeling.md#req-176--adl-14-operational-template-model).
 
 ---
 
@@ -371,14 +325,14 @@ Three candidates are named and none is built:
 | [STRAND-04](#strand-04--rm-polymorphism-and-codec-performance) | RM polymorphism + codec perf | **Partially resolved** | [Generics and reflection](idiom.md#generics-and-reflection), REQ-040, REQ-052..053 |
 | [STRAND-05](#strand-05--smart-on-openehr-auth-library) | SMART-on-openEHR auth library | **Resolved** ([ADR 0009](../adr/0009-smart-auth-library-scope.md)) | REQ-061..064 |
 | [STRAND-06](#strand-06--concurrency-and-transport-hygiene) | Concurrency / transport hygiene | Open | REQ-021, REQ-026 |
-| [STRAND-07](#strand-07--versioning-and-module-path) | Versioning + module path | **Resolved** | REQ-001, REQ-004, REQ-005 |
+| [STRAND-07](#strand-07--versioning-and-module-path) | Versioning + module path | **Resolved** | REQ-001, REQ-004 |
 | [STRAND-08](#strand-08--cadasto-extras-boundary-criteria-conditional-extraction) | Cadasto-extras extraction | Open (long-term) | [Boundary rules](module-layout.md#boundary-rules) |
-| [STRAND-09](#strand-09--its-rest-conformance-follow-ups) | ITS-REST conformance follow-ups (REST probes; stored-query paging) | **Resolved** ([ADR 0026](../adr/0026-stored-query-paging-fields-only-when-set.md)) | REQ-057, REQ-059, REQ-095, REQ-099 |
+| [STRAND-09](#strand-09--its-rest-conformance-follow-ups) | ITS-REST conformance follow-ups (REST probes; stored-query paging) | **Resolved** ([ADR 0026](../adr/0026-stored-query-paging-fields-only-when-set.md)) | REQ-057, REQ-059, REQ-050, REQ-099 |
 | [STRAND-10](#strand-10--rmpath-one-sentinel-for-two-not-found-conditions) | rmpath not-found sentinel split | Open | REQ-053, REQ-121 |
 | [STRAND-11](#strand-11--probe-recording-format-har-or-a-purpose-built-yaml) | Probe recording format (HAR vs YAML) | **Resolved** ([ADR 0020](../adr/0020-cassette-recording-har.md)) | REQ-082 |
 | [STRAND-12](#strand-12--bmm-interface-classes-carry-no-is_abstract-flag) | BMM interface classes carry no `is_abstract` | Open | REQ-041, REQ-048 |
-| [STRAND-13](#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped) | Properties inherited from a primitive-mapped ancestor are dropped | Open | REQ-041, REQ-046, REQ-048 |
+| [STRAND-13](#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped) | Properties inherited from a primitive-mapped ancestor are dropped | Open | REQ-041, REQ-048 |
 | [STRAND-14](#strand-14--should-template-driven-validation-also-run-the-rm-floor-invariants) | Template-driven validation and the RM floor | **Resolved** ([ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md)) | REQ-102, REQ-112 |
 | [STRAND-15](#strand-15--decode-time-presence-and-unmatched-member-capture-on-the-generated-types) | Decode-time presence and unmatched-member capture | Partly resolved (presence: [ADR 0033](../adr/0033-missing-members-reported-by-decoders.md); capture open) | REQ-040, REQ-052, REQ-112, REQ-170, REQ-175 |
 | [STRAND-16](#strand-16--validator-policy-beyond-the-limits) | Validator policy beyond the limits | Open | REQ-102, REQ-171 |
-| [STRAND-17](#strand-17--the-opt-parser-and-the-generated-operational-template-model) | The OPT parser and the generated OPT model | **Resolved** ([ADR 0035](../adr/0035-compile-step-reads-operational-template-model.md)) | REQ-013, REQ-100, REQ-103, REQ-107, REQ-108, REQ-111, REQ-116, REQ-176 |
+| [STRAND-17](#strand-17--the-opt-parser-and-the-generated-operational-template-model) | The OPT parser and the generated OPT model | **Resolved** ([ADR 0035](../adr/0035-compile-step-reads-operational-template-model.md)) | REQ-013, REQ-100, REQ-103, REQ-107, REQ-108, REQ-111, REQ-176 |

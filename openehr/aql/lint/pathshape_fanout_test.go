@@ -1,6 +1,6 @@
 package lint_test
 
-// pathshape_fanout_test.go: REQ-164 § Path-shape checks — aql_fanout_path_grain,
+// pathshape_fanout_test.go: REQ-161 § Path-shape checks — aql_fanout_path_grain,
 // the PATH source of engine-defined row multiplicity (SPECQUERY-9). Its sibling
 // aql_fanout_row_grain (REQ-161) owns the JUNCTION source, and the two are
 // disjoint by construction: this one needs two projected paths under ONE alias,
@@ -41,7 +41,7 @@ const obsFrom = " FROM OBSERVATION o[" + obsArch + "]"
 const twoAliasFrom = " FROM EHR e CONTAINS COMPOSITION c[" + compArch + "] " +
 	"CONTAINS OBSERVATION o[" + obsArch + "]"
 
-// witness is REQ-164 § The conservative segment walk's named firing witness,
+// witness is REQ-161 § The conservative segment walk's named firing witness,
 // quoted there verbatim as `SELECT o/data/events/time, o/links/meaning/value`:
 // the two paths diverge AT the alias, with an unpredicated container on each
 // branch (HISTORY.events and LOCATABLE.links, the latter inherited by
@@ -75,7 +75,7 @@ func oneFanoutPath(t *testing.T, q string, opts *lint.Options) lint.Issue {
 
 // --- Firing rules ------------------------------------------------------------
 
-// TestFanoutPathGrainFiresOnTheSpecWitness is the firing witness REQ-164 § The
+// TestFanoutPathGrainFiresOnTheSpecWitness is the firing witness REQ-161 § The
 // conservative segment walk names outright. It also pins the whole finding: the
 // Span covers the LATER path of the pair, Detail names BOTH paths and cites
 // SPECQUERY-9 as its sibling does, the severity is Warning, and the result is
@@ -90,7 +90,7 @@ func TestFanoutPathGrainFiresOnTheSpecWitness(t *testing.T) {
 	// Two unpredicated repeating segments (one per branch) are the PREMISE of
 	// the fan-out, so the repeating-segment code accompanies it by construction:
 	// the two report different defects — which occurrence, and how many rows —
-	// and REQ-164 § No double-reporting gives neither ownership of the other.
+	// and REQ-161 § No double-reporting gives neither ownership of the other.
 	if want := []string{repCode, repCode, fanoutPathCode}; !slices.Equal(codes(res), want) {
 		t.Fatalf("codes = %v, want %v", codes(res), want)
 	}
@@ -102,7 +102,7 @@ func TestFanoutPathGrainFiresOnTheSpecWitness(t *testing.T) {
 		t.Errorf("Issue.Path = %q, want the path the span covers", iss.Path)
 	}
 	if iss.Severity != lint.Warning {
-		t.Errorf("severity = %v, want warning (REQ-164 § Path-shape checks)", iss.Severity)
+		t.Errorf("severity = %v, want warning (REQ-161 § Path-shape checks)", iss.Severity)
 	}
 	for _, want := range []string{"o/data/events/time", "o/links/meaning/value", "SPECQUERY-9"} {
 		if !strings.Contains(iss.Detail, want) {
@@ -114,7 +114,7 @@ func TestFanoutPathGrainFiresOnTheSpecWitness(t *testing.T) {
 	}
 }
 
-// TestFanoutPathGrainCountsSegmentsTypedBeforeAWalkStop pins REQ-164 § The
+// TestFanoutPathGrainCountsSegmentsTypedBeforeAWalkStop pins REQ-161 § The
 // conservative segment walk's bounded-reach ruling: a walk that stopped still
 // contributes the segments it typed BEFORE the stop. The first path here is the
 // audited projection, whose walk ends at `EVENT.data`'s generic `T` —
@@ -280,7 +280,7 @@ func TestFanoutPathGrainValueFreeFields(t *testing.T) {
 	}
 }
 
-// TestFanoutPathGrainIsUngated pins REQ-164 § Always on, never gated for this
+// TestFanoutPathGrainIsUngated pins REQ-161 § Always on, never gated for this
 // code: no Options field switches it off. Options.Relation governs it least of
 // all — an overlay edge states a containment ROUTE fact, and this check asks
 // only about attribute typing and the projection's shape.

@@ -22,7 +22,7 @@ import (
 //  1. With principal_uid="u-123" / principal_type="AGENT", the resulting
 //     LaunchContext.Principal == {UID:"u-123", Type:PrincipalTypeAgent}.
 //  2. With no principal_* claims, LaunchContext.Principal is nil.
-func Probe008PrincipalClaimsVerbatim(ctx context.Context) (Result, error) { // PROBE-008 (REQ-067)
+func Probe008PrincipalClaimsVerbatim(ctx context.Context) (Result, error) { // PROBE-008 (REQ-064)
 	r := Result{Probe: "PROBE-008"}
 
 	const (

@@ -19,11 +19,11 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 <!-- BEGIN GENERATED: registry (make spec-generate — edit traceability.yaml, not this table) -->
 | ID | Title | Canonical | Stability | Impl. |
 |---|---|---|---|---|
-| REQ-001 | Module path | [packaging.md](packaging.md#req-001--module-path) | draft | landed |
+| REQ-001 | Module path | [module-layout.md](module-layout.md#req-001--module-path) | draft | landed |
 | REQ-002 | Go version (retired) | [retired-requirements.md](retired-requirements.md#req-002--go-version) | deprecated | retired |
 | REQ-003 | License (retired) | [retired-requirements.md](retired-requirements.md#req-003--license) | deprecated | retired |
-| REQ-004 | Semantic versioning | [packaging.md](packaging.md#req-004--semantic-versioning) | draft | landed |
-| REQ-005 | Internal boundary | [packaging.md](packaging.md#req-005--internal-boundary) | draft | landed |
+| REQ-004 | Semantic versioning | [module-layout.md](module-layout.md#req-004--semantic-versioning) | draft | landed |
+| REQ-005 | Internal boundary (retired) | [retired-requirements.md](retired-requirements.md#req-005--internal-boundary) | deprecated | retired |
 | REQ-010 | `cadasto/` cut line (retired) | [retired-requirements.md](retired-requirements.md#req-010--cadasto-cut-line) | deprecated | retired |
 | REQ-011 | No sideways `cadasto/` imports (retired) | [retired-requirements.md](retired-requirements.md#req-011--no-sideways-cadasto-imports) | deprecated | retired |
 | REQ-012 | Auth layering (retired) | [retired-requirements.md](retired-requirements.md#req-012--auth-layering) | deprecated | retired |
@@ -40,16 +40,16 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-031 | Embedded base structs (retired) | [retired-requirements.md](retired-requirements.md#req-031--embedded-base-structs) | deprecated | retired |
 | REQ-032 | Interfaces for abstract RM (retired) | [retired-requirements.md](retired-requirements.md#req-032--interfaces-for-abstract-rm) | deprecated | retired |
 | REQ-033 | No inheritance emulation (retired) | [retired-requirements.md](retired-requirements.md#req-033--no-inheritance-emulation) | deprecated | retired |
-| REQ-034 | openEHR terminology vocabulary | [rm-modeling.md](rm-modeling.md#openehr-terminology-vocabulary-req-034) | draft | landed |
-| REQ-040 | Type registry | [rm-modeling.md](rm-modeling.md#type-registry-req-040) | draft | landed |
-| REQ-041 | Pinned BMM sources | [bmm-conformance.md](bmm-conformance.md#req-041--pinned-bmm-sources) | draft | landed |
+| REQ-034 | openEHR terminology vocabulary | [reference-model.md](reference-model.md#openehr-terminology-vocabulary-req-034) | draft | landed |
+| REQ-040 | Type registry | [reference-model.md](reference-model.md#type-registry-req-040) | draft | landed |
+| REQ-041 | Pinned BMM sources | [reference-model.md](reference-model.md#req-041--pinned-bmm-sources) | draft | landed |
 | REQ-042 | Generated code, drift-detected (retired) | [retired-requirements.md](retired-requirements.md#req-042--generated-code-drift-detected) | deprecated | retired |
 | REQ-043 | P_BMM → Go mapping rules (retired) | [retired-requirements.md](retired-requirements.md#req-043--p_bmm--go-mapping-rules) | deprecated | retired |
 | REQ-044 | Hand-written extensions isolated (retired) | [retired-requirements.md](retired-requirements.md#req-044--hand-written-extensions-isolated) | deprecated | retired |
-| REQ-045 | BMM loader building block | [bmm-conformance.md](bmm-conformance.md#req-045--bmm-loader-is-a-building-block) | draft | landed |
-| REQ-046 | Primitive type mapping | [bmm-conformance.md](bmm-conformance.md#primitive-type-mapping) | draft | landed |
+| REQ-045 | BMM loader building block | [reference-model.md](reference-model.md#req-045--bmm-loader-is-a-building-block) | draft | landed |
+| REQ-046 | Primitive type mapping (retired) | [retired-requirements.md](retired-requirements.md#req-046--primitive-type-mapping) | deprecated | retired |
 | REQ-047 | BMM authoritative on divergence (retired) | [retired-requirements.md](retired-requirements.md#req-047--bmm-authoritative-on-divergence) | deprecated | retired |
-| REQ-048 | RM meta-model introspection | [bmm-conformance.md](bmm-conformance.md#req-048--rm-meta-model-introspection-surface) | draft | landed |
+| REQ-048 | RM meta-model introspection | [reference-model.md](reference-model.md#req-048--rm-meta-model-introspection-surface) | draft | landed |
 | REQ-049 | RM class-universe absence reasons (retired) | [retired-requirements.md](retired-requirements.md#req-049--rm-class-universe-absence-reasons) | deprecated | retired |
 | REQ-050 | REST 1.1.0 pin | [wire.md](wire.md#req-050) | draft | landed |
 | REQ-051 | Cadasto spec-version header (retired) | [retired-requirements.md](retired-requirements.md#req-051--cadasto-spec-version-header) | deprecated | retired |
@@ -67,14 +67,14 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-063 | Token refresh | [auth.md](auth.md#req-063--token-refresh) | draft | landed |
 | REQ-064 | Launch context | [auth.md](auth.md#req-064--launch-context) | draft | landed |
 | REQ-065 | Per-client tenant binding (retired) | [retired-requirements.md](retired-requirements.md#req-065--per-client-tenant-binding) | deprecated | retired |
-| REQ-066 | Caller attribution | [auth.md](auth.md#req-066) | draft | landed |
-| REQ-067 | Platform principal claims | [auth.md](auth.md#req-067) | draft | landed |
+| REQ-066 | Caller attribution | [transport.md](transport.md#req-066--caller-attribution) | draft | landed |
+| REQ-067 | Platform principal claims (retired) | [retired-requirements.md](retired-requirements.md#req-067--platform-principal-claims) | deprecated | retired |
 | REQ-068 | SMART flows and launch modes | [auth.md](auth.md#req-068--flow-and-launch-mode-coverage) | draft | landed |
 | REQ-069 | HTTP Basic on openEHR REST | [auth.md](auth.md#req-069) | draft | landed |
-| REQ-070 | First-class discovery | [service-discovery.md](service-discovery.md#req-070) | draft | landed |
-| REQ-071 | Discovery cache | [service-discovery.md](service-discovery.md#req-071) | draft | landed |
-| REQ-072 | Discovery validation | [service-discovery.md](service-discovery.md#req-072) | draft | landed |
-| REQ-073 | Discovery trust posture | [service-discovery.md](service-discovery.md#req-073--discovery-trust-posture) | draft | landed |
+| REQ-070 | First-class discovery | [auth.md](auth.md#req-070) | draft | landed |
+| REQ-071 | Discovery cache | [auth.md](auth.md#req-071) | draft | landed |
+| REQ-072 | Discovery validation | [auth.md](auth.md#req-072) | draft | landed |
+| REQ-073 | Discovery trust posture | [auth.md](auth.md#req-073--discovery-trust-posture) | draft | landed |
 | REQ-080 | openEHR wire conformance (retired) | [retired-requirements.md](retired-requirements.md#req-080--openehr-wire-conformance) | deprecated | retired |
 | REQ-081 | Wire-level parity (retired) | [retired-requirements.md](retired-requirements.md#req-081--wire-level-parity) | deprecated | retired |
 | REQ-082 | Probe runnability | [conformance.md](conformance.md#req-082--runnability) | draft | partial |
@@ -84,11 +84,11 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-092 | TLS posture | [transport.md](transport.md#req-092--tls-posture) | draft | landed |
 | REQ-093 | Error envelope mapping | [transport.md](transport.md#req-093--openehr-error-envelope-mapping) | draft | landed |
 | REQ-094 | `Prefer` negotiation | [transport.md](transport.md#req-094--prefer-response-shape-negotiation) | draft | landed |
-| REQ-095 | OpenAPI authoritative source | [wire.md](wire.md#req-095) | draft | partial |
+| REQ-095 | OpenAPI authoritative source (retired) | [retired-requirements.md](retired-requirements.md#req-095--openapi-authoritative-source) | deprecated | retired |
 | REQ-096 | Unambiguous "disable retry" (retired) | [retired-requirements.md](retired-requirements.md#req-096--unambiguous-disable-retry) | deprecated | retired |
 | REQ-097 | First-class `Idempotency-Key` (deprecated) | [retired-requirements.md](retired-requirements.md#req-097--first-class-idempotency-key) | deprecated | retired |
 | REQ-098 | Request-level observer hook | [transport.md](transport.md#req-098--request-level-observer-hook) | draft | landed |
-| REQ-099 | ITS-REST Admin client surface | [module-layout.md](module-layout.md#req-099--its-rest-admin-client-surface) | draft | landed |
+| REQ-099 | ITS-REST Admin client surface | [wire.md](wire.md#req-099--its-rest-admin-client-surface) | draft | landed |
 | REQ-100 | ADL 1.4 operational template (OPT) parse and paths (retired) | [retired-requirements.md](retired-requirements.md#req-100--adl-14-operational-template-opt-parse-and-paths) | deprecated | retired |
 | REQ-101 | Generic OPT-driven composition builder | [clinical-modeling.md](clinical-modeling.md#req-101--generic-opt-driven-composition-builder) | draft | landed |
 | REQ-102 | Composition validation | [clinical-modeling.md](clinical-modeling.md#req-102--composition-validation) | draft | landed |
@@ -103,14 +103,14 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-111 | Public compiled-template bridge | [clinical-modeling.md](clinical-modeling.md#req-111--public-compiled-template-bridge) | draft | landed |
 | REQ-112 | Template-less Reference Model validation floor | [clinical-modeling.md](clinical-modeling.md#req-112--template-less-reference-model-validation-floor) | draft | partial |
 | REQ-113 | Execution-oriented parsed AQL AST | [clinical-modeling.md](clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) | draft | landed |
-| REQ-116 | Template-level node naming and name-predicated paths | [clinical-modeling.md](clinical-modeling.md#req-116--template-level-node-naming-and-name-predicated-paths) | draft | landed |
+| REQ-116 | Template-level node naming and name-predicated paths (retired) | [retired-requirements.md](retired-requirements.md#req-116--template-level-node-naming-and-name-predicated-paths) | deprecated | retired |
 | REQ-117 | AQL expression-catalogue completion (retired) | [retired-requirements.md](retired-requirements.md#req-117--aql-expression-catalogue-completion) | deprecated | retired |
 | REQ-118 | Deprecated `SELECT TOP` clause and literal source text (retired) | [retired-requirements.md](retired-requirements.md#req-118--deprecated-select-top-clause-and-literal-source-text) | deprecated | retired |
 | REQ-119 | Re-parseable canonical AQL emission | [clinical-modeling.md](clinical-modeling.md#req-119--re-parseable-canonical-aql-emission) | draft | landed |
-| REQ-120 | RM identifier parsing and derivation | [rm-functions.md](rm-functions.md#req-120--rm-identifier-parsing-and-derivation) | draft | landed |
-| REQ-121 | Locatable path read access | [rm-functions.md](rm-functions.md#req-121--locatable-path-read-access) | draft | landed |
-| REQ-122 | Version-control derived helpers | [rm-functions.md](rm-functions.md#req-122--version-control-derived-helpers) | draft | landed |
-| REQ-123 | Temporal data-value helpers | [rm-functions.md](rm-functions.md#req-123--temporal-data-value-helpers) | draft | landed |
+| REQ-120 | RM identifier parsing and derivation | [reference-model.md](reference-model.md#req-120--rm-identifier-parsing-and-derivation) | draft | landed |
+| REQ-121 | Locatable path read access | [reference-model.md](reference-model.md#req-121--locatable-path-read-access) | draft | landed |
+| REQ-122 | Version-control derived helpers (retired) | [retired-requirements.md](retired-requirements.md#req-122--version-control-derived-helpers) | deprecated | retired |
+| REQ-123 | Temporal data-value helpers | [reference-model.md](reference-model.md#req-123--temporal-data-value-helpers) | draft | landed |
 | REQ-130 | Contribution builder | [wire.md](wire.md#req-130--contribution-builder) | draft | landed |
 | REQ-140 | Underscore-prefixed RM attributes (simplified formats) | [wire.md](wire.md#req-140--underscore-prefixed-rm-attributes) | draft | landed |
 | REQ-142 | Contribution read (retired) | [retired-requirements.md](retired-requirements.md#req-142--contribution-read) | deprecated | retired |
@@ -122,7 +122,7 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-161 | AQL semantic and portability lint | [clinical-modeling.md](clinical-modeling.md#req-161--aql-semantic-and-portability-lint) | draft | landed |
 | REQ-162 | Builder containment verification (retired) | [retired-requirements.md](retired-requirements.md#req-162--builder-containment-verification) | deprecated | retired |
 | REQ-163 | AQL write-side expressivity parity | [clinical-modeling.md](clinical-modeling.md#req-163--aql-write-side-expressivity-parity) | draft | landed |
-| REQ-164 | AQL path-shape and paging lint | [clinical-modeling.md](clinical-modeling.md#req-164--aql-path-shape-and-paging-lint) | draft | landed |
+| REQ-164 | AQL path-shape and paging lint (retired) | [retired-requirements.md](retired-requirements.md#req-164--aql-path-shape-and-paging-lint) | deprecated | retired |
 | REQ-165 | openEHR scope syntax | [auth.md](auth.md#req-165--openehr-scope-syntax) | draft | landed |
 | REQ-166 | Bearer challenge on 401 and 403 | [transport.md](transport.md#req-166--bearer-challenge-on-401-and-403) | draft | landed |
 | REQ-167 | Token revocation | [auth.md](auth.md#req-167--token-revocation) | draft | landed |
@@ -151,5 +151,5 @@ A plan may reserve a number before its spec text exists; record the reservation 
 
 - REQ-114: reserved for the OPT author validator.
 - REQ-115: reserved for the FLAT author linter.
-- REQ-124 and REQ-125: retired, never reused; they were reserved for the deferred RM-function stubs, which [rm-functions.md](rm-functions.md) records as out of scope.
+- REQ-124 and REQ-125: retired, never reused; they were reserved for the deferred RM-function stubs, which [reference-model.md](reference-model.md) records as out of scope.
 - REQ-141: retired, never reused.

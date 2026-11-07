@@ -8,7 +8,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
-// REQ-102 (Structural — binding items), REQ-116 — a one-entry name list
+// REQ-102 (Structural — binding items), REQ-111 — a one-entry name list
 // with list_open true pins no name, so an item whose name is that entry
 // binds as if the child pinned none: to the first child that pins no name.
 // Here that is the first child, which may occur once, so the second, which

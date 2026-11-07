@@ -296,7 +296,7 @@ func TestOriginalVersionLifecycleStateDefiningCode(t *testing.T) {
 // authors an imported version — so without it that half of the rule could be
 // reverted and stay green.
 //
-// REQ-095: the pinned OpenAPI UpdateVersion DTO declares no contribution, so
+// REQ-050: the pinned OpenAPI UpdateVersion DTO declares no contribution, so
 // an unset one is omitted from the write body.
 func TestVersionWrappersOmitAbsentContribution(t *testing.T) {
 	original := marshalToMap(t, contribution.WrapOriginalVersion(buildOriginalVersionRM()))
