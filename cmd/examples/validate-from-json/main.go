@@ -230,7 +230,7 @@ func resolvePaths(useCorpus bool, args []string) (jsonPath, optPath string, err 
 // defaultCompositionPath locates testdata/minimal_blood_pressure.json
 // relative to this source file, so `go run` works from any directory. The
 // fixture is written by gen_fixture.go, which refuses to write one that fails
-// validation.
+// validation, and a test fails when the committed file is not what it writes.
 func defaultCompositionPath() (string, error) {
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {

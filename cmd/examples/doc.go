@@ -11,7 +11,8 @@
 //
 // Run any of them from the repository root with `go run ./cmd/examples/<name>`:
 //
-//   - canonical_json: decode a canonical-JSON COMPOSITION into typed RM structs
+//   - canonical_json: decode a canonical-JSON COMPOSITION, the bundled fixture
+//     or a file you name, into typed RM structs
 //   - canxml_roundtrip: one COMPOSITION through canonical JSON and XML and back
 //   - opt-parse: read and compile an operational template (OPT) and look paths
 //     up in it

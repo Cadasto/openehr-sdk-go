@@ -14,7 +14,7 @@ Get from zero to a working import in a few minutes. This guide is for applicatio
 |---|---|
 | **Go 1.27.x** | Matches `go.mod` (minimum `1.27.0`). Host Go is the fast path for `go run` and IDE tooling. |
 | **Make** (optional) | Recommended for contributors and CI-parity checks (`make ci`). |
-| **An openEHR backend** (optional) | Only needed for live REST calls. Most building-block examples run offline with vendored fixtures. |
+| **An openEHR backend** (optional) | Only needed for live REST calls. Every bundled example runs offline: the REST ones use a fake backend in the same process. |
 
 ## Install
 
@@ -133,10 +133,12 @@ c, err := transport.New(cat, transport.WithHTTPClient(b.HTTPClient()))
 if err != nil {
 	log.Fatal(err)
 }
+ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+defer cancel()
 created, meta, err := ehr.Create(ctx, c)
 ```
 
-`ehr` is the leaf client `openehr/client/ehr`. `created` is the decoded `*rm.EHR`, and `meta` carries the response headers such as `Location`.
+`ehr` is the leaf client `openehr/client/ehr`. `created` is the decoded `*rm.EHR`, and `meta` carries the response headers such as `Location`. The deadline bounds the call, so a server that stops answering cannot hold your program; give every REST call one.
 
 To run the same call without importing `sandbox/`, use the [`ehr_create`](../cmd/examples/ehr_create/main.go) example. It targets a throwaway handler:
 
@@ -169,13 +171,16 @@ c, err := transport.New(cat,
 
 The [`service-auth`](examples.md#service-auth) example shows the full wiring, including `clientcreds.NewFromCatalog`, which takes the token endpoint from the service catalog.
 
-For SMART-on-openEHR launches, use `auth/smart` and the application-level helpers under `smart/`. Details: [specifications/auth.md](specifications/auth.md).
+For an app that acts for a signed-in user, run a SMART-on-openEHR launch with `auth/smart` and the application-level helpers under `smart/`. The `Source` from `auth/smart` is a token source too, passed to `transport.New` in the same way. The [`smart-launch`](examples.md#smart-launch) example walks through the PKCE flow, and its catalogue entry shows that wiring. Details: [specifications/auth.md](specifications/auth.md).
 
 ### Per-request auth (MCP, multi-tenant)
 
 When one process serves many users, attach a different token to each call through the context:
 
 ```go
+// r is the incoming request: its context ends when the caller goes away.
+ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+defer cancel()
 ctx = auth.WithTokenSource(ctx, perRequestTokenSource)
 created, meta, err := ehr.Create(ctx, c)
 ```

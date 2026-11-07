@@ -27,6 +27,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"time"
 
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/contribution"
@@ -103,8 +104,11 @@ func run() error {
 		fmt.Println("\nOK: body built. Re-run with -commit to POST it to an in-process fake CDR.")
 		return nil
 	}
-	// Step 4 (only with -commit): send it the way an application would.
-	return commitToFakeCDR(context.Background(), submission, body)
+	// Step 4 (only with -commit): send it the way an application would,
+	// with a deadline, so a CDR that stops answering cannot hold the program.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return commitToFakeCDR(ctx, submission, body)
 }
 
 // loadComposition reads a vendored canonical-JSON composition and decodes it

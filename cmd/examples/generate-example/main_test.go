@@ -9,7 +9,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 )
 
-// TestREQ107_ParsePolicy is the REQ-107 check that --policy reads the five
+// TestREQ107_ParsePolicy is the REQ-107 check that -policy reads the five
 // names required, minimal, medium, large and complete in any case, minimal
 // as Required and complete as Large, and that any other text, the empty
 // string included, is an error that wraps instance.ErrUnsupportedPolicy
@@ -41,8 +41,8 @@ func TestREQ107_ParsePolicy(t *testing.T) {
 			if tc.wantErr {
 				if !errors.Is(err, instance.ErrUnsupportedPolicy) {
 					t.Errorf("parsePolicy(%q) = %v, %v; want an error wrapping instance.ErrUnsupportedPolicy", tc.name, got, err)
-				} else if !strings.Contains(err.Error(), "--policy") {
-					t.Errorf("parsePolicy(%q) error = %q, want it to name the flag --policy", tc.name, err)
+				} else if !strings.HasPrefix(err.Error(), "-policy (") {
+					t.Errorf("parsePolicy(%q) error = %q, want it to start with the one-dash flag name \"-policy (\"", tc.name, err)
 				}
 				return
 			}

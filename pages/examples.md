@@ -9,27 +9,28 @@ description: >-
 
 The programs under
 [`cmd/examples/`](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples)
-are short programs to copy from. Between them they cover the building blocks
-end to end (decode, parse, compile, validate, synthesise, encode, and AQL).
-They also cover REST calls for EHRs, compositions, AQL queries, templates and
-contributions, and two ways to authenticate: a SMART launch for an app with a
-signed-in user, and client credentials for a service with no user. The REST
-examples run against a fake backend in the same process, so none of them needs
-a clinical data repository (CDR) or an account.
+are short programs to copy from, for the offline building blocks, the REST
+client and authentication. The REST examples run against a fake backend in the
+same process, so none of them needs a clinical data repository (CDR) or an
+account.
 
 The full catalogue in the repository,
 [docs/examples.md](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/examples.md),
-lists each program's flags and fixtures, with notes on what to copy into your
-own application. This page covers four of them in detail.
+says what each program covers and lists its flags and fixtures, with notes on
+what to copy into your own application. This page covers four of them in
+detail.
 
-Fixture paths resolve relative to the source file, so each `go run` works from
-any working directory inside a clone.
+A program finds its bundled fixtures from anywhere in a clone. A file path you
+pass it resolves from the working directory.
 
 ## Decode canonical JSON {#canonical_json}
 
 This is the smallest building-block program in the repository. It decodes a
 canonical-JSON Composition from the fixtures into a typed `rm.Composition`,
 without importing transport or auth.
+
+Clone the repository first, as [Install](install.md#add-the-module) shows,
+then run this from the root of the clone:
 
 ```bash
 go run ./cmd/examples/canonical_json
@@ -47,7 +48,9 @@ OK: canonical-JSON Composition decoded from body_weight.json
 
 `archetype_node_id` names the archetype the document is built on, `language`
 and `territory` are codes with the terminology they come from, and
-`content items` counts the entries the document carries.
+`content items` counts the entries the document carries. Name a
+canonical-JSON Composition file after the command to decode that one instead,
+as in `go run ./cmd/examples/canonical_json composition.json`.
 
 Packages: `openehr/rm`, `openehr/serialize/canjson`. Fixture:
 `testkit/corpus/compositions/body_weight.json`.
@@ -133,12 +136,14 @@ go build ./cmd/examples/...
 
 If you are new to the SDK, try them in this order:
 
-1. Decode canonical JSON
-2. Validate JSON against the RM and a template
-3. Create an EHR
-4. Manage a template on the server
-5. Save, read and update a Composition
-6. Build an AQL query
-7. Execute an AQL query
-8. Run a SMART PKCE launch
-9. Authenticate a backend service
+1. Decode canonical JSON (`canonical_json`)
+2. Read an operational template (`opt-parse`)
+3. Validate JSON against the RM and a template (`validate-from-json`)
+4. Synthesise a Composition from a template (`generate-example`)
+5. Create an EHR (`ehr_create`)
+6. Manage a template on the server (`definition-lifecycle`)
+7. Save, read and update a Composition (`composition-crud`)
+8. Build an AQL query (`aql-build`)
+9. Execute an AQL query (`query-execute`)
+10. Run a SMART PKCE launch (`smart-launch`)
+11. Authenticate a backend service (`service-auth`)

@@ -16,6 +16,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"time"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
@@ -57,7 +58,11 @@ func run() error {
 	// Step 3: the typed leaf call. POST /ehr with no body asks the server to
 	// create an EHR with a default EHR_STATUS. The SDK decodes the returned
 	// EHR and collects the response headers (Location, ETag, ...) into meta.
-	created, meta, err := ehr.Create(context.Background(), client)
+	// The deadline bounds the call, so a server that stops answering cannot
+	// hold the program.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	created, meta, err := ehr.Create(ctx, client)
 	if err != nil {
 		return fmt.Errorf("ehr.Create: %w", err)
 	}
