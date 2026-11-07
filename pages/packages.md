@@ -38,7 +38,7 @@ package.
 | [`openehr/composition`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/composition) | OPT-driven Composition builder | [`compile-build-validate`](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/examples.md#compile-build-validate) |
 | [`openehr/aql`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/aql) | AQL builders and request / result models | [`aql-build`](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/examples.md#aql-build) |
 | [`openehr/aql/parse`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/aql/parse) | AQL syntax parser | [`aql-parse-structured`](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/examples.md#aql-parse-structured) |
-| [`openehr/aql/lint`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/aql/lint) | Static lint | [`lint-aql`](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/examples.md#lint-aql) |
+| [`openehr/aql/lint`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/aql/lint) | Static lint | [`lint-aql`](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/examples.md#lint-aql), through `validation.ValidateAQL` |
 | [`openehr/aql/contain`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/aql/contain) | Containment admissibility | [`aql-build`](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/examples.md#aql-build) |
 | [`openehr/bmm`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/bmm) | BMM loader | |
 
