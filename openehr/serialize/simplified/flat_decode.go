@@ -2251,10 +2251,11 @@ type templateIndex struct {
 	// nodes at one path disagree on it, one of them determining none
 	// included: the template then gives no single coded name.
 	codedNames map[string]codedName
-	// ordinals maps the bare path of a C_DV_ORDINAL node to the terminology
-	// its pairs give each code at each ordinal value. A pair maps to "" where
-	// the nodes at that path, or the pairs of one of them, give it more than
-	// one: the template then gives no single answer.
+	// ordinals maps the compiled path of a C_DV_ORDINAL node, and its bare
+	// path, to the terminology its pairs give each code at each ordinal
+	// value. A pair maps to "" where the nodes at that path, or the pairs of
+	// one of them, give it more than one: the template then gives no single
+	// answer.
 	ordinals map[string]map[ordinalPair]string
 	// rmTypes maps a path to the RM type the template gives the node there. It
 	// maps to "" where the nodes at one path disagree, the alternatives of one
@@ -2365,10 +2366,16 @@ func (x *templateIndex) addOrdinals(path string, ord constraints.CDvOrdinal) {
 
 // ordinalTerminologies returns the terminology the template's C_DV_ORDINAL at
 // path gives each code and value, "" for one it gives no single one; nil
-// where there is none, and in a decode without the template.
+// where there is none, and in a decode without the template. Below reused
+// siblings whose C_DV_ORDINALs differ, path, which keeps every name the
+// template pins, finds the sibling's own pairs; the bare alias answers where
+// it names no C_DV_ORDINAL the template holds.
 func (x *templateIndex) ordinalTerminologies(path string) map[ordinalPair]string {
 	if x == nil {
 		return nil
+	}
+	if terms, ok := x.ordinals[path]; ok {
+		return terms
 	}
 	return x.ordinals[bareAQLPath(path)]
 }
@@ -2644,10 +2651,14 @@ func buildTemplateIndex(c *templatecompile.Compiled) *templateIndex {
 	}
 	var walk func(n *templatecompile.CompiledNode)
 	walk = func(n *templatecompile.CompiledNode) {
-		// Under the bare path alone: decode looks an ordinal up by the key
-		// [walkAQLKeyed] composes, made bare ([templateIndex.ordinals]).
+		// Under the compiled path, the key [walkAQLKeyed] composes, and its
+		// bare alias ([templateIndex.ordinalTerminologies]).
 		if ord, ok := n.PrimitiveConstraint().(constraints.CDvOrdinal); ok {
-			x.addOrdinals(bareAQLPath(n.AQLPath()), ord)
+			path := n.AQLPath()
+			x.addOrdinals(path, ord)
+			if bare := bareAQLPath(path); bare != path {
+				x.addOrdinals(bare, ord)
+			}
 		}
 		if s := emptyStructuresOf(n); len(s) > 0 {
 			if bare := bareAQLPath(n.AQLPath()); x.structures[bare] == nil {

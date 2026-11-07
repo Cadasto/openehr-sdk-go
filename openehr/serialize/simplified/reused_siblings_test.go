@@ -6,9 +6,12 @@ package simplified_test
 
 import (
 	"maps"
+	"os"
 	"slices"
+	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rmpath"
@@ -303,6 +306,75 @@ func TestREQ053ReusedSiblingItemNamesDecodeWithTemplate(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// TestREQ053ReusedSiblingOrdinalTerminology — REQ-053, REQ-116: where the
+// ELEMENT at0004 of each named EVENT sibling is a C_DV_ORDINAL whose one pair
+// codes X1 at 1, in local in 'First event' and in SNOMED-CT in 'Second
+// event', a WithTemplate decode of a reader-shaped body, |code, |value and
+// |ordinal with no terminology, gives each event's symbol the terminology its
+// own sibling's pair gives, and the composition validates against the
+// template.
+func TestREQ053ReusedSiblingOrdinalTerminology(t *testing.T) {
+	const id = "sdk_named_sibling_events.v1"
+	raw, err := os.ReadFile("testdata/named_sibling_events.opt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// textValue opens the DV_TEXT that each event's at0004 holds, the only
+	// DV_TEXT at that depth; its <node_id /> closes it.
+	const textValue = "<children xsi:type=\"C_COMPLEX_OBJECT\">\n                              <rm_type_name>DV_TEXT</rm_type_name>"
+	opt := string(raw)
+	if n := strings.Count(opt, textValue); n != 2 {
+		t.Fatalf("%s holds %d DV_TEXT values at at0004's depth, want 2", id, n)
+	}
+	for _, terminology := range []string{"local", "SNOMED-CT"} {
+		at := strings.Index(opt, textValue)
+		end := at + strings.Index(opt[at:], "<node_id />") + len("<node_id />")
+		opt = opt[:at] + "<children xsi:type=\"C_DV_ORDINAL\">\n<rm_type_name>DV_ORDINAL</rm_type_name>" +
+			opt[at+len(textValue):end] +
+			"<list><value>1</value><symbol><defining_code><terminology_id><value>" + terminology +
+			"</value></terminology_id><code_string>X1</code_string></defining_code></symbol></list>" + opt[end:]
+	}
+	model, err := aom14.ReadOperationalTemplate(strings.NewReader(opt))
+	if err != nil {
+		t.Fatalf("ReadOperationalTemplate: %v", err)
+	}
+	wt, compiled := compileTemplate(t, id, model)
+	body := mustJSON(t, map[string]any{
+		"ctx/language":                                  "en",
+		"ctx/territory":                                 "NL",
+		"ctx/composer_name":                             "Composer",
+		"ctx/time":                                      "2026-10-26T09:00:00Z",
+		namedEventsObs + "/text|code":                   "X1",
+		namedEventsObs + "/text|value":                  "Mild",
+		namedEventsObs + "/text|ordinal":                1,
+		namedEventsObs + "/time":                        "2026-10-26T09:00:00Z",
+		namedEventsObs + "/text2|code":                  "X1",
+		namedEventsObs + "/text2|value":                 "Mild",
+		namedEventsObs + "/text2|ordinal":               1,
+		namedEventsObs + "/time2":                       "2026-10-26T10:00:00Z",
+		"sdk_named_sibling_events/category|code":        "433",
+		"sdk_named_sibling_events/category|value":       "event",
+		"sdk_named_sibling_events/category|terminology": "openehr",
+	})
+	for _, format := range []string{"FLAT", "STRUCTURED"} {
+		t.Run(format, func(t *testing.T) {
+			back := decodeAs(t, format, body, wt, simplified.WithTemplate(compiled), simplified.WithStrict())
+			for event, want := range map[string]string{"First event": "local", "Second event": "SNOMED-CT"} {
+				ord, ok := namedEventItem(t, back, event, "at0004").(*rm.DVOrdinal)
+				if !ok {
+					t.Fatalf("the at0004 value of the event named %q is a %T, want *rm.DVOrdinal", event, namedEventItem(t, back, event, "at0004"))
+				}
+				if got := ord.Symbol.DefiningCode.TerminologyID.Value; got != want {
+					t.Errorf("the ordinal of the event named %q: symbol terminology %q, want %s, its sibling's", event, got, want)
+				}
+			}
+			for _, is := range validation.ValidateComposition(back, compiled).Issues {
+				t.Errorf("decoded composition: %s at %s: %s", is.Code, is.Path, is.Detail)
+			}
+		})
 	}
 }
 
