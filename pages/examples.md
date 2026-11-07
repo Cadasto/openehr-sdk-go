@@ -22,8 +22,8 @@ The full catalogue in the repository,
 lists each program's flags and fixtures, with notes on what to copy into your
 own application. This page covers four of them in detail.
 
-Fixture paths resolve relative to the source file, so each `go run` works from
-any working directory inside a clone.
+A program finds its bundled fixtures from anywhere in a clone. A file path you
+pass it resolves from the working directory.
 
 ## Decode canonical JSON {#canonical_json}
 
