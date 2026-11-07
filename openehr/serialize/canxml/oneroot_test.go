@@ -35,6 +35,7 @@ func TestREQ056_XMLOneRoot(t *testing.T) {
 		"text after a comment":           `<!-- note -->` + xmlPlanted,
 		"text after a PI":                `<?pi data?>` + xmlPlanted,
 		"stray end element":              `</extra>`,
+		"markup it cannot read":          `<1>`,
 		"document type after the root":   `<!DOCTYPE extra>`,
 		"unclosed second root":           `<extra>`,
 		"second root after a comment":    `<!-- note --><extra/>`,

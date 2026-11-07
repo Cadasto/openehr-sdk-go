@@ -15,18 +15,21 @@ import (
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
-// TestREQ056_NotWellFormedIsItsOwnClass pins that a refusal of input that is
-// not well-formed XML, which encoding/xml reads without a syntax error, can be
-// told apart from a document of the wrong shape (REQ-056, REQ-111): it wraps
-// canxml.ErrNotWellFormed beside canxml.ErrInvalidShape, for canxml.Unmarshal
-// in every mode and for the operational template reader, while a primitive
-// failure wraps canxml.ErrInvalidShape alone. Its text names the rule the
-// input breaks, not "cause withheld", and none of the input. The inputs are
-// the corpus BMI documents with one defect each.
+// TestREQ056_NotWellFormedIsItsOwnClass pins that the decode's own refusal of
+// input that is not well-formed XML can be told apart from a document of the
+// wrong shape (REQ-056, REQ-111): it wraps canxml.ErrNotWellFormed beside
+// canxml.ErrInvalidShape, for canxml.Unmarshal in every mode and for the
+// operational template reader, while a primitive failure wraps
+// canxml.ErrInvalidShape alone. Its text names the rule the input breaks, not
+// "cause withheld", and none of the input. Markup encoding/xml cannot read
+// before the root, with nothing refused before it, stays its *xml.SyntaxError
+// in both readers. The inputs are the corpus BMI documents with one defect
+// each.
 //
 // Can-fail control: drop the sentinel from a refusal's cause and its row
 // fails the errors.Is check; drop its text from the value-free renderer's
-// forms and its row reads "cause withheld".
+// forms and its row reads "cause withheld"; refuse a syntax error the prolog
+// check reads before anything it refused, and the syntax-error rows fail.
 func TestREQ056_NotWellFormedIsItsOwnClass(t *testing.T) {
 	composition := readCorpus(t, "compositions/BMI.xml")
 	template := readCorpus(t, "templates/BMI.opt")
@@ -57,6 +60,7 @@ func TestREQ056_NotWellFormedIsItsOwnClass(t *testing.T) {
 	compositionTwice := withAttr(composition, "COMPOSITION", `archetype_node_id="PLANTED"`)
 	declarationInside := before(composition, `<?xml version="1.0"?>`)
 	declarationAfterSpace := joined([]byte(" "+`<?xml version="1.0" encoding="UTF-8"?>`), composition)
+	declarationAfterSpaceThenSyntax := joined([]byte(" "+`<?xml version="1.0"?><1>`), composition)
 	compositionTwoRoots := joined(composition, []byte("<PLANTED/>"))
 	templateTwice := withAttr(template, "template", `concept="PLANTED" concept="PLANTED"`)
 	templateTwoRoots := joined(template, []byte("<PLANTED/>"))
@@ -84,6 +88,15 @@ func TestREQ056_NotWellFormedIsItsOwnClass(t *testing.T) {
 			rule: "content before the root element",
 			decode: func() error {
 				return canxml.Unmarshal(declarationAfterSpace, new(rm.Composition))
+			},
+		},
+		{
+			// The misplaced declaration is refused before the decode reaches
+			// the markup it cannot read.
+			name: "composition after white space, a declaration and markup it cannot read",
+			rule: "content before the root element",
+			decode: func() error {
+				return canxml.Unmarshal(declarationAfterSpaceThenSyntax, new(rm.Composition))
 			},
 		},
 		{
@@ -126,12 +139,34 @@ func TestREQ056_NotWellFormedIsItsOwnClass(t *testing.T) {
 		})
 	}
 
-	t.Run("markup encoding/xml cannot read before the root is its syntax error", func(t *testing.T) {
-		err := canxml.Unmarshal(joined([]byte("<1>"), composition), new(rm.Composition), canxml.WithStrict())
-		if _, ok := errors.AsType[*xml.SyntaxError](err); !ok || errors.Is(err, canxml.ErrNotWellFormed) {
-			t.Fatalf("canxml.Unmarshal(<1> + root) = %v; want an *xml.SyntaxError that does not wrap canxml.ErrNotWellFormed", err)
+	// Markup encoding/xml cannot read before the root, which may be the
+	// root's own start tag, is its syntax error when nothing refused comes
+	// before it: first, after a comment, and after the XML declaration, so
+	// that the prolog check reads up to it.
+	syntaxErrors := map[string]func() error{}
+	for head, name := range map[string]string{
+		"<1>":                           "first",
+		"<!-- c --><1>":                 "after a comment",
+		`<?xml version="1.0"?>` + "<1>": "after the XML declaration",
+	} {
+		syntaxErrors["composition, markup it cannot read "+name] = func() error {
+			return canxml.Unmarshal(joined([]byte(head), composition), new(rm.Composition), canxml.WithStrict())
 		}
-	})
+		for mode, opts := range map[string][]canxml.DecoderOption{"default": nil, "strict": {canxml.WithStrict()}} {
+			syntaxErrors[mode+" template, markup it cannot read "+name] = func() error {
+				_, err := aom14.ReadOperationalTemplate(bytes.NewReader(joined([]byte(head), template)), opts...)
+				return err
+			}
+		}
+	}
+	for name, decode := range syntaxErrors {
+		t.Run(name, func(t *testing.T) {
+			err := decode()
+			if _, ok := errors.AsType[*xml.SyntaxError](err); !ok || errors.Is(err, canxml.ErrNotWellFormed) {
+				t.Fatalf("decode = %v; want an *xml.SyntaxError that does not wrap canxml.ErrNotWellFormed", err)
+			}
+		})
+	}
 
 	t.Run("a primitive failure is not one", func(t *testing.T) {
 		const doc = `<ehr_status xmlns="http://schemas.openehr.org/v1"><is_queryable>maybe</is_queryable></ehr_status>`

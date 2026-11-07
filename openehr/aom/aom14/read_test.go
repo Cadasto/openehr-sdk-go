@@ -198,11 +198,12 @@ func TestREQ176_REQ111_ReadOperationalTemplateHoldsContentAfterTheRoot(t *testin
 	t.Parallel()
 	const planted = "PLANTED"
 	refused := map[string]string{
-		"a second root":       `<template><template_id><value>` + planted + `</value></template_id></template>`,
-		"an empty element":    `<` + planted + `/>`,
-		"text":                planted,
-		"a stray end element": `</` + planted + `>`,
-		"a CDATA section":     `<![CDATA[` + planted + `]]>`,
+		"a second root":         `<template><template_id><value>` + planted + `</value></template_id></template>`,
+		"an empty element":      `<` + planted + `/>`,
+		"text":                  planted,
+		"a stray end element":   `</` + planted + `>`,
+		"a CDATA section":       `<![CDATA[` + planted + `]]>`,
+		"markup it cannot read": `<1>`,
 	}
 	defaultOnly := map[string]string{
 		"a document type":           `<!DOCTYPE ` + planted + `>`,
