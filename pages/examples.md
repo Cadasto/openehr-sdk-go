@@ -9,18 +9,16 @@ description: >-
 
 The programs under
 [`cmd/examples/`](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples)
-are short programs to copy from. Between them they cover the building blocks
-end to end (decode, parse, compile, validate, synthesise, encode, and AQL).
-They also cover REST calls for EHRs, compositions, AQL queries, templates and
-contributions, and two ways to authenticate: a SMART launch for an app with a
-signed-in user, and client credentials for a service with no user. The REST
-examples run against a fake backend in the same process, so none of them needs
-a clinical data repository (CDR) or an account.
+are short programs to copy from, for the offline building blocks, the REST
+client and authentication. The REST examples run against a fake backend in the
+same process, so none of them needs a clinical data repository (CDR) or an
+account.
 
 The full catalogue in the repository,
 [docs/examples.md](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/examples.md),
-lists each program's flags and fixtures, with notes on what to copy into your
-own application. This page covers four of them in detail.
+says what each program covers and lists its flags and fixtures, with notes on
+what to copy into your own application. This page covers four of them in
+detail.
 
 A program finds its bundled fixtures from anywhere in a clone. A file path you
 pass it resolves from the working directory.
