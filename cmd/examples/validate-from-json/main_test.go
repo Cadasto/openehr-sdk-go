@@ -1,16 +1,55 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/cmd/examples/validate-from-json/internal/bpfixture"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
+
+// The committed default fixture is what gen_fixture.go writes: a change to
+// the builder in internal/bpfixture without a rerun of the generator, or an
+// edit to the file by hand, fails here.
+func TestDefaultFixtureIsWhatTheGeneratorWrites(t *testing.T) {
+	want, err := bpfixture.Document()
+	if err != nil {
+		t.Fatalf("bpfixture.Document() error = %v", err)
+	}
+	path, err := defaultCompositionPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Errorf("%s is not what gen_fixture.go writes; rerun `go run gen_fixture.go` from "+
+			"cmd/examples/validate-from-json/.\n%s", path, firstDifference(got, want))
+	}
+}
+
+// firstDifference shows where two documents first differ, with some context
+// either side, rather than dumping both.
+func firstDifference(got, want []byte) string {
+	at := 0
+	for at < min(len(got), len(want)) && got[at] == want[at] {
+		at++
+	}
+	window := func(b []byte) string {
+		return string(b[max(at-60, 0):min(at+60, len(b))])
+	}
+	return fmt.Sprintf("first difference at byte %d (committed %d bytes, generated %d bytes)\n"+
+		"  committed: …%s…\n  generated: …%s…", at, len(got), len(want), window(got), window(want))
+}
 
 // -cassette must keep setting the same switch as -corpus: deleting that
 // alias fails the "deprecated -cassette spelling" case.
