@@ -703,7 +703,7 @@ go run ./cmd/examples/definition-lifecycle
 ```text
 uploaded template    : body_weight
 listed metadata      : id=body_weight concept=body_weight
-downloaded OPT       : 84804 bytes, identical to the upload: true
+downloaded OPT       : 84789 bytes, identical to the upload: true
 compiled handle      : template=body_weight root=openEHR-EHR-COMPOSITION.encounter.v1
 example composition  : openEHR-EHR-COMPOSITION.encounter.v1 with 1 content item(s)
 OK: template uploaded, listed, downloaded and compiled; example received

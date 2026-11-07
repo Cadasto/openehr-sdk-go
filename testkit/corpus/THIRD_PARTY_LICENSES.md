@@ -101,9 +101,33 @@ The repository's `LICENSE` names no copyright holder; the project is published b
 
 To refresh, copy both files from a checkout of a newer commit and update the commit and blobs here; `git hash-object --no-filters` gives a file's blob.
 
+## openEHR CKM
+
+**Source:** openEHR Clinical Knowledge Manager, template `1013.26.380` "Vital signs" (project *Vital signs*, International Core Resources, draft of 2021-03-08), operational template export `https://ckm.openehr.org/ckm/rest/v1/templates/1013.26.380/opt`, fetched 2026-11-07 (`sha256` `3a0d31bd3b5dc632…`, git blob `ab7508b210e96d2df4ccec5b712e6763236241b7`).
+
+```
+Licensed under Creative Commons Attribution-ShareAlike (CKM content), as are the archetypes it holds
+```
+
+**Vendored:** `templates/Vital signs CKM.opt`. **Modifications:** renamed so its id, and the id the reference Web Template derives from it, differ from `vital_signs`: its `template_id` (in the header and on the root node) and `concept` read `Vital signs CKM`, its uid is a new one, and the name it pins on the COMPOSITION, `vital_signs2` upstream, reads `Vital signs CKM`. Nothing else in it is edited. The derived work stays under the same terms.
+
+## RippleOSI/Ripple-openEHR
+
+**Source:** https://github.com/RippleOSI/Ripple-openEHR  
+**Pinned commit:** `9d501747b1a5c6c712539ea9b415c5d96b000105` (`master`)  
+**Path within source:** `technical/operational/IDCR - Vital Signs Encounter.opt`
+
+```
+Licensed under the Apache License, Version 2.0 (full text: licenses/Apache-2.0.txt)
+```
+
+The repository's `LICENSE` names no copyright holder; the repository is published under the RippleOSI organisation.
+
+**Vendored:** `templates/IDCR - Vital Signs Encounter.v1.opt`, renamed to its template id, unmodified upstream bytes (git blob `dc7193c6d1d6593f301a730eee6dc0019429c0cb`; byte-order mark and CRLF line endings kept). It is the original Ocean Template Designer export: it still constrains `is_integral` on a DV_PROPORTION, which the Reference Model defines as a function, where the copy in the EHRbase server's tests had those constraints removed by hand.
+
 ## CODE24 (Cadasto)
 
-**Files:** CODE24-sourced templates under `templates/` paired with `compositions/` (see [README.md](README.md)), including the OPT-only `Referral Request.v1`; benchmark `vital_signs` and `clinical_notes.v0` (made by Medblocks together with CODE24). The `alternative_types.en.v1` and `BMI` compositions are CODE24's, but their OPTs are EHRbase's (above). `body_weight.opt` has its authoring tool's account id replaced by `user=redacted`; nothing else in it is edited. `clinical_notes.v0.opt`, an Archetype Designer export that another tool later re-serialised, has that tool's changes undone where they break the schema: the root carries no `xsi:type` (it had `OPT`, a type no schema defines), the XML declaration is back, and `match_negated` follows `existence` again instead of preceding `rm_attribute_name`; nothing else in it is edited. `vital_signs.opt`, an Ocean Template Designer export, has two edits. Its four empty `xs:boolean` interval flags are spelt `true`. The existence of each OBSERVATION's `protocol`, each event's `state` and their `items` is 0..1, the Reference Model's, where the export wrote 1..1. `blood_pressure_strict_existence.opt` is that export's blood pressure OBSERVATION alone, with each existence as exported, under its own template id and uid.
+**Files:** CODE24-sourced templates under `templates/` paired with `compositions/` (see [README.md](README.md)), including the OPT-only `Referral Request.v1`; benchmark `vital_signs` and `clinical_notes.v0` (made by Medblocks together with CODE24). The `alternative_types.en.v1` and `BMI` compositions are CODE24's, but their OPTs are EHRbase's (above). `clinical_notes.v0.opt`, an Archetype Designer export that another tool later re-serialised, has that tool's changes undone where they break the schema: the root carries no `xsi:type` (it had `OPT`, a type no schema defines), the XML declaration is back, and `match_negated` follows `existence` again instead of preceding `rm_attribute_name`; nothing else in it is edited. `vital_signs.opt`, an Ocean Template Designer export, has two edits. Its four empty `xs:boolean` interval flags are spelt `true`. The existence of each OBSERVATION's `protocol`, each event's `state` and their `items` is 0..1, the Reference Model's, where the export wrote 1..1. `blood_pressure_strict_existence.opt` is that export's blood pressure OBSERVATION alone, with each existence as exported, under its own template id and uid.
 
 **License:** MIT
 
