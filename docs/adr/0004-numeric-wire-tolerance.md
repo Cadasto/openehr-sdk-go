@@ -9,7 +9,7 @@ date: 2026-05-16
 # ADR 0004 — Strict-encode, permissive-decode for BMM `Real` and `Integer`
 
 - **Status:** Accepted, 2026-05-16.
-- **Tracks:** REQ-046 (BMM primitive mapping), REQ-052 (canonical-JSON wire profile), STRAND-04 (RM polymorphism + codec performance).
+- **Tracks:** REQ-046 (BMM primitive mapping, since retired into REQ-041), REQ-052 (canonical-JSON wire profile), STRAND-04 (RM polymorphism + codec performance).
 - **Amended 2026-10-15** (maintainer decision): `Integer` decode also accepts a whole number written with a zero fraction or an exponent (`1.0`, `1e0`), bare or quoted, as that integer, and refuses one with a non-zero fraction; the reference's own FLAT writes a DV_PROPORTION `type` as `1.0`. The rule's normative home is [wire.md § Floating-point precision](../specifications/wire.md#floating-point-precision); `Integer64` stays out of scope as below.
 - **Amended 2026-10-19** (maintainer decision): `Integer64` takes the `Integer` decode rule above, as the defined type `rm.Integer64` (underlying `int64`), which supersedes its exclusion in the 2026-10-15 amendment. `DV_COUNT.magnitude`, the RM's one `Integer64` attribute, refused `2.0`, `2e0` and `"2"`, which a `DV_QUANTITY.precision` accepts; one RM integer rule now covers both widths. The cost is an API break: `DVCount.Magnitude` changes from `int64` to `rm.Integer64`, so a caller that assigns or compares a typed `int64` needs a conversion (untyped constants still work). `Double` stays out of scope.
 
@@ -26,7 +26,7 @@ The canonical-JSON wire profile ([`docs/specifications/wire.md`](../../docs/spec
 - "`DV_QUANTITY` magnitudes are emitted as JSON numbers, not strings, **unless the spec mandates otherwise** (some implementations have used strings to avoid float-precision loss; the SDK takes a position — see § Floating-point precision below)."
 - The double-precision rule of [wire.md § Floating-point precision](../specifications/wire.md#floating-point-precision): magnitudes are IEEE 754 double-precision JSON numbers, never coerced through `float32` or a similarly lossy intermediate.
 
-The wire spec foresees that real producers exist that emit `"magnitude": "354"` (string) rather than `"magnitude": 354` (number). The vendored fixtures confirm this — `testkit/corpus/compositions/BMI.json` carries `"magnitude": "354"` etc. The spec ENCODE side is settled (numbers only); the DECODE side has been implicit until now.
+The wire spec foresees that real producers exist that emit `"magnitude": "354"` (string) rather than `"magnitude": 354` (number). The vendored fixtures confirm this — `testkit/corpus/compositions/vital_signs.json` carries `"magnitude": "1256"` etc. The spec ENCODE side is settled (numbers only); the DECODE side has been implicit until now.
 
 A permissive decoder is needed for SDK consumers to round-trip real-world CDR fixtures, but strict downstream consumers (other openEHR clients, third-party producers) need to be able to assume the SDK emits numbers. Asymmetric tolerance is the standard Postel-style answer; it needs to be **explicit** so the SDK's openEHR wire conformance (REQ-080) is unambiguous.
 
@@ -63,12 +63,12 @@ Each is emitted by the BMM generator wherever the BMM primitive `Real` / `Intege
 - openEHR wire conformance (REQ-080): any conforming client has to handle quoted magnitudes the same way on decode to keep fixture round-trip semantics identical. Without this ADR a strict-number-only decoder would reject the `"magnitude": "354"` form that real CDRs emit. (The earlier wire-level cross-SDK parity requirement, REQ-081, has since been retired.)
 - Consumers that need strict-number-only decode can wrap `canjson.Unmarshal` with a pre-pass that rejects quoted numerics, but the SDK itself does not offer a strict-decode mode in v1 — the loss of fixture interoperability outweighs the strictness benefit at this stage.
 - The generated `MarshalJSONTo` for every concrete RM type continues to emit numbers (no behaviour change on the encode side).
-- Documentation: REQ-046 stays as written — its "fixed mapping" pertains to underlying type only. The Floating-point precision section of REQ-052 references this ADR for decode tolerance. The note that `primitiveGoType` emits the alias type name (not the raw primitive) is captured in [`docs/specifications/reference-model.md`](../../docs/specifications/reference-model.md) § Primitive type mapping.
+- Documentation: the fixed primitive mapping, now REQ-041's *Primitive types* rule, stays as written; it pertains to the underlying type only. The Floating-point precision section of REQ-052 references this ADR for decode tolerance. The note that `primitiveGoType` emits the alias type name (not the raw primitive) is captured in [`docs/specifications/reference-model.md`](../../docs/specifications/reference-model.md) § Primitive type mapping.
 
 ## References
 
-- [`docs/specifications/reference-model.md`](../../docs/specifications/reference-model.md) — REQ-046 (primitive mapping).
+- [`docs/specifications/reference-model.md`](../../docs/specifications/reference-model.md) — REQ-041 (primitive mapping).
 - [`docs/specifications/wire.md`](../../docs/specifications/wire.md) — REQ-052 (canonical-JSON wire profile, Floating-point precision).
 - [`openehr/rm/real.go`](../../openehr/rm/real.go), [`openehr/rm/integer.go`](../../openehr/rm/integer.go), [`openehr/rm/integer64.go`](../../openehr/rm/integer64.go) — the defined types implementing this ADR.
 - [`internal/bmmgen/primitives.go`](../../internal/bmmgen/primitives.go) — the generator's mapping table.
-- [`testkit/corpus/compositions/BMI.json`](../../testkit/corpus/compositions/BMI.json) — concrete fixture with quoted-number magnitudes.
+- [`testkit/corpus/compositions/vital_signs.json`](../../testkit/corpus/compositions/vital_signs.json) — concrete fixture with quoted-number magnitudes.

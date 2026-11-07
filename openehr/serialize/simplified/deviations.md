@@ -632,7 +632,7 @@ Closing it needs a FLAT spelling for a folded wrapper — a reference-side chang
 the reference spelling wins), not a codec one. PROBE-086 cannot see the gap at all, because
 its input is FLAT and a folded wrapper never appears there.
 
-**Archetype-reuse siblings (REQ-116).** REQ-116 made templates that reuse one archetype
+**Archetype-reuse siblings (REQ-111).** Template-level node names (REQ-111) made templates that reuse one archetype
 among siblings *exportable*: distinct WebTemplate `id`s via the pinned template-level name,
 and name-predicated `aqlPath`s. Siblings are the nodes under one parent that share an
 attribute and a node id. The codec resolves each node by its *resolution path*: the

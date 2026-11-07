@@ -12,7 +12,7 @@ date: 2026-08-30
 - **Supersedes:** —
 - **Superseded by:** —
 - **Strand:** none — direct decision (this plan's Phase 0); no prior open research strand.
-- **Introduces:** [REQ-144](../specifications/wire.md#req-144--definition-metadata-decoding) (Definition metadata decoding). **Amends:** [REQ-095](../specifications/wire.md#the-openapi-files-are-authoritative) (OpenAPI authoritative source) — one keyed compatibility exception, carried by § REQ-095 itself rather than asserted from here.
+- **Introduces:** [REQ-144](../specifications/wire.md#req-144--definition-metadata-decoding) (Definition metadata decoding). **Amends:** REQ-095 (OpenAPI authoritative source), since retired into [REQ-050](../specifications/wire.md#the-openapi-files-are-authoritative) — one keyed compatibility exception, carried by REQ-050's section rather than asserted from here.
 - **Landed in:** [PR 139](https://github.com/Cadasto/openehr-sdk-go/pull/139) (definition metadata decoding).
 - **Related:** [ADR 0004](0004-numeric-wire-tolerance.md) (strict-encode / permissive-decode for BMM numerics — the asymmetry precedent and its evidence bar); [ADR 0015](0015-flat-metadata-spelling.md) (accept both spellings on input, emit exactly one).
 

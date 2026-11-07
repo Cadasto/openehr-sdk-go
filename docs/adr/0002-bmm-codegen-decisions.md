@@ -13,7 +13,7 @@ date: 2026-05-16
 - **Superseded by:** —
 - **Amended:** D4, 2026-10-01 (the `P_BMM_INTERFACE` shape). D8, 2026-10-11 (the interval classes' boundary-flag logic). D9 added, 2026-10-12 (canonical-XML unmatched content). D10 added, 2026-10-26 (canonical-XML child order from the ITS-XML schemas). D9, 2026-10-26 (the decoders hand the runtime a description of their class on entry, [ADR 0033](0033-missing-members-reported-by-decoders.md)). D8, 2026-11-01 (the optional item-structure lists `ITEM_LIST.items`, `ITEM_TREE.items` and `ITEM_TABLE.rows` take `omitzero`, issue 341). D2 and D5, 2026-11-02 (the targets' roots are SDK-authored schemas over the pinned ones, [ADR 0034](0034-sdk-authored-root-schemas.md)). D10, 2026-11-02 (BASE Release-1.2.0, and which members are XML attributes, [ADR 0034](0034-sdk-authored-root-schemas.md)). D2, 2026-11-02 (an include diamond resolves to the descendant's form, [ADR 0034](0034-sdk-authored-root-schemas.md)).
 - **Tracks:** the BMM code generator, landed on `main` in commit [b89aa589](https://github.com/Cadasto/openehr-sdk-go/commit/b89aa589).
-- **Requirements:** [REQ-043](../specifications/reference-model.md#mapping-rules) (the P_BMM to Go mapping rules the generator applies); [REQ-056](../specifications/wire.md#req-056) (the canonical-XML child order D10 supplies).
+- **Requirements:** REQ-043 (the P_BMM to Go mapping rules the generator applies), since retired into [REQ-041](../specifications/reference-model.md#mapping-rules); [REQ-056](../specifications/wire.md#req-056) (the canonical-XML child order D10 supplies).
 
 ## Context
 

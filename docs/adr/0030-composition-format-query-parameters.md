@@ -12,7 +12,7 @@ date: 2026-10-25
 - **Supersedes:** —
 - **Superseded by:** —
 - **Strand:** none — a direct decision.
-- **Amends:** [REQ-173](../specifications/wire.md#req-173--composition-representation-formats) (Composition representation formats), which states the rule, and [REQ-095](../specifications/wire.md#the-openapi-files-are-authoritative) (OpenAPI authoritative source), which carries the fourth keyed exception.
+- **Amends:** [REQ-173](../specifications/wire.md#req-173--composition-representation-formats) (Composition representation formats), which states the rule, and REQ-095 (OpenAPI authoritative source), since retired into [REQ-050](../specifications/wire.md#the-openapi-files-are-authoritative), which carries the fourth keyed exception.
 - **Related:** [ADR 0026](0026-stored-query-paging-fields-only-when-set.md) and [ADR 0024](0024-contribution-deletion-without-data.md) (the keyed-exception form this one follows).
 
 ## Context

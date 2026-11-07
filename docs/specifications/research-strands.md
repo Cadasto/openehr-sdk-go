@@ -58,7 +58,15 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 | Abstract generic `EVENT` polymorphism (`History.events`) | Promote `EVENT` to a Go interface; `POINT_EVENT` / `INTERVAL_EVENT` concrete; whitelist in generator | [ADR 0003](../adr/0003-rm-event-polymorphism.md) |
 | `Real` / `Integer` wire tolerance (quoted vs numeric JSON) | Strict encode, permissive decode via `rm.Real` / `rm.Integer` / `rm.Integer64` defined types | [ADR 0004](../adr/0004-numeric-wire-tolerance.md) |
 | `encoding/json/v2` as the canonical-JSON codec; encoded member order is not a contract | Migrate to standard-library v2; retire the generator's per-type `MarshalJSON` / `UnmarshalJSON` and `openehr/internal/jsonpoly`; `_type` first becomes a SHOULD and round-trip fidelity is asserted semantically rather than byte-wise | [ADR 0021](../adr/0021-json-member-order-not-a-contract.md), [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md) |
+
+### Benchmark evidence
+
+Time/op change against the retired generated marshalers (v1 at `90473f9f`), from `benchstat -count=10` on one machine (13th Gen i7-13700H, WSL2, `go1.27.1`). Each of the first two columns was measured against its own v1 run in the same session. The benchmarks live in `openehr/serialize/canjson/`, `openehr/rm/typereg/` and `openehr/serialize/simplified/`. The allocation column gives v1, then PR 171, then PR 174, and takes its v1 figure from the PR 171 run.
+
+The PR 280 column is measured differently. Its baseline is `main` at `6f75aea3`, which already holds PR 171 and PR 174, not v1, and it comes from `benchstat -count=6` on the same machine with `go1.27.2`. Each cell gives the time/op change, then the allocs/op change in brackets: the FLAT corpus has grown since v1, so its absolute counts no longer compare with the allocation column. A `~` is a time change that did not reach p < 0.05. The FLAT rows ran on a busier host (load about 3) than the others (load about 1), so their time cells are the least reliable; allocation counts do not depend on load.
+
 | Benchmark | v2 migration ([PR 171](https://github.com/Cadasto/openehr-sdk-go/pull/171), `93d06e1f`) | single-pass concrete decode ([PR 174](https://github.com/Cadasto/openehr-sdk-go/pull/174)) | hot-path cuts ([PR 280](https://github.com/Cadasto/openehr-sdk-go/pull/280)), against `main` | allocs/op |
+|---|---|---|---|---|
 | `EncodeComposition_400` | -47.82% | -47.91% | -24.88% (-65.87%) | 9 281 / 16 444 / 16.44k |
 | `DecodeComposition_400` | +8.98% | -39.62% | -44.07% (-42.42%) | 21 665 / 16 860 / 13.25k |
 | `DecodeCompositionFixture` | -38.30% | -61.05% | -31.62% (-45.65%) | 6 279 / 5 220 / 4 809 |

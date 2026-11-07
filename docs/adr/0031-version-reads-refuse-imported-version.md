@@ -12,7 +12,7 @@ date: 2026-10-25
 - **Supersedes:** —
 - **Superseded by:** —
 - **Strand:** —
-- **Amends:** [REQ-174](../specifications/wire.md#req-174--versioned-object-reads) (Versioned-object reads), which states the refusal, and [REQ-095](../specifications/wire.md#the-openapi-files-are-authoritative) (OpenAPI authoritative source), which carries the keyed exception.
+- **Amends:** [REQ-174](../specifications/wire.md#req-174--versioned-object-reads) (Versioned-object reads), which states the refusal, and REQ-095 (OpenAPI authoritative source), since retired into [REQ-050](../specifications/wire.md#the-openapi-files-are-authoritative), which carries the keyed exception.
 - **Related:** [ADR 0024](0024-contribution-deletion-without-data.md) and [ADR 0026](0026-stored-query-paging-fields-only-when-set.md) (the keyed-exception form this one follows).
 
 ## Context

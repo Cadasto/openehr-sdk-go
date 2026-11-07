@@ -244,7 +244,7 @@ Documented exceptions:
 
 ## Public-API stability
 
-Anything outside `internal/` (REQ-005) participates in semver (REQ-004). Implications:
+Anything outside `internal/` participates in semver (REQ-004). Implications:
 
 - Adding to the public surface is a minor bump.
 - Renaming or removing a public symbol is a major bump.

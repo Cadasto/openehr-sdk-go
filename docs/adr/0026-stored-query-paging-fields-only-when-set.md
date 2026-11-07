@@ -12,7 +12,7 @@ date: 2026-10-13
 - **Supersedes:** —
 - **Superseded by:** —
 - **Strand:** resolves item 2 of [STRAND-09](../specifications/research-strands.md#strand-09--its-rest-conformance-follow-ups), recorded from the maintainer's issue [#261](https://github.com/Cadasto/openehr-sdk-go/issues/261) (its *Expected behaviour*).
-- **Amends:** [REQ-057](../specifications/wire.md#req-057) (Stored AQL queries), which states the paging rule, and [REQ-095](../specifications/wire.md#the-openapi-files-are-authoritative) (OpenAPI authoritative source), which carries the third keyed exception.
+- **Amends:** [REQ-057](../specifications/wire.md#req-057) (Stored AQL queries), which states the paging rule, and REQ-095 (OpenAPI authoritative source), since retired into [REQ-050](../specifications/wire.md#the-openapi-files-are-authoritative), which carries the third keyed exception.
 - **Related:** [ADR 0024](0024-contribution-deletion-without-data.md) (the keyed-exception form this one follows).
 
 ## Context

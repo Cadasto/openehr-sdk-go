@@ -254,7 +254,7 @@ The launch mode follows from the configuration at construction time. An applicat
 
 The flow (standalone launch, summarised):
 
-1. **Discovery.** Fetch the SMART configuration document from the Platform base URL's well-known URL (see [auth.md](auth.md)). Extract `authorization_endpoint`, `token_endpoint`, `jwks_uri`, `registration_endpoint` (if dynamic registration is used), and `scopes_supported`.
+1. **Discovery.** Fetch the SMART configuration document from the Platform base URL's well-known URL (see [§ Service discovery](#service-discovery)). Extract `authorization_endpoint`, `token_endpoint`, `jwks_uri`, `registration_endpoint` (if dynamic registration is used), and `scopes_supported`.
 2. **PKCE pair.** Generate a `code_verifier` (cryptographically random, 43–128 chars per RFC 7636) and derive `code_challenge` = `S256(code_verifier)`.
 3. **Authorization request.** Redirect the user to `authorization_endpoint` with `response_type=code`, `client_id`, `redirect_uri`, `scope` (for openEHR resources, the [REQ-165](#req-165--openehr-scope-syntax) shape `<compartment>/<resource>-<pattern>.<permissions>`, e.g. `patient/composition-*.rs`), `aud` (the Platform base URL, which is the `iss` of an embedded launch, or an explicit audience identifier), `state`, `code_challenge`, `code_challenge_method=S256`, plus SMART-specific `launch` parameter if EHR-launch.
 4. **Authorization response.** Receive the redirect at the redirect URI and complete it with `CompleteAuthorization` (§ Completing the authorization below), which checks `state`, the RFC 9207 `iss` and an error response before any token-endpoint call.
