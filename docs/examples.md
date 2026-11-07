@@ -281,9 +281,22 @@ go run ./cmd/examples/generate-example \
 | Flag | Default | Values |
 |---|---|---|
 | `-opt` | `vital_signs.opt` fixture | Path to an ADL 1.4 OPT |
-| `-policy` | `medium` | `required` builds only the data points the template makes mandatory and a composition's context: it builds an optional list where the list holds a mandatory item, and leaves one out where only the list's minimum item count asks for an item; `medium` also builds every attribute the template constrains, with at most one optional archetype under each, the first whose content the template describes; `large` builds every attribute and a member of every optional archetype the template names, each of several uses of one archetype included, named or not. `minimal` is another name for `required`, and `complete` for `large` for now. Case does not matter. `required` and `medium` are the ITS-REST template example's `detail_level` levels of those names; `large` stops short of its `complete` level. No policy builds an optional node whose only content the template leaves undescribed, such as a cluster that holds nothing but an open slot, nor an optional structure that would hold no item, such as a protocol whose tree holds nothing but an open slot. No policy writes a `uid` the template does not require, on a composition, an entry or a party alike, so the server that stores the document gives it its id. Under each of them every primitive leaf holds its example value |
+| `-policy` | `medium` | `required`, `medium` or `large`, listed below; `minimal` is another name for `required`, and `complete` for `large` for now. Case does not matter |
 | `-territory` | `NL` | ISO 3166-1 code; a COMPOSITION root requires one |
 | `-composer-name` | `Example Composer` | Name recorded as the composition's composer |
+
+The policies:
+
+- `required` builds only the data points the template makes mandatory and a composition's context, and builds an optional list where the list holds a mandatory item, not where only the list's minimum item count asks for an item.
+- `medium` also builds every attribute the template constrains, with at most one optional archetype under each, the first whose content the template describes.
+- `large` builds every attribute and a member of every optional archetype the template names, each of several uses of one archetype included, named or not.
+
+`required` and `medium` are the ITS-REST template example's `detail_level` levels of those names; `large` stops short of its `complete` level. Under every policy:
+
+- No optional node is built whose only content the template leaves undescribed, such as a cluster that holds nothing but an open slot.
+- No optional structure is built that would hold no item, such as a protocol whose tree holds nothing but an open slot.
+- No `uid` is written that the template does not require, on a composition, an entry or a party alike, so the server that stores the document gives it its id.
+- Every primitive leaf holds its example value.
 
 **Packages:** `openehr/aom/aom14`, `openehr/templatecompile`, `openehr/instance`, `openehr/rm`, `openehr/serialize/canjson`. **No `internal/` import.**
 
