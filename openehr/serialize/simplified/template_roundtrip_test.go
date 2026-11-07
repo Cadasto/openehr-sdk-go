@@ -283,7 +283,7 @@ var emptyStructureCases = []struct {
 	policy   instance.Policy
 	paths    []string
 }{
-	{template: "vital_signs", policy: instance.Medium, paths: []string{
+	{template: "blood_pressure_strict_existence", policy: instance.Medium, paths: []string{
 		"/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events[at0006]/state",
 		"/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/protocol",
 	}},
@@ -327,9 +327,9 @@ func writtenEmptyStructures(t *testing.T, comp *rm.Composition, paths []string) 
 	return written
 }
 
-// TestREQ053WithTemplateRebuildsRequiredEmptyList — REQ-053: the vital_signs
-// skeleton writes the blood_pressure event's state and the protocol with no
-// member, and with their items present and empty, which the template
+// TestREQ053WithTemplateRebuildsRequiredEmptyList — REQ-053: the
+// blood_pressure_strict_existence skeleton writes the blood_pressure event's
+// state and the protocol with no member, and with their items present and empty, which the template
 // requires by its existence (existence 1..1, cardinality 0..*, no child or
 // slots only), as "items":[]. A WithTemplate decode of its FLAT and
 // STRUCTURED bodies rebuilds both structures as the generator writes them,

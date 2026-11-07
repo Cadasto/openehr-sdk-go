@@ -45,7 +45,7 @@ node /content[openEHR-EHR-OBSERVATION.blood_pressure.v1]
   binding terminology="SNOMED-CT" node_or_path="at0000" target_terminology="SNOMED-CT" target_code="163020007"
   binding terminology="SNOMED-CT" node_or_path="at0000" target_terminology="SNOMED-CT" target_code="364075005"
   attr "data" rm_type="HISTORY" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
-  attr "protocol" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "protocol" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
   attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
@@ -73,7 +73,7 @@ node /content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events[at0006]
   term[en] "at0006" code="at0006" description="other event in event history" text="any event"
   binding terminology="LNC205" node_or_path="/data[at0002]/events[at0006]/data[at0001]/item[at0004]" target_terminology="LNC205" target_code="8311-3"
   attr "data" rm_type="T" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
-  attr "state" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "state" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
   attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
@@ -128,14 +128,14 @@ node /content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events[at0006]/sta
   rm_type="ITEM_LIST" node_id="at0007" archetype_id="" node_name="" occurrences=1..1 slot=false
   term[en] "at0007" code="at0007" description="@ internal @" text="state structure"
   binding terminology="LNC205" node_or_path="/data[at0002]/events[at0007]/data[at0001]/item[at0004]" target_terminology="LNC205" target_code="8316-2"
-  attr "items" rm_type="ELEMENT" cardinality=multiple existence=1..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=0
+  attr "items" rm_type="ELEMENT" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=0
   attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
 node /content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/protocol
   rm_type="ITEM_TREE" node_id="at0011" archetype_id="" node_name="" occurrences=1..1 slot=false
   term[en] "at0011" code="at0011" description="list structure" text="list structure"
-  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=1
   attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
@@ -151,7 +151,7 @@ node /content[openEHR-EHR-OBSERVATION.body_temperature.v1]
   binding terminology="SNOMED-CT" node_or_path="at0000" target_terminology="SNOMED-CT" target_code="163020007"
   binding terminology="SNOMED-CT" node_or_path="at0000" target_terminology="SNOMED-CT" target_code="364075005"
   attr "data" rm_type="HISTORY" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
-  attr "protocol" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "protocol" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
   attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
@@ -180,7 +180,7 @@ node /content[openEHR-EHR-OBSERVATION.body_temperature.v1]/data/events[at0003]
   binding terminology="SNOMED-CT" node_or_path="at0003" target_terminology="SNOMED-CT" target_code="364090009"
   binding terminology="LNC205" node_or_path="/data[at0002]/events[at0003]/data[at0001]/item[at0004]" target_terminology="LNC205" target_code="8310-5"
   attr "data" rm_type="T" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
-  attr "state" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "state" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
   attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
@@ -225,7 +225,7 @@ node /content[openEHR-EHR-OBSERVATION.body_temperature.v1]/data/events[at0003]/d
 node /content[openEHR-EHR-OBSERVATION.body_temperature.v1]/data/events[at0003]/state
   rm_type="ITEM_TREE" node_id="at0029" archetype_id="" node_name="" occurrences=1..1 slot=false
   term[en] "at0029" code="at0029" description="State information about the patient" text="State"
-  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=0..1 implicit=false not_in_rm=false required=false children=3
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..1 implicit=false not_in_rm=false required=false children=3
   attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
@@ -247,7 +247,7 @@ node /content[openEHR-EHR-OBSERVATION.body_temperature.v1]/data/events[at0003]/s
 node /content[openEHR-EHR-OBSERVATION.body_temperature.v1]/protocol
   rm_type="ITEM_TREE" node_id="at0020" archetype_id="" node_name="" occurrences=1..1 slot=false
   term[en] "at0020" code="at0020" description="@ internal @" text="Protocol"
-  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=0..1 implicit=false not_in_rm=false required=false children=1
+  attr "items" rm_type="ITEM" cardinality=multiple existence=0..1 child_multiplicity=0..1 implicit=false not_in_rm=false required=false children=1
   attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
@@ -262,7 +262,7 @@ node /content[openEHR-EHR-OBSERVATION.heart_rate.v1]
   binding terminology="SNOMED-CT" node_or_path="at0000" target_terminology="SNOMED-CT" target_code="163020007"
   binding terminology="SNOMED-CT" node_or_path="at0000" target_terminology="SNOMED-CT" target_code="364075005"
   attr "data" rm_type="HISTORY" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
-  attr "protocol" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "protocol" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
   attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "language" rm_type="CODE_PHRASE" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
@@ -291,7 +291,7 @@ node /content[openEHR-EHR-OBSERVATION.heart_rate.v1]/data/events[at0003]
   binding terminology="SNOMED-CT" node_or_path="at0003" target_terminology="SNOMED-CT" target_code="364090009"
   binding terminology="LNC205" node_or_path="/data[at0002]/events[at0003]/data[at0001]/item[at0004]" target_terminology="LNC205" target_code="8310-5"
   attr "data" rm_type="T" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
-  attr "state" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "state" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
   attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
@@ -336,14 +336,14 @@ node /content[openEHR-EHR-OBSERVATION.heart_rate.v1]/data/events[at0003]/data/it
 node /content[openEHR-EHR-OBSERVATION.heart_rate.v1]/data/events[at0003]/state
   rm_type="ITEM_LIST" node_id="at0012" archetype_id="" node_name="" occurrences=1..1 slot=false
   term[en] "at0012" code="at0012" description="@ internal @" text="List"
-  attr "items" rm_type="ELEMENT" cardinality=multiple existence=1..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=0
+  attr "items" rm_type="ELEMENT" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=0
   attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
 node /content[openEHR-EHR-OBSERVATION.heart_rate.v1]/protocol
   rm_type="ITEM_LIST" node_id="at0010" archetype_id="" node_name="" occurrences=1..1 slot=false
   term[en] "at0010" code="at0010" description="@ internal @" text="List"
-  attr "items" rm_type="ELEMENT" cardinality=multiple existence=1..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=0
+  attr "items" rm_type="ELEMENT" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=0
   attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
@@ -387,7 +387,7 @@ node /content[openEHR-EHR-OBSERVATION.respiration.v1]/data/events[at0002]
   binding terminology="LNC205" node_or_path="/data[at0002]/events[at0017]/data[at0001]/item[at0004]" target_terminology="LNC205" target_code="8325-3"
   binding terminology="LNC205" node_or_path="/data[at0002]/events[at0007]/data[at0001]/item[at0004]" target_terminology="LNC205" target_code="8316-2"
   attr "data" rm_type="T" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
-  attr "state" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "state" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
   attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "time" rm_type="DV_DATE_TIME" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
@@ -426,7 +426,7 @@ node /content[openEHR-EHR-OBSERVATION.respiration.v1]/data/events[at0002]/data/i
 node /content[openEHR-EHR-OBSERVATION.respiration.v1]/data/events[at0002]/state
   rm_type="ITEM_LIST" node_id="at0022" archetype_id="" node_name="" occurrences=1..1 slot=false
   term[en] "at0022" code="at0022" description="@ internal @" text="List"
-  attr "items" rm_type="ELEMENT" cardinality=multiple existence=1..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=0
+  attr "items" rm_type="ELEMENT" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=0
   attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 

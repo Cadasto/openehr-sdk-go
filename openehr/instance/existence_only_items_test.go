@@ -153,21 +153,22 @@ func TestREQ107_ExistenceOnlyItemsGetNoUndescribedMember(t *testing.T) {
 	}
 }
 
-// TestREQ107_VitalSignsStateAndProtocolHoldNoUndescribedItems is the
-// REQ-107 check of What a visit writes on vital_signs (issue 295). Each
-// OBSERVATION requires its protocol, and each event its state (existence
-// 1..1), and the template gives their items an existence of 1..1 at a
-// cardinality of 0..* and no child, or only slots. Only that existence
-// asks for a member, so under Large and Medium, both value fills and
-// several seeds, the root holds no LOCATABLE with the archetype node id
-// at0000 and no slot fill below a protocol or a state; the blood_pressure
-// event's state is the ITEM_LIST at0007 and its protocol the ITEM_TREE
+// TestREQ107_StrictExistenceStateAndProtocolHoldNoUndescribedItems is the
+// REQ-107 check of What a visit writes on blood_pressure_strict_existence, the
+// blood pressure OBSERVATION of vital_signs.opt as Ocean Template Designer
+// exported it (issue 295). The OBSERVATION requires its protocol, and each
+// event its state (existence 1..1), and the template gives their items an
+// existence of 1..1 at a cardinality of 0..* and no child, or only slots.
+// Only that existence asks for a member, so under Large and Medium, both
+// value fills and several seeds, the root holds no LOCATABLE with the
+// archetype node id at0000 and no slot fill below a protocol or a state;
+// the event's state is the ITEM_LIST at0007 and its protocol the ITEM_TREE
 // at0011, both with items present and empty, since their existence
 // requires the list (issue 341). Every root passes the template validator
 // and the RM floor.
-func TestREQ107_VitalSignsStateAndProtocolHoldNoUndescribedItems(t *testing.T) {
+func TestREQ107_StrictExistenceStateAndProtocolHoldNoUndescribedItems(t *testing.T) {
 	const bloodPressure = "openEHR-EHR-OBSERVATION.blood_pressure.v1"
-	c := compileFixture(t, "vital_signs")
+	c := compileFixture(t, "blood_pressure_strict_existence")
 	for _, policy := range largeAndMedium {
 		for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
 			seeds := []uint64{1, 2, 3}
@@ -175,7 +176,7 @@ func TestREQ107_VitalSignsStateAndProtocolHoldNoUndescribedItems(t *testing.T) {
 				seeds = seeds[:1]
 			}
 			for _, seed := range seeds {
-				call := fmt.Sprintf("Generate(vital_signs, %v, %v, seed %d)", policy, fill, seed)
+				call := fmt.Sprintf("Generate(blood_pressure_strict_existence, %v, %v, seed %d)", policy, fill, seed)
 				comp := generateComposition(t, c, instance.Options{
 					Policy:      policy,
 					ValueFill:   fill,

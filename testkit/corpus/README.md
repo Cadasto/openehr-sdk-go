@@ -129,8 +129,15 @@ The templates are at the `ehrbase/ehrbase` commit in [`UPSTREAM_PINS.txt`](UPSTR
 |---|---|:---:|:---:|
 | `vital_signs` | yes | yes | — |
 | `clinical_notes.v0` | yes | yes | — |
+| `blood_pressure_strict_existence` | yes | — | — |
 
 `clinical_notes.v0` was made by Medblocks together with CODE24; its OPT names its Medblocks author, and it is credited under CODE24 here.
+
+`vital_signs` is an Ocean Template Designer export, edited here.
+The export gave each OBSERVATION's `protocol`, each event's `state` and their `items` an existence of 1..1: the ADL 1.4 default where an archetype states none.
+A document then had to carry those structures, and an empty `items` list, even with nothing to record, which some CDRs refuse.
+This copy gives them the Reference Model's existence, 0..1.
+`blood_pressure_strict_existence` keeps the export's reading: it is the export's blood pressure OBSERVATION alone, each existence as exported, so the generator, validator and codec tests of a list required by its existence alone still have a corpus template.
 
 ### CODE24 (Cadasto)
 

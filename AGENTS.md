@@ -91,7 +91,7 @@ Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev
 
 **Gotchas worth the reading:**
 
-- **Never hand-edit a vendored fixture** under `resources/` or `testkit/corpus/` — being byte-identical to upstream is its whole value. Re-sync instead.
+- **Never hand-edit a vendored fixture** under `resources/` or `testkit/corpus/` — being byte-identical to upstream is its whole value. Re-sync instead. CODE24's own fixtures have no upstream to re-sync from, so they may be edited; record each edit in [`testkit/corpus/THIRD_PARTY_LICENSES.md`](testkit/corpus/THIRD_PARTY_LICENSES.md).
 - `make probe-status` prints `MISSING` for any probe covered inline or in a sibling's file. That is the filename heuristic, **not** drift — `make spec-check` is the real gate.
 - A new test file that cites a `REQ-NNN` makes `make spec-check` fail with "tests list is stale" until `make spec-generate` rewrites the map's `tests:` list; commit what it writes.
 - A non-test file that imports `reflect` fails `TestREQ024ReflectOnlyForReviewedUses` until it is added to the reviewed list in [`internal/reflect_guard_test.go`](internal/reflect_guard_test.go), for a use [idiom.md § API conventions](docs/specifications/idiom.md#api-conventions) allows, such as a typed-nil check.
