@@ -487,20 +487,40 @@ func buildExample(t *testing.T, root, program string) string {
 func runExample(t *testing.T, root, bin string) string {
 	t.Helper()
 
+	stdout, stderr, status := runExampleStatus(t, root, bin)
+	if status != 0 {
+		t.Fatalf("%s (in %s): exit status %d\nstderr:\n%s", filepath.Base(bin), root, status, stderr)
+	}
+	return stdout
+}
+
+// runExampleStatus runs one built example program with args from the module
+// root and returns its stdout, its stderr and its exit status, so a caller can
+// hold a documented failing run to the status the docs promise. A run that
+// ends other than by exiting, such as one killed at the timeout, fails the
+// test.
+func runExampleStatus(t *testing.T, root, bin string, args ...string) (stdout, stderr string, status int) {
+	t.Helper()
+
 	ctx, cancel := context.WithTimeout(t.Context(), exampleTimeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, bin)
+	cmd := exec.CommandContext(ctx, bin, args...)
 	cmd.Dir = root
 
-	var stdout, stderr strings.Builder
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		t.Fatalf("%s (in %s): %v%s\nstderr:\n%s",
-			filepath.Base(bin), root, err, deadlineNote(ctx), stderr.String())
+	var out, errOut strings.Builder
+	cmd.Stdout = &out
+	cmd.Stderr = &errOut
+	err := cmd.Run()
+	if exitErr, ok := errors.AsType[*exec.ExitError](err); ok && exitErr != nil &&
+		exitErr.Exited() && ctx.Err() == nil {
+		return out.String(), errOut.String(), exitErr.ExitCode()
 	}
-	return stdout.String()
+	if err != nil {
+		t.Fatalf("%s %q (in %s): %v%s\nstderr:\n%s",
+			filepath.Base(bin), args, root, err, deadlineNote(ctx), errOut.String())
+	}
+	return out.String(), errOut.String(), 0
 }
 
 // deadlineNote turns a killed-by-timeout into a sentence, so the failure says
