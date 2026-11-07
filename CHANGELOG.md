@@ -8,6 +8,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **Canonical XML** gains `WithStringText`, which keeps a string sent empty or as white space as canonical JSON does, and `ErrNotWellFormed`, which marks input that is not well-formed XML (REQ-056, REQ-175).
+- **The testkit corpus** gains ten pinned EHRbase server test templates and three vital-signs templates by other authors, from CaboLabs, CKM and Ripple, the first with its own composition (PROBE-111, REQ-056).
+
+### Changed
+
+- **Breaking: the report options** of canjson and canxml pass a `Pointer` or `Path` value written on demand instead of a string, so a report's memory no longer grows with the document's depth (REQ-170, REQ-175).
+- **Breaking: canonical XML** refuses white space before the XML declaration, as the operational template reader does in strict mode, and no longer reports a one-space TERM_MAPPING `match` as missing or empty (REQ-056, REQ-111, REQ-175).
+- **FLAT and STRUCTURED** encode and decode reused siblings that differ only by their template names, such as two named events, where encode failed on a path resolving to both (REQ-053, REQ-116, REQ-140).
+- **The corpus template `vital_signs`** takes the RM's 0..1 existence on its protocol, state and their items, and its exported 1..1 form stays as `blood_pressure_strict_existence`.
+
 ## [0.46.0] - 2026-11-06
 
 Forty-sixth `v0.x` minor: canonical XML reports what a document sends nilled or empty and decodes as canonical JSON does, generated documents pass the template validator again, and FLAT and the Web Template take values and labels as the reference does. **Breaking:** the deprecated OPT parser is removed, auth discovery and token documents decode with `encoding/json/v2`, and canonical XML, the operational template reader and `templatecompile.Compile` refuse input they accepted.
