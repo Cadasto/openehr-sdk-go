@@ -221,7 +221,7 @@ func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*Operat
 	// lr.N reaches 0 only once r has given a byte past the limit.
 	src := &sourceReader{r: r}
 	lr := &io.LimitedReader{R: src, N: readMaxBytes + 1}
-	// in keeps every byte read from r, for the checks and a second decode; it
+	// in keeps every byte read from r, for a second reading and decode; it
 	// is made as large as r says it is. Nothing the read returns refers to it.
 	in := inputBuffers.Get().(*bytes.Buffer)
 	in.Reset()
@@ -245,6 +245,10 @@ func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*Operat
 			first = []canxml.DecoderOption{canxml.WithStrict()}
 		}
 	}
+	// The first decode passes its tokens to facts, which decide on a second
+	// reading once it has read the document.
+	var facts tokenFacts
+	first = slices.Concat(first, []canxml.DecoderOption{facts.observeOption()})
 	ot, err := readDocument(br, first, settings.Strict)
 	// An input past the size limit is refused as such, whatever the decode
 	// made of the bytes it read: the limit may have cut it short.
@@ -258,7 +262,7 @@ func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*Operat
 	}
 	var tolerant bool
 	if err == nil {
-		tolerant = needsTolerance(in.Bytes(), ot, settings.Strict)
+		tolerant = facts.needsTolerance(ot, settings.Strict)
 	} else {
 		tolerant = retryable(err, settings.Strict)
 	}

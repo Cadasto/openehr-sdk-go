@@ -91,12 +91,18 @@ type Scope struct {
 	reader *trackingReader
 	// maxDepth is the depth limit [Scope.LimitDepth] set; 0 for none.
 	maxDepth int
+	// observe is the function [Scope.ObserveTokens] set; nil for none.
+	observe func(xml.Token)
 }
 
 // LimitDepth makes the decodes through the decoder [Scope.NewDecoder] returns
 // next refuse an element nested deeper than n, as [Tracker.LimitDepth] says,
 // and the refusal comes back on its own. n <= 0 sets no limit, the default.
 func (s *Scope) LimitDepth(n int) { s.maxDepth = max(n, 0) }
+
+// ObserveTokens passes fn each token the decoder [Scope.NewDecoder] returns
+// next reads from its source, as [Tracker.ObserveTokens] says.
+func (s *Scope) ObserveTokens(fn func(xml.Token)) { s.observe = fn }
 
 // NewDecoder returns a decoder that reads canonical XML from r and keeps the
 // namespace scope of every element it opens in s. Decode values from it with
@@ -107,6 +113,7 @@ func (s *Scope) NewDecoder(r io.Reader) *xml.Decoder {
 	// decoders find no policy, and the decode stays untracked.
 	t := NewTracker(nil, false)
 	t.LimitDepth(s.maxDepth)
+	t.ObserveTokens(s.observe)
 	s.reader = &trackingReader{src: xml.NewDecoder(r), t: t}
 	return xml.NewTokenDecoder(s.reader)
 }

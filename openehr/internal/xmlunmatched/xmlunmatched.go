@@ -225,6 +225,9 @@ type Tracker struct {
 	// maxDepth is the deepest an element may nest below the root of the value,
 	// the root at depth 1, set by [Tracker.LimitDepth]; 0 sets no limit.
 	maxDepth int
+	// observe is passed each token the decoder reads from its source, set by
+	// [Tracker.ObserveTokens]; nil for none.
+	observe func(xml.Token)
 	// refusal is the refusal of the first element nested deeper than
 	// maxDepth, kept so that the decode returns it on its own and every later
 	// read of the decoder returns it again, the input standing inside that
@@ -501,6 +504,13 @@ func (t *Tracker) childPath(n int, p place) *reportpath.Node {
 // the element by its path, kept to [pathEnds] segments at each end; the
 // decoder returns it again from every later read.
 func (t *Tracker) LimitDepth(n int) { t.maxDepth = max(n, 0) }
+
+// ObserveTokens passes fn each token the decoder [Tracker.NewDecoder] returns
+// reads from its source, in order and once, before the decode acts on it, a
+// token read ahead included: element names with their namespaces resolved,
+// and every attribute, the namespace declarations included. fn must not keep
+// a token's bytes past the call. A nil fn observes nothing, the default.
+func (t *Tracker) ObserveTokens(fn func(xml.Token)) { t.observe = fn }
 
 // refuseDepth refuses the element the decoder opened last, nested one past the
 // depth limit, and keeps the refusal, which it returns.
@@ -857,6 +867,9 @@ func (r *trackingReader) Token() (xml.Token, error) {
 		}
 	} else {
 		tok, err = r.src.Token()
+	}
+	if r.t.observe != nil && err == nil {
+		r.t.observe(tok)
 	}
 	switch tk := tok.(type) {
 	case xml.StartElement:

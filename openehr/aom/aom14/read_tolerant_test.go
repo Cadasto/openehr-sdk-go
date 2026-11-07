@@ -269,17 +269,31 @@ func TestREQ111_ReaderRefusesADefinitionTypedAsASlotOrAConstraint(t *testing.T) 
 // TestREQ111_ReaderReadsTheNamespaceTheSchemasDeclare pins that, in every
 // mode, an element in the http://schemas.openehr.org/v2 namespace reads as
 // the element of that name in the http://schemas.openehr.org/v1 one, under
-// the default namespace and under a prefix, after a byte-order mark too.
+// the default namespace and under a prefix, after a byte-order mark too, and
+// below a root in the v1 namespace, which the first decode reads without a
+// failure, skipping the elements in the v2 one.
+//
+// Can-fail control: drop the v2 declaration fact from the facts that decide
+// on a second reading, and below a v1 root the rm_type_name and node_id of
+// the second element read as absent.
 func TestREQ111_ReaderReadsTheNamespaceTheSchemasDeclare(t *testing.T) {
 	t.Parallel()
 	data := readerFixture(t, "namespace-v2.opt")
-	want := decoded(t, bytes.ReplaceAll(data, []byte(nsV2), []byte(nsV1)))
+	v1 := bytes.ReplaceAll(data, []byte(nsV2), []byte(nsV1))
+	want := decoded(t, v1)
 	if n := len(want.Definition.Attributes); n != 1 {
 		t.Fatalf("the v1 reading of the fixture holds %d attributes, want 1", n)
 	}
+	// The fixture binds the prefix oe to the v2 namespace on one element,
+	// whose rm_type_name and node_id carry it.
+	prefixV1, prefixV2 := []byte(`xmlns:oe="`+nsV1+`"`), []byte(`xmlns:oe="`+nsV2+`"`)
+	if !bytes.Contains(v1, prefixV1) {
+		t.Fatalf("the fixture binds no prefix oe")
+	}
 	inputs := map[string][]byte{
-		"as written":              data,
-		"after a byte-order mark": append([]byte{0xEF, 0xBB, 0xBF}, data...),
+		"as written":                 data,
+		"after a byte-order mark":    append([]byte{0xEF, 0xBB, 0xBF}, data...),
+		"below a root in the v1 one": bytes.Replace(v1, prefixV1, prefixV2, 1),
 	}
 	for mode, opts := range modes {
 		for name, in := range inputs {
