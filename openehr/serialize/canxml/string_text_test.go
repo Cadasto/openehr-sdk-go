@@ -198,6 +198,43 @@ func TestREQ056_REQ175_WithStringTextKeepsAStringsText(t *testing.T) {
 	})
 }
 
+// TestREQ175_XMLWhiteSpaceCharacterCarriesAValue pins the missing-member
+// table (REQ-175): only a string element of white space carries no value, so a
+// TERM_MAPPING `match` of one space, a legal Character, is a value in every
+// mode, as `"match": " "` is in canonical JSON. The decode keeps it, the
+// missing-member option does not report it, and neither does the
+// sent-without-a-value option, with or without WithStringText.
+//
+// Can-fail control: count white space as text for strings alone, as the
+// tracker once did, and both options report /match.
+func TestREQ175_XMLWhiteSpaceCharacterCarriesAValue(t *testing.T) {
+	const doc = `<term_mapping xmlns="http://schemas.openehr.org/v1"><match> </match>` +
+		`<target><terminology_id><value>SNOMED-CT</value></terminology_id><code_string>1</code_string></target></term_mapping>`
+	for _, tc := range []struct {
+		mode string
+		opts []canxml.DecoderOption
+	}{
+		{mode: "default"},
+		{mode: "WithStringText", opts: []canxml.DecoderOption{canxml.WithStringText()}},
+	} {
+		var missing, sent []string
+		opts := append([]canxml.DecoderOption{
+			canxml.WithMissing(func(p string) { missing = append(missing, p) }),
+			canxml.WithPresence(func(p string, pr canxml.Presence) { sent = append(sent, p+" "+pr.String()) }),
+		}, tc.opts...)
+		var m rm.TermMapping
+		if err := canxml.Unmarshal([]byte(doc), &m, opts...); err != nil {
+			t.Fatalf("%s: canxml.Unmarshal = %v", tc.mode, err)
+		}
+		if m.Match != " " {
+			t.Errorf("%s: Match = %q; want %q", tc.mode, m.Match, " ")
+		}
+		if len(missing) != 0 || len(sent) != 0 {
+			t.Errorf("%s: WithMissing reported %q and WithPresence %q; want neither to report the match", tc.mode, missing, sent)
+		}
+	}
+}
+
 // count returns how many items of list equal s.
 func count(list []string, s string) int {
 	n := 0

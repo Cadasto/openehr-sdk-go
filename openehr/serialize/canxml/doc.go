@@ -196,8 +196,8 @@
 //
 // The options reach the generated UnmarshalXML methods, which encoding/xml
 // calls with nothing but the *xml.Decoder, through the decoder itself: a
-// decode given [WithUnmatched], [WithStrict], [WithMissing] or
-// [WithPresence] reads its
+// decode given [WithUnmatched], [WithStrict], [WithMissing], [WithPresence]
+// or [WithStringText] reads its
 // input through a token source that tracks the open elements, and registers
 // its decoder with its own policy while it runs. Concurrent decodes each
 // have their own decoder and so their own policy. The generated methods
@@ -214,8 +214,10 @@
 // of that name, and no XML attribute of it where the ITS-XML schema carries
 // the attribute as one (`archetype_node_id`, an ARCHETYPE_TERM's `code`);
 // the child it has carries `xsi:nil="true"` (or `1`), whatever it holds; or
-// the child is a primitive element whose text is empty or XML whitespace
-// only, which carries no value, as an empty interval flag element does. The
+// the child is a primitive element with no text, or a string element whose
+// text is XML whitespace only, which carries no value, as an empty interval
+// flag element does, unless [WithStringText] keeps the string's text. A
+// Character of one space, such as a TERM_MAPPING `match`, is a value. The
 // decoder cannot always show that in the value it returns: a member the SDK
 // holds by value, a number, a boolean, a string or a value struct such as
 // PARTY_SELF or ARCHETYPE_ID, decodes to its zero value whether the input
@@ -284,10 +286,11 @@
 // # Members sent without a value
 //
 // An input can send a member and give it no value: an element that carries
-// `xsi:nil="true"` (or `1`), or a primitive element whose text is empty, or
-// XML whitespace only for a string. An optional member sent so decodes as
-// absent, and a mandatory one to its zero value, as if the input had left it
-// out (see "Wire profile"), unless [WithStringText] keeps a string's text,
+// `xsi:nil="true"` (or `1`), or a primitive element with no text, or a
+// string element whose text is XML whitespace only. An optional member sent
+// so decodes as absent, and a mandatory one to its zero value, as if the
+// input had left it out (see "Wire profile"), unless [WithStringText] keeps
+// a string's text,
 // and [WithMissing] reports mandatory members only, so neither the value nor
 // that option says the input sent it. [WithPresence] passes each such member, mandatory or optional, to a
 // function, once, as its element closes, by the JSON Pointer [WithMissing]

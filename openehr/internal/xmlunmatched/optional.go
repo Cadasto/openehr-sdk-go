@@ -59,9 +59,10 @@ func SkipNil(dec *xml.Decoder, start xml.StartElement) (bool, error) {
 // of a primitive type, into v as [DecodeElement] does, unless the element
 // carries no value, and reports whether it decoded it. An element carries no
 // value when it has no text, or, for a string, when its text is XML
-// whitespace only, unless the decode keeps a string's text
-// ([Tracker.KeepStringText]): the member is then sent without a value and the decoder
-// leaves it absent, where [DecodeElement] would decode the zero value. Text
+// whitespace only: the member is then sent without a value and the decoder
+// leaves it absent, where [DecodeElement] would decode the zero value. A
+// decode that keeps a string's text ([Tracker.KeepStringText]) decodes such
+// a string element too, as the text it carries, and reports it decoded. Text
 // that does not convert to v's type fails as in [DecodeElement], so a number
 // or boolean element of whitespace only fails. The decoder hands a nilled
 // element to [SkipNil] first. start must be the token the decoder read last.
@@ -104,11 +105,12 @@ func Zero[T any](p *T) {
 
 // DecodeMandatory decodes the element start opens, that of a mandatory member
 // of a primitive type, into v as [DecodeElement] does, except a string
-// element whose text is XML whitespace only, unless the decode keeps a
-// string's text ([Tracker.KeepStringText]): it carries no value, so the
+// element whose text is XML whitespace only: it carries no value, so the
 // member gets the empty string, the zero value the decode gives a document
-// without the element. The decoder hands a nilled element to [SkipNil]
-// first. start must be the token the decoder read last.
+// without the element. A decode that keeps a string's text
+// ([Tracker.KeepStringText]) keeps that whitespace instead. The decoder
+// hands a nilled element to [SkipNil] first. start must be the token the
+// decoder read last.
 func DecodeMandatory(dec *xml.Decoder, start *xml.StartElement, v any) error {
 	if err := DecodeElement(dec, start, v); err != nil {
 		return err
@@ -120,8 +122,9 @@ func DecodeMandatory(dec *xml.Decoder, start *xml.StartElement, v any) error {
 }
 
 // KeepStringText makes the decodes of t keep the text of a string element
-// that is not nilled, empty or XML whitespace only, as the string's value:
-// [DecodeOptional] then decodes it, where it would leave the member absent,
+// sent empty or as XML whitespace only, when the element is not nilled, as
+// the string's value: [DecodeOptional] then decodes it, where it would leave
+// the member absent,
 // [DecodeMandatory] keeps its whitespace, and the member carries a value, so
 // it is no missing member ([Tracker.ReportMissing]). It is still sent
 // without a value for [Tracker.ReportPresence], which reports it as empty.
