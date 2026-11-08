@@ -904,6 +904,7 @@ requirements:
     probes: [PROBE-007]
     tests:
       - auth/clientcreds/expires_in_test.go
+      - auth/clientcreds/max_token_lifetime_test.go
       - auth/clientcreds/member_names_test.go
       - auth/clientcreds/reauth_test.go
       - auth/clientcreds/refresh_threshold_test.go
@@ -912,6 +913,7 @@ requirements:
       - auth/clientcreds/zero_lifetime_test.go
       - auth/errors_test.go
       - auth/jwtbearer/expires_in_test.go
+      - auth/jwtbearer/max_token_lifetime_test.go
       - auth/jwtbearer/member_names_test.go
       - auth/jwtbearer/reauth_test.go
       - auth/jwtbearer/refresh_threshold_test.go
@@ -1013,6 +1015,7 @@ requirements:
       - auth/clientcreds/redact_test.go
       - auth/jwtbearer/client_assertion_test.go
       - auth/jwtbearer/jwtbearer_test.go
+      - auth/jwtbearer/key_size_test.go
       - auth/jwtbearer/redact_test.go
       - auth/jwtbearer/template_copy_test.go
       - auth/smart/client_assertion_test.go
@@ -2257,6 +2260,7 @@ requirements:
       - openehr/client/system/null_body_test.go
       - testkit/probes/transport/probe_101_decode_failure_surfaced.go
       - testkit/probes/transport/probes_test.go
+      - transport/body_complete_test.go
       - transport/body_read_error_test.go
       - transport/decode_error_test.go
       - transport/errors_test.go
