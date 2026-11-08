@@ -490,22 +490,33 @@ func (e *DecodeError) Unwrap() error {
 	return e.Inner
 }
 
-// BodyReadError reports a 2xx response whose body could not be read: the
-// connection dropped mid-body, the body did not match its Content-Encoding,
-// or it was longer than the [WithMaxResponseBody] ceiling. The status is then
-// the only trustworthy signal of what the server did; on a write it says the
-// server committed. It is distinct from a wire failure ([WireError]), which a
-// status that is not 2xx gives even when its body cannot be read, and from a
-// body that was read but does not decode ([DecodeError]). Extract it with
-// errors.AsType[*transport.BodyReadError](err); the operation-name wrap a
-// leaf package adds does not hide it.
+// BodyReadError reports a 2xx response whose body could not be read. The
+// status is then the only trustworthy signal of what the server did; on a
+// write it says the server committed. It is distinct from a wire failure
+// ([WireError]), which a status that is not 2xx gives even when its body
+// cannot be read, and from a body that was read but does not decode
+// ([DecodeError]). Extract it with errors.AsType[*transport.BodyReadError](err);
+// the operation-name wrap a leaf package adds does not hide it.
+//
+// Complete tells an answer the caller cannot use from one that never finished
+// arriving. Each kind of read failure is marked as follows:
+//
+//   - A body longer than the [WithMaxResponseBody] ceiling: complete.
+//   - A body that does not match its Content-Encoding, such as a bad gzip
+//     header, a corrupt compressed stream or a failed gzip checksum: complete.
+//   - A failure after the body's last byte: a chunked trailer on HTTP/1 that
+//     is malformed or too long, or any failure once every byte of a declared
+//     Content-Length has arrived, such as data past it on HTTP/2: complete.
+//   - A connection cut before the body's last byte: not complete.
+//   - Any other read failure: not complete, so a failure the client does not
+//     recognise is never taken for a whole answer.
 //
 // [Client.Do] returns it beside a non-nil [Response] that carries the
 // StatusCode, the Header and the parsed Metadata, so the ETag and Location of
 // a committed write survive, and whose Body is empty. The error carries no
-// body bytes: a partial body is not the representation. Its text does not
-// carry the read failure's own text either, which can quote bytes the server
-// sent; reach the read failure through Inner or Unwrap.
+// body bytes: a partial body is not the representation, even when Complete is
+// true. Its text does not carry the read failure's own text either, which can
+// quote bytes the server sent; reach the read failure through Inner or Unwrap.
 type BodyReadError struct {
 	// Method is the HTTP method of the request.
 	Method string
@@ -517,10 +528,23 @@ type BodyReadError struct {
 	// StatusCode is the 2xx status the server sent before the body failed.
 	StatusCode int
 	// Inner is the read failure, reachable via Unwrap: io.ErrUnexpectedEOF
-	// for a connection cut mid-body, the content-coding error (such as
-	// gzip.ErrHeader) for a body that does not match its encoding, or an
-	// error wrapping [ErrResponseTooLarge] for a body over the ceiling.
+	// for a connection cut mid-body; the content-coding error (gzip.ErrHeader,
+	// gzip.ErrChecksum or a flate.CorruptInputError) for a body that does not
+	// match its encoding; an error wrapping [ErrResponseTooLarge] for a body
+	// over the ceiling; net/http's own error for a chunked trailer that is
+	// malformed (a textproto.ProtocolError) or too long, or for data past an
+	// HTTP/2 Content-Length; or whatever other error the
+	// body read returned.
 	Inner error
+	// Complete reports whether the server sent its whole answer before the
+	// read failed. It is true when the failure lies in what the server sent
+	// or in the client's own ceiling: the body was over the ceiling, did not
+	// match its Content-Encoding, or failed after its last byte. It is false
+	// when the body stopped arriving before its last byte, and when the
+	// failure is one the client does not recognise. The zero value is false,
+	// so a BodyReadError built by hand counts as incomplete. Complete changes
+	// neither Error nor Unwrap.
+	Complete bool
 }
 
 // Error names the method, the route, the status and the kind of read failure.

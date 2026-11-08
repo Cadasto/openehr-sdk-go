@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/cadasto/openehr-sdk-go/auth/clientcreds"
 	"github.com/cadasto/openehr-sdk-go/auth/jwtbearer"
@@ -147,14 +148,15 @@ func TestREQ060_PrintsNoCredential(t *testing.T) { // REQ-060
 		{
 			name: "Config with a client secret",
 			v: clientcreds.Config{
-				TokenURL:     "https://svc:" + urlPassword + "@idp.example/token",
-				ClientID:     "client-id",
-				ClientSecret: clientSecret,
-				Scope:        "system/*.read",
-				Issuer:       "https://idp.example",
+				TokenURL:         "https://svc:" + urlPassword + "@idp.example/token",
+				ClientID:         "client-id",
+				ClientSecret:     clientSecret,
+				Scope:            "system/*.read",
+				MaxTokenLifetime: 5 * time.Minute,
+				Issuer:           "https://idp.example",
 			},
 			secrets: []string{clientSecret, urlPassword},
-			shown:   []string{redactedMarker, "idp.example/token", "client-id", "system/*.read", "https://idp.example"},
+			shown:   []string{redactedMarker, "idp.example/token", "client-id", "system/*.read", "MaxTokenLifetime: 5m0s", "https://idp.example"},
 		},
 		{
 			name: "Config with a password in its issuer and audience",
@@ -209,6 +211,18 @@ func TestREQ060_PrintsNoCredential(t *testing.T) { // REQ-060
 		for _, v := range []any{clientcreds.Config{}, &clientcreds.Config{}} {
 			if _, ok := v.(slog.LogValuer); !ok {
 				t.Errorf("%T does not implement slog.LogValuer", v)
+			}
+		}
+	})
+
+	t.Run("LogValue carries the durations", func(t *testing.T) {
+		t.Parallel()
+		var buf bytes.Buffer
+		slog.New(slog.NewTextHandler(&buf, nil)).Info("printed", "cfg",
+			clientcreds.Config{RefreshThreshold: time.Minute, MaxTokenLifetime: 5 * time.Minute})
+		for _, want := range []string{"cfg.RefreshThreshold=1m0s", "cfg.MaxTokenLifetime=5m0s"} {
+			if !strings.Contains(buf.String(), want) {
+				t.Errorf("slog TextHandler wrote %q, want it to carry %s", buf.String(), want)
 			}
 		}
 	})

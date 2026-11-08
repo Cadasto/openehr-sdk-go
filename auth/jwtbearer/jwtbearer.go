@@ -58,11 +58,23 @@ type Config struct {
 	// counts as 0: the token is replaced once it has expired, so an expired
 	// token is never returned.
 	RefreshThreshold time.Duration
+	// MaxTokenLifetime bounds how long the source trusts an access token
+	// from the token endpoint: the token expires no later than this long
+	// after the response that carried it arrived, also when the response
+	// gives no expires_in, so that [Source.Token] renews it ahead of time as
+	// it renews any token. 0 sets no bound: a token without expires_in is
+	// then kept until [Source.Reauth]. A negative value is refused with
+	// [auth.ErrInvalidConfig].
+	MaxTokenLifetime time.Duration
 	Issuer           string
 	// ClientID, when set, is sent in the form body as client_id;
 	// some authorization servers require this even with a JWT
 	// assertion. Default empty.
 	ClientID string
+
+	// maxTokenLifetimeByOption reports that [WithMaxTokenLifetime] set
+	// MaxTokenLifetime, so a zero there is a refused bound, not no bound.
+	maxTokenLifetimeByOption bool
 }
 
 // redacted is the text that stands for a credential when a value is printed
@@ -92,9 +104,9 @@ func credentialAttr(key string, set bool) slog.Attr {
 // that carries one masked, as [url.URL.Redacted] masks it. The other fields
 // are shown as they are, except HTTPClient, which is left out.
 func (c Config) String() string {
-	return fmt.Sprintf("jwtbearer.Config{TokenURL: %q, Assertion: %s, Scope: %q, Audience: %q, RefreshThreshold: %s, Issuer: %q, ClientID: %q}",
+	return fmt.Sprintf("jwtbearer.Config{TokenURL: %q, Assertion: %s, Scope: %q, Audience: %q, RefreshThreshold: %s, MaxTokenLifetime: %s, Issuer: %q, ClientID: %q}",
 		urlredact.String(c.TokenURL), credentialText(c.Assertion != nil), c.Scope, urlredact.String(c.Audience), c.RefreshThreshold,
-		urlredact.String(c.Issuer), c.ClientID)
+		c.MaxTokenLifetime, urlredact.String(c.Issuer), c.ClientID)
 }
 
 // GoString returns the text of [Config.String], so that printing c in Go
@@ -122,6 +134,7 @@ func (c Config) LogValue() slog.Value {
 		slog.String("Scope", c.Scope),
 		slog.String("Audience", urlredact.String(c.Audience)),
 		slog.Duration("RefreshThreshold", c.RefreshThreshold),
+		slog.Duration("MaxTokenLifetime", c.MaxTokenLifetime),
 		slog.String("Issuer", urlredact.String(c.Issuer)),
 		slog.String("ClientID", c.ClientID),
 	)
@@ -156,6 +169,25 @@ func WithClientID(id string) Option { return func(cfg *Config) { cfg.ClientID = 
 // expired token is never returned.
 func WithRefreshThreshold(d time.Duration) Option {
 	return func(cfg *Config) { cfg.RefreshThreshold = d }
+}
+
+// WithMaxTokenLifetime bounds how long the source trusts an access token from
+// the token endpoint: d after the response that carried it arrived. A token
+// whose response gives no expires_in then expires at that time, so that
+// [Source.Token] renews it ahead of time, as it renews a token with
+// expires_in, instead of keeping it until [Source.Reauth]. A token whose
+// expires_in ends later is brought forward to that time, and one that ends
+// earlier keeps its own expiry. A d of zero or below is refused with
+// [auth.ErrInvalidConfig] when the source is built.
+//
+// Choose a d longer than the refresh threshold ([WithRefreshThreshold], 30 seconds by
+// default): a token that expires within the threshold is due at once, so
+// with a shorter d every Token call sends a new token request.
+func WithMaxTokenLifetime(d time.Duration) Option {
+	return func(cfg *Config) {
+		cfg.MaxTokenLifetime = d
+		cfg.maxTokenLifetimeByOption = true
+	}
 }
 
 // WithIssuer sets the issuer URL recorded on produced tokens.
@@ -262,8 +294,24 @@ func FromConfig(cfg Config) (*Source, error) {
 	if err != nil || u.Scheme == "" || u.Host == "" {
 		return nil, fmt.Errorf("%w: TokenURL %q is not a valid absolute URL", auth.ErrInvalidConfig, urlredact.String(cfg.TokenURL))
 	}
+	if err := checkMaxTokenLifetime(cfg); err != nil {
+		return nil, err
+	}
 	cfg.RefreshThreshold = cmp.Or(cfg.RefreshThreshold, defaultRefreshThreshold)
 	return &Source{cfg: cfg, tokenURL: u, client: noredirect.Client(cfg.HTTPClient)}, nil
+}
+
+// checkMaxTokenLifetime refuses a maximum token lifetime below zero, and one
+// of zero that WithMaxTokenLifetime set: only the Config field's zero means
+// no bound.
+func checkMaxTokenLifetime(cfg Config) error {
+	switch d := cfg.MaxTokenLifetime; {
+	case cfg.maxTokenLifetimeByOption && d <= 0:
+		return fmt.Errorf("%w: WithMaxTokenLifetime(%s): the maximum token lifetime must be above zero", auth.ErrInvalidConfig, d)
+	case d < 0:
+		return fmt.Errorf("%w: MaxTokenLifetime %s is negative; zero sets no bound", auth.ErrInvalidConfig, d)
+	}
+	return nil
 }
 
 var _ auth.Reauther = (*Source)(nil)
@@ -457,6 +505,8 @@ func (s *Source) stale() bool {
 		return true
 	}
 	if s.cur.ExpiresAt.IsZero() {
+		// No declared expiry and no maximum token lifetime: cache until
+		// Reauth drops the token.
 		return false
 	}
 	// A negative threshold counts as 0, so a token past its expiry is never
@@ -537,20 +587,31 @@ func (s *Source) fetch(ctx context.Context) (auth.Token, error) {
 		}
 	}
 
-	// RFC 6749 §5.1: expires_in is the token's lifetime, so one of zero or
-	// below makes the token due at once, and only a response without one,
-	// or with null, leaves it without an expiry (REQ-063).
-	var expiresAt time.Time
-	if secs, ok := expiresin.Seconds(tr.ExpiresIn.String()); ok {
-		expiresAt = time.Now().Add(time.Duration(max(secs, 0)) * time.Second)
-	}
 	return auth.Token{
 		Value:     tr.AccessToken,
 		Type:      authScheme(tr.TokenType),
-		ExpiresAt: expiresAt,
+		ExpiresAt: expiry(time.Now(), tr.ExpiresIn, s.cfg.MaxTokenLifetime),
 		Scope:     cmp.Or(tr.Scope, s.cfg.Scope),
 		Issuer:    s.cfg.Issuer,
 	}, nil
+}
+
+// expiry returns the ExpiresAt of a token whose response arrived at arrival
+// with expiresIn. RFC 6749 §5.1 makes expires_in the token's lifetime, so one
+// of zero or below makes the token due at once, and a response without one,
+// or with null, leaves it without an expiry. A bound above zero caps the
+// expiry at arrival plus bound, and gives a token without one that expiry.
+func expiry(arrival time.Time, expiresIn json.Number, bound time.Duration) time.Time {
+	var at time.Time
+	if secs, ok := expiresin.Seconds(expiresIn.String()); ok {
+		at = arrival.Add(time.Duration(max(secs, 0)) * time.Second)
+	}
+	if bound > 0 {
+		if limit := arrival.Add(bound); at.IsZero() || at.After(limit) {
+			at = limit
+		}
+	}
+	return at
 }
 
 // authScheme maps a token endpoint's token_type to the Authorization scheme.
