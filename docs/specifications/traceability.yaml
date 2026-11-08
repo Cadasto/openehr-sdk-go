@@ -2712,3 +2712,9 @@ requirements:
     implementation: planned
     packages: [openehr/client/definition]
     probes: [PROBE-112]
+    tests:
+      - openehr/client/definition/body_read_error_test.go
+      - openehr/client/definition/path_encoding_test.go
+      - openehr/client/definition/template_representations_test.go
+      - testkit/probes/definition/probe_112_template_representations.go
+      - testkit/probes/definition/probes_test.go
