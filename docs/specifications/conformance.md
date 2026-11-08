@@ -890,11 +890,11 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 #### PROBE-112 — Template representations reach the wire
 
 - **Title:** `GetOperationalTemplate` and `GetWebTemplate` read the ADL 1.4 template route with their representation's `Accept` and hand back the body the server sent.
-- **Preconditions:** A sandbox Definition server on `GET /definition/template/adl1.4/{template_id}` that answers `application/xml` with an operational template, `application/openehr.wt+json` with a Web Template, and any other `Accept` with `406`.
+- **Preconditions:** Two sandbox Definition servers on `GET /definition/template/adl1.4/{template_id}` that hold the same template. The first answers `application/xml` with an operational template, `application/openehr.wt+json` with a Web Template, and any other `Accept` with `406`. The second offers no Web Templates and answers `application/openehr.wt+json` with `406`. The probe takes the template id and the bytes of both representations as inputs.
 - **Wire assertion:** Each call issues exactly one `GET` on the route with the template id in place and its own `Accept` (`application/xml`, `application/openehr.wt+json`), and returns the served body byte for byte. A server that answers `406` to the Web Template's `Accept` makes `GetWebTemplate` fail with a non-nil error and non-nil metadata. Sentinel identity (`ErrInvalidConfig`, `*transport.WireError`) is pinned by `definition` unit tests, not by this probe.
 - **Effect:** read-only (`GET`, no state change).
 - **Modes:** Sandbox.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — can-fail plants serve a backend that ignores `Accept`, alter the operational template or the Web Template body, serve a Web Template from the server that has none, and fail that server's transport so the refusal carries no metadata; recorder plants drop or double a request and change its method, its format or template-id segment, or either read's `Accept`.
 - **Satisfies:** REQ-177.
 
 ### RM model introspection
