@@ -1138,6 +1138,7 @@ requirements:
       - sandbox/independence_test.go
       - sandbox/roundtrip_test.go
       - sandbox/script_test.go
+      - testkit/probe/cassette_contribution_test.go
       - testkit/probe/cassette_errors_test.go
       - testkit/probe/cassette_test.go
       - testkit/probe/cassette_versioned_test.go
@@ -2122,11 +2123,13 @@ requirements:
     packages: [openehr/client/ehr/contribution]
     probes: [PROBE-084]
     tests:
+      - cmd/probe-record/scenarios_contribution_test.go
       - openehr/client/ehr/contribution/builder_test.go
       - openehr/client/ehr/contribution/submission_decode_test.go
       - openehr/client/ehr/contribution/submission_test.go
       - openehr/client/ehr/contribution/version_shadow_internal_test.go
       - openehr/client/ehr/contribution/version_test.go
+      - testkit/probe/cassette_contribution_test.go
       - testkit/probes/versioned/probe_072_contribution_submission_shape.go
       - testkit/probes/versioned/probe_084_built_contribution_body.go
       - testkit/probes/versioned/probes_test.go
