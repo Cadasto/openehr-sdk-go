@@ -335,7 +335,8 @@ A token response whose `expires_in` is zero or below **MUST** give the access to
 
 - A token without a declared expiry **MUST** get an `ExpiresAt` of the time its response arrived plus `d`, so the refresh threshold renews it as it renews a token with `expires_in`.
 - A token whose declared expiry is later than that time **MUST** be capped at it; an earlier declared expiry is kept.
-- `WithMaxTokenLifetime` with a `d` of zero or below **MUST** fail construction with `auth.ErrInvalidConfig`, and so **MUST** a negative `Config.MaxTokenLifetime`, whose zero sets no bound.
+- `WithMaxTokenLifetime` with a `d` of zero or below **MUST** fail construction with `auth.ErrInvalidConfig`.
+- A negative `Config.MaxTokenLifetime` **MUST** fail construction the same way; a zero one sets no bound.
 
 The capped `ExpiresAt` is the token's `ExpiresAt` for everything below, the transient-failure backoff included.
 
