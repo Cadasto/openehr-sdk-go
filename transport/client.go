@@ -546,14 +546,12 @@ func (c *Client) doOnce(ctx context.Context, req *Request, targetURL, safeURL st
 	return resp, c.mapWireError(req, safeURL, resp)
 }
 
-// The texts of two read failures net/http raises for a chunked trailer after
-// the body's last byte. Both are plain errors.New values with no type or
-// sentinel to match, so they are matched by text, as net/http itself matches
-// the second when it reads a request header.
-const (
-	errTextLongTrailer     = "http: suspiciously long trailer after chunked body"
-	errTextMessageTooLarge = "message too large"
-)
+// errTextLongTrailer is the text of the read failure net/http raises for a
+// chunked trailer longer than its read buffer, after the body's last byte. It
+// is a plain errors.New value with no type or sentinel to match, so it is
+// matched by text. net/http reads a response trailer with no limit on its
+// line count, so textproto's "message too large" cannot arise here.
+const errTextLongTrailer = "http: suspiciously long trailer after chunked body"
 
 // bodyArrivedWhole reports, for BodyReadError.Complete, whether the server
 // sent its whole answer before a 2xx body read failed with readErr.
@@ -574,7 +572,7 @@ func bodyArrivedWhole(readErr error, read, contentLength int64) bool {
 	case errors.Is(readErr, gzip.ErrHeader), errors.Is(readErr, gzip.ErrChecksum), corruptCoding:
 		// The body does not match its Content-Encoding.
 		return true
-	case malformedTrailer, readErr.Error() == errTextLongTrailer, readErr.Error() == errTextMessageTooLarge:
+	case malformedTrailer, readErr.Error() == errTextLongTrailer:
 		return true
 	case contentLength >= 0 && read >= contentLength:
 		// Every declared byte arrived before the failure. Over HTTP/2 this is
