@@ -72,10 +72,12 @@ func run() error {
 	// Step 2: describe the batch once, then add one Change per version. The
 	// builder derives each version's change_type from the operation
 	// (Creation, Amendment, ...) and copies the committer and system id from
-	// the batch audit into every version. The batch audit's own change_type
-	// describes the contribution as a whole and is never derived from the
-	// versions, so the caller declares it. Build validates everything
-	// accumulated so far and returns every problem joined into one error.
+	// the batch audit into every version; the system id is set because a
+	// server such as EHRbase refuses a commit without one. The batch audit's
+	// own change_type describes the contribution as a whole and is never
+	// derived from the versions, so the caller declares it. Build validates
+	// everything accumulated so far and returns every problem joined into
+	// one error.
 	submission, err := contribution.NewBuilder().
 		WithCommitterName("Dr. House").
 		WithSystemID("cdr.example").

@@ -12,7 +12,9 @@ import (
 // commit audit. The vendored ITS-REST pin recommends that clients send
 // `_type: "UPDATE_AUDIT"`, and that servers also accept `AUDIT_DETAILS` or an
 // omitted `_type`. The SDK defaults to `AUDIT_DETAILS`. Callers can switch to
-// `UPDATE_AUDIT` when a server accepts only that form.
+// `UPDATE_AUDIT` when a server accepts only that form. A server that refuses
+// the default for a missing system id needs [UpdateAudit.SystemID] set, not
+// another type.
 type AuditType string
 
 const (
@@ -20,14 +22,16 @@ const (
 	// default: the zero value of [UpdateAudit.Type] resolves to it.
 	AuditTypeAuditDetails AuditType = "AUDIT_DETAILS"
 	// AuditTypeUpdateAudit emits `_type:"UPDATE_AUDIT"`, the form the vendored
-	// ITS-REST pin recommends clients send.
+	// ITS-REST pin recommends clients send. It suits a server that accepts
+	// only this form; EHRbase does not resolve it and refuses the commit.
 	AuditTypeUpdateAudit AuditType = "UPDATE_AUDIT"
 )
 
 // UpdateAudit is the ITS-REST Contribution_create commit-audit DTO: the
 // request-side shape, distinct from the persisted [rm.AuditDetails] returned
 // on GET. Per ITS-REST PR 131 / SPECITS-95 the commit audit must not carry
-// a server-assigned time_committed; system_id is optional on write. The SDK
+// a server-assigned time_committed; the pin leaves system_id optional on
+// write, though some servers require it (see [UpdateAudit.SystemID]). The SDK
 // emits _type:"AUDIT_DETAILS" by default (see [AuditType]).
 type UpdateAudit struct {
 	// ChangeType is the audit change-type coded value (openEHR Terminology
@@ -37,7 +41,20 @@ type UpdateAudit struct {
 	Committer rm.PartyProxy
 	// Description is the optional reason-for-committal text; omitted when nil.
 	Description rm.DVTextLike
-	// SystemID is the optional logical EHR system id; omitted when empty.
+	// SystemID is the logical system id of the commit; omitted when empty.
+	//
+	// The ITS-REST pin leaves it optional on write. A server that validates
+	// the commit audit as the RM AUDIT_DETAILS, EHRbase among them, refuses a
+	// commit without a non-empty system id on the batch audit and on every
+	// version's commit_audit; [Builder.WithSystemID] sets the batch one and
+	// the builder copies it into each version. EHRbase accepts any non-empty
+	// value and records its own system id on the stored audit, so the
+	// system_id of the EHR being written to ([rm.EHR.SystemID], which
+	// `ehr.Create` and `ehr.Get` return) is a natural value. The SDK cannot
+	// pick one itself. A refusal for a missing system id is fixed by setting
+	// one, not by switching [UpdateAudit.Type] to [AuditTypeUpdateAudit]:
+	// EHRbase does not resolve that type and refuses it with or without a
+	// system id.
 	SystemID string
 	// Type selects the emitted `_type`. The zero value emits
 	// AuditTypeAuditDetails, the SDK default; set AuditTypeUpdateAudit for

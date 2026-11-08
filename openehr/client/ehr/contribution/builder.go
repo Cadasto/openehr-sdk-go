@@ -367,8 +367,9 @@ func (b *Builder) WithDescription(text string) *Builder {
 	return b
 }
 
-// WithSystemID sets the batch audit's logical system id. It is optional on
-// the write path; the server sets its own when omitted.
+// WithSystemID sets the batch audit's logical system id, copied into every
+// version that does not override it. Some servers, EHRbase among them, refuse
+// a commit without one; [UpdateAudit.SystemID] says which value to use.
 func (b *Builder) WithSystemID(id string) *Builder {
 	if b == nil {
 		return b
