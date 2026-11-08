@@ -665,7 +665,7 @@ When a leaf gains an operation or an option, its package's `Repository` interfac
 | `GetOperationalTemplate` | `application/xml` | the operational template |
 | `GetWebTemplate` | `application/openehr.wt+json` | the Web Template |
 
-Both **MUST** return a 2xx body byte for byte, undecoded, with the response metadata. A `TemplateFormat` other than `FormatADL14` **MUST** fail with `ErrInvalidConfig` before any request is issued. An empty template id is refused before any request as on every leaf, by [REQ-150](transport.md#req-150--path-parameter-segment-validation), with an error that also satisfies `ErrInvalidConfig`. On a non-2xx answer, the `406` of a server that does not offer the representation included, both **MUST** return the typed wire error of [REQ-093](transport.md#req-093--openehr-error-envelope-mapping) with the response metadata beside it. `GetTemplate` stays as a deprecated alias of `GetOperationalTemplate`.
+Both **MUST** return a 2xx body byte for byte, undecoded, with the response metadata. A `TemplateFormat` other than `FormatADL14` **MUST** fail with `ErrInvalidConfig` before any request is issued. An empty template id is refused with `ErrInvalidConfig` before any request is issued, and a malformed one by [REQ-150](transport.md#req-150--path-parameter-segment-validation). On a non-2xx answer, the `406` of a server that does not offer the representation included, both **MUST** return the typed wire error of [REQ-093](transport.md#req-093--openehr-error-envelope-mapping) with the response metadata beside it. `GetTemplate` stays as a deprecated alias of `GetOperationalTemplate`.
 
 **Acceptance.**
 
@@ -775,7 +775,7 @@ An EHR has one EHR_STATUS, so its versioned object is addressed by the `ehr_id` 
 
 **Latest and at a time.** The latest-version read and the version-at-time read are separate calls on one path. The latest-version read **MUST NOT** send `version_at_time`. The version-at-time read **MUST** refuse a zero `time.Time` with `ErrInvalidConfig` before any request is issued: the zero time is Go's "not set", not an instant a caller means, and the latest-version read is the call for "now".
 
-An empty path parameter and a `404` are refused and mapped as on every leaf, by [REQ-150](transport.md#req-150--path-parameter-segment-validation) and [REQ-093](transport.md#req-093--openehr-error-envelope-mapping).
+An empty path parameter is refused with `ErrInvalidConfig` before any request is issued, a malformed one by [REQ-150](transport.md#req-150--path-parameter-segment-validation), and a `404` is mapped as on every leaf, by [REQ-093](transport.md#req-093--openehr-error-envelope-mapping).
 
 **Representation.** v1 of these reads, the contribution read included, **MUST** request canonical JSON (`Accept: application/json`, the pin's `Accept_canonical`). Canonical XML and the simplified formats are out of scope here; the composition leaf's formats are [§ REQ-173](#req-173--composition-representation-formats)'s.
 
