@@ -290,20 +290,26 @@ func writeH2Frame(w io.Writer, typ, flags byte, stream uint32, payload []byte) e
 	return err
 }
 
-// h2ResponseHeaders is the HPACK header block for status 200 and the given
-// Content-Length, without Huffman coding: the static table's ":status: 200"
-// entry (index 8), then content-length (index 28) as a literal that is not
-// indexed.
-func h2ResponseHeaders(contentLength string) []byte {
+// h2ResponseHeaders is the HPACK header block for status 200, the given
+// Content-Length and, when contentEncoding is not empty, that
+// Content-Encoding, without Huffman coding: the static table's ":status: 200"
+// entry (index 8), then content-length (index 28) and content-encoding
+// (index 26) as literals that are not indexed.
+func h2ResponseHeaders(contentLength, contentEncoding string) []byte {
 	block := []byte{0x80 | 8, 0x0f, 28 - 15, byte(len(contentLength))}
-	return append(block, contentLength...)
+	block = append(block, contentLength...)
+	if contentEncoding != "" {
+		block = append(block, 0x0f, 26-15, byte(len(contentEncoding)))
+		block = append(block, contentEncoding...)
+	}
+	return block
 }
 
 // h2cServer answers the first request on each connection, over HTTP/2 with
-// prior knowledge, with status 200, the declared contentLength and one DATA
-// frame of data that ends the stream. It sets answered once it has written
+// prior knowledge, with status 200, the declared contentLength and
+// contentEncoding, and one DATA frame of data that ends the stream. It sets answered once it has written
 // the response, and then reads frames until the client closes the connection.
-func h2cServer(t *testing.T, contentLength, data string, answered *atomic.Bool) func(conn net.Conn) {
+func h2cServer(t *testing.T, contentLength, contentEncoding, data string, answered *atomic.Bool) func(conn net.Conn) {
 	return func(conn net.Conn) {
 		br := bufio.NewReader(conn)
 		preface := make([]byte, len(h2Preface))
@@ -334,7 +340,7 @@ func h2cServer(t *testing.T, contentLength, data string, answered *atomic.Bool) 
 				}
 			case typ == h2FrameHeaders && !replied:
 				replied = true
-				if err := writeH2Frame(conn, h2FrameHeaders, h2FlagEndHeaders, stream, h2ResponseHeaders(contentLength)); err != nil {
+				if err := writeH2Frame(conn, h2FrameHeaders, h2FlagEndHeaders, stream, h2ResponseHeaders(contentLength, contentEncoding)); err != nil {
 					t.Errorf("server: write HEADERS: %v", err)
 					return
 				}
@@ -351,16 +357,21 @@ func h2cServer(t *testing.T, contentLength, data string, answered *atomic.Bool) 
 // TestBodyReadErrorCompleteHTTP2 pins Complete on HTTP/2, where a server can
 // send more data than the Content-Length it declared: net/http reads the
 // declared bytes and then fails, after the body's last byte, so the answer
-// is whole. A stream that ends short of its Content-Length is the control: the
-// body stopped before its last byte.
+// is whole. A gzip body runs past its Content-Length the same way, but
+// net/http decompresses it and reports no Content-Length, so the declared
+// length cannot tell it apart. A stream that ends short of its Content-Length
+// is the control: the body stopped before its last byte.
 func TestBodyReadErrorCompleteHTTP2(t *testing.T) { // REQ-151
+	zipped := string(gzipBytes(t, "hello"))
 	cases := []struct {
-		name          string
-		contentLength string
-		data          string
-		want          bool
+		name            string
+		contentLength   string
+		contentEncoding string
+		data            string
+		want            bool
 	}{
 		{name: "data past the declared Content-Length", contentLength: "5", data: "helloEXTRA", want: true},
+		{name: "gzip data past the declared Content-Length", contentLength: strconv.Itoa(len(zipped)), contentEncoding: "gzip", data: zipped + "EXTRA", want: true},
 		{name: "stream ends before the declared Content-Length", contentLength: "10", data: "hello", want: false},
 	}
 
@@ -368,7 +379,7 @@ func TestBodyReadErrorCompleteHTTP2(t *testing.T) { // REQ-151
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			var answered atomic.Bool
-			base := rawServer(t, h2cServer(t, tc.contentLength, tc.data, &answered))
+			base := rawServer(t, h2cServer(t, tc.contentLength, tc.contentEncoding, tc.data, &answered))
 			// Unencrypted HTTP/2 alone: the client speaks HTTP/2 with prior
 			// knowledge to an http:// URL.
 			tr := &http.Transport{Protocols: new(http.Protocols)}
