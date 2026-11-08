@@ -339,7 +339,7 @@ A token response whose `expires_in` is zero or below **MUST** give the access to
 
 The capped `ExpiresAt` is the token's `ExpiresAt` for everything below, the transient-failure backoff included.
 
-**Acceptance (maximum token lifetime).** With `WithMaxTokenLifetime(d)`, a response without `expires_in` is renewed by the first `Token` call once `d` less the refresh threshold has passed, with no `401` first. A response whose `expires_in` exceeds `d` is renewed then too, and one below `d` keeps its own expiry. Without the option, a response without `expires_in` is cached until `Reauth`. A `d` of zero or below fails construction with `auth.ErrInvalidConfig`.
+**Acceptance (maximum token lifetime).** With `WithMaxTokenLifetime(d)`, a response without `expires_in` is renewed by the first `Token` call once `d` less the refresh threshold has passed, with no `401` first. A response whose `expires_in` exceeds `d` is renewed then too, and one below `d` keeps its own expiry. Without the option, a response without `expires_in` is cached until `Reauth`.
 
 Wire-driven refresh — recovering from a `401 Unauthorized` that indicates an expired/invalid token — is **opt-in** rather than automatic inside the `TokenSource`: the transport layer exposes `transport.WithReauthOn401`, which on a 401 invokes the configured `auth.Reauther` (implemented by `*smart.Source.Reauth`) once and replays the request. Keeping it opt-in avoids surprising retries of non-idempotent writes ([§ Transport 401 hook](#transport-401-hook)).
 

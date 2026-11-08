@@ -505,8 +505,8 @@ func (e *DecodeError) Unwrap() error {
 //   - A body that does not match its Content-Encoding, such as a bad gzip
 //     header, a corrupt compressed stream or a failed gzip checksum: complete.
 //   - A failure after the body's last byte: a chunked trailer on HTTP/1 that
-//     is malformed, too long or has too many lines, or data past the
-//     Content-Length the server declared on HTTP/2: complete.
+//     is malformed or too long, or any failure once every byte of a declared
+//     Content-Length has arrived, such as data past it on HTTP/2: complete.
 //   - A connection cut before the body's last byte: not complete.
 //   - Any other read failure: not complete, so a failure the client does not
 //     recognise is never taken for a whole answer.
@@ -532,8 +532,8 @@ type BodyReadError struct {
 	// gzip.ErrChecksum or a flate.CorruptInputError) for a body that does not
 	// match its encoding; an error wrapping [ErrResponseTooLarge] for a body
 	// over the ceiling; net/http's own error for a chunked trailer that is
-	// malformed (a textproto.ProtocolError), too long or has too many lines,
-	// or for data past an HTTP/2 Content-Length; or whatever other error the
+	// malformed (a textproto.ProtocolError) or too long, or for data past an
+	// HTTP/2 Content-Length; or whatever other error the
 	// body read returned.
 	Inner error
 	// Complete reports whether the server sent its whole answer before the

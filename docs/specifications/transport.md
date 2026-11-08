@@ -247,7 +247,7 @@ These outcomes are their own, and the table **MUST NOT** override them:
 |---|---|
 | A body longer than the *Bounded response reads* ceiling (`transport.ErrResponseTooLarge`) | true |
 | A body that does not match its `Content-Encoding`, such as a gzip header or checksum failure | true |
-| A failure net/http raises after the body's last byte: a malformed or over-long HTTP/1 chunked trailer, or data past an HTTP/2 `Content-Length` | true |
+| A failure after the body's last byte: a malformed or over-long HTTP/1 chunked trailer, or any failure once every byte of a declared `Content-Length` has arrived, such as HTTP/2 data past it | true |
 | A connection cut before the body's last byte (`io.ErrUnexpectedEOF`) | false |
 
 A read failure the SDK does not recognise **MUST** count as incomplete, so an unknown failure is never taken for a whole answer. `Complete` changes neither the error's text nor what it wraps.

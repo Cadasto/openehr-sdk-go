@@ -233,6 +233,10 @@ func WithRefreshThreshold(d time.Duration) Option {
 // expires_in ends later is brought forward to that time, and one that ends
 // earlier keeps its own expiry. A d of zero or below is refused with
 // [auth.ErrInvalidConfig] when the source is built.
+//
+// Choose a d longer than the refresh threshold ([WithRefreshThreshold], 30 seconds by
+// default): a token that expires within the threshold is due at once, so
+// with a shorter d every Token call sends a new token request.
 func WithMaxTokenLifetime(d time.Duration) Option {
 	return func(cfg *Config) {
 		cfg.MaxTokenLifetime = d
