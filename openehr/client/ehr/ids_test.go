@@ -98,13 +98,21 @@ func TestNewVersionMetadataPrefersETag(t *testing.T) {
 }
 
 // TestVersionUIDMalformedSegments asserts the stricter (canonical-parser)
-// behaviour: a non-three-part version-uid yields empty segments (REQ-120).
+// behaviour: a version-uid the canonical parser refuses yields empty
+// segments, and is not read as a version from an ETag (REQ-120).
 func TestVersionUIDMalformedSegments(t *testing.T) {
-	for _, raw := range []string{"uid::sys", "uid::sys::0", "uid::sys::1.1", "garbage", ""} {
+	for _, raw := range []string{
+		"uid::sys", "uid::sys::0", "uid::sys::1.1", "garbage", "",
+		"8849182c-82ad-4088-a07f-48ead4180515::cdr example::1",
+		"8849182c-82ad-4088-a07f-48ead4180515::cdr.example::01",
+	} {
 		v := VersionUID(raw)
 		if v.VersionedObjectID() != "" || v.CreatingSystemID() != "" || v.VersionNumber() != "" {
 			t.Errorf("%q: want empty segments, got %q/%q/%q",
 				raw, v.VersionedObjectID(), v.CreatingSystemID(), v.VersionNumber())
+		}
+		if got := versionUIDFromETag(raw); got != "" {
+			t.Errorf("versionUIDFromETag(%q) = %q, want empty", raw, got)
 		}
 	}
 }
