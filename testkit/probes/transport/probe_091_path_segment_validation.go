@@ -56,7 +56,7 @@ const (
 //   - contribution.Commit          — /ehr/{ehr_id}/contribution (a write)
 //   - contribution.Get             — /ehr/{ehr_id}/contribution/{contribution_uid}
 //   - query.RunStored              — /query/{qualified_query_name}
-//   - definition.GetTemplate       — /definition/template/{format}/{template_id}
+//   - definition.GetOperationalTemplate — /definition/template/{format}/{template_id}
 //   - demographic.GetVersionedParty — /demographic/versioned_party/{uid}
 //   - admin.DeleteEHR              — /admin/ehr/{ehr_id}
 //
@@ -116,7 +116,7 @@ func Probe091PathSegmentValidation(ctx context.Context, c *transport.Client, cap
 	// the service root MUST still be reachable — REQ-150 carves it out
 	// explicitly because the System API's only operation is `OPTIONS /`.
 	before := requests()
-	if _, _, err := definition.GetTemplate(ctx, c, "Blood Pressure.v1", definition.FormatADL14); err != nil {
+	if _, _, err := definition.GetOperationalTemplate(ctx, c, "Blood Pressure.v1", definition.FormatADL14); err != nil {
 		r.Status = "fail"
 		r.Detail = fmt.Sprintf("a well-formed dotted/spaced template id was refused: %v", err)
 		return r, nil
@@ -204,8 +204,8 @@ func hostileLeaves() []hostileLeaf {
 			_, _, err := query.RunStored(ctx, c, id, nil)
 			return err
 		}},
-		{"definition.GetTemplate", func(ctx context.Context, c *transport.Client, id string) error {
-			_, _, err := definition.GetTemplate(ctx, c, id, definition.FormatADL14)
+		{"definition.GetOperationalTemplate", func(ctx context.Context, c *transport.Client, id string) error {
+			_, _, err := definition.GetOperationalTemplate(ctx, c, id, definition.FormatADL14)
 			return err
 		}},
 		{"demographic.GetVersionedParty", func(ctx context.Context, c *transport.Client, id string) error {

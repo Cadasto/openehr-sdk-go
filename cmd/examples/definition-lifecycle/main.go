@@ -92,11 +92,12 @@ func run() error {
 	}
 	fmt.Printf("listed metadata      : id=%s concept=%s\n", listed[i].TemplateID, listed[i].Concept)
 
-	// Step 4: download the stored OPT. GetTemplate returns the bytes exactly
-	// as the server sends them. A server may store a template in another form
-	// than the one uploaded, so the bytes need not match the upload; the
-	// program reports whether they do, and step 5 is the real check.
-	raw, _, err := definition.GetTemplate(ctx, client, id, definition.FormatADL14)
+	// Step 4: download the stored OPT. GetOperationalTemplate returns the
+	// bytes exactly as the server sends them. A server may store a template
+	// in another form than the one uploaded, so the bytes need not match the
+	// upload; the program reports whether they do, and step 5 is the real
+	// check.
+	raw, _, err := definition.GetOperationalTemplate(ctx, client, id, definition.FormatADL14)
 	if err != nil {
 		return fmt.Errorf("get template: %w", err)
 	}
