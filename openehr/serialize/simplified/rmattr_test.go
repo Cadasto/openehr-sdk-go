@@ -257,6 +257,34 @@ func TestRMAttrUIDSubtypeMismatchRefusedOnEncode(t *testing.T) {
 	}
 }
 
+// TestRMAttrMalformedVersionIDRefusedOnEncode — REQ-140. An
+// OBJECT_VERSION_ID whose value rm.ParseObjectVersionID refuses would decode
+// as a HIER_OBJECT_ID, so encode refuses it, and its error says the value is
+// not a well-formed version id rather than calling it another subtype's form.
+func TestRMAttrMalformedVersionIDRefusedOnEncode(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	for name, value := range map[string]string{
+		"creating system id with a space": "6e3a9506-b81c-4d74-a37f-1464fb7106b2::cdr example::1",
+		"version tree id with a zero pad": "6e3a9506-b81c-4d74-a37f-1464fb7106b2::ehrbase.org::01",
+	} {
+		t.Run(name, func(t *testing.T) {
+			comp := decodeRMAttr(t, wt, rmattrBody(nil))
+			comp.UID = &rm.ObjectVersionID{Value: value}
+			_, err := MarshalFlat(comp, wt)
+			if !errors.Is(err, ErrUnsupportedDatatype) {
+				t.Fatalf("MarshalFlat err = %v, want ErrUnsupportedDatatype", err)
+			}
+			msg := err.Error()
+			if !strings.Contains(msg, "not a well-formed object_id::creating_system_id::version_tree_id") {
+				t.Errorf("err = %q, want it to say the value is not a well-formed version id", msg)
+			}
+			if strings.Contains(msg, "lexical form of") {
+				t.Errorf("err = %q calls a malformed version id another subtype's lexical form", msg)
+			}
+		})
+	}
+}
+
 // --- _link:N ------------------------------------------------------------
 
 // TestRMAttrLinkRoundTrip — REQ-140. `_link:N` carries `|meaning`, `|type`
