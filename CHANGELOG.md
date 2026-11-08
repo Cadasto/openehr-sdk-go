@@ -8,6 +8,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.48.0] - 2026-11-08
+
+Forty-eighth `v0.x` minor: the definition client reads both forms of an ADL 1.4 template, a lost body says whether it arrived whole, tokens take a maximum lifetime, and the contribution docs say what EHRbase needs on a commit audit. **Breaking:** object version ids parse strictly, signers refuse RSA keys under 1024 bits, and `definition.Repository` gains two methods.
+
+### Added
+
+- **`definition.GetOperationalTemplate` and `GetWebTemplate`** read the two forms ITS-REST serves for an ADL 1.4 template, chosen by `Accept`, and return the body verbatim with its metadata (REQ-177, PROBE-112).
+- **`transport.BodyReadError.Complete`** says whether a lost 2xx body arrived whole, so a caller no longer matches net/http's error text (REQ-151).
+- **`WithMaxTokenLifetime`** on `auth/clientcreds` and `auth/jwtbearer`, and `Config.MaxTokenLifetime`, give a token without `expires_in` an expiry and cap a later one (REQ-063).
+- **The testkit recordings** gain EHRbase 2.37.1 answering contribution commits with and without a system id and as `UPDATE_AUDIT`, and the `contribution` docs say such a server needs a system id (REQ-130, REQ-082).
+
+### Changed
+
+- **Breaking: `rm.ParseObjectVersionID`** refuses an object id or creating system id that is no UID form, and `rm.ParseVersionTreeID` refuses `+1`, `01` and parts past 64 bits (REQ-120).
+- **Breaking: `jwtbearer.NewClaimsSigner` and `NewClientAssertion`** refuse an RSA key under 1024 bits at construction, an opaque signer included (REQ-068).
+- **Breaking: `definition.Repository`** gains `GetOperationalTemplate` and `GetWebTemplate`, so an implementation outside the module must add them (REQ-177).
+
+### Deprecated
+
+- **`definition.GetTemplate`** remains as an alias of `GetOperationalTemplate`, and its errors now carry the `definition.GetOperationalTemplate:` prefix (REQ-177).
+
 ## [0.47.0] - 2026-11-07
 
 Forty-seventh `v0.x` minor: canonical XML keeps empty strings as canonical JSON does and marks input that is not well-formed, FLAT and STRUCTURED handle reused siblings told apart by their names, operational templates read faster, and the testkit corpus gains sixteen templates. **Breaking:** the canjson and canxml report options pass `Pointer` and `Path` values written on demand, and canonical XML refuses white space before the XML declaration.
