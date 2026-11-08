@@ -147,8 +147,9 @@ func (f *fakeCDR) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// GetOperationalTemplate asks for application/xml, the OPT itself.
-	// GetWebTemplate asks the same route for application/openehr.wt+json,
-	// which this fake does not serve.
+	// GetWebTemplate asks the same route for application/openehr.wt+json;
+	// this fake ignores Accept and answers every read of the route with the
+	// OPT, so it does not stand in for a server that serves Web Templates.
 	w.Header().Set("Content-Type", "application/xml")
 	_, _ = w.Write(stored.opt)
 }
