@@ -2,6 +2,7 @@ package rm_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -10,18 +11,47 @@ import (
 // REQ-120 — identifier parsing and derivation.
 
 func TestParseObjectVersionID(t *testing.T) {
+	const uuid = "8849182c-82ad-4088-a07f-48ead4180515"
 	tests := []struct {
 		name    string
 		in      string
 		wantErr bool
+		// part, when set, is the part the error names: a refused UID part
+		// is reported with its name and its value.
+		part string
 	}{
-		{"canonical trunk", "87284370-2D4B-4e3d-A3F3-F303D2F4F34B::cdr.example::1", false},
-		{"canonical branch", "abc::sys::1.1.1", false},
-		{"no separators", "not-a-version", true},
-		{"two parts", "obj::sys", true},
-		{"empty segment", "obj::::1", true},
-		{"bad version tree", "obj::sys::1.2", true},
-		{"trailing extra", "obj::sys::1::extra", true},
+		{name: "canonical trunk", in: "87284370-2D4B-4e3d-A3F3-F303D2F4F34B::cdr.example::1"},
+		{name: "canonical branch", in: "abc::sys::1.1.1"},
+		{name: "no separators", in: "not-a-version", wantErr: true},
+		{name: "two parts", in: "obj::sys", wantErr: true},
+		{name: "empty segment", in: "obj::::1", wantErr: true},
+		{name: "bad version tree", in: "obj::sys::1.2", wantErr: true},
+		{name: "trailing extra", in: "obj::sys::1::extra", wantErr: true},
+
+		// REQ-120: object_id and creating_system_id are each a UID, read
+		// leniently as dot-separated labels of ASCII letters, digits, '-'
+		// and '_'. Systems in the wild send ids RFC 1034 would refuse.
+		{name: "system id with underscore", in: uuid + "::EMR_APP::1"},
+		{name: "dotted system id with underscores", in: uuid + "::y_d_h.code_4_health.com::1"},
+		{name: "reverse-domain system id", in: uuid + "::local.ehrbase.org::1"},
+		{name: "single-label system id", in: uuid + "::EHRSERVER::1"},
+		{name: "ISO OID object id", in: "1.2.840.113619::cdr.example::1"},
+		{name: "plain decimal branch", in: uuid + "::cdr.example::10.20.30"},
+
+		{name: "blank system id", in: uuid + ":: ::1", wantErr: true, part: "creating_system_id"},
+		{name: "space in system id", in: uuid + "::cdr example::1", wantErr: true, part: "creating_system_id"},
+		{name: "tab in system id", in: uuid + "::cdr\texample::1", wantErr: true, part: "creating_system_id"},
+		{name: "control character in system id", in: uuid + "::cdr\x01example::1", wantErr: true, part: "creating_system_id"},
+		{name: "trailing newline in system id", in: uuid + "::cdr.example\n::1", wantErr: true, part: "creating_system_id"},
+		{name: "slash in system id", in: uuid + "::cdr/example::1", wantErr: true, part: "creating_system_id"},
+		{name: "quote in system id", in: uuid + "::cdr\"x::1", wantErr: true, part: "creating_system_id"},
+		{name: "single colon in system id", in: uuid + "::cdr:example::1", wantErr: true, part: "creating_system_id"},
+		{name: "non-ASCII letter in system id", in: uuid + "::cdr.ex\u00e4mple::1", wantErr: true, part: "creating_system_id"},
+		{name: "empty label in system id", in: uuid + "::cdr..example::1", wantErr: true, part: "creating_system_id"},
+		{name: "leading dot in system id", in: uuid + "::.cdr::1", wantErr: true, part: "creating_system_id"},
+		{name: "trailing dot in system id", in: uuid + "::cdr.::1", wantErr: true, part: "creating_system_id"},
+		{name: "spaces in object id", in: "not a uid::cdr.example.org::1", wantErr: true, part: "object_id"},
+		{name: "leading zero in version tree", in: "obj::sys::01", wantErr: true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -32,6 +62,9 @@ func TestParseObjectVersionID(t *testing.T) {
 				}
 				if !errors.Is(err, rm.ErrMalformedID) {
 					t.Errorf("error %v is not ErrMalformedID", err)
+				}
+				if tc.part != "" && !strings.Contains(err.Error(), tc.part) {
+					t.Errorf("ParseObjectVersionID(%q) error %q does not name the part %s", tc.in, err, tc.part)
 				}
 				return
 			}
@@ -164,13 +197,30 @@ func TestVersionTreeID(t *testing.T) {
 		t.Error("branch(2.1.4) IsFirst = true")
 	}
 
-	for _, bad := range []string{"1.2", "0", "x", "1.0.1", ""} {
-		if _, err := rm.ParseVersionTreeID(bad); err == nil {
+	// REQ-120: each part is a decimal integer of at least 1 that fits in a
+	// signed 64-bit integer, written without a sign or a leading zero, so
+	// one version has one spelling.
+	for _, bad := range []string{
+		"1.2", "0", "x", "1.0.1", "",
+		"+1", "-1", "01", "1.02.3", "1.1.+1", " 1", "1 ",
+		"9223372036854775808",  // one past the signed 64-bit range
+		"99999999999999999999", // far past it
+	} {
+		_, err := rm.ParseVersionTreeID(bad)
+		if err == nil {
 			t.Errorf("ParseVersionTreeID(%q) = nil error, want error", bad)
+			continue
+		}
+		if !errors.Is(err, rm.ErrMalformedID) {
+			t.Errorf("ParseVersionTreeID(%q) error %v is not ErrMalformedID", bad, err)
 		}
 	}
-	if _, err := rm.ParseVersionTreeID("1.2.3"); err != nil {
-		t.Errorf("ParseVersionTreeID(1.2.3) = %v, want nil", err)
+	// The bound is the same on every platform: past a 32-bit int, up to
+	// the largest signed 64-bit integer, a part is accepted.
+	for _, good := range []string{"1", "1.2.3", "10.20.30", "3000000000", "9223372036854775807"} {
+		if _, err := rm.ParseVersionTreeID(good); err != nil {
+			t.Errorf("ParseVersionTreeID(%q) = %v, want nil", good, err)
+		}
 	}
 }
 

@@ -179,6 +179,14 @@ func TestREQ140EncodeRefusalTextNamesNoRequirementOrValue(t *testing.T) {
 				c.UID = &rm.HierObjectID{Value: refusalTextSecret + "::ehrbase.org::1"}
 			},
 		},
+		{
+			name: "_uid OBJECT_VERSION_ID whose value is malformed", key: rmattrRoot + "/_uid",
+			mutate: func(_ *testing.T, c *rm.Composition) {
+				// The creating system id holds a space, so the value is no
+				// well-formed version id and decode would read a HIER_OBJECT_ID.
+				c.UID = &rm.ObjectVersionID{Value: refusalTextSecret + "::cdr example::1"}
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			comp := decodeRMAttr(t, wt, base)

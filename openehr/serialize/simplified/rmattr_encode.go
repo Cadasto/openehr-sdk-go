@@ -327,9 +327,11 @@ func careEntryGuidelineIDOf(owner any) rm.ObjectRefLike {
 // of its own and decode re-derives it from the lexical form ([uidBasedIDType]).
 // A value whose form implies the *other* subtype would therefore come back
 // retyped — the codec refuses rather than emitting a payload that does not
-// round-trip. An all-zero id writes nothing, the same reason
-// [codePhraseToFlat] skips an empty code_string: there is no value to carry, and
-// an unconditional emit would put a blank `_uid` on every composition.
+// round-trip. An OBJECT_VERSION_ID whose value is not a well-formed version id
+// is refused for the same reason, and its error says so. An all-zero id writes
+// nothing, the same reason [codePhraseToFlat] skips an empty code_string: there
+// is no value to carry, and an unconditional emit would put a blank `_uid` on
+// every composition.
 func uidRMAttr(out map[string]any, base string, uid rm.UIDBasedID) error {
 	var value, kind string
 	switch u := uid.(type) {
@@ -356,6 +358,12 @@ func uidRMAttr(out map[string]any, base string, uid rm.UIDBasedID) error {
 		return nil
 	}
 	if implied := uidBasedIDType(value); implied != kind {
+		if kind == "OBJECT_VERSION_ID" {
+			// The value fails rm.ParseObjectVersionID. Its parse error quotes
+			// the value, so it stays out of this value-free text.
+			return fmt.Errorf("%w: %q carries an OBJECT_VERSION_ID whose value is not a well-formed object_id::creating_system_id::version_tree_id, so decode would read it as a HIER_OBJECT_ID",
+				ErrUnsupportedDatatype, base+"/_uid")
+		}
 		return fmt.Errorf("%w: %q carries a %s whose value is the lexical form of a %s; the bare `_uid` key cannot distinguish them, so decode would retype it",
 			ErrUnsupportedDatatype, base+"/_uid", kind, implied)
 	}

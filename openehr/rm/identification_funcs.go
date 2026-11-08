@@ -34,6 +34,19 @@ var (
 	oidRE  = regexp.MustCompile(`^[0-9]+(\.[0-9]+)*$`)
 )
 
+// lenientUIDRE matches a UID read leniently, as ParseObjectVersionID
+// checks its object_id and creating_system_id: dot-separated labels of
+// ASCII letters, digits, '-' and '_', none empty. A UUID and an ISO OID
+// are both such label sequences, and so is an INTERNET_ID; '_' is wider
+// than RFC 1034 allows because creating systems send ids such as EMR_APP.
+// detectUID does not use it: derivation stays best-effort.
+var lenientUIDRE = regexp.MustCompile(`^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$`)
+
+// versionTreePartRE matches one VERSION_TREE_ID part as ParseVersionTreeID
+// accepts it: a decimal integer of at least 1, written without a sign or a
+// leading zero.
+var versionTreePartRE = regexp.MustCompile(`^[1-9][0-9]*$`)
+
 // detectUID builds the concrete UID for a root/id string by matching
 // its lexical shape. Never fails: an unrecognised shape is treated as an
 // INTERNET_ID (the reverse-domain fallback), so callers get a typed,
@@ -206,9 +219,14 @@ func (o *ObjectVersionID) IsBranch() bool {
 }
 
 // ParseObjectVersionID validates s against the OBJECT_VERSION_ID lexical
-// form `object_id '::' creating_system_id '::' version_tree_id` (three
-// non-empty "::"-separated parts, the last a valid VERSION_TREE_ID) and
-// returns the value. Returns ErrMalformedID (wrapped) otherwise.
+// form `object_id '::' creating_system_id '::' version_tree_id` and returns
+// the value. The three parts must all be present. The object_id and the
+// creating_system_id must each be a UID: a UUID, an ISO OID or an internet
+// id, read as dot-separated labels of ASCII letters, digits, '-' and '_',
+// none of them empty. So "EMR_APP" and "local.ehrbase.org" are accepted,
+// and a part that is blank or holds white space, a control character or
+// other punctuation is not. The version_tree_id must be one
+// [ParseVersionTreeID] accepts. Returns ErrMalformedID (wrapped) otherwise.
 func ParseObjectVersionID(s string) (ObjectVersionID, error) {
 	parts := strings.Split(s, "::")
 	if len(parts) != 3 {
@@ -217,13 +235,27 @@ func ParseObjectVersionID(s string) (ObjectVersionID, error) {
 	if slices.Contains(parts, "") {
 		return ObjectVersionID{}, fmt.Errorf("%w: object_version_id %q has an empty segment", ErrMalformedID, s)
 	}
+	// Each inner error below already wraps ErrMalformedID; chaining it
+	// keeps errors.Is(…, ErrMalformedID) true without doubling the prefix.
+	if err := checkUIDPart("object_id", parts[0]); err != nil {
+		return ObjectVersionID{}, fmt.Errorf("object_version_id %q: %w", s, err)
+	}
+	if err := checkUIDPart("creating_system_id", parts[1]); err != nil {
+		return ObjectVersionID{}, fmt.Errorf("object_version_id %q: %w", s, err)
+	}
 	if _, err := ParseVersionTreeID(parts[2]); err != nil {
-		// Chain the inner error so it is unwrappable; it already wraps
-		// ErrMalformedID, so errors.Is(…, ErrMalformedID) still holds and
-		// the prefix is not doubled.
 		return ObjectVersionID{}, fmt.Errorf("object_version_id %q: %w", s, err)
 	}
 	return ObjectVersionID{Value: s}, nil
+}
+
+// checkUIDPart reports, wrapping ErrMalformedID, when value, the part of an
+// identifier called name, is not a UID as lenientUIDRE reads one.
+func checkUIDPart(name, value string) error {
+	if !lenientUIDRE.MatchString(value) {
+		return fmt.Errorf("%w: %s %q is not a UID: want dot-separated labels of ASCII letters, digits, '-' and '_'", ErrMalformedID, name, value)
+	}
+	return nil
 }
 
 // --- VERSION_TREE_ID (trunk_version [ '.' branch_number '.' branch_version ]) ---
@@ -267,16 +299,23 @@ func (v *VersionTreeID) IsFirst() bool {
 }
 
 // ParseVersionTreeID validates s against the VERSION_TREE_ID lexical
-// form (1 or 3 dot-separated integers, each >= 1) and returns the value.
+// form, 1 or 3 dot-separated parts, and returns the value. Each part must
+// be a decimal integer of at least 1 that fits in a signed 64-bit integer
+// on every platform, written in ASCII digits without a sign, a leading zero
+// or white space. So "1" and "2.1.4" are accepted, and "+1", "01" and
+// "1.02.3" are not, which gives each version one spelling. Returns
+// ErrMalformedID (wrapped) otherwise.
 func ParseVersionTreeID(s string) (VersionTreeID, error) {
 	parts := strings.Split(s, ".")
 	if len(parts) != 1 && len(parts) != 3 {
 		return VersionTreeID{}, fmt.Errorf("%w: version_tree_id %q must have 1 or 3 dot-separated parts", ErrMalformedID, s)
 	}
 	for _, p := range parts {
-		n, err := strconv.Atoi(p)
-		if err != nil || n < 1 {
-			return VersionTreeID{}, fmt.Errorf("%w: version_tree_id %q part %q is not an integer >= 1", ErrMalformedID, s, p)
+		if !versionTreePartRE.MatchString(p) {
+			return VersionTreeID{}, fmt.Errorf("%w: version_tree_id %q part %q is not a decimal integer >= 1 without a sign or a leading zero", ErrMalformedID, s, p)
+		}
+		if _, err := strconv.ParseInt(p, 10, 64); err != nil {
+			return VersionTreeID{}, fmt.Errorf("%w: version_tree_id %q part %q: %w", ErrMalformedID, s, p, err)
 		}
 	}
 	return VersionTreeID{Value: s}, nil
