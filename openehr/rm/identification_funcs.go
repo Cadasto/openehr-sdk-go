@@ -300,10 +300,11 @@ func (v *VersionTreeID) IsFirst() bool {
 
 // ParseVersionTreeID validates s against the VERSION_TREE_ID lexical
 // form, 1 or 3 dot-separated parts, and returns the value. Each part must
-// be a decimal integer of at least 1 that fits in an int, written in ASCII
-// digits without a sign, a leading zero or white space. So "1" and "2.1.4"
-// are accepted, and "+1", "01" and "1.02.3" are not, which gives each
-// version one spelling. Returns ErrMalformedID (wrapped) otherwise.
+// be a decimal integer of at least 1 that fits in a signed 64-bit integer
+// on every platform, written in ASCII digits without a sign, a leading zero
+// or white space. So "1" and "2.1.4" are accepted, and "+1", "01" and
+// "1.02.3" are not, which gives each version one spelling. Returns
+// ErrMalformedID (wrapped) otherwise.
 func ParseVersionTreeID(s string) (VersionTreeID, error) {
 	parts := strings.Split(s, ".")
 	if len(parts) != 1 && len(parts) != 3 {
@@ -313,7 +314,7 @@ func ParseVersionTreeID(s string) (VersionTreeID, error) {
 		if !versionTreePartRE.MatchString(p) {
 			return VersionTreeID{}, fmt.Errorf("%w: version_tree_id %q part %q is not a decimal integer >= 1 without a sign or a leading zero", ErrMalformedID, s, p)
 		}
-		if _, err := strconv.Atoi(p); err != nil {
+		if _, err := strconv.ParseInt(p, 10, 64); err != nil {
 			return VersionTreeID{}, fmt.Errorf("%w: version_tree_id %q part %q: %w", ErrMalformedID, s, p, err)
 		}
 	}

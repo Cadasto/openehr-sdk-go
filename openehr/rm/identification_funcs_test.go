@@ -197,12 +197,14 @@ func TestVersionTreeID(t *testing.T) {
 		t.Error("branch(2.1.4) IsFirst = true")
 	}
 
-	// REQ-120: each part is a decimal integer of at least 1, written
-	// without a sign or a leading zero, so one version has one spelling.
+	// REQ-120: each part is a decimal integer of at least 1 that fits in a
+	// signed 64-bit integer, written without a sign or a leading zero, so
+	// one version has one spelling.
 	for _, bad := range []string{
 		"1.2", "0", "x", "1.0.1", "",
 		"+1", "-1", "01", "1.02.3", "1.1.+1", " 1", "1 ",
-		"99999999999999999999", // larger than any int
+		"9223372036854775808",  // one past the signed 64-bit range
+		"99999999999999999999", // far past it
 	} {
 		_, err := rm.ParseVersionTreeID(bad)
 		if err == nil {
@@ -213,7 +215,9 @@ func TestVersionTreeID(t *testing.T) {
 			t.Errorf("ParseVersionTreeID(%q) error %v is not ErrMalformedID", bad, err)
 		}
 	}
-	for _, good := range []string{"1", "1.2.3", "10.20.30"} {
+	// The bound is the same on every platform: past a 32-bit int, up to
+	// the largest signed 64-bit integer, a part is accepted.
+	for _, good := range []string{"1", "1.2.3", "10.20.30", "3000000000", "9223372036854775807"} {
 		if _, err := rm.ParseVersionTreeID(good); err != nil {
 			t.Errorf("ParseVersionTreeID(%q) = %v, want nil", good, err)
 		}
