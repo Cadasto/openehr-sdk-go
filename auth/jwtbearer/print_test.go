@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/cadasto/openehr-sdk-go/auth/jwtbearer"
 )
@@ -153,14 +154,15 @@ func TestREQ060_PrintsNoCredential(t *testing.T) { // REQ-060
 		{
 			name: "Config",
 			v: jwtbearer.Config{
-				TokenURL:  "https://svc:" + urlPassword + "@idp.example/token",
-				Assertion: signer,
-				Scope:     "system/*.read",
-				ClientID:  "client-id",
-				Issuer:    "https://idp.example",
+				TokenURL:         "https://svc:" + urlPassword + "@idp.example/token",
+				Assertion:        signer,
+				Scope:            "system/*.read",
+				MaxTokenLifetime: 5 * time.Minute,
+				ClientID:         "client-id",
+				Issuer:           "https://idp.example",
 			},
 			secrets: []string{privateD, urlPassword},
-			shown:   []string{redactedMarker, "idp.example/token", "system/*.read", "client-id", "https://idp.example"},
+			shown:   []string{redactedMarker, "idp.example/token", "system/*.read", "MaxTokenLifetime: 5m0s", "client-id", "https://idp.example"},
 		},
 		{
 			name: "Config with a password in its issuer and audience",
@@ -221,6 +223,18 @@ func TestREQ060_PrintsNoCredential(t *testing.T) { // REQ-060
 		for _, v := range []any{jwtbearer.Config{}, &jwtbearer.Config{}, signer} {
 			if _, ok := v.(slog.LogValuer); !ok {
 				t.Errorf("%T does not implement slog.LogValuer", v)
+			}
+		}
+	})
+
+	t.Run("LogValue carries the durations", func(t *testing.T) {
+		t.Parallel()
+		var buf bytes.Buffer
+		slog.New(slog.NewTextHandler(&buf, nil)).Info("printed", "cfg",
+			jwtbearer.Config{RefreshThreshold: time.Minute, MaxTokenLifetime: 5 * time.Minute})
+		for _, want := range []string{"cfg.RefreshThreshold=1m0s", "cfg.MaxTokenLifetime=5m0s"} {
+			if !strings.Contains(buf.String(), want) {
+				t.Errorf("slog TextHandler wrote %q, want it to carry %s", buf.String(), want)
 			}
 		}
 	})
