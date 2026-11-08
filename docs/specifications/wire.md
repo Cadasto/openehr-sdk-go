@@ -6,7 +6,7 @@ kind: specification
 
 **Status:** Draft
 
-The normative contract between the SDK and any conformant openEHR backend (Cadasto CDR, EHRbase, others). Covers REQ-050 (the REST 1.1.0 pin and its OpenAPI files), REQ-052 to REQ-057 and REQ-059 (wire surface and openEHR headers), REQ-099 (Admin client surface), REQ-130 (contribution builder), REQ-140 (underscore-prefixed RM attributes), REQ-143 (template list filters), REQ-144 (Definition metadata decoding), REQ-169 (interval boundary flag defaults), REQ-170 (unmatched content on decode), REQ-173 (composition representation formats), REQ-174 (versioned-object reads), and REQ-175 (missing members on decode). Transport hygiene (REQ-066, REQ-090 to REQ-094, REQ-098, REQ-150, REQ-151, REQ-166) lives in [transport.md](transport.md).
+The normative contract between the SDK and any conformant openEHR backend (Cadasto CDR, EHRbase, others). Covers REQ-050 (the REST 1.1.0 pin and its OpenAPI files), REQ-052 to REQ-057 and REQ-059 (wire surface and openEHR headers), REQ-099 (Admin client surface), REQ-130 (contribution builder), REQ-140 (underscore-prefixed RM attributes), REQ-143 (template list filters), REQ-144 (Definition metadata decoding), REQ-169 (interval boundary flag defaults), REQ-170 (unmatched content on decode), REQ-173 (composition representation formats), REQ-174 (versioned-object reads), REQ-175 (missing members on decode), and REQ-177 (template representations). Transport hygiene (REQ-066, REQ-090 to REQ-094, REQ-098, REQ-150, REQ-151, REQ-166) lives in [transport.md](transport.md).
 
 The premise: correctness is wire-level. The bytes on the wire and the AQL strings conform to the openEHR spec; the Go source shape is independent.
 
@@ -655,6 +655,29 @@ When a leaf gains an operation or an option, its package's `Repository` interfac
 | `fetch` | `WithFetch` | |
 
 `ListTemplates` **MUST** omit the query key of an unset option and send an explicit `0` for `offset` or `fetch`, the rule [§ REQ-057](#req-057) *Paging* states for stored-query execution. A negative `offset` or `fetch` **MUST** fail with `ErrInvalidConfig` before any request is issued. The `format` argument selects the list path; v1 supports `FormatADL14`, the only registered `TemplateFormat` value.
+
+### REQ-177 — Template representations
+
+`GET /definition/template/adl1.4/{template_id}` (`definition_template_adl1.4_get` in the vendored pin) serves one template in two representations, chosen by `Accept`: the operational template as `application/xml` and the Web Template as `application/openehr.wt+json`. The Definition leaf **MUST** offer each through its own call on that route, so the call a caller makes, never an option, decides which representation comes back:
+
+| Call | `Accept` sent | Body returned |
+|---|---|---|
+| `GetOperationalTemplate` | `application/xml` | the operational template |
+| `GetWebTemplate` | `application/openehr.wt+json` | the Web Template |
+
+Both **MUST** return a 2xx body byte for byte, undecoded, with the response metadata. A `TemplateFormat` other than `FormatADL14` **MUST** fail with `ErrInvalidConfig` before any request is issued. An empty template id is refused before any request as on every leaf, by [REQ-150](transport.md#req-150--path-parameter-segment-validation), with an error that also satisfies `ErrInvalidConfig`. On a non-2xx answer, the `406` of a server that does not offer the representation included, both **MUST** return the typed wire error of [REQ-093](transport.md#req-093--openehr-error-envelope-mapping) with the response metadata beside it. `GetTemplate` stays as a deprecated alias of `GetOperationalTemplate`.
+
+**Acceptance.**
+
+- `GetOperationalTemplate` with `FormatADL14` and the id `body_weight.v1` sends one `GET /definition/template/adl1.4/body_weight.v1` with `Accept: application/xml`, and returns the 200 body byte for byte.
+- `GetWebTemplate` sends the same request with `Accept: application/openehr.wt+json`, and returns the 200 body byte for byte.
+- Each fails with `ErrInvalidConfig` and issues no request for a `TemplateFormat` other than `FormatADL14` and for an empty template id.
+- A `406` answer to either call fails with a `*transport.WireError` whose status is 406, and the metadata returned beside it is non-nil.
+- `GetTemplate` returns what `GetOperationalTemplate` returns for the same arguments, and `Repository` offers all three calls.
+
+Out of scope: decoding the Web Template into a `webtemplate.WebTemplate`; the `application/json` value, which the pin's `Accept_Template` parameter lists but its `200_Template_adl1_4_retrieved` response declares no body for; the ADL 2 template routes.
+
+- **Probes:** [PROBE-112](conformance.md#probe-112--template-representations-reach-the-wire).
 
 ### REQ-144 — Definition metadata decoding
 

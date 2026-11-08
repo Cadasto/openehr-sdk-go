@@ -22,7 +22,7 @@ Each probe has a stable `PROBE-NNN` ID, one catalogue entry here, and a pass/fai
 
 ### REQ-082 — Runnability
 
-A backend-facing probe runs in up to three modes: **Sandbox**, against the in-memory `sandbox/` transport; **Cassette**, against a replayed recording; and **Live**, against a reference openEHR deployment. An **in-repo** probe asserts a property over vendored inputs or over the SDK's own output and reaches no server in any mode. Each catalogue entry's **Modes** line says which applies: 37 of the 82 catalog entries are in-repo by construction. Today 12 entries declare all three modes; a mode missing from a backend-facing entry is open work in this requirement, not a defect in the probe ([roadmap.md](../roadmap.md)).
+A backend-facing probe runs in up to three modes: **Sandbox**, against the in-memory `sandbox/` transport; **Cassette**, against a replayed recording; and **Live**, against a reference openEHR deployment. An **in-repo** probe asserts a property over vendored inputs or over the SDK's own output and reaches no server in any mode. Each catalogue entry's **Modes** line says which applies: 37 of the 83 catalog entries are in-repo by construction. Today 12 entries declare all three modes; a mode missing from a backend-facing entry is open work in this requirement, not a defect in the probe ([roadmap.md](../roadmap.md)).
 
 How the runner selects a mode, what a probe reports and each mode's working rules are in [development-process.md § Conformance probes](../development-process.md#conformance-probes). This section holds what an SDK consumer, or the operator of a deployment a probe writes to, relies on.
 
@@ -886,6 +886,16 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 - **Modes:** Sandbox.
 - **Status:** Implemented (Sandbox) — can-fail plants drop the fraction or cut it to milliseconds, send `version_at_time` on a read that takes none, change a read's method, path or `Accept` (the refusal rows' requests included), serve an `ORIGINAL_VERSION` on the refusal row, serve version `data` of the wrong type, and serve a version that is not deleted without `data`; a 404 on each of the four other-leaf rows still passes, since those rows judge the request only.
 - **Satisfies:** REQ-174.
+
+#### PROBE-112 — Template representations reach the wire
+
+- **Title:** `GetOperationalTemplate` and `GetWebTemplate` read the ADL 1.4 template route with their representation's `Accept` and hand back the body the server sent.
+- **Preconditions:** A sandbox Definition server on `GET /definition/template/adl1.4/{template_id}` that answers `application/xml` with an operational template, `application/openehr.wt+json` with a Web Template, and any other `Accept` with `406`.
+- **Wire assertion:** Each call issues exactly one `GET` on the route with the template id in place and its own `Accept` (`application/xml`, `application/openehr.wt+json`), and returns the served body byte for byte. A server that answers `406` to the Web Template's `Accept` makes `GetWebTemplate` fail with a non-nil error and non-nil metadata. Sentinel identity (`ErrInvalidConfig`, `*transport.WireError`) is pinned by `definition` unit tests, not by this probe.
+- **Effect:** read-only (`GET`, no state change).
+- **Modes:** Sandbox.
+- **Status:** Draft.
+- **Satisfies:** REQ-177.
 
 ### RM model introspection
 
