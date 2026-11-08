@@ -173,7 +173,15 @@ func (s *ClaimsSigner) LogValue() slog.Value {
 //   - the signer's Public method panics or reports no usable public key:
 //     nil, or an RSA or ECDSA public key without its modulus or curve (a
 //     curve whose parameters are missing or cannot be read counts as none);
-//   - the signer's key type does not match the algorithm family.
+//   - the signer's key type does not match the algorithm family;
+//   - the algorithm is RS256 or RS384 and the RSA key is shorter than 1024
+//     bits, the minimum crypto/rsa signs with.
+//
+// The RSA key's size is read from the public key the signer's Public method
+// reports, so a signer of the caller's own type, such as a key-store handle,
+// is checked as an *rsa.PrivateKey is. The 1024-bit minimum is fixed: the
+// rsa1024min=0 GODEBUG setting, which crypto/rsa keeps for tests, does not
+// lower it.
 //
 // A Public method panics for a nil key of most other types held in a
 // non-nil crypto.Signer, such as a nil ed25519.PrivateKey or a nil pointer
@@ -185,7 +193,7 @@ func (s *ClaimsSigner) LogValue() slog.Value {
 // whether it can sign is known only when it signs.
 //
 // Key requirements per algorithm:
-//   - RS256, RS384: *rsa.PrivateKey
+//   - RS256, RS384: *rsa.PrivateKey of at least 1024 bits
 //   - ES256: *ecdsa.PrivateKey on P-256
 //   - ES384: *ecdsa.PrivateKey on P-384
 //
@@ -259,7 +267,8 @@ const clientAssertionLifetime = 5 * time.Minute
 //     without its scalar or point, or a signer whose Public method panics
 //     or reports no usable public key;
 //   - alg is not supported;
-//   - the key does not fit alg.
+//   - the key does not fit alg, such as an RSA key shorter than 1024 bits
+//     for RS256 or RS384.
 //
 // [NewClaimsSigner] describes these checks and lists the key each algorithm
 // needs. A signer of the caller's own type whose Public method reports a
@@ -428,16 +437,23 @@ func toJoseAlg(alg string) (gojose.SignatureAlgorithm, error) {
 	}
 }
 
+// minRSABits is the shortest RSA modulus, in bits, that RS256 and RS384
+// accept: the minimum crypto/rsa signs with. It is fixed. The rsa1024min=0
+// GODEBUG setting, which crypto/rsa keeps for tests, does not lower it.
+const minRSABits = 1024
+
 // validateKeyAlg checks that the signer's public key fits alg: RS256 and
-// RS384 need an *rsa.PublicKey, ES256 an *ecdsa.PublicKey on P-256, and
-// ES384 one on P-384. It inspects only Public(), so an opaque crypto.Signer
-// (e.g. a KMS or HSM adapter) passes when its Public() returns a usable key
-// of the type alg needs, and is refused when it returns any other type, no
-// key, or an RSA or ECDSA key without its modulus or curve. At signing time
-// a signer that is not a concrete *rsa.PrivateKey or *ecdsa.PrivateKey is
-// wrapped with github.com/go-jose/go-jose/v4/cryptosigner, which handles
-// both RSA and ECDSA (including ES256/ES384). An alg outside the four is not
-// checked here; toJoseAlg refuses it. (REQ-068)
+// RS384 need an *rsa.PublicKey of at least minRSABits, ES256 an
+// *ecdsa.PublicKey on P-256, and ES384 one on P-384. It inspects only
+// Public(), so an opaque crypto.Signer (e.g. a KMS or HSM adapter) passes
+// when its Public() returns a usable key of the type and size alg needs, and
+// is refused when it returns any other type, a shorter RSA key, no key, or
+// an RSA or ECDSA key without its modulus or curve. The rsa1024min=0 GODEBUG
+// setting does not lower the RSA minimum. At signing time a signer that is
+// not a concrete *rsa.PrivateKey or *ecdsa.PrivateKey is wrapped with
+// github.com/go-jose/go-jose/v4/cryptosigner, which handles both RSA and
+// ECDSA (including ES256/ES384). An alg outside the four is not checked
+// here; toJoseAlg refuses it. (REQ-068)
 func validateKeyAlg(signer crypto.Signer, alg string) error {
 	pub, err := publicKey(signer)
 	if err != nil {
@@ -448,8 +464,14 @@ func validateKeyAlg(signer crypto.Signer, alg string) error {
 	}
 	switch alg {
 	case "RS256", "RS384":
-		if _, ok := pub.(*rsa.PublicKey); !ok {
+		rsaPub, ok := pub.(*rsa.PublicKey)
+		if !ok {
 			return fmt.Errorf("%w: %s requires an RSA signer, got %T", auth.ErrInvalidConfig, alg, pub)
+		}
+		// The modulus's bit length, as crypto/rsa measures it: a byte count
+		// would round a 1020-bit modulus up to 1024.
+		if bits := rsaPub.N.BitLen(); bits < minRSABits {
+			return fmt.Errorf("%w: %s requires an RSA key of at least %d bits, got %d bits", auth.ErrInvalidConfig, alg, minRSABits, bits)
 		}
 	case "ES256":
 		return checkCurve(pub, alg, elliptic.P256())
