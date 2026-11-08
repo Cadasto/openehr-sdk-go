@@ -485,11 +485,16 @@ The SDK **MUST** expose the derived components of the openEHR identifier types, 
 
 Each fallible identifier form has one error-returning parser in `openehr/rm` (`ParseObjectVersionID`, `ParseVersionTreeID`, `ParseArchetypeID`, `ParseTerminologyID`), and client-side helpers such as the version-uid splitter in `openehr/client/ehr` delegate to it rather than re-parse. `HIER_OBJECT_ID` / `UID_BASED_ID` decomposition is best-effort only, with no `Parse…` entry point.
 
+`ParseObjectVersionID` and `ParseVersionTreeID` check each part of their form and **MUST** return an error when one fails:
+
+- `ParseObjectVersionID`: `object_id` and `creating_system_id` are each a `UID`, that is a UUID, an ISO OID or an `INTERNET_ID`. An `INTERNET_ID` is read as dot-separated labels of ASCII letters, digits, `-` and `_`, none empty: wider than RFC 1034's label syntax, since creating systems send ids such as `EMR_APP`, yet refusing white space, control characters and other punctuation.
+- `ParseVersionTreeID`: each part is a decimal integer of at least 1, written without a sign or a leading zero, so that one version has one spelling where ids are compared as strings (`If-Match`, ETags, URL paths).
+
 For a malformed identifier string, the `Parse…` function **MUST** return a non-nil error and the best-effort derivation methods **MUST** return a zero value; neither panics. `DV_URI`'s functions are not identifier derivations in this sense: they split any text, as its bullet above says.
 
-**Acceptance:** for canonical and malformed sample strings of each identifier form, `Parse…`, where the form has one, round-trips the input and derived components equal the spec's lexical decomposition; malformed input yields an error from `Parse…` (no panic); best-effort methods never panic; the client version-uid helper produces identical results to the canonical parser. The `DV_URI` functions split sample references with and without each component, a `DV_EHR_URI` decoded from a `LINK` target answers them without a panic, and a nil `DV_URI` or `DV_EHR_URI` answers empty.
+**Acceptance:** for canonical and malformed sample strings of each identifier form, `Parse…`, where the form has one, round-trips the input and derived components equal the spec's lexical decomposition; malformed input yields an error from `Parse…` (no panic); best-effort methods never panic; the client version-uid helper produces identical results to the canonical parser. `ParseObjectVersionID` refuses an `object_id` or `creating_system_id` that is blank or holds white space, a control character or other punctuation, and accepts one with `_`; `ParseVersionTreeID` refuses a part with a sign or a leading zero. The `DV_URI` functions split sample references with and without each component, a `DV_EHR_URI` decoded from a `LINK` target answers them without a panic, and a nil `DV_URI` or `DV_EHR_URI` answers empty.
 
-**Out of scope:** validity *checking* of the embedded `UID` syntax beyond decomposition; generation of new identifiers (covered for instance synthesis by REQ-107). Of the recommended convenience accessors, only `LOCATABLE_REF.as_uri` exists; the `OBJECT_REF` / `PARTY_REF` / `PARTY_PROXY` ones are deferred, and the underlying fields are already directly accessible on the generated structs.
+**Out of scope:** checking a `UID` part beyond the reading above, such as RFC 1034 label syntax or a UUID's version bits; generation of new identifiers (covered for instance synthesis by REQ-107). Of the recommended convenience accessors, only `LOCATABLE_REF.as_uri` exists; the `OBJECT_REF` / `PARTY_REF` / `PARTY_PROXY` ones are deferred, and the underlying fields are already directly accessible on the generated structs.
 
 #### Version-control derived helpers
 
