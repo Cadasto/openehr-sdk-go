@@ -546,6 +546,56 @@ func editResponseJSON(t *testing.T, e *probe.HAREntry, edit func(body map[string
 	e.Response.Content.Text = string(after)
 }
 
+// editRequestJSON decodes e's request body as a JSON object, applies
+// edit, and stores the result. An edit that changes nothing fails the
+// test, so a row cannot pass by mutating nothing.
+func editRequestJSON(t *testing.T, e *probe.HAREntry, edit func(body map[string]any)) {
+	t.Helper()
+	if e.Request.PostData == nil {
+		t.Fatalf("recorded %s request carries no body", e.Request.Method)
+	}
+	var body map[string]any
+	if err := json.Unmarshal([]byte(e.Request.PostData.Text), &body); err != nil {
+		t.Fatalf("recorded %s request body: %v", e.Request.Method, err)
+	}
+	before, err := json.Marshal(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	edit(body)
+	after, err := json.Marshal(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(before, after) {
+		t.Fatalf("mutation left the recorded %s request body unchanged", e.Request.Method)
+	}
+	e.Request.PostData.Text = string(after)
+}
+
+// recordedVersionAudit returns the commit_audit of the one version a decoded
+// contribution body carries, failing the test unless there is exactly one.
+func recordedVersionAudit(t *testing.T, body map[string]any) map[string]any {
+	t.Helper()
+	versions, ok := body["versions"].([]any)
+	if !ok || len(versions) != 1 {
+		t.Fatalf("recorded commit body has versions %v, want one", body["versions"])
+	}
+	version, ok := versions[0].(map[string]any)
+	if !ok {
+		t.Fatalf("recorded commit version %v is not an object", versions[0])
+	}
+	return jsonObject(t, version, "commit_audit")
+}
+
+// answerWithoutBody turns e's recorded response into a 204 with no body,
+// the answer a commit under Prefer return=minimal gets when it is
+// accepted.
+func answerWithoutBody(e *probe.HAREntry) {
+	e.Response.Status = 204
+	e.Response.Content.Text = ""
+}
+
 // jsonObject returns the object m holds under key, failing the test when
 // there is none.
 func jsonObject(t *testing.T, m map[string]any, key string) map[string]any {
@@ -619,6 +669,11 @@ func TestCassette_ScenarioChecksFailOnAMutatedRecording_REQ082_REQ095_REQ094_REQ
 	}
 	compositionUpdate := func(t *testing.T, c *transport.Client, _ probe.HAR) error {
 		return replayCompositionUpdate(t.Context(), c)
+	}
+	// The contribution-audit checks read the refusal message too, so they
+	// replay through a client that keeps error bodies.
+	contributionAudit := func(t *testing.T, _ *transport.Client, har probe.HAR) error {
+		return replayContributionAudit(t.Context(), rawReplayClientFor(t, har), har)
 	}
 	// compositionWrites returns the recording's writes to one composition
 	// path suffix, in capture order: the saves on "/composition", the
@@ -904,6 +959,87 @@ func TestCassette_ScenarioChecksFailOnAMutatedRecording_REQ082_REQ095_REQ094_REQ
 			},
 			replay: compositionUpdate,
 			want:   "PROBE-071",
+		},
+		{
+			name:      "contribution-audit commit without a system id answered 204",
+			recording: "contribution-audit.har",
+			mutate: func(t *testing.T, har *probe.HAR) {
+				answerWithoutBody(recordedCommits(t, har)[0])
+			},
+			replay: contributionAudit,
+			want:   "commit without a system id: answered",
+		},
+		{
+			name:      "contribution-audit commit with a system id answered 400",
+			recording: "contribution-audit.har",
+			mutate: func(t *testing.T, har *probe.HAR) {
+				commits := recordedCommits(t, har)
+				commits[1].Response = commits[0].Response
+			},
+			replay: contributionAudit,
+			want:   "commit with a system id: want success",
+		},
+		{
+			name:      "contribution-audit UPDATE_AUDIT commit answered 204",
+			recording: "contribution-audit.har",
+			mutate: func(t *testing.T, har *probe.HAR) {
+				answerWithoutBody(recordedCommits(t, har)[2])
+			},
+			replay: contributionAudit,
+			want:   "commit UPDATE_AUDIT: answered",
+		},
+		{
+			name:      "contribution-audit UPDATE_AUDIT commit answered 500",
+			recording: "contribution-audit.har",
+			mutate: func(t *testing.T, har *probe.HAR) {
+				recordedCommits(t, har)[2].Response.Status = 500
+			},
+			replay: contributionAudit,
+			want:   "commit UPDATE_AUDIT: want a 400 wire error",
+		},
+		{
+			name:      "contribution-audit refusal without a system id names another attribute",
+			recording: "contribution-audit.har",
+			mutate: func(t *testing.T, har *probe.HAR) {
+				editResponseJSON(t, recordedCommits(t, har)[0], func(b map[string]any) {
+					b["message"] = "Attribute committer of class AUDIT_DETAILS does not match existence 1..1"
+				})
+			},
+			replay: contributionAudit,
+			want:   "commit without a system id: refusal message",
+		},
+		{
+			name:      "contribution-audit recorded commit without a system id carries one",
+			recording: "contribution-audit.har",
+			mutate: func(t *testing.T, har *probe.HAR) {
+				editRequestJSON(t, recordedCommits(t, har)[0], func(b map[string]any) {
+					jsonObject(t, b, "audit")["system_id"] = cassetteContributionSystemID
+				})
+			},
+			replay: contributionAudit,
+			want:   "commit without a system id: recorded audit system_id",
+		},
+		{
+			name:      "contribution-audit recorded version audit with a system id carries none",
+			recording: "contribution-audit.har",
+			mutate: func(t *testing.T, har *probe.HAR) {
+				editRequestJSON(t, recordedCommits(t, har)[1], func(b map[string]any) {
+					delete(recordedVersionAudit(t, b), "system_id")
+				})
+			},
+			replay: contributionAudit,
+			want:   "commit with a system id: recorded versions[0].commit_audit system_id",
+		},
+		{
+			name:      "contribution-audit recorded UPDATE_AUDIT version audit is AUDIT_DETAILS",
+			recording: "contribution-audit.har",
+			mutate: func(t *testing.T, har *probe.HAR) {
+				editRequestJSON(t, recordedCommits(t, har)[2], func(b map[string]any) {
+					recordedVersionAudit(t, b)["_type"] = "AUDIT_DETAILS"
+				})
+			},
+			replay: contributionAudit,
+			want:   "commit UPDATE_AUDIT: recorded versions[0].commit_audit _type",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

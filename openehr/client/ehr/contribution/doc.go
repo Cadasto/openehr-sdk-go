@@ -21,11 +21,27 @@
 // persisted `rm.AuditDetails`): it omits the server-assigned
 // `time_committed` and keeps `change_type` as `DV_CODED_TEXT`
 // (SPECITS-95 / ITS-REST PR 131). It marshals as `_type:"AUDIT_DETAILS"`
-// by default (the form reference CDRs validate), with a settable
-// [AuditTypeUpdateAudit] fallback for servers that refuse it. Inline
-// versions are submitted through the [OriginalVersion] / [ImportedVersion]
-// write-wrappers ([WrapOriginalVersion] / [WrapImportedVersion]), which
-// carry the same commit-audit shape.
+// by default, and as `_type:"UPDATE_AUDIT"` when its type is
+// [AuditTypeUpdateAudit]. Inline versions are submitted through the
+// [OriginalVersion] / [ImportedVersion] write-wrappers
+// ([WrapOriginalVersion] / [WrapImportedVersion]), which carry the same
+// commit-audit shape.
+//
+// The ITS-REST pin leaves the audit's `system_id` optional on write, asks
+// clients to send `UPDATE_AUDIT`, and asks servers to accept `AUDIT_DETAILS`
+// or an omitted `_type`. A server that validates the commit audit as the RM
+// `AUDIT_DETAILS`, EHRbase among them, refuses a commit without a non-empty
+// system id on the batch audit and on every version's `commit_audit`. Set it
+// once with [Builder.WithSystemID]: the builder copies it into each version.
+// EHRbase accepts any non-empty value and records its own system id on the
+// stored audit, so the `system_id` of the EHR being written to
+// ([rm.EHR.SystemID], which `ehr.Create` and `ehr.Get` return) is a natural
+// value. The SDK cannot pick one itself.
+//
+// [AuditTypeUpdateAudit] is for a server that accepts only `UPDATE_AUDIT`.
+// EHRbase does not resolve that type and refuses it with or without a system
+// id. A refusal for a missing system id is fixed by setting one, not by
+// switching the type.
 //
 // [Builder] is the authoring surface over that shape: it assembles a [Submission] from payloads and per-operation
 // [Change] values ([Creation], [Amendment], [Modification], [Deletion]),

@@ -53,6 +53,11 @@ var scenarios = map[string]scenario{
 		desc:    "GET an unknown EHR (404), then POST three AQL queries the server refuses (400)",
 		capture: captureErrorEnvelopes,
 	},
+	"contribution-audit": {
+		name:    "contribution-audit",
+		desc:    "three times, POST /ehr then POST a fixed FOLDER contribution to it: the default audit without a system id, with one, and UPDATE_AUDIT with one (only the commit with a system id must succeed)",
+		capture: captureContributionAudit,
+	},
 }
 
 // The error-envelopes scenario reads only: one fixed EHR id no deployment

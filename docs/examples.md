@@ -691,7 +691,7 @@ OK: the captured request body is byte-identical to the built body
 
 **What to copy into your app:**
 
-1. `contribution.NewBuilder()`, then declare the batch audit once: committer, system id, and the batch `change_type` (which is *never* derived from the versions).
+1. `contribution.NewBuilder()`, then declare the batch audit once: committer, system id (a server such as EHRbase refuses a commit without one), and the batch `change_type` (which is *never* derived from the versions).
 2. Accumulate one `Change` per version: `contribution.Creation(payload)`, or `Amendment` / `Modification` / `Deletion` with the preceding version uid. Each is generic over the four versionable RM types, so a wrong payload type is a compile error.
 3. `Build()` once. It returns a `*contribution.Submission` that has already passed `Validate`, or every accumulated error joined.
 4. `contribution.Commit(ctx, client, ehrID, submission)`, with a deadline on `ctx` (`context.WithTimeout`).

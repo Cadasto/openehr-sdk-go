@@ -27,8 +27,8 @@ type Submission struct {
 	// there is no separate `openehr-audit-details` header on this
 	// endpoint. Uses [UpdateAudit] (not [rm.AuditDetails]) so that
 	// server-assigned time_committed is never emitted; _type defaults to
-	// "AUDIT_DETAILS" (accepted by conformant CDRs); see [UpdateAudit.Type]
-	// to fall back to "UPDATE_AUDIT" for servers that accept only that form.
+	// "AUDIT_DETAILS" (see [UpdateAudit.Type]). Some servers, EHRbase among
+	// them, also need a non-empty system id; see [UpdateAudit.SystemID].
 	Audit UpdateAudit
 	// Versions is the closed type-set of inline-data versions to commit; a
 	// version may carry no data (see [Deletion]).
