@@ -52,7 +52,7 @@ func Probe067TemplateUploadRoundTrip(ctx context.Context, c *transport.Client, o
 		return r, nil
 	}
 
-	fetched, _, err := definition.GetTemplate(ctx, c, uploaded.TemplateID, definition.FormatADL14)
+	fetched, _, err := definition.GetOperationalTemplate(ctx, c, uploaded.TemplateID, definition.FormatADL14)
 	if err != nil {
 		r.Status = "fail"
 		r.Detail = fmt.Sprintf("get failed: %v", err)

@@ -302,28 +302,65 @@ func UploadTemplate(ctx context.Context, c *transport.Client, format TemplateFor
 	return &out, resp.Metadata, nil
 }
 
-// GetTemplate fetches the raw OPT bytes for templateID under the
-// given format. It returns the bytes verbatim; consumers read the XML
-// themselves, for example with aom14.ReadOperationalTemplate followed by
-// templatecompile.Compile.
+// GetOperationalTemplate fetches the operational template (OPT XML) for
+// templateID under the given format. It returns the response body exactly
+// as the server sent it; consumers read the XML themselves, for example
+// with aom14.ReadOperationalTemplate followed by templatecompile.Compile.
 //
-// Wire: GET /definition/template/{format}/{template_id}. Accept
-// header is set to `application/xml` to request the OPT body (some
-// deployments also serve `application/openehr.wt+json` Web Template
-// shape under the same path; consumers requiring that should call
-// [transport.Client.Do] directly with a custom Accept).
+// A format other than [FormatADL14] and an empty templateID fail with
+// [transport.ErrInvalidConfig] before any request is sent. Any other
+// failure, a 406 from a server that does not serve the XML included,
+// returns the error with the response metadata beside it when a response
+// arrived; a non-2xx status is a [*transport.WireError].
+//
+// Wire: GET /definition/template/{format}/{template_id} with
+// Accept: application/xml. [GetWebTemplate] reads the same template as a
+// Web Template.
+func GetOperationalTemplate(ctx context.Context, c *transport.Client, templateID string, format TemplateFormat) ([]byte, *transport.Metadata, error) {
+	return getTemplateRepresentation(ctx, c, "definition.GetOperationalTemplate", templateID, format, "application/xml")
+}
+
+// GetWebTemplate fetches the Web Template (JSON) for templateID under the
+// given format. It returns the response body exactly as the server sent
+// it; consumers decode the JSON themselves.
+//
+// The refusals and the error return are those of
+// [GetOperationalTemplate]. A server that does not serve Web Templates
+// answers 406, which surfaces as a [*transport.WireError] with the
+// response metadata beside it.
+//
+// Wire: GET /definition/template/{format}/{template_id} with
+// Accept: application/openehr.wt+json.
+func GetWebTemplate(ctx context.Context, c *transport.Client, templateID string, format TemplateFormat) ([]byte, *transport.Metadata, error) {
+	return getTemplateRepresentation(ctx, c, "definition.GetWebTemplate", templateID, format, "application/openehr.wt+json")
+}
+
+// GetTemplate fetches the operational template (OPT XML) for templateID
+// under the given format, exactly as [GetOperationalTemplate] does. Use
+// [GetWebTemplate] for the Web Template.
+//
+// Deprecated: Use [GetOperationalTemplate], which sends the same request
+// and returns the same result.
 func GetTemplate(ctx context.Context, c *transport.Client, templateID string, format TemplateFormat) ([]byte, *transport.Metadata, error) {
+	return GetOperationalTemplate(ctx, c, templateID, format)
+}
+
+// getTemplateRepresentation reads one template in the representation accept
+// names and returns the body undecoded. op prefixes every error, so each
+// exported call reports under its own name. The response metadata comes back
+// beside a transport error whenever a response arrived (REQ-177).
+func getTemplateRepresentation(ctx context.Context, c *transport.Client, op, templateID string, format TemplateFormat, accept string) ([]byte, *transport.Metadata, error) {
 	if !format.IsValid() {
-		return nil, nil, fmt.Errorf("definition.GetTemplate: %w: format %q is not supported in v1", transport.ErrInvalidConfig, format)
+		return nil, nil, fmt.Errorf("%s: %w: format %q is not supported in v1", op, transport.ErrInvalidConfig, format)
 	}
 	if templateID == "" {
-		return nil, nil, fmt.Errorf("definition.GetTemplate: %w: empty templateID", transport.ErrInvalidConfig)
+		return nil, nil, fmt.Errorf("%s: %w: empty templateID", op, transport.ErrInvalidConfig)
 	}
 	req := &transport.Request{
 		Method: http.MethodGet,
 		Path:   "/definition/template/" + format.PathSegment() + "/" + templateID,
 		Route:  "/definition/template/{format}/{template_id}",
-		Accept: "application/xml",
+		Accept: accept,
 	}
 	resp, err := c.Do(ctx, req)
 	if err != nil {
@@ -561,6 +598,13 @@ func extractLastPathSegment(p string) string {
 // dependency-injection seam.
 type Repository interface {
 	UploadTemplate(ctx context.Context, format TemplateFormat, body io.Reader, opts ...UploadOption) (*TemplateMetadata, *transport.Metadata, error)
+	GetOperationalTemplate(ctx context.Context, templateID string, format TemplateFormat) ([]byte, *transport.Metadata, error)
+	GetWebTemplate(ctx context.Context, templateID string, format TemplateFormat) ([]byte, *transport.Metadata, error)
+	// GetTemplate reads the operational template, as GetOperationalTemplate
+	// does.
+	//
+	// Deprecated: Use GetOperationalTemplate, which sends the same request
+	// and returns the same result.
 	GetTemplate(ctx context.Context, templateID string, format TemplateFormat) ([]byte, *transport.Metadata, error)
 	ListTemplates(ctx context.Context, format TemplateFormat, opts ...ListOption) ([]TemplateMetadata, *transport.Metadata, error)
 	DeleteTemplate(ctx context.Context, templateID string, format TemplateFormat) (*transport.Metadata, error)
@@ -581,8 +625,16 @@ func (r *repository) UploadTemplate(ctx context.Context, format TemplateFormat, 
 	return UploadTemplate(ctx, r.c, format, body, opts...)
 }
 
+func (r *repository) GetOperationalTemplate(ctx context.Context, templateID string, format TemplateFormat) ([]byte, *transport.Metadata, error) {
+	return GetOperationalTemplate(ctx, r.c, templateID, format)
+}
+
+func (r *repository) GetWebTemplate(ctx context.Context, templateID string, format TemplateFormat) ([]byte, *transport.Metadata, error) {
+	return GetWebTemplate(ctx, r.c, templateID, format)
+}
+
 func (r *repository) GetTemplate(ctx context.Context, templateID string, format TemplateFormat) ([]byte, *transport.Metadata, error) {
-	return GetTemplate(ctx, r.c, templateID, format)
+	return GetOperationalTemplate(ctx, r.c, templateID, format)
 }
 
 func (r *repository) ListTemplates(ctx context.Context, format TemplateFormat, opts ...ListOption) ([]TemplateMetadata, *transport.Metadata, error) {

@@ -182,7 +182,7 @@ func (c *cdrClient) upload(ctx context.Context, opt []byte) (outcome, string) {
 func (c *cdrClient) storedTemplate(ctx context.Context, id string) ([]byte, outcome) {
 	var body []byte
 	o := c.call(ctx, func(ctx context.Context) error {
-		b, _, err := definition.GetTemplate(ctx, c.c, id, definition.FormatADL14)
+		b, _, err := definition.GetOperationalTemplate(ctx, c.c, id, definition.FormatADL14)
 		body = b
 		return err
 	})

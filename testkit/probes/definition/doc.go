@@ -1,5 +1,5 @@
 // Package definitionprobes hosts the openEHR conformance probes
-// for the openEHR REST Definition API (PROBE-067 and PROBE-093).
+// for the openEHR REST Definition API (PROBE-067, PROBE-093 and PROBE-112).
 //
 // Probes are plain functions returning (Result, error) and run
 // against any compliant transport.Client backend. Today that is the

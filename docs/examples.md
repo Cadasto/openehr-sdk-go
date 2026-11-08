@@ -730,7 +730,7 @@ OK: template uploaded, listed, downloaded and compiled; example received
 1. Bound the work with `context.WithTimeout`, give your `*http.Client` a `Timeout` of its own, and pass it to `transport.New` with `transport.WithHTTPClient`.
 2. `definition.UploadTemplate(ctx, client, definition.FormatADL14, body)`, then read the id from the returned metadata's `TemplateID`.
 3. `definition.ListTemplates(ctx, client, definition.FormatADL14, definition.WithTemplateID(id))` to read one template's metadata. ITS-REST makes the filter a wildcard pattern, matched by the server, so take the entry whose `TemplateID` equals the id, not the first entry.
-4. To compile exactly what the server holds, download it with `definition.GetTemplate`, then run `aom14.ReadOperationalTemplate` and `templatecompile.Compile`. The download may differ from the bytes you uploaded. Compile once per template and reuse the handle.
+4. To compile exactly what the server holds, download it with `definition.GetOperationalTemplate`, then run `aom14.ReadOperationalTemplate` and `templatecompile.Compile`. The download may differ from the bytes you uploaded. Compile once per template and reuse the handle.
 5. `definition.ExampleComposition` gives a starting payload for a template. `WithExampleType` and `WithExampleDetailLevel` choose the kind of example; without them the server applies the ITS-REST defaults, `input` and `required`.
 
 ---

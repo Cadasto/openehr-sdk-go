@@ -123,11 +123,22 @@ func TestDefinitionCutBodyKeepsMetadata(t *testing.T) { // REQ-151
 				return v != nil, meta, err
 			},
 		},
+		// The deprecated GetTemplate has no row: it returns what
+		// GetOperationalTemplate returns, which
+		// TestGetTemplateIsOperationalTemplateAlias pins (REQ-177).
 		{
-			name:   "GetTemplate",
+			name:   "GetOperationalTemplate",
 			status: http.StatusOK,
 			call: func(t *testing.T, c *transport.Client) (bool, *transport.Metadata, error) {
-				v, meta, err := definition.GetTemplate(t.Context(), c, "body_weight.v1", definition.FormatADL14)
+				v, meta, err := definition.GetOperationalTemplate(t.Context(), c, "body_weight.v1", definition.FormatADL14)
+				return v != nil, meta, err
+			},
+		},
+		{
+			name:   "GetWebTemplate",
+			status: http.StatusOK,
+			call: func(t *testing.T, c *transport.Client) (bool, *transport.Metadata, error) {
+				v, meta, err := definition.GetWebTemplate(t.Context(), c, "body_weight.v1", definition.FormatADL14)
 				return v != nil, meta, err
 			},
 		},

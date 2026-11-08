@@ -2708,3 +2708,17 @@ requirements:
       - testkit/probes/template/probe_111_operational_template_compare.go
       - testkit/probes/template/probe_111_operational_template_round_trip.go
       - testkit/probes/template/probe_111_operational_template_round_trip_test.go
+
+  - id: REQ-177
+    title: Template representations
+    canonical: docs/specifications/wire.md#req-177--template-representations
+    status: draft
+    implementation: landed
+    packages: [openehr/client/definition]
+    probes: [PROBE-112]
+    tests:
+      - openehr/client/definition/body_read_error_test.go
+      - openehr/client/definition/path_encoding_test.go
+      - openehr/client/definition/template_representations_test.go
+      - testkit/probes/definition/probe_112_template_representations.go
+      - testkit/probes/definition/probes_test.go

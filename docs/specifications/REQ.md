@@ -135,6 +135,7 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-174 | Versioned-object reads | [wire.md](wire.md#req-174--versioned-object-reads) | draft | landed |
 | REQ-175 | Missing members on decode | [wire.md](wire.md#req-175--missing-members-on-decode) | draft | landed |
 | REQ-176 | ADL 1.4 operational template model | [clinical-modeling.md](clinical-modeling.md#req-176--adl-14-operational-template-model) | draft | landed |
+| REQ-177 | Template representations | [wire.md](wire.md#req-177--template-representations) | draft | landed |
 <!-- END GENERATED: registry -->
 
 **Impl.** column: `landed` (code + tests), `partial` (subset), `planned` (spec only), `retired` (a withdrawn requirement, **Stability** `deprecated`; its canonical link opens its entry in [retired-requirements.md](retired-requirements.md), which says where the rule went).
