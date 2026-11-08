@@ -53,13 +53,27 @@ func assertSingleEncoded(t *testing.T, op, decoded, escaped string) {
 	}
 }
 
-func TestGetTemplatePathSingleEncoded(t *testing.T) {
-	var decoded, escaped string
-	srv := captureServer(t, &decoded, &escaped, 0, []byte("<template/>"))
-	if _, _, err := definition.GetTemplate(t.Context(), newClient(t, srv), spacedTemplateID, definition.FormatADL14); err != nil {
-		t.Fatal(err)
+// TestTemplateReadPathSingleEncoded holds both template reads to the
+// single-encode contract (REQ-050, REQ-177). The deprecated GetTemplate has
+// no row: it sends what GetOperationalTemplate sends, which
+// TestGetTemplateIsOperationalTemplateAlias pins.
+func TestTemplateReadPathSingleEncoded(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		call templateGetter
+	}{
+		{name: "GetOperationalTemplate", call: definition.GetOperationalTemplate},
+		{name: "GetWebTemplate", call: definition.GetWebTemplate},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var decoded, escaped string
+			srv := captureServer(t, &decoded, &escaped, 0, []byte("<template/>"))
+			if _, _, err := tc.call(t.Context(), newClient(t, srv), spacedTemplateID, definition.FormatADL14); err != nil {
+				t.Fatal(err)
+			}
+			assertSingleEncoded(t, tc.name, decoded, escaped)
+		})
 	}
-	assertSingleEncoded(t, "GetTemplate", decoded, escaped)
 }
 
 func TestDeleteTemplatePathSingleEncoded(t *testing.T) {
@@ -87,9 +101,10 @@ func TestExampleCompositionPathSingleEncoded(t *testing.T) {
 }
 
 // TestTemplateSpacedIDRoundTrip is the REQ-050 acceptance case: upload a
-// template whose id contains a space, then GetTemplate it by that id and
-// receive 200 with the body. A double-encoded GET requests a literal
-// "Referral%20Request.v1" id, which the store never held → 404.
+// template whose id contains a space, then read it back by that id with
+// GetOperationalTemplate and receive 200 with the body. A double-encoded GET
+// requests a literal "Referral%20Request.v1" id, which the store never
+// held → 404.
 func TestTemplateSpacedIDRoundTrip(t *testing.T) {
 	opt := []byte("<template><template_id><value>Referral Request.v1</value></template_id></template>")
 	// Store keyed by the DECODED path, as a real server resolves an id.
@@ -118,9 +133,9 @@ func TestTemplateSpacedIDRoundTrip(t *testing.T) {
 	if _, _, err := definition.UploadTemplate(t.Context(), c, definition.FormatADL14, bytes.NewReader(opt)); err != nil {
 		t.Fatalf("upload: %v", err)
 	}
-	got, _, err := definition.GetTemplate(t.Context(), c, spacedTemplateID, definition.FormatADL14)
+	got, _, err := definition.GetOperationalTemplate(t.Context(), c, spacedTemplateID, definition.FormatADL14)
 	if err != nil {
-		t.Fatalf("GetTemplate by spaced id: %v (double-encoding would 404 here)", err)
+		t.Fatalf("GetOperationalTemplate by spaced id: %v (double-encoding would 404 here)", err)
 	}
 	if !bytes.Equal(got, opt) {
 		t.Errorf("round-trip body mismatch: got %q", got)

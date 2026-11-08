@@ -7,7 +7,7 @@
 //
 //   - POST   /definition/template/adl1.4
 //   - GET    /definition/template/adl1.4
-//   - GET    /definition/template/adl1.4/{template_id}
+//   - GET    /definition/template/adl1.4/{template_id}   (operational template or Web Template)
 //   - GET    /definition/template/adl1.4/{template_id}/example
 //   - DELETE /definition/template/adl1.4/{template_id}   (where supported)
 //   - PUT    /definition/query/{qualified_query_name}
@@ -18,6 +18,10 @@
 //
 // Templates are stored on the deployment as XML; the SDK transports
 // raw bytes so consumers can supply OPTs verbatim from .opt files or
-// from an in-memory build. Example COMPOSITION responses are decoded
-// via the canjson codec into *rm.Composition.
+// from an in-memory build. One template read serves two
+// representations, each through its own call: [GetOperationalTemplate]
+// returns the operational template (OPT XML) and [GetWebTemplate] the
+// Web Template (JSON), both as the bytes the server sent. Example
+// COMPOSITION responses are decoded via the canjson codec into
+// *rm.Composition.
 package definition
