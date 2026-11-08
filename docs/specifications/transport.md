@@ -218,7 +218,7 @@ A 2xx status says the server did what was asked. On a write, the status and its 
 
 | After a 2xx | Error |
 |---|---|
-| The body could not be read: the connection dropped mid-body, the body did not match its `Content-Encoding`, or it was longer than the [§ REQ-093](#req-093--openehr-error-envelope-mapping) *Bounded response reads* ceiling | `*transport.BodyReadError`, in every `Prefer` mode |
+| The body could not be read: the connection dropped mid-body, the body did not match its `Content-Encoding`, it was longer than the [§ REQ-093](#req-093--openehr-error-envelope-mapping) *Bounded response reads* ceiling, or net/http refused what followed its last byte | `*transport.BodyReadError`, in every `Prefer` mode |
 | A write that sent `Prefer: return=representation`, through the `ehr.WriteResult` family or `contribution.Commit`, got an empty body or one that does not decode as the expected resource; or `ehr.Create` got an empty body | `*ehr.NoRepresentationError`, wrapping `transport.ErrInvalidShape` for an empty body and the decoder's error otherwise |
 | Any other body that does not decode as the requested representation, `ehr.Create`'s included | `*transport.DecodeError` |
 | A read that expected a representation got an empty body: `transport.Decode` and the reads that mirror it | an error wrapping `transport.ErrInvalidShape` |
@@ -241,6 +241,17 @@ These outcomes are their own, and the table **MUST NOT** override them:
 
 **A body that cannot be read.** On a 2xx, `Client.Do` **MUST** return the `*transport.BodyReadError` beside a non-nil `*transport.Response` that carries `StatusCode`, `Header` and `Metadata` as for any 2xx, and an empty `Body`; the error **MUST** carry the request's method, its route template and the status, and no byte read before the failure, since a partial body is not the representation. On any other status whose body cannot be read, `Client.Do` **MUST** return a non-nil `*Response` whose `Body` is empty, beside an error from which `errors.AsType` recovers the `*transport.WireError` the status and headers classify (its status sentinel, its route and, on a 401 or 403, its Bearer challenge under [§ REQ-166](#req-166--bearer-challenge-on-401-and-403)), with no openEHR envelope and no `RawBody`. That error **MUST** also wrap the read failure, so `errors.Is` reaches the same causes as on a 2xx, and the text it adds to the `WireError`'s own **MUST** stay value-free under the rule above. A body that cannot be read leaves the failure classified by its status, as a body that is not an error envelope already does. The [§ REQ-098](#req-098--request-level-observer-hook) observation of such a call carries the response status beside the error, and [§ REQ-091](#req-091--retry-policy) *Retrying after a body read failure* says when it is sent again.
 
+**Whether the body arrived whole.** A `*transport.BodyReadError` **MUST** say in its `Complete` field whether the server sent its whole answer, so a caller can tell an answer it cannot use from one that never finished arriving. `Complete` is true when the failure lies in what the server sent, or in the client's own ceiling, and false when the body stopped arriving before its last byte:
+
+| Read failure | `Complete` |
+|---|---|
+| A body longer than the *Bounded response reads* ceiling (`transport.ErrResponseTooLarge`) | true |
+| A body that does not match its `Content-Encoding`, such as a gzip header or checksum failure | true |
+| A failure net/http raises after the body's last byte: a malformed or over-long HTTP/1 chunked trailer, or data past an HTTP/2 `Content-Length` | true |
+| A connection cut before the body's last byte (`io.ErrUnexpectedEOF`) | false |
+
+A read failure the SDK does not recognise **MUST** count as incomplete, so an unknown failure is never taken for a whole answer. `Complete` changes neither the error's text nor what it wraps.
+
 **A body that does not decode.** A `*transport.DecodeError` **MUST** carry the request's method and route template, and the raw response bytes in `Body` whatever the client's options ([ADR 0018](../adr/0018-raw-bytes-on-decode-error.md)), bounded only by the client's `WithMaxResponseBody` ceiling: the 64 MiB default, an explicit positive limit, or none where the caller disabled the cap with a negative value (*Bounded response reads*, [§ REQ-093](#req-093--openehr-error-envelope-mapping)). `Body` holds patient data for a clinical resource, so reading it is a deliberate act: `Error()` never includes it, and the type's documentation says so, as it does for `ehr.NoRepresentationError.Cause`. ADR 0018 settles why these bytes are attached unconditionally while REQ-093 gates the bodies of non-2xx responses.
 
 **Scope.** The taxonomy binds every 2xx response body read on the `transport.Client` stack, through `transport.Decode` or a decode a leaf writes by hand, so which route a leaf took is invisible to the caller. Scope follows the decode, not the verb: the Definition upload and PUT leaves are in scope, since their 2xx metadata responses are decoded as any read response is.
@@ -252,6 +263,7 @@ These outcomes are their own, and the table **MUST NOT** override them:
 - `composition.Save` against such a `201` returns no composition, the version metadata the `ETag` names, and the `*BodyReadError`.
 - A `409` whose body is cut matches `transport.ErrVersionConflict`; `errors.AsType[*transport.WireError]` recovers status `409`, and `errors.Is(err, io.ErrUnexpectedEOF)` holds. `errors.AsType[*transport.BodyReadError]` does not match.
 - A value placed in a response header and in the bytes read before the cut appears nowhere in `BodyReadError.Error()`, and a value the server sends as a malformed chunked trailer appears nowhere in the error text on either arm.
+- A body cut mid-read gives a `BodyReadError` whose `Complete` is false. A malformed chunked trailer, an over-long chunked trailer, data past an HTTP/2 `Content-Length`, a body over the ceiling and a gzip body that fails its checksum each give one whose `Complete` is true.
 
 - **Probes:** PROBE-101
 
