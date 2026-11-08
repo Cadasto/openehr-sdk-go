@@ -22,8 +22,10 @@ const (
 	// default: the zero value of [UpdateAudit.Type] resolves to it.
 	AuditTypeAuditDetails AuditType = "AUDIT_DETAILS"
 	// AuditTypeUpdateAudit emits `_type:"UPDATE_AUDIT"`, the form the vendored
-	// ITS-REST pin recommends clients send. It suits a server that accepts
-	// only this form; EHRbase does not resolve it and refuses the commit.
+	// ITS-REST pin recommends clients send. It names the REST commit DTO, not
+	// an RM class, so a server that reads the audit as an RM type, EHRbase
+	// among them, does not resolve it and refuses the commit. It suits a
+	// server that accepts only this form.
 	AuditTypeUpdateAudit AuditType = "UPDATE_AUDIT"
 )
 
