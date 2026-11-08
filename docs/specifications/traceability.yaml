@@ -2709,7 +2709,7 @@ requirements:
     title: Template representations
     canonical: docs/specifications/wire.md#req-177--template-representations
     status: draft
-    implementation: planned
+    implementation: landed
     packages: [openehr/client/definition]
     probes: [PROBE-112]
     tests:
