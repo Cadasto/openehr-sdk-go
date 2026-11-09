@@ -507,9 +507,10 @@ func (f failedReader) Read([]byte) (int, error) { return 0, f.err }
 // what comes before and after it. Inside the value, a Decoder given
 // [WithUnmatched], [WithStrict], [WithMissing], [WithPresence],
 // [WithStringText] or a positive [WithMaxDepth] refuses a processing
-// instruction whose target is xml, which
-// XML reserves for the declaration at the start of a document, with
-// [ErrInvalidShape]; one given none of them may read past it.
+// instruction whose target is xml, which XML reserves for the declaration at
+// the start of a document, and a `<!…>` markup declaration, which XML allows
+// only before the root element, with an error that wraps [ErrInvalidShape]
+// and [ErrNotWellFormed]; one given none of them may read past either.
 func (d *Decoder) Decode(v any) error {
 	switch {
 	case d.trk != nil:
