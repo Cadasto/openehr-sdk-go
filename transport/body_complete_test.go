@@ -11,8 +11,10 @@ package transport_test
 // and, over unencrypted HTTP/2, data past the declared Content-Length.
 //
 // Too many trailer lines has no case: net/http's client reads a response
-// trailer with no limit on its lines, and the 4 KiB limit on a trailer's
-// length stops a long one first, so that failure cannot reach a client.
+// trailer with no limit on its lines. textproto's "message too large" still
+// reaches a client by one other path, which has a case: a trailer whose first
+// line starts with a space or tab and runs past the 80 bytes textproto reads
+// of it to quote it.
 
 import (
 	"bufio"

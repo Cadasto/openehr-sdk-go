@@ -546,16 +546,19 @@ func (c *Client) doOnce(ctx context.Context, req *Request, targetURL, safeURL st
 	return resp, c.mapWireError(req, safeURL, resp)
 }
 
-// The texts of two read failures net/http raises after the body's last byte:
-// a chunked trailer longer than its read buffer, and HTTP/2 data past the
-// declared Content-Length. Both are plain errors.New values with no type or
-// sentinel to match, so they are matched by text. The second needs its text
-// when net/http decompresses a gzip body: the response then declares no
-// Content-Length, so the declared-length rule below cannot see it. net/http
-// reads a response trailer with no limit on its line count, so textproto's
-// "message too large" cannot arise here.
+// The texts of three read failures net/http raises after the body's last
+// byte: a chunked trailer longer than its read buffer, a chunked trailer whose
+// first line starts with a space or tab and runs past the 80 bytes textproto
+// reads of it to quote it, and HTTP/2 data past the declared Content-Length.
+// All three are plain errors.New values with no exported type or sentinel to
+// match, so they are matched by text. The second is textproto's "message too
+// large": net/http reads a response trailer with no limit on its line count,
+// so this is the only way it reaches a client. The third needs its text when
+// net/http decompresses a gzip body: the response then declares no
+// Content-Length, so the declared-length rule below cannot see it.
 const (
 	errTextLongTrailer       = "http: suspiciously long trailer after chunked body"
+	errTextLongTrailerLine   = "message too large"
 	errTextPastContentLength = "net/http: server replied with more than declared Content-Length; truncated"
 )
 
@@ -566,6 +569,8 @@ const (
 // does not recognise counts as incomplete.
 func bodyArrivedWhole(readErr error, read, contentLength int64) bool {
 	_, corruptCoding := errors.AsType[flate.CorruptInputError](readErr)
+	// flate raises InternalError while it decodes a block's Huffman table.
+	_, flateInternal := errors.AsType[flate.InternalError](readErr)
 	// textproto quotes a malformed trailer line; net/http reads the trailer
 	// only after the body's last chunk.
 	_, malformedTrailer := errors.AsType[textproto.ProtocolError](readErr)
@@ -575,10 +580,11 @@ func bodyArrivedWhole(readErr error, read, contentLength int64) bool {
 	case errors.Is(readErr, ErrResponseTooLarge):
 		// The client's own ceiling refused the body.
 		return true
-	case errors.Is(readErr, gzip.ErrHeader), errors.Is(readErr, gzip.ErrChecksum), corruptCoding:
+	case errors.Is(readErr, gzip.ErrHeader), errors.Is(readErr, gzip.ErrChecksum), corruptCoding, flateInternal:
 		// The body does not match its Content-Encoding.
 		return true
-	case malformedTrailer, readErr.Error() == errTextLongTrailer, readErr.Error() == errTextPastContentLength:
+	case malformedTrailer, readErr.Error() == errTextLongTrailer, readErr.Error() == errTextLongTrailerLine,
+		readErr.Error() == errTextPastContentLength:
 		return true
 	case contentLength >= 0 && read >= contentLength:
 		// Every declared byte arrived before the failure. Over HTTP/2 this is
