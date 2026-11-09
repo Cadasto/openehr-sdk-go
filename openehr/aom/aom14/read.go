@@ -71,10 +71,9 @@ const inputBufferMax = 4 << 20
 // refused with an error that wraps [canxml.ErrInvalidShape] and
 // [canxml.ErrNotWellFormed] and carries none of it, and so is an element that
 // carries one attribute twice, outside what the default mode leaves out
-// unread. Markup before the
-// root that encoding/xml cannot read fails as its *xml.SyntaxError, unless
-// content [canxml.Unmarshal] refuses comes before it, which both modes then
-// refuse. The root element may have any name, so a document whose root is
+// unread. Markup before the root that encoding/xml cannot read fails as its
+// *xml.SyntaxError, unless content [canxml.Unmarshal] refuses comes before
+// it, which both modes then refuse. The root element may have any name, so a document whose root is
 // `<OPERATIONAL_TEMPLATE>` reads as one whose root is `<template>`. An input
 // with no root element, empty or holding only a declaration, comments,
 // whitespace or text, is refused with an error that wraps
@@ -208,9 +207,8 @@ const inputBufferMax = 4 << 20
 //
 // A document that needs none of these readings is decoded once; one that
 // needs one is decoded a second time, from the bytes the reader keeps of the
-// input, but for what it reads past before and after the root, and so is
-// every document when opts pass what the decode reports to a function, which
-// sees each item once.
+// input, and so is every document when opts pass what the decode reports to a
+// function, which sees each item once.
 //
 // A caller that decodes an operational template with [canxml.Unmarshal] or a
 // [canxml.Decoder] itself gets neither limit and none of these readings
