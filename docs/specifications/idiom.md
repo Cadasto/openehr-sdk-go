@@ -28,7 +28,7 @@ func (c *Client) GetComposition(id ObjectVersionID, ctx context.Context) (*rm.Co
 `context.Context` is also the carrier for:
 
 - **Request-scoped values** — primarily for OTel propagation. The SDK defines no context-value keys of its own for control flow, which would be an anti-pattern.
-- **Per-request auth** — a server acting for many users, such as an MCP server, attaches via `auth.WithTokenSource(ctx, ts)` a token obtained for the openEHR API on the user's behalf, never a token forwarded from its own caller (see [auth.md § Per-request TokenSource](auth.md#per-request-tokensource)).
+- **Per-request auth** — a server acting for many users, such as an MCP server, attaches with `auth.WithTokenSource(ctx, ts)` a source for a token obtained for the openEHR API on the user's behalf; it never forwards the token its own caller sent (see [auth.md § Per-request TokenSource](auth.md#per-request-tokensource)).
 
 Pure functions (codecs, validators with no I/O, AQL string builders) **SHOULD NOT** take `context.Context`, because a context they never consult is noise at every call site.
 
