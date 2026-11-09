@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
@@ -122,6 +123,43 @@ func TestREQ056_XMLOneRootAfterFailedRoot(t *testing.T) {
 	if de, ok := errors.AsType[*canxml.DecodeError](err); !ok || de == nil || de.Path != "/dv_count[1]/magnitude[1]" {
 		t.Errorf("canxml.Unmarshal err = %v; want the root's own error, a DecodeError on /dv_count[1]/magnitude[1], not the one-root refusal", err)
 	}
+}
+
+// TestREQ056_XMLOneRootAfterTheSecondDecode pins the one-root rule on a
+// document that canxml.Unmarshal, given no option, decodes a second time,
+// because an `xsi:type` inside it names a prefix declared on an element
+// around the attribute (prefixSlot): what follows the root is judged after
+// that second decode as after the first.
+//
+// Can-fail control: skip the check after the root once the second decode
+// succeeds, and the refused cases decode without an error.
+func TestREQ056_XMLOneRootAfterTheSecondDecode(t *testing.T) {
+	refused := map[string]string{
+		"trailing text":   xmlPlanted,
+		"second root":     `<extra/>`,
+		"XML declaration": `<?xml version="1.0"?>`,
+		"CDATA section":   `<![CDATA[ ]]>`,
+	}
+	for name, tail := range refused {
+		t.Run("refused/"+name, func(t *testing.T) {
+			err := canxml.Unmarshal(append(prefixSlot(), tail...), new(aom14.ArchetypeSlot))
+			if !errors.Is(err, canxml.ErrInvalidShape) || !errors.Is(err, canxml.ErrNotWellFormed) {
+				t.Fatalf("canxml.Unmarshal(slot + %q) err = %v; want errors.Is(_, canxml.ErrInvalidShape) and errors.Is(_, canxml.ErrNotWellFormed)", tail, err)
+			}
+			if strings.Contains(err.Error(), xmlPlanted) {
+				t.Errorf("canxml.Unmarshal(slot + %q) err = %q; it echoes the trailing content", tail, err)
+			}
+		})
+	}
+	t.Run("accepted/comment", func(t *testing.T) {
+		var slot aom14.ArchetypeSlot
+		if err := canxml.Unmarshal(append(prefixSlot(), "<!-- note -->\n"...), &slot); err != nil {
+			t.Fatalf("canxml.Unmarshal(slot + a comment) = %v; want nil", err)
+		}
+		if len(slot.Includes) != 1 {
+			t.Errorf("canxml.Unmarshal(slot + a comment): the slot holds %d includes; want 1", len(slot.Includes))
+		}
+	})
 }
 
 // TestREQ056_XMLBeforeRoot pins the other half of the one-root rule: in every
@@ -342,12 +380,13 @@ func TestREQ056_XMLTargetInsideTheRoot(t *testing.T) {
 // content it skips as unmatched, in every mode, and so does a
 // canxml.Decoder given any option, with an error that wraps
 // canxml.ErrInvalidShape and canxml.ErrNotWellFormed, is no unmatched content
-// and carries none of the declaration. The same bytes in a comment or a CDATA
-// section pass.
+// and carries none of the declaration, whatever comes before the root. The
+// same bytes in a comment or a CDATA section pass.
 //
 // Can-fail control: let the tracked token source pass a declaration and every
 // refused row decodes; let Unmarshal given no option skip its scan of the
-// bytes and that mode decodes them.
+// bytes and that mode decodes them; start that scan past the root's start
+// tag and the rows with a prolog decode in that mode.
 func TestREQ056_XMLDeclarationInsideTheRoot(t *testing.T) {
 	const ns = `xmlns="http://schemas.openehr.org/v1"`
 	refused := map[string]string{
@@ -360,6 +399,13 @@ func TestREQ056_XMLDeclarationInsideTheRoot(t *testing.T) {
 		"after an instruction holding <!--": `<dv_text ` + ns + `><?pi <!-- ?><!DOCTYPE ` + xmlPlanted + `><value>a</value></dv_text>`,
 		"after an instruction holding a CDATA opener": `<dv_text ` + ns + `><value>a<?pi <![CDATA[ ?><!ENTITY ` + xmlPlanted +
 			` "v"></value></dv_text>`,
+		"in a root after the XML declaration": `<?xml version="1.0"?><dv_text ` + ns + `><!DOCTYPE ` + xmlPlanted +
+			`><value>a</value></dv_text>`,
+		"in a root after a byte order mark and the XML declaration": "\ufeff" + `<?xml version="1.0"?><dv_text ` + ns +
+			`><value>a</value><!DOCTYPE ` + xmlPlanted + `></dv_text>`,
+		"in a root after a comment":       `<!-- c --><dv_text ` + ns + `><!DOCTYPE ` + xmlPlanted + `><value>a</value></dv_text>`,
+		"in a root after a document type": `<!DOCTYPE dv_text><dv_text ` + ns + `><value>a<!DOCTYPE ` + xmlPlanted + `></value></dv_text>`,
+		"in a root after whitespace":      "\n " + `<dv_text ` + ns + `><!DOCTYPE ` + xmlPlanted + `><value>a</value></dv_text>`,
 	}
 	accepted := map[string]struct{ in, value string }{
 		"declaration in a comment":      {`<dv_text ` + ns + `><!-- <!DOCTYPE x> --><value>a</value></dv_text>`, "a"},
