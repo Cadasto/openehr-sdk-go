@@ -212,6 +212,15 @@ func TestBodyReadErrorCompleteHTTP1(t *testing.T) { // REQ-151
 			want:    true,
 		},
 		{
+			// The last chunk arrives, then the connection closes before the
+			// trailer's closing line: the failure comes after the body's
+			// last byte.
+			name:     "connection closed after the last chunk, before the trailer's end",
+			response: []byte("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\n\r\n2\r\n{}\r\n0\r\n"),
+			premise:  func(inner error) bool { return inner != nil && inner.Error() == "http: unexpected EOF reading trailer" },
+			want:     true,
+		},
+		{
 			name:     "gzip body that fails its checksum",
 			response: rawResponse("Content-Encoding: gzip\r\n", badCRC),
 			premise:  func(inner error) bool { return errors.Is(inner, gzip.ErrChecksum) },
