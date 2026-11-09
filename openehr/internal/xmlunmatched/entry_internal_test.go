@@ -582,3 +582,111 @@ func TestREQ176_REQ052_EntryRefusalsKeepTheirText(t *testing.T) {
 		}
 	}
 }
+
+// nestedItem is a class value of a Hash keyed by its language that holds
+// another such Hash, subs, of entryItem values: an entry held while the one
+// around it is held too.
+type nestedItem struct {
+	Language string
+	Subs     map[string]entryItem
+}
+
+var nestedItemClass = &Class{Name: "NESTED", Required: []string{"language"}}
+
+func (v *nestedItem) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error {
+	if err := Enter(dec, start, nestedItemClass); err != nil {
+		return err
+	}
+	var subs bool
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			return err
+		}
+		switch tk := tok.(type) {
+		case xml.StartElement:
+			switch LocalName(tk.Name) {
+			case "language":
+				if err := DecodeElement(dec, &tk, &v.Language); err != nil {
+					return err
+				}
+			case "subs":
+				if err := DecodeEntryKeyedBy(dec, &tk, func(v *entryItem) string { return v.Language }, &v.Subs, &subs); err != nil {
+					return err
+				}
+			default:
+				if err := SkipUnmatched(dec, tk); err != nil {
+					return err
+				}
+			}
+		case xml.CharData:
+			if err := CheckUnmatchedText(dec, tk); err != nil {
+				return err
+			}
+		case xml.EndElement:
+			return nil
+		}
+	}
+}
+
+// nestedHolder holds one Hash member, items, of nestedItem values keyed by
+// their language.
+type nestedHolder struct {
+	Items map[string]nestedItem
+}
+
+var nestedHolderClass = &Class{Name: "NESTED_HOLDER"}
+
+func (h *nestedHolder) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error {
+	if err := Enter(dec, start, nestedHolderClass); err != nil {
+		return err
+	}
+	var items bool
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			return err
+		}
+		switch tk := tok.(type) {
+		case xml.StartElement:
+			if LocalName(tk.Name) == "items" {
+				if err := DecodeEntryKeyedBy(dec, &tk, func(v *nestedItem) string { return v.Language }, &h.Items, &items); err != nil {
+					return err
+				}
+				continue
+			}
+			if err := SkipUnmatched(dec, tk); err != nil {
+				return err
+			}
+		case xml.CharData:
+			if err := CheckUnmatchedText(dec, tk); err != nil {
+				return err
+			}
+		case xml.EndElement:
+			return nil
+		}
+	}
+}
+
+// TestREQ176_REQ175_NestedEntryKeysWaitForTheOutermostHold pins that the
+// pointer of a missing member inside a Hash entry nested in another names
+// both entries by their keys when the outer entry's key comes after the inner
+// entry: the keys wait for the outermost hold to end, not the inner one, by
+// which time the outer key has not been read.
+//
+// Can-fail control: give the pending keys at the end of every hold, the inner
+// one included, and the outer entry is named under an empty key,
+// /items//subs/de/purpose.
+func TestREQ176_REQ175_NestedEntryKeysWaitForTheOutermostHold(t *testing.T) {
+	doc := `<holder ` + xmlnsDecl + `><items>` +
+		`<subs><language>de</language></subs>` +
+		`<language>en</language>` +
+		`</items></holder>`
+	got, err := decodeMissing(doc, new(nestedHolder), false)
+	if err != nil {
+		t.Fatalf("Decode = %v; want nil", err)
+	}
+	if want := []string{"/items/en/subs/de/purpose"}; !slices.Equal(got, want) {
+		t.Errorf("missing members %q; want %q", got, want)
+	}
+}
