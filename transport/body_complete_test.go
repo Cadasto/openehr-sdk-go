@@ -6,7 +6,7 @@ package transport_test
 // whole answer before the body read failed. These tests drive transport.Client
 // against a raw TCP listener that writes the response bytes by hand, so every
 // read failure is the one net/http itself raises from bytes on the wire: a
-// body cut mid-read, a malformed or over-long chunked trailer, a body that does
+// body cut mid-read, a malformed, over-long or cut chunked trailer, a body that does
 // not match its Content-Encoding, a body over the WithMaxResponseBody ceiling,
 // and, over unencrypted HTTP/2, data past the declared Content-Length.
 //

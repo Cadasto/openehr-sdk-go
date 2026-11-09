@@ -546,19 +546,21 @@ func (c *Client) doOnce(ctx context.Context, req *Request, targetURL, safeURL st
 	return resp, c.mapWireError(req, safeURL, resp)
 }
 
-// The texts of three read failures net/http raises after the body's last
+// The texts of four read failures net/http raises after the body's last
 // byte: a chunked trailer longer than its read buffer, a chunked trailer whose
 // first line starts with a space or tab and runs past the 80 bytes textproto
-// reads of it to quote it, and HTTP/2 data past the declared Content-Length.
-// All three are plain errors.New values with no exported type or sentinel to
+// reads of it to quote it, a connection that closes after the last chunk
+// before the trailer's end, and HTTP/2 data past the declared Content-Length.
+// All four are plain errors.New values with no exported type or sentinel to
 // match, so they are matched by text. The second is textproto's "message too
 // large": net/http reads a response trailer with no limit on its line count,
-// so this is the only way it reaches a client. The third needs its text when
+// so this is the only way it reaches a client. The last needs its text when
 // net/http decompresses a gzip body: the response then declares no
 // Content-Length, so the declared-length rule below cannot see it.
 const (
 	errTextLongTrailer       = "http: suspiciously long trailer after chunked body"
 	errTextLongTrailerLine   = "message too large"
+	errTextTrailerEOF        = "http: unexpected EOF reading trailer"
 	errTextPastContentLength = "net/http: server replied with more than declared Content-Length; truncated"
 )
 
@@ -584,7 +586,7 @@ func bodyArrivedWhole(readErr error, read, contentLength int64) bool {
 		// The body does not match its Content-Encoding.
 		return true
 	case malformedTrailer, readErr.Error() == errTextLongTrailer, readErr.Error() == errTextLongTrailerLine,
-		readErr.Error() == errTextPastContentLength:
+		readErr.Error() == errTextTrailerEOF, readErr.Error() == errTextPastContentLength:
 		return true
 	case contentLength >= 0 && read >= contentLength:
 		// Every declared byte arrived before the failure. Over HTTP/2 this is
