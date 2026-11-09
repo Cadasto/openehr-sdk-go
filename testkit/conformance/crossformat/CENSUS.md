@@ -26,7 +26,7 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 | alternative_events | flat-canonical | compared 115, missing 8, extra 4, altered 13, excluded 4 |
 | consult_record | json-xml | compared 150, missing 0, extra 0, altered 0, excluded 0 |
 | consult_record | canonical-flat | compared 26, missing 1, extra 6, altered 0, excluded 0 |
-| consult_record | flat-canonical | compared 150, missing 7, extra 0, altered 6, excluded 4 |
+| consult_record | flat-canonical | compared 150, missing 7, extra 0, altered 4, excluded 3 |
 | consult_record | flat-structured | compared 40, missing 12, extra 5, altered 0, excluded 0 |
 | consult_record | structured-flat | compared 29, missing 0, extra 1, altered 0, excluded 1 |
 | corona | canonical-flat | compared 104, missing 0, extra 0, altered 1, excluded 0 |
@@ -45,7 +45,7 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 | persistent_minimal | canonical-flat | compared 11, missing 0, extra 1, altered 1, excluded 0 |
 | persistent_minimal | flat-canonical | compared 72, missing 2, extra 0, altered 5, excluded 0 |
 | test_all_types | canonical-flat | compared 83, missing 8, extra 6, altered 10, excluded 0 |
-| test_all_types | flat-canonical | compared 423, missing 51, extra 36, altered 39, excluded 11 |
+| test_all_types | flat-canonical | compared 423, missing 40, extra 34, altered 35, excluded 7 |
 
 ## alternative_events
 
@@ -114,8 +114,8 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 
 ### flat-canonical
 
-- Outcome: compared 150, missing 7, extra 0, altered 6, excluded 4
-- Reason: The 4 excluded keys are ctx/time and ctx/setting, refused, and ctx/location and created/date_time_value, reported as unmatched content, as follows. UPSTREAM consult_record ctx conflict: the FLAT gives ctx/time and context/start_time different values, decode refuses the pair and the harness removes ctx/time; the start time left agrees with the canonical. ctx/setting: the FLAT writes ctx/setting as bare text, the setting without the |code and |value the codec reads it as, which decode refuses in every mode as a missing required suffix; the harness removes it, so decode fills the default 238 other care against the canonical 228 primary medical care. ctx/location: the codec does not read ctx/location (it reads context/_location), so the location is missing. Choice element: decode does not read media_file/created/date_time_value (the SDK spells it created), so the media_file cluster lacks its created element (6 leaves). RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (4 leaves).
+- Outcome: compared 150, missing 7, extra 0, altered 4, excluded 3
+- Reason: The 3 excluded keys are ctx/time, refused, and ctx/location and created/date_time_value, reported as unmatched content, as follows. UPSTREAM consult_record ctx conflict: the FLAT gives ctx/time and context/start_time different values, decode refuses the pair and the harness removes ctx/time; the start time left agrees with the canonical. ctx/location: the codec does not read ctx/location (it reads context/_location), so the location is missing. Choice element: decode does not read media_file/created/date_time_value (the SDK spells it created), so the media_file cluster lacks its created element (6 leaves). RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (4 leaves).
 - Missing (7):
   - `/content/0/data/items/2/items/2/_type`
   - `/content/0/data/items/2/items/2/archetype_node_id`
@@ -124,17 +124,14 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - `/content/0/data/items/2/items/2/value/_type`
   - `/content/0/data/items/2/items/2/value/value`
   - `/context/location`
-- Altered (6):
+- Altered (4):
   - `/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
   - `/content/0/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
   - `/content/0/data/items/2/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
   - `/context/other_context/items/0/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
-  - `/context/setting/defining_code/code_string`: reference `"228"`, ours `"238"`
-  - `/context/setting/value`: reference `"primary medical care"`, ours `"other care"`
-- Reducing decode removed 4 keys from the upstream FLAT:
+- Reducing decode removed 3 keys from the upstream FLAT:
   - 2: `reported as unmatched content`
   - 1: `simplified: path not in web template: conflicting spellings of <key>: "<key>" and "opconsultation/context/start_time" give different values; remove one`
-  - 1: `simplified: unsupported datatype: "<key>" spells the setting without its |code and |value, the pair <key> travels as`
 
 ### flat-structured
 
@@ -397,22 +394,20 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 
 ### flat-canonical
 
-- Outcome: compared 423, missing 51, extra 36, altered 39, excluded 11
-- Reason: The 11 excluded keys are the section_3 ACTION's in-context ism_transition/current_state (3) and time (1) and the identifier keys (4), refused, and choice/quantity_value|magnitude and |unit (2) and the bare proportion_any (1), reported as unmatched content, as follows. Web Template projection: decode refuses the ACTION's in-context ism_transition and time in every mode as RM data it would otherwise drop or replace, so the decoded ACTION has an empty current_state (3 leaves) and the context start time as its time. party reference type: the upstream FLAT writes no composer|type, so decode gives the composer's reference the type PARTY against the canonical's PERSON. DV_IDENTIFIER: the FLAT writes the id as the bare value, and decode refuses the four identifier keys as missing the required |id, so the identifier element is missing. Choice element: decode does not read choice/quantity_value (the SDK spells it choice), so the choice element is missing. DV_PROPORTION: decode reports the bare proportion_any, the derived magnitude, as unmatched content, and reads |type 1.0 as the Integer 1. Upstream conversion differences: a DV_URI and the proportion's precision only the canonical carries, and duration_any (P1Y2M10DT2H30M against PT30M). Upstream date and time spelling: the canonical writes dates in the basic format (20190114) and date-times with a comma and +00:00, the FLAT in the extended format with a full stop and Z (6 leaves). HISTORY.origin: the FLAT has no origin key and decode fills it from the context start time (openehr/serialize/simplified/deviations.md), where the canonical sets it otherwise. Shifted positions: the elements decode lacks move their later siblings up, the identifier in the OBSERVATION and the DV_URI and the choice element in the EVALUATION, so the OBSERVATION's proportion and the EVALUATION's intervals and cluster compare against the canonical's next element; this accounts for most of the missing, extra and altered leaves. RM-FLOOR archetype_details: the canonical SECTION and the ACTION's description CLUSTER have none, decode adds them (8 extra leaves), and rm_version is 1.2.0 against 1.0.2 and 1.0.4.
-- Missing (51, first 10 shown):
-  - `/content/0/data/events/0/data/items/14/value/assigner`
-  - `/content/0/data/events/0/data/items/14/value/id`
-  - `/content/0/data/events/0/data/items/14/value/issuer`
-  - `/content/0/data/events/0/data/items/15/_type`
-  - `/content/0/data/events/0/data/items/15/archetype_node_id`
-  - `/content/0/data/events/0/data/items/15/name/_type`
-  - `/content/0/data/events/0/data/items/15/name/value`
-  - `/content/0/data/events/0/data/items/15/value/_type`
-  - `/content/0/data/events/0/data/items/15/value/denominator`
-  - `/content/0/data/events/0/data/items/15/value/numerator`
-- Extra (36, first 10 shown):
-  - `/content/0/data/events/0/data/items/14/value/denominator`
-  - `/content/0/data/events/0/data/items/14/value/numerator`
+- Outcome: compared 423, missing 40, extra 34, altered 35, excluded 7
+- Reason: The 7 excluded keys are the section_3 ACTION's in-context ism_transition/current_state (3) and time (1), refused, and choice/quantity_value|magnitude and |unit (2) and the bare proportion_any (1), reported as unmatched content, as follows. Web Template projection: decode refuses the ACTION's in-context ism_transition and time in every mode as RM data it would otherwise drop or replace, so the decoded ACTION has an empty current_state (3 leaves) and the context start time as its time. party reference type: the upstream FLAT writes no composer|type, so decode gives the composer's reference the type PARTY against the canonical's PERSON. Choice element: decode does not read choice/quantity_value (the SDK spells it choice), so the choice element is missing. DV_PROPORTION: decode reports the bare proportion_any, the derived magnitude, as unmatched content, and reads |type 1.0 as the Integer 1. Upstream conversion differences: a DV_URI and the proportion's precision only the canonical carries, and duration_any (P1Y2M10DT2H30M against PT30M). Upstream date and time spelling: the canonical writes dates in the basic format (20190114) and date-times with a comma and +00:00, the FLAT in the extended format with a full stop and Z (6 leaves). HISTORY.origin: the FLAT has no origin key and decode fills it from the context start time (openehr/serialize/simplified/deviations.md), where the canonical sets it otherwise. Shifted positions: the elements decode lacks move their later siblings up, the DV_URI and the choice element in the EVALUATION, so the EVALUATION's intervals and cluster compare against the canonical's next element; this accounts for most of the missing, extra and altered leaves. RM-FLOOR archetype_details: the canonical SECTION and the ACTION's description CLUSTER have none, decode adds them (8 extra leaves), and rm_version is 1.2.0 against 1.0.2 and 1.0.4.
+- Missing (40, first 10 shown):
+  - `/content/0/data/events/0/data/items/15/value/precision`
+  - `/content/1/data/items/0/value/value`
+  - `/content/1/data/items/2/value/lower/magnitude`
+  - `/content/1/data/items/2/value/lower/units`
+  - `/content/1/data/items/2/value/upper/magnitude`
+  - `/content/1/data/items/2/value/upper/units`
+  - `/content/1/data/items/3/value/_type`
+  - `/content/1/data/items/3/value/lower/_type`
+  - `/content/1/data/items/3/value/lower/value`
+  - `/content/1/data/items/3/value/lower_included`
+- Extra (34, first 10 shown):
   - `/content/1/data/items/0/value/lower/_type`
   - `/content/1/data/items/0/value/lower/magnitude`
   - `/content/1/data/items/0/value/lower_included`
@@ -421,19 +416,20 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - `/content/1/data/items/0/value/upper/magnitude`
   - `/content/1/data/items/0/value/upper_included`
   - `/content/1/data/items/0/value/upper_unbounded`
-- Altered (39, first 10 shown):
+  - `/content/1/data/items/1/value/lower/units`
+  - `/content/1/data/items/1/value/upper/units`
+- Altered (35, first 10 shown):
   - `/archetype_details/rm_version`: reference `"1.0.2"`, ours `"1.2.0"`
   - `/composer/external_ref/type`: reference `"PERSON"`, ours `"PARTY"`
   - `/content/0/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
   - `/content/0/data/events/0/data/items/11/value/value`: reference `"P1Y2M10DT2H30M"`, ours `"PT30M"`
-  - `/content/0/data/events/0/data/items/14/archetype_node_id`: reference `"at0021"`, ours `"at0022"`
-  - `/content/0/data/events/0/data/items/14/name/value`: reference `"identifier"`, ours `"proportion any"`
-  - `/content/0/data/events/0/data/items/14/value/_type`: reference `"DV_IDENTIFIER"`, ours `"DV_PROPORTION"`
-  - `/content/0/data/events/0/data/items/14/value/type`: reference `"LOCALID"`, ours `1`
   - `/content/0/data/events/0/data/items/5/value/value`: reference `"20190114"`, ours `"2019-01-14"`
   - `/content/0/data/events/0/data/items/6/value/value`: reference `"2019-01-28T21:22:49,426+00:00"`, ours `"2019-01-28T21:22:49.426Z"`
-- Reducing decode removed 11 keys from the upstream FLAT:
-  - 4: `simplified: decode "<key>": simplified: unsupported datatype: DV_IDENTIFIER missing required |id`
+  - `/content/0/data/events/0/data/items/7/value/value`: reference `"2019-01-28T21:22:49,427+00:00"`, ours `"2019-01-28T21:22:49.427Z"`
+  - `/content/0/data/events/0/time/value`: reference `"2019-01-28T21:22:49,332+00:00"`, ours `"2019-01-28T21:22:49.332Z"`
+  - `/content/0/data/origin/value`: reference `"2019-01-28T21:22:49,326+00:00"`, ours `"2019-01-14T18:36:49.294Z"`
+  - `/content/1/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
+- Reducing decode removed 7 keys from the upstream FLAT:
   - 3: `reported as unmatched content`
   - 3: `simplified: path not in web template: "<key>" is the reference's in-context spelling of an ACTION's ISM transition current_state, which the Web Template this SDK builds does not model - refused rather than dropped or replaced (see deviations.md)`
   - 1: `simplified: path not in web template: "<key>" is the reference's in-context spelling of an ACTION's time, which the Web Template this SDK builds does not model - refused rather than dropped or replaced (see deviations.md)`

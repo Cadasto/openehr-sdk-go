@@ -499,12 +499,15 @@ var metadataOwnedBaseType = map[string]string{
 	"language": "CODE_PHRASE", "territory": "CODE_PHRASE",
 }
 
-// ctxSettingBare is the bare spelling of ctx/setting, which the decode reads as
-// a pair of suffixes only, and ctxSettingTerminology the witness of the
-// terminology that pair implies.
+// ctxSettingBare is the bare spelling of ctx/setting, which names a member of
+// the openEHR setting group by its code or its rubric ([putBareSetting]), and
+// ctxSettingTerminology the witness of the terminology the setting implies.
+// settingBase is the real path of the same field below the template root,
+// whose bare key decode reads as ctxSettingBare.
 const (
 	ctxSettingBare        = "ctx/setting"
 	ctxSettingTerminology = "ctx/setting|terminology"
+	settingBase           = "context/setting"
 )
 
 // ctxFields are the ctx/ keys the decode reads into context (REQ-053). Any
@@ -815,10 +818,13 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 				continue
 			}
 			if key == ctxSettingBare {
-				// ctx/setting is read as its |code + |value pair; a bare value is
-				// the field missing both (REQ-170: a missing required suffix).
-				return nil, nil, nil, nil, fmt.Errorf("%w: %q spells the setting without its |code and |value, the pair ctx/setting travels as",
-					ErrUnsupportedDatatype, key)
+				// The format accepts a setting's code or its rubric alone
+				// (REQ-053): it is read as the pair it names, and compared
+				// with any other spelling of that pair.
+				if err := putBareSetting(ctx, ctxOrigin, key, val); err != nil {
+					return nil, nil, nil, nil, err
+				}
+				continue
 			}
 			if key == ctxSettingTerminology {
 				// The setting's terminology is implied, never carried: a witness
@@ -899,13 +905,20 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 		// A suffix the leaf's datatype does not have at all is not such a
 		// spelling: the decode does not read it, so it is unmatched (REQ-170).
 		// A bare value is not such a suffix but a spelling of the field missing
-		// its required suffixes: refused, as below.
+		// its required suffixes: refused, as below, except the setting's, which
+		// is read as the bare ctx/setting is (REQ-053).
 		if base, suffix, _ := strings.Cut(rel, "|"); contextMetaOwnedBases[base] {
 			if matched, _ := leafSuffixMatched(metadataOwnedBaseType[base], suffix); !matched && suffix != "" {
 				sink.add(key)
 				continue
 			}
 			if val == nil {
+				continue
+			}
+			if rel == settingBase {
+				if err := putBareSetting(ctx, ctxOrigin, key, val); err != nil {
+					return nil, nil, nil, nil, err
+				}
 				continue
 			}
 			return nil, nil, nil, nil, fmt.Errorf("%w: %q is not a spelling the ctx/ short form can carry — %s owns this leaf, so only its accepted suffixes travel (see deviations.md)",
@@ -940,6 +953,41 @@ func checkTerminologyWitness(key string, val any, want string) error {
 			ErrUnsupportedDatatype, key, want)
 	}
 	return nil
+}
+
+// putBareSetting reads a bare setting, ctx/setting or the real path's bare
+// key, which the format lets carry either the setting's code or its rubric.
+// The value is looked up in the openEHR setting group, by code first and then
+// by rubric, and recorded as the ctx/setting|code + |value pair that names the
+// same member, so it is compared with any other spelling of the pair as two
+// spellings of one field are ([putCtx], REQ-053). A value that is neither is
+// refused naming the key: no setting can be built from it, since the RM
+// requires a code of that group.
+func putBareSetting(ctx map[string]any, origin map[string]string, key string, val any) error {
+	s, err := ctxString(strconv.Quote(key), val)
+	if err != nil {
+		return err
+	}
+	code, rubric, member := settingMember(s)
+	if !member {
+		return fmt.Errorf("%w: %q is neither a code nor a rubric of the openEHR setting group, so it names no setting a composition can carry",
+			ErrUnsupportedDatatype, key)
+	}
+	if err := putCtx(ctx, origin, "ctx/setting|code", code, key); err != nil {
+		return err
+	}
+	return putCtx(ctx, origin, "ctx/setting|value", rubric, key)
+}
+
+// settingMember finds s in the openEHR setting group, as a code first and then
+// as a rubric, and returns that member's code and rubric. member is false when
+// s is neither.
+func settingMember(s string) (code, rubric string, member bool) {
+	if r, isCode := terminology.Setting.Rubric(s); isCode {
+		return s, r, true
+	}
+	code, member = terminology.Setting.Code(s)
+	return code, s, member
 }
 
 // putCtx records a context value under its normalised ctx/ key, tracking in
@@ -3338,21 +3386,23 @@ func dvFromSuffixesAt(holds, rmType string, listOpen bool, sfx map[string]any, k
 	// shape). |code is the discriminator: its presence re-selects the
 	// DV_CODED_TEXT builder, and the group then follows that type's own rules —
 	// |value required, |terminology / |formatting optional, bare value refused.
-	// Without |code the leaf stays a plain DV_TEXT and a stray |value /
-	// |terminology is refused by the allowlist below, as before. The encoder is
-	// the exact inverse: leafToFlat routes a fully-captured DV_CODED_TEXT at a
-	// DV_TEXT leaf to the coded suffix set instead of |raw.
+	// Without |code the leaf stays a plain DV_TEXT, whose |value is its bare
+	// value ([shorthandSpellings]), and a stray |terminology is refused by the
+	// allowlist below, as before. The encoder is the exact inverse:
+	// leafToFlat routes a fully-captured DV_CODED_TEXT at a DV_TEXT leaf to the
+	// coded suffix set instead of |raw.
 	// The discriminator is a |code that is not the empty string, not the key's
 	// mere presence: `|code: ""` and `|code: null` are what a form emits for
 	// "free text, no code selected", and promoting those would mint a
 	// DV_CODED_TEXT whose CODE_PHRASE.code_string is empty — RM-invalid, yet
 	// stable enough on re-encode that nothing downstream flags it, and matched by
 	// any AQL predicate testing defining_code/code_string against ''. They stay a
-	// plain DV_TEXT: a null |code is absent (REQ-053, dropped above), and the
-	// allowlist below refuses the stray `|code: ""`, or the |value beside a null
-	// one, as it did before this carve-out. A |code of another JSON kind does
-	// select the coded builder, so the fit check refuses it naming the |code key
-	// (REQ-053), rather than the allowlist refusing the leaf.
+	// plain DV_TEXT: a null |code is absent (REQ-053, dropped above), so a
+	// |value beside one is the text's value, and the allowlist below refuses
+	// the stray `|code: ""`, as it did before this carve-out. A |code of
+	// another JSON kind does select the coded builder, so the fit check refuses
+	// it naming the |code key (REQ-053), rather than the allowlist refusing the
+	// leaf.
 	if rmType == "DV_TEXT" {
 		if code, coded := sfx["code"]; coded {
 			if s, isString := code.(string); !isString || s != "" {
@@ -3364,6 +3414,10 @@ func dvFromSuffixesAt(holds, rmType string, listOpen bool, sfx map[string]any, k
 		return nil, err
 	}
 	if err := checkSuffixFits(rmType, sfx, keyOf); err != nil {
+		return nil, err
+	}
+	sfx, err := foldShorthand(rmType, sfx, keyOf)
+	if err != nil {
 		return nil, err
 	}
 	// The bare-leaf datatypes all rebuild as {_type, <attr>: value} from the ""
@@ -3625,7 +3679,7 @@ func multimediaFromSuffixes(sfx map[string]any) (map[string]any, error) {
 // decorated attribute like |accuracy that only rides |raw) is rejected rather
 // than silently dropped. |other and |raw are handled before this check.
 var allowedSuffixes = map[string]map[string]bool{
-	"DV_TEXT":       {"": true, "formatting": true},
+	"DV_TEXT":       {"": true, "value": true, "formatting": true},
 	"DV_CODED_TEXT": {"code": true, "value": true, "terminology": true, "formatting": true},
 	"DV_DATE_TIME":  {"": true, "magnitude_status": true, "normal_status": true},
 	"DV_DATE":       {"": true, "magnitude_status": true, "normal_status": true},
@@ -3648,14 +3702,56 @@ var allowedSuffixes = map[string]map[string]bool{
 		"magnitude_status": true, "normal_status": true,
 		"accuracy": true, "accuracy_is_percent": true, "precision": true,
 	},
-	"DV_IDENTIFIER": {"id": true, "issuer": true, "assigner": true, "type": true},
+	"DV_IDENTIFIER": {"": true, "id": true, "issuer": true, "assigner": true, "type": true},
 	"CODE_PHRASE":   {"code": true, "terminology": true, "preferred_term": true},
-	"DV_PARSABLE":   {"": true, "formalism": true},
+	"DV_PARSABLE":   {"": true, "value": true, "formalism": true},
 	"DV_MULTIMEDIA": {
 		"": true, "mediatype": true, "size": true, "data": true,
 		"alternatetext": true, "integrity_check": true,
 		"integrity_check_algorithm": true, "compression_algorithm": true,
 	},
+}
+
+// shorthandSpelling is a second spelling decode reads for one attribute of a
+// datatype: short is the suffix ("" for the bare value) a client may write in
+// place of full, the suffix encode writes.
+type shorthandSpelling struct {
+	short, full, attr string
+}
+
+// shorthandSpellings are the input shorthands of the ITS-REST 1.1.0
+// Simplified Formats: a DV_IDENTIFIER's id may be written as the bare value
+// ("For the input |id might be left out"), and a DV_TEXT's or a DV_PARSABLE's
+// value as `|value`. Decode reads either spelling; encode writes full only.
+var shorthandSpellings = map[string]shorthandSpelling{
+	"DV_IDENTIFIER": {short: "", full: "id", attr: "id"},
+	"DV_TEXT":       {short: "value", full: "", attr: "value"},
+	"DV_PARSABLE":   {short: "value", full: "", attr: "value"},
+}
+
+// foldShorthand rewrites the shorthand spelling in sfx, a suffix map of rmType
+// with no nulls left, onto the suffix its datatype is built from
+// ([shorthandSpellings]). Both spellings may be present when they hold the
+// same value. Two that differ are refused naming both keys and neither value,
+// rather than one being chosen (REQ-053). The map returned is sfx itself when
+// there is nothing to rewrite.
+func foldShorthand(rmType string, sfx map[string]any, keyOf func(string) string) (map[string]any, error) {
+	sp, has := shorthandSpellings[rmType]
+	if !has {
+		return sfx, nil
+	}
+	v, short := sfx[sp.short]
+	if !short {
+		return sfx, nil
+	}
+	if w, both := sfx[sp.full]; both && !sameCtxValue(v, w) {
+		return nil, fmt.Errorf("%w: %s and %s spell the %s %s twice and disagree; remove one",
+			ErrUnsupportedDatatype, suffixLabel(keyOf, sp.full), suffixLabel(keyOf, sp.short), rmType, sp.attr)
+	}
+	out := maps.Clone(sfx)
+	delete(out, sp.short)
+	out[sp.full] = v
+	return out, nil
 }
 
 // orderedPassThrough are the optional DV_ORDERED / DV_QUANTIFIED / DV_AMOUNT

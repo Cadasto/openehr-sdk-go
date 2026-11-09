@@ -1143,9 +1143,10 @@ func TestContextOwnedLeafUnacceptedSpellingRefused(t *testing.T) {
 			},
 		}},
 		{"setting formatting", root + "/context/setting|formatting", "plain"},
-		// A bare value spells the coded setting missing its required |code and
-		// |value: malformed, refused in every mode (REQ-170).
-		{"setting bare", root + "/context/setting", "other care"},
+		// A bare value names the setting by its code or its rubric (REQ-053);
+		// one that is neither names no setting: malformed, refused in every
+		// mode (REQ-170).
+		{"setting bare outside the setting group", root + "/context/setting", "intensive care"},
 		{"start_time raw beside ctx/time", root + "/context/start_time|raw", map[string]any{
 			"_type": "DV_DATE_TIME", "value": "2026-08-05T10:00:00Z",
 		}},

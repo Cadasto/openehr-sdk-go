@@ -1246,10 +1246,11 @@ func TestREQ170StrictWithReportPassesTheFirstPath(t *testing.T) {
 // TestREQ170LoneBareValueIsAMissingSuffix — REQ-170 refuses in every mode
 // "matched content that is malformed: … a missing required suffix". A bare
 // value alone at a leaf whose datatype has no bare spelling is that datatype
-// missing every suffix it requires, and a bare ctx/setting is the setting
-// missing its |code and |value: both fail by default, under the report option
-// and under strict, naming no value. Beside a suffix the datatype reads,
-// DV_PROPORTION's derived bare magnitude stays unmatched content.
+// missing every suffix it requires, and a bare ctx/setting that is neither a
+// code nor a rubric of the openEHR setting group names no setting (REQ-053):
+// both fail by default, under the report option and under strict, naming no
+// value. Beside a suffix the datatype reads, DV_PROPORTION's derived bare
+// magnitude stays unmatched content.
 func TestREQ170LoneBareValueIsAMissingSuffix(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	const secret = "secret-value-0451"
@@ -1259,7 +1260,7 @@ func TestREQ170LoneBareValueIsAMissingSuffix(t *testing.T) {
 	for name, body := range map[string]map[string]any{
 		"DV_CODED_TEXT": rmattrBody(map[string]any{rmattrCodedText: secret}),
 		"DV_QUANTITY":   quantity,
-		"DV_IDENTIFIER": rmattrBody(map[string]any{rmattrEvent + "/dv_identifier": secret}),
+		"DV_ORDINAL":    rmattrBody(map[string]any{rmattrEvent + "/dv_ordinal": secret}),
 		"ctx/setting":   rmattrBody(map[string]any{"ctx/setting": secret}),
 	} {
 		t.Run(name, func(t *testing.T) {

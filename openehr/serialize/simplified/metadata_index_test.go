@@ -383,7 +383,7 @@ func TestREQ053IndexedMetadataRefusalsHold(t *testing.T) {
 		named []string
 	}{
 		{"setting formatting", "context:0/setting:0|formatting", "plain", simplified.ErrUnsupportedDatatype, nil},
-		{"setting bare", "context:0/setting:0", "other care", simplified.ErrUnsupportedDatatype, nil},
+		{"setting bare outside the setting group", "context:0/setting:0", "intensive care", simplified.ErrUnsupportedDatatype, nil},
 		{"start_time raw", "context:0/start_time:0|raw", map[string]any{"_type": "DV_DATE_TIME", "value": "2026-08-05T10:00:00Z"}, simplified.ErrUnsupportedDatatype, nil},
 		{"composer nested identifier that does not fit", "composer:0/_identifier:0|id", 122, simplified.ErrUnsupportedDatatype, []string{"DV_IDENTIFIER.id"}},
 		{"composer relationship past :0", "composer:0/relationship:1|code", "122", simplified.ErrUnsupportedDatatype, []string{"single-valued"}},

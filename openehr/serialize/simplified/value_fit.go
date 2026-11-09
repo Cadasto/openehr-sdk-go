@@ -49,7 +49,7 @@ var orderedSuffixAttrPaths = map[string]string{
 // suffix in [allowedSuffixes], plus DV_CODED_TEXT's `|other`, which rebuilds a
 // DV_TEXT `value`.
 var suffixAttrPaths = map[string]map[string]string{
-	"DV_TEXT": {"": "value"},
+	"DV_TEXT": {"": "value", "value": "value"},
 	"DV_CODED_TEXT": {
 		"code": "defining_code/code_string", "value": "value",
 		"terminology": "defining_code/terminology_id/value", "other": "value",
@@ -66,9 +66,9 @@ var suffixAttrPaths = map[string]map[string]string{
 	"DV_ORDINAL":    {"code": "symbol/defining_code/code_string", "value": "symbol/value", "ordinal": "value"},
 	"DV_SCALE":      {"code": "symbol/defining_code/code_string", "value": "symbol/value", "ordinal": "value"},
 	"DV_PROPORTION": {"numerator": "numerator", "denominator": "denominator", "type": "type"},
-	"DV_IDENTIFIER": {"id": "id", "issuer": "issuer", "assigner": "assigner", "type": "type"},
+	"DV_IDENTIFIER": {"": "id", "id": "id", "issuer": "issuer", "assigner": "assigner", "type": "type"},
 	"CODE_PHRASE":   {"code": "code_string", "terminology": "terminology_id/value", "preferred_term": "preferred_term"},
-	"DV_PARSABLE":   {"": "value", "formalism": "formalism"},
+	"DV_PARSABLE":   {"": "value", "value": "value", "formalism": "formalism"},
 	"DV_MULTIMEDIA": {
 		"": "uri/value", "mediatype": "media_type/code_string", "size": "size",
 		"data": "data", "integrity_check": "integrity_check", "alternatetext": "alternate_text",

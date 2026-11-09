@@ -619,6 +619,7 @@ requirements:
       - openehr/serialize/simplified/rmattr_party_test.go
       - openehr/serialize/simplified/rmattr_repeating_test.go
       - openehr/serialize/simplified/roundtrip_test.go
+      - openehr/serialize/simplified/shorthand_test.go
       - openehr/serialize/simplified/simplified_test.go
       - openehr/serialize/simplified/string_leaf_test.go
       - openehr/serialize/simplified/structured_ctx_test.go

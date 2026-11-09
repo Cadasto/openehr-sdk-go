@@ -794,18 +794,19 @@ func TestRealCodecRefusal(t *testing.T) {
 	})
 
 	t.Run("refused suffix named by its leaf is removed alone", func(t *testing.T) {
-		// A DV_TEXT `|value` without the `|code` that selects the coded subtype
-		// is malformed matched content: the codec refuses it naming the leaf's
-		// base with the allowlist's "unexpected |x for TYPE" wording, which
-		// refusedSuffix parses so that only the one entry goes and the bare value
-		// beside it stays.
+		// A DV_TEXT `|terminology` without the `|code` that selects the coded
+		// subtype is malformed matched content: the codec refuses it naming the
+		// leaf's base with the allowlist's "unexpected |x for TYPE" wording,
+		// which refusedSuffix parses so that only the one entry goes and the
+		// bare value beside it stays. (`|value` served here until it became the
+		// DV_TEXT's own input shorthand, REQ-053.)
 		text := target.Root + "/conformance_section/conformance_observation/any_event:0/dv_text"
 		body := maps.Clone(leaf)
 		body[text] = "text value"
-		body[text+"|value"] = "stray"
+		body[text+"|terminology"] = "stray"
 		_, err := decodeSubset(target, body, nil)
 		if err == nil {
-			t.Fatal("dv_text|value without |code decoded — the codec no longer refuses it, so this test needs another malformed suffix")
+			t.Fatal("dv_text|terminology without |code decoded — the codec no longer refuses it, so this test needs another malformed suffix")
 		}
 		if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
 			t.Fatalf("real refusal is not ErrUnsupportedDatatype: %v", err)
@@ -813,8 +814,8 @@ func TestRealCodecRefusal(t *testing.T) {
 		if got := offendingKey(err); got != text {
 			t.Errorf("offendingKey(real refusal) = %q, want the leaf base %q\nrefusal: %v", got, text, err)
 		}
-		if got, ok := refusedSuffix(err); !ok || got != "|value" {
-			t.Errorf("refusedSuffix(real refusal) = %q, %v; want %q, true\nrefusal: %v", got, ok, "|value", err)
+		if got, ok := refusedSuffix(err); !ok || got != "|terminology" {
+			t.Errorf("refusedSuffix(real refusal) = %q, %v; want %q, true\nrefusal: %v", got, ok, "|terminology", err)
 		}
 		if got, want := reasonOf(err, text), "unsupported |suffix for DV_TEXT"; got != want {
 			t.Errorf("reasonOf(real refusal) = %q, want %q\nrefusal: %v", got, want, err)
@@ -823,11 +824,11 @@ func TestRealCodecRefusal(t *testing.T) {
 		if !gap || removed != 1 {
 			t.Fatalf("dropRefused(real refusal) = %d, %v; want 1, true", removed, gap)
 		}
-		if _, still := body[text+"|value"]; still {
-			t.Error("|value survived its own refusal")
+		if _, still := body[text+"|terminology"]; still {
+			t.Error("|terminology survived its own refusal")
 		}
 		if _, ok := body[text]; !ok {
-			t.Error("the bare dv_text was dropped by a |value refusal — the leaf, not the entry, went")
+			t.Error("the bare dv_text was dropped by a |terminology refusal — the leaf, not the entry, went")
 		}
 		if _, err := decodeSubset(target, body, nil); err != nil {
 			t.Errorf("body decodes only with the refused suffix removed, but still fails: %v", err)

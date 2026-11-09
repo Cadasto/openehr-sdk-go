@@ -104,6 +104,7 @@ func shorthandCases() []shorthandCase {
 	id := shorthandObs + "/identifier"
 	text := shorthandObs + "/text"
 	parsable := shorthandObs + "/parsable_any"
+	feeder := shorthandObs + "/_feeder_audit"
 	settingPair := map[string]any{"ctx/setting|code": "238", "ctx/setting|value": "other care"}
 	return []shorthandCase{
 		{
@@ -159,6 +160,28 @@ func shorthandCases() []shorthandCase {
 			name:      "DV_PARSABLE |value beside an equal bare value",
 			shorthand: map[string]any{parsable: parsableText, parsable + "|value": parsableText, parsable + "|formalism": "GLIF 1.0"},
 			full:      map[string]any{parsable: parsableText, parsable + "|formalism": "GLIF 1.0"},
+		},
+		{
+			name:      "party _identifier bare value",
+			shorthand: map[string]any{"test_all_types/composer/_identifier:0": identifierID, "test_all_types/composer/_identifier:0|issuer": "Hospital"},
+			full:      map[string]any{"test_all_types/composer/_identifier:0|id": identifierID, "test_all_types/composer/_identifier:0|issuer": "Hospital"},
+		},
+		{
+			name: "feeder item id bare value and original_content |value",
+			shorthand: map[string]any{
+				text: "text 69",
+				feeder + "/originating_system_audit|system_id": "S",
+				feeder + "/originating_system_item_id:0":       identifierID,
+				feeder + "/original_content|value":             parsableText,
+				feeder + "/original_content|formalism":         "text/plain",
+			},
+			full: map[string]any{
+				text: "text 69",
+				feeder + "/originating_system_audit|system_id": "S",
+				feeder + "/originating_system_item_id:0|id":    identifierID,
+				feeder + "/original_content":                   parsableText,
+				feeder + "/original_content|formalism":         "text/plain",
+			},
 		},
 		{
 			name:      "ctx/setting by rubric",
@@ -342,6 +365,12 @@ func TestREQ053DisagreeingShorthandRefused(t *testing.T) {
 		{
 			name:  "ctx/setting outside the setting group",
 			extra: map[string]any{"ctx/setting": first},
+			want:  simplified.ErrUnsupportedDatatype,
+			named: []string{`"ctx/setting"`},
+		},
+		{
+			name:  "ctx/setting outside the setting group beside the pair",
+			extra: map[string]any{"ctx/setting": first, "ctx/setting|code": "238", "ctx/setting|value": "other care"},
 			want:  simplified.ErrUnsupportedDatatype,
 			named: []string{`"ctx/setting"`},
 		},
