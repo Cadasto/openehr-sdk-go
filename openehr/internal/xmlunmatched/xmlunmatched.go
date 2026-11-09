@@ -358,6 +358,12 @@ func (t *Tracker) NewDecoder(r io.Reader) *xml.Decoder {
 	return xml.NewTokenDecoder(t.reader)
 }
 
+// inputOffset returns the offset in the input of the decoder from
+// [Tracker.NewDecoder] of the first byte it has not read: once
+// [Tracker.Decode] has decoded a value, the byte after the value's end tag,
+// since nothing is read ahead of the decoder outside an element.
+func (t *Tracker) inputOffset() int64 { return t.reader.src.InputOffset() }
+
 // Decode decodes the next value of dec, a decoder from [Tracker.NewDecoder],
 // into v, with dec registered for t meanwhile, so the generated decoders
 // apply t's policy. Paths are relative to the value being decoded. A strict
@@ -902,10 +908,12 @@ func (r *trackingReader) Token() (xml.Token, error) {
 			return nil, r.t.fail(r.t.path(), errXMLTargetInside)
 		}
 	case xml.Directive:
-		// A directive inside an element, such as a document type
-		// declaration, may not hold one either.
-		if len(r.t.open) > 1 && holdsXMLTarget(tk) {
-			return nil, r.t.fail(r.t.path(), errXMLTargetInside)
+		// XML allows a markup declaration, such as a document type
+		// declaration, only before the root element
+		// (https://www.w3.org/TR/xml/#NT-content), so one inside an element
+		// is not well-formed.
+		if len(r.t.open) > 1 {
+			return nil, r.t.fail(r.t.path(), errDeclarationInside)
 		}
 	}
 	return tok, err
@@ -914,6 +922,10 @@ func (r *trackingReader) Token() (xml.Token, error) {
 // errXMLTargetInside is the cause of the refusal of a processing instruction
 // whose target is xml inside an element, which is not well-formed XML.
 var errXMLTargetInside error = notWellFormed("the element holds a processing instruction whose target is xml, which XML reserves for the declaration at the start of a document")
+
+// errDeclarationInside is the cause of the refusal of a markup declaration
+// inside an element, which is not well-formed XML.
+var errDeclarationInside error = notWellFormed("the element holds a markup declaration, which XML allows only before the root element")
 
 // withoutNamespaceDecls returns attrs without its namespace declarations. It
 // returns attrs itself when it holds none.

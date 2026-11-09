@@ -43,6 +43,10 @@ func TestREQ056_XMLOneRoot(t *testing.T) {
 		"element in a foreign namespace": `<x:extra xmlns:x="urn:example"/>`,
 		"XML declaration":                `<?xml version="1.0"?>`,
 		"xml target in capitals":         `<?XML pi data?>`,
+		"CDATA section of white space":   `<![CDATA[ ]]>`,
+		"empty CDATA section":            `<![CDATA[]]>`,
+		"character reference to a space": `&#32;`,
+		"white space, then a reference":  "\n&#xA;",
 	}
 	accepted := map[string]string{
 		"nothing":                         "",
@@ -165,15 +169,26 @@ func TestREQ056_XMLBeforeRoot(t *testing.T) {
 		"XML declaration after a PI":                             `<?pi data?><?xml version="1.0"?>`,
 		"xml target in capitals":                                 `<?XML pi data?>`,
 		"xml target in the document type":                        `<!DOCTYPE dv_count [<?xml pi data?>]>`,
+		"CDATA section of white space":                           `<![CDATA[ ]]>`,
+		"character reference to a space":                         `&#32;`,
+		"character reference after the XML declaration":          `<?xml version="1.0"?>&#x9;`,
+		"document type with no name":                             `<!DOCTYPE >`,
+		"document type whose name starts with a digit":           `<!DOCTYPE 1x>`,
+		"document type with no system literal":                   `<!DOCTYPE dv_count SYSTEM>`,
+		"document type with a public id alone":                   `<!DOCTYPE dv_count PUBLIC "a">`,
+		"document type with an unknown declaration":              `<!DOCTYPE dv_count [<!FOO>]>`,
+		"document type with text in its subset":                  `<!DOCTYPE dv_count [ ` + xmlPlanted + ` ]>`,
 	}
 	accepted := map[string]string{
-		"nothing":                        "",
-		"XML declaration":                `<?xml version="1.0" encoding="UTF-8"?>`,
-		"whitespace":                     " \n\t\r\n",
-		"comment":                        `<!-- note -->`,
-		"processing instruction":         `<?pi data?>`,
-		"document type":                  `<!DOCTYPE dv_count>`,
-		"document type with subset":      `<!DOCTYPE dv_count [<!ENTITY e "v">]>`,
+		"nothing":                   "",
+		"XML declaration":           `<?xml version="1.0" encoding="UTF-8"?>`,
+		"whitespace":                " \n\t\r\n",
+		"comment":                   `<!-- note -->`,
+		"processing instruction":    `<?pi data?>`,
+		"document type":             `<!DOCTYPE dv_count>`,
+		"document type with subset": `<!DOCTYPE dv_count [<!ENTITY e "v">]>`,
+		"document type of every item": `<!DOCTYPE dv_count PUBLIC "-//A//B" 'x.dtd' [ <!ELEMENT dv_count ANY>` +
+			` <!ATTLIST dv_count a CDATA "v>]"> <!ENTITY % p "x"> %p; <!NOTATION n SYSTEM "u"> <?pi d?> <!-- c --> ]>`,
 		"xml target in a subset literal": `<!DOCTYPE dv_count [<!ENTITY e "<?xml v?>">]>`,
 		"xml target in a subset comment": `<!DOCTYPE dv_count [<!-- <?xml v?> -->]>`,
 		"byte order mark":                bom,
@@ -303,6 +318,76 @@ func TestREQ056_XMLTargetInsideTheRoot(t *testing.T) {
 					if strings.Contains(err.Error(), leak) {
 						t.Errorf("%s(%s) err = %q; it echoes the instruction's %q", mode, in, err, leak)
 					}
+				}
+			})
+		}
+		for name, c := range accepted {
+			t.Run(mode+"/accepted/"+name, func(t *testing.T) {
+				var v rm.DVText
+				if err := decode(c.in, &v); err != nil {
+					t.Fatalf("%s(%s) = %v; want nil", mode, c.in, err)
+				}
+				if v.Value != c.value {
+					t.Errorf("%s(%s) decoded value %q; want %q", mode, c.in, v.Value, c.value)
+				}
+			})
+		}
+	}
+}
+
+// TestREQ056_XMLDeclarationInsideTheRoot pins that XML allows a markup
+// declaration (`<!…>` other than a comment or a CDATA section), such as a
+// document type declaration, only before the root element (REQ-056):
+// canxml.Unmarshal refuses one inside an element, in a primitive's text or in
+// content it skips as unmatched, in every mode, and so does a
+// canxml.Decoder given any option, with an error that wraps
+// canxml.ErrInvalidShape and canxml.ErrNotWellFormed, is no unmatched content
+// and carries none of the declaration. The same bytes in a comment or a CDATA
+// section pass.
+//
+// Can-fail control: let the tracked token source pass a declaration and every
+// refused row decodes; let Unmarshal given no option skip its scan of the
+// bytes and that mode decodes them.
+func TestREQ056_XMLDeclarationInsideTheRoot(t *testing.T) {
+	const ns = `xmlns="http://schemas.openehr.org/v1"`
+	refused := map[string]string{
+		"document type first in the root": `<dv_text ` + ns + `><!DOCTYPE ` + xmlPlanted + `><value>a</value></dv_text>`,
+		"inside a primitive's text":       `<dv_text ` + ns + `><value>a<!DOCTYPE ` + xmlPlanted + `>b</value></dv_text>`,
+		"after a member":                  `<dv_text ` + ns + `><value>a</value><!ELEMENT ` + xmlPlanted + ` ANY></dv_text>`,
+		"inside unmatched content":        `<dv_text ` + ns + `><value>a</value><extra><!ENTITY ` + xmlPlanted + ` "v"></extra></dv_text>`,
+		"after a comment that holds <!":   `<dv_text ` + ns + `><!-- <! --><value>a</value><!DOCTYPE ` + xmlPlanted + `></dv_text>`,
+		"a well-formed one with a subset": `<dv_text ` + ns + `><!DOCTYPE dv_text [<!ENTITY ` + xmlPlanted + ` "v">]><value>a</value></dv_text>`,
+	}
+	accepted := map[string]struct{ in, value string }{
+		"declaration in a comment": {`<dv_text ` + ns + `><!-- <!DOCTYPE x> --><value>a</value></dv_text>`, "a"},
+		"declaration in CDATA":     {`<dv_text ` + ns + `><value><![CDATA[<!DOCTYPE x>]]></value></dv_text>`, "<!DOCTYPE x>"},
+		"document type before":     {`<!DOCTYPE dv_text><dv_text ` + ns + `><value>a</value></dv_text>`, "a"},
+	}
+	modes := map[string]func(in string, v any) error{
+		"Unmarshal": func(in string, v any) error { return canxml.Unmarshal([]byte(in), v) },
+		"Unmarshal WithUnmatched": func(in string, v any) error {
+			return canxml.Unmarshal([]byte(in), v, canxml.WithUnmatched(func(canxml.Path) {}))
+		},
+		"Unmarshal WithStrict": func(in string, v any) error { return canxml.Unmarshal([]byte(in), v, canxml.WithStrict()) },
+		"Decoder WithMaxDepth": func(in string, v any) error {
+			return canxml.NewDecoder(strings.NewReader(in), canxml.WithMaxDepth(100)).Decode(v)
+		},
+		"Decoder WithUnmatched": func(in string, v any) error {
+			return canxml.NewDecoder(strings.NewReader(in), canxml.WithUnmatched(func(canxml.Path) {})).Decode(v)
+		},
+	}
+	for mode, decode := range modes {
+		for name, in := range refused {
+			t.Run(mode+"/refused/"+name, func(t *testing.T) {
+				if mode == "Unmarshal WithStrict" && name == "inside unmatched content" {
+					t.Skip("strict refuses the unmatched element at its start tag, before what it holds")
+				}
+				err := decode(in, new(rm.DVText))
+				if !errors.Is(err, canxml.ErrInvalidShape) || !errors.Is(err, canxml.ErrNotWellFormed) || errors.Is(err, canxml.ErrUnknownElement) {
+					t.Fatalf("%s(%s) = %v; want an error that wraps canxml.ErrInvalidShape and canxml.ErrNotWellFormed, and not canxml.ErrUnknownElement", mode, in, err)
+				}
+				if strings.Contains(err.Error(), xmlPlanted) {
+					t.Errorf("%s(%s) err = %q; it echoes the declaration", mode, in, err)
 				}
 			})
 		}
