@@ -146,7 +146,7 @@ The size limit **MUST** be 32 MiB for an OPT, an uploaded template and a BMM doc
 
 ### Definition template upload (`openehr/client/definition/`)
 
-- `UploadTemplate` **MUST** apply the OPT size limit before it forwards bytes to the CDR.
+- `UploadTemplate` **MUST** refuse a body larger than the size limit, which the package exports as `definition.MaxUploadBytes`, before it forwards bytes to the CDR, with an error wrapping `definition.ErrUploadTooLarge` and `transport.ErrInvalidConfig`.
 
 ### Polymorphic JSON decode (`openehr/rm/typereg/`)
 

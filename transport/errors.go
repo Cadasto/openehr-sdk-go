@@ -529,12 +529,14 @@ type BodyReadError struct {
 	StatusCode int
 	// Inner is the read failure, reachable via Unwrap: io.ErrUnexpectedEOF
 	// for a connection cut mid-body; the content-coding error (gzip.ErrHeader,
-	// gzip.ErrChecksum or a flate.CorruptInputError) for a body that does not
-	// match its encoding; an error wrapping [ErrResponseTooLarge] for a body
-	// over the ceiling; net/http's own error for a chunked trailer that is
-	// malformed (a textproto.ProtocolError) or too long, or for data past an
-	// HTTP/2 Content-Length; or whatever other error the
-	// body read returned.
+	// gzip.ErrChecksum, a flate.CorruptInputError or a flate.InternalError)
+	// for a body that does not match its encoding; an error wrapping
+	// [ErrResponseTooLarge] for a body over the ceiling; the error net/http
+	// raises for a chunked trailer that is malformed (a
+	// textproto.ProtocolError), too long, opens with an indented line too
+	// long to quote (textproto's "message too large") or is cut before its
+	// end, or for data past an HTTP/2 Content-Length; or whatever other error
+	// the body read returned.
 	Inner error
 	// Complete reports whether the server sent its whole answer before the
 	// read failed. It is true when the failure lies in what the server sent

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -174,11 +175,23 @@ func (m TemplateMetadata) MarshalJSON() ([]byte, error) {
 	return json.Marshal(merged)
 }
 
-// maxUploadBytes is the maximum number of bytes UploadTemplate will
-// read from the body io.Reader before returning an "input too large"
-// error. Default is 32 MiB. Unexported so tests in package definition
-// can lower it temporarily via t.Cleanup.
-var maxUploadBytes int64 = 32 << 20
+// MaxUploadBytes is the largest template body, in bytes, that
+// [UploadTemplate] sends: 32 MiB. The limit counts the bytes as read, a
+// leading byte-order mark included. A caller can check a body's size against
+// it before the call, for example to turn away an oversized file before
+// reading it.
+const MaxUploadBytes = 32 << 20
+
+// ErrUploadTooLarge is wrapped by the error [UploadTemplate] returns when its
+// body is larger than [MaxUploadBytes]; nothing is sent to the server then.
+// The same error also wraps [transport.ErrInvalidConfig], so a caller can
+// tell an oversized body from the other refused inputs with errors.Is while a
+// check for the broader class still holds.
+var ErrUploadTooLarge = errors.New("definition: upload body too large")
+
+// maxUploadBytes is the limit UploadTemplate applies: MaxUploadBytes, unless
+// a test in package definition lowers it temporarily via t.Cleanup.
+var maxUploadBytes int64 = MaxUploadBytes
 
 // uploadConfig is the resolved option set for [UploadTemplate].
 type uploadConfig struct {
@@ -200,7 +213,9 @@ func WithUploadVersion(v string) UploadOption {
 // OPT XML document; the Content-Type header is set to
 // `application/xml` automatically. ADL 2 source-form upload (Content-
 // Type `text/plain`) is not yet implemented. A leading UTF-8 byte-order
-// mark is removed before the body is sent.
+// mark is removed before the body is sent. A body larger than
+// [MaxUploadBytes] is refused before anything is sent, with an error that
+// wraps both [ErrUploadTooLarge] and [transport.ErrInvalidConfig].
 //
 // The request accepts both `application/json` and `application/xml`. The
 // ITS-REST 201 response may carry the created template as a JSON
@@ -231,7 +246,7 @@ func UploadTemplate(ctx context.Context, c *transport.Client, format TemplateFor
 		return nil, nil, fmt.Errorf("definition.UploadTemplate: read body: %w", err)
 	}
 	if int64(len(raw)) > maxUploadBytes {
-		return nil, nil, fmt.Errorf("definition.UploadTemplate: %w: body exceeds %d bytes", transport.ErrInvalidConfig, maxUploadBytes)
+		return nil, nil, fmt.Errorf("definition.UploadTemplate: %w: %w: body exceeds %d bytes", transport.ErrInvalidConfig, ErrUploadTooLarge, maxUploadBytes)
 	}
 	// Drop one leading UTF-8 BOM so every caller need not: some deployments
 	// refuse a BOM-prefixed OPT (EHRbase answers "Content is not allowed in

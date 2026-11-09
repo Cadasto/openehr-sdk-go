@@ -6,13 +6,15 @@ package transport_test
 // whole answer before the body read failed. These tests drive transport.Client
 // against a raw TCP listener that writes the response bytes by hand, so every
 // read failure is the one net/http itself raises from bytes on the wire: a
-// body cut mid-read, a malformed or over-long chunked trailer, a body that does
+// body cut mid-read, a malformed, over-long or cut chunked trailer, a body that does
 // not match its Content-Encoding, a body over the WithMaxResponseBody ceiling,
 // and, over unencrypted HTTP/2, data past the declared Content-Length.
 //
 // Too many trailer lines has no case: net/http's client reads a response
-// trailer with no limit on its lines, and the 4 KiB limit on a trailer's
-// length stops a long one first, so that failure cannot reach a client.
+// trailer with no limit on its lines. textproto's "message too large" still
+// reaches a client by one other path, which has a case: a trailer whose first
+// line starts with a space or tab and runs past the 80 bytes textproto reads
+// of it to quote it.
 
 import (
 	"bufio"
@@ -196,6 +198,26 @@ func TestBodyReadErrorCompleteHTTP1(t *testing.T) { // REQ-151
 			name:     "over-long chunked trailer",
 			response: []byte("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n0\r\nX-Pad: " + strings.Repeat("a", 8<<10) + "\r\n\r\n"),
 			premise:  func(inner error) bool { return inner != nil && strings.Contains(inner.Error(), "trailer") },
+			want:     true,
+		},
+		{
+			// A trailer's first line cannot start with a space or tab:
+			// textproto reads such a line only up to 80 bytes, to quote it,
+			// and this one is longer, so the read fails with textproto's
+			// "message too large" after the body's last chunk.
+			name: "chunked trailer whose indented first line is over-long",
+			response: []byte("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\n\r\n2\r\n{}\r\n0\r\n" +
+				" " + strings.Repeat("a", 100) + "\r\n\r\n"),
+			premise: func(inner error) bool { return inner != nil && inner.Error() == "message too large" },
+			want:    true,
+		},
+		{
+			// The last chunk arrives, then the connection closes before the
+			// trailer's closing line: the failure comes after the body's
+			// last byte.
+			name:     "connection closed after the last chunk, before the trailer's end",
+			response: []byte("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\n\r\n2\r\n{}\r\n0\r\n"),
+			premise:  func(inner error) bool { return inner != nil && inner.Error() == "http: unexpected EOF reading trailer" },
 			want:     true,
 		},
 		{
