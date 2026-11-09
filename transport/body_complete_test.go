@@ -199,6 +199,17 @@ func TestBodyReadErrorCompleteHTTP1(t *testing.T) { // REQ-151
 			want:     true,
 		},
 		{
+			// A trailer's first line cannot start with a space or tab:
+			// textproto reads such a line only up to 80 bytes, to quote it,
+			// and this one is longer, so the read fails with textproto's
+			// "message too large" after the body's last chunk.
+			name: "chunked trailer whose indented first line is over-long",
+			response: []byte("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\n\r\n2\r\n{}\r\n0\r\n" +
+				" " + strings.Repeat("a", 100) + "\r\n\r\n"),
+			premise: func(inner error) bool { return inner != nil && inner.Error() == "message too large" },
+			want:    true,
+		},
+		{
 			name:     "gzip body that fails its checksum",
 			response: rawResponse("Content-Encoding: gzip\r\n", badCRC),
 			premise:  func(inner error) bool { return errors.Is(inner, gzip.ErrChecksum) },
