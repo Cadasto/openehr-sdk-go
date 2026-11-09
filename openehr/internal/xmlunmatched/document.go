@@ -432,7 +432,8 @@ func mayHoldDeclaration(b []byte) bool {
 			}
 			piKnown = true
 		}
-		open, end := d+len(declOpen), []byte(nil)
+		open := d + len(declOpen)
+		var end []byte
 		switch {
 		case pi >= 0 && pi < d:
 			open, end = pi+len(piOpen), piClose
