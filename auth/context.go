@@ -9,16 +9,19 @@ type tokenSourceCtxKey struct{}
 // outgoing request and prefers the per-request TokenSource over the
 // client default when present.
 //
-// Use case: an MCP server holds one transport.Client and forwards each
-// incoming caller's token through ctx, so the client itself does not own
-// the user-level credentials.
+// Use case: a server acting for many users, such as an MCP server, holds
+// one shared transport.Client, and each request's context carries a source
+// for a token issued for the openEHR API on behalf of the user that request
+// serves, for example by an OAuth 2.0 token exchange. The client itself
+// owns no user-level credential. An MCP server never passes on the token
+// its MCP client sent it; the MCP specification forbids that.
 //
 // A nil ts returns ctx unchanged, so the client default applies. A ts that
 // is not nil itself but holds a nil pointer, func, map, slice or chan, such
 // as a nil *smart.Source, is attached as given: the transport then fails
 // the request with an error matching transport.ErrInvalidConfig before
 // sending it, and never falls back to the client default, which would send
-// the client's own credential in place of the caller's.
+// the client's own credential in place of the one meant for this request.
 func WithTokenSource(ctx context.Context, ts TokenSource) context.Context {
 	if ts == nil {
 		return ctx

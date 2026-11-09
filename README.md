@@ -53,7 +53,7 @@ It was built with these kinds of consumer in mind:
 
 1. **Benchmark and load tools** running high-concurrency CRUD against the openEHR REST API.
 2. **Synthetic data seeders** that use an OPT to drive bulk Compositions and demographic records.
-3. **MCP servers** that expose openEHR operations as tools for agentic clients, forwarding the caller's token.
+3. **MCP servers** that expose openEHR operations as tools for agentic clients, with a per-request token issued for the openEHR API on the user's behalf.
 4. **Federative API clients** that fan out over several openEHR backends, with per-node spec pinning and partial-failure handling.
 5. **SMART-on-openEHR apps with a Go backend**: server-side launch, token handling, and CDR calls from a Go web or API service.
 

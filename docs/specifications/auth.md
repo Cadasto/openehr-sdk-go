@@ -89,7 +89,9 @@ Further providers, such as plain OIDC or a session cookie, can be added as sub-p
 
 #### Per-request TokenSource
 
-Some use cases — most notably an MCP server forwarding an incoming caller's token — need to attach a per-request `TokenSource` rather than configuring one at client-construction time:
+A process that serves many users, such as an MCP server or a multi-tenant backend, gives each request a source for a token issued for the openEHR API on behalf of the user that request serves, for example by an OAuth 2.0 token exchange ([RFC 8693](https://www.rfc-editor.org/rfc/rfc8693)) at the openEHR server's authorization server. An MCP server never passes on the token it received from its own MCP client: the MCP specification forbids it in [Authorization § Access Token Usage › Token Handling](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization) and in [Security Considerations § Access Token Privilege Restriction](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization/security-considerations).
+
+Such a process attaches a per-request `TokenSource` rather than configuring one at client-construction time:
 
 ```go
 // package auth (sketch)
