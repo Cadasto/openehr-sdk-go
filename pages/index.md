@@ -67,8 +67,9 @@ implements them.
 Go developers new to openEHR, and openEHR developers new to Go. It was
 written with a few kinds of consumer in mind: benchmark and load tools running
 high-concurrency CRUD, synthetic data seeders that drive bulk Compositions from
-a template, MCP servers that forward the caller's token, federative clients
-that fan out over several CDRs, and SMART-on-openEHR apps with a Go backend.
+a template, MCP servers that call the openEHR API with a token issued for each
+user, federative clients that fan out over several CDRs, and SMART-on-openEHR
+apps with a Go backend.
 
 You do not have to adopt the whole module. If the job only needs one
 building-block package, import that one.

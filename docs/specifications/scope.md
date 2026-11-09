@@ -99,11 +99,11 @@ A Model Context Protocol server that exposes openEHR operations as MCP tools to 
 | SDK provides | Stays bespoke |
 |---|---|
 | Typed method signatures that map ~1:1 to MCP tool definitions | MCP framework integration (e.g. `mark3labs/mcp-go`); tool registration; transport bindings |
-| Per-request `auth.TokenSource` via context (REQ-060 + ctx) | Mapping incoming MCP auth to a per-request `TokenSource` |
+| Per-request `auth.TokenSource` via context (REQ-060 + ctx) | Obtaining a token for the openEHR API on the caller's behalf (for example by a token exchange) and wrapping it as a per-request `TokenSource` |
 | Idempotent, ctx-cancellable methods | Tool-result serialization for MCP transport |
 | Sandbox / recorded transports for tool testing | LLM-side prompt engineering |
 
-The SDK's `context.Context`-first design (REQ-020) makes per-request auth forwarding natural — the incoming token from the MCP transport becomes a `WithTokenSource(ctx, ts)` and propagates through every SDK call without rewiring.
+The SDK's `context.Context`-first design (REQ-020) makes per-request auth natural: a `WithTokenSource(ctx, ts)` carries the token obtained for the openEHR API, never the token that arrived over the MCP transport, and propagates through every SDK call without rewiring.
 
 #### Federative API client
 

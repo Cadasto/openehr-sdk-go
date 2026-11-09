@@ -185,6 +185,8 @@ ctx = auth.WithTokenSource(ctx, perRequestTokenSource)
 created, meta, err := ehr.Create(ctx, c)
 ```
 
+`perRequestTokenSource` yields a token issued for the openEHR API on behalf of the user this request serves, for example one obtained by an OAuth 2.0 token exchange at that API's authorization server. An MCP server must not pass on the token it received from its MCP client, as the MCP specification's [Access Token Privilege Restriction](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization/security-considerations) section says.
+
 ---
 
 ## Idioms to remember
