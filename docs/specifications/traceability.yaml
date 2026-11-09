@@ -1741,6 +1741,8 @@ requirements:
       - internal/templatecompile/resolve_test.go
       - openehr/aom/aom14/read_test.go
       - openehr/bmm/load_test.go
+      - openehr/client/definition/template_cap_test.go
+      - openehr/client/definition/upload_limit_test.go
       - openehr/internal/xmlunmatched/xml_depth_internal_test.go
       - openehr/rm/typereg/registry_test.go
       - openehr/rm/typereg/streaming_hotpath_test.go
@@ -2263,6 +2265,7 @@ requirements:
       - openehr/client/system/null_body_test.go
       - testkit/probes/transport/probe_101_decode_failure_surfaced.go
       - testkit/probes/transport/probes_test.go
+      - transport/body_complete_internal_test.go
       - transport/body_complete_test.go
       - transport/body_read_error_test.go
       - transport/decode_error_test.go
