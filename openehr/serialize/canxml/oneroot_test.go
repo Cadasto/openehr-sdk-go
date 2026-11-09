@@ -351,17 +351,21 @@ func TestREQ056_XMLTargetInsideTheRoot(t *testing.T) {
 func TestREQ056_XMLDeclarationInsideTheRoot(t *testing.T) {
 	const ns = `xmlns="http://schemas.openehr.org/v1"`
 	refused := map[string]string{
-		"document type first in the root": `<dv_text ` + ns + `><!DOCTYPE ` + xmlPlanted + `><value>a</value></dv_text>`,
-		"inside a primitive's text":       `<dv_text ` + ns + `><value>a<!DOCTYPE ` + xmlPlanted + `>b</value></dv_text>`,
-		"after a member":                  `<dv_text ` + ns + `><value>a</value><!ELEMENT ` + xmlPlanted + ` ANY></dv_text>`,
-		"inside unmatched content":        `<dv_text ` + ns + `><value>a</value><extra><!ENTITY ` + xmlPlanted + ` "v"></extra></dv_text>`,
-		"after a comment that holds <!":   `<dv_text ` + ns + `><!-- <! --><value>a</value><!DOCTYPE ` + xmlPlanted + `></dv_text>`,
-		"a well-formed one with a subset": `<dv_text ` + ns + `><!DOCTYPE dv_text [<!ENTITY ` + xmlPlanted + ` "v">]><value>a</value></dv_text>`,
+		"document type first in the root":   `<dv_text ` + ns + `><!DOCTYPE ` + xmlPlanted + `><value>a</value></dv_text>`,
+		"inside a primitive's text":         `<dv_text ` + ns + `><value>a<!DOCTYPE ` + xmlPlanted + `>b</value></dv_text>`,
+		"after a member":                    `<dv_text ` + ns + `><value>a</value><!ELEMENT ` + xmlPlanted + ` ANY></dv_text>`,
+		"inside unmatched content":          `<dv_text ` + ns + `><value>a</value><extra><!ENTITY ` + xmlPlanted + ` "v"></extra></dv_text>`,
+		"after a comment that holds <!":     `<dv_text ` + ns + `><!-- <! --><value>a</value><!DOCTYPE ` + xmlPlanted + `></dv_text>`,
+		"a well-formed one with a subset":   `<dv_text ` + ns + `><!DOCTYPE dv_text [<!ENTITY ` + xmlPlanted + ` "v">]><value>a</value></dv_text>`,
+		"after an instruction holding <!--": `<dv_text ` + ns + `><?pi <!-- ?><!DOCTYPE ` + xmlPlanted + `><value>a</value></dv_text>`,
+		"after an instruction holding a CDATA opener": `<dv_text ` + ns + `><value>a<?pi <![CDATA[ ?><!ENTITY ` + xmlPlanted +
+			` "v"></value></dv_text>`,
 	}
 	accepted := map[string]struct{ in, value string }{
-		"declaration in a comment": {`<dv_text ` + ns + `><!-- <!DOCTYPE x> --><value>a</value></dv_text>`, "a"},
-		"declaration in CDATA":     {`<dv_text ` + ns + `><value><![CDATA[<!DOCTYPE x>]]></value></dv_text>`, "<!DOCTYPE x>"},
-		"document type before":     {`<!DOCTYPE dv_text><dv_text ` + ns + `><value>a</value></dv_text>`, "a"},
+		"declaration in a comment":      {`<dv_text ` + ns + `><!-- <!DOCTYPE x> --><value>a</value></dv_text>`, "a"},
+		"declaration in CDATA":          {`<dv_text ` + ns + `><value><![CDATA[<!DOCTYPE x>]]></value></dv_text>`, "<!DOCTYPE x>"},
+		"declaration in an instruction": {`<dv_text ` + ns + `><?pi <!DOCTYPE x> ?><value>a</value></dv_text>`, "a"},
+		"document type before":          {`<!DOCTYPE dv_text><dv_text ` + ns + `><value>a</value></dv_text>`, "a"},
 	}
 	modes := map[string]func(in string, v any) error{
 		"Unmarshal": func(in string, v any) error { return canxml.Unmarshal([]byte(in), v) },

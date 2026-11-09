@@ -127,7 +127,15 @@ func afterRoot(rest []byte) error {
 // [io.EOF], comes back as r returned it.
 func ReadAfterRoot(r io.ByteReader) error {
 	rec := &recorder{r: r}
-	err := epilogue(xml.NewDecoder(rec), func(from, to int64) []byte { return rec.read[from:to] })
+	// rec.read starts at offset base: what comes before the token epilogue
+	// reads is not read again, so it is let go, and the bytes kept are those
+	// of one token at a time.
+	var base int64
+	err := epilogue(xml.NewDecoder(rec), func(from, to int64) []byte {
+		rec.read = rec.read[from-base:]
+		base = from
+		return rec.read[:to-base]
+	})
 	if rec.err != nil {
 		return rec.err
 	}
@@ -137,7 +145,8 @@ func ReadAfterRoot(r io.ByteReader) error {
 // epilogue reads d's tokens, the rest of a document after its root element,
 // to the end. Comments, processing instructions and whitespace pass, the
 // whitespace as written, raw being the bytes d read from offset from to
-// offset to: a CDATA section or a character reference is element content,
+// offset to, which it asks for each token in turn, never for an earlier one:
+// a CDATA section or a character reference is element content,
 // whatever it stands for (https://www.w3.org/TR/xml/#NT-Misc). Anything else,
 // an element, other text, a document type declaration, a processing
 // instruction whose target is xml in any letter case, or a token encoding/xml
@@ -153,6 +162,7 @@ func epilogue(d *xml.Decoder, raw func(from, to int64) []byte) error {
 		if err != nil {
 			return errAfterRoot()
 		}
+		written := raw(from, d.InputOffset())
 		switch t := tok.(type) {
 		case xml.Comment:
 			continue
@@ -161,7 +171,7 @@ func epilogue(d *xml.Decoder, raw func(from, to int64) []byte) error {
 				continue
 			}
 		case xml.CharData:
-			if isXMLSpace(raw(from, d.InputOffset())) {
+			if isXMLSpace(written) {
 				continue
 			}
 		}
@@ -400,41 +410,55 @@ func opensXMLTarget(b []byte) bool {
 
 // mayHoldDeclaration reports whether b, a document from its root's start tag
 // on, may hold a markup declaration (`<!…>`): `<!` that opens neither a
-// comment nor a CDATA section, both of which it skips whole. A processing
-// instruction can hold those bytes too, which only a decode tells apart. An
-// unclosed comment or CDATA section ends the search, the decode having
-// refused it already. It costs one search of b for `<!`.
+// comment nor a CDATA section. It reads the markup that can hold those bytes
+// in document order, skipping each comment, CDATA section and processing
+// instruction whole, so that one holding `<!`, or the opener of another, is
+// no declaration and hides none. An unclosed one ends the search, the decode
+// having refused it already. Each byte of b is searched at most once for
+// each opener.
 func mayHoldDeclaration(b []byte) bool {
-	for {
-		i := bytes.Index(b, declOpen)
-		if i < 0 {
+	// pi is the offset of the next `<?` at or after at, -1 when none is
+	// left; it is searched for again only once at has passed it.
+	at, pi := 0, -1
+	for piKnown := false; ; {
+		d := bytes.Index(b[at:], declOpen)
+		if d < 0 {
 			return false
 		}
-		b = b[i+len(declOpen):]
-		var end []byte
+		d += at
+		if !piKnown || (pi >= 0 && pi < at) {
+			if pi = bytes.Index(b[at:], piOpen); pi >= 0 {
+				pi += at
+			}
+			piKnown = true
+		}
+		open, end := d+len(declOpen), []byte(nil)
 		switch {
-		case bytes.HasPrefix(b, commentOpen):
+		case pi >= 0 && pi < d:
+			open, end = pi+len(piOpen), piClose
+		case bytes.HasPrefix(b[open:], commentOpen):
 			end = commentClose
-		case bytes.HasPrefix(b, cdataOpen):
+		case bytes.HasPrefix(b[open:], cdataOpen):
 			end = cdataClose
 		default:
 			return true
 		}
-		j := bytes.Index(b, end)
+		j := bytes.Index(b[open:], end)
 		if j < 0 {
 			return false
 		}
-		b = b[j+len(end):]
+		at = open + j + len(end)
 	}
 }
 
 // declOpen opens a markup declaration, a comment or a CDATA section; what
-// follows it in the last two opens them, and their close ends them
-// ([mayHoldDeclaration]).
+// follows it in the last two opens them, and their close ends them, as
+// piClose ends a processing instruction ([mayHoldDeclaration]).
 var (
 	declOpen                  = []byte("<!")
 	commentOpen, commentClose = []byte("--"), []byte("-->")
 	cdataOpen, cdataClose     = []byte("[CDATA["), []byte("]]>")
+	piClose                   = []byte("?>")
 )
 
 // piOpen opens a processing instruction, and xmlTarget is the target XML

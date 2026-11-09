@@ -334,8 +334,14 @@ func TestREQ056_DoctypeWellFormed(t *testing.T) {
 // TestREQ056_MayHoldDeclaration pins what makes Unmarshal given no option
 // decode a document a second time, through a decoder that refuses a markup
 // declaration inside the root: `<!` in the document from its root on that
-// opens neither a comment nor a CDATA section, both of which the scan skips
-// whole.
+// opens neither a comment nor a CDATA section. The scan reads comments, CDATA
+// sections and processing instructions in document order and skips each
+// whole, so one that holds `<!` or the opener of another neither counts nor
+// hides a declaration after it.
+//
+// Can-fail control: skip comments and CDATA sections but not processing
+// instructions, as the scan once did, and the rows with an instruction that
+// holds an opener report false.
 func TestREQ056_MayHoldDeclaration(t *testing.T) {
 	for _, tc := range []struct {
 		name, data string
@@ -351,10 +357,50 @@ func TestREQ056_MayHoldDeclaration(t *testing.T) {
 		{"one after the root", `<a/><!DOCTYPE x>`, true},
 		{"an unclosed comment", `<a><!-- <!DOCTYPE x></a>`, false},
 		{"an unclosed CDATA section", `<a><![CDATA[<!DOCTYPE x></a>`, false},
+		{"a declaration in an instruction", `<a><?pi <!DOCTYPE x> ?></a>`, false},
+		{"one after an instruction that holds a comment opener", `<a><?pi <!-- ?><!DOCTYPE x></a>`, true},
+		{"one after an instruction that holds a CDATA opener", `<a><?pi <![CDATA[ ?><b><!x></b></a>`, true},
+		{"one after a comment that holds an instruction opener", `<a><!-- <? --><!DOCTYPE x></a>`, true},
+		{"one after a CDATA section that holds an instruction opener", `<a><![CDATA[<?]]><!x></a>`, true},
+		{"an instruction after a declaration", `<a><!x><?pi?></a>`, true},
+		{"many instructions and comments", strings.Repeat(`<?pi <!-- ?><!-- <? -->`, 50) + `<!x>`, true},
+		{"an unclosed instruction", `<a><?pi <!DOCTYPE x></a>`, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := mayHoldDeclaration([]byte(tc.data)); got != tc.want {
 				t.Errorf("mayHoldDeclaration(%q) = %t; want %t", tc.data, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestREQ056_ReadAfterRootJudgesEachTokenAsWritten pins that ReadAfterRoot,
+// which keeps the bytes of one token at a time, judges each token by its own
+// bytes however many come before it: white space as written passes after any
+// number of comments, processing instructions and white space, and a CDATA
+// section or a character reference after them is refused.
+//
+// Can-fail control: let go of the bytes past the token too, or slice them
+// from the wrong base, and the refused rows pass or the accepted ones fail.
+func TestREQ056_ReadAfterRootJudgesEachTokenAsWritten(t *testing.T) {
+	lead := strings.Repeat("<!-- a comment -->\n<?pi data?> \r\n", 200)
+	for _, tc := range []struct {
+		name, rest string
+		refused    bool
+	}{
+		{name: "white space after many tokens", rest: lead + " \t\r\n"},
+		{name: "nothing after many tokens", rest: lead},
+		{name: "CDATA of white space after many tokens", rest: lead + "<![CDATA[ ]]>", refused: true},
+		{name: "a reference after many tokens", rest: lead + "&#32;", refused: true},
+		{name: "white space, then a reference", rest: lead + "\n &#xA;", refused: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ReadAfterRoot(strings.NewReader(tc.rest))
+			if tc.refused != (err != nil) {
+				t.Fatalf("ReadAfterRoot(%d bytes) = %v; want refused %t", len(tc.rest), err, tc.refused)
+			}
+			if err != nil && (!errors.Is(err, ErrInvalidShape) || !errors.Is(err, ErrNotWellFormed)) {
+				t.Errorf("ReadAfterRoot err = %v; want errors.Is(_, ErrInvalidShape) and errors.Is(_, ErrNotWellFormed)", err)
 			}
 		})
 	}
