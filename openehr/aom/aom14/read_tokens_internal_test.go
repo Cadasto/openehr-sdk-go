@@ -36,7 +36,7 @@ func secondReadingOf(data []byte, strict bool) secondReading {
 	if strict {
 		opts = append(opts, canxml.WithStrict())
 	}
-	ot, err := readDocument(bufio.NewReader(bytes.NewReader(data)), opts, strict)
+	ot, err := readDocument(bufio.NewReader(bytes.NewReader(data)), opts)
 	if err != nil {
 		return secondReading{}
 	}
@@ -50,7 +50,7 @@ func secondReadingOf(data []byte, strict bool) secondReading {
 		if strict {
 			second = append(second, canxml.WithStrict())
 		}
-		ot2, err := readDocument(bufio.NewReader(bytes.NewReader(read)), second, strict)
+		ot2, err := readDocument(bufio.NewReader(bytes.NewReader(read)), second)
 		r.differs = err != nil || !reflect.DeepEqual(ot, ot2)
 	}
 	return r
