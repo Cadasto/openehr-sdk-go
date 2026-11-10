@@ -2,20 +2,23 @@ package simplified
 
 import (
 	"errors"
+	"time"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
 // Option configures a decode (UnmarshalFlat / UnmarshalStructured).
-// [WithTemplate] supplies the compiled template; [WithUnmatched] and
-// [WithStrict] say what happens to input the decode does not read.
+// [WithTemplate] supplies the compiled template, and [WithDefaultTime] the
+// start time it gives a body with none; [WithUnmatched] and [WithStrict] say
+// what happens to input the decode does not read.
 type Option func(*decodeConfig)
 
 // decodeConfig holds the resolved decode options.
 type decodeConfig struct {
-	template  *templatecompile.Compiled
-	unmatched func(path string)
-	strict    bool
+	template    *templatecompile.Compiled
+	defaultTime time.Time
+	unmatched   func(path string)
+	strict      bool
 }
 
 // WithUnmatched passes every unmatched item of the input to fn while the
@@ -98,7 +101,17 @@ func (c decodeConfig) tracked() bool {
 // tell from an ITEM_TREE. The RM-mandatory attributes the formats omit
 // (HISTORY.origin, EVENT.time, ENTRY language/encoding/subject,
 // EVENT_CONTEXT.setting, …) are completed from ctx defaults and RM
-// conventions; these are synthesised defaults, not recovered data. An empty structure (an ITEM_TREE or ITEM_LIST with no
+// conventions; these are synthesised defaults, not recovered data. A
+// HISTORY with no origin takes the earliest time its own events carry,
+// compared as instants, else the start time, and an event with no time takes
+// its HISTORY's origin. An ACTIVITY with no action_archetype_id takes the one
+// the instance generator writes on its own template node: a value the first
+// C_STRING that node allows on that attribute accepts, or the default /.*/
+// where that C_STRING has neither a list nor a pattern, or the node allows
+// none there. Decode leaves the id out where that C_STRING accepts no value
+// the generator builds. A composition category the body does not spell is the one
+// the template fixes, a single openehr code such as 431|persistent, or else
+// 433|event. An empty structure (an ITEM_TREE or ITEM_LIST with no
 // items, say) that the template requires and allows to stay empty has no key
 // in the formats, so decode adds it back, empty, under a parent the body
 // rebuilt, with the type, node id and name the template gives it. It is
@@ -108,9 +121,10 @@ func (c decodeConfig) tracked() bool {
 // terminology and text, an ordinal's value and text. A coded text whose
 // terminology neither the body nor the template gives is refused as missing
 // its |terminology. The decoded composition then validates against the
-// OPT, provided ctx/time is present when the template carries HISTORY/EVENT
-// nodes (their mandatory origin/time have no other source; see
-// deviations.md).
+// OPT, provided each HISTORY has an event time and each ACTION a time, or the
+// body gives a start time, or the caller passes [WithDefaultTime], when the
+// template carries HISTORY/EVENT or ACTION nodes: their mandatory origin and
+// times have no other source (see deviations.md).
 //
 // Without this option decode omits names, defaults and empty structures,
 // completes no coded value, and infers a folded structure's subtype from its
@@ -118,6 +132,28 @@ func (c decodeConfig) tracked() bool {
 // format-idempotent but the result is not canonically complete.
 func WithTemplate(c *templatecompile.Compiled) Option {
 	return func(cfg *decodeConfig) { cfg.template = c }
+}
+
+// WithDefaultTime gives t to a body that carries no start time, in a decode
+// with [WithTemplate]. A body carries its start time in ctx/time, in the ctx
+// object's time member in STRUCTURED, or at "<root>/context/start_time"; an
+// empty or null value there carries none. Decode then reads the body as if
+// its ctx/time held t, in UTC and to the second: t is the context's
+// start_time, the time of an ACTION the body gives none, and the origin of a
+// HISTORY whose events carry no time, which its events then take (see
+// [WithTemplate]); the context it builds takes the 238|other care setting.
+//
+// On a composition whose category is 431|persistent, the one the body spells
+// or else the one the template fixes, t builds no EVENT_CONTEXT. It still
+// fills the other times, and it is the start time of a context the body
+// builds, with a setting, say. A start time the body carries builds the
+// context whatever the category.
+//
+// The Simplified Formats give a missing ctx/time the current time. Decode
+// reads no clock, so the caller passes one, such as time.Now(). The zero time
+// leaves the option off, and without [WithTemplate] it does nothing.
+func WithDefaultTime(t time.Time) Option {
+	return func(cfg *decodeConfig) { cfg.defaultTime = t }
 }
 
 func newDecodeConfig(opts []Option) decodeConfig {

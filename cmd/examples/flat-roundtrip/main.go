@@ -106,7 +106,8 @@ func run() error {
 	// template and fills the other required attributes with synthesised
 	// defaults (from ctx values and RM conventions), so treat those as
 	// defaults, not recovered data. The result validates when the FLAT
-	// input carries ctx/time, which this one does.
+	// input carries ctx/time, which this one does; for a body without it,
+	// add simplified.WithDefaultTime(time.Now()) to give it the caller's time.
 	conformant, err := simplified.UnmarshalFlat(flat, wt, simplified.WithTemplate(compiled))
 	if err != nil {
 		return fmt.Errorf("decode FLAT with template: %w", err)

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"regexp/syntax"
 	"slices"
 	"strings"
 	"sync"
@@ -13,6 +12,7 @@ import (
 	"uuid"
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
+	"github.com/cadasto/openehr-sdk-go/internal/cstringvalue"
 	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	"github.com/cadasto/openehr-sdk-go/internal/rmlists"
 	"github.com/cadasto/openehr-sdk-go/internal/rmroots"
@@ -1690,8 +1690,8 @@ func writeBMMPrimitive(optNode *tcimpl.CompiledNode, parent any, attr, rmType st
 // valid ISO 8601 value; "=" for the magnitude_status of a quantified value
 // (a quantity, a count or a temporal value), the value its RM invariant
 // Magnitude_status_valid admits; defaultMatch for a TERM_MAPPING's match,
-// the RM default, which Match_valid admits; anyActionArchetype, the RM
-// default, for an ACTIVITY's action_archetype_id; and the open-string
+// the RM default, which Match_valid admits; cstringvalue.AnyActionArchetype,
+// the RM default, for an ACTIVITY's action_archetype_id; and the open-string
 // example otherwise. ok is false for a TERMINOLOGY_ID's value, which stays
 // empty: the code phrase it belongs to keeps the terminology it already
 // carries (replacesTerminology). It is false as well for the value of any other
@@ -1722,15 +1722,11 @@ func (g *generator) bmmStringDefault(parent any, attr string) (string, bool) {
 		}
 	case *rm.Activity:
 		if attr == "action_archetype_id" {
-			return anyActionArchetype, true
+			return cstringvalue.AnyActionArchetype, true
 		}
 	}
 	return "example", true
 }
-
-// anyActionArchetype is the RM default of ACTIVITY.action_archetype_id, a
-// pattern in // delimiters that matches the id of any archetype.
-const anyActionArchetype = "/.*/"
 
 // stringField returns a reference to the BMM String attribute attr of
 // parent, through which it is read and written. It covers every String
@@ -3996,8 +3992,8 @@ const defaultTransition = "535"
 // value is a list member or a pattern match that the constraint accepts,
 // or the example under a C_STRING with neither (stringForConstraint),
 // except on an ACTIVITY's action_archetype_id, where such a C_STRING gets
-// the RM default /.*/ (anyActionArchetype), as where the OPT leaves the
-// attribute silent (bmmStringDefault); on a PARTY_REF's type it is also a
+// the RM default /.*/ (cstringvalue.ActionArchetypeID), as where the OPT
+// leaves the attribute silent (bmmStringDefault); on a PARTY_REF's type it is also a
 // class name PARTY_REF Type_validity admits (see partyRefType), on an
 // ACCESS_GROUP_REF's type the one type its Type_validity admits, on a
 // TERM_MAPPING's match a character
@@ -4040,9 +4036,10 @@ func applyStringLeaf(leaf *tcimpl.CompiledNode, rmValue any, attr string, cs con
 	case *rm.Activity:
 		// A C_STRING with neither a pattern nor a list gives no id, so the
 		// RM default goes there, as where the OPT leaves the attribute
-		// silent (bmmStringDefault).
-		if attr == "action_archetype_id" && cs.Pattern == "" && len(cs.List) == 0 {
-			s, err = anyActionArchetype, nil
+		// silent (bmmStringDefault). The FLAT decode's template completion
+		// shares the pick (cstringvalue.ActionArchetypeID).
+		if attr == "action_archetype_id" {
+			s, err = cstringvalue.ActionArchetypeID(cs, ex)
 		}
 	default:
 		if attr == "magnitude_status" && quantified(rmValue) {
@@ -4087,133 +4084,18 @@ func leafPath(leaf *tcimpl.CompiledNode) string {
 
 // errNoStringValue reports a C_STRING that no string the generator can
 // build satisfies: no list member passes the pattern, the pattern matches
-// nothing, or the pattern does not compile.
-var errNoStringValue = errors.New("no string satisfies the C_STRING constraint")
+// nothing, or the pattern does not compile. It is the shared pick's
+// (cstringvalue.ErrNoValue).
+var errNoStringValue = cstringvalue.ErrNoValue
 
 // stringForConstraint returns a string cs accepts: the example ex when cs
 // accepts it, else the first list member cs accepts, else, for a
 // pattern-only constraint, the shortest string the pattern's syntax
 // builds. Acceptance is cs.Validate, which matches a pattern against the
 // whole string, so a value that only contains a match is never
-// chosen. It returns errNoStringValue when none of these is accepted.
+// chosen. It returns errNoStringValue when none of these is accepted. The
+// pick is cstringvalue.Pick, which the FLAT decode's template completion
+// shares, so the two write the same value for one constraint.
 func stringForConstraint(cs constraints.CString, ex any) (string, error) {
-	s, ok := ex.(string)
-	if !ok {
-		return "", fmt.Errorf("C_STRING example value is %T, want string", ex)
-	}
-	accepts := func(v string) bool { return len(cs.Validate(v)) == 0 }
-	if accepts(s) {
-		return s, nil
-	}
-	for _, member := range cs.List {
-		if accepts(member) {
-			return member, nil
-		}
-	}
-	if len(cs.List) == 0 && cs.Pattern != "" {
-		if m, built := patternExample(cs.Pattern); built && accepts(m) {
-			return m, nil
-		}
-	}
-	return "", errNoStringValue
-}
-
-// patternExample builds the shortest string the regular expression
-// pattern describes: no repetition beyond the minimum, the first
-// alternative, and one plain character for a class or a dot. built is
-// false when the pattern does not parse or matches nothing.
-func patternExample(pattern string) (string, bool) {
-	re, err := syntax.Parse(pattern, syntax.Perl)
-	if err != nil {
-		return "", false
-	}
-	var b strings.Builder
-	if !writeShortest(&b, re.Simplify()) {
-		return "", false
-	}
-	return b.String(), true
-}
-
-func writeShortest(b *strings.Builder, re *syntax.Regexp) bool {
-	switch re.Op {
-	case syntax.OpEmptyMatch, syntax.OpStar, syntax.OpQuest,
-		syntax.OpBeginLine, syntax.OpEndLine, syntax.OpBeginText, syntax.OpEndText,
-		syntax.OpWordBoundary, syntax.OpNoWordBoundary:
-		// Zero width, or zero repetitions. The caller checks the whole
-		// string against the pattern, so a boundary that does not hold
-		// there is caught.
-		return true
-	case syntax.OpLiteral:
-		for _, r := range re.Rune {
-			b.WriteRune(r)
-		}
-		return true
-	case syntax.OpCharClass:
-		r, ok := classRune(re.Rune)
-		if ok {
-			b.WriteRune(r)
-		}
-		return ok
-	case syntax.OpAnyChar, syntax.OpAnyCharNotNL:
-		b.WriteByte('a')
-		return true
-	case syntax.OpCapture, syntax.OpPlus:
-		return writeShortest(b, re.Sub[0])
-	case syntax.OpRepeat:
-		for range re.Min {
-			if !writeShortest(b, re.Sub[0]) {
-				return false
-			}
-		}
-		return true
-	case syntax.OpConcat:
-		for _, sub := range re.Sub {
-			if !writeShortest(b, sub) {
-				return false
-			}
-		}
-		return true
-	case syntax.OpAlternate:
-		for _, sub := range re.Sub {
-			var alt strings.Builder
-			if writeShortest(&alt, sub) {
-				b.WriteString(alt.String())
-				return true
-			}
-		}
-		return false
-	case syntax.OpNoMatch:
-		// The pattern admits no string.
-		return false
-	default:
-		return false
-	}
-}
-
-// classRune picks one character of a character class given as rune
-// ranges: a letter or digit when the class has one, else the first
-// printable ASCII character, else the class's first character.
-func classRune(ranges []rune) (rune, bool) {
-	if len(ranges) < 2 {
-		return 0, false
-	}
-	in := func(r rune) bool {
-		for i := 0; i+1 < len(ranges); i += 2 {
-			if ranges[i] <= r && r <= ranges[i+1] {
-				return true
-			}
-		}
-		return false
-	}
-	for _, r := range "aA0" {
-		if in(r) {
-			return r, true
-		}
-	}
-	for r := rune(0x21); r < 0x7f; r++ {
-		if in(r) {
-			return r, true
-		}
-	}
-	return ranges[0], true
+	return cstringvalue.Pick(cs, ex)
 }

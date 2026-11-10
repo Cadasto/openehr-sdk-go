@@ -418,11 +418,33 @@ partially or silently accepted.
   conventions (`rminfo.RequiredAttributes` drives the walk), so the decoded composition
   **validates against the OPT** (verified over the vendored corpus by PROBE-076's conformance
   leg and `names_test.go`). These are **synthesised defaults**, not recovered data — the
-  formats never carried them, so e.g. every `EVENT.time`/`HISTORY.origin` takes the context
-  `start_time` and `subject` becomes `PARTY_SELF`. **Qualifier:** `EVENT.time` and
-  `HISTORY.origin` have no source other than `ctx/time` — a payload without `ctx/time`
-  decodes successfully but does not validate when the template carries HISTORY/EVENT nodes
-  (pinned by `names_test.go`). **A required structure with no member is rebuilt too**
+  formats never carried them, so e.g. a `HISTORY.origin` takes the earliest time its own
+  events carry, compared as instants, else the context `start_time`; an `EVENT.time` the
+  body leaves out takes its HISTORY's origin; and `subject` becomes `PARTY_SELF`. Until
+  2026-11-10 every `EVENT.time`/`HISTORY.origin` took the context `start_time`; the
+  earliest event time now comes first, as the reference orders the two. The reference's
+  explicit `<observation>/history_origin` key is still refused (above). Since 2026-11-10
+  `COMPOSITION.category`
+  is the code the template's category constraint fixes (one `openehr` code, such as
+  `431|persistent`), and `433|event` only where the template fixes none; until then every
+  such decode wrote `433|event`, so a persistent template's composition failed validation.
+  Since 2026-11-10 an ACTIVITY with no `action_archetype_id` takes the one the instance
+  generator writes on its own template node, an unnamed one beside a twin that pins a
+  name included (`TestREQ053ActivityTakesItsOwnNodesActionArchetypeID`): a value the first
+  `C_STRING` there accepts, or the RM default `/.*/` where that `C_STRING` has neither a
+  list nor a pattern or the node allows none. Decode still leaves it out where that
+  `C_STRING` accepts no value the generator builds (pinned by
+  `TestREQ053ActivityTakesNoActionArchetypeIDTheTemplateDoesNotSettle`). Until then decode
+  left out every one, and the ACTIVITY failed validation.
+  **Qualifier:** `EVENT.time` and `HISTORY.origin` have no source other than the event
+  times the body gives, its start time (`ctx/time` or `<root>/context/start_time`) and,
+  since 2026-11-10, `WithDefaultTime`; `ACTION.time` has only the last two. The format gives a missing `ctx/time` the server's
+  current time;
+  decode reads no clock, so the caller passes one, and the body then decodes as if its
+  `ctx/time` held it, except that on a persistent composition the default builds no
+  `EVENT_CONTEXT`. Without any of them, a payload decodes successfully but does not
+  validate when the template carries HISTORY/EVENT or ACTION nodes (pinned by `names_test.go`).
+  **A required structure with no member is rebuilt too**
   (since 2026-10-26, issue 311). Where a rebuilt node lacks a single-valued attribute that
   the template's existence, or the RM, requires of it, and the template gives there one
   concrete `ITEM_STRUCTURE` it lets hold no member (or alternatives that agree on its
@@ -449,7 +471,12 @@ partially or silently accepted.
   setting, so a `WithTemplate` decode of a body that carried no setting re-encodes with
   exactly those two keys gained — a *faithful* encoding of the completed composition, not
   drift; an OPT-free decode synthesises nothing and stays byte-identical (both pinned by
-  `TestSettingWithTemplateDefaultRoundTrip`). The other completions stay invisible on
+  `TestSettingWithTemplateDefaultRoundTrip`). The ACTIVITY `action_archetype_id` default
+  (since 2026-11-10) is visible too: encode writes the in-context leaf, so a body that left
+  it out re-encodes with `…/action_archetype_id` gained. So are the times a body left out:
+  a completed `EVENT.time` re-encodes at its event's `…/time` key, and a `WithDefaultTime`
+  start time as `ctx/time`, except on a persistent composition, where the default builds no
+  context to carry it. The other completions stay invisible on
   re-encode: the names it gives the nodes below the root never leak into FLAT, and
   origin/encoding have no emitted
   surface. `subject` acquired one on 2026-08-05 (Phase C2) and stays invisible anyway,

@@ -14,10 +14,9 @@
 //
 // The codecs take an *rm.Composition and a *webtemplate.WebTemplate and
 // return bytes (or the reverse). They import only openehr/rm (+ rmpath /
-// rminfo / typereg), openehr/terminology, openehr/template/webtemplate,
-// openehr/templatecompile (the WithTemplate name/default source),
-// openehr/serialize/canjson, two module-internal helpers (the type-name
-// reader and the compiled template's non-copying readers), and the
+// rminfo / typereg), openehr/terminology, openehr/template (+ constraints /
+// webtemplate), openehr/templatecompile (the WithTemplate name/default
+// source), openehr/serialize/canjson, module-internal helpers, and the
 // standard library. They never import the transport, auth, or client layers.
 //
 // Context output-form and exotic-datatype fallbacks are documented in
@@ -30,6 +29,11 @@
 // ctx/setting|code and ctx/setting|value pair. Decode also reads the
 // reference implementation's spelling of each under the template root, such
 // as "<root>/language|code", and two spellings of one field must agree.
+//
+// The format gives a body without ctx/time the current time, but decode reads
+// no clock. With [WithTemplate], [WithDefaultTime] passes it one: a body with
+// no start time decodes as if its ctx/time held the caller's time, and on a
+// persistent composition that default builds no EVENT_CONTEXT.
 //
 // The composer is the one field those short forms carry only in part:
 // ctx/composer_name carries a party with a name and nothing else, and
