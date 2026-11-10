@@ -435,9 +435,9 @@ partially or silently accepted.
   generator builds, or where the template's ACTIVITY nodes at its path disagree on it
   (pinned by `TestREQ053ActivityTakesNoActionArchetypeIDTheTemplateDoesNotSettle`). Until
   then decode left out every one, and the ACTIVITY failed validation.
-  **Qualifier:** `EVENT.time`, `HISTORY.origin` and `ACTION.time` have no source other than
-  the event times the body gives, its start time (`ctx/time` or `<root>/context/start_time`) and,
-  since 2026-11-10, `WithDefaultTime`. The format gives a missing `ctx/time` the server's
+  **Qualifier:** `EVENT.time` and `HISTORY.origin` have no source other than the event
+  times the body gives, its start time (`ctx/time` or `<root>/context/start_time`) and,
+  since 2026-11-10, `WithDefaultTime`; `ACTION.time` has only the last two. The format gives a missing `ctx/time` the server's
   current time;
   decode reads no clock, so the caller passes one, and the body then decodes as if its
   `ctx/time` held it, except that on a persistent composition the default builds no
