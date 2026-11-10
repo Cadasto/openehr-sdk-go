@@ -4,12 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"cmp"
-	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
 	"slices"
-	"strings"
 	"sync"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/decodeopts"
@@ -55,28 +53,27 @@ const inputBufferMax = 4 << 20
 // [canxml.WithMaxDepth] among them applies as well as the element limit, and
 // the smaller limit wins: it can lower the limit and never raise it.
 //
-// The input is one document. Given [canxml.WithStrict], it is held to the
-// rules [canxml.Unmarshal] holds a document to: before the root it may hold
-// the XML declaration, comments, processing instructions, whitespace and one
-// document type declaration, after a UTF-8 byte-order mark at the very start;
-// after the root it may hold comments, processing instructions and
-// whitespace. XML reserves the processing instruction target xml, in any
-// letter case, for the XML declaration, which nothing but the byte-order
-// mark may precede, so a processing instruction with that target elsewhere
-// before or after the root, such as one after whitespace, a second
-// declaration or one after the root's end, is refused; a target that only starts with those
-// letters, such as xml-stylesheet, passes. Without it, the reader also reads
-// past, before the root, any content encoding/xml reads, such as text or a
-// CDATA section, and, after the root, a `<!…>` declaration and a processing
-// instruction whose target is xml; one inside the root is refused in both
-// modes, as canonical XML refuses it. Anything else before or after the root,
-// such as an element after it or a stray end tag before it, is refused with
-// an error that wraps [canxml.ErrInvalidShape] and [canxml.ErrNotWellFormed]
-// and carries none of it, and so is an element that carries one attribute
-// twice, outside what the default mode leaves out unread. Markup before the
-// root that encoding/xml cannot read fails as its *xml.SyntaxError, unless
-// content [canxml.Unmarshal] refuses comes before it, which both modes then
-// refuse. The root element may have any name, so a document whose root is
+// The input is one document, held in both modes to the rules
+// [canxml.Unmarshal] holds a document to: before the root it may hold the XML
+// declaration, comments, processing instructions, whitespace and one
+// well-formed document type declaration, after a UTF-8 byte-order mark at
+// the very start; after the root it may hold comments, processing
+// instructions and whitespace. Whitespace is the literal characters, so a
+// CDATA section or a character reference outside the root is refused,
+// whatever it stands for. XML reserves the processing instruction target xml,
+// in any letter case, for the XML declaration, which nothing but the
+// byte-order mark may precede, so a processing instruction with that target
+// elsewhere, such as one after whitespace, a second declaration or one
+// inside or after the root, is refused, and so is a `<!…>` declaration inside
+// the root; a target that only starts with those letters, such as
+// xml-stylesheet, passes. Anything else before or after the root, such as
+// text before it, an element after it or a stray end tag before it, is
+// refused with an error that wraps [canxml.ErrInvalidShape] and
+// [canxml.ErrNotWellFormed] and carries none of it, and so is an element that
+// carries one attribute twice, outside what the default mode leaves out
+// unread. Markup before the root that encoding/xml cannot read fails as its
+// *xml.SyntaxError, unless content [canxml.Unmarshal] refuses comes before
+// it, which both modes then refuse. The root element may have any name, so a document whose root is
 // `<OPERATIONAL_TEMPLATE>` reads as one whose root is `<template>`. An input
 // with no root element, empty or holding only a declaration, comments,
 // whitespace or text, is refused with an error that wraps
@@ -210,9 +207,8 @@ const inputBufferMax = 4 << 20
 //
 // A document that needs none of these readings is decoded once; one that
 // needs one is decoded a second time, from the bytes the reader keeps of the
-// input, but for what it reads past before and after the root, and so is
-// every document when opts pass what the decode reports to a function, which
-// sees each item once.
+// input, and so is every document when opts pass what the decode reports to a
+// function, which sees each item once.
 //
 // A caller that decodes an operational template with [canxml.Unmarshal] or a
 // [canxml.Decoder] itself gets neither limit and none of these readings
@@ -249,7 +245,7 @@ func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*Operat
 	// reading once it has read the document.
 	var facts tokenFacts
 	first = slices.Concat(first, []canxml.DecoderOption{facts.observeOption()})
-	ot, err := readDocument(br, first, settings.Strict)
+	ot, err := readDocument(br, first)
 	// An input past the size limit is refused as such, whatever the decode
 	// made of the bytes it read: the limit may have cut it short.
 	if lr.N == 0 {
@@ -291,11 +287,11 @@ func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*Operat
 			return nil, err
 		}
 		if changed {
-			return readResult(readDocument(bufio.NewReader(bytes.NewReader(read)), opts, settings.Strict))
+			return readResult(readDocument(bufio.NewReader(bytes.NewReader(read)), opts))
 		}
 	}
 	if settings.Reports {
-		return readResult(readDocument(bufio.NewReader(bytes.NewReader(data)), opts, settings.Strict))
+		return readResult(readDocument(bufio.NewReader(bytes.NewReader(data)), opts))
 	}
 	return readResult(ot, err)
 }
@@ -316,14 +312,13 @@ func (s *sourceReader) Read(p []byte) (int, error) {
 }
 
 // readDocument decodes one document from br with opts and the element limit:
-// what comes before the root, the root, and what comes after it. Unless
-// strict, it reads past the content before the root that encoding/xml reads,
-// and a `<!…>` declaration after it.
-func readDocument(br *bufio.Reader, opts []canxml.DecoderOption, strict bool) (*OperationalTemplate, error) {
+// what comes before the root, the root, and what comes after it, each held to
+// the rules of [canxml.Unmarshal].
+func readDocument(br *bufio.Reader, opts []canxml.DecoderOption) (*OperationalTemplate, error) {
 	// The stream decoder skips what comes before the root, so the prolog is
 	// checked first; the decode then reads the bytes the check read again.
 	head, err := xmlunmatched.ReadProlog(br)
-	if err != nil && (strict || !errors.Is(err, canxml.ErrInvalidShape) || !readsPastProlog(head)) {
+	if err != nil {
 		return nil, err
 	}
 	// The decoder takes no byte past the root element from an
@@ -336,28 +331,10 @@ func readDocument(br *bufio.Reader, opts []canxml.DecoderOption, strict bool) (*
 	if err := canxml.NewDecoder(src, opts...).Decode(ot); err != nil {
 		return nil, err
 	}
-	if err := afterRoot(src, strict); err != nil {
+	if err := afterRoot(src); err != nil {
 		return nil, err
 	}
 	return ot, nil
-}
-
-// readsPastProlog reports whether the default mode reads past head, the bytes
-// before the root element and its start tag that the prolog check refused:
-// whether encoding/xml reads each token in it up to that start tag, whatever
-// the token is. A byte-order mark at the very start is the one byte sequence
-// it skips unread.
-func readsPastProlog(head []byte) bool {
-	d := xml.NewDecoder(bytes.NewReader(bytes.TrimPrefix(head, byteOrderMark)))
-	for {
-		tok, err := d.Token()
-		if err != nil {
-			return false
-		}
-		if _, ok := tok.(xml.StartElement); ok {
-			return true
-		}
-	}
 }
 
 // readResult returns what [ReadOperationalTemplate] returns for a decode that
@@ -380,46 +357,19 @@ func errInputTooLarge() error {
 }
 
 // afterRoot reads r, the rest of the input after the root element, to its
-// end. Comments, processing instructions and whitespace pass, and unless
-// strict a `<!…>` declaration as well, which encoding/xml reads, and a
-// processing instruction whose target is xml in any letter case, which XML
-// reserves for the XML declaration at the start. Anything else, an element,
-// other text or markup encoding/xml cannot read, is refused, with an error
-// that wraps [canxml.ErrInvalidShape] and names none of it, as
-// [canxml.Unmarshal] refuses it.
-func afterRoot(r io.Reader, strict bool) error {
-	dec := xml.NewDecoder(r)
-	for {
-		tok, err := dec.Token()
-		if errors.Is(err, io.EOF) {
-			return nil
-		}
-		if _, ok := errors.AsType[*xml.SyntaxError](err); ok {
-			return errAfterRoot()
-		}
-		if err != nil {
-			return fmt.Errorf("aom14: read after the root element: %w", err)
-		}
-		switch t := tok.(type) {
-		case xml.Comment:
-			continue
-		case xml.ProcInst:
-			// A target that only starts with xml, such as xml-stylesheet,
-			// passes (https://www.w3.org/TR/xml/#NT-PITarget).
-			if !strict || !strings.EqualFold(t.Target, "xml") {
-				continue
-			}
-		case xml.Directive:
-			if !strict {
-				continue
-			}
-		case xml.CharData:
-			if len(bytes.Trim(t, " \t\r\n")) == 0 {
-				continue
-			}
-		}
-		return errAfterRoot()
+// end, holding it to the rule of [canxml.Unmarshal]: comments, processing
+// instructions and whitespace as written pass, and anything else is refused,
+// with an error that wraps [canxml.ErrInvalidShape] and
+// [canxml.ErrNotWellFormed] and names none of it.
+func afterRoot(r io.ByteReader) error {
+	err := xmlunmatched.ReadAfterRoot(r)
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, xmlunmatched.ErrNotWellFormed):
+		return fmt.Errorf("aom14: %w", err)
 	}
+	return fmt.Errorf("aom14: read after the root element: %w", err)
 }
 
 // errAfterRoot is the refusal of content after the root element, which wraps

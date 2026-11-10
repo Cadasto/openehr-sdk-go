@@ -474,17 +474,14 @@ func TestREQ111_ReaderReadsAnElementInAnotherNamespace(t *testing.T) {
 }
 
 // TestREQ111_ReaderReadsTheDocumentShapesOutsideTheSchemas pins the default
-// mode's reading of the fixtures of the document shapes the schemas do not
-// allow: a root element in a namespace of no openEHR schema, text before the
-// root and a declaration after it, each read as its *.read.opt with nothing
-// unmatched. Strict mode refuses the first as an element in a foreign
-// namespace and the others as content outside the root.
+// mode's reading of the fixture of the document shape the schemas do not
+// allow: a root element in a namespace of no openEHR schema, read as its
+// *.read.opt with nothing unmatched. Strict mode refuses it as an element in
+// a foreign namespace.
 func TestREQ111_ReaderReadsTheDocumentShapesOutsideTheSchemas(t *testing.T) {
 	t.Parallel()
 	for name, strict := range map[string]error{
-		"root-namespace":       canxml.ErrNamespace,
-		"text-before-root":     canxml.ErrInvalidShape,
-		"directive-after-root": canxml.ErrInvalidShape,
+		"root-namespace": canxml.ErrNamespace,
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -1240,7 +1237,7 @@ func TestREQ111_ReaderReportsEachItemOnce(t *testing.T) {
 		"shapes.opt", "values.opt", "values-every-mode.opt", "namespace-v2.opt", "default-mode-readings.opt",
 		"integer-bounds.opt", "quantity-assumed-value.opt", "attribute-children.opt", "item-namespaces.opt",
 		"infinite-integer-bounds.opt", "foreign-namespaces.opt", "definition-type.opt", "nan-integer-bounds.opt",
-		"root-namespace.opt", "text-before-root.opt", "directive-after-root.opt", "xsi-element.opt",
+		"root-namespace.opt", "xsi-element.opt",
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()

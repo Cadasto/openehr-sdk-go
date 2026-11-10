@@ -187,29 +187,35 @@ func TestREQ176_ReadOperationalTemplateAppliesTheCallersOptions(t *testing.T) {
 
 // TestREQ176_REQ111_ReadOperationalTemplateHoldsContentAfterTheRoot pins that
 // the reader holds the input to one document. After the root, in every mode,
-// comments, processing instructions and whitespace pass, and an element,
-// text, a CDATA section or a stray end element is refused with an error
-// wrapping canxml.ErrInvalidShape that carries none of it. A `<!…>`
-// declaration, and a processing instruction whose target is xml in any
-// letter case, which XML reserves for the XML declaration at the start, are
-// read past in the default mode and refused so given canxml.WithStrict. A
-// target that only starts with xml passes in every mode.
+// comments, processing instructions and white space pass, and an element,
+// text, a CDATA section, a character reference, a stray end element, a `<!…>`
+// declaration, or a processing instruction whose target is xml in any letter
+// case, which XML reserves for the XML declaration at the start, is refused
+// with an error wrapping canxml.ErrInvalidShape and canxml.ErrNotWellFormed
+// that carries none of it. A CDATA section or a character reference is
+// refused even where it stands for white space. A target that only starts
+// with xml passes in every mode.
+//
+// Can-fail control: read past a declaration or an xml target after the root
+// in the default mode, as the reader once did, and those rows read there;
+// judge text there by what it decodes to and the white-space CDATA and
+// reference rows read.
 func TestREQ176_REQ111_ReadOperationalTemplateHoldsContentAfterTheRoot(t *testing.T) {
 	t.Parallel()
 	const planted = "PLANTED"
 	refused := map[string]string{
-		"a second root":         `<template><template_id><value>` + planted + `</value></template_id></template>`,
-		"an empty element":      `<` + planted + `/>`,
-		"text":                  planted,
-		"a stray end element":   `</` + planted + `>`,
-		"a CDATA section":       `<![CDATA[` + planted + `]]>`,
-		"markup it cannot read": `<1>`,
-	}
-	defaultOnly := map[string]string{
-		"a document type":           `<!DOCTYPE ` + planted + `>`,
-		"another declaration":       `<!ENTITY ` + planted + ` "x">`,
-		"an XML declaration":        `<?xml version="1.0" extra="` + planted + `"?>`,
-		"an xml target in capitals": `<?XML ` + planted + `?>`,
+		"a second root":                  `<template><template_id><value>` + planted + `</value></template_id></template>`,
+		"an empty element":               `<` + planted + `/>`,
+		"text":                           planted,
+		"a stray end element":            `</` + planted + `>`,
+		"a CDATA section":                `<![CDATA[` + planted + `]]>`,
+		"markup it cannot read":          `<1>`,
+		"a document type":                `<!DOCTYPE ` + planted + `>`,
+		"another declaration":            `<!ENTITY ` + planted + ` "x">`,
+		"an XML declaration":             `<?xml version="1.0" extra="` + planted + `"?>`,
+		"an xml target in capitals":      `<?XML ` + planted + `?>`,
+		"a CDATA section of white space": `<![CDATA[ ]]>`,
+		"a character reference to space": `&#32;`,
 	}
 	accepted := map[string]string{
 		"nothing":                       "",
@@ -225,16 +231,6 @@ func TestREQ176_REQ111_ReadOperationalTemplateHoldsContentAfterTheRoot(t *testin
 				refusesContentOutsideTheRoot(t, readTemplate+tail, planted, opts...)
 			})
 		}
-		for name, tail := range defaultOnly {
-			t.Run(mode+"/default mode only/"+name, func(t *testing.T) {
-				t.Parallel()
-				if mode == "strict" {
-					refusesContentOutsideTheRoot(t, readTemplate+tail, planted, opts...)
-					return
-				}
-				readsTemplateT(t, readTemplate+tail, opts...)
-			})
-		}
 		for name, tail := range accepted {
 			t.Run(mode+"/accepted/"+name, func(t *testing.T) {
 				t.Parallel()
@@ -246,16 +242,19 @@ func TestREQ176_REQ111_ReadOperationalTemplateHoldsContentAfterTheRoot(t *testin
 
 // TestREQ176_REQ056_ReadOperationalTemplateRefusesAnXMLTargetInsideTheRoot
 // pins that a processing instruction whose target is xml, in any letter case,
-// inside the root element is refused in both modes, as a canonical-XML decode
-// given any option refuses it, with an error wrapping canxml.ErrInvalidShape
-// that carries none of it; a target that only starts with xml passes. The
-// default mode reads past one before or after the root alone.
+// and a `<!…>` declaration, such as a document type declaration, inside the
+// root element are refused in both modes, as a canonical-XML decode given any
+// option refuses them, with an error wrapping canxml.ErrInvalidShape and
+// canxml.ErrNotWellFormed that carries none of them; a target that only
+// starts with xml passes.
 func TestREQ176_REQ056_ReadOperationalTemplateRefusesAnXMLTargetInsideTheRoot(t *testing.T) {
 	t.Parallel()
 	const planted = "PLANTED"
 	refused := map[string]string{
 		"an XML declaration":        `<?xml version="1.0" extra="` + planted + `"?>`,
 		"an xml target in capitals": `<?XML ` + planted + `?>`,
+		"a document type":           `<!DOCTYPE ` + planted + `>`,
+		"an entity declaration":     `<!ENTITY ` + planted + ` "x">`,
 	}
 	for mode, opts := range readModes {
 		for name, pi := range refused {
@@ -273,28 +272,32 @@ func TestREQ176_REQ056_ReadOperationalTemplateRefusesAnXMLTargetInsideTheRoot(t 
 
 // TestREQ176_REQ111_ReadOperationalTemplateHoldsContentBeforeTheRoot pins
 // what the reader reads before the root element. In every mode the XML
-// declaration, comments, processing instructions, whitespace and one document
-// type declaration pass, and a stray end element, or markup encoding/xml
-// cannot read, is refused with an error wrapping canxml.ErrInvalidShape that
-// carries none of it. Text, a CDATA section, a second document type, another
+// declaration, comments, processing instructions, white space and one
+// well-formed document type declaration pass, after a byte-order mark too.
+// Anything else is refused with an error wrapping canxml.ErrInvalidShape and
+// canxml.ErrNotWellFormed that carries none of it: text, a CDATA section or a
+// character reference, even one that stands for white space, a stray end
+// element, a second document type or one XML's grammar does not allow, another
 // declaration, and a processing instruction whose target is xml in any letter
-// case other than the XML declaration at the very start, one after
-// whitespace included, which encoding/xml reads,
-// are read past in the default mode and refused so given canxml.WithStrict.
-// A target that only starts with xml passes in every mode. An input with only
-// such content and no root is the no-root case
+// case other than the XML declaration at the very start, one after white
+// space included. A target that only starts with xml passes. An input with
+// only such content and no root is the no-root case
 // (TestREQ108_ReadOperationalTemplateRefusesAnInputWithNoRootElement).
+//
+// Can-fail control: read past what the prolog check refuses in the default
+// mode, as the reader once did, and every refused row but the stray end
+// element and the bad markup reads there.
 func TestREQ176_REQ111_ReadOperationalTemplateHoldsContentBeforeTheRoot(t *testing.T) {
 	t.Parallel()
 	const planted = "PLANTED"
 	refused := map[string]string{
-		"a stray end element":   `</` + planted + `>`,
-		"text, then bad markup": planted + `<1>`,
-	}
-	defaultOnly := map[string]string{
+		"a stray end element":                  `</` + planted + `>`,
+		"text, then bad markup":                planted + `<1>`,
 		"text":                                 planted,
 		"text after a declaration":             `<?xml version="1.0"?>` + planted,
 		"a CDATA section":                      `<![CDATA[` + planted + `]]>`,
+		"a CDATA section of white space":       `<![CDATA[ ]]>`,
+		"a character reference to a space":     `&#32;`,
 		"a second document type":               `<!DOCTYPE template><!DOCTYPE ` + planted + `>`,
 		"another declaration":                  `<!ENTITY ` + planted + ` "x">`,
 		"a second XML declaration":             `<?xml version="1.0"?><?xml version="1.0" extra="` + planted + `"?>`,
@@ -303,33 +306,30 @@ func TestREQ176_REQ111_ReadOperationalTemplateHoldsContentBeforeTheRoot(t *testi
 		"an XML declaration after a line feed": "\n" + `<?xml version="1.0"?>`,
 		"an xml target in capitals":            `<?XML ` + planted + `?>`,
 		"an xml target in the subset":          `<!DOCTYPE template [<?xml ` + planted + `?>]>`,
+		"a document type with no name":         `<!DOCTYPE >`,
+		"a name that starts with a digit":      `<!DOCTYPE 1x>`,
+		"no system literal":                    `<!DOCTYPE template SYSTEM>`,
+		"a public id alone":                    `<!DOCTYPE template PUBLIC "a">`,
+		"an unknown declaration in the subset": `<!DOCTYPE template [<!FOO>]>`,
+		"text in the subset":                   `<!DOCTYPE template [ ` + planted + ` ]>`,
 	}
 	accepted := map[string]string{
-		"nothing":                       "",
-		"whitespace":                    " \n\t\r\n",
-		"a target that starts with xml": `<?xml version="1.0"?><?xml-stylesheet href="a.xsl"?>`,
-		"the XML declaration":           `<?xml version="1.0" encoding="UTF-8"?>` + "\n",
-		"a comment":                     `<!-- note -->`,
-		"a processing instruction":      `<?pi data?>`,
-		"one document type":             `<!DOCTYPE template>`,
-		"all of them":                   `<?xml version="1.0"?><!-- note --><!DOCTYPE template><?pi data?>` + "\n",
+		"nothing":                         "",
+		"whitespace":                      " \n\t\r\n",
+		"a target that starts with xml":   `<?xml version="1.0"?><?xml-stylesheet href="a.xsl"?>`,
+		"the XML declaration":             `<?xml version="1.0" encoding="UTF-8"?>` + "\n",
+		"a comment":                       `<!-- note -->`,
+		"a processing instruction":        `<?pi data?>`,
+		"one document type":               `<!DOCTYPE template>`,
+		"one document type with a subset": `<!DOCTYPE template SYSTEM "t.dtd" [<!ELEMENT template ANY>]>`,
+		"all of them":                     `<?xml version="1.0"?><!-- note --><!DOCTYPE template><?pi data?>` + "\n",
 	}
 	for mode, opts := range readModes {
 		for name, head := range refused {
 			t.Run(mode+"/refused/"+name, func(t *testing.T) {
 				t.Parallel()
-				refusesContentOutsideTheRoot(t, head+readTemplate, planted, opts...)
-			})
-		}
-		for name, head := range defaultOnly {
-			t.Run(mode+"/default mode only/"+name, func(t *testing.T) {
-				t.Parallel()
 				for _, bom := range []string{"", "\ufeff"} {
-					if mode == "strict" {
-						refusesContentOutsideTheRoot(t, bom+head+readTemplate, planted, opts...)
-						continue
-					}
-					readsTemplateT(t, bom+head+readTemplate, opts...)
+					refusesContentOutsideTheRoot(t, bom+head+readTemplate, planted, opts...)
 				}
 			})
 		}

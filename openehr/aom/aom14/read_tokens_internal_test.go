@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -36,7 +37,7 @@ func secondReadingOf(data []byte, strict bool) secondReading {
 	if strict {
 		opts = append(opts, canxml.WithStrict())
 	}
-	ot, err := readDocument(bufio.NewReader(bytes.NewReader(data)), opts, strict)
+	ot, err := readDocument(bufio.NewReader(bytes.NewReader(data)), opts)
 	if err != nil {
 		return secondReading{}
 	}
@@ -50,10 +51,19 @@ func secondReadingOf(data []byte, strict bool) secondReading {
 		if strict {
 			second = append(second, canxml.WithStrict())
 		}
-		ot2, err := readDocument(bufio.NewReader(bytes.NewReader(read)), second, strict)
+		ot2, err := readDocument(bufio.NewReader(bytes.NewReader(read)), second)
 		r.differs = err != nil || !reflect.DeepEqual(ot, ot2)
 	}
 	return r
+}
+
+// overAsked are the templates, sorted, for which the token facts ask for a
+// second reading that changes nothing, in both modes: each holds a C_BOOLEAN
+// item with an assumed value, which the facts cannot tell from one the reader
+// reads as none.
+var overAsked = []string{
+	"../../../testkit/corpus/templates/IDCR - Vital Signs Encounter.v1.opt",
+	"testdata/reader/values-every-mode.read.opt",
 }
 
 // templateRoots are the folders that hold the operational templates of the
@@ -102,11 +112,17 @@ func templateFiles(t testing.TB) []string {
 // first decode ask for no second reading, that reading reads the document as
 // the first decode did: the facts never skip a reading the reader needs.
 //
+// It also pins the other side: the facts ask for a second reading that changes
+// nothing only for the templates overAsked names, so ordinary templates stay
+// decoded once.
+//
 // Can-fail control: drop the definition fact from needsTolerance, and
 // testdata/reader/definition-type.opt, in both modes, and the parity
 // exceptions definition_archetype_slot.opt and
-// definition_primitive_constraint.opt read otherwise. The reader's behaviour
-// tests hold the other facts.
+// definition_primitive_constraint.opt read otherwise. Let any value element
+// with no text count as empty, so that the facts ask for every template, and
+// the decoded corpus templates other than overAsked are each reported. The
+// reader's behaviour tests hold the other facts.
 func TestREQ111_TokenFactsMissNoSecondReading(t *testing.T) {
 	t.Parallel()
 	files := templateFiles(t)
@@ -115,6 +131,7 @@ func TestREQ111_TokenFactsMissNoSecondReading(t *testing.T) {
 	}
 	for _, strict := range []bool{false, true} {
 		var decoded, asked, needed int
+		var extra []string
 		for _, path := range files {
 			data, err := os.ReadFile(path)
 			if err != nil {
@@ -127,6 +144,9 @@ func TestREQ111_TokenFactsMissNoSecondReading(t *testing.T) {
 			decoded++
 			if r.asked {
 				asked++
+				if !r.differs {
+					extra = append(extra, filepath.ToSlash(path))
+				}
 			}
 			if r.differs {
 				needed++
@@ -134,6 +154,9 @@ func TestREQ111_TokenFactsMissNoSecondReading(t *testing.T) {
 					t.Errorf("strict=%v %s: the token facts ask for no second reading, which reads the document otherwise", strict, path)
 				}
 			}
+		}
+		if slices.Sort(extra); !slices.Equal(extra, overAsked) {
+			t.Errorf("strict=%v: the token facts ask for a second reading that changes nothing of\n%q\nwant only\n%q", strict, extra, overAsked)
 		}
 		if needed == 0 {
 			t.Errorf("strict=%v: no template of the %d decoded needs a second reading, want the corpus to hold one", strict, decoded)

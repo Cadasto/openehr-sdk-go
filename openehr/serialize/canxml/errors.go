@@ -16,10 +16,11 @@ import (
 // inside a [DecodeError] that names the element (see [Unmarshal]); through
 // [Unmarshal], for content before the root element other than the XML
 // declaration, comments, processing instructions, whitespace and one
-// document type declaration, and after it other than comments, processing
-// instructions and whitespace, and for a processing instruction whose
+// well-formed document type declaration, and after it other than comments,
+// processing instructions and whitespace, for a processing instruction whose
 // target is xml in any letter case anywhere but the XML declaration at the
-// start, those three together with [ErrNotWellFormed]; and for an interval side written bounded with no bound where the
+// start, and for a `<!…>` declaration inside the root, those four together
+// with [ErrNotWellFormed]; and for an interval side written bounded with no bound where the
 // bound is held by value. Encode returns it for a nil value or a value that
 // does not implement xml.Marshaler. Other XML
 // syntax errors come back unchanged from encoding/xml, so an errors.Is
@@ -40,8 +41,12 @@ var ErrInvalidShape = xmlunmatched.ErrInvalidShape
 //   - a processing instruction whose target is xml in any letter case
 //     anywhere but the XML declaration at the very start, after a UTF-8 byte
 //     order mark at most, whether before, inside or after the root;
+//   - a `<!…>` declaration, such as a document type declaration, inside the
+//     root;
 //   - content before or after the root element that XML does not allow
-//     there, such as text, an end element, a second root or markup
+//     there, such as text, a CDATA section or a character reference even
+//     where it stands for whitespace, an end element, a second root, a
+//     document type declaration XML's grammar does not allow, or markup
 //     encoding/xml cannot read after the root, apart from such markup before
 //     the root with nothing refused before it, which may be the root's own
 //     start tag.

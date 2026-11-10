@@ -81,11 +81,11 @@ It reads as well, in its default mode:
 - a `<children>` typed `C_COMPLEX_OBJECT` that carries an archetype id, as `C_ARCHETYPE_ROOT`;
 - a `<children>` typed with a `C_PRIMITIVE` class, as a `C_PRIMITIVE_OBJECT` leaf that carries it;
 - an `<item>` typed `C_CODE_PHRASE`, `C_DV_QUANTITY`, `C_DV_ORDINAL` or `CONSTRAINT_REF`, as the object that holds it, of the item's class, and one typed `C_PRIMITIVE_OBJECT` as the item it holds;
-- a `C_REAL` value, or a `C_DV_QUANTITY` magnitude bound, that Go's float parse reads and XML Schema's `double` does not, such as `Inf`, `0x1p-2` or more digits than a `double` holds, as the number Go reads;
-- content before the root element that `encoding/xml` reads, such as text or a CDATA section, and a directive (`<!…>`) or a processing instruction whose target is `xml`, in any letter case, after it, each of which it reads past.
+- a `C_REAL` value, or a `C_DV_QUANTITY` magnitude bound, that Go's float parse reads and XML Schema's `double` does not, such as `Inf`, `0x1p-2` or more digits than a `double` holds, as the number Go reads.
 
 What a tolerance leaves out, such as the attributes of that leaf, is unmatched content, which the report option of [wire.md § REQ-170](wire.md#req-170--unmatched-content-on-decode) reports.
-Content the reader refuses before or after the root element, in either mode, and an element that carries one attribute twice outside what a tolerance leaves out are not well-formed XML: the error wraps `canxml.ErrNotWellFormed` as well as `canxml.ErrInvalidShape`, as for `canxml.Unmarshal` ([wire.md § REQ-056](wire.md#req-056)).
+Well-formedness does not depend on the mode: in both, the reader holds what comes before, inside and after the root element to the rules of `canxml.Unmarshal` ([wire.md § REQ-056](wire.md#req-056)).
+Content it refuses there, and an element that carries one attribute twice outside what a tolerance leaves out, are not well-formed XML: the error wraps `canxml.ErrNotWellFormed` as well as `canxml.ErrInvalidShape`.
 Markup before the root that `encoding/xml` cannot read fails as its `*xml.SyntaxError` instead, unless content `canxml.Unmarshal` refuses comes before it: the reader then refuses that content in either mode.
 The reader refuses, in every mode, four readings, the first three with an error wrapping `canxml.ErrInvalidShape`:
 

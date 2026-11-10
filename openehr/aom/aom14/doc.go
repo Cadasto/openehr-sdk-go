@@ -40,9 +40,8 @@
 // has two modes. The default mode reads shapes and values the AM
 // Release-1.4 schemas do not allow, which operational templates in use
 // hold, such as a constraint object with no type, a <children> typed with
-// a primitive class, a real number written as Go reads one, an element in
-// another namespace, or text before the root element, each in a weaker
-// form the function gives. Given [canxml.WithStrict], the strict mode
+// a primitive class, a real number written as Go reads one, or an element
+// in another namespace, each in a weaker form the function gives. Given [canxml.WithStrict], the strict mode
 // reads the document as the schemas write it: it refuses each of those
 // shapes and values, and any content the model does not read, keeping only
 // the readings the function lists for every mode, such as the v2 namespace

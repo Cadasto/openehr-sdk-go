@@ -26,21 +26,24 @@
 //
 //   - One root element per document. [Unmarshal] refuses an element, or
 //     text other than whitespace, after the root, and text, an end element
-//     or markup other than one document type declaration before it, in
-//     every mode, with [ErrInvalidShape] and [ErrNotWellFormed]. Comments, processing
-//     instructions and whitespace are accepted on either side of the root,
-//     as XML allows them, and so are, before it, the XML declaration, one
-//     document type declaration and a UTF-8 byte order mark at the very
-//     start. XML reserves the processing instruction target xml, in any
-//     letter case, for the XML declaration, which nothing but the byte
-//     order mark may precede, so [Unmarshal] refuses one elsewhere, before,
-//     inside or after the root, such as one after whitespace, a second
-//     declaration or one inside an element, with [ErrInvalidShape] and
-//     [ErrNotWellFormed], and so does a [Decoder] given [WithUnmatched],
-//     [WithStrict], [WithMissing], [WithPresence], [WithStringText] or a
-//     positive [WithMaxDepth] inside the
-//     value it decodes; a target that only starts with those letters, such
-//     as xml-stylesheet, is accepted.
+//     or markup other than one well-formed document type declaration before
+//     it, in every mode, with [ErrInvalidShape] and [ErrNotWellFormed].
+//     Comments, processing instructions and whitespace are accepted on
+//     either side of the root, as XML allows them, and so are, before it,
+//     the XML declaration, one document type declaration and a UTF-8 byte
+//     order mark at the very start. Whitespace is the literal characters: a
+//     CDATA section or a character reference outside the root is refused,
+//     whatever it stands for. XML reserves the processing instruction target
+//     xml, in any letter case, for the XML declaration, which nothing but
+//     the byte order mark may precede, and allows a `<!…>` declaration only
+//     before the root, so [Unmarshal] refuses an instruction with that
+//     target elsewhere, such as one after whitespace, a second declaration
+//     or one inside an element, and a declaration inside the root, with
+//     [ErrInvalidShape] and [ErrNotWellFormed], and so does a [Decoder]
+//     given [WithUnmatched], [WithStrict], [WithMissing], [WithPresence],
+//     [WithStringText] or a positive [WithMaxDepth] inside the value it
+//     decodes; a target that only starts with those letters, such as
+//     xml-stylesheet, is accepted.
 //   - Default namespace: `http://schemas.openehr.org/v1`.
 //   - `xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"` is
 //     declared on the document root whenever any descendant carries

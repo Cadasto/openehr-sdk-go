@@ -106,6 +106,16 @@ func TestREQ056_UnmarshalOneRoot(t *testing.T) {
 		"xml target in capitals before":    {`<?XML ` + planted + `?>` + root, "content before the root element"},
 		"XML declaration after the root":   {root + `<?xml version="1.0"?>`, "content after the root element"},
 		"xml target in mixed case after":   {root + `<?XmL ` + planted + `?>`, "content after the root element"},
+		// White space outside the root is the literal characters alone: a
+		// CDATA section or a character reference is element content, whatever
+		// it stands for.
+		"CDATA section of white space before":       {`<![CDATA[ ]]>` + root, "content before the root element"},
+		"character reference to a space before":     {`&#32;` + root, "content before the root element"},
+		"CDATA section of white space after":        {root + `<![CDATA[ ]]>`, "content after the root element"},
+		"empty CDATA section after":                 {root + `<![CDATA[]]>`, "content after the root element"},
+		"character reference to a line feed after":  {root + "\n&#xA;", "content after the root element"},
+		"document type with no name":                {`<!DOCTYPE >` + root, "content before the root element"},
+		"document type with an unknown declaration": {`<!DOCTYPE counted [<!` + planted + `>]>` + root, "content before the root element"},
 	}
 	for mode, tracker := range documentModes() {
 		for name, in := range accepted {
@@ -175,6 +185,233 @@ func TestREQ056_ReadPrologXMLTarget(t *testing.T) {
 			}
 			if strings.Contains(err.Error(), planted) {
 				t.Errorf("ReadProlog(%q) err = %q; it echoes the content", in, err)
+			}
+		})
+	}
+}
+
+// TestREQ056_ReadPrologRawForm pins that ReadProlog judges white space by how
+// it is written, as Unmarshal does: literal white space passes before the
+// root, after a byte order mark too, and a CDATA section or a character
+// reference that stands for white space is refused, with an error that wraps
+// ErrInvalidShape and ErrNotWellFormed; and that it holds the one document
+// type declaration to its grammar.
+//
+// Can-fail control: judge text by what it decodes to and the CDATA and
+// character-reference rows read; judge a document type by its keyword alone
+// and the malformed one reads.
+func TestREQ056_ReadPrologRawForm(t *testing.T) {
+	const root = `<counted><n>1</n></counted>`
+	accepted := map[string]string{
+		"literal white space":            " \t\r\n" + root,
+		"after a byte order mark":        "\ufeff \n" + root,
+		"after the XML declaration":      `<?xml version="1.0"?>` + "\n" + root,
+		"a well-formed document type":    `<!DOCTYPE counted [<!ELEMENT counted ANY>]>` + root,
+		"white space after the document": `<!DOCTYPE counted>` + " \n" + root,
+	}
+	refused := map[string]string{
+		"CDATA section of white space":     `<![CDATA[ ]]>` + root,
+		"character reference to a space":   `&#32;` + root,
+		"character reference to a tab":     `<?xml version="1.0"?>&#x9;` + root,
+		"white space, then a CDATA":        " <![CDATA[\n]]>" + root,
+		"a document type with no name":     `<!DOCTYPE >` + root,
+		"a document type's stray text":     `<!DOCTYPE counted [ junk ]>` + root,
+		"after a byte order mark, a CDATA": "\ufeff<![CDATA[ ]]>" + root,
+	}
+	for name, in := range accepted {
+		t.Run("accepted/"+name, func(t *testing.T) {
+			if _, err := ReadProlog(bufio.NewReader(strings.NewReader(in))); err != nil {
+				t.Errorf("ReadProlog(%q) = %v; want nil", in, err)
+			}
+		})
+	}
+	for name, in := range refused {
+		t.Run("refused/"+name, func(t *testing.T) {
+			_, err := ReadProlog(bufio.NewReader(strings.NewReader(in)))
+			if !errors.Is(err, ErrInvalidShape) || !errors.Is(err, ErrNotWellFormed) {
+				t.Errorf("ReadProlog(%q) err = %v; want errors.Is(_, ErrInvalidShape) and errors.Is(_, ErrNotWellFormed)", in, err)
+			}
+		})
+	}
+}
+
+// TestREQ056_DoctypeWellFormed pins the grammar the one document type
+// declaration before the root is held to (XML 1.0 § 2.8, doctypedecl): a
+// name after DOCTYPE and white space; SYSTEM and one quoted system literal,
+// or PUBLIC, a quoted public id of the characters PubidChar allows and a
+// system literal, each after white space; and an internal subset of markup
+// declarations (ELEMENT, ATTLIST, ENTITY, NOTATION, each with white space and
+// a name, closed outside its quoted literals and holding no `<` outside
+// them), processing instructions whose target is a name other than xml,
+// comments, parameter-entity references and white space. What each markup
+// declaration holds after its name is not judged further.
+//
+// Can-fail control: a malformed row breaks one rule where it can, so that
+// dropping that rule's check alone, such as the refusal of `<` in a markup
+// declaration, the name a parameter-entity reference or a processing
+// instruction needs, or the white space before a literal, lets its row
+// through.
+func TestREQ056_DoctypeWellFormed(t *testing.T) {
+	wellFormed := []string{
+		`<!DOCTYPE x>`,
+		`<!DOCTYPE x >`,
+		"<!DOCTYPE\tx\n>",
+		`<!DOCTYPE é:x-1.y·>`,
+		`<!DOCTYPE _x>`,
+		`<!DOCTYPE x SYSTEM "x.dtd">`,
+		`<!DOCTYPE x SYSTEM 'a"b'>`,
+		`<!DOCTYPE x SYSTEM "">`,
+		`<!DOCTYPE x PUBLIC "-//A//DTD B 1.0//EN" "x.dtd">`,
+		`<!DOCTYPE x PUBLIC '-//A' 'x.dtd' >`,
+		`<!DOCTYPE x[]>`,
+		`<!DOCTYPE x []>`,
+		`<!DOCTYPE x [] >`,
+		`<!DOCTYPE x SYSTEM "x.dtd" [ ]>`,
+		`<!DOCTYPE x [<!ELEMENT x ANY>]>`,
+		`<!DOCTYPE x [<!ATTLIST x a CDATA "v>w]">]>`,
+		`<!DOCTYPE x [<!ENTITY e "<v>">]>`,
+		`<!DOCTYPE x [<!ENTITY % p 'v'> %p; ]>`,
+		`<!DOCTYPE x [<!NOTATION n SYSTEM "u">]>`,
+		`<!DOCTYPE x [<?pi data?><?pi?>]>`,
+		`<!DOCTYPE x [<?xml-stylesheet href="a"?>]>`,
+		`<!DOCTYPE x [<!-- a - <!DOCTYPE b> --><!---->]>`,
+		`<!DOCTYPE x [<!-- <?xml v?> -->]>`,
+		`<!DOCTYPE x [<!ENTITY e "<?xml v?>">]>`,
+		"<!DOCTYPE x [\n <!ELEMENT x ANY>\n <!-- c -->\n]>",
+	}
+	malformed := []string{
+		`<!DOCTYPE>`,
+		`<!DOCTYPE >`,
+		`<!DOCTYPEx>`,
+		`<!DOCTYPE 1x>`,
+		`<!DOCTYPE -x>`,
+		`<!DOCTYPE x SYSTEM>`,
+		`<!DOCTYPE x SYSTEM x.dtd>`,
+		`<!DOCTYPE x SYSTEM"x.dtd">`,
+		`<!DOCTYPE x SYSTEM "x.dtd`,
+		`<!DOCTYPE x system "x.dtd">`,
+		`<!DOCTYPE x PUBLIC "a">`,
+		`<!DOCTYPE x PUBLIC "a" >`,
+		`<!DOCTYPE x PUBLIC "a{b" "x.dtd">`,
+		`<!DOCTYPE x PUBLIC 'a'b' "x.dtd">`,
+		`<!DOCTYPE x PUBLIC "a""x.dtd">`,
+		`<!DOCTYPE x PUBLIC"a" "x.dtd">`,
+		`<!DOCTYPE x "x.dtd">`,
+		`<!DOCTYPE x junk>`,
+		`<!DOCTYPE x [] SYSTEM "x.dtd">`,
+		`<!DOCTYPE x [] junk>`,
+		`<!DOCTYPE x [<!FOO>]>`,
+		`<!DOCTYPE x [ junk ]>`,
+		`<!DOCTYPE x [<!ELEMENT>]>`,
+		`<!DOCTYPE x [<!ELEMENT 1x ANY>]>`,
+		`<!DOCTYPE x [<!ELEMENTx ANY>]>`,
+		`<!DOCTYPE x [<!element x ANY>]>`,
+		`<!DOCTYPE x [<!ELEMENT x <y>>]>`,
+		`<!DOCTYPE x [<!ELEMENT x <y>]>`,
+		`<!DOCTYPE x [<!ENTITY e "v>]>`,
+		`<!DOCTYPE x [<!ENTITY %p "v">]>`,
+		`<!DOCTYPE x [%p]>`,
+		`<!DOCTYPE x [% p;]>`,
+		`<!DOCTYPE x [%;]>`,
+		`<!DOCTYPE x [<?xml v?>]>`,
+		`<!DOCTYPE x [<?XML v?>]>`,
+		`<!DOCTYPE x [<?1pi v?>]>`,
+		`<!DOCTYPE x [<? v?>]>`,
+		`<!DOCTYPE x [<?pi v>]>`,
+		`<!DOCTYPE x [<?piv?x?>]>`,
+		`<!DOCTYPE x [<!-- a -- b -->]>`,
+		`<!DOCTYPE x [<!-- a --->]>`,
+		`<!DOCTYPE x [<!-- a >]>`,
+		`<!DOCTYPE x [<![CDATA[a]]>]>`,
+		`<!DOCTYPE x [`,
+		`<!DOCTYPE x [<!ELEMENT x ANY>`,
+		`<!DOCTYPE<!-- c --> x>`,
+		`<!DOCTYPE x<!-- c -->>`,
+		`<!DOCTYPE x>junk`,
+		`<!ENTITY x "v">`,
+	}
+	for _, d := range wellFormed {
+		if !doctypeWellFormed([]byte(d)) {
+			t.Errorf("doctypeWellFormed(%q) = false; want true", d)
+		}
+	}
+	for _, d := range malformed {
+		if doctypeWellFormed([]byte(d)) {
+			t.Errorf("doctypeWellFormed(%q) = true; want false", d)
+		}
+	}
+}
+
+// TestREQ056_MayHoldDeclaration pins what makes Unmarshal given no option
+// decode a document a second time, through a decoder that refuses a markup
+// declaration inside the root: `<!` in the document from its root on that
+// opens neither a comment nor a CDATA section. The scan reads comments, CDATA
+// sections and processing instructions in document order and skips each
+// whole, so one that holds `<!` or the opener of another neither counts nor
+// hides a declaration after it.
+//
+// Can-fail control: skip comments and CDATA sections but not processing
+// instructions, as the scan once did, and the rows with an instruction that
+// holds an opener report false.
+func TestREQ056_MayHoldDeclaration(t *testing.T) {
+	for _, tc := range []struct {
+		name, data string
+		want       bool
+	}{
+		{"no markup", `<a><b>1</b></a>`, false},
+		{"a comment", `<a><!-- c --></a>`, false},
+		{"a declaration in a comment", `<a><!-- <!DOCTYPE x> --></a>`, false},
+		{"a declaration in a CDATA section", `<a><![CDATA[<!DOCTYPE x>]]></a>`, false},
+		{"a document type", `<a><!DOCTYPE x></a>`, true},
+		{"an element declaration after a comment", `<a><!-- c --><b><!ELEMENT x ANY></b></a>`, true},
+		{"one after a CDATA section", `<a><![CDATA[x]]><!x></a>`, true},
+		{"one after the root", `<a/><!DOCTYPE x>`, true},
+		{"an unclosed comment", `<a><!-- <!DOCTYPE x></a>`, false},
+		{"an unclosed CDATA section", `<a><![CDATA[<!DOCTYPE x></a>`, false},
+		{"a declaration in an instruction", `<a><?pi <!DOCTYPE x> ?></a>`, false},
+		{"one after an instruction that holds a comment opener", `<a><?pi <!-- ?><!DOCTYPE x></a>`, true},
+		{"one after an instruction that holds a CDATA opener", `<a><?pi <![CDATA[ ?><b><!x></b></a>`, true},
+		{"one after a comment that holds an instruction opener", `<a><!-- <? --><!DOCTYPE x></a>`, true},
+		{"one after a CDATA section that holds an instruction opener", `<a><![CDATA[<?]]><!x></a>`, true},
+		{"an instruction after a declaration", `<a><!x><?pi?></a>`, true},
+		{"many instructions and comments", strings.Repeat(`<?pi <!-- ?><!-- <? -->`, 50) + `<!x>`, true},
+		{"an unclosed instruction", `<a><?pi <!DOCTYPE x></a>`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := mayHoldDeclaration([]byte(tc.data)); got != tc.want {
+				t.Errorf("mayHoldDeclaration(%q) = %t; want %t", tc.data, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestREQ056_ReadAfterRootJudgesEachTokenAsWritten pins that ReadAfterRoot,
+// which keeps the bytes of one token at a time, judges each token by its own
+// bytes however many come before it: white space as written passes after any
+// number of comments, processing instructions and white space, and a CDATA
+// section or a character reference after them is refused.
+//
+// Can-fail control: let go of the bytes past the token too, or slice them
+// from the wrong base, and the refused rows pass or the accepted ones fail.
+func TestREQ056_ReadAfterRootJudgesEachTokenAsWritten(t *testing.T) {
+	lead := strings.Repeat("<!-- a comment -->\n<?pi data?> \r\n", 200)
+	for _, tc := range []struct {
+		name, rest string
+		refused    bool
+	}{
+		{name: "white space after many tokens", rest: lead + " \t\r\n"},
+		{name: "nothing after many tokens", rest: lead},
+		{name: "CDATA of white space after many tokens", rest: lead + "<![CDATA[ ]]>", refused: true},
+		{name: "a reference after many tokens", rest: lead + "&#32;", refused: true},
+		{name: "white space, then a reference", rest: lead + "\n &#xA;", refused: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ReadAfterRoot(strings.NewReader(tc.rest))
+			if tc.refused != (err != nil) {
+				t.Fatalf("ReadAfterRoot(%d bytes) = %v; want refused %t", len(tc.rest), err, tc.refused)
+			}
+			if err != nil && (!errors.Is(err, ErrInvalidShape) || !errors.Is(err, ErrNotWellFormed)) {
+				t.Errorf("ReadAfterRoot err = %v; want errors.Is(_, ErrInvalidShape) and errors.Is(_, ErrNotWellFormed)", err)
 			}
 		})
 	}
