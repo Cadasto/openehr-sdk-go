@@ -256,3 +256,20 @@ func TestREQ053EmptyStartTimeBesideCtxTime(t *testing.T) {
 		})
 	}
 }
+
+// TestREQ053EmptyTemporalDecoratedUnderAnotherSpelling — REQ-053. An
+// _accuracy key that spells the event without its :0 decorates the same
+// value as the bare "" spelled with it, so the "" stays a value: the body
+// decodes as the one spelling both keys alike does.
+func TestREQ053EmptyTemporalDecoratedUnderAnotherSpelling(t *testing.T) {
+	wt, _ := conformanceTarget(t)
+	leaf := emptyTemporalEvent + "/dv_date_time"
+	_, want := decodeLoneValue(t, wt, mustJSON(t, emptyTemporalBody(map[string]any{leaf: "", leaf + "/_accuracy": "PT1S"})))
+	_, got := decodeLoneValue(t, wt, mustJSON(t, emptyTemporalBody(map[string]any{
+		leaf: "",
+		emptyTemporalObs + "/any_event/dv_date_time/_accuracy": "PT1S",
+	})))
+	if string(got) != string(want) {
+		t.Errorf("an _accuracy spelled without the event's :0 decodes to\n%s\nwant what the :0 spelling decodes to\n%s", got, want)
+	}
+}

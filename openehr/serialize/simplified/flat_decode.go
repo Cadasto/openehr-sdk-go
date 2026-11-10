@@ -204,6 +204,9 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 		groups[base][suffix] = val
 		keys[base][suffix] = key
 	}
+	// A value decoration beside a leaf's bare "" keeps the "" a value
+	// ([leafSuffixes]).
+	decorations := decoratingFamilies(attrGroups)
 	// Process leaf groups in a stable (sorted) order so the reconstructed tree
 	// is deterministic: distinct-node-id siblings are appended in this order,
 	// which must not depend on Go map iteration. [orderByTemplate] later puts
@@ -229,7 +232,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 		if err != nil {
 			return nil, fmt.Errorf("simplified: %q: %w", base, err)
 		}
-		sfx, err := leafSuffixes(leaf, groups[base], keyOf, sink)
+		sfx, err := leafSuffixes(leaf, groups[base], keyOf, sink, decoratesValue(leaf, sib, decorations[indexedPath(base)]))
 		if err != nil {
 			return nil, err
 		}
@@ -354,11 +357,22 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 // dropped without a word, so a leaf whose keys are all null comes back empty,
 // and a null key is never refused for want of a carrier. A key the decode
 // does not read goes to sink whatever its value.
-func leafSuffixes(leaf *webtemplate.Node, sfx map[string]any, keyOf func(string) string, sink *unmatchedSink) (map[string]any, error) {
+//
+// A bare "" at a leaf of [unsetStringType] is absent the same way where no
+// other key of the leaf the decode reads holds a value and decorated is
+// false: encode writes no key for that value, so a decode, encode and decode
+// keeps the composition (REQ-053). decorated reports whether an underscore
+// family decorates the leaf's value ([decoratesValue]); one keeps the "", as
+// a suffix does, since a decoration with no value is refused.
+func leafSuffixes(leaf *webtemplate.Node, sfx map[string]any, keyOf func(string) string, sink *unmatchedSink, decorated bool) (map[string]any, error) {
 	rmType := nodeRMType(leaf)
 	if len(leaf.Children) == 0 {
 		if _, judged := leafSuffixMatched(rmType, ""); judged {
-			return matchedSuffixes(rmType, sfx, keyOf, sink), nil
+			out := matchedSuffixes(rmType, sfx, keyOf, sink)
+			if !decorated && unsetBareValue(rmType, out) {
+				return nil, nil
+			}
+			return out, nil
 		}
 	}
 	out := maps.Clone(sfx)
@@ -398,6 +412,63 @@ func leafSuffixes(leaf *webtemplate.Node, sfx map[string]any, keyOf func(string)
 		}
 	}
 	return out, nil
+}
+
+// unsetBareValue reports whether sfx, the suffixes the decode reads at a leaf
+// of rmType, is a bare "" alone at one of [unsetStringType].
+func unsetBareValue(rmType string, sfx map[string]any) bool {
+	v, bare := sfx[""]
+	return bare && len(sfx) == 1 && v == "" && unsetStringType(rmType)
+}
+
+// decoratingFamilies returns the families of the underscore groups that hold
+// a value, by the [indexedPath] of the node each one is at. A group whose
+// keys all hold JSON null is absent (REQ-053) and decorates nothing.
+func decoratingFamilies(groups []rmattrGroup) map[string][]string {
+	out := make(map[string][]string)
+	for _, g := range groups {
+		if allNull(g.tails) {
+			continue
+		}
+		at := indexedPath(g.base)
+		out[at] = append(out[at], g.family)
+	}
+	return out
+}
+
+// decoratesValue reports whether one of families is a value decoration the
+// decode reads at leaf: leaf is a collapsed ELEMENT's value, and the family
+// is judged against its datatype, as [rmattrOwnerAt] and [rmattrFamilyOf]
+// judge it. A family of the ELEMENT itself, such as _null_flavour, decorates
+// no value.
+func decoratesValue(leaf *webtemplate.Node, sib *reusedSiblings, families []string) bool {
+	if len(families) == 0 || len(leaf.Children) > 0 || !strings.HasSuffix(sib.nodePath(leaf), "/value") {
+		return false
+	}
+	for _, family := range families {
+		if fam, _, read := rmattrFamilyOf("ELEMENT", nodeRMType(leaf), family); read && fam.value {
+			return true
+		}
+	}
+	return false
+}
+
+// indexedPath spells a FLAT path with an index on every segment, :0 where
+// the segment carries none, which addresses the same node ([resolveLeaf]).
+// A path that does not parse comes back as written.
+func indexedPath(path string) string {
+	pk, err := parseFlatKey(path)
+	if err != nil {
+		return path
+	}
+	var b strings.Builder
+	for i, seg := range pk.segs {
+		if i > 0 {
+			b.WriteByte('/')
+		}
+		writeFlatSeg(&b, flatSeg{id: seg.id, idx: max(seg.idx, 0)})
+	}
+	return b.String()
 }
 
 // unmappedReads reports whether suffix names an attribute of the RM class of
@@ -896,7 +967,11 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 			continue
 		}
 		if ctxKey, isAlias := metadataAliases[rel]; isAlias {
-			if val == nil {
+			// A "" at the start time's real path is absent as a null is,
+			// since its leaf is a DV_DATE_TIME ([leafSuffixes], REQ-053). Any
+			// other key of that leaf the decode reads is refused below, so the
+			// "" is alone wherever the decode goes on.
+			if val == nil || (val == "" && unsetStringType(metadataOwnedBaseType[rel])) {
 				continue
 			}
 			if err := putCtx(ctx, ctxOrigin, ctxKey, val, key); err != nil {

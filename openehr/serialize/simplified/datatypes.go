@@ -225,10 +225,12 @@ func emitLeafValue(out map[string]any, flatPath string, v any, rmType string, li
 		// for the RM-mandatory value string, so a Web Template leaf writes no
 		// key for it: a decode that gives an EVENT with no time, or an
 		// INTERVAL_EVENT with no width, an empty one re-encodes without a key
-		// the input never carried. One that carries a decoration keeps its ""
-		// key, because decode refuses a decoration with no value. An interval
-		// bound is not a leaf (decorated is false there), and keeps its "" for
-		// the bound refusals of [intervalBoundToFlat].
+		// the input never carried. Decode reads a lone "" at such a leaf as
+		// absent ([leafSuffixes]), so the round trip keeps the composition. One
+		// that carries a decoration keeps its "" key, because decode refuses a
+		// decoration with no value. An interval bound is not a leaf (decorated
+		// is false there), and keeps its "" for the bound refusals of
+		// [intervalBoundToFlat].
 		if decorated && unsetStringValue(sfxType, m) {
 			return "", nil
 		}
@@ -249,14 +251,22 @@ func emitLeafValue(out map[string]any, flatPath string, v any, rmType string, li
 		ErrUnsupportedDatatype, flatPath, rmType)
 }
 
-// unsetStringValue reports whether m, the canonical form of a value of
-// rmType, is a DV_DATE_TIME, DV_DATE, DV_TIME, DV_DURATION, DV_URI or
-// DV_EHR_URI whose value is the empty string and which carries no other
-// attribute.
-func unsetStringValue(rmType string, m map[string]any) bool {
+// unsetStringType reports whether rmType is a DV_DATE_TIME, DV_DATE,
+// DV_TIME, DV_DURATION, DV_URI or DV_EHR_URI: a datatype whose RM-mandatory
+// value is a string, the empty one of which stands for "not set".
+func unsetStringType(rmType string) bool {
 	switch rmType {
 	case "DV_DATE_TIME", "DV_DATE", "DV_TIME", "DV_DURATION", "DV_URI", "DV_EHR_URI":
-	default:
+		return true
+	}
+	return false
+}
+
+// unsetStringValue reports whether m, the canonical form of a value of
+// rmType, is one of [unsetStringType] whose value is the empty string and
+// which carries no other attribute.
+func unsetStringValue(rmType string, m map[string]any) bool {
+	if !unsetStringType(rmType) {
 		return false
 	}
 	for k, v := range m {
