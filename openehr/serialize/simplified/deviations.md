@@ -468,7 +468,10 @@ partially or silently accepted.
   drift; an OPT-free decode synthesises nothing and stays byte-identical (both pinned by
   `TestSettingWithTemplateDefaultRoundTrip`). The ACTIVITY `action_archetype_id` default
   (since 2026-11-10) is visible too: encode writes the in-context leaf, so a body that left
-  it out re-encodes with `…/action_archetype_id` gained. The other completions stay invisible on
+  it out re-encodes with `…/action_archetype_id` gained. So are the times a body left out:
+  a completed `EVENT.time` re-encodes at its event's `…/time` key, and a `WithDefaultTime`
+  start time as `ctx/time`, except on a persistent composition, where the default builds no
+  context to carry it. The other completions stay invisible on
   re-encode: the names it gives the nodes below the root never leak into FLAT, and
   origin/encoding have no emitted
   surface. `subject` acquired one on 2026-08-05 (Phase C2) and stays invisible anyway,
