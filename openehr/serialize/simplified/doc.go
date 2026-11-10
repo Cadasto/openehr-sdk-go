@@ -95,7 +95,8 @@
 // carries nothing to refuse. An empty string at the bare value of a
 // DV_DATE_TIME, DV_DATE, DV_TIME, DV_DURATION, DV_URI or DV_EHR_URI leaf is
 // absent the same way where no other key decorates that value, since encode
-// writes no key for it. A key the decode does not read is unmatched
+// writes no key for it, and so is an empty ctx/time, which spells the start
+// time, a DV_DATE_TIME. A key the decode does not read is unmatched
 // whatever its value. In STRUCTURED a null member or array element reads the
 // same way, and OPT-free conversion carries it to FLAT as a key holding null.
 // Two spellings of a key the decode does not read are two unmatched keys. A

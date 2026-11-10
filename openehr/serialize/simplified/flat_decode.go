@@ -868,7 +868,8 @@ func MetadataWitnessSpellings() []string {
 // outside that leaf's datatype, go to sink as unmatched content (REQ-170),
 // whatever their value. A ctx/ field, an alias, a witness or a ctx/-owned leaf
 // suffix the decode reads that holds JSON null is absent (REQ-053) and is
-// dropped.
+// dropped, and so is a "" at ctx/time or at the start time's real path, the
+// two spellings of a DV_DATE_TIME.
 //
 // Every other key at the composer's real path (`<root>/composer|id`,
 // `<root>/composer/_identifier:0|id`, …) goes to composer, one party group
@@ -892,8 +893,12 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 				continue
 			}
 			// A ctx/ field the decode reads that holds null is absent
-			// (REQ-053): a null ctx/language is a missing one.
-			if val == nil {
+			// (REQ-053): a null ctx/language is a missing one. ctx/time
+			// spells the start time, a DV_DATE_TIME, so a "" there is
+			// absent as a "" at the start time's real path is (below), and
+			// neither spelling's "" disagrees with the other's time. Every
+			// other ctx/ field keeps its reading of "".
+			if val == nil || (key == "ctx/time" && val == "") {
 				continue
 			}
 			if key == ctxSettingBare {

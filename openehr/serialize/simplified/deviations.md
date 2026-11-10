@@ -529,10 +529,12 @@ partially or silently accepted.
   refuses a decoration with no value, and an interval bound keeps its refusal of an empty value.
   Decode reads a lone `""` at such a leaf, one beside no other suffix and no `_`-attribute key
   of its value, as absent, as it reads a `null`, so a decode, encode and decode keeps the
-  composition; a `""` at `<root>/context/start_time` beside `ctx/time` is therefore no second
-  spelling of the time. The reference refuses an empty date-time: its `DvDateTimeRMUnmarshaller`
-  passes `""` to `OpenEHRDateTimeParseUtils.parseDateTime`, which fails. Reading it as absent is
-  the SDK's, more lenient.
+  composition. A `""` at `ctx/time` is absent the same way as one at `<root>/context/start_time`,
+  the other spelling of that DV_DATE_TIME, so either beside the other is no second spelling of the
+  time; every other `ctx/` field keeps its reading of `""`. The reference refuses an empty
+  date-time: its `DvDateTimeRMUnmarshaller` passes `""` to
+  `OpenEHRDateTimeParseUtils.parseDateTime`, which fails. Reading it as absent is the SDK's,
+  more lenient.
 
 - **`:index` strictness** — a FLAT `:index` must be canonically spelled (`0`, `1`, …;
   negative, `+`, or zero-padded spellings are rejected — they would collide with other
