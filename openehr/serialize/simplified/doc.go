@@ -71,7 +71,8 @@
 // abstract EVENT node an event the body gives any of those three keys decodes
 // as an INTERVAL_EVENT, and any other as a POINT_EVENT. Decode reads
 // history_origin ahead of the origin [WithTemplate] derives, and encode writes
-// it unless it is, as written, the earliest time the events carry. Any other
+// it unless it holds nothing but a value that is, as written, the earliest
+// time the events carry. Any other
 // spelling of the four, such as "<event>/sample_count", is unmatched content.
 //
 // # Unmatched content

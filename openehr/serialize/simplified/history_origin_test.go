@@ -8,6 +8,7 @@ package simplified_test
 // decode would not derive the same origin from the events.
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -116,4 +117,69 @@ func TestREQ053HistoryOriginEncodes(t *testing.T) {
 	if v, written := flatOf(t, derived, wt)[historyOriginKey]; written {
 		t.Errorf("an origin at the earliest event time wrote %q = %#v", historyOriginKey, v)
 	}
+
+	// An origin at the earliest event time that holds more than its value is
+	// not the origin decode derives: encode writes it, decoration included.
+	const eventTime = "2021-12-21T16:02:58.0094262+01:00"
+	decorated := decodeWith(t, wt, eventBody(map[string]any{
+		historyOriginKey:                       eventTime,
+		historyOriginKey + "|magnitude_status": "~",
+	}), simplified.WithTemplate(compiled))
+	out := flatOf(t, decorated, wt)
+	if out[historyOriginKey] != eventTime || out[historyOriginKey+"|magnitude_status"] != "~" {
+		t.Errorf("a decorated origin at the earliest event time wrote %q = %#v and |magnitude_status = %#v, want %q and \"~\"",
+			historyOriginKey, out[historyOriginKey], out[historyOriginKey+"|magnitude_status"], eventTime)
+	}
+}
+
+// TestREQ053CodecLeavesAreSingleValued — REQ-053, REQ-170. Each attribute the
+// codec reads with no Web Template node is single-valued: a second STRUCTURED
+// element of one is past its bound and refused, whatever it holds, as an
+// element of a single-valued node is.
+func TestREQ053CodecLeavesAreSingleValued(t *testing.T) {
+	wt, _ := conformanceTarget(t)
+	for _, tc := range []struct {
+		name  string
+		event bool // the member sits on the event rather than the OBSERVATION
+		value any
+	}{
+		{"width", true, "PT1H"},
+		{"math_function", true, map[string]any{"|code": "146", "|value": "mean", "|terminology": "openehr"}},
+		{"history_origin", false, explicitOrigin},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			b, err := simplified.FlatToStructured(mustJSON(t, eventBody(nil)))
+			if err != nil {
+				t.Fatalf("FlatToStructured: %v", err)
+			}
+			var doc map[string]any
+			if err := json.Unmarshal(b, &doc); err != nil {
+				t.Fatal(err)
+			}
+			obs := firstElement(t, firstElement(t, doc["conformance-ehrbase.de.v0"].(map[string]any)["conformance_section"])["conformance_observation"])
+			holder := obs
+			if tc.event {
+				holder = firstElement(t, obs["any_event"])
+			}
+			holder[tc.name] = []any{tc.value, map[string]any{"x_unknown": "x"}}
+			_, err = simplified.UnmarshalStructured(mustJSON(t, doc), wt)
+			if !errors.Is(err, simplified.ErrUnknownPath) || !strings.Contains(err.Error(), "single-valued") {
+				t.Errorf("a second %s element: err = %v, want ErrUnknownPath naming it single-valued", tc.name, err)
+			}
+		})
+	}
+}
+
+// firstElement returns the first object of the STRUCTURED array v.
+func firstElement(t *testing.T, v any) map[string]any {
+	t.Helper()
+	arr, ok := v.([]any)
+	if !ok || len(arr) == 0 {
+		t.Fatalf("want a non-empty array, got %#v", v)
+	}
+	m, ok := arr[0].(map[string]any)
+	if !ok {
+		t.Fatalf("want an object, got %#v", arr[0])
+	}
+	return m
 }
