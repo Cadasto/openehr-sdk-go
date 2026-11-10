@@ -353,15 +353,21 @@ func writeFlatSeg(b *strings.Builder, s flatSeg) {
 // one on every run. Each group carries sink, which takes the keys its grammar
 // does not read.
 //
-// Keys are consumed from content: what stays behind is ordinary leaf data.
-func rmattrGroups(content map[string]any, sink *unmatchedSink) ([]rmattrGroup, error) {
+// Keys are consumed from content: what stays behind is ordinary leaf data. keys
+// holds content's keys in sorted order, each parsed once ([parseContentKeys]); a
+// key no longer in content is skipped, and the first one left that does not
+// parse is refused.
+func rmattrGroups(content map[string]any, keys []contentKey, sink *unmatchedSink) ([]rmattrGroup, error) {
 	byInstance := make(map[string]*rmattrGroup)
-	for _, key := range slices.Sorted(maps.Keys(content)) {
-		pk, err := parseFlatKey(key)
-		if err != nil {
-			return nil, err
+	for _, ck := range keys {
+		key := ck.key
+		if _, ok := content[key]; !ok {
+			continue
 		}
-		base, family, index, tail, isAttr := splitRMAttrKey(pk)
+		if ck.err != nil {
+			return nil, ck.err
+		}
+		base, family, index, tail, isAttr := splitRMAttrKey(ck.pk)
 		if !isAttr {
 			continue
 		}

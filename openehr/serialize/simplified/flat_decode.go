@@ -170,11 +170,14 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 	}
 	budget := &allocBudget{limit: maxTotalNodes}
 	sib := reusedSiblingsOf(wt)
+	// The three passes below walk content in sorted order and share one parse of
+	// each key; each skips the keys an earlier one took out of content.
+	parsed := parseContentKeys(content)
 	// The reference's in-context keys for RM attributes the Web Template this
 	// SDK builds does not model name RM data decode would drop: refused in every
 	// mode, before anything could set them aside as unmatched or the
 	// WithTemplate defaults replace them (REQ-170).
-	if err := refuseInContextKeys(content, wt, sib); err != nil {
+	if err := refuseInContextKeys(content, parsed, wt, sib); err != nil {
 		return nil, err
 	}
 	// Siphon off the composite leaves first — the ones whose FLAT form has
@@ -188,7 +191,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 	// grammar has. It has to run before the `_` router, which would otherwise claim
 	// `subject/_identifier:0` as a family whose owner is a leaf the grammar cannot
 	// judge.
-	compositeGroups, err := compositeLeafGroups(content, wt, sink)
+	compositeGroups, err := compositeLeafGroups(content, parsed, wt, sink)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +200,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 	// before it, so those keys are grouped per (owner path, family, :index) and
 	// routed by the owner's RM class instead of resolving to a leaf. What stays
 	// in content is ordinary template-constrained leaf data.
-	attrGroups, err := rmattrGroups(content, sink)
+	attrGroups, err := rmattrGroups(content, parsed, sink)
 	if err != nil {
 		return nil, err
 	}
@@ -2081,18 +2084,19 @@ var inContextAttrs = map[string]struct {
 // is unmatched content. A key that walks through one of several reused siblings
 // that no pinned name tells apart is left to the refusal that path gets.
 //
-// Keys are checked in sorted order, so a body with several names the same one on
-// every run. The error names the key, or the `_reason` family instance, and
-// carries no value. Such a key that holds JSON null carries no data to drop:
-// it is absent (REQ-053), and is removed from content.
-func refuseInContextKeys(content map[string]any, wt *webtemplate.WebTemplate, sib *reusedSiblings) error {
-	for _, key := range slices.Sorted(maps.Keys(content)) {
-		pk, err := parseFlatKey(key)
-		if err != nil {
+// keys holds content's keys in sorted order, each parsed once
+// ([parseContentKeys]), so a body with several names the same one on every run.
+// The error names the key, or the `_reason` family instance, and carries no
+// value. Such a key that holds JSON null carries no data to drop: it is absent
+// (REQ-053), and is removed from content.
+func refuseInContextKeys(content map[string]any, keys []contentKey, wt *webtemplate.WebTemplate, sib *reusedSiblings) error {
+	for _, ck := range keys {
+		key := ck.key
+		if ck.err != nil {
 			// A malformed index is refused where the key is decoded.
 			continue
 		}
-		named, owner, attr, ok := inContextKey(wt, key, pk, sib)
+		named, owner, attr, ok := inContextKey(wt, key, ck.pk, sib)
 		if !ok {
 			continue
 		}
@@ -2197,16 +2201,22 @@ func definingCodeOf(v any) map[string]any {
 // party / interval grammars decode it with no second mechanism (REQ-140 design
 // constraint 5).
 //
-// Keys are consumed from content: what stays behind is ordinary leaf data. Each
-// group carries sink, which takes the keys its grammar does not read.
-func compositeLeafGroups(content map[string]any, wt *webtemplate.WebTemplate, sink *unmatchedSink) ([]rmattrGroup, error) {
+// Keys are consumed from content: what stays behind is ordinary leaf data. keys
+// holds content's keys in sorted order, each parsed once ([parseContentKeys]); a
+// key no longer in content is skipped, and the first one left that does not
+// parse is refused. Each group carries sink, which takes the keys its grammar
+// does not read.
+func compositeLeafGroups(content map[string]any, keys []contentKey, wt *webtemplate.WebTemplate, sink *unmatchedSink) ([]rmattrGroup, error) {
 	byLeaf := make(map[string]*rmattrGroup)
-	for _, key := range slices.Sorted(maps.Keys(content)) {
-		pk, err := parseFlatKey(key)
-		if err != nil {
-			return nil, err
+	for _, ck := range keys {
+		key := ck.key
+		if _, ok := content[key]; !ok {
+			continue
 		}
-		base, family, index, tail, isComposite := splitCompositeLeafKey(wt, pk)
+		if ck.err != nil {
+			return nil, ck.err
+		}
+		base, family, index, tail, isComposite := splitCompositeLeafKey(wt, ck.pk)
 		if !isComposite {
 			continue
 		}
@@ -4656,4 +4666,25 @@ func parseFlatKey(key string) (parsedKey, error) {
 		segs = append(segs, seg)
 	}
 	return parsedKey{segs: segs, suffix: suffix}, nil
+}
+
+// contentKey is one FLAT content key with its [parseFlatKey] result: pk when
+// the key parses, err when it does not.
+type contentKey struct {
+	key string
+	pk  parsedKey
+	err error
+}
+
+// parseContentKeys parses each key of content once, in sorted order, for the
+// passes that walk content before the leaf loop. A key that does not parse
+// keeps its error, and each pass decides what that means for it.
+func parseContentKeys(content map[string]any) []contentKey {
+	keys := slices.Sorted(maps.Keys(content))
+	out := make([]contentKey, len(keys))
+	for i, key := range keys {
+		pk, err := parseFlatKey(key)
+		out[i] = contentKey{key: key, pk: pk, err: err}
+	}
+	return out
 }
