@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 	"weak"
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
@@ -103,6 +104,14 @@ func decodeFlatMap(flat map[string]any, wt *webtemplate.WebTemplate, cfg decodeC
 	var tmpl *templateIndex
 	if cfg.template != nil {
 		tmpl = templateIndexFor(cfg.template)
+		if !cfg.defaultTime.IsZero() {
+			// Every decode with the template shares the cached index, so the
+			// caller's time goes on a copy that this decode alone reads. It
+			// takes the form the instance generator writes its clock in.
+			withTime := *tmpl
+			withTime.startTime = cfg.defaultTime.UTC().Format(time.RFC3339)
+			tmpl = &withTime
+		}
 	}
 	compJSON, unmatched, err := decodeFlatIgnoring(flat, wt, tmpl, cfg.strict)
 	unmatched = slices.Concat(skipped, unmatched)
@@ -302,6 +311,14 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 	}
 	if tmpl != nil {
 		ci.category = tmpl.category
+		// A body with no start time in any spelling takes the caller's default
+		// as if its ctx/time held it, except that the default builds no context
+		// on a persistent composition (REQ-053). RM 1.0.4 allows that
+		// composition one, so a start time the body gives still builds it.
+		if !ci.haveTime && tmpl.startTime != "" {
+			ci.time, ci.haveTime = tmpl.startTime, true
+			ci.timeBuildsNoContext = persistentComposition(compJSON, ci)
+		}
 	}
 	composerJSON, err := decodeComposer(composer, ci, ctxOrigin)
 	if err != nil {
@@ -1160,6 +1177,11 @@ type ctxInfo struct {
 	// none. It is the zero codedName where the template fixes none, and in a
 	// decode without the template.
 	category codedName
+	// timeBuildsNoContext is set where time is the default start time
+	// ([templateIndex.startTime]) of a persistent composition
+	// ([persistentComposition]): it fills the times the body leaves out, and
+	// is the start time of a context the body builds, but builds none itself.
+	timeBuildsNoContext bool
 }
 
 // parseCtx decodes the ctx/ entries. Only the core context fields reach it:
@@ -1296,29 +1318,44 @@ func applyContext(compJSON map[string]any, ci ctxInfo, composer map[string]any) 
 	if composer != nil {
 		compJSON["composer"] = composer
 	}
-	if ci.haveTime || ci.haveSettingCode {
-		// Merge into any EVENT_CONTEXT already reconstructed from clinical paths
-		// (other_context, …) rather than replacing it — otherwise that data would
-		// be lost.
-		ctxObj, _ := compJSON["context"].(map[string]any)
-		if ctxObj == nil {
-			ctxObj = map[string]any{"_type": "EVENT_CONTEXT"}
-			compJSON["context"] = ctxObj
-		}
-		if ci.haveTime {
-			ctxObj["start_time"] = map[string]any{"_type": "DV_DATE_TIME", "value": ci.time}
-		}
-		if ci.haveSettingCode {
-			// parseCtx enforced the pair, and the terminology is the implied
-			// openehr (a real-path |terminology witness naming anything else was
-			// already refused in siphonContext) — REQ-053.
-			ctxObj["setting"] = map[string]any{
-				"_type": "DV_CODED_TEXT", "value": ci.settingValue,
-				"defining_code": codePhraseJSON(ci.settingCode, terminology.ID),
-			}
+	// Merge into any EVENT_CONTEXT already reconstructed from clinical paths
+	// (other_context, …) rather than replacing it — otherwise that data would
+	// be lost. A default start time on a persistent composition builds none,
+	// but is the start time of one the body builds (REQ-053).
+	ctxObj, _ := compJSON["context"].(map[string]any)
+	if ctxObj == nil && ((ci.haveTime && !ci.timeBuildsNoContext) || ci.haveSettingCode) {
+		ctxObj = map[string]any{"_type": "EVENT_CONTEXT"}
+		compJSON["context"] = ctxObj
+	}
+	if ctxObj == nil {
+		return nil
+	}
+	if ci.haveTime {
+		ctxObj["start_time"] = map[string]any{"_type": "DV_DATE_TIME", "value": ci.time}
+	}
+	if ci.haveSettingCode {
+		// parseCtx enforced the pair, and the terminology is the implied
+		// openehr (a real-path |terminology witness naming anything else was
+		// already refused in siphonContext) — REQ-053.
+		ctxObj["setting"] = map[string]any{
+			"_type": "DV_CODED_TEXT", "value": ci.settingValue,
+			"defining_code": codePhraseJSON(ci.settingCode, terminology.ID),
 		}
 	}
 	return nil
+}
+
+// persistentComposition reports whether compJSON, with ci, is a persistent
+// composition: whether its category, the one the body spells or else the one
+// [defaultAttr] gives it, is 431 `persistent` in the openehr terminology.
+func persistentComposition(compJSON map[string]any, ci ctxInfo) bool {
+	category, spelled := compJSON["category"].(map[string]any)
+	if !spelled {
+		category = defaultAttr("category", ci)
+	}
+	dc, _ := category["defining_code"].(map[string]any)
+	tid, _ := dc["terminology_id"].(map[string]any)
+	return dc["code_string"] == "431" && tid["value"] == terminology.ID
 }
 
 // completeRequired fills the RM-mandatory attributes the FLAT/STRUCTURED formats
@@ -2443,6 +2480,11 @@ type templateIndex struct {
 	// category is the composition category the template fixes ([categoryOf]),
 	// or the zero codedName where it fixes none.
 	category codedName
+	// startTime is the start time [WithDefaultTime] gives a body that carries
+	// none, as decode writes it, or "" for none. It is the caller's, not the
+	// template's: the cached index ([templateIndexFor]) never holds one, and
+	// [decodeFlatMap] sets it on a copy that one decode reads.
+	startTime string
 }
 
 // categoryOf returns the category the template fixes on root, its
