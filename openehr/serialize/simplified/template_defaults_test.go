@@ -335,16 +335,17 @@ func TestREQ053DefaultTimeOff(t *testing.T) {
 // builds no EVENT_CONTEXT but still fills the origin and the event time. An
 // EVENT_CONTEXT the body builds (with a setting, say) takes the default as its
 // start time, a body's own start time builds one as before, and a body
-// category other than persistent lets the default build one.
+// category other than persistent, code 431 in another terminology included,
+// lets the default build one.
 func TestREQ053DefaultTimeOnPersistent(t *testing.T) {
 	const bodyTime = "2019-03-22T22:00:00+01:00"
 	persistentWT, persistent := templateOf(t, persistentMinimalID)
 	eventWT, event := templateOf(t, minimalObservationID)
-	bodyCategory := func(root, code, text string) map[string]any {
+	bodyCategory := func(root, terminology, code, text string) map[string]any {
 		return map[string]any{
 			root + "/category|code":        code,
 			root + "/category|value":       text,
-			root + "/category|terminology": "openehr",
+			root + "/category|terminology": terminology,
 		}
 	}
 	cases := []struct {
@@ -360,24 +361,34 @@ func TestREQ053DefaultTimeOnPersistent(t *testing.T) {
 		validates bool
 	}{
 		{
-			"the template's category", persistentWT, persistent,
-			defaultsBody("persistent_minimal", nil), "", callerClockText, true,
+			name: "the template's category", wt: persistentWT, compiled: persistent,
+			body:  defaultsBody("persistent_minimal", nil),
+			start: "", times: callerClockText, validates: true,
 		},
 		{
-			"a body start time", persistentWT, persistent,
-			defaultsBody("persistent_minimal", map[string]any{"ctx/time": bodyTime}), bodyTime, bodyTime, true,
+			name: "a body start time", wt: persistentWT, compiled: persistent,
+			body:  defaultsBody("persistent_minimal", map[string]any{"ctx/time": bodyTime}),
+			start: bodyTime, times: bodyTime, validates: true,
 		},
 		{
-			"a body setting", persistentWT, persistent,
-			defaultsBody("persistent_minimal", map[string]any{"ctx/setting|code": "238"}), callerClockText, callerClockText, true,
+			name: "a body setting", wt: persistentWT, compiled: persistent,
+			body:  defaultsBody("persistent_minimal", map[string]any{"ctx/setting|code": "238"}),
+			start: callerClockText, times: callerClockText, validates: true,
 		},
 		{
-			"the body's category", eventWT, event,
-			defaultsBody("minimal", bodyCategory("minimal", "431", "persistent")), "", callerClockText, false,
+			name: "the body's category", wt: eventWT, compiled: event,
+			body:  defaultsBody("minimal", bodyCategory("minimal", "openehr", "431", "persistent")),
+			start: "", times: callerClockText, validates: false,
 		},
 		{
-			"a body category of event", persistentWT, persistent,
-			defaultsBody("persistent_minimal", bodyCategory("persistent_minimal", "433", "event")), callerClockText, callerClockText, false,
+			name: "a body category of event", wt: persistentWT, compiled: persistent,
+			body:  defaultsBody("persistent_minimal", bodyCategory("persistent_minimal", "openehr", "433", "event")),
+			start: callerClockText, times: callerClockText, validates: false,
+		},
+		{
+			name: "a body category coded 431 in another terminology", wt: eventWT, compiled: event,
+			body:  defaultsBody("minimal", bodyCategory("minimal", "local", "431", "persistent")),
+			start: callerClockText, times: callerClockText, validates: false,
 		},
 	}
 	for _, tc := range cases {
