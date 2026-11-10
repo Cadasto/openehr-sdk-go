@@ -2,20 +2,23 @@ package simplified
 
 import (
 	"errors"
+	"time"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
 // Option configures a decode (UnmarshalFlat / UnmarshalStructured).
-// [WithTemplate] supplies the compiled template; [WithUnmatched] and
-// [WithStrict] say what happens to input the decode does not read.
+// [WithTemplate] supplies the compiled template, and [WithDefaultTime] the
+// start time it gives a body with none; [WithUnmatched] and [WithStrict] say
+// what happens to input the decode does not read.
 type Option func(*decodeConfig)
 
 // decodeConfig holds the resolved decode options.
 type decodeConfig struct {
-	template  *templatecompile.Compiled
-	unmatched func(path string)
-	strict    bool
+	template    *templatecompile.Compiled
+	defaultTime time.Time
+	unmatched   func(path string)
+	strict      bool
 }
 
 // WithUnmatched passes every unmatched item of the input to fn while the
@@ -118,6 +121,27 @@ func (c decodeConfig) tracked() bool {
 // format-idempotent but the result is not canonically complete.
 func WithTemplate(c *templatecompile.Compiled) Option {
 	return func(cfg *decodeConfig) { cfg.template = c }
+}
+
+// WithDefaultTime gives t to a body that carries no start time, in a decode
+// with [WithTemplate]. A body carries its start time in ctx/time, in the ctx
+// object's time member in STRUCTURED, or at "<root>/context/start_time"; an
+// empty or null value there carries none. Decode then reads the body as if
+// its ctx/time held t, in UTC and to the second: t is the context's
+// start_time, and the HISTORY origin and the EVENT and ACTION times the body
+// leaves out, and the context it builds takes the 238|other care setting.
+//
+// On a composition whose category is 431|persistent, the one the body spells
+// or else the one the template fixes, t builds no EVENT_CONTEXT. It still
+// fills the other times, and it is the start time of a context the body
+// builds, with a setting, say. A start time the body carries builds the
+// context whatever the category.
+//
+// The Simplified Formats give a missing ctx/time the current time. Decode
+// reads no clock, so the caller passes one, such as time.Now(). The zero time
+// leaves the option off, and without [WithTemplate] it does nothing.
+func WithDefaultTime(t time.Time) Option {
+	return func(cfg *decodeConfig) { cfg.defaultTime = t }
 }
 
 func newDecodeConfig(opts []Option) decodeConfig {
