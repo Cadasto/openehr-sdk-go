@@ -5,11 +5,12 @@ package simplified_test
 // Simplified Formats requires a DV_CODED_TEXT's |value and |terminology "only
 // for external terminologies", and lets a DV_ORDINAL's |value and |ordinal
 // "be left out if symbol is defined in template". So with the template, a
-// coded text takes the terminology its defining_code constraint names and the
-// term text of a code that constraint lists, and an ordinal takes the value
-// and the term text the C_DV_ORDINAL pairs give its code. A terminology the
-// template does not determine is a missing required suffix. Without the
-// template decode is unchanged.
+// coded text takes the terminology its defining_code constraint names, or the
+// one a reference set's terminology: URI names where its code phrase names
+// none, and the term text of a code that constraint lists, and an ordinal
+// takes the value and the term text the C_DV_ORDINAL pairs give its code. A
+// terminology the template does not determine is a missing required suffix.
+// Without the template decode is unchanged.
 
 import (
 	"bytes"
@@ -434,6 +435,34 @@ func TestREQ053TemplateCompletionReferenceSetTerminology(t *testing.T) {
 			}
 		})
 	}
+	t.Run("an alternative that agrees", func(t *testing.T) {
+		// The reference set's URI names openehr, and a C_CODE_PHRASE
+		// alternative after it lists the openEHR code 433, whose rubric is
+		// "event": the two agree on the terminology, and the code takes the
+		// alternative's text.
+		opt := allTypesOPT(t)
+		const uri = "<referenceSetUri>terminology:SNOMED-CT</referenceSetUri>"
+		replaceExactlyOnce(t, opt, uri, uri)
+		uriAt := strings.Index(opt, uri)
+		start := strings.LastIndex(opt[:uriAt], `<children xsi:type="C_COMPLEX_OBJECT">`)
+		closing := regexp.MustCompile(`^` + regexp.QuoteMeta(uri) + `\s*</children>\s*</attributes>\s*</children>`).FindStringIndex(opt[uriAt:])
+		if start < 0 || closing == nil {
+			t.Fatal("the test_all_types OPT no longer holds the reference set's DV_CODED_TEXT as expected — fixture changed?")
+		}
+		reference := opt[start : uriAt+closing[1]]
+		named := replaceExactlyOnce(t, reference, uri, "<referenceSetUri>terminology:openehr</referenceSetUri>")
+		phrase := replaceExactlyOnce(t, reference, `xsi:type="C_CODE_REFERENCE"`, `xsi:type="C_CODE_PHRASE"`)
+		phrase = replaceExactlyOnce(t, phrase, uri, "<terminology_id><value>openehr</value></terminology_id><code_list>433</code_list>")
+		wt, compiled := editedAllTypes(t, replaceExactlyOnce(t, opt, reference, named+phrase))
+		withTemplate := simplified.WithTemplate(compiled)
+		code := map[string]any{obsReference + "|code": "433"}
+		spelled := map[string]any{obsReference + "|code": "433", obsReference + "|value": "event", obsReference + "|terminology": "openehr"}
+		got := decodeWith(t, wt, completionBody(code), withTemplate)
+		want := decodeWith(t, wt, completionBody(spelled), withTemplate)
+		if g, w := canonicalComposition(t, got), canonicalComposition(t, want); !bytes.Equal(g, w) {
+			t.Errorf("%v decodes to\n%s\nwant what %v decodes to\n%s", code, g, spelled, w)
+		}
+	})
 	for _, tc := range []struct{ name, uri string }{
 		{name: "another scheme", uri: "http://snomed.info/sct"},
 		{name: "no scheme", uri: "//fhir.hl7.org/ValueSet/$expand?url=http://snomed.info/sct"},

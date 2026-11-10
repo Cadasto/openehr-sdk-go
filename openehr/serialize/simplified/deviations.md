@@ -375,14 +375,22 @@ partially or silently accepted.
   `WithTemplate`, a `DV_CODED_TEXT` leaf, the `\|code` substitution at a `DV_TEXT` leaf included,
   that carries no `\|terminology` takes the terminology its `defining_code` constraint names
   (`local` for a local code list, an external terminology id with no code list), where the
-  alternatives at its path agree on one. One that carries no `\|value` takes its code's term
-  text, read as for a coded node name, where that constraint lists the code and the coded text is
-  in its terminology. A value or terminology the body gives is kept as written, for validation to
-  judge. **Still refused**, as a missing required suffix naming the key: a `\|terminology` the
-  template does not determine (a reference set that names only its URI, a `DV_TEXT` node,
-  alternatives that disagree), except at an ISM transition's current state or careflow step,
-  which take `openehr` and `local` (§ Fail-loud posture), and a `\|value` it does not determine
-  (a code outside the list, a constraint that lists no code). Until 2026-11-10 `\|code` alone was
+  alternatives at its path agree on one. A reference set (`C_CODE_REFERENCE`) whose code phrase
+  names no terminology names the one its `terminology:` URI names:
+  `terminology:<name>[/<version>]`, with any query or fragment, names `<name>`, or
+  `<name>(<version>)` where it gives a version, the `TERMINOLOGY_ID` form, so `test_all_types`'
+  `terminology:SNOMED-CT` gives `SNOMED-CT`. The openEHR specifications do not say which
+  terminology id such a URI names: this reading is the SDK's, at the maintainer's ruling of
+  2026-11-10. A terminology the code phrase names is kept, whatever the URI says, and a
+  reference set read by its URI gives no term text. One that carries no `\|value` takes its
+  code's term text, read as for a coded node name, where that constraint lists the code and the
+  coded text is in its terminology. A value or terminology the body gives is kept as written,
+  for validation to judge. **Still refused**, as a missing required suffix naming the key: a
+  `\|terminology` the template does not determine (a reference set whose URI is of another
+  scheme or names no terminology, a `DV_TEXT` node, alternatives that disagree), except at an
+  ISM transition's current state or careflow step, which take `openehr` and `local`
+  (§ Fail-loud posture), and a `\|value` it does not determine (a code outside the list, a
+  constraint that lists no code). Until 2026-11-10 `\|code` alone was
   refused for want of `\|value`, and a coded text without `\|terminology` decoded with an empty
   terminology that validation then refused as `required`. Without the template decode is
   unchanged: a coded text needs `\|code` and `\|value` and takes no terminology it does not

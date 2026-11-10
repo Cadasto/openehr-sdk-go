@@ -2495,13 +2495,24 @@ type codedTerms struct {
 // codedTermsOf returns what n, a DV_CODED_TEXT node, gives a coded value: the
 // terminology of the one C_CODE_PHRASE, or C_CODE_REFERENCE read as the code
 // phrase it carries, that constrains its defining_code, and the term text of
-// each code that phrase lists, the text a coded node name takes. A
+// each code that phrase lists, the text a coded node name takes. A reference
+// set whose code phrase names no terminology gives the one its terminology:
+// URI names ([constraints.CodeReference.ReferenceSetTerminology]), the SDK's
+// reading, and no term text: a reference set lists none (REQ-053). A
 // defining_code the template constrains in any other way, or not at all, and
-// a code phrase that names no terminology, such as a reference set that names
-// only its URI, give nothing.
+// a code phrase that names no terminology and no such URI give nothing.
 func codedTermsOf(n *templatecompile.CompiledNode) codedTerms {
-	phrase, ok := constraints.CodePhraseOf(onePrimitive(n, "defining_code"))
-	if !ok || phrase.Terminology == "" {
+	pc := onePrimitive(n, "defining_code")
+	phrase, ok := constraints.CodePhraseOf(pc)
+	if !ok {
+		return codedTerms{}
+	}
+	if ref, isRef := pc.(constraints.CodeReference); isRef && phrase.Terminology == "" {
+		if id, named := ref.ReferenceSetTerminology(); named {
+			return codedTerms{terminology: id}
+		}
+	}
+	if phrase.Terminology == "" {
 		return codedTerms{}
 	}
 	t := codedTerms{terminology: phrase.Terminology, texts: make(map[string]string, len(phrase.CodeList))}
@@ -2527,8 +2538,10 @@ func (x *templateIndex) addCodedTerms(path string, t codedTerms) {
 		x.codedValues[path] = codedTerms{}
 	default:
 		// A node's texts are recorded under its compiled path and its bare
-		// alias alike, so they are merged into a copy.
-		texts := maps.Clone(prev.texts)
+		// alias alike, so they are merged into a copy. A reference set read
+		// by its URI records no texts, a nil map.
+		texts := make(map[string]string, len(prev.texts)+len(t.texts))
+		maps.Copy(texts, prev.texts)
 		for code, text := range t.texts {
 			if held, both := texts[code]; both {
 				text = agreedText(held, text)
