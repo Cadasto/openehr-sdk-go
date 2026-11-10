@@ -5,7 +5,9 @@ package simplified_test
 // writes no key for one that carries nothing else, so a template-free decode
 // of a body with no event time re-encodes without the `…/time: ""` key the
 // input did not carry. One that carries a decoration keeps its bare "" key,
-// since a decoration without a value does not read back.
+// since a decoration without a value does not read back. Decode reads a bare
+// "" that no other key of its leaf decorates as absent, as it reads a null,
+// so decoding, encoding and decoding again keeps the composition.
 
 import (
 	"encoding/json"
@@ -15,8 +17,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
 // The PROBE-086 corpus template's OBSERVATION event and its temporal leaves.
@@ -62,19 +66,18 @@ func reencodeFlat(t *testing.T, wt *webtemplate.WebTemplate, body map[string]any
 // TestREQ053EmptyTemporalWritesNoKey — REQ-053. A template-free decode of a
 // body with no event time, and of one whose temporal leaf is "", re-encodes
 // with no key for the empty value. The event's time is RM-mandatory and the
-// decode gives it an empty value again, so decoding that output gives the
-// same composition as decoding the input; an empty leaf value is not set, and
-// the leaf is absent from that output.
+// decode gives it an empty value again, and a lone "" at an ELEMENT's leaf
+// reads as absent, so decoding that output gives the same composition as
+// decoding the input.
 func TestREQ053EmptyTemporalWritesNoKey(t *testing.T) {
 	wt, _ := conformanceTarget(t)
 	for _, tc := range []struct {
-		name       string
-		extra      map[string]any
-		key        string
-		sameDecode bool
+		name  string
+		extra map[string]any
+		key   string
 	}{
-		{name: "no event time", key: emptyTemporalEvent + "/time", sameDecode: true},
-		{name: "empty event time", extra: map[string]any{emptyTemporalEvent + "/time": ""}, key: emptyTemporalEvent + "/time", sameDecode: true},
+		{name: "no event time", key: emptyTemporalEvent + "/time"},
+		{name: "empty event time", extra: map[string]any{emptyTemporalEvent + "/time": ""}, key: emptyTemporalEvent + "/time"},
 		{name: "empty DV_DATE_TIME leaf", extra: map[string]any{emptyTemporalEvent + "/dv_date_time": ""}, key: emptyTemporalEvent + "/dv_date_time"},
 		{name: "empty DV_DATE leaf", extra: map[string]any{emptyTemporalEvent + "/dv_date": ""}, key: emptyTemporalEvent + "/dv_date"},
 		{name: "empty DV_TIME leaf", extra: map[string]any{emptyTemporalEvent + "/dv_time": ""}, key: emptyTemporalEvent + "/dv_time"},
@@ -83,9 +86,6 @@ func TestREQ053EmptyTemporalWritesNoKey(t *testing.T) {
 			got, first := reencodeFlat(t, wt, emptyTemporalBody(tc.extra))
 			if v, written := got[tc.key]; written {
 				t.Errorf("MarshalFlat wrote %q = %#v for an empty value; want no key", tc.key, v)
-			}
-			if !tc.sameDecode {
-				return
 			}
 			_, second := reencodeFlat(t, wt, got)
 			if string(first) != string(second) {
@@ -96,15 +96,16 @@ func TestREQ053EmptyTemporalWritesNoKey(t *testing.T) {
 }
 
 // TestREQ053EmptyTemporalDecoratedKeepsItsKey — REQ-053. An empty temporal
-// value that carries a |magnitude_status or a |normal_status keeps its bare
-// "" key beside them, because decode refuses a decoration with no value: the
-// body reads back as written.
+// value that carries a |magnitude_status, a |normal_status or an _accuracy
+// keeps its bare "" key beside them, because decode refuses a decoration with
+// no value: the body reads back as written, the "" not read as absent.
 func TestREQ053EmptyTemporalDecoratedKeepsItsKey(t *testing.T) {
 	wt, _ := conformanceTarget(t)
 	leaf := emptyTemporalEvent + "/dv_date_time"
 	for _, decoration := range []map[string]any{
 		{leaf + "|magnitude_status": "<="},
 		{leaf + "|normal_status": "N"},
+		{leaf + "/_accuracy": "PT1S"},
 	} {
 		extra := map[string]any{leaf: ""}
 		maps.Copy(extra, decoration)
@@ -143,5 +144,115 @@ func TestREQ053EmptyTemporalBoundStaysRefused(t *testing.T) {
 	}
 	if want := leaf + "/_normal_range/lower"; !strings.Contains(err.Error(), want) {
 		t.Errorf("err = %v, want it to name %q", err, want)
+	}
+}
+
+// decodeLoneValue decodes body, FLAT, with opts, failing the test on an
+// error, and renders the composition as canonical JSON.
+func decodeLoneValue(t *testing.T, wt *webtemplate.WebTemplate, body []byte, opts ...simplified.Option) (*rm.Composition, []byte) {
+	t.Helper()
+	comp, err := simplified.UnmarshalFlat(body, wt, opts...)
+	if err != nil {
+		t.Fatalf("UnmarshalFlat(%s) = %v", body, err)
+	}
+	return comp, canonicalComposition(t, comp)
+}
+
+// assertReadsAsNull decodes body, which spells key "", in FLAT and in
+// STRUCTURED with opts, and holds each composition, and the one decoding its
+// FLAT encoding gives, to want, the composition the body gives with key null.
+func assertReadsAsNull(t *testing.T, wt *webtemplate.WebTemplate, key string, body map[string]any, want []byte, opts ...simplified.Option) *rm.Composition {
+	t.Helper()
+	flat := mustJSON(t, body)
+	comp, got := decodeLoneValue(t, wt, flat, opts...)
+	if string(got) != string(want) {
+		t.Errorf("UnmarshalFlat with %q: \"\" =\n%s\nwant what %q: null gives:\n%s", key, got, key, want)
+	}
+	structured, err := simplified.FlatToStructured(flat)
+	if err != nil {
+		t.Fatalf("FlatToStructured(%s) = %v", flat, err)
+	}
+	sc, err := simplified.UnmarshalStructured(structured, wt, opts...)
+	if err != nil {
+		t.Fatalf("UnmarshalStructured(%s) = %v", structured, err)
+	}
+	if got := canonicalComposition(t, sc); string(got) != string(want) {
+		t.Errorf("UnmarshalStructured(%s) =\n%s\nwant what %q: null gives:\n%s", structured, got, key, want)
+	}
+	out, err := simplified.MarshalFlat(comp, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat: %v", err)
+	}
+	if _, again := decodeLoneValue(t, wt, out, opts...); string(again) != string(want) {
+		t.Errorf("decoding the re-encoded body %s gives\n%s\nwant\n%s", out, again, want)
+	}
+	return comp
+}
+
+// TestREQ053EmptyLoneValueReadsAsNull — REQ-053. A "" at the bare value of a
+// DV_DATE_TIME, DV_DURATION or DV_URI leaf of test_all_types that no other
+// key of the leaf decorates decodes as a null there does, in FLAT and in
+// STRUCTURED, with and without the template: no ELEMENT, and with the
+// template the composition validates. Encoding it and decoding the output
+// gives that composition again.
+func TestREQ053EmptyLoneValueReadsAsNull(t *testing.T) {
+	wt, compiled := shorthandTarget(t)
+	for _, key := range []string{
+		shorthandObs + "/datetime",
+		shorthandObs + "/duration_any",
+		"test_all_types/test_all_types2:0/uri",
+	} {
+		for _, mode := range shorthandModes(compiled) {
+			t.Run(key[strings.LastIndex(key, "/")+1:]+"/"+mode.name, func(t *testing.T) {
+				_, want := decodeLoneValue(t, wt, mustJSON(t, completionBody(map[string]any{key: nil})), mode.opts...)
+				comp := assertReadsAsNull(t, wt, key, completionBody(map[string]any{key: ""}), want, mode.opts...)
+				if mode.opts == nil {
+					return
+				}
+				if res := validation.ValidateComposition(comp, compiled); !res.OK {
+					t.Errorf("ValidateComposition(%q: \"\") is not OK: %+v", key, res.Issues)
+				}
+			})
+		}
+	}
+}
+
+// TestREQ053EmptyValueBesideNullFlavourReadsAsNull — REQ-053. A null flavour
+// is the ELEMENT's, not its value's, so it decorates no "" beside it: the ""
+// reads as absent, and the ELEMENT carries the null flavour alone, as with a
+// null value. Encode writes no key for that "" either, so the round trip
+// keeps the ELEMENT as it was.
+func TestREQ053EmptyValueBesideNullFlavourReadsAsNull(t *testing.T) {
+	wt, compiled := shorthandTarget(t)
+	key := shorthandObs + "/datetime"
+	flavour := map[string]any{
+		key + "/_null_flavour|code":        "253",
+		key + "/_null_flavour|value":       "unknown",
+		key + "/_null_flavour|terminology": "openehr",
+	}
+	for _, mode := range shorthandModes(compiled) {
+		t.Run(mode.name, func(t *testing.T) {
+			null := maps.Clone(flavour)
+			null[key] = nil
+			_, want := decodeLoneValue(t, wt, mustJSON(t, completionBody(null)), mode.opts...)
+			empty := maps.Clone(flavour)
+			empty[key] = ""
+			assertReadsAsNull(t, wt, key, completionBody(empty), want, mode.opts...)
+		})
+	}
+}
+
+// TestREQ053EmptyStartTimeBesideCtxTime — REQ-053. A "" at
+// <root>/context/start_time reads as absent, as a null there does, so beside
+// ctx/time it is no second spelling of the time that disagrees with it:
+// ctx/time gives the start time.
+func TestREQ053EmptyStartTimeBesideCtxTime(t *testing.T) {
+	wt, compiled := shorthandTarget(t)
+	const key = "test_all_types/context/start_time"
+	for _, mode := range shorthandModes(compiled) {
+		t.Run(mode.name, func(t *testing.T) {
+			_, want := decodeLoneValue(t, wt, mustJSON(t, completionBody(map[string]any{key: nil})), mode.opts...)
+			assertReadsAsNull(t, wt, key, completionBody(map[string]any{key: ""}), want, mode.opts...)
+		})
 	}
 }
