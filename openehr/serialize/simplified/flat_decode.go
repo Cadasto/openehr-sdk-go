@@ -1585,23 +1585,26 @@ func resolveLeaf(wt *webtemplate.WebTemplate, segs []flatSeg, sib *reusedSibling
 				break
 			}
 		}
-		if next == nil && i == len(segs)-2 {
-			// The last segment may name an attribute the codec reads where the
-			// Web Template has no node ([codecLeaf]). Each is single-valued, and
-			// an INTERVAL_EVENT attribute under an abstract EVENT makes the
-			// event an INTERVAL_EVENT (REQ-053).
-			if leaf := codecLeaf(node, seg.id); leaf != nil {
-				if seg.idx > 0 {
-					return nil, nil, nil, errSingleValuedIndex(seg)
-				}
-				if intervalEventLeaf(node, leaf) {
-					predType[bareAQLPath(node.AQLPath)] = "INTERVAL_EVENT"
-				}
-				return leaf, predIndex, predType, nil
-			}
-		}
 		if next == nil {
-			return nil, nil, nil, errSegNotFound
+			// The segment may name an attribute the codec reads where the Web
+			// Template has no node ([codecLeaf]). Each is single-valued, so an
+			// index past :0 on it is past its bound whatever follows it, and it
+			// is a leaf, so a segment below it resolves nothing. An
+			// INTERVAL_EVENT attribute under an abstract EVENT makes the event
+			// an INTERVAL_EVENT (REQ-053).
+			leaf := codecLeaf(node, seg.id)
+			switch {
+			case leaf == nil:
+				return nil, nil, nil, errSegNotFound
+			case seg.idx > 0:
+				return nil, nil, nil, errSingleValuedIndex(seg)
+			case i != len(segs)-2:
+				return nil, nil, nil, errSegNotFound
+			}
+			if intervalEventLeaf(node, leaf) {
+				predType[bareAQLPath(node.AQLPath)] = "INTERVAL_EVENT"
+			}
+			return leaf, predIndex, predType, nil
 		}
 		// Placement reads an index only where the attribute is a list, so on a
 		// single-valued one an index past :0 would be dropped and the key merged

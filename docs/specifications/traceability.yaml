@@ -2524,6 +2524,7 @@ requirements:
       - openehr/serialize/simplified/context_test.go
       - openehr/serialize/simplified/flat_decode_test.go
       - openehr/serialize/simplified/hardening_test.go
+      - openehr/serialize/simplified/history_origin_test.go
       - openehr/serialize/simplified/index_bound_test.go
       - openehr/serialize/simplified/ism_transition_test.go
       - openehr/serialize/simplified/malformed_key_test.go

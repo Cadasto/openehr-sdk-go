@@ -101,7 +101,9 @@ Concretely:
   adds them while it walks), and the Web Template stays the reference's, so the codec reads
   them itself: `|sample_count` at an EVENT or INTERVAL_EVENT node, `math_function` and
   `width` at an EVENT node (an INTERVAL_EVENT node has them as children), and
-  `history_origin` at an OBSERVATION node whose children name its HISTORY's node id. Until
+  `history_origin` at an OBSERVATION node whose children name its HISTORY's node id. Each is
+  single-valued, so an index past `:0` on it is refused whatever follows it, and a segment
+  below it is unmatched content, as below any leaf. Until
   then decode refused all four in every mode. Each other spelling of them
   (`<event>/sample_count`, `<event>|width`, `<observation>|history_origin`) is unmatched
   content. Two readings differ from the reference's:
