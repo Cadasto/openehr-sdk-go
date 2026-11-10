@@ -220,15 +220,16 @@ func emitLeafValue(out map[string]any, flatPath string, v any, rmType string, li
 		if err != nil {
 			return "", err
 		}
-		// An empty date, time or date-time that carries nothing else is not
-		// set, as Go has no other spelling of that for the RM-mandatory value
-		// string, so a Web Template leaf writes no key for it: a decode that
-		// gives an EVENT with no time an empty one re-encodes without a `time`
-		// key the input never carried. One that carries a decoration keeps its
-		// "" key, because decode refuses a decoration with no value. An interval
+		// An empty date, time, date-time, duration, URI or EHR URI that
+		// carries nothing else is not set, as Go has no other spelling of that
+		// for the RM-mandatory value string, so a Web Template leaf writes no
+		// key for it: a decode that gives an EVENT with no time, or an
+		// INTERVAL_EVENT with no width, an empty one re-encodes without a key
+		// the input never carried. One that carries a decoration keeps its ""
+		// key, because decode refuses a decoration with no value. An interval
 		// bound is not a leaf (decorated is false there), and keeps its "" for
 		// the bound refusals of [intervalBoundToFlat].
-		if decorated && unsetTemporal(sfxType, m) {
+		if decorated && unsetStringValue(sfxType, m) {
 			return "", nil
 		}
 		if capturedFully(sfxType, m, captured) {
@@ -248,12 +249,13 @@ func emitLeafValue(out map[string]any, flatPath string, v any, rmType string, li
 		ErrUnsupportedDatatype, flatPath, rmType)
 }
 
-// unsetTemporal reports whether m, the canonical form of a value of rmType, is
-// a DV_DATE_TIME, DV_DATE or DV_TIME whose value is the empty string and which
-// carries no other attribute.
-func unsetTemporal(rmType string, m map[string]any) bool {
+// unsetStringValue reports whether m, the canonical form of a value of
+// rmType, is a DV_DATE_TIME, DV_DATE, DV_TIME, DV_DURATION, DV_URI or
+// DV_EHR_URI whose value is the empty string and which carries no other
+// attribute.
+func unsetStringValue(rmType string, m map[string]any) bool {
 	switch rmType {
-	case "DV_DATE_TIME", "DV_DATE", "DV_TIME":
+	case "DV_DATE_TIME", "DV_DATE", "DV_TIME", "DV_DURATION", "DV_URI", "DV_EHR_URI":
 	default:
 		return false
 	}

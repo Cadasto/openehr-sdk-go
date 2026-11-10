@@ -521,13 +521,14 @@ partially or silently accepted.
   emits the leaf with an empty value rather than omitting it: the encoder cannot tell "unset"
   from "set to the zero value" for a non-pointer field. Only reachable with RM-invalid input — a
   valid composition populates it, and a `WithTemplate` decode synthesises it (§ Deviations,
-  RM-mandatory attributes). A DV_DATE_TIME, DV_DATE or DV_TIME is the exception since
-  2026-11-10: one whose value is the empty string and that carries nothing else writes no key at
-  any Web Template leaf, so an `EVENT.time` left at its zero value, which a template-free decode
-  of a body with no event time gives, re-encodes without the `…/time: ""` key the body never
-  carried. One carrying a decoration, such as a `\|magnitude_status`, keeps its `""` key, since
-  decode refuses a decoration with no value, and an interval bound keeps its refusal of an empty
-  value.
+  RM-mandatory attributes). A DV_DATE_TIME, DV_DATE, DV_TIME, DV_DURATION, DV_URI or
+  DV_EHR_URI is the exception since 2026-11-10: one whose value is the empty string and that
+  carries nothing else writes no key at any Web Template leaf, so an `EVENT.time` or an
+  `INTERVAL_EVENT.width` left at its zero value, which a template-free decode of a body with no
+  event time or width gives, re-encodes without the `…/time: ""` or `…/width: ""` key the body
+  never carried, and an ELEMENT value spelled `""` at such a leaf is absent from the output. One
+  carrying a decoration, such as a `\|magnitude_status`, keeps its `""` key, since decode
+  refuses a decoration with no value, and an interval bound keeps its refusal of an empty value.
 
 - **`:index` strictness** — a FLAT `:index` must be canonically spelled (`0`, `1`, …;
   negative, `+`, or zero-padded spellings are rejected — they would collide with other
