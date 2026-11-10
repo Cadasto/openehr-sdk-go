@@ -322,9 +322,9 @@ func splitRMAttrKey(key string, pk parsedKey) (base, family string, index int, t
 	return "", "", 0, "", false
 }
 
-// writeFlatSeg re-spells one parsed FLAT segment, so a reconstructed base or
-// tail is byte-identical to the key it came from ([parseFlatKey] has already
-// rejected any non-canonical index spelling).
+// writeFlatSeg spells one parsed FLAT segment: its id, then ":<index>" when it
+// carries one. A segment [parseFlatSeg] accepts has that spelling only, so it
+// is byte-identical to the key the segment came from.
 func writeFlatSeg(b *strings.Builder, s flatSeg) {
 	b.WriteString(s.id)
 	if s.idx >= 0 {

@@ -9,10 +9,11 @@ import (
 )
 
 // TestFlatDecodeRefusesFirstMalformedKey pins which key a body with several
-// malformed indexes is refused for: the first in sorted order, on every run,
-// whichever pass before the leaf loop meets it (an underscore family, a party
-// leaf, an in-context spelling, an ordinary leaf). The refusal is the key's own
-// parse error, unwrapped.
+// malformed indexes is refused for: the first in sorted order, on every run.
+// The keys are of each kind the passes before the leaf loop read (an underscore
+// family, a party leaf, an in-context spelling, an ordinary leaf), and
+// compositeLeafGroups, the first pass that refuses a malformed key, meets them
+// all. The refusal is the key's own parse error, unwrapped.
 func TestFlatDecodeRefusesFirstMalformedKey(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	malformed := []string{
