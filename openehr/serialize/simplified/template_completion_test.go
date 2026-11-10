@@ -280,11 +280,6 @@ func TestREQ053TemplateCompletionRefusesWhatItDoesNotDetermine(t *testing.T) {
 	)
 	for _, tc := range []refusalCase{
 		{
-			name:   "a reference set with no terminology",
-			leaves: map[string]any{obsReference + "|code": "1004034", obsReference + "|value": "a term"},
-			key:    obsReference, reason: missingTerminology,
-		},
-		{
 			name:   "a coded text at a DV_TEXT leaf",
 			leaves: map[string]any{obsText + "|code": "c1", obsText + "|value": "a term"},
 			key:    obsText, reason: missingTerminology,
@@ -376,6 +371,81 @@ func TestREQ053TemplateCompletionExternalTerminology(t *testing.T) {
 			key:    obsReference, reason: "DV_CODED_TEXT missing required |value",
 		}, withTemplate)
 	})
+}
+
+// referenceSetAllTypes compiles the test_all_types OPT with the URI of its
+// reference set replaced by uri, and a terminology_id of terminology added to
+// the reference set where terminology is not "", and builds its Web Template.
+// uri holds no character XML escapes.
+func referenceSetAllTypes(t *testing.T, uri, terminology string) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
+	t.Helper()
+	repl := "<referenceSetUri>" + uri + "</referenceSetUri>"
+	if terminology != "" {
+		repl = "<terminology_id><value>" + terminology + "</value></terminology_id>" + repl
+	}
+	return editedAllTypes(t, replaceExactlyOnce(t, allTypesOPT(t), "<referenceSetUri>terminology:SNOMED-CT</referenceSetUri>", repl))
+}
+
+// TestREQ053TemplateCompletionReferenceSetTerminology — REQ-053: with the
+// template, a coded text whose reference set names no terminology takes the
+// one its terminology: URI names, spelled as a TERMINOLOGY_ID: the name, with
+// the version in parentheses where the URI gives one. A terminology the
+// reference set names is kept, whatever its URI says. The URI gives no term
+// text, so a |value stays required, and a URI of another scheme, or one that
+// names no terminology, gives no terminology. test_all_types' reference set is
+// terminology:SNOMED-CT.
+func TestREQ053TemplateCompletionReferenceSetTerminology(t *testing.T) {
+	short := map[string]any{obsReference + "|code": "1004034", obsReference + "|value": "a term"}
+	full := func(terminology string) map[string]any {
+		leaves := maps.Clone(short)
+		leaves[obsReference+"|terminology"] = terminology
+		return leaves
+	}
+	t.Run("test_all_types", func(t *testing.T) {
+		wt, compiled := shorthandTarget(t)
+		withTemplate := simplified.WithTemplate(compiled)
+		got := decodeWith(t, wt, completionBody(short), withTemplate)
+		want := decodeWith(t, wt, completionBody(full("SNOMED-CT")), withTemplate)
+		if g, w := canonicalComposition(t, got), canonicalComposition(t, want); !bytes.Equal(g, w) {
+			t.Errorf("%v decodes to\n%s\nwant what %v decodes to\n%s", short, g, full("SNOMED-CT"), w)
+		}
+		if res := validation.ValidateComposition(got, compiled); !res.OK {
+			t.Errorf("ValidateComposition(%v) is not OK: %+v", short, res.Issues)
+		}
+		wantMissingSuffix(t, wt, refusalCase{
+			leaves: map[string]any{obsReference + "|code": "1004034"},
+			key:    obsReference, reason: "DV_CODED_TEXT missing required |value",
+		}, withTemplate)
+	})
+	for _, tc := range []struct {
+		name, uri, terminology, want string
+	}{
+		{name: "a version", uri: "terminology:LOINC/2.73", want: "LOINC(2.73)"},
+		{name: "a query", uri: "terminology:SNOMED-CT?subset=x", want: "SNOMED-CT"},
+		{name: "a terminology the reference set names", uri: "terminology:SNOMED-CT", terminology: "LOINC", want: "LOINC"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			wt, compiled := referenceSetAllTypes(t, tc.uri, tc.terminology)
+			withTemplate := simplified.WithTemplate(compiled)
+			got := decodeWith(t, wt, completionBody(short), withTemplate)
+			want := decodeWith(t, wt, completionBody(full(tc.want)), withTemplate)
+			if g, w := canonicalComposition(t, got), canonicalComposition(t, want); !bytes.Equal(g, w) {
+				t.Errorf("at %s, %v decodes to\n%s\nwant what %v decodes to\n%s", tc.uri, short, g, full(tc.want), w)
+			}
+		})
+	}
+	for _, tc := range []struct{ name, uri string }{
+		{name: "another scheme", uri: "http://snomed.info/sct"},
+		{name: "no scheme", uri: "//fhir.hl7.org/ValueSet/$expand?url=http://snomed.info/sct"},
+		{name: "no name", uri: "terminology:"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			wt, compiled := referenceSetAllTypes(t, tc.uri, "")
+			wantMissingSuffix(t, wt, refusalCase{
+				leaves: short, key: obsReference, reason: "DV_CODED_TEXT missing required |terminology",
+			}, simplified.WithTemplate(compiled))
+		})
+	}
 }
 
 // TestREQ053TemplateCompletionNeedsAgreement — REQ-053: the template
