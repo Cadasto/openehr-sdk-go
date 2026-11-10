@@ -103,13 +103,18 @@ func (c decodeConfig) tracked() bool {
 // in the formats, so decode adds it back, empty, under a parent the body
 // rebuilt, with the type, node id and name the template gives it. It is
 // synthesised too, and decode adds none where the template asks the
-// structure for a member. The decoded composition then validates against the
+// structure for a member. A coded text or an ordinal that leaves out what the
+// format lets a client leave out takes it from the template: a coded text's
+// terminology and text, an ordinal's value and text. A coded text whose
+// terminology neither the body nor the template gives is refused as missing
+// its |terminology. The decoded composition then validates against the
 // OPT, provided ctx/time is present when the template carries HISTORY/EVENT
 // nodes (their mandatory origin/time have no other source; see
 // deviations.md).
 //
-// Without this option decode omits names, defaults and empty structures, and
-// infers a folded structure's subtype from its path: the round-trip stays
+// Without this option decode omits names, defaults and empty structures,
+// completes no coded value, and infers a folded structure's subtype from its
+// path: the round-trip stays
 // format-idempotent but the result is not canonically complete.
 func WithTemplate(c *templatecompile.Compiled) Option {
 	return func(cfg *decodeConfig) { cfg.template = c }
