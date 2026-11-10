@@ -241,9 +241,16 @@ func TestREQ056_ReadPrologRawForm(t *testing.T) {
 // or PUBLIC, a quoted public id of the characters PubidChar allows and a
 // system literal, each after white space; and an internal subset of markup
 // declarations (ELEMENT, ATTLIST, ENTITY, NOTATION, each with white space and
-// a name and closed outside its quoted literals), processing instructions
-// whose target is not xml, comments, parameter-entity references and white
-// space. What each markup declaration holds after its name is not judged.
+// a name, closed outside its quoted literals and holding no `<` outside
+// them), processing instructions whose target is a name other than xml,
+// comments, parameter-entity references and white space. What each markup
+// declaration holds after its name is not judged further.
+//
+// Can-fail control: a malformed row breaks one rule where it can, so that
+// dropping that rule's check alone, such as the refusal of `<` in a markup
+// declaration, the name a parameter-entity reference or a processing
+// instruction needs, or the white space before a literal, lets its row
+// through.
 func TestREQ056_DoctypeWellFormed(t *testing.T) {
 	wellFormed := []string{
 		`<!DOCTYPE x>`,
@@ -288,6 +295,7 @@ func TestREQ056_DoctypeWellFormed(t *testing.T) {
 		`<!DOCTYPE x PUBLIC "a{b" "x.dtd">`,
 		`<!DOCTYPE x PUBLIC 'a'b' "x.dtd">`,
 		`<!DOCTYPE x PUBLIC "a""x.dtd">`,
+		`<!DOCTYPE x PUBLIC"a" "x.dtd">`,
 		`<!DOCTYPE x "x.dtd">`,
 		`<!DOCTYPE x junk>`,
 		`<!DOCTYPE x [] SYSTEM "x.dtd">`,
@@ -299,13 +307,16 @@ func TestREQ056_DoctypeWellFormed(t *testing.T) {
 		`<!DOCTYPE x [<!ELEMENTx ANY>]>`,
 		`<!DOCTYPE x [<!element x ANY>]>`,
 		`<!DOCTYPE x [<!ELEMENT x <y>>]>`,
+		`<!DOCTYPE x [<!ELEMENT x <y>]>`,
 		`<!DOCTYPE x [<!ENTITY e "v>]>`,
 		`<!DOCTYPE x [<!ENTITY %p "v">]>`,
 		`<!DOCTYPE x [%p]>`,
 		`<!DOCTYPE x [% p;]>`,
+		`<!DOCTYPE x [%;]>`,
 		`<!DOCTYPE x [<?xml v?>]>`,
 		`<!DOCTYPE x [<?XML v?>]>`,
 		`<!DOCTYPE x [<?1pi v?>]>`,
+		`<!DOCTYPE x [<? v?>]>`,
 		`<!DOCTYPE x [<?pi v>]>`,
 		`<!DOCTYPE x [<?piv?x?>]>`,
 		`<!DOCTYPE x [<!-- a -- b -->]>`,
