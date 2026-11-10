@@ -31,6 +31,11 @@
 // reference implementation's spelling of each under the template root, such
 // as "<root>/language|code", and two spellings of one field must agree.
 //
+// The format gives a body without ctx/time the current time, but decode reads
+// no clock. With [WithTemplate], [WithDefaultTime] passes it one: a body with
+// no start time decodes as if its ctx/time held the caller's time, and on a
+// persistent composition that default builds no EVENT_CONTEXT.
+//
 // The composer is the one field those short forms carry only in part:
 // ctx/composer_name carries a party with a name and nothing else, and
 // ctx/composer_self a composer that is the record subject, with no reference.

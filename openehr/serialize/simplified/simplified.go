@@ -101,7 +101,9 @@ func (c decodeConfig) tracked() bool {
 // tell from an ITEM_TREE. The RM-mandatory attributes the formats omit
 // (HISTORY.origin, EVENT.time, ENTRY language/encoding/subject,
 // EVENT_CONTEXT.setting, …) are completed from ctx defaults and RM
-// conventions; these are synthesised defaults, not recovered data. An empty structure (an ITEM_TREE or ITEM_LIST with no
+// conventions; these are synthesised defaults, not recovered data. A
+// composition category the body does not spell is the one the template
+// fixes, a single openehr code such as 431|persistent, or else 433|event. An empty structure (an ITEM_TREE or ITEM_LIST with no
 // items, say) that the template requires and allows to stay empty has no key
 // in the formats, so decode adds it back, empty, under a parent the body
 // rebuilt, with the type, node id and name the template gives it. It is
@@ -111,9 +113,9 @@ func (c decodeConfig) tracked() bool {
 // terminology and text, an ordinal's value and text. A coded text whose
 // terminology neither the body nor the template gives is refused as missing
 // its |terminology. The decoded composition then validates against the
-// OPT, provided ctx/time is present when the template carries HISTORY/EVENT
-// nodes (their mandatory origin/time have no other source; see
-// deviations.md).
+// OPT, provided the body gives a start time, or the caller passes
+// [WithDefaultTime], when the template carries HISTORY/EVENT nodes: their
+// mandatory origin and time have no other source (see deviations.md).
 //
 // Without this option decode omits names, defaults and empty structures,
 // completes no coded value, and infers a folded structure's subtype from its
