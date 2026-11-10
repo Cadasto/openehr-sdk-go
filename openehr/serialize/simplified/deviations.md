@@ -435,14 +435,14 @@ partially or silently accepted.
   generator builds, or where the template's ACTIVITY nodes at its path disagree on it
   (pinned by `TestREQ053ActivityTakesNoActionArchetypeIDTheTemplateDoesNotSettle`). Until
   then decode left out every one, and the ACTIVITY failed validation.
-  **Qualifier:** `EVENT.time` and `HISTORY.origin` have no source other than the event
-  times the body gives, its start time (`ctx/time` or `<root>/context/start_time`) and,
+  **Qualifier:** `EVENT.time`, `HISTORY.origin` and `ACTION.time` have no source other than
+  the event times the body gives, its start time (`ctx/time` or `<root>/context/start_time`) and,
   since 2026-11-10, `WithDefaultTime`. The format gives a missing `ctx/time` the server's
   current time;
   decode reads no clock, so the caller passes one, and the body then decodes as if its
   `ctx/time` held it, except that on a persistent composition the default builds no
   `EVENT_CONTEXT`. Without any of them, a payload decodes successfully but does not
-  validate when the template carries HISTORY/EVENT nodes (pinned by `names_test.go`).
+  validate when the template carries HISTORY/EVENT or ACTION nodes (pinned by `names_test.go`).
   **A required structure with no member is rebuilt too**
   (since 2026-10-26, issue 311). Where a rebuilt node lacks a single-valued attribute that
   the template's existence, or the RM, requires of it, and the template gives there one
