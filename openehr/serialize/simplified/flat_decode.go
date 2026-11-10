@@ -667,39 +667,41 @@ var metadataSegPaths = func() map[string]bool {
 // That index addresses a list slot a single-valued attribute does not have.
 // The segment is rewritten without it all the same, so the caller can tell
 // whether the key is a metadata spelling at all. A malformed index comes back
-// unchanged, for the leaf loop to refuse.
+// unchanged, for the leaf loop to refuse, and so does a key whose metadata run
+// carries no index.
+//
+// What follows the run is sliced from rel rather than re-spelled: a segment
+// [parseFlatSeg] accepts has one spelling only ([cutAtSeg]).
 func metadataRel(rel string) (norm string, overIndexed bool) {
-	path, suffix, piped := strings.Cut(rel, "|")
-	var b strings.Builder
-	var seen, sep string
-	onMeta := true
+	path, _, _ := strings.Cut(rel, "|")
+	var seen string // the run's unindexed spelling so far
+	runEnd := 0     // the offset in rel just past the run's last segment
+	off := 0        // the offset in rel of the segment being read
+	indexed, onMeta := false, true
 	for p := range strings.SplitSeq(path, "/") {
 		s, ok := parseFlatSeg(p)
 		if !ok {
 			return rel, false
 		}
-		b.WriteString(sep)
-		sep = "/"
 		if onMeta {
 			at := s.id
 			if seen != "" {
 				at = seen + "/" + s.id
 			}
 			if metadataSegPaths[at] {
-				seen = at
-				b.WriteString(s.id)
+				seen, runEnd = at, off+len(p)
+				indexed = indexed || s.idx >= 0
 				overIndexed = overIndexed || s.idx > 0
-				continue
+			} else {
+				onMeta = false
 			}
-			onMeta = false
 		}
-		writeFlatSeg(&b, s)
+		off += len(p) + 1
 	}
-	if piped {
-		b.WriteByte('|')
-		b.WriteString(suffix)
+	if !indexed {
+		return rel, false
 	}
-	return b.String(), overIndexed
+	return seen + rel[runEnd:], overIndexed
 }
 
 // overIndexedMetadataSeg returns the first segment of the leading run of
@@ -2219,7 +2221,7 @@ func compositeLeafGroups(content map[string]any, keys []contentKey, wt *webtempl
 		if ck.err != nil {
 			return nil, ck.err
 		}
-		base, family, index, tail, isComposite := splitCompositeLeafKey(wt, ck.pk)
+		base, family, index, tail, isComposite := splitCompositeLeafKey(wt, key, ck.pk)
 		if !isComposite {
 			continue
 		}
@@ -2243,11 +2245,12 @@ func compositeLeafGroups(content map[string]any, keys []contentKey, wt *webtempl
 	return groups, nil
 }
 
-// splitCompositeLeafKey splits a parsed FLAT key at the composite Web Template
-// leaf it addresses, if any: the first segment run that resolves to a childless
-// node of a party or DV_INTERVAL RM type. base is the leaf's parent path, family
-// and index the leaf segment itself, and tail everything after it (each remaining
-// segment with a leading "/", then "|suffix").
+// splitCompositeLeafKey splits a FLAT key, parsed as pk, at the composite Web
+// Template leaf it addresses, if any: the first segment run that resolves to a
+// childless node of a party or DV_INTERVAL RM type. base is the leaf's parent
+// path, family and index the leaf segment itself, and tail everything after it
+// (each remaining segment with a leading "/", then "|suffix"); base and tail
+// are slices of key ([cutAtSeg]).
 //
 // Two kinds of key are deliberately not composite leaves. One whose path reaches
 // an `_`-prefixed segment first belongs to that family — a `_feeder_audit`'s
@@ -2255,7 +2258,7 @@ func compositeLeafGroups(content map[string]any, keys []contentKey, wt *webtempl
 // addressing a composition-metadata leaf [emitContext] writes is the composer,
 // whose keys [siphonContext] has already taken, whether or not the Web
 // Template carries its node (ADR 0029).
-func splitCompositeLeafKey(wt *webtemplate.WebTemplate, pk parsedKey) (base, family string, index int, tail string, ok bool) {
+func splitCompositeLeafKey(wt *webtemplate.WebTemplate, key string, pk parsedKey) (base, family string, index int, tail string, ok bool) {
 	node := wt.Tree
 	if len(pk.segs) == 0 || pk.segs[0].id != node.ID {
 		return "", "", 0, "", false
@@ -2289,22 +2292,8 @@ func splitCompositeLeafKey(wt *webtemplate.WebTemplate, pk parsedKey) (base, fam
 			!compositeLeafOwnsSub(nodeRMType(node), pk.segs[i+1].id) {
 			return "", "", 0, "", false
 		}
-		var b, t strings.Builder
-		for j, s := range pk.segs[:i] {
-			if j > 0 {
-				b.WriteByte('/')
-			}
-			writeFlatSeg(&b, s)
-		}
-		for _, s := range pk.segs[i+1:] {
-			t.WriteByte('/')
-			writeFlatSeg(&t, s)
-		}
-		if pk.suffix != "" {
-			t.WriteByte('|')
-			t.WriteString(pk.suffix)
-		}
-		return b.String(), seg.id, seg.idx, t.String(), true
+		base, tail := cutAtSeg(key, i)
+		return base, seg.id, seg.idx, tail, true
 	}
 	return "", "", 0, "", false
 }
@@ -4661,6 +4650,33 @@ func parseFlatKey(key string) (parsedKey, error) {
 		segs = append(segs, seg)
 	}
 	return parsedKey{segs: segs, suffix: suffix}, nil
+}
+
+// cutAtSeg splits key, a FLAT key [parseFlatKey] accepts, around its path
+// segment i, which the key must have: base is the path before that segment,
+// and tail everything after it, each later segment with its leading "/", then
+// "|suffix" when the suffix is not empty. Both are slices of key, and they are
+// the bytes re-spelling the parsed segments with [writeFlatSeg] would build: a
+// segment [parseFlatSeg] accepts is its id alone, or its id, ":" and the
+// canonical index, so it has one spelling only. A trailing bare "|" is no
+// suffix to parseFlatKey, so tail leaves it out.
+func cutAtSeg(key string, i int) (base, tail string) {
+	path, suffix := splitSuffix(key)
+	start := 0
+	for range i {
+		start += strings.IndexByte(path[start:], '/') + 1
+	}
+	end := len(path)
+	if j := strings.IndexByte(path[start:], '/'); j >= 0 {
+		end = start + j
+	}
+	if start > 0 {
+		base = path[:start-1]
+	}
+	if suffix == "" {
+		return base, path[end:]
+	}
+	return base, key[end:]
 }
 
 // parseFlatSeg reads one "/"-separated FLAT path segment, which may carry a

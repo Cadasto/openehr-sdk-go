@@ -301,14 +301,14 @@ type rmattrOwner struct {
 	resolve func(attr string) (map[string]any, error)
 }
 
-// splitRMAttrKey splits a parsed FLAT key at its first `_`-prefixed path
-// segment. base is the owner's FLAT path (indices preserved), family and index
-// come from the `_` segment, and tail is everything after it — the remaining
-// path segments, each with a leading "/", then "|suffix" when the key carried
-// one. ok is false for a key with no `_` segment, and for one whose *root*
-// segment is `_`-prefixed (no owner could precede it), which then fails as an
-// ordinary unresolvable path.
-func splitRMAttrKey(pk parsedKey) (base, family string, index int, tail string, ok bool) {
+// splitRMAttrKey splits a FLAT key, parsed as pk, at its first `_`-prefixed
+// path segment. base is the owner's FLAT path (indices preserved), family and
+// index come from the `_` segment, and tail is everything after it — the
+// remaining path segments, each with a leading "/", then "|suffix" when the key
+// carried one; base and tail are slices of key ([cutAtSeg]). ok is false for a
+// key with no `_` segment, and for one whose *root* segment is `_`-prefixed (no
+// owner could precede it), which then fails as an ordinary unresolvable path.
+func splitRMAttrKey(key string, pk parsedKey) (base, family string, index int, tail string, ok bool) {
 	for i, seg := range pk.segs {
 		if !strings.HasPrefix(seg.id, "_") {
 			continue
@@ -316,22 +316,8 @@ func splitRMAttrKey(pk parsedKey) (base, family string, index int, tail string, 
 		if i == 0 {
 			return "", "", 0, "", false
 		}
-		var b, t strings.Builder
-		for j, s := range pk.segs[:i] {
-			if j > 0 {
-				b.WriteByte('/')
-			}
-			writeFlatSeg(&b, s)
-		}
-		for _, s := range pk.segs[i+1:] {
-			t.WriteByte('/')
-			writeFlatSeg(&t, s)
-		}
-		if pk.suffix != "" {
-			t.WriteByte('|')
-			t.WriteString(pk.suffix)
-		}
-		return b.String(), seg.id, seg.idx, t.String(), true
+		base, tail := cutAtSeg(key, i)
+		return base, seg.id, seg.idx, tail, true
 	}
 	return "", "", 0, "", false
 }
@@ -367,7 +353,7 @@ func rmattrGroups(content map[string]any, keys []contentKey, sink *unmatchedSink
 		if ck.err != nil {
 			return nil, ck.err
 		}
-		base, family, index, tail, isAttr := splitRMAttrKey(ck.pk)
+		base, family, index, tail, isAttr := splitRMAttrKey(key, ck.pk)
 		if !isAttr {
 			continue
 		}
