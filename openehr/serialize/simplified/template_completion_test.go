@@ -693,3 +693,183 @@ func TestREQ053TemplateCompletesIntervalOrdinalBounds(t *testing.T) {
 		})
 	}
 }
+
+// closingChildren returns the index in opt just past the </children> that
+// closes the <children> element opened at start.
+func closingChildren(t *testing.T, opt string, start int) int {
+	t.Helper()
+	depth := 0
+	for i := start; i < len(opt); i++ {
+		switch {
+		case strings.HasPrefix(opt[i:], "<children"):
+			depth++
+		case strings.HasPrefix(opt[i:], "</children>"):
+			if depth--; depth == 0 {
+				return i + len("</children>")
+			}
+		}
+	}
+	t.Fatalf("the <children> element at offset %d is not closed — fixture changed?", start)
+	return 0
+}
+
+// adminRoot is one copy of the ADMIN_ENTRY archetype root of adminEntryPair:
+// the name it pins ("" for none) and the text its archetype gives the term
+// at0001.
+type adminRoot struct{ name, text string }
+
+// adminCoded is the leaf of the ADMIN_ENTRY root of adminEntryPair that pins no
+// name.
+const adminCoded = "test_all_types/test_all_types3:0/section_2/test_all_types:0/count_3"
+
+// adminEntryPair compiles the test_all_types OPT with its ADMIN_ENTRY archetype
+// root held twice, first and second in that order. In each copy the ELEMENT's
+// value is a DV_CODED_TEXT that lists the local code at0001, whose term text
+// the copy's archetype gives as it says. The two copies share one path once
+// the name that one of them pins is dropped.
+func adminEntryPair(t *testing.T, first, second adminRoot) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
+	t.Helper()
+	opt := allTypesOPT(t)
+	// coded is contextCoded's DV_CODED_TEXT with its three codes replaced by
+	// at0001.
+	const lastCode = "<code_list>at0008</code_list>"
+	replaceExactlyOnce(t, opt, lastCode, lastCode)
+	codedStart := strings.LastIndex(opt[:strings.Index(opt, lastCode)], `<children xsi:type="C_COMPLEX_OBJECT">`)
+	if codedStart < 0 {
+		t.Fatal("the test_all_types OPT no longer holds contextCoded's DV_CODED_TEXT as expected — fixture changed?")
+	}
+	coded := opt[codedStart:closingChildren(t, opt, codedStart)]
+	codes := matchOnce(t, regexp.MustCompile(`<code_list>at0006</code_list>\s*<code_list>at0007</code_list>\s*<code_list>at0008</code_list>`), coded, "contextCoded")
+	coded = replaceExactlyOnce(t, coded, codes, "<code_list>at0001</code_list>")
+
+	// root is the ADMIN_ENTRY archetype root with its DV_COUNT turned into
+	// coded.
+	const admin, count = "<rm_type_name>ADMIN_ENTRY</rm_type_name>", "<rm_type_name>DV_COUNT</rm_type_name>"
+	replaceExactlyOnce(t, opt, admin, admin)
+	rootStart := strings.LastIndex(opt[:strings.Index(opt, admin)], `<children xsi:type="C_ARCHETYPE_ROOT">`)
+	if rootStart < 0 {
+		t.Fatal("the test_all_types OPT no longer holds the ADMIN_ENTRY archetype root as expected — fixture changed?")
+	}
+	rootEnd := closingChildren(t, opt, rootStart)
+	root := opt[rootStart:rootEnd]
+	replaceExactlyOnce(t, root, count, count)
+	countStart := strings.LastIndex(root[:strings.Index(root, count)], `<children xsi:type="C_COMPLEX_OBJECT">`)
+	root = root[:countStart] + coded + root[closingChildren(t, root, countStart):]
+
+	const term, archetypeID = `<items id="text">Unico(a)</items>`, "<archetype_id>"
+	replaceExactlyOnce(t, root, term, term)
+	replaceExactlyOnce(t, root, archetypeID, archetypeID)
+	copyOf := func(r adminRoot) string {
+		out := strings.Replace(root, term, `<items id="text">`+r.text+`</items>`, 1)
+		if r.name == "" {
+			return out
+		}
+		pin := `<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>name</rm_attribute_name>` +
+			`<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>DV_TEXT</rm_type_name><node_id/>` +
+			`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>value</rm_attribute_name>` +
+			`<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>STRING</rm_type_name><node_id/>` +
+			`<item xsi:type="C_STRING"><list>` + r.name + `</list></item></children></attributes></children></attributes>`
+		return strings.Replace(out, archetypeID, pin+archetypeID, 1)
+	}
+	return editedAllTypes(t, opt[:rootStart]+copyOf(first)+copyOf(second)+opt[rootEnd:])
+}
+
+// TestREQ053TemplateCompletionAlternativesGiveACodeNoText — REQ-053: where
+// two coded-text nodes that share one path, as the template indexes it, name
+// one terminology and give one code different texts, they give that code no
+// text, whichever comes first, so a |code with no |value there, with or
+// without its |terminology, is a missing required |value. Nodes that give the
+// code one text give it that text. The two nodes here are two copies of one
+// archetype root, one pinning a name and the other none, so the path of the
+// one that pins none is the path they share.
+func TestREQ053TemplateCompletionAlternativesGiveACodeNoText(t *testing.T) {
+	const term = "Unico(a)"
+	code := map[string]any{adminCoded + "|code": "at0001"}
+	codeAndTerminology := map[string]any{adminCoded + "|code": "at0001", adminCoded + "|terminology": "local"}
+	t.Run("texts that agree", func(t *testing.T) {
+		wt, compiled := adminEntryPair(t, adminRoot{name: "Named copy", text: term}, adminRoot{text: term})
+		withTemplate := simplified.WithTemplate(compiled)
+		full := map[string]any{adminCoded + "|code": "at0001", adminCoded + "|value": term, adminCoded + "|terminology": "local"}
+		got := decodeWith(t, wt, completionBody(code), withTemplate)
+		want := decodeWith(t, wt, completionBody(full), withTemplate)
+		if g, w := canonicalComposition(t, got), canonicalComposition(t, want); !bytes.Equal(g, w) {
+			t.Errorf("%v decodes to\n%s\nwant what %v decodes to\n%s", code, g, full, w)
+		}
+	})
+	for _, tc := range []struct {
+		name          string
+		first, second adminRoot
+	}{
+		{
+			name:  "the node that pins no name comes second",
+			first: adminRoot{name: "Named copy", text: term}, second: adminRoot{text: "another term"},
+		},
+		{
+			name:  "the node that pins no name comes first",
+			first: adminRoot{text: "another term"}, second: adminRoot{name: "Named copy", text: term},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			wt, compiled := adminEntryPair(t, tc.first, tc.second)
+			for name, leaves := range map[string]map[string]any{"code alone": code, "code and terminology": codeAndTerminology} {
+				t.Run(name, func(t *testing.T) {
+					wantMissingSuffix(t, wt, refusalCase{
+						leaves: leaves, key: adminCoded, reason: "DV_CODED_TEXT missing required |value",
+					}, simplified.WithTemplate(compiled))
+				})
+			}
+		})
+	}
+}
+
+// conformanceTransition is the FLAT id of the conformance corpus ACTION's
+// first ISM transition node, the one of ism_transition[at0005].
+const conformanceTransition = "conformance-ehrbase.de.v0/conformance_section/conformance_action/transition"
+
+// careflowStepUnconstrained compiles the conformance corpus OPT with the
+// defining_code constraint of the careflow_step of its first ISM_TRANSITION,
+// at0005, left out, so the template names no terminology for that step.
+func careflowStepUnconstrained(t *testing.T) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
+	t.Helper()
+	raw, err := os.ReadFile(fixtures.FlatConformanceOpt())
+	if err != nil {
+		t.Fatalf("read the conformance corpus OPT: %v", err)
+	}
+	opt := string(raw)
+	step := regexp.MustCompile(`(?s)(<rm_attribute_name>careflow_step</rm_attribute_name>.*?)` +
+		`<attributes xsi:type="C_SINGLE_ATTRIBUTE">\s*<rm_attribute_name>defining_code</rm_attribute_name>.*?</attributes>`)
+	loc := step.FindStringSubmatchIndex(opt)
+	if loc == nil || !strings.Contains(opt[loc[3]:loc[1]], "<code_list>at0005</code_list>") {
+		t.Fatal("the conformance corpus OPT's first careflow_step no longer constrains at0005 as expected — fixture changed?")
+	}
+	model, err := aom14.ReadOperationalTemplate(strings.NewReader(opt[:loc[3]] + opt[loc[1]:]))
+	if err != nil {
+		t.Fatalf("ReadOperationalTemplate(edited conformance corpus OPT): %v", err)
+	}
+	return compileTemplate(t, "conformance-ehrbase.de.v0", model)
+}
+
+// TestREQ053TemplateCompletionCareflowStepTakesLocal — REQ-053: with the
+// template, an ISM transition's careflow step that carries |code and |value
+// and no |terminology, where the template leaves its defining_code
+// unconstrained, is read as local, as a decode without the template reads it,
+// and is not refused as a missing required |terminology.
+func TestREQ053TemplateCompletionCareflowStepTakesLocal(t *testing.T) {
+	wt, compiled := careflowStepUnconstrained(t)
+	withTemplate := simplified.WithTemplate(compiled)
+	state := map[string]any{
+		conformanceTransition + "/current_state|code":        "524",
+		conformanceTransition + "/current_state|value":       "planned",
+		conformanceTransition + "/current_state|terminology": "openehr",
+	}
+	short := map[string]any{conformanceTransition + "/careflow_step|code": "at0005", conformanceTransition + "/careflow_step|value": "a step"}
+	full := maps.Clone(short)
+	full[conformanceTransition+"/careflow_step|terminology"] = "local"
+	maps.Copy(short, state)
+	maps.Copy(full, state)
+	got := decodeWith(t, wt, completionBody(short), withTemplate)
+	want := decodeWith(t, wt, completionBody(full), withTemplate)
+	if g, w := canonicalComposition(t, got), canonicalComposition(t, want); !bytes.Equal(g, w) {
+		t.Errorf("%v decodes to\n%s\nwant what %v decodes to\n%s", short, g, full, w)
+	}
+}
