@@ -380,8 +380,7 @@ partially or silently accepted.
   `terminology:<name>[/<version>]`, with any query or fragment, names `<name>`, or
   `<name>(<version>)` where it gives a version, the `TERMINOLOGY_ID` form, so `test_all_types`'
   `terminology:SNOMED-CT` gives `SNOMED-CT`. The openEHR specifications do not say which
-  terminology id such a URI names: this reading is the SDK's. A terminology the code phrase names is kept, whatever the URI says, and a
-  reference set read by its URI gives no term text. One that carries no `\|value` takes its
+  terminology id such a URI names: this reading is the SDK's. A terminology the code phrase names is kept, whatever the URI says. One that carries no `\|value` takes its
   code's term text, read as for a coded node name, where that constraint lists the code and the
   coded text is in its terminology. A value or terminology the body gives is kept as written,
   for validation to judge. **Still refused**, as a missing required suffix naming the key: a

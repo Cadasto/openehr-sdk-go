@@ -2568,26 +2568,16 @@ type codedTerms struct {
 }
 
 // codedTermsOf returns what n, a DV_CODED_TEXT node, gives a coded value: the
-// terminology of the one C_CODE_PHRASE, or C_CODE_REFERENCE read as the code
-// phrase it carries, that constrains its defining_code, and the term text of
-// each code that phrase lists, the text a coded node name takes. A reference
-// set whose code phrase names no terminology gives the one its terminology:
-// URI names ([constraints.CodeReference.ReferenceSetTerminology]), the SDK's
-// reading, and no term text: a reference set lists none (REQ-053). A
-// defining_code the template constrains in any other way, or not at all, and
-// a code phrase that names no terminology and no such URI give nothing.
+// terminology of the one C_CODE_PHRASE or C_CODE_REFERENCE that constrains its
+// defining_code, a reference set whose code phrase names none taking the one
+// its terminology: URI names ([constraints.CodePhraseWithTerminologyOf]), the
+// SDK's reading (REQ-053), and the term text of each code that phrase lists,
+// the text a coded node name takes. A defining_code the template constrains in
+// any other way, or not at all, and a code phrase that names no terminology
+// and no such URI give nothing.
 func codedTermsOf(n *templatecompile.CompiledNode) codedTerms {
-	pc := onePrimitive(n, "defining_code")
-	phrase, ok := constraints.CodePhraseOf(pc)
-	if !ok {
-		return codedTerms{}
-	}
-	if ref, isRef := pc.(constraints.CodeReference); isRef && phrase.Terminology == "" {
-		if id, named := ref.ReferenceSetTerminology(); named {
-			return codedTerms{terminology: id}
-		}
-	}
-	if phrase.Terminology == "" {
+	phrase, ok := constraints.CodePhraseWithTerminologyOf(onePrimitive(n, "defining_code"))
+	if !ok || phrase.Terminology == "" {
 		return codedTerms{}
 	}
 	t := codedTerms{terminology: phrase.Terminology, texts: make(map[string]string, len(phrase.CodeList))}
