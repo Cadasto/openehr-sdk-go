@@ -20,6 +20,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
@@ -254,6 +255,59 @@ func TestREQ053EmptyStartTimeBesideCtxTime(t *testing.T) {
 			_, want := decodeLoneValue(t, wt, mustJSON(t, completionBody(map[string]any{key: nil})), mode.opts...)
 			assertReadsAsNull(t, wt, key, completionBody(map[string]any{key: ""}), want, mode.opts...)
 		})
+	}
+}
+
+// TestREQ053EmptyCtxTimeReadsAsNull — REQ-053. ctx/time spells the start
+// time, a DV_DATE_TIME, so a "" there reads as absent, as a null there does
+// and as a "" at <root>/context/start_time does: the body decodes as one with
+// no ctx/time, in FLAT and in STRUCTURED, with and without the template, and
+// encoding it and decoding the output gives that composition again.
+func TestREQ053EmptyCtxTimeReadsAsNull(t *testing.T) {
+	wt, compiled := shorthandTarget(t)
+	const key = "ctx/time"
+	for _, mode := range shorthandModes(compiled) {
+		t.Run(mode.name, func(t *testing.T) {
+			_, want := decodeLoneValue(t, wt, mustJSON(t, completionBody(map[string]any{key: nil})), mode.opts...)
+			assertReadsAsNull(t, wt, key, completionBody(map[string]any{key: ""}), want, mode.opts...)
+		})
+	}
+}
+
+// TestREQ053EmptyCtxTimeBesideStartTime — REQ-053. A "" at ctx/time is no
+// second spelling of the start time that disagrees with <root>/context/start_time
+// beside it: the start time is the real path's, whichever of the two keys
+// sorts first. test_all_types sorts its root after ctx/, and the corpus
+// template sorts its root before it.
+func TestREQ053EmptyCtxTimeBesideStartTime(t *testing.T) {
+	allTypesWT, allTypesCompiled := shorthandTarget(t)
+	corpusWT, corpusCompiled := conformanceTarget(t)
+	for _, tc := range []struct {
+		name     string
+		wt       *webtemplate.WebTemplate
+		compiled *templatecompile.Compiled
+		body     func(map[string]any) map[string]any
+		path     string
+		time     string
+	}{
+		{
+			name: "ctx/time sorts first", wt: allTypesWT, compiled: allTypesCompiled, body: completionBody,
+			path: "test_all_types/context/start_time", time: "2019-03-22T22:00:00+01:00",
+		},
+		{
+			name: "start_time sorts first", wt: corpusWT, compiled: corpusCompiled, body: emptyTemporalBody,
+			path: "conformance-ehrbase.de.v0/context/start_time", time: "2021-12-21T14:19:31.649613+01:00",
+		},
+	} {
+		for _, mode := range shorthandModes(tc.compiled) {
+			t.Run(tc.name+"/"+mode.name, func(t *testing.T) {
+				_, want := decodeLoneValue(t, tc.wt, mustJSON(t, tc.body(map[string]any{"ctx/time": nil, tc.path: tc.time})), mode.opts...)
+				comp := assertReadsAsNull(t, tc.wt, "ctx/time", tc.body(map[string]any{"ctx/time": "", tc.path: tc.time}), want, mode.opts...)
+				if comp.Context == nil || comp.Context.StartTime.Value != tc.time {
+					t.Errorf("UnmarshalFlat(ctx/time: \"\", %s: %q) gives context %+v, want start time %q", tc.path, tc.time, comp.Context, tc.time)
+				}
+			})
+		}
 	}
 }
 
