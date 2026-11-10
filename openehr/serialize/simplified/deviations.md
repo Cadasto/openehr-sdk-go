@@ -169,7 +169,10 @@ Concretely:
   DV_CODED_TEXT or a DV_QUANTITY, is such a value missing every required suffix, while a
   DV_PROPORTION's derived bare magnitude beside its numerator is unmatched, and alone where
   every other key of its leaf is null; a DV_IDENTIFIER's bare value is its `\|id`, and a bare
-  `ctx/setting` names the setting by its code or its rubric, the `ctx/` context row below), a bare
+  `ctx/setting` names the setting by its code or its rubric, the `ctx/` context row below; with
+  `WithTemplate`, a coded text's `\|terminology` the template does not determine is one, while a
+  coded text's `\|value` or `\|terminology`, or an ordinal's `\|value` or `\|ordinal`, that the
+  template determines is taken from it, § Deviations, the ordinal and coded-text entries), a bare
   `ctx/setting` that is neither a code nor a rubric of the openEHR `setting` group (it names no
   setting, so it is refused naming the key), two spellings of one leaf value that disagree (a
   DV_IDENTIFIER's bare value and `\|id`, a DV_TEXT's or a DV_PARSABLE's bare value and
@@ -341,21 +344,49 @@ partially or silently accepted.
   `<root>/_name` as unmatched and named the composition after the template, and encode wrote
   no name at all (the PROBE-105 census recorded it for `consult_record` and `ehrn_abdm`).
 
-- **An ordinal's terminology on `WithTemplate` decode.** A `DV_ORDINAL` leaf, and each bound of
-  a `DV_INTERVAL<DV_ORDINAL>` leaf, carries `\|code`, `\|value` and `\|ordinal` and no
-  terminology, and the reference rebuilds the symbol in `local` whatever the template says (its
+- **An ordinal's terminology, value and text on `WithTemplate` decode.** A `DV_ORDINAL` leaf,
+  and each bound of a `DV_INTERVAL<DV_ORDINAL>` leaf, carries `\|code`, `\|value` and
+  `\|ordinal` and no terminology, and the reference rebuilds the symbol in `local` whatever the template says (its
   `DvOrdinalRMUnmarshaller`); decode without the template does the same. With `WithTemplate`,
   the symbol takes the terminology of the template's `C_DV_ORDINAL` pair with its code and
   ordinal value, where the pairs at its path agree on one, so a template whose ordinals are coded
   outside `local` decodes to the value it lists rather than one its validation refuses as
-  `primitive_not_in_list`. A `\|raw` ordinal keeps its own terminology, encode still writes a
+  `primitive_not_in_list`. A leaf that carries `\|code` and leaves out `\|ordinal` or
+  `\|value`, which ITS-REST 1.1.0 *Simplified Formats* § DV_ORDINAL allows "if symbol is
+  defined in template", takes them from the same pairs: the ordinal value where the pairs at its
+  path give its code exactly one, and the code's term text in the pair's terminology, read as for
+  a coded name. Pairs that give the code two values give it neither, and pairs that give it two
+  texts give it no text. What they do not give stays a missing required suffix, refused naming
+  the key, and a bound of a `DV_INTERVAL<DV_ORDINAL>` leaf still needs all three suffixes. A
+  `\|raw` ordinal keeps its own terminology, encode still writes a
   non-local ordinal as `\|raw`, since it cannot know the decode will have the template, and a
   `DV_SCALE` symbol stays `local`: the compiled template holds no pairs for it. **Round-trip
   limit:** encode writes a `local` ordinal in the suffix form, so a `local` symbol where the
   template's pair for that code and value names another terminology, a value the template
   refuses, comes back in the template's terminology. No corpus template codes an ordinal outside
   `local`; `TestREQ053WithTemplateOrdinalTerminology` and
-  `TestREQ053WithTemplateOrdinalIntervalTerminology` pin it.
+  `TestREQ053WithTemplateOrdinalIntervalTerminology` pin it, and `template_completion_test.go`
+  the completed value and text.
+
+- **A coded text's terminology and text on `WithTemplate` decode.** ITS-REST 1.1.0 *Simplified
+  Formats* § DV_CODED_TEXT requires `\|value` and `\|terminology` "only for external
+  terminologies", and the Web Template leaves a local list's `local` terminology out
+  (`webtemplate/deviations.md` § Input-level), so a client may send `\|code` alone. With
+  `WithTemplate`, a `DV_CODED_TEXT` leaf, the `\|code` substitution at a `DV_TEXT` leaf included,
+  that carries no `\|terminology` takes the terminology its `defining_code` constraint names
+  (`local` for a local code list, an external terminology id with no code list), where the
+  alternatives at its path agree on one. One that carries no `\|value` takes its code's term
+  text, read as for a coded node name, where that constraint lists the code and the coded text is
+  in its terminology. A value or terminology the body gives is kept as written, for validation to
+  judge. **Still refused**, as a missing required suffix naming the key: a `\|terminology` the
+  template does not determine (a reference set that names only its URI, a `DV_TEXT` node,
+  alternatives that disagree), except at an ISM transition's current state or careflow step,
+  which take `openehr` and `local` (§ Fail-loud posture), and a `\|value` it does not determine
+  (a code outside the list, a constraint that lists no code). Until 2026-11-10 `\|code` alone was
+  refused for want of `\|value`, and a coded text without `\|terminology` decoded with an empty
+  terminology that validation then refused as `required`. Without the template decode is
+  unchanged: a coded text needs `\|code` and `\|value` and takes no terminology it does not
+  carry. No corpus body moves (PROBE-086, PROBE-105); `template_completion_test.go` pins it.
 
 - **`archetype_details` is rebuilt on decode, not carried.** FLAT has no key for it, because
   the Web Template already holds the archetype id of every archetype root and the template id.

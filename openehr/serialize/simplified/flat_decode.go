@@ -236,7 +236,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 		if len(sfx) == 0 {
 			continue
 		}
-		dv, err := leafFromSuffixes(leafHolds(leaf), nodeRMType(leaf), leafListOpen(leaf), sfx, keyOf)
+		dv, err := clinicalLeafValue(leaf, sfx, keyOf, tmpl != nil)
 		if err != nil {
 			return nil, fmt.Errorf("simplified: decode %q: %w", base, err)
 		}
@@ -244,8 +244,16 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 		if err != nil {
 			return nil, fmt.Errorf("simplified: place %q: %w", base, err)
 		}
-		if _, raw := sfx["raw"]; !raw && nodeRMType(leaf) == "DV_ORDINAL" {
-			settleOrdinalTerminology(dv, tmpl.ordinalTerminologies(key))
+		if _, raw := sfx["raw"]; !raw {
+			// The key the template is indexed by is known once the value is
+			// placed: what the body leaves out of a coded value is taken from
+			// the template, or refused, now (REQ-053).
+			if err := tmpl.completeCodedValue(dv, key); err != nil {
+				return nil, fmt.Errorf("simplified: decode %q: %w", base, err)
+			}
+			if nodeRMType(leaf) == "DV_ORDINAL" {
+				settleOrdinalTerminology(dv, tmpl.ordinalTerminologies(key))
+			}
 		}
 	}
 	// Composite leaves are placed like any other leaf, after the clinical loop so a
@@ -2305,6 +2313,13 @@ type templateIndex struct {
 	// one of them, give it more than one: the template then gives no single
 	// answer.
 	ordinals map[string]map[ordinalPair]string
+	// ordinalCodes maps the compiled path of a C_DV_ORDINAL node, and its
+	// bare path, to what its pairs give each code ([ordinalCode]).
+	ordinalCodes map[string]map[string]ordinalCode
+	// codedValues maps the compiled path of a DV_CODED_TEXT node, and its
+	// bare path, to what its defining_code constraint gives a coded value
+	// there ([codedTerms]).
+	codedValues map[string]codedTerms
 	// rmTypes maps a path to the RM type the template gives the node there. It
 	// maps to "" where the nodes at one path disagree, the alternatives of one
 	// single-valued attribute, say, which share a path: the template then gives
@@ -2394,13 +2409,19 @@ type ordinalPair struct {
 }
 
 // addOrdinals records the terminology each pair of ord, the C_DV_ORDINAL of
-// a node at path, gives its code at its value. A code and value that another
-// pair or another node at path gives another terminology are left with none.
-func (x *templateIndex) addOrdinals(path string, ord constraints.CDvOrdinal) {
+// the node n at path, gives its code at its value. A code and value that
+// another pair or another node at path gives another terminology are left
+// with none. It also records what the pairs give each code ([ordinalCode]).
+func (x *templateIndex) addOrdinals(path string, n *templatecompile.CompiledNode, ord constraints.CDvOrdinal) {
 	terms := x.ordinals[path]
 	if terms == nil {
 		terms = make(map[ordinalPair]string, len(ord.Values))
 		x.ordinals[path] = terms
+	}
+	codes := x.ordinalCodes[path]
+	if codes == nil {
+		codes = make(map[string]ordinalCode, len(ord.Values))
+		x.ordinalCodes[path] = codes
 	}
 	for _, v := range ord.Values {
 		pair := ordinalPair{code: v.Symbol.CodeString, value: v.Value}
@@ -2409,7 +2430,205 @@ func (x *templateIndex) addOrdinals(path string, ord constraints.CDvOrdinal) {
 			term = ""
 		}
 		terms[pair] = term
+		text, _ := codeTermText(n, v.Symbol.Terminology, v.Symbol.CodeString)
+		c, seen := codes[pair.code]
+		switch {
+		case !seen:
+			c = ordinalCode{value: v.Value, text: text}
+		case c.value != v.Value:
+			c.ambiguous = true
+		}
+		c.text = agreedText(c.text, text)
+		codes[pair.code] = c
 	}
+}
+
+// agreedText is the term text two constraints that give one code the texts
+// held and next give it together: the text where they agree, none ("") where
+// they do not.
+func agreedText(held, next string) string {
+	if held != next {
+		return ""
+	}
+	return held
+}
+
+// ordinalCode is what the C_DV_ORDINAL pairs at one path give one code: its
+// ordinal value, and its term text in the pair's terminology
+// ([codeTermText]), "" for none. A code that pairs there give two values is
+// ambiguous: the template gives it neither. Pairs that give it two texts
+// leave it with none.
+type ordinalCode struct {
+	value     int
+	text      string
+	ambiguous bool
+}
+
+// ordinalCodeAt returns what the template's C_DV_ORDINAL at path gives code
+// ([ordinalCode]), looked up as [templateIndex.ordinalTerminologies] looks up
+// the pairs. ok is false where no pair there holds code, where the code is
+// ambiguous, and where there is no C_DV_ORDINAL at path.
+func (x *templateIndex) ordinalCodeAt(path, code string) (c ordinalCode, ok bool) {
+	codes, held := x.ordinalCodes[path]
+	if !held {
+		codes = x.ordinalCodes[bareAQLPath(path)]
+	}
+	c, ok = codes[code]
+	return c, ok && !c.ambiguous
+}
+
+// codedTerms is what the template gives a coded value at one path: the
+// terminology that its defining_code constraint names, and the term text of
+// each code it lists that has one ([codeTermText]). The zero value gives no
+// terminology and no text.
+type codedTerms struct {
+	terminology string
+	texts       map[string]string
+}
+
+// codedTermsOf returns what n, a DV_CODED_TEXT node, gives a coded value: the
+// terminology of the one C_CODE_PHRASE, or C_CODE_REFERENCE read as the code
+// phrase it carries, that constrains its defining_code, and the term text of
+// each code that phrase lists, the text a coded node name takes. A
+// defining_code the template constrains in any other way, or not at all, and
+// a code phrase that names no terminology, such as a reference set that names
+// only its URI, give nothing.
+func codedTermsOf(n *templatecompile.CompiledNode) codedTerms {
+	phrase, ok := constraints.CodePhraseOf(onePrimitive(n, "defining_code"))
+	if !ok || phrase.Terminology == "" {
+		return codedTerms{}
+	}
+	t := codedTerms{terminology: phrase.Terminology, texts: make(map[string]string, len(phrase.CodeList))}
+	for _, code := range phrase.CodeList {
+		if text, ok := codeTermText(n, phrase.Terminology, code); ok {
+			t.texts[code] = text
+		}
+	}
+	return t
+}
+
+// addCodedTerms records t, what a DV_CODED_TEXT node at path gives a coded
+// value there. A second node at that path, an alternative, that names
+// another terminology, or none, leaves the path with nothing; one that names
+// the same adds the texts of its codes, and a code the two give different
+// texts is left with none.
+func (x *templateIndex) addCodedTerms(path string, t codedTerms) {
+	prev, seen := x.codedValues[path]
+	switch {
+	case !seen:
+		x.codedValues[path] = t
+	case prev.terminology != t.terminology:
+		x.codedValues[path] = codedTerms{}
+	default:
+		// A node's texts are recorded under its compiled path and its bare
+		// alias alike, so they are merged into a copy.
+		texts := maps.Clone(prev.texts)
+		for code, text := range t.texts {
+			if held, both := texts[code]; both {
+				text = agreedText(held, text)
+			}
+			texts[code] = text
+		}
+		x.codedValues[path] = codedTerms{terminology: prev.terminology, texts: texts}
+	}
+}
+
+// codedTermsAt returns what the template gives a coded value at path
+// ([codedTerms]), looked up as [templateIndex.ordinalTerminologies] looks up
+// an ordinal's pairs.
+func (x *templateIndex) codedTermsAt(path string) codedTerms {
+	if t, ok := x.codedValues[path]; ok {
+		return t
+	}
+	return x.codedValues[bareAQLPath(path)]
+}
+
+// completeCodedValue gives dv, a value decode built from a leaf's suffixes
+// and placed at path, the suffixes the body leaves out and the template
+// determines (REQ-053), and refuses one it leaves out and the template does
+// not determine, as a missing required suffix. Only a coded text and an
+// ordinal leave any out, and only in a decode with the template
+// ([clinicalLeafValue]); every other value is left as it is, and so is every
+// value in a decode without the template.
+//
+// A coded text that names no terminology takes the one the template's
+// defining_code constraint names at path ([codedTerms]), and one with no
+// value takes the term text that constraint lists for its code, where the
+// coded text's terminology is that constraint's: the text a coded node name
+// takes. A terminology the template does not determine is refused, except at
+// an ISM transition, which [settleIsmTransitions] gives one
+// ([ismSettlesTerminology]). An ordinal with no ordinal value, or no symbol
+// text, takes the value and the term text the template's pairs at path give
+// its code, where they give it one value ([ordinalCode]); its terminology is
+// settled after ([settleOrdinalTerminology]). What the body gives is kept as
+// written, for validation to judge.
+func (x *templateIndex) completeCodedValue(dv any, path string) error {
+	m, _ := dv.(map[string]any)
+	if x == nil || m == nil {
+		return nil
+	}
+	switch m["_type"] {
+	case "DV_CODED_TEXT":
+		return x.completeCodedText(m, path)
+	case "DV_ORDINAL":
+		return x.completeOrdinal(m, path)
+	}
+	return nil
+}
+
+// completeCodedText is [templateIndex.completeCodedValue] for a coded text.
+func (x *templateIndex) completeCodedText(dv map[string]any, path string) error {
+	dc, _ := dv["defining_code"].(map[string]any)
+	terms := x.codedTermsAt(path)
+	if _, named := dc["terminology_id"]; !named && terms.terminology != "" {
+		dc["terminology_id"] = map[string]any{"_type": "TERMINOLOGY_ID", "value": terms.terminology}
+	}
+	if _, valued := dv["value"]; !valued {
+		text := ""
+		if tid, _ := dc["terminology_id"].(map[string]any); terms.terminology != "" && tid["value"] == terms.terminology {
+			code, _ := dc["code_string"].(string)
+			text = terms.texts[code]
+		}
+		if text == "" {
+			return errMissingSuffix("DV_CODED_TEXT", "value")
+		}
+		dv["value"] = text
+	}
+	if _, named := dc["terminology_id"]; !named && !ismSettlesTerminology(path) {
+		return errMissingSuffix("DV_CODED_TEXT", "terminology")
+	}
+	return nil
+}
+
+// completeOrdinal is [templateIndex.completeCodedValue] for an ordinal.
+func (x *templateIndex) completeOrdinal(dv map[string]any, path string) error {
+	symbol, _ := dv["symbol"].(map[string]any)
+	dc, _ := symbol["defining_code"].(map[string]any)
+	code, _ := dc["code_string"].(string)
+	c, ok := x.ordinalCodeAt(path, code)
+	if _, valued := symbol["value"]; !valued {
+		if !ok || c.text == "" {
+			return errMissingSuffix("DV_ORDINAL", "value")
+		}
+		symbol["value"] = c.text
+	}
+	if _, valued := dv["value"]; !valued {
+		if !ok {
+			return errMissingSuffix("DV_ORDINAL", "ordinal")
+		}
+		dv["value"] = c.value
+	}
+	return nil
+}
+
+// ismSettlesTerminology reports whether path names an ISM transition's current
+// state or careflow step, whose terminology [settleIsmTransitions] gives where
+// the body names none: RM Current_state_valid admits `openehr` alone, and a
+// careflow step is coded with its node's at-code. Only ISM_TRANSITION has an
+// attribute of either name.
+func ismSettlesTerminology(path string) bool {
+	_, attr, _ := strings.CutLast(path, "/")
+	return attr == "current_state" || attr == "careflow_step"
 }
 
 // ordinalTerminologies returns the terminology the template's C_DV_ORDINAL at
@@ -2691,11 +2910,13 @@ func templateIndexFor(c *templatecompile.Compiled) *templateIndex {
 // language, so the rubric is in that language.
 func buildTemplateIndex(c *templatecompile.Compiled) *templateIndex {
 	x := &templateIndex{
-		names:      make(map[string]string),
-		codedNames: make(map[string]codedName),
-		rmTypes:    make(map[string]string),
-		structures: make(map[string][]emptyStructure),
-		ordinals:   make(map[string]map[ordinalPair]string),
+		names:        make(map[string]string),
+		codedNames:   make(map[string]codedName),
+		rmTypes:      make(map[string]string),
+		structures:   make(map[string][]emptyStructure),
+		ordinals:     make(map[string]map[ordinalPair]string),
+		ordinalCodes: make(map[string]map[string]ordinalCode),
+		codedValues:  make(map[string]codedTerms),
 	}
 	var walk func(n *templatecompile.CompiledNode)
 	walk = func(n *templatecompile.CompiledNode) {
@@ -2703,9 +2924,16 @@ func buildTemplateIndex(c *templatecompile.Compiled) *templateIndex {
 		// bare alias ([templateIndex.ordinalTerminologies]).
 		if ord, ok := n.PrimitiveConstraint().(constraints.CDvOrdinal); ok {
 			path := n.AQLPath()
-			x.addOrdinals(path, ord)
+			x.addOrdinals(path, n, ord)
 			if bare := bareAQLPath(path); bare != path {
-				x.addOrdinals(bare, ord)
+				x.addOrdinals(bare, n, ord)
+			}
+		}
+		if n.RMTypeName() == "DV_CODED_TEXT" {
+			path, terms := n.AQLPath(), codedTermsOf(n)
+			x.addCodedTerms(path, terms)
+			if bare := bareAQLPath(path); bare != path {
+				x.addCodedTerms(bare, terms)
 			}
 		}
 		if s := emptyStructuresOf(n); len(s) > 0 {
@@ -3357,6 +3585,27 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any, keyOf func
 // _type is holds or an RM subtype of it and its members decode as that _type,
 // which is what canonical JSON admits.
 func dvFromSuffixesAt(holds, rmType string, listOpen bool, sfx map[string]any, keyOf func(suffix string) string) (map[string]any, error) {
+	return dvFromSuffixesWith(holds, rmType, listOpen, sfx, keyOf, false)
+}
+
+// clinicalLeafValue is [leafFromSuffixes] for a leaf of the clinical leaf
+// loop. In a decode with the template (deferred), a coded text and an ordinal
+// are built without the suffixes the body leaves out and the template may
+// supply, which [templateIndex.completeCodedValue] gives, or refuses, once the
+// value is placed and its path in the template is known.
+func clinicalLeafValue(leaf *webtemplate.Node, sfx map[string]any, keyOf func(suffix string) string, deferred bool) (any, error) {
+	rmType := nodeRMType(leaf)
+	if !deferred || rmType == stringLeafType {
+		return leafFromSuffixes(leafHolds(leaf), rmType, leafListOpen(leaf), sfx, keyOf)
+	}
+	return dvFromSuffixesWith(leafHolds(leaf), rmType, leafListOpen(leaf), sfx, keyOf, true)
+}
+
+// dvFromSuffixesWith is [dvFromSuffixesAt], with deferred set where a decode
+// with the template may supply what the body leaves out: a coded text's
+// |value and an ordinal's |value and |ordinal are then left out of the value
+// rather than refused ([deferrableSuffix]).
+func dvFromSuffixesWith(holds, rmType string, listOpen bool, sfx map[string]any, keyOf func(suffix string) string, deferred bool) (map[string]any, error) {
 	sfx = withoutNulls(sfx)
 	// |raw bypass: a pre-serialised canonical fragment (carrying its own string
 	// _type); used directly, whatever the leaf rmType, once the attribute it
@@ -3385,7 +3634,9 @@ func dvFromSuffixesAt(holds, rmType string, listOpen bool, sfx map[string]any, k
 	// stored at a DV_TEXT-typed leaf (the corpus's dv_coded_text_as_dv_text
 	// shape). |code is the discriminator: its presence re-selects the
 	// DV_CODED_TEXT builder, and the group then follows that type's own rules —
-	// |value required, |terminology / |formatting optional, bare value refused.
+	// |value required, |terminology / |formatting optional, bare value refused
+	// (a decode with the template completes the coded text as it completes any
+	// other, [templateIndex.completeCodedValue]).
 	// Without |code the leaf stays a plain DV_TEXT, whose |value is its bare
 	// value ([shorthandSpellings]), and a stray |terminology is refused by the
 	// allowlist below, as before. The encoder is the exact inverse:
@@ -3470,7 +3721,7 @@ func dvFromSuffixesAt(holds, rmType string, listOpen bool, sfx map[string]any, k
 		if err != nil {
 			return nil, err
 		}
-		val, err := requireSuffix(rmType, sfx, "value")
+		val, valued, err := deferrableSuffix(rmType, sfx, "value", deferred)
 		if err != nil {
 			return nil, err
 		}
@@ -3478,7 +3729,10 @@ func dvFromSuffixesAt(holds, rmType string, listOpen bool, sfx map[string]any, k
 		if t, ok := sfx["terminology"]; ok {
 			dc["terminology_id"] = map[string]any{"_type": "TERMINOLOGY_ID", "value": t}
 		}
-		dv := map[string]any{"_type": "DV_CODED_TEXT", "value": val, "defining_code": dc}
+		dv := map[string]any{"_type": "DV_CODED_TEXT", "defining_code": dc}
+		if valued {
+			dv["value"] = val
+		}
 		if err := applyOrderedSuffixes(dv, sfx); err != nil {
 			return nil, err
 		}
@@ -3488,11 +3742,11 @@ func dvFromSuffixesAt(holds, rmType string, listOpen bool, sfx map[string]any, k
 		if err != nil {
 			return nil, err
 		}
-		val, err := requireSuffix(rmType, sfx, "value")
+		val, valued, err := deferrableSuffix(rmType, sfx, "value", deferred)
 		if err != nil {
 			return nil, err
 		}
-		ordinal, err := requireSuffix(rmType, sfx, "ordinal")
+		ordinal, ordered, err := deferrableSuffix(rmType, sfx, "ordinal", deferred)
 		if err != nil {
 			return nil, err
 		}
@@ -3500,13 +3754,20 @@ func dvFromSuffixesAt(holds, rmType string, listOpen bool, sfx map[string]any, k
 		// "local", as the reference does, and a WithTemplate decode then gives
 		// it the template's ([settleOrdinalTerminology]).
 		symbol := map[string]any{
-			"_type": "DV_CODED_TEXT", "value": val,
+			"_type": "DV_CODED_TEXT",
 			"defining_code": map[string]any{
 				"_type": "CODE_PHRASE", "code_string": code,
 				"terminology_id": map[string]any{"_type": "TERMINOLOGY_ID", "value": "local"},
 			},
 		}
-		return map[string]any{"_type": "DV_ORDINAL", "value": ordinal, "symbol": symbol}, nil
+		if valued {
+			symbol["value"] = val
+		}
+		dv := map[string]any{"_type": "DV_ORDINAL", "symbol": symbol}
+		if ordered {
+			dv["value"] = ordinal
+		}
+		return dv, nil
 	case "DV_SCALE":
 		// The DV_ORDINAL grammar one class over: same symbol, same three
 		// suffixes, `|ordinal` carrying DV_SCALE's Real `value` (scaleToFlat).
@@ -3876,13 +4137,30 @@ func leafHolds(leaf *webtemplate.Node) string {
 func requireSuffix(rmType string, sfx map[string]any, name string) (any, error) {
 	v, ok := sfx[name]
 	if !ok {
-		label := "|" + name
-		if name == "" {
-			label = "bare value"
-		}
-		return nil, fmt.Errorf("%w: %s missing required %s", ErrUnsupportedDatatype, rmType, label)
+		return nil, errMissingSuffix(rmType, name)
 	}
 	return v, nil
+}
+
+// deferrableSuffix is [requireSuffix] for a suffix a decode with the template
+// may supply once the value is placed ([templateIndex.completeCodedValue]):
+// where deferred, an absent one is no error, and ok reports whether sfx holds
+// it.
+func deferrableSuffix(rmType string, sfx map[string]any, name string, deferred bool) (v any, ok bool, err error) {
+	if v, ok = sfx[name]; ok || deferred {
+		return v, ok, nil
+	}
+	return nil, false, errMissingSuffix(rmType, name)
+}
+
+// errMissingSuffix refuses a value of rmType whose required suffix name the
+// body leaves out, "" naming the bare value.
+func errMissingSuffix(rmType, name string) error {
+	label := "|" + name
+	if name == "" {
+		label = "bare value"
+	}
+	return fmt.Errorf("%w: %s missing required %s", ErrUnsupportedDatatype, rmType, label)
 }
 
 // impliedCompositionName is the name decode gives a composition whose body

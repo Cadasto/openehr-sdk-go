@@ -78,8 +78,11 @@
 // datatype has neither a suffix set nor a sub-path grammar refuses its bare
 // value and any suffix naming an attribute of its RM class.
 // So does malformed content: a value of the wrong shape, a missing required
-// suffix (a lone bare value where the datatype has no bare spelling, a bare
-// ctx/setting, a null required suffix), two spellings of one field the decode
+// suffix (a lone bare value where the datatype has no bare spelling, a null
+// required suffix, and with [WithTemplate] a coded text's |terminology the
+// template does not determine; a coded text's |value or |terminology, or an
+// ordinal's |value or |ordinal, that the template determines is taken from it
+// and not missing), two spellings of one field the decode
 // reads that disagree (such as `x` and `x|`; a lone `x|` reads as `x`), an
 // index past its bound. A value that does not fit its RM attribute, one the
 // canonical-JSON decode of that attribute would refuse, is refused with

@@ -381,8 +381,8 @@ func TestREQ053TemplateCompletionExternalTerminology(t *testing.T) {
 // TestREQ053TemplateCompletionNeedsAgreement — REQ-053: the template
 // determines nothing where it disagrees with itself. Two coded-text
 // alternatives at one path that name different terminologies give no
-// terminology, and ordinal pairs that give one code two values give it no
-// ordinal and no text.
+// terminology, ordinal pairs that give one code two values give it no
+// ordinal and no text, and pairs that give it two texts give it no text.
 func TestREQ053TemplateCompletionNeedsAgreement(t *testing.T) {
 	t.Run("coded text alternatives", func(t *testing.T) {
 		// alternative is contextCoded's DV_CODED_TEXT, from its opening tag to
@@ -415,6 +415,33 @@ func TestREQ053TemplateCompletionNeedsAgreement(t *testing.T) {
 			},
 		} {
 			wantMissingSuffix(t, wt, tc, simplified.WithTemplate(compiled))
+		}
+	})
+	t.Run("ordinal texts", func(t *testing.T) {
+		// A SNOMED-CT pair beside the local one, before or after it, gives
+		// at0015 the same value, 1, and no term text, where the local pair
+		// gives it "ord1".
+		pair := regexp.MustCompile(`<list>\s*<value>1</value>\s*<symbol>\s*<value/>\s*<defining_code>\s*<terminology_id>\s*<value>local</value>\s*</terminology_id>\s*<code_string>at0015</code_string>\s*</defining_code>\s*</symbol>\s*</list>`)
+		opt := allTypesOPT(t)
+		local := matchOnce(t, pair, opt, "the test_all_types OPT")
+		snomed := `<list><value>1</value><symbol><value/><defining_code><terminology_id><value>SNOMED-CT</value></terminology_id>` +
+			`<code_string>at0015</code_string></defining_code></symbol></list>`
+		for order, pairs := range map[string]string{"SNOMED-CT first": snomed + local, "local first": local + snomed} {
+			t.Run(order, func(t *testing.T) {
+				wt, compiled := editedAllTypes(t, replaceExactlyOnce(t, opt, local, pairs))
+				withTemplate := simplified.WithTemplate(compiled)
+				wantMissingSuffix(t, wt, refusalCase{
+					leaves: map[string]any{obsOrdinal + "|code": "at0015"},
+					key:    obsOrdinal, reason: "DV_ORDINAL missing required |value",
+				}, withTemplate)
+				short := map[string]any{obsOrdinal + "|code": "at0015", obsOrdinal + "|value": "ord1"}
+				full := map[string]any{obsOrdinal + "|code": "at0015", obsOrdinal + "|value": "ord1", obsOrdinal + "|ordinal": 1}
+				got := decodeWith(t, wt, completionBody(short), withTemplate)
+				want := decodeWith(t, wt, completionBody(full), withTemplate)
+				if g, w := canonicalComposition(t, got), canonicalComposition(t, want); !bytes.Equal(g, w) {
+					t.Errorf("%v decodes to\n%s\nwant what %v decodes to\n%s", short, g, full, w)
+				}
+			})
 		}
 	})
 }
