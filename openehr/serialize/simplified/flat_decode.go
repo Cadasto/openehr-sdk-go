@@ -2136,7 +2136,7 @@ func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g 
 		// reused-sibling refusal, each with its own message.
 		return fmt.Errorf("simplified: %q: %w", g.prefix(), err)
 	}
-	value, ordinalBounds, err := compositeLeafValue(g, nodeRMType(node))
+	value, ordinalBounds, err := compositeLeafValue(g, nodeRMType(node), tmpl != nil)
 	if err == nil || errors.Is(err, errNothingMatched) {
 		if dupErr := g.settleDups(); dupErr != nil {
 			return dupErr
@@ -2153,6 +2153,12 @@ func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g 
 		return fmt.Errorf("simplified: place %q: %w", g.prefix(), err)
 	}
 	for _, end := range ordinalBounds {
+		// A bound's path in the template is known once the leaf is placed:
+		// what the body leaves out of its ordinal is taken from the template's
+		// pairs for that bound, or refused, now, as at a leaf (REQ-053).
+		if err := tmpl.completeCodedValue(value[end], key+"/"+end); err != nil {
+			return fmt.Errorf("simplified: decode %q: %w", g.prefix()+"/"+end, err)
+		}
 		settleOrdinalTerminology(value[end], tmpl.ordinalTerminologies(key+"/"+end))
 	}
 	return nil
@@ -2162,11 +2168,11 @@ func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g 
 // grammar (rmattr_party.go) or the interval grammar (rmattr_value.go), each the
 // same implementation those families use at every other position. It also
 // returns the bounds of a DV_INTERVAL<DV_ORDINAL> leaf that were built from
-// their suffixes, whose symbols a WithTemplate decode settles once the leaf is
-// placed.
-func compositeLeafValue(g rmattrGroup, rmType string) (map[string]any, []string, error) {
+// their suffixes, which a WithTemplate decode (deferred) completes and whose
+// symbols it settles once the leaf is placed.
+func compositeLeafValue(g rmattrGroup, rmType string, deferred bool) (map[string]any, []string, error) {
 	if anchor, isInterval := intervalLeafAnchor(rmType); isInterval {
-		return intervalLeafSuffixes(g, anchor)
+		return intervalLeafSuffixes(g, anchor, deferred)
 	}
 	party, populated, err := partyLeafSuffixes(g)
 	if err != nil {

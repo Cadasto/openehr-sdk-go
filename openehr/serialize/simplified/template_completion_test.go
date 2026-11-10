@@ -445,3 +445,152 @@ func TestREQ053TemplateCompletionNeedsAgreement(t *testing.T) {
 		}
 	})
 }
+
+// intervalOrdinalTemplate is Test_dv_interval_dv_count_lower_upper_constraint
+// with its DV_INTERVAL<DV_COUNT> leaf retargeted to DV_INTERVAL<DV_ORDINAL>,
+// each bound a C_DV_ORDINAL that pairs the local codes at0047 "mild" and
+// at0048 "severe" with 1 and 2. It returns the Web Template, the compiled
+// template, the leaf's FLAT key and its canonical path.
+func intervalOrdinalTemplate(t *testing.T) (wt *webtemplate.WebTemplate, compiled *templatecompile.Compiled, key, path string) {
+	t.Helper()
+	const (
+		id         = "Test_dv_interval_dv_count_lower_upper_constraint.v0"
+		countType  = "DV_INTERVAL&lt;DV_COUNT&gt;"
+		boundStart = "<children xsi:type=\"C_COMPLEX_OBJECT\">\n<rm_type_name>DV_COUNT</rm_type_name>"
+		boundEnd   = "</attributes>\n                            </children>"
+		exactlyOne = "<lower_included>true</lower_included><upper_included>true</upper_included>" +
+			"<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>1</lower><upper>1</upper>"
+		pairs = `<list><value>1</value><symbol><defining_code><terminology_id><value>local</value></terminology_id>` +
+			`<code_string>at0047</code_string></defining_code></symbol></list>` +
+			`<list><value>2</value><symbol><defining_code><terminology_id><value>local</value></terminology_id>` +
+			`<code_string>at0048</code_string></defining_code></symbol></list>`
+		terms = `<term_definitions code="at0047"><items id="text">mild</items><items id="description">mild</items></term_definitions>` +
+			`<term_definitions code="at0048"><items id="text">severe</items><items id="description">severe</items></term_definitions>`
+	)
+	ordinalBound := `<children xsi:type="C_DV_ORDINAL"><rm_type_name>DV_ORDINAL</rm_type_name><occurrences>` + exactlyOne +
+		`</occurrences><node_id></node_id>` + pairs + `</children>`
+	raw, err := os.ReadFile(fixtures.TemplateOpt(id))
+	if err != nil {
+		t.Fatal(err)
+	}
+	opt := replaceExactlyOnce(t, string(raw), countType, "DV_INTERVAL&lt;DV_ORDINAL&gt;")
+	if strings.Count(opt, boundStart) != 2 {
+		t.Fatalf("%s no longer holds two DV_COUNT bounds", id)
+	}
+	for range 2 {
+		start := strings.Index(opt, boundStart)
+		end := strings.Index(opt[start:], boundEnd)
+		if end < 0 {
+			t.Fatalf("%s: a DV_COUNT bound is not closed as expected", id)
+		}
+		opt = opt[:start] + ordinalBound + opt[start+end+len(boundEnd):]
+	}
+	opt = replaceExactlyOnce(t, opt, `<term_definitions code="at0046">`, terms+`<term_definitions code="at0046">`)
+	model, err := aom14.ReadOperationalTemplate(strings.NewReader(opt))
+	if err != nil {
+		t.Fatalf("ReadOperationalTemplate: %v", err)
+	}
+	wt, compiled = compileTemplate(t, id, model)
+	var leaf *webtemplate.Node
+	var find func(n *webtemplate.Node)
+	find = func(n *webtemplate.Node) {
+		if strings.HasPrefix(n.RMType, "DV_INTERVAL") {
+			leaf = n
+		}
+		for _, ch := range n.Children {
+			find(ch)
+		}
+	}
+	find(wt.Tree)
+	if leaf == nil {
+		t.Fatal("the Web Template has no DV_INTERVAL leaf")
+	}
+	key, ok := flatKeyOf(wt.Tree, leaf.AQLPath, nil)
+	if !ok {
+		t.Fatalf("no FLAT key for %s", leaf.AQLPath)
+	}
+	return wt, compiled, key, leaf.AQLPath
+}
+
+// TestREQ053TemplateCompletesIntervalOrdinalBounds — REQ-053: with the
+// template, each bound of a DV_INTERVAL<DV_ORDINAL> leaf is completed as a
+// leaf ordinal is: a bound that carries |code alone, or |code with one of
+// |value and |ordinal, takes the rest from the C_DV_ORDINAL pairs of its
+// bound, in FLAT and in STRUCTURED. What the bound gives is kept. A code the
+// pairs do not hold is refused as a missing required suffix naming the
+// bound's key, and without the template a bound needs all three suffixes.
+func TestREQ053TemplateCompletesIntervalOrdinalBounds(t *testing.T) {
+	wt, compiled, key, path := intervalOrdinalTemplate(t)
+	body := func(bounds map[string]any) []byte { return mustJSON(t, completionBody(bounds)) }
+	bounds := map[string]any{
+		key + "/lower|code":    "at0047",
+		key + "/upper|code":    "at0048",
+		key + "/upper|value":   "severe, as written",
+		key + "/upper|ordinal": nil,
+	}
+	ordinalAt := func(t *testing.T, comp *rm.Composition, end string) *rm.DVOrdinal {
+		t.Helper()
+		items, err := rmpath.ItemsAtPath(comp, path)
+		if err != nil || len(items) != 1 {
+			t.Fatalf("ItemsAtPath(%s) = %d items, %v; want the interval", path, len(items), err)
+		}
+		iv, ok := items[0].(*rm.DVInterval[rm.DVOrdered])
+		if !ok {
+			t.Fatalf("%s holds a %T, want *rm.DVInterval[rm.DVOrdered]", path, items[0])
+		}
+		bound := iv.Lower
+		if end == "upper" {
+			bound = iv.Upper
+		}
+		ord, ok := bound.(*rm.DVOrdinal)
+		if !ok {
+			t.Fatalf("%s %s bound is a %T, want *rm.DVOrdinal", path, end, bound)
+		}
+		return ord
+	}
+	for _, format := range []string{"FLAT", "STRUCTURED"} {
+		t.Run(format, func(t *testing.T) {
+			got := decodeAs(t, format, body(bounds), wt, simplified.WithTemplate(compiled))
+			for _, want := range []struct {
+				end, code, text string
+				value           rm.Integer
+			}{
+				{"lower", "at0047", "mild", 1},
+				{"upper", "at0048", "severe, as written", 2},
+			} {
+				ord := ordinalAt(t, got, want.end)
+				sym := ord.Symbol
+				if ord.Value != want.value || sym.Value != want.text || sym.DefiningCode.CodeString != want.code ||
+					sym.DefiningCode.TerminologyID.Value != "local" {
+					t.Errorf("%s bound = value %d, symbol %q %s::%s; want value %d, symbol %q local::%s",
+						want.end, ord.Value, sym.Value, sym.DefiningCode.TerminologyID.Value, sym.DefiningCode.CodeString,
+						want.value, want.text, want.code)
+				}
+			}
+		})
+	}
+	withTemplate := simplified.WithTemplate(compiled)
+	for _, tc := range []struct {
+		name   string
+		bounds map[string]any
+		reason string
+		opts   []simplified.Option
+	}{
+		{"without the template", map[string]any{key + "/lower|code": "at0047"}, "DV_ORDINAL missing required |value", nil},
+		{"a code outside the pairs", map[string]any{key + "/lower|code": "at0099"}, "DV_ORDINAL missing required |value", []simplified.Option{withTemplate}},
+		{
+			"a code outside the pairs, with its value",
+			map[string]any{key + "/lower|code": "at0099", key + "/lower|value": "x"},
+			"DV_ORDINAL missing required |ordinal",
+			[]simplified.Option{withTemplate},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			comp, err := simplified.UnmarshalFlat(body(tc.bounds), wt, tc.opts...)
+			if err == nil {
+				t.Fatalf("UnmarshalFlat(%v) = %s, want it refused: %s", tc.bounds, canonicalComposition(t, comp), tc.reason)
+			}
+			wantRefusal(t, err, simplified.ErrUnsupportedDatatype, `"`+key+`/lower"`, tc.reason)
+		})
+	}
+}

@@ -351,13 +351,13 @@ partially or silently accepted.
   the symbol takes the terminology of the template's `C_DV_ORDINAL` pair with its code and
   ordinal value, where the pairs at its path agree on one, so a template whose ordinals are coded
   outside `local` decodes to the value it lists rather than one its validation refuses as
-  `primitive_not_in_list`. A leaf that carries `\|code` and leaves out `\|ordinal` or
+  `primitive_not_in_list`. A leaf or a bound that carries `\|code` and leaves out `\|ordinal` or
   `\|value`, which ITS-REST 1.1.0 *Simplified Formats* § DV_ORDINAL allows "if symbol is
-  defined in template", takes them from the same pairs: the ordinal value where the pairs at its
+  defined in template", takes them from the same pairs (a bound's since 2026-11-10): the ordinal value where the pairs at its
   path give its code exactly one, and the code's term text in the pair's terminology, read as for
   a coded name. Pairs that give the code two values give it neither, and pairs that give it two
   texts give it no text. What they do not give stays a missing required suffix, refused naming
-  the key, and a bound of a `DV_INTERVAL<DV_ORDINAL>` leaf still needs all three suffixes. A
+  the key of the leaf or the bound. A
   `\|raw` ordinal keeps its own terminology, encode still writes a
   non-local ordinal as `\|raw`, since it cannot know the decode will have the template, and a
   `DV_SCALE` symbol stays `local`: the compiled template holds no pairs for it. **Round-trip
