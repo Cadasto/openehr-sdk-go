@@ -129,7 +129,10 @@ func sampleByConstraint(pc constraints.PrimitiveConstraint, s sampler) any {
 	case constraints.CodePhrase:
 		return sampleCode(c, s)
 	case constraints.CodeReference:
-		return sampleCode(c.CodePhrase, s)
+		// The code phrase it carries, in the terminology its URI names
+		// where that phrase names none, as applyPrimitiveExample values it.
+		cp, _ := constraints.CodePhraseWithTerminologyOf(c)
+		return sampleCode(cp, s)
 
 	case constraints.CDvOrdinal:
 		if len(c.Values) > 0 {

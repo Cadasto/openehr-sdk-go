@@ -12,7 +12,9 @@ import "strings"
 // alone, and ExampleValue is the embedded one's. [CodePhraseOf] reads a
 // CodeReference and a CodePhrase alike, for a consumer that has no use for
 // the reference set, and [CodeReference.ReferenceSetTerminology] reads the
-// terminology the URI names.
+// terminology the URI names. [CodePhraseWithTerminologyOf] reads the two
+// alike too, with that terminology where the code phrase names none, for a
+// consumer that needs the terminology a value is coded in.
 type CodeReference struct {
 	CodePhrase
 	ReferenceSetURI string
@@ -70,4 +72,27 @@ func CodePhraseOf(pc PrimitiveConstraint) (CodePhrase, bool) {
 		return c.CodePhrase, true
 	}
 	return CodePhrase{}, false
+}
+
+// CodePhraseWithTerminologyOf returns the code phrase constraint pc
+// carries, as [CodePhraseOf] does, except that a [CodeReference] whose code
+// phrase names no terminology takes the one its URI names
+// ([CodeReference.ReferenceSetTerminology]). A code phrase that names a
+// terminology keeps it, and one whose URI names none is returned as it is.
+//
+// It is for a reader that needs the terminology a value is coded in, such
+// as one that writes an example value or describes a form input. A
+// validator, which does not consult the reference set, reads [CodePhraseOf].
+// The second result is false for any other constraint, and for nil.
+func CodePhraseWithTerminologyOf(pc PrimitiveConstraint) (CodePhrase, bool) {
+	phrase, ok := CodePhraseOf(pc)
+	if !ok || phrase.Terminology != "" {
+		return phrase, ok
+	}
+	if ref, isRef := pc.(CodeReference); isRef {
+		if id, named := ref.ReferenceSetTerminology(); named {
+			phrase.Terminology = id
+		}
+	}
+	return phrase, true
 }

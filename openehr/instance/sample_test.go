@@ -88,6 +88,20 @@ func TestSampleValue_codeReferenceDrawsAsItsCodePhrase(t *testing.T) {
 	}
 }
 
+// TestSampleValue_codeReferenceDrawsInTheURIsTerminology confirms a
+// C_CODE_REFERENCE whose code phrase names no terminology draws its codes
+// in the one its terminology: URI names (REQ-103), as the code phrase
+// naming it draws them.
+func TestSampleValue_codeReferenceDrawsInTheURIsTerminology(t *testing.T) {
+	codes := []string{"22298006", "38341003", "271649006"}
+	ref := constraints.CodeReference{CodeList: codes, ReferenceSetURI: "terminology:SNOMED-CT"}
+	got := draws(ref, newSampler(mrand.NewPCG(3, 4)), 12)
+	want := draws(constraints.CodePhrase{Terminology: "SNOMED-CT", CodeList: codes}, newSampler(mrand.NewPCG(3, 4)), 12)
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Errorf("C_CODE_REFERENCE terminology:SNOMED-CT draws %v; want the SNOMED-CT code phrase's %v", got, want)
+	}
+}
+
 // TestSampleValue_unboundedFallsBackToExample confirms an unconstrained
 // primitive yields the deterministic ExampleValue (no spurious draw).
 func TestSampleValue_unboundedFallsBackToExample(t *testing.T) {

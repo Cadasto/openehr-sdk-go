@@ -73,6 +73,76 @@ func TestREQ103_CodePhraseOf(t *testing.T) {
 	}
 }
 
+// REQ-103: CodePhraseWithTerminologyOf reads a CodePhrase and a
+// CodeReference as CodePhraseOf does, except that a CodeReference whose code
+// phrase names no terminology takes the one its terminology: URI names. A
+// terminology the code phrase names is kept, a URI that names none leaves
+// the phrase as it is, and any other constraint and none report false.
+func TestREQ103_CodePhraseWithTerminologyOf(t *testing.T) {
+	t.Parallel()
+	codes := []string{"22298006", "38341003"}
+	tests := []struct {
+		name   string
+		pc     constraints.PrimitiveConstraint
+		want   constraints.CodePhrase
+		wantOK bool
+	}{
+		{
+			name:   "code phrase",
+			pc:     constraints.CodePhrase{Terminology: "local", CodeList: []string{"at0001"}},
+			want:   constraints.CodePhrase{Terminology: "local", CodeList: []string{"at0001"}},
+			wantOK: true,
+		},
+		{name: "code phrase with no terminology", pc: constraints.CodePhrase{CodeList: codes}, want: constraints.CodePhrase{CodeList: codes}, wantOK: true},
+		{
+			name:   "code reference whose URI names the terminology",
+			pc:     constraints.CodeReference{ReferenceSetURI: "terminology:SNOMED-CT"},
+			want:   constraints.CodePhrase{Terminology: "SNOMED-CT"},
+			wantOK: true,
+		},
+		{
+			name:   "code reference whose URI names the terminology, with codes",
+			pc:     constraints.CodeReference{CodeList: codes, ReferenceSetURI: "terminology:SNOMED-CT"},
+			want:   constraints.CodePhrase{Terminology: "SNOMED-CT", CodeList: codes},
+			wantOK: true,
+		},
+		{
+			name:   "code reference whose URI names the terminology and its version",
+			pc:     constraints.CodeReference{ReferenceSetURI: "terminology:LOINC/2.73"},
+			want:   constraints.CodePhrase{Terminology: "LOINC(2.73)"},
+			wantOK: true,
+		},
+		{
+			name:   "code reference whose code phrase names the terminology",
+			pc:     constraints.CodeReference{Terminology: "LOINC", CodeList: codes, ReferenceSetURI: "terminology:SNOMED-CT"},
+			want:   constraints.CodePhrase{Terminology: "LOINC", CodeList: codes},
+			wantOK: true,
+		},
+		{
+			name:   "code reference whose URI is of another scheme",
+			pc:     constraints.CodeReference{CodeList: codes, ReferenceSetURI: "http://snomed.info/sct"},
+			want:   constraints.CodePhrase{CodeList: codes},
+			wantOK: true,
+		},
+		{name: "code reference whose URI names no terminology", pc: constraints.CodeReference{ReferenceSetURI: "terminology:"}, wantOK: true},
+		{name: "constraint reference", pc: constraints.ConstraintRef{Reference: "ac0001"}},
+		{name: "string", pc: constraints.CString{}},
+		{name: "none", pc: nil},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got, ok := constraints.CodePhraseWithTerminologyOf(tc.pc)
+			if ok != tc.wantOK || got.Terminology != tc.want.Terminology || !slices.Equal(got.CodeList, tc.want.CodeList) {
+				t.Errorf("CodePhraseWithTerminologyOf(%#v) = %#v, %t; want %#v, %t", tc.pc, got, ok, tc.want, tc.wantOK)
+			}
+			if plain, _ := constraints.CodePhraseOf(tc.pc); !slices.Equal(got.CodeList, plain.CodeList) {
+				t.Errorf("CodePhraseWithTerminologyOf(%#v) codes = %q, want CodePhraseOf's %q", tc.pc, got.CodeList, plain.CodeList)
+			}
+		})
+	}
+}
+
 // violationCodes returns the code of each violation, in order, or nil for
 // none.
 func violationCodes(vs []constraints.Violation) []constraints.ViolationCode {
