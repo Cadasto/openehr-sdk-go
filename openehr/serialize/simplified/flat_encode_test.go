@@ -136,15 +136,17 @@ func TestEncodeSkipsEmptyRepeatInstances(t *testing.T) {
 	//     RM-mandatory and emit as FLAT leaves;
 	//   - the LOCATABLE identity attributes the REQ-140 underscore grammar
 	//     carries — instance.Generate stamps a `uid` on every archetyped node,
-	//     which now emits as `<path>/_uid`.
+	//     which now emits as `<path>/_uid`;
+	//   - the HISTORY origin, which emits as `<path>/history_origin` where no
+	//     event time stands for it, as here once the events are gone.
 	middle := deepCopyComposition(t, comp)
 	switch o := middle.Content[0].(type) {
 	case *rm.Observation:
-		o.Data.Events = nil
+		o.Data.Events, o.Data.Origin = nil, rm.DVDateTime{}
 		o.Language, o.Encoding = rm.CodePhrase{}, rm.CodePhrase{}
 		o.UID, o.Links = nil, nil
 	case rm.Observation:
-		o.Data.Events = nil
+		o.Data.Events, o.Data.Origin = nil, rm.DVDateTime{}
 		o.Language, o.Encoding = rm.CodePhrase{}, rm.CodePhrase{}
 		o.UID, o.Links = nil, nil
 		middle.Content[0] = o

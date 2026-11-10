@@ -133,23 +133,20 @@ func flatOf(t *testing.T, comp *rm.Composition, wt *webtemplate.WebTemplate) map
 	return out
 }
 
-// structuredAsFlat encodes comp as STRUCTURED and returns the FLAT map the
-// OPT-free conversion gives that document.
-func structuredAsFlat(t *testing.T, comp *rm.Composition, wt *webtemplate.WebTemplate) map[string]any {
+// structuredRoundTrip encodes comp as STRUCTURED and decodes the document
+// back under strict, without the template, so what it holds is what the
+// document spells.
+func structuredRoundTrip(t *testing.T, comp *rm.Composition, wt *webtemplate.WebTemplate) *rm.Composition {
 	t.Helper()
 	b, err := simplified.MarshalStructured(comp, wt)
 	if err != nil {
 		t.Fatalf("MarshalStructured: %v", err)
 	}
-	fb, err := simplified.StructuredToFlat(b)
+	back, err := simplified.UnmarshalStructured(b, wt, simplified.WithStrict())
 	if err != nil {
-		t.Fatalf("StructuredToFlat: %v", err)
+		t.Fatalf("UnmarshalStructured of the encoded document: %v", err)
 	}
-	var out map[string]any
-	if err := json.Unmarshal(fb, &out); err != nil {
-		t.Fatal(err)
-	}
-	return out
+	return back
 }
 
 // TestREQ053AbstractEventDecodesIntervalAttributes — REQ-053, issue 424. The
@@ -256,27 +253,28 @@ func TestREQ053SampleCountMustFitAnInteger(t *testing.T) {
 
 // TestREQ053AbstractEventEncodesIntervalAttributes — REQ-053, issue 424.
 // Encode writes an INTERVAL_EVENT under an abstract EVENT node with the keys
-// decode reads, in FLAT and in STRUCTURED, `|sample_count` only where it is
-// set, and decode reads the result back to the same event. A POINT_EVENT
+// decode reads, `|sample_count` only where it is set, and decode reads the
+// FLAT and the STRUCTURED it writes back to the same event. A POINT_EVENT
 // writes none of them.
 func TestREQ053AbstractEventEncodesIntervalAttributes(t *testing.T) {
 	wt, compiled := conformanceTarget(t)
 	comp := decodeWith(t, wt, eventBody(intervalKeys()), simplified.WithTemplate(compiled))
 	want := intervalKeys()
 	want[eventAt+"|sample_count"] = 5.0 // a JSON number reads back as float64
-	for name, got := range map[string]map[string]any{
-		"FLAT":       flatOf(t, comp, wt),
-		"STRUCTURED": structuredAsFlat(t, comp, wt),
-	} {
-		for key, v := range want {
-			if got[key] != v {
-				t.Errorf("%s wrote %q = %#v, want %#v", name, key, got[key], v)
-			}
+	got := flatOf(t, comp, wt)
+	for key, v := range want {
+		if got[key] != v {
+			t.Errorf("MarshalFlat wrote %q = %#v, want %#v", key, got[key], v)
 		}
 	}
-	back := intervalEvent(t, onlyEvent(t, wt, decodeAs(t, "FLAT", mustJSON(t, flatOf(t, comp, wt)), wt), "conformance_observation"))
-	if back.SampleCount == nil || *back.SampleCount != 5 || back.Width.Value != "P30D" || back.MathFunction.DefiningCode.CodeString != "146" {
-		t.Errorf("decode of the encoded body: event = %+v, want sample_count 5, width P30D, math_function 146", back)
+	for format, back := range map[string]*rm.Composition{
+		"FLAT":       decodeAs(t, "FLAT", mustJSON(t, got), wt, simplified.WithStrict()),
+		"STRUCTURED": structuredRoundTrip(t, comp, wt),
+	} {
+		ev := intervalEvent(t, onlyEvent(t, wt, back, "conformance_observation"))
+		if ev.SampleCount == nil || *ev.SampleCount != 5 || ev.Width.Value != "P30D" || ev.MathFunction.DefiningCode.CodeString != "146" {
+			t.Errorf("decode of the encoded %s: event = %+v, want sample_count 5, width P30D, math_function 146", format, ev)
+		}
 	}
 
 	widthOnly := decodeWith(t, wt, eventBody(map[string]any{eventAt + "/width": "PT1H"}))
@@ -324,8 +322,10 @@ func TestREQ053IntervalEventNodeCarriesSampleCount(t *testing.T) {
 				if ev.SampleCount == nil || *ev.SampleCount != 24 {
 					t.Errorf("sample_count = %v, want 24", ev.SampleCount)
 				}
-				if got := flatOf(t, comp, wt)[event+"|sample_count"]; got != 24.0 {
-					t.Errorf("MarshalFlat wrote |sample_count = %#v, want 24", got)
+				// Both nodes are single-valued, so encode writes no index.
+				const written = "constrain/blood_pressure/a24_hour_average|sample_count"
+				if got := flatOf(t, comp, wt)[written]; got != 24.0 {
+					t.Errorf("MarshalFlat wrote %q = %#v, want 24", written, got)
 				}
 			})
 		}

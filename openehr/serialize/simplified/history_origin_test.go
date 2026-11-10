@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
 )
 
@@ -19,7 +20,7 @@ import (
 // before its event time and before its start time.
 const (
 	historyOriginKey = eventObs + "/history_origin"
-	explicitOrigin    = "2021-12-20T15:02:58.0094262+01:00"
+	explicitOrigin   = "2021-12-20T15:02:58.0094262+01:00"
 )
 
 // TestREQ053HistoryOriginDecodes — REQ-053. The explicit history_origin is the
@@ -91,23 +92,24 @@ func TestREQ053HistoryOriginMustBeADateTime(t *testing.T) {
 }
 
 // TestREQ053HistoryOriginEncodes — REQ-053. Encode writes the origin at
-// `<observation>/history_origin`, in FLAT and in STRUCTURED, where it differs
-// from the earliest event time decode would give it, and decode reads it back;
-// an origin that is the earliest event time writes no key.
+// `<observation>/history_origin` where it differs from the earliest event time
+// decode would give it, and decode reads the FLAT and the STRUCTURED it writes
+// back to that origin, without the template, which derives none; an origin
+// that is the earliest event time writes no key.
 func TestREQ053HistoryOriginEncodes(t *testing.T) {
 	wt, compiled := conformanceTarget(t)
 	explicit := decodeWith(t, wt, eventBody(map[string]any{historyOriginKey: explicitOrigin}), simplified.WithTemplate(compiled))
-	for name, got := range map[string]map[string]any{
-		"FLAT":       flatOf(t, explicit, wt),
-		"STRUCTURED": structuredAsFlat(t, explicit, wt),
-	} {
-		if got[historyOriginKey] != explicitOrigin {
-			t.Errorf("%s wrote %q = %#v, want %q", name, historyOriginKey, got[historyOriginKey], explicitOrigin)
-		}
+	got := flatOf(t, explicit, wt)
+	if got[historyOriginKey] != explicitOrigin {
+		t.Errorf("MarshalFlat wrote %q = %#v, want %q", historyOriginKey, got[historyOriginKey], explicitOrigin)
 	}
-	back := observationOf(t, wt, decodeAs(t, "FLAT", mustJSON(t, flatOf(t, explicit, wt)), wt, simplified.WithTemplate(compiled)), "conformance_observation")
-	if back.Data.Origin.Value != explicitOrigin {
-		t.Errorf("decode of the encoded body: origin = %q, want %q", back.Data.Origin.Value, explicitOrigin)
+	for format, back := range map[string]*rm.Composition{
+		"FLAT":       decodeAs(t, "FLAT", mustJSON(t, got), wt, simplified.WithStrict()),
+		"STRUCTURED": structuredRoundTrip(t, explicit, wt),
+	} {
+		if origin := observationOf(t, wt, back, "conformance_observation").Data.Origin.Value; origin != explicitOrigin {
+			t.Errorf("decode of the encoded %s: origin = %q, want %q", format, origin, explicitOrigin)
+		}
 	}
 
 	derived := decodeWith(t, wt, eventBody(nil), simplified.WithTemplate(compiled))

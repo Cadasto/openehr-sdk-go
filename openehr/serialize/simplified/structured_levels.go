@@ -302,6 +302,11 @@ func (l memberLevel) judgeNode(name string) (memberLevel, bool) {
 		}
 		return level, true
 	}
+	if leaf := codecLeaf(l.node, name); leaf != nil {
+		// An attribute the codec reads where the Web Template has no node
+		// (REQ-053), single-valued like every one of them.
+		return nodeLevel(leaf, rel).bounded(oneValue), true
+	}
 	rmType := nodeRMType(l.node)
 	if strings.HasPrefix(name, "_") {
 		if rmType == "ISM_TRANSITION" && name == ismReasonFamily {
@@ -314,7 +319,7 @@ func (l memberLevel) judgeNode(name string) (memberLevel, bool) {
 		return memberLevel{kind: levelMetadata, rel: rel, bound: oneValue}, true
 	case rmType == "ACTION" && name == ismReferenceSeg:
 		return ismReferenceLevel, true
-	case inContextAttrs[rmType].leaf[name], rmType == "ISM_TRANSITION" && ismLeaves[name]:
+	case rmType == "ACTION" && name == actionTimeLeaf, rmType == "ISM_TRANSITION" && ismLeaves[name]:
 		return suffixesOnly, true
 	}
 	return memberLevel{}, false
