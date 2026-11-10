@@ -1455,78 +1455,39 @@ func TestREQ170FamilyIndexJudgedBeforeItsTails(t *testing.T) {
 	})
 }
 
-// TestREQ170IntervalEventAndObservationAttrsRefused — REQ-170 / REQ-140. An
-// INTERVAL_EVENT's `math_function`, `width` and `sample_count` and an
-// OBSERVATION's `history_origin`, in the reference's spelling — a leaf under
-// the node or a suffix on it — name RM data the Web Template this SDK builds
-// does not model. Each is refused by default, under the report option and
-// under strict, naming the key and the attribute, and none of its value and no
-// requirement id, in FLAT and in its STRUCTURED form. Where the Web Template
-// does resolve one, it decodes as before.
-func TestREQ170IntervalEventAndObservationAttrsRefused(t *testing.T) {
+// TestREQ170IntervalEventAndObservationOtherSpellingsUnmatched — REQ-170 /
+// REQ-053. The codec reads an INTERVAL_EVENT's `math_function` and `width` as
+// leaves under the event, its `sample_count` as a suffix on it, and an
+// OBSERVATION's `history_origin` as a leaf under it, the Simplified Formats'
+// spellings. Each other spelling of the four (a suffix where the format writes
+// a leaf, or a leaf where it writes a suffix) is unmatched content like any
+// key outside the grammar: ignored by default, reported, and refused under
+// strict.
+func TestREQ170IntervalEventAndObservationOtherSpellingsUnmatched(t *testing.T) {
 	wt, _ := conformanceWT(t)
-	const secret = "secret-value-0451"
-	for _, tc := range []struct {
-		keys        []string
-		names, attr string
-	}{
-		{[]string{rmattrEvent + "/math_function|code", rmattrEvent + "/math_function|value", rmattrEvent + "/math_function|terminology"}, rmattrEvent + "/math_function|code", "an INTERVAL_EVENT's math_function"},
-		{[]string{rmattrEvent + "/width"}, rmattrEvent + "/width", "an INTERVAL_EVENT's width"},
-		{[]string{rmattrEvent + "/sample_count"}, rmattrEvent + "/sample_count", "an INTERVAL_EVENT's sample_count"},
-		{[]string{rmattrEvent + "|sample_count"}, rmattrEvent + "|sample_count", "an INTERVAL_EVENT's sample_count"},
-		{[]string{rmattrEvent + "|math_function"}, rmattrEvent + "|math_function", "an INTERVAL_EVENT's math_function"},
-		{[]string{rmattrEvent + "|width"}, rmattrEvent + "|width", "an INTERVAL_EVENT's width"},
-		{[]string{rmattrObs + "/history_origin"}, rmattrObs + "/history_origin", "an OBSERVATION's history_origin"},
-		{[]string{rmattrObs + "|history_origin"}, rmattrObs + "|history_origin", "an OBSERVATION's history_origin"},
+	for _, key := range []string{
+		rmattrEvent + "/sample_count", rmattrEvent + "|math_function", rmattrEvent + "|width",
+		rmattrObs + "|history_origin", rmattrEvent + "/x_note", rmattrEvent + "|x_note", rmattrObs + "/width",
 	} {
-		t.Run(tc.names, func(t *testing.T) {
-			keys := make(map[string]any, len(tc.keys))
-			for _, k := range tc.keys {
-				keys[k] = secret
-			}
-			err := refusedInEveryMode(t, wt, rmattrBody(keys))
-			if !errors.Is(err, ErrUnknownPath) || !strings.Contains(err.Error(), strconv.Quote(tc.names)) {
-				t.Errorf("err = %v, want ErrUnknownPath naming %q", err, tc.names)
-			}
-			// The refusal names the attribute, and no requirement id.
-			if !strings.Contains(err.Error(), tc.attr) || strings.Contains(err.Error(), "REQ-") {
-				t.Errorf("err = %v, want it to name %q and no requirement id", err, tc.attr)
-			}
-			if strings.Contains(err.Error(), secret) {
-				t.Errorf("err = %v carries the key's value", err)
-			}
-			// The STRUCTURED form of the same body reaches the same refusal.
-			serr := structuredRefusedInEveryMode(t, wt, rmattrBody(keys))
-			if !errors.Is(serr, ErrUnknownPath) || !strings.Contains(serr.Error(), "in-context spelling") ||
-				!strings.Contains(serr.Error(), tc.attr) || strings.Contains(serr.Error(), "REQ-") ||
-				strings.Contains(serr.Error(), secret) {
-				t.Errorf("STRUCTURED err = %v, want the in-context refusal naming %q, no requirement id and no value", serr, tc.attr)
-			}
-		})
-	}
-	// Any other unresolved key under those nodes stays unmatched content.
-	for _, key := range []string{rmattrEvent + "/x_note", rmattrEvent + "|x_note", rmattrObs + "/width"} {
 		t.Run("unmatched "+key, func(t *testing.T) {
 			assertUnmatched(t, wt, rmattrBody(map[string]any{key: "x"}), key)
 		})
 	}
 	// A key that walks through one of several reused siblings that no pinned
-	// name tells apart is left to the refusal that path gets, before any
-	// in-context rule could name it. Under siblings their names tell apart, the
-	// in-context rule applies as under any other node.
+	// name tells apart is refused as that path is. Under siblings their names
+	// tell apart, the keys decode as under any other node.
 	t.Run("keys under a reused sibling", func(t *testing.T) {
-		for _, tc := range []struct {
-			pinA, pinB, want string
-		}{
-			{"", "", "reused siblings"},
-			{"A", "B", "in-context spelling"},
-		} {
-			reused := twoReusedObservationWT(tc.pinA, tc.pinB)
-			for _, key := range []string{"root/a/history_origin", "root/a/any_event:0/width"} {
-				err := refusedInEveryMode(t, reused, map[string]any{"ctx/language": "en", "ctx/territory": "NL", key: "x"})
-				if !errors.Is(err, ErrUnknownPath) || !strings.Contains(err.Error(), tc.want) {
-					t.Errorf("%s, pinned names %q and %q: err = %v, want the %s refusal", key, tc.pinA, tc.pinB, err, tc.want)
-				}
+		for _, key := range []string{"root/a/history_origin", "root/a/any_event:0/width"} {
+			body := map[string]any{"ctx/language": "en", "ctx/territory": "NL", key: "2021-12-20T15:02:58Z"}
+			if key == "root/a/any_event:0/width" {
+				body[key] = "PT1H"
+			}
+			err := refusedInEveryMode(t, twoReusedObservationWT("", ""), body)
+			if !errors.Is(err, ErrUnknownPath) || !strings.Contains(err.Error(), "reused siblings") {
+				t.Errorf("%s, no pinned names: err = %v, want the reused-siblings refusal", key, err)
+			}
+			if _, err := UnmarshalFlat(mustJSON(t, body), twoReusedObservationWT("A", "B"), WithStrict()); err != nil {
+				t.Errorf("%s, pinned names A and B: err = %v, want it decoded", key, err)
 			}
 		}
 	})

@@ -158,9 +158,12 @@ func TestREQ053AllNullKeysReadAsAbsent(t *testing.T) {
 		// `x|` spells the bare value of `x`; a null spelling is no disagreement.
 		"null x| beside x": {rmattrText: "text", rmattrText + "|": nil},
 		"null x beside x|": {rmattrText: nil, rmattrText + "|": "text"},
-		// The reference's in-context spelling of RM data the Web Template does
-		// not model is refused, rather than dropped; a null one drops nothing.
-		"null in-context INTERVAL_EVENT width": {rmattrEvent + "/width": nil},
+		// The INTERVAL_EVENT and OBSERVATION attributes the codec reads where
+		// the Web Template has no node: a null one is absent, so the event stays
+		// a POINT_EVENT and the origin is the one decode derives.
+		"null INTERVAL_EVENT width":        {rmattrEvent + "/width": nil},
+		"null INTERVAL_EVENT sample_count": {rmattrEvent + "|sample_count": nil},
+		"null OBSERVATION history_origin":  {rmattrObs + "/history_origin": nil},
 		// A family this codec defers has no carrier; an all-null one is absent.
 		"null deferred family": {rmattrAction + "/_instruction_details|x": nil},
 		"null inlined participation identifier": {
