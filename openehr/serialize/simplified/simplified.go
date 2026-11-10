@@ -105,10 +105,14 @@ func (c decodeConfig) tracked() bool {
 // HISTORY with no origin takes the earliest time its own events carry,
 // compared as instants, else the start time, and an event with no time takes
 // its HISTORY's origin. An ACTIVITY with no action_archetype_id takes the one
-// the instance generator writes for the template: a value the template's
-// C_STRING on that attribute accepts, else the default /.*/. A
-// composition category the body does not spell is the one the template
-// fixes, a single openehr code such as 431|persistent, or else 433|event. An empty structure (an ITEM_TREE or ITEM_LIST with no
+// the instance generator writes for the template: a value the first C_STRING
+// the template allows on that attribute accepts, or the default /.*/ where
+// that C_STRING has neither a list nor a pattern, or the template allows none
+// there. Decode leaves the id out where that C_STRING accepts no value the
+// generator builds, or where the template's ACTIVITY nodes at its path
+// disagree on it. A composition category the body does not spell is the one
+// the template fixes, a single openehr code such as 431|persistent, or else
+// 433|event. An empty structure (an ITEM_TREE or ITEM_LIST with no
 // items, say) that the template requires and allows to stay empty has no key
 // in the formats, so decode adds it back, empty, under a parent the body
 // rebuilt, with the type, node id and name the template gives it. It is
@@ -118,10 +122,10 @@ func (c decodeConfig) tracked() bool {
 // terminology and text, an ordinal's value and text. A coded text whose
 // terminology neither the body nor the template gives is refused as missing
 // its |terminology. The decoded composition then validates against the
-// OPT, provided each HISTORY has an event time, or the body gives a start
-// time, or the caller passes [WithDefaultTime], when the template carries
-// HISTORY/EVENT nodes: their mandatory origin and time have no other source
-// (see deviations.md).
+// OPT, provided each HISTORY has an event time and each ACTION a time, or the
+// body gives a start time, or the caller passes [WithDefaultTime], when the
+// template carries HISTORY/EVENT or ACTION nodes: their mandatory origin and
+// times have no other source (see deviations.md).
 //
 // Without this option decode omits names, defaults and empty structures,
 // completes no coded value, and infers a folded structure's subtype from its
