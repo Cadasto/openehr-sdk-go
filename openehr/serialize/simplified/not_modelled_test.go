@@ -43,7 +43,12 @@ func TestREQ170NotModelledKeys(t *testing.T) {
 						t.Fatalf("err = %v, want ErrNotModelled and ErrUnknownPath", err)
 					}
 					msg := err.Error()
+					// FLAT names the key as written, or the family instance;
+					// STRUCTURED names its FLAT form, an index on every segment.
 					named := strings.Contains(msg, `"`+key+`"`) || strings.Contains(msg, `"`+strings.Split(key, "|")[0])
+					if format == "STRUCTURED" {
+						named = strings.Contains(msg, `"conformance-ehrbase.de.v0/conformance_section:0/conformance_action:0/`)
+					}
 					if !named || !strings.Contains(msg, "does not model") {
 						t.Errorf("err = %q, want it to name the key and say this SDK does not model it", msg)
 					}

@@ -432,5 +432,5 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - `/content/1/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
 - Reducing decode removed 7 keys from the upstream FLAT:
   - 3: `reported as unmatched content`
-  - 3: `simplified: path not in web template: "<key>" is the reference's in-context spelling of an ACTION's ISM transition current_state, which the Web Template this SDK builds does not model - refused rather than dropped or replaced (see deviations.md)`
-  - 1: `simplified: path not in web template: "<key>" is the reference's in-context spelling of an ACTION's time, which the Web Template this SDK builds does not model - refused rather than dropped or replaced (see deviations.md)`
+  - 3: `simplified: path not modelled: "<key>" spells an ACTION's ISM transition current_state, a Simplified Formats path this SDK does not model; refused rather than ignored`
+  - 1: `simplified: path not modelled: "<key>" spells an ACTION's time, a Simplified Formats path this SDK does not model; refused rather than ignored`

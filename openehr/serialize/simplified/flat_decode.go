@@ -2087,8 +2087,8 @@ var ismLeaves = map[string]bool{"current_state": true, "transition": true, "care
 // that no pinned name tells apart is left to the refusal that path gets.
 //
 // Keys are checked in sorted order, so a body with several names the same one on
-// every run. The error names the key, or the `_reason` family instance, and
-// carries no value. Such a key that holds JSON null carries no data to drop:
+// every run. The error wraps [ErrNotModelled], names the key, or the `_reason`
+// family instance, and carries no value. Such a key that holds JSON null carries no data to drop:
 // it is absent (REQ-053), and is removed from content.
 func refuseInContextKeys(content map[string]any, wt *webtemplate.WebTemplate, sib *reusedSiblings) error {
 	for _, key := range slices.Sorted(maps.Keys(content)) {
@@ -2106,8 +2106,8 @@ func refuseInContextKeys(content map[string]any, wt *webtemplate.WebTemplate, si
 			delete(content, key)
 			continue
 		}
-		return fmt.Errorf("%w: %q is the reference's in-context spelling of an %s's %s, which the Web Template this SDK builds does not model — refused rather than dropped or replaced (see deviations.md)",
-			ErrUnknownPath, named, owner, attr)
+		return fmt.Errorf("%w: %q spells an %s's %s, a Simplified Formats path this SDK does not model; refused rather than ignored",
+			ErrNotModelled, named, owner, attr)
 	}
 	return nil
 }
