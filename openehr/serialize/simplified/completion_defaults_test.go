@@ -298,9 +298,10 @@ const twinName = `<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>n
 // twinActivityTemplate compiles the minimal_instruction OPT with a twin of
 // its one ACTIVITY node put after it: the same node id, but the name 'Twin
 // activity' pinned and an action_archetype_id pattern naming another ACTION
-// archetype. The two ACTIVITY nodes share the path that spells no name,
-// /activities[at0001], which is the unnamed one's own. It builds its Web
-// Template too.
+// archetype. The twin has a path of its own,
+// /activities[at0001,'Twin activity'], and the unnamed one keeps
+// /activities[at0001], which is also the twin's path with its name left out.
+// It builds its Web Template too.
 func twinActivityTemplate(t *testing.T) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
 	t.Helper()
 	return rewrittenInstructionTemplate(t, func(opt string) string {
@@ -409,6 +410,13 @@ func activityIDsBy(t *testing.T, comp *rm.Composition, key func(activity map[str
 // the instance generator writes for compiled under its Large policy.
 func generatedActivityIDs(t *testing.T, compiled *templatecompile.Compiled) map[string]string {
 	t.Helper()
+	return activityIDs(t, generatedComposition(t, compiled))
+}
+
+// generatedComposition returns the composition the instance generator writes
+// for compiled under its Large policy.
+func generatedComposition(t *testing.T, compiled *templatecompile.Compiled) *rm.Composition {
+	t.Helper()
 	composer := "Test Composer"
 	out, err := instance.Generate(t.Context(), compiled, instance.Options{
 		Policy:    instance.Large,
@@ -423,7 +431,7 @@ func generatedActivityIDs(t *testing.T, compiled *templatecompile.Compiled) map[
 	if err != nil {
 		t.Fatalf("instance.AsComposition: %v", err)
 	}
-	return activityIDs(t, comp)
+	return comp
 }
 
 // instructionBody is a minimal_instruction FLAT body whose one ACTIVITY holds
@@ -530,20 +538,37 @@ func TestREQ053ActivityTakesTheTemplatesActionArchetypeID(t *testing.T) {
 // value the generator builds: its one list member fails its pattern.
 const unbuildableAlternative = `<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>STRING</rm_type_name><node_id /><item xsi:type="C_STRING"><pattern>[0-9]+</pattern><list>abc</list></item></children>`
 
+// TestREQ053ActivityTakesItsOwnNodesActionArchetypeID — REQ-053: an ACTIVITY
+// that pins no name, beside a twin of its node id that pins one and names
+// another ACTION archetype, takes the action_archetype_id its own node gives,
+// and the twin takes its own, as the generator writes them. Both ACTIVITY
+// nodes are reachable by the path with no name, and only the unnamed one's
+// node is there. The composition then validates.
+func TestREQ053ActivityTakesItsOwnNodesActionArchetypeID(t *testing.T) {
+	wt, compiled := twinActivityTemplate(t)
+	body := instructionBody(map[string]any{"minimal/minimal:0/twin_activity/duration": "PT20M"})
+	want := map[string]string{"Current Activity": "openEHR-EHR-ACTION.minimal.v1", "Twin activity": "openEHR-EHR-ACTION.twin.v1"}
+	if got := activityNamedIDs(t, generatedComposition(t, compiled)); !maps.Equal(got, want) {
+		t.Fatalf("generator: action_archetype_id by ACTIVITY name = %v, want %v", got, want)
+	}
+	for format, comp := range decodeBothFormats(t, wt, body, simplified.WithTemplate(compiled)) {
+		if got := activityNamedIDs(t, comp); !maps.Equal(got, want) {
+			t.Errorf("%s: action_archetype_id by ACTIVITY name = %v, want %v", format, got, want)
+		}
+		wantValidates(t, format, comp, compiled, true)
+	}
+}
+
 // TestREQ053ActivityTakesNoActionArchetypeIDTheTemplateDoesNotSettle —
 // REQ-053: with the template, decode leaves out the action_archetype_id of an
-// ACTIVITY the body gives none where the template settles no one value
-// there. Either the first C_STRING on that attribute accepts no value the
-// generator builds, and the generator refuses the template too; or the
-// ACTIVITY nodes at the ACTIVITY's path disagree on it, though each alone
-// gives one. A twin that pins its name has a path of its own, and takes its
-// own value.
+// ACTIVITY the body gives none where the first C_STRING on that attribute
+// accepts no value the generator builds, and the generator refuses the
+// template too.
 func TestREQ053ActivityTakesNoActionArchetypeIDTheTemplateDoesNotSettle(t *testing.T) {
 	unbuildableWT, unbuildable := editedInstructionTemplate(t, func(attribute string) string {
 		head, _, _ := strings.Cut(attribute, "<children")
 		return head + unbuildableAlternative + "</attributes>"
 	})
-	twinWT, twin := twinActivityTemplate(t)
 	cases := []struct {
 		name     string
 		wt       *webtemplate.WebTemplate
@@ -559,11 +584,6 @@ func TestREQ053ActivityTakesNoActionArchetypeIDTheTemplateDoesNotSettle(t *testi
 		{
 			name: "a C_STRING no built value satisfies", wt: unbuildableWT, compiled: unbuildable,
 			body: instructionBody(nil), want: map[string]string{"Current Activity": ""}, generatorRefuses: true,
-		},
-		{
-			name: "ACTIVITY nodes at one path that disagree", wt: twinWT, compiled: twin,
-			body: instructionBody(map[string]any{"minimal/minimal:0/twin_activity/duration": "PT20M"}),
-			want: map[string]string{"Current Activity": "", "Twin activity": "openEHR-EHR-ACTION.twin.v1"},
 		},
 	}
 	for _, tc := range cases {
