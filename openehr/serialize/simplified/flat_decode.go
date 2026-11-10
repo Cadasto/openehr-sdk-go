@@ -764,8 +764,9 @@ func isMetadataSpelling(rel string) bool {
 // below it. The root segment may carry an explicit index (`<root>:0/…`, the
 // form REQ-053 reads as `<root>/…`), so it is parsed rather than matched as a
 // literal prefix; rootSeg reports the index it carries. rooted is false for a
-// key whose first segment is not the root, has nothing below it, or carries a
-// malformed index (the leaf loop refuses that one). The first segment's
+// key with no `/`, for one whose first segment is not the root, and for one
+// whose root segment carries a malformed index (the leaf loop refuses that
+// one); `<root>/` is rooted, with rel empty. The first segment's
 // |suffix is cut off before it is parsed, as [parseFlatKey] does, so a bare
 // `<root>|/…` is rooted and `<root>|x/…` is not.
 func cutRoot(key, rootID string) (rel string, rootSeg flatSeg, rooted bool) {
