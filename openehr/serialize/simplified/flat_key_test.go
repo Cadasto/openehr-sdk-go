@@ -85,3 +85,111 @@ func TestContentPassesSkipKeysAnEarlierPassTook(t *testing.T) {
 		t.Errorf("content left = %v, want both kept keys consumed", slices.Sorted(maps.Keys(content)))
 	}
 }
+
+// TestCutRootEdgeKeys pins how a key splits at the template root's segment:
+// `|` is cut off the first segment before it is parsed, so `root|/x` is rooted
+// and `root|a/x` is not, and a malformed index on the root keeps the key out.
+func TestCutRootEdgeKeys(t *testing.T) {
+	tests := []struct {
+		key    string
+		rel    string
+		seg    flatSeg
+		rooted bool
+	}{
+		{key: "root/x", rel: "x", seg: flatSeg{"root", -1}, rooted: true},
+		{key: "root:0/x", rel: "x", seg: flatSeg{"root", 0}, rooted: true},
+		{key: "root:1/x/y", rel: "x/y", seg: flatSeg{"root", 1}, rooted: true},
+		{key: "root/", rel: "", seg: flatSeg{"root", -1}, rooted: true},
+		{key: "root|/x", rel: "x", seg: flatSeg{"root", -1}, rooted: true},
+		{key: "root:0|/x|code", rel: "x|code", seg: flatSeg{"root", 0}, rooted: true},
+		{key: "root|a/x"},
+		{key: "root|a|/x"},
+		{key: "root|x:0/y"},
+		{key: "root:00/x"},
+		{key: "root:-1/x"},
+		{key: "root:x/y"},
+		{key: "root"},
+		{key: "other/x"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.key, func(t *testing.T) {
+			rel, seg, rooted := cutRoot(tc.key, "root")
+			if rel != tc.rel || seg != tc.seg || rooted != tc.rooted {
+				t.Errorf("cutRoot(%q) = %q, %+v, %t, want %q, %+v, %t", tc.key, rel, seg, rooted, tc.rel, tc.seg, tc.rooted)
+			}
+		})
+	}
+}
+
+// TestRootSegmentAloneEdgeKeys pins how a key with no `/` is read as the
+// template root's segment: the last `|` and what follows it are the suffix,
+// and a malformed index keeps the key out.
+func TestRootSegmentAloneEdgeKeys(t *testing.T) {
+	tests := []struct {
+		key   string
+		seg   flatSeg
+		alone bool
+	}{
+		{key: "root", seg: flatSeg{"root", -1}, alone: true},
+		{key: "root:2", seg: flatSeg{"root", 2}, alone: true},
+		{key: "root:2|code", seg: flatSeg{"root", 2}, alone: true},
+		{key: "root|", seg: flatSeg{"root", -1}, alone: true},
+		{key: "root:1|a:0", seg: flatSeg{"root", 1}, alone: true},
+		{key: "root|a|b"},
+		{key: "root:02"},
+		{key: "root:02|code"},
+		{key: "root/x"},
+		{key: "rootx"},
+		{key: "root:x"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.key, func(t *testing.T) {
+			seg, alone := rootSegmentAlone(tc.key, "root")
+			if seg != tc.seg || alone != tc.alone {
+				t.Errorf("rootSegmentAlone(%q) = %+v, %t, want %+v, %t", tc.key, seg, alone, tc.seg, tc.alone)
+			}
+		})
+	}
+}
+
+// TestMetadataRelEdgeKeys pins the unindexed spelling metadataRel gives a
+// root-relative key: only the leading run of metadata segments loses its
+// index, the suffix after the first `|` is kept as written, and a key with a
+// malformed index anywhere comes back unchanged and not over-indexed.
+func TestMetadataRelEdgeKeys(t *testing.T) {
+	tests := []struct {
+		rel         string
+		norm        string
+		overIndexed bool
+	}{
+		{rel: "language|code", norm: "language|code"},
+		{rel: "language:0|code", norm: "language|code"},
+		{rel: "language:1|code", norm: "language|code", overIndexed: true},
+		{rel: "language:0|", norm: "language|"},
+		{rel: "language:0|a|b", norm: "language|a|b"},
+		{rel: "language:0:0|code", norm: "language:0:0|code"},
+		{rel: "context:0", norm: "context"},
+		{rel: "context:0/start_time:0", norm: "context/start_time"},
+		{rel: "context:0/start_time:2|x", norm: "context/start_time|x", overIndexed: true},
+		{rel: "context:1/setting:0|code", norm: "context/setting|code", overIndexed: true},
+		{rel: "context:0/start_time:0/x|a:0/b", norm: "context/start_time/x|a:0/b"},
+		{rel: "context:0/other_context/x:1|y", norm: "context/other_context/x:1|y"},
+		{rel: "context:0/x:y", norm: "context/x:y"},
+		{rel: "composer:0/_identifier:0|id", norm: "composer/_identifier:0|id"},
+		{rel: "start_time:0", norm: "start_time:0"},
+		{rel: "conformance_section:0/x:0|y", norm: "conformance_section:0/x:0|y"},
+		{rel: "context:0/x:01", norm: "context:0/x:01"},
+		{rel: "context:1/x:01", norm: "context:1/x:01"},
+		{rel: "context/x:01", norm: "context/x:01"},
+		{rel: "context:00/start_time", norm: "context:00/start_time"},
+		{rel: "", norm: ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.rel, func(t *testing.T) {
+			norm, over := metadataRel(tc.rel)
+			if norm != tc.norm || over != tc.overIndexed {
+				t.Errorf("metadataRel(%q) = %q, %t, want %q, %t", tc.rel, norm, over, tc.norm, tc.overIndexed)
+			}
+		})
+	}
+}

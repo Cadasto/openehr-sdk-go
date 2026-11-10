@@ -670,24 +670,23 @@ var metadataSegPaths = func() map[string]bool {
 // unchanged, for the leaf loop to refuse.
 func metadataRel(rel string) (norm string, overIndexed bool) {
 	path, suffix, piped := strings.Cut(rel, "|")
-	pk, err := parseFlatKey(path)
-	if err != nil {
-		return rel, false
-	}
 	var b strings.Builder
-	var seen string
+	var seen, sep string
 	onMeta := true
-	for i, s := range pk.segs {
-		if i > 0 {
-			b.WriteByte('/')
+	for p := range strings.SplitSeq(path, "/") {
+		s, ok := parseFlatSeg(p)
+		if !ok {
+			return rel, false
 		}
+		b.WriteString(sep)
+		sep = "/"
 		if onMeta {
-			p := s.id
+			at := s.id
 			if seen != "" {
-				p = seen + "/" + s.id
+				at = seen + "/" + s.id
 			}
-			if metadataSegPaths[p] {
-				seen = p
+			if metadataSegPaths[at] {
+				seen = at
 				b.WriteString(s.id)
 				overIndexed = overIndexed || s.idx > 0
 				continue
@@ -764,17 +763,20 @@ func isMetadataSpelling(rel string) bool {
 // form REQ-053 reads as `<root>/…`), so it is parsed rather than matched as a
 // literal prefix; rootSeg reports the index it carries. rooted is false for a
 // key whose first segment is not the root, has nothing below it, or carries a
-// malformed index (the leaf loop refuses that one).
+// malformed index (the leaf loop refuses that one). The first segment's
+// |suffix is cut off before it is parsed, as [parseFlatKey] does, so a bare
+// `<root>|/…` is rooted and `<root>|x/…` is not.
 func cutRoot(key, rootID string) (rel string, rootSeg flatSeg, rooted bool) {
 	first, rel, found := strings.Cut(key, "/")
 	if !found {
 		return "", flatSeg{}, false
 	}
-	pk, err := parseFlatKey(first)
-	if err != nil || pk.suffix != "" || len(pk.segs) != 1 || pk.segs[0].id != rootID {
+	first, suffix := splitSuffix(first)
+	seg, ok := parseFlatSeg(first)
+	if !ok || suffix != "" || seg.id != rootID {
 		return "", flatSeg{}, false
 	}
-	return rel, pk.segs[0], true
+	return rel, seg, true
 }
 
 // rootSegmentAlone parses a key that has no `/` as one segment and its
@@ -783,11 +785,12 @@ func rootSegmentAlone(key, rootID string) (flatSeg, bool) {
 	if strings.Contains(key, "/") {
 		return flatSeg{}, false
 	}
-	pk, err := parseFlatKey(key)
-	if err != nil || len(pk.segs) != 1 || pk.segs[0].id != rootID {
+	base, _ := splitSuffix(key)
+	seg, ok := parseFlatSeg(base)
+	if !ok || seg.id != rootID {
 		return flatSeg{}, false
 	}
-	return pk.segs[0], true
+	return seg, true
 }
 
 // errRootIndex refuses an index past the bound of the template root's own
@@ -4642,30 +4645,44 @@ type parsedKey struct {
 	suffix string
 }
 
-// parseFlatKey splits a FLAT key into path segments and the trailing |suffix.
-// Each "/"-separated segment may carry a ":<index>" suffix; a trailing
-// "|<attr>" is the leaf attribute suffix. A numeric index must be spelled
-// canonically ("0", "1", …): a negative index would collide with the internal
-// "no index" sentinel, and non-canonical spellings ("-1", "+0", "00") would
-// make distinct JSON keys resolve to the same slot, silently overwriting one
-// value with another — both are rejected.
+// parseFlatKey splits a FLAT key into path segments and the trailing |suffix:
+// a trailing "|<attr>" is the leaf attribute suffix, and each "/"-separated
+// segment before it is read by [parseFlatSeg]. A segment whose index is not
+// spelled canonically is refused, naming the index and the path.
 func parseFlatKey(key string) (parsedKey, error) {
 	key, suffix := splitSuffix(key)
 	segs := make([]flatSeg, 0, strings.Count(key, "/")+1)
 	for p := range strings.SplitSeq(key, "/") {
-		seg := flatSeg{id: p, idx: -1}
-		if id, idxStr, found := strings.CutLast(p, ":"); found {
-			if n, err := strconv.Atoi(idxStr); err == nil {
-				if n < 0 || idxStr != strconv.Itoa(n) {
-					return parsedKey{}, fmt.Errorf("%w: invalid :index %q in %q", ErrUnknownPath, idxStr, key)
-				}
-				seg.id = id
-				seg.idx = n
-			}
+		seg, ok := parseFlatSeg(p)
+		if !ok {
+			_, idxStr, _ := strings.CutLast(p, ":")
+			return parsedKey{}, fmt.Errorf("%w: invalid :index %q in %q", ErrUnknownPath, idxStr, key)
 		}
 		segs = append(segs, seg)
 	}
 	return parsedKey{segs: segs, suffix: suffix}, nil
+}
+
+// parseFlatSeg reads one "/"-separated FLAT path segment, which may carry a
+// ":<index>" after its id. A numeric index must be spelled canonically ("0",
+// "1", …): a negative index would collide with the internal "no index"
+// sentinel, and non-canonical spellings ("-1", "+0", "00") would make distinct
+// JSON keys resolve to the same slot, silently overwriting one value with
+// another, so ok is false for both. Text after the last ":" that is not a
+// number is no index, and stays part of the id.
+func parseFlatSeg(p string) (seg flatSeg, ok bool) {
+	id, idxStr, found := strings.CutLast(p, ":")
+	if !found {
+		return flatSeg{id: p, idx: -1}, true
+	}
+	n, err := strconv.Atoi(idxStr)
+	if err != nil {
+		return flatSeg{id: p, idx: -1}, true
+	}
+	if n < 0 || idxStr != strconv.Itoa(n) {
+		return flatSeg{}, false
+	}
+	return flatSeg{id: id, idx: n}, true
 }
 
 // contentKey is one FLAT content key with its [parseFlatKey] result: pk when
