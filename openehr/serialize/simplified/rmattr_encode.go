@@ -70,6 +70,11 @@ func rmattrEncode(owner any, base string, out map[string]any) error {
 	if err := partyProxyRMAttr(out, base+"/_provider", entryProviderOf(owner)); err != nil {
 		return err
 	}
+	if i, ok := as[rm.Instruction](owner); ok {
+		if err := wfDefinitionRMAttr(out, base+"/_wf_definition", i.WfDefinition); err != nil {
+			return err
+		}
+	}
 	if err := deferredEntryRMAttrs(owner, base); err != nil {
 		return err
 	}
@@ -115,20 +120,40 @@ func plainText(m map[string]any) bool {
 	return true
 }
 
-// deferredEntryRMAttrs refuses the two ENTRY attributes whose families stay
-// deferred: ACTION `instruction_details` and INSTRUCTION `wf_definition`. Decode
-// refuses their keys as unknown families, so a value written here could never be
-// read back; and with no grammar there is nothing to write. A populated one is
-// therefore a typed error naming the key, never the value (REQ-140), and an
-// absent one writes nothing.
+// wfDefinitionRMAttr writes INSTRUCTION.wf_definition, a DV_PARSABLE, at path
+// (`<instruction>/_wf_definition`) through the DV_PARSABLE leaf emitter, so a
+// value its suffixes cannot carry, such as one with a charset or a language,
+// rides `_wf_definition|raw` at its own key, as an `original_content` does.
+// The emitter writes the value under the bare key; this family spells it
+// `|value`, as ITS-REST 1.1.0 Simplified Formats § INSTRUCTION and the
+// PROBE-086 corpus do, so the bare key is written there instead. A nil one
+// writes nothing.
+func wfDefinitionRMAttr(out map[string]any, path string, wf *rm.DVParsable) error {
+	if wf == nil {
+		return nil
+	}
+	sub := make(map[string]any, 2)
+	if _, err := emitLeafValue(sub, path, *wf, "DV_PARSABLE", false, false); err != nil {
+		return err
+	}
+	for key, v := range sub {
+		if key == path {
+			key += "|value"
+		}
+		out[key] = v
+	}
+	return nil
+}
+
+// deferredEntryRMAttrs refuses the one ENTRY attribute whose family stays
+// deferred: ACTION `instruction_details`. Decode refuses its keys, so a value
+// written here could never be read back; and with no grammar there is nothing
+// to write. A populated one is therefore a typed error naming the key, never
+// the value (REQ-140), and an absent one writes nothing.
 func deferredEntryRMAttrs(owner any, base string) error {
 	if a, ok := as[rm.Action](owner); ok && a.InstructionDetails != nil {
 		return fmt.Errorf("%w: %q carries an ACTION.instruction_details, which has no FLAT grammar yet and no |raw carrier — deferred rather than dropped (see deviations.md)",
 			ErrUnsupportedDatatype, base+"/_instruction_details")
-	}
-	if i, ok := as[rm.Instruction](owner); ok && i.WfDefinition != nil {
-		return fmt.Errorf("%w: %q carries an INSTRUCTION.wf_definition, which has no FLAT grammar yet and no |raw carrier — deferred rather than dropped (see deviations.md)",
-			ErrUnsupportedDatatype, base+"/_wf_definition")
 	}
 	return nil
 }

@@ -33,7 +33,9 @@
 //	}
 //
 // A [CodeReference] carries the [CodePhrase] it refines; [CodePhraseOf]
-// reads either as that code phrase constraint.
+// reads either as that code phrase constraint, and
+// [CodePhraseWithTerminologyOf] also gives it the terminology the reference
+// set's URI names where the code phrase names none.
 //
 // Each constraint exposes Validate(value any) []Violation. A nil
 // (empty) result means the value satisfies every clause; a non-empty

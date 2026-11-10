@@ -594,7 +594,9 @@ requirements:
       - openehr/serialize/simplified/context_test.go
       - openehr/serialize/simplified/ctx_error_values_test.go
       - openehr/serialize/simplified/datatypes_test.go
+      - openehr/serialize/simplified/empty_duration_uri_test.go
       - openehr/serialize/simplified/empty_structure_test.go
+      - openehr/serialize/simplified/empty_temporal_test.go
       - openehr/serialize/simplified/error_text_test.go
       - openehr/serialize/simplified/fit_test.go
       - openehr/serialize/simplified/flat_decode_test.go
@@ -619,10 +621,12 @@ requirements:
       - openehr/serialize/simplified/rmattr_party_test.go
       - openehr/serialize/simplified/rmattr_repeating_test.go
       - openehr/serialize/simplified/roundtrip_test.go
+      - openehr/serialize/simplified/shorthand_test.go
       - openehr/serialize/simplified/simplified_test.go
       - openehr/serialize/simplified/string_leaf_test.go
       - openehr/serialize/simplified/structured_ctx_test.go
       - openehr/serialize/simplified/structured_test.go
+      - openehr/serialize/simplified/template_completion_test.go
       - openehr/serialize/simplified/template_index_cache_test.go
       - openehr/serialize/simplified/template_order_test.go
       - openehr/serialize/simplified/template_roundtrip_test.go
@@ -1465,6 +1469,7 @@ requirements:
       - internal/templatecompile/walk/walk_test.go
       - openehr/instance/coded_group_test.go
       - openehr/instance/coded_name_code_test.go
+      - openehr/instance/coded_term_text_test.go
       - openehr/instance/placeholder_test.go
       - openehr/instance/sample_test.go
       - openehr/instance/string_leaf_internal_test.go
@@ -2154,6 +2159,7 @@ requirements:
       - openehr/serialize/simplified/composition_name_test.go
       - openehr/serialize/simplified/context_test.go
       - openehr/serialize/simplified/datatypes_test.go
+      - openehr/serialize/simplified/empty_temporal_test.go
       - openehr/serialize/simplified/error_text_test.go
       - openehr/serialize/simplified/flat_encode_test.go
       - openehr/serialize/simplified/flat_pinned_test.go
@@ -2175,6 +2181,7 @@ requirements:
       - openehr/serialize/simplified/structured_test.go
       - openehr/serialize/simplified/unmatched_test.go
       - openehr/serialize/simplified/unspelled_node_test.go
+      - openehr/serialize/simplified/wf_definition_test.go
       - openehr/template/webtemplate/incontext_rmpath_test.go
       - testkit/conformance/webtemplate/archetype_details_test.go
       - testkit/probes/serialize/probe_089_underscore_round_trip.go
@@ -2518,7 +2525,9 @@ requirements:
       - openehr/serialize/simplified/rmattr_value_test.go
       - openehr/serialize/simplified/string_leaf_test.go
       - openehr/serialize/simplified/structured_ctx_test.go
+      - openehr/serialize/simplified/template_completion_test.go
       - openehr/serialize/simplified/unmatched_test.go
+      - openehr/serialize/simplified/wf_definition_test.go
       - testkit/conformance/webtemplate/archetype_details_test.go
       - testkit/conformance/webtemplate/decode_reducing_test.go
       - testkit/conformance/webtemplate/helpers_test.go

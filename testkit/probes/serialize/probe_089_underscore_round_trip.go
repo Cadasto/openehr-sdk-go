@@ -492,6 +492,21 @@ var Probe089Inputs = []Probe089Case{
 		},
 	},
 	{
+		// The value is the corpus's (`ehrbase_conformance_instruction`), and so
+		// is the `|value` spelling of a DV_PARSABLE's value the family uses.
+		Name: "instruction_wf_definition",
+		Rows: []string{"INSTRUCTION: _wf_definition"},
+		Keys: map[string]any{
+			probe089Instr + "/narrative":                "Human readable instruction narrative",
+			probe089Instr + "/language|code":            "en",
+			probe089Instr + "/language|terminology":     "ISO_639-1",
+			probe089Instr + "/_wf_definition|value":     "wf_definition",
+			probe089Instr + "/_wf_definition|formalism": "formalism",
+			probe089Qty + "|magnitude":                  65.9,
+			probe089Qty + "|unit":                       "unit",
+		},
+	},
+	{
 		Name: "interval_leaf",
 		Rows: []string{"DV_INTERVAL<T> leaf (the interval grammar at a modelled node)"},
 		Keys: map[string]any{
@@ -546,17 +561,8 @@ var Probe089Refusals = []Probe089Refusal{
 		Names: []string{probe089Action + "/_instruction_details"},
 	},
 	{
-		Name: "wf_definition_deferred",
-		Keys: map[string]any{
-			probe089Instr + "/_wf_definition|value":     "wf_definition",
-			probe089Instr + "/_wf_definition|formalism": "formalism",
-		},
-		Want:  simplified.ErrUnknownPath,
-		Names: []string{probe089Instr + "/_wf_definition"},
-	},
-	{
 		// FEEDER_AUDIT_DETAILS.other_details is an ITEM_STRUCTURE the
-		// reference's suffix set has no channel for — the third deferral.
+		// reference's suffix set has no channel for — the second deferral.
 		Name: "feeder_audit_other_details_deferred",
 		Keys: map[string]any{
 			probe089Obs + "/_feeder_audit/originating_system_audit|system_id":       "orig",

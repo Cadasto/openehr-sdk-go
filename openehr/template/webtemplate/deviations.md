@@ -199,6 +199,19 @@ failure, not a deviation.
 - **`terminology`** — emitted for external bindings only (e.g. `openehr`). The
   archetype-internal `local` value is omitted, mirroring the reference (pinned by
   `TestInputParity`).
+- **Reference-set `terminology`** — for a `C_CODE_REFERENCE`, the code input's
+  `terminology` is the one its code phrase names, else the one its `terminology:` URI
+  names, read as `constraints.CodeReference.ReferenceSetTerminology` reads it:
+  `terminology:SNOMED-CT` gives `SNOMED-CT`, as the reference does. The two part
+  where the reference keeps more of the URI: it drops the scheme and keeps the rest
+  as written (`OPTParser.removeSchema`), whatever the code phrase names. So
+  `terminology:LOINC/2.73` gives the reference `LOINC/2.73` and the SDK `LOINC(2.73)`,
+  `terminology:code24?subset=x` gives `code24?subset=x` and `code24`, and a URI of
+  another scheme, such as `http://snomed.info/sct`, gives `//snomed.info/sct` and no
+  `terminology`. A code phrase that names a terminology keeps it here, where the
+  reference writes the URI's. None of the three vendored references holds a
+  `C_CODE_REFERENCE`, so `TestInputParity` does not meet this; the cases are pinned by
+  `TestCodedTextInput_REQ106_REQ103_ReferenceSetTerminology`.
 - **`listOpen`** — emitted (`true`) for an open coded list: an empty constraint list, or
   a DV_CODED_TEXT with a DV_TEXT alternative (the free-text `other` input admits values
   beyond the enumerated codes), mirroring the reference (pinned by `TestInputParity`).

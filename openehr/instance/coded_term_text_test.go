@@ -4,10 +4,12 @@ import (
 	"fmt"
 	mrand "math/rand/v2"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
@@ -252,6 +254,57 @@ func TestREQ107_FamilyHistoryExternalCodesTakeTheTermText(t *testing.T) {
 						t.Errorf("%v/%v/seed=%d: no ELEMENT %s coded in SNOMED-CT generated", policy, fill, seed, node)
 					}
 				}
+			}
+		}
+	}
+}
+
+// TestREQ107_REQ103_ReferenceSetTerminologyCodesTheValue is the REQ-107
+// check that a coded text whose C_CODE_REFERENCE names no terminology in
+// its code phrase is coded in the terminology its terminology: URI names
+// (REQ-103), as one whose code phrase names it is: the vendored
+// test_all_types OPT's ELEMENT at0006, coded_text_terminology, has the URI
+// terminology:SNOMED-CT and no terminology_id. It holds under Large and
+// Medium, both value fills and several seeds, and every composition
+// validates against the template.
+func TestREQ107_REQ103_ReferenceSetTerminologyCodesTheValue(t *testing.T) {
+	const archetype = "openEHR-EHR-OBSERVATION.test_all_types.v1"
+	opt, err := readOPTFile(filepath.Join(fixtures.CrossFormatRoot(), "test_all_types", "template.opt"))
+	if err != nil {
+		t.Fatalf("read test_all_types: %v", err)
+	}
+	c, err := templatecompile.Compile(opt)
+	if err != nil {
+		t.Fatalf("Compile test_all_types: %v", err)
+	}
+	for _, policy := range largeAndMedium {
+		for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
+			for seed := range uint64(4) {
+				opts := instance.Options{
+					Policy: policy, ValueFill: fill, ValueSource: mrand.NewPCG(seed, corpusStream),
+					Territory: "NL", Composer: testComposer(), Now: defaultsNow,
+				}
+				comp := generateComposition(t, c, opts)
+				found := 0
+				visitRMIn(comp, func(path, in string, e rm.Element) {
+					if in != archetype || e.ArchetypeNodeID != "at0006" {
+						return
+					}
+					found++
+					ct, ok := e.Value.(*rm.DVCodedText)
+					if !ok {
+						t.Errorf("%v/%v/seed=%d: ELEMENT at0006 value at %s is %T, want *rm.DVCodedText", policy, fill, seed, path, e.Value)
+						return
+					}
+					if got := ct.DefiningCode.TerminologyID.Value; got != "SNOMED-CT" {
+						t.Errorf("%v/%v/seed=%d: ELEMENT at0006 value at %s is coded %s::%s, want terminology SNOMED-CT",
+							policy, fill, seed, path, got, ct.DefiningCode.CodeString)
+					}
+				})
+				if found == 0 {
+					t.Errorf("%v/%v/seed=%d: test_all_types generated no ELEMENT at0006", policy, fill, seed)
+				}
+				noValidationErrors(t, comp, c)
 			}
 		}
 	}

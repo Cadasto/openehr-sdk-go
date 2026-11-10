@@ -363,9 +363,11 @@ func TestREQ053FitNamesTheKeyAtEveryPosition(t *testing.T) {
 
 // fullSuffixSets holds, per datatype, a value for every suffix it reads, each
 // distinct from its neighbours, so a suffix whose recorded attribute path is
-// wrong finds another suffix's value there.
+// wrong finds another suffix's value there. An input shorthand and the suffix
+// it stands for are the exception: they spell one attribute, so they hold one
+// value, since two that differ are refused.
 var fullSuffixSets = map[string]map[string]any{
-	"DV_TEXT":       {"": "t", "formatting": "f"},
+	"DV_TEXT":       {"": "t", "value": "t", "formatting": "f"},
 	"DV_CODED_TEXT": {"code": "c", "value": "v", "terminology": "t", "formatting": "f"},
 	"DV_DATE_TIME":  {"": "2021-01-01T00:00:00Z", "magnitude_status": "=", "normal_status": "N"},
 	"DV_DATE":       {"": "2021-01-01", "magnitude_status": "=", "normal_status": "N"},
@@ -385,9 +387,9 @@ var fullSuffixSets = map[string]map[string]any{
 		"numerator": 2.5, "denominator": 3.5, "type": 1, "magnitude_status": "=", "normal_status": "N",
 		"accuracy": 1.5, "accuracy_is_percent": true, "precision": 3,
 	},
-	"DV_IDENTIFIER": {"id": "i", "issuer": "is", "assigner": "as", "type": "ty"},
+	"DV_IDENTIFIER": {"": "i", "id": "i", "issuer": "is", "assigner": "as", "type": "ty"},
 	"CODE_PHRASE":   {"code": "c", "terminology": "t", "preferred_term": "p"},
-	"DV_PARSABLE":   {"": "v", "formalism": "f"},
+	"DV_PARSABLE":   {"": "v", "value": "v", "formalism": "f"},
 	"DV_MULTIMEDIA": {
 		"": "http://u", "mediatype": "text/plain", "size": 5, "data": "aGk=", "alternatetext": "a",
 		"integrity_check": "aWM=", "integrity_check_algorithm": "SHA-1", "compression_algorithm": "zip",

@@ -67,8 +67,9 @@
 // whatever its value holds, and is reported as that member; a name it reads
 // keeps the shape refusals. A key the decode reads is never unmatched, even
 // where the decode then refuses it: a PARTICIPATION `time`, a
-// FEEDER_AUDIT_DETAILS `other_details`, `_instruction_details` and
-// `_wf_definition` have no carrier and fail the decode in every mode. So do, in the reference's in-context spelling and
+// FEEDER_AUDIT_DETAILS `other_details` and `_instruction_details` have no
+// carrier and fail the decode in every mode. So do, in the reference's
+// in-context spelling and
 // where the Web Template does not resolve them, an ACTION's ISM transition and
 // time (a `current_state`, `transition` or `careflow_step` leaf or a `_reason`
 // family under an `ism_transition` node, and the ACTION's own `time` leaf), an
@@ -78,8 +79,11 @@
 // datatype has neither a suffix set nor a sub-path grammar refuses its bare
 // value and any suffix naming an attribute of its RM class.
 // So does malformed content: a value of the wrong shape, a missing required
-// suffix (a lone bare value where the datatype has no bare spelling, a bare
-// ctx/setting, a null required suffix), two spellings of one field the decode
+// suffix (a lone bare value where the datatype has no bare spelling, a null
+// required suffix, and with [WithTemplate] a coded text's |terminology the
+// template does not determine; a coded text's |value or |terminology, or an
+// ordinal's |value or |ordinal, that the template determines is taken from it
+// and not missing), two spellings of one field the decode
 // reads that disagree (such as `x` and `x|`; a lone `x|` reads as `x`), an
 // index past its bound. A value that does not fit its RM attribute, one the
 // canonical-JSON decode of that attribute would refuse, is refused with
@@ -88,7 +92,11 @@
 // A JSON null held by a key the decode reads is absent, never the zero of its
 // type: a leaf whose keys are all null is not built, a null ctx/ field is a
 // missing one, and a null key the decode would refuse for want of a carrier
-// carries nothing to refuse. A key the decode does not read is unmatched
+// carries nothing to refuse. An empty string at the bare value of a
+// DV_DATE_TIME, DV_DATE, DV_TIME, DV_DURATION, DV_URI or DV_EHR_URI leaf is
+// absent the same way where no other key decorates that value, since encode
+// writes no key for it, and so is an empty ctx/time, which spells the start
+// time, a DV_DATE_TIME. A key the decode does not read is unmatched
 // whatever its value. In STRUCTURED a null member or array element reads the
 // same way, and OPT-free conversion carries it to FLAT as a key holding null.
 // Two spellings of a key the decode does not read are two unmatched keys. A

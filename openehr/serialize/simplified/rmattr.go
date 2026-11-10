@@ -215,10 +215,10 @@ type rmattrFamily struct {
 
 // rmattrFamilies is the vocabulary this codec carries. A family absent here is
 // unmatched content (REQ-170): ignored by default, reported or refused on
-// request. The two the plan defers indefinitely (`_instruction_details`,
-// `_wf_definition`) are the exception, [rmattrDeferredFamilies]: the decode
-// reads their keys and refuses them in every mode, so they stay visible in the
-// PROBE-086 census instead of decoding into nothing.
+// request. The one the plan defers indefinitely (`_instruction_details`) is
+// the exception, [rmattrDeferredFamilies]: the decode reads its keys and
+// refuses them in every mode, so they stay visible in the PROBE-086 census
+// instead of decoding into nothing.
 //
 // `_identifier` is deliberately **not** a family here, though the corpus writes
 // it: it is only ever reached *inside* a party — nested in
@@ -268,18 +268,19 @@ var rmattrFamilies = map[string]rmattrFamily{
 		attr: "accuracy", attrType: "DV_DURATION", value: true,
 		decode: decodeRMAttrTemporalAccuracy,
 	},
-	"_feeder_audit": {attr: "feeder_audit", decode: decodeRMAttrFeederAudit},
-	"_provider":     {attr: "provider", decode: decodeRMAttrProvider},
+	"_feeder_audit":  {attr: "feeder_audit", decode: decodeRMAttrFeederAudit},
+	"_provider":      {attr: "provider", decode: decodeRMAttrProvider},
+	"_wf_definition": {attr: "wf_definition", decode: decodeRMAttrWfDefinition},
 }
 
-// rmattrDeferredFamilies are the two families the spec names and this codec
-// defers (REQ-140 *Deliberate exclusions*), by the RM attribute each addresses.
-// At an owner that declares the attribute the key resolves but has no carrier,
-// so it is refused in every mode (REQ-170); anywhere else it names nothing and
-// is unmatched content like any other unknown family.
+// rmattrDeferredFamilies are the families the spec names and this codec defers
+// (REQ-140 *Deliberate exclusions*), by the RM attribute each addresses: only
+// `_instruction_details` now. At an owner that declares the attribute the key
+// resolves but has no carrier, so it is refused in every mode (REQ-170);
+// anywhere else it names nothing and is unmatched content like any other
+// unknown family.
 var rmattrDeferredFamilies = map[string]string{
 	"_instruction_details": "instruction_details",
-	"_wf_definition":       "wf_definition",
 }
 
 // rmattrOwner is the resolved owner of an `_`-family group: the RM class name
@@ -404,8 +405,8 @@ type rmattrDecoded struct {
 //  1. a group whose owner path reaches no Web Template node, whose family is
 //     unrecognised, or whose family the owner's RM class does not declare is
 //     unmatched content (REQ-170): every key goes to the sink and the group is
-//     skipped. The two deferred families are the exception where the owner
-//     declares them: [ErrUnknownPath] in every mode;
+//     skipped. A deferred family is the exception where the owner declares
+//     it: [ErrUnknownPath] in every mode;
 //  2. an instance whose `:index` is past its family's bound is ErrUnknownPath,
 //     judged before its tails, since the index makes every key of the
 //     instance malformed whatever follows it (REQ-170);
@@ -850,6 +851,17 @@ func decodeRMAttrEndTime(g rmattrGroup, _ string) (any, error) {
 		return nil, err
 	}
 	return map[string]any{"_type": "DV_DATE_TIME", "value": value}, nil
+}
+
+// decodeRMAttrWfDefinition decodes INSTRUCTION's `_wf_definition`, a
+// DV_PARSABLE, through the DV_PARSABLE value grammar an `original_content`
+// uses: the value bare or as `|value`, `|formalism` beside it, both
+// RM-mandatory, or the whole value as `|raw`. A sub-path, such as a
+// `_charset` member, is unmatched content: a value carrying one rides `|raw`.
+// Only INSTRUCTION declares wf_definition, so the router admits the family
+// there alone.
+func decodeRMAttrWfDefinition(g rmattrGroup, _ string) (any, error) {
+	return decodeRMAttrLeafValue(g, "DV_PARSABLE")
 }
 
 // decodeRMAttrLocation decodes EVENT_CONTEXT's `_location` — a bare String, so

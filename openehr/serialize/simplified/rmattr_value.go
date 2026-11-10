@@ -323,7 +323,14 @@ func (ts rmattrTails) listValue(g rmattrGroup, seg string, idx int, rmType strin
 // failure. tailOf spells the tail of one suffix of it, "" for the sub-object
 // itself.
 func (ts rmattrTails) valueAt(g rmattrGroup, tailOf func(suffix string) string, holds, rmType string, sfx map[string]any) (map[string]any, error) {
-	dv, err := dvFromSuffixesAt(holds, rmType, false, sfx, func(suffix string) string { return ts.key(g, tailOf(suffix)) })
+	return ts.valueAtWith(g, tailOf, holds, rmType, sfx, false)
+}
+
+// valueAtWith is [rmattrTails.valueAt], with deferred set where a decode with
+// the template may supply what the body leaves out of the value
+// ([dvFromSuffixesWith]).
+func (ts rmattrTails) valueAtWith(g rmattrGroup, tailOf func(suffix string) string, holds, rmType string, sfx map[string]any, deferred bool) (map[string]any, error) {
+	dv, err := dvFromSuffixesWith(holds, rmType, false, sfx, func(suffix string) string { return ts.key(g, tailOf(suffix)) }, deferred)
 	if err != nil {
 		return nil, fmt.Errorf("simplified: decode %q: %w", ts.key(g, tailOf("")), err)
 	}
@@ -453,7 +460,11 @@ var normalRangeBoundByValue = map[string]bool{"DV_COUNT": true, "DV_QUANTITY": t
 // ([normalRangeBoundByValue]): there the Go value cannot hold the absence, and
 // filling in a zero bound would change the interval's meaning, so the side is
 // refused; held as an interface, it decodes as written, with no bound.
-func intervalSuffixes(g rmattrGroup, ts rmattrTails, anchor string, boundByValue bool) (map[string]any, error) {
+//
+// deferred is set for an interval leaf in a decode with the template, whose
+// bounds that template may complete once the leaf is placed
+// ([dvFromSuffixesWith], [placeCompositeLeaf]).
+func intervalSuffixes(g rmattrGroup, ts rmattrTails, anchor string, boundByValue, deferred bool) (map[string]any, error) {
 	iv := map[string]any{"_type": "DV_INTERVAL"}
 	// The type a bound is held as, which a `|raw` bound must name or descend
 	// from: the anchor itself where the RM holds the bound by value, and any
@@ -488,7 +499,7 @@ func intervalSuffixes(g rmattrGroup, ts rmattrTails, anchor string, boundByValue
 				ErrUnsupportedDatatype, g.prefix(), end, end, end)
 		}
 		if bounded {
-			dv, err := ts.valueAt(g, func(suffix string) string { return subTail(end, suffix) }, bound, anchor, ts.sub[end])
+			dv, err := ts.valueAtWith(g, func(suffix string) string { return subTail(end, suffix) }, bound, anchor, ts.sub[end], deferred)
 			if err != nil {
 				return nil, err
 			}
@@ -546,15 +557,18 @@ func includedOpenSideError(key, end string) error {
 //
 // For a DV_ORDINAL anchor it also returns the bounds ("lower", "upper") built
 // from their suffixes rather than given as |raw: their symbols carry no
-// terminology in the formats ([settleOrdinalTerminology]).
-func intervalLeafSuffixes(g rmattrGroup, anchor string) (map[string]any, []string, error) {
+// terminology in the formats ([settleOrdinalTerminology]). In a decode with the
+// template (deferred) those bounds are built without the |value and |ordinal
+// the body leaves out, which [templateIndex.completeCodedValue] gives, or
+// refuses, once the leaf is placed.
+func intervalLeafSuffixes(g rmattrGroup, anchor string, deferred bool) (map[string]any, []string, error) {
 	ts, err := intervalTails(g, anchor, intervalSubTails)
 	if err != nil {
 		return nil, nil, err
 	}
 	// A DV_INTERVAL at a Web Template leaf is polymorphic: canonical JSON
 	// decodes it as DV_INTERVAL<DV_ORDERED>, an interface bound.
-	iv, err := intervalSuffixes(g, ts, anchor, false)
+	iv, err := intervalSuffixes(g, ts, anchor, false, deferred)
 	if err != nil || anchor != "DV_ORDINAL" {
 		return iv, nil, err
 	}
@@ -594,7 +608,7 @@ func decodeRMAttrNormalRange(g rmattrGroup, anchor string) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return intervalSuffixes(g, ts, anchor, normalRangeBoundByValue[anchor])
+	return intervalSuffixes(g, ts, anchor, normalRangeBoundByValue[anchor], false)
 }
 
 // refRangeSubTails is REFERENCE_RANGE's sub-object set: the interval's two
@@ -624,7 +638,7 @@ func decodeRMAttrReferenceRange(g rmattrGroup, anchor string) (any, error) {
 	}
 	// REFERENCE_RANGE.range is DV_INTERVAL<DV_ORDERED>, an interface bound,
 	// whatever the leaf's datatype.
-	iv, err := intervalSuffixes(g, ts, anchor, false)
+	iv, err := intervalSuffixes(g, ts, anchor, false, false)
 	if err != nil {
 		return nil, err
 	}

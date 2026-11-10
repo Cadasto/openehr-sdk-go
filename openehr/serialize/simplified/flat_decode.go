@@ -204,6 +204,9 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 		groups[base][suffix] = val
 		keys[base][suffix] = key
 	}
+	// A value decoration beside a leaf's bare "" keeps the "" a value
+	// ([leafSuffixes]).
+	decorations := decoratingFamilies(attrGroups)
 	// Process leaf groups in a stable (sorted) order so the reconstructed tree
 	// is deterministic: distinct-node-id siblings are appended in this order,
 	// which must not depend on Go map iteration. [orderByTemplate] later puts
@@ -229,14 +232,14 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 		if err != nil {
 			return nil, fmt.Errorf("simplified: %q: %w", base, err)
 		}
-		sfx, err := leafSuffixes(leaf, groups[base], keyOf, sink)
+		sfx, err := leafSuffixes(leaf, groups[base], keyOf, sink, decoratesValue(leaf, sib, decorations[indexedPath(base)]))
 		if err != nil {
 			return nil, err
 		}
 		if len(sfx) == 0 {
 			continue
 		}
-		dv, err := leafFromSuffixes(leafHolds(leaf), nodeRMType(leaf), leafListOpen(leaf), sfx, keyOf)
+		dv, err := clinicalLeafValue(leaf, sfx, keyOf, tmpl != nil)
 		if err != nil {
 			return nil, fmt.Errorf("simplified: decode %q: %w", base, err)
 		}
@@ -244,8 +247,16 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 		if err != nil {
 			return nil, fmt.Errorf("simplified: place %q: %w", base, err)
 		}
-		if _, raw := sfx["raw"]; !raw && nodeRMType(leaf) == "DV_ORDINAL" {
-			settleOrdinalTerminology(dv, tmpl.ordinalTerminologies(key))
+		if _, raw := sfx["raw"]; !raw {
+			// The key the template is indexed by is known once the value is
+			// placed: what the body leaves out of a coded value is taken from
+			// the template, or refused, now (REQ-053).
+			if err := tmpl.completeCodedValue(dv, key); err != nil {
+				return nil, fmt.Errorf("simplified: decode %q: %w", base, err)
+			}
+			if nodeRMType(leaf) == "DV_ORDINAL" {
+				settleOrdinalTerminology(dv, tmpl.ordinalTerminologies(key))
+			}
 		}
 	}
 	// Composite leaves are placed like any other leaf, after the clinical loop so a
@@ -346,11 +357,22 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 // dropped without a word, so a leaf whose keys are all null comes back empty,
 // and a null key is never refused for want of a carrier. A key the decode
 // does not read goes to sink whatever its value.
-func leafSuffixes(leaf *webtemplate.Node, sfx map[string]any, keyOf func(string) string, sink *unmatchedSink) (map[string]any, error) {
+//
+// A bare "" at a leaf of [unsetStringType] is absent the same way where no
+// other key of the leaf the decode reads holds a value and decorated is
+// false: encode writes no key for that value, so a decode, encode and decode
+// keeps the composition (REQ-053). decorated reports whether an underscore
+// family decorates the leaf's value ([decoratesValue]); one keeps the "", as
+// a suffix does, since a decoration with no value is refused.
+func leafSuffixes(leaf *webtemplate.Node, sfx map[string]any, keyOf func(string) string, sink *unmatchedSink, decorated bool) (map[string]any, error) {
 	rmType := nodeRMType(leaf)
 	if len(leaf.Children) == 0 {
 		if _, judged := leafSuffixMatched(rmType, ""); judged {
-			return matchedSuffixes(rmType, sfx, keyOf, sink), nil
+			out := matchedSuffixes(rmType, sfx, keyOf, sink)
+			if !decorated && unsetBareValue(rmType, out) {
+				return nil, nil
+			}
+			return out, nil
 		}
 	}
 	out := maps.Clone(sfx)
@@ -390,6 +412,63 @@ func leafSuffixes(leaf *webtemplate.Node, sfx map[string]any, keyOf func(string)
 		}
 	}
 	return out, nil
+}
+
+// unsetBareValue reports whether sfx, the suffixes the decode reads at a leaf
+// of rmType, is a bare "" alone at one of [unsetStringType].
+func unsetBareValue(rmType string, sfx map[string]any) bool {
+	v, bare := sfx[""]
+	return bare && len(sfx) == 1 && v == "" && unsetStringType(rmType)
+}
+
+// decoratingFamilies returns the families of the underscore groups that hold
+// a value, by the [indexedPath] of the node each one is at. A group whose
+// keys all hold JSON null is absent (REQ-053) and decorates nothing.
+func decoratingFamilies(groups []rmattrGroup) map[string][]string {
+	out := make(map[string][]string)
+	for _, g := range groups {
+		if allNull(g.tails) {
+			continue
+		}
+		at := indexedPath(g.base)
+		out[at] = append(out[at], g.family)
+	}
+	return out
+}
+
+// decoratesValue reports whether one of families is a value decoration the
+// decode reads at leaf: leaf is a collapsed ELEMENT's value, and the family
+// is judged against its datatype, as [rmattrOwnerAt] and [rmattrFamilyOf]
+// judge it. A family of the ELEMENT itself, such as _null_flavour, decorates
+// no value.
+func decoratesValue(leaf *webtemplate.Node, sib *reusedSiblings, families []string) bool {
+	if len(families) == 0 || len(leaf.Children) > 0 || !strings.HasSuffix(sib.nodePath(leaf), "/value") {
+		return false
+	}
+	for _, family := range families {
+		if fam, _, read := rmattrFamilyOf("ELEMENT", nodeRMType(leaf), family); read && fam.value {
+			return true
+		}
+	}
+	return false
+}
+
+// indexedPath spells a FLAT path with an index on every segment, :0 where
+// the segment carries none, which addresses the same node ([resolveLeaf]).
+// A path that does not parse comes back as written.
+func indexedPath(path string) string {
+	pk, err := parseFlatKey(path)
+	if err != nil {
+		return path
+	}
+	var b strings.Builder
+	for i, seg := range pk.segs {
+		if i > 0 {
+			b.WriteByte('/')
+		}
+		writeFlatSeg(&b, flatSeg{id: seg.id, idx: max(seg.idx, 0)})
+	}
+	return b.String()
 }
 
 // unmappedReads reports whether suffix names an attribute of the RM class of
@@ -499,12 +578,15 @@ var metadataOwnedBaseType = map[string]string{
 	"language": "CODE_PHRASE", "territory": "CODE_PHRASE",
 }
 
-// ctxSettingBare is the bare spelling of ctx/setting, which the decode reads as
-// a pair of suffixes only, and ctxSettingTerminology the witness of the
-// terminology that pair implies.
+// ctxSettingBare is the bare spelling of ctx/setting, which names a member of
+// the openEHR setting group by its code or its rubric ([putBareSetting]), and
+// ctxSettingTerminology the witness of the terminology the setting implies.
+// settingBase is the real path of the same field below the template root,
+// whose bare key decode reads as ctxSettingBare.
 const (
 	ctxSettingBare        = "ctx/setting"
 	ctxSettingTerminology = "ctx/setting|terminology"
+	settingBase           = "context/setting"
 )
 
 // ctxFields are the ctx/ keys the decode reads into context (REQ-053). Any
@@ -786,7 +868,8 @@ func MetadataWitnessSpellings() []string {
 // outside that leaf's datatype, go to sink as unmatched content (REQ-170),
 // whatever their value. A ctx/ field, an alias, a witness or a ctx/-owned leaf
 // suffix the decode reads that holds JSON null is absent (REQ-053) and is
-// dropped.
+// dropped, and so is a "" at ctx/time or at the start time's real path, the
+// two spellings of a DV_DATE_TIME.
 //
 // Every other key at the composer's real path (`<root>/composer|id`,
 // `<root>/composer/_identifier:0|id`, …) goes to composer, one party group
@@ -810,15 +893,22 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 				continue
 			}
 			// A ctx/ field the decode reads that holds null is absent
-			// (REQ-053): a null ctx/language is a missing one.
-			if val == nil {
+			// (REQ-053): a null ctx/language is a missing one. ctx/time
+			// spells the start time, a DV_DATE_TIME, so a "" there is
+			// absent as a "" at the start time's real path is (below), and
+			// neither spelling's "" disagrees with the other's time. Every
+			// other ctx/ field keeps its reading of "".
+			if val == nil || (key == "ctx/time" && val == "") {
 				continue
 			}
 			if key == ctxSettingBare {
-				// ctx/setting is read as its |code + |value pair; a bare value is
-				// the field missing both (REQ-170: a missing required suffix).
-				return nil, nil, nil, nil, fmt.Errorf("%w: %q spells the setting without its |code and |value, the pair ctx/setting travels as",
-					ErrUnsupportedDatatype, key)
+				// The format accepts a setting's code or its rubric alone
+				// (REQ-053): it is read as the pair it names, and compared
+				// with any other spelling of that pair.
+				if err := putBareSetting(ctx, ctxOrigin, key, val); err != nil {
+					return nil, nil, nil, nil, err
+				}
+				continue
 			}
 			if key == ctxSettingTerminology {
 				// The setting's terminology is implied, never carried: a witness
@@ -882,7 +972,11 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 			continue
 		}
 		if ctxKey, isAlias := metadataAliases[rel]; isAlias {
-			if val == nil {
+			// A "" at the start time's real path is absent as a null is,
+			// since its leaf is a DV_DATE_TIME ([leafSuffixes], REQ-053). Any
+			// other key of that leaf the decode reads is refused below, so the
+			// "" is alone wherever the decode goes on.
+			if val == nil || (val == "" && unsetStringType(metadataOwnedBaseType[rel])) {
 				continue
 			}
 			if err := putCtx(ctx, ctxOrigin, ctxKey, val, key); err != nil {
@@ -899,13 +993,20 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 		// A suffix the leaf's datatype does not have at all is not such a
 		// spelling: the decode does not read it, so it is unmatched (REQ-170).
 		// A bare value is not such a suffix but a spelling of the field missing
-		// its required suffixes: refused, as below.
+		// its required suffixes: refused, as below, except the setting's, which
+		// is read as the bare ctx/setting is (REQ-053).
 		if base, suffix, _ := strings.Cut(rel, "|"); contextMetaOwnedBases[base] {
 			if matched, _ := leafSuffixMatched(metadataOwnedBaseType[base], suffix); !matched && suffix != "" {
 				sink.add(key)
 				continue
 			}
 			if val == nil {
+				continue
+			}
+			if rel == settingBase {
+				if err := putBareSetting(ctx, ctxOrigin, key, val); err != nil {
+					return nil, nil, nil, nil, err
+				}
 				continue
 			}
 			return nil, nil, nil, nil, fmt.Errorf("%w: %q is not a spelling the ctx/ short form can carry — %s owns this leaf, so only its accepted suffixes travel (see deviations.md)",
@@ -940,6 +1041,41 @@ func checkTerminologyWitness(key string, val any, want string) error {
 			ErrUnsupportedDatatype, key, want)
 	}
 	return nil
+}
+
+// putBareSetting reads a bare setting, ctx/setting or the real path's bare
+// key, which the format lets carry either the setting's code or its rubric.
+// The value is looked up in the openEHR setting group, by code first and then
+// by rubric, and recorded as the ctx/setting|code + |value pair that names the
+// same member, so it is compared with any other spelling of the pair as two
+// spellings of one field are ([putCtx], REQ-053). A value that is neither is
+// refused naming the key: no setting can be built from it, since the RM
+// requires a code of that group.
+func putBareSetting(ctx map[string]any, origin map[string]string, key string, val any) error {
+	s, err := ctxString(strconv.Quote(key), val)
+	if err != nil {
+		return err
+	}
+	code, rubric, member := settingMember(s)
+	if !member {
+		return fmt.Errorf("%w: %q is neither a code nor a rubric of the openEHR setting group, so it names no setting a composition can carry",
+			ErrUnsupportedDatatype, key)
+	}
+	if err := putCtx(ctx, origin, "ctx/setting|code", code, key); err != nil {
+		return err
+	}
+	return putCtx(ctx, origin, "ctx/setting|value", rubric, key)
+}
+
+// settingMember finds s in the openEHR setting group, as a code first and then
+// as a rubric, and returns that member's code and rubric. member is false when
+// s is neither.
+func settingMember(s string) (code, rubric string, member bool) {
+	if r, isCode := terminology.Setting.Rubric(s); isCode {
+		return s, r, true
+	}
+	code, member = terminology.Setting.Code(s)
+	return code, s, member
 }
 
 // putCtx records a context value under its normalised ctx/ key, tracking in
@@ -1012,8 +1148,8 @@ type ctxInfo struct {
 	time                string
 	haveTime            bool
 	// setting carries the ctx/setting|code + |value pair (REQ-053). parseCtx
-	// enforces that the two arrive together, so applyContext keys on
-	// haveSettingCode alone.
+	// completes half of it from the openEHR setting group or refuses it, so
+	// applyContext keys on haveSettingCode alone.
 	settingCode, settingValue         string
 	haveSettingCode, haveSettingValue bool
 }
@@ -1071,22 +1207,32 @@ func parseCtx(ctx map[string]any, origin map[string]string) (ctxInfo, error) {
 			return ci, err
 		}
 	}
-	// ctx/setting travels as a pair: the rubric is not derivable from the code
-	// without a terminology service, and a code is not derivable from the rubric
-	// at all, so half of it cannot be completed — it is refused naming the
-	// missing key (REQ-053). The same shape requireSuffix enforces for a leaf's
-	// mandatory suffixes.
+	// Half of the ctx/setting pair, in either spelling, is completed from the
+	// openEHR setting group, as a bare ctx/setting is ([putBareSetting]) —
+	// REQ-053: |code alone takes its member's rubric, and |value alone its
+	// member's code. A |code is read as a code only and a |value as a rubric
+	// only. Completion runs here, once every spelling has met in [putCtx], so a
+	// half beside another spelling naming another member was already refused
+	// there as a disagreement. A half the group does not complete (a code outside
+	// it, a value that is no rubric of it, an empty half) is refused naming the
+	// missing key, the shape requireSuffix enforces for a leaf's mandatory
+	// suffixes.
 	if ci.haveSettingCode != ci.haveSettingValue {
 		present, missing := "ctx/setting|code", "ctx/setting|value"
-		if !ci.haveSettingCode {
+		if ci.haveSettingCode {
+			ci.settingValue, ci.haveSettingValue = terminology.Setting.Rubric(ci.settingCode)
+		} else {
 			present, missing = "ctx/setting|value", "ctx/setting|code"
+			ci.settingCode, ci.haveSettingCode = terminology.Setting.Code(ci.settingValue)
 		}
 		// Both halves are named in the spelling the payload used: telling a
 		// real-path author to add a `ctx/`-spelled key they never wrote sends them
 		// to the wrong place. ctxSpelling falls back to the ctx/ form when the
 		// missing key has no origin, which is exactly right — it was not written.
-		return ci, fmt.Errorf("%w: %s without %s — the ctx/setting pair travels together",
-			ErrUnsupportedDatatype, ctxSpelling(origin, present), ctxSpelling(origin, missing))
+		if !ci.haveSettingCode || !ci.haveSettingValue {
+			return ci, fmt.Errorf("%w: %s without %s, and the openEHR setting group has no member to complete it from",
+				ErrUnsupportedDatatype, ctxSpelling(origin, present), ctxSpelling(origin, missing))
+		}
 	}
 	// Neither half may be empty. An empty code would rebuild a CODE_PHRASE with no
 	// code_string — RM-invalid, and refused by emitContextSetting on the way back
@@ -2080,7 +2226,7 @@ func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g 
 		// reused-sibling refusal, each with its own message.
 		return fmt.Errorf("simplified: %q: %w", g.prefix(), err)
 	}
-	value, ordinalBounds, err := compositeLeafValue(g, nodeRMType(node))
+	value, ordinalBounds, err := compositeLeafValue(g, nodeRMType(node), tmpl != nil)
 	if err == nil || errors.Is(err, errNothingMatched) {
 		if dupErr := g.settleDups(); dupErr != nil {
 			return dupErr
@@ -2097,6 +2243,12 @@ func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g 
 		return fmt.Errorf("simplified: place %q: %w", g.prefix(), err)
 	}
 	for _, end := range ordinalBounds {
+		// A bound's path in the template is known once the leaf is placed:
+		// what the body leaves out of its ordinal is taken from the template's
+		// pairs for that bound, or refused, now, as at a leaf (REQ-053).
+		if err := tmpl.completeCodedValue(value[end], key+"/"+end); err != nil {
+			return fmt.Errorf("simplified: decode %q: %w", g.prefix()+"/"+end, err)
+		}
 		settleOrdinalTerminology(value[end], tmpl.ordinalTerminologies(key+"/"+end))
 	}
 	return nil
@@ -2106,11 +2258,11 @@ func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g 
 // grammar (rmattr_party.go) or the interval grammar (rmattr_value.go), each the
 // same implementation those families use at every other position. It also
 // returns the bounds of a DV_INTERVAL<DV_ORDINAL> leaf that were built from
-// their suffixes, whose symbols a WithTemplate decode settles once the leaf is
-// placed.
-func compositeLeafValue(g rmattrGroup, rmType string) (map[string]any, []string, error) {
+// their suffixes, which a WithTemplate decode (deferred) completes and whose
+// symbols it settles once the leaf is placed.
+func compositeLeafValue(g rmattrGroup, rmType string, deferred bool) (map[string]any, []string, error) {
 	if anchor, isInterval := intervalLeafAnchor(rmType); isInterval {
-		return intervalLeafSuffixes(g, anchor)
+		return intervalLeafSuffixes(g, anchor, deferred)
 	}
 	party, populated, err := partyLeafSuffixes(g)
 	if err != nil {
@@ -2257,6 +2409,13 @@ type templateIndex struct {
 	// one of them, give it more than one: the template then gives no single
 	// answer.
 	ordinals map[string]map[ordinalPair]string
+	// ordinalCodes maps the compiled path of a C_DV_ORDINAL node, and its
+	// bare path, to what its pairs give each code ([ordinalCode]).
+	ordinalCodes map[string]map[string]ordinalCode
+	// codedValues maps the compiled path of a DV_CODED_TEXT node, and its
+	// bare path, to what its defining_code constraint gives a coded value
+	// there ([codedTerms]).
+	codedValues map[string]codedTerms
 	// rmTypes maps a path to the RM type the template gives the node there. It
 	// maps to "" where the nodes at one path disagree, the alternatives of one
 	// single-valued attribute, say, which share a path: the template then gives
@@ -2346,13 +2505,19 @@ type ordinalPair struct {
 }
 
 // addOrdinals records the terminology each pair of ord, the C_DV_ORDINAL of
-// a node at path, gives its code at its value. A code and value that another
-// pair or another node at path gives another terminology are left with none.
-func (x *templateIndex) addOrdinals(path string, ord constraints.CDvOrdinal) {
+// the node n at path, gives its code at its value. A code and value that
+// another pair or another node at path gives another terminology are left
+// with none. It also records what the pairs give each code ([ordinalCode]).
+func (x *templateIndex) addOrdinals(path string, n *templatecompile.CompiledNode, ord constraints.CDvOrdinal) {
 	terms := x.ordinals[path]
 	if terms == nil {
 		terms = make(map[ordinalPair]string, len(ord.Values))
 		x.ordinals[path] = terms
+	}
+	codes := x.ordinalCodes[path]
+	if codes == nil {
+		codes = make(map[string]ordinalCode, len(ord.Values))
+		x.ordinalCodes[path] = codes
 	}
 	for _, v := range ord.Values {
 		pair := ordinalPair{code: v.Symbol.CodeString, value: v.Value}
@@ -2361,7 +2526,208 @@ func (x *templateIndex) addOrdinals(path string, ord constraints.CDvOrdinal) {
 			term = ""
 		}
 		terms[pair] = term
+		text, _ := codeTermText(n, v.Symbol.Terminology, v.Symbol.CodeString)
+		c, seen := codes[pair.code]
+		switch {
+		case !seen:
+			c = ordinalCode{value: v.Value, text: text}
+		case c.value != v.Value:
+			c.ambiguous = true
+		}
+		c.text = agreedText(c.text, text)
+		codes[pair.code] = c
 	}
+}
+
+// agreedText is the term text two constraints that give one code the texts
+// held and next give it together: the text where they agree, none ("") where
+// they do not.
+func agreedText(held, next string) string {
+	if held != next {
+		return ""
+	}
+	return held
+}
+
+// ordinalCode is what the C_DV_ORDINAL pairs at one path give one code: its
+// ordinal value, and its term text in the pair's terminology
+// ([codeTermText]), "" for none. A code that pairs there give two values is
+// ambiguous: the template gives it neither. Pairs that give it two texts
+// leave it with none.
+type ordinalCode struct {
+	value     int
+	text      string
+	ambiguous bool
+}
+
+// ordinalCodeAt returns what the template's C_DV_ORDINAL at path gives code
+// ([ordinalCode]), looked up as [templateIndex.ordinalTerminologies] looks up
+// the pairs. ok is false where no pair there holds code, where the code is
+// ambiguous, and where there is no C_DV_ORDINAL at path.
+func (x *templateIndex) ordinalCodeAt(path, code string) (c ordinalCode, ok bool) {
+	codes, held := x.ordinalCodes[path]
+	if !held {
+		codes = x.ordinalCodes[bareAQLPath(path)]
+	}
+	c, ok = codes[code]
+	return c, ok && !c.ambiguous
+}
+
+// codedTerms is what the template gives a coded value at one path: the
+// terminology that its defining_code constraint names, and the term text of
+// each code it lists that has one ([codeTermText]). The zero value gives no
+// terminology and no text.
+type codedTerms struct {
+	terminology string
+	texts       map[string]string
+}
+
+// codedTermsOf returns what n, a DV_CODED_TEXT node, gives a coded value: the
+// terminology of the one C_CODE_PHRASE or C_CODE_REFERENCE that constrains its
+// defining_code, a reference set whose code phrase names none taking the one
+// its terminology: URI names ([constraints.CodePhraseWithTerminologyOf]), the
+// SDK's reading (REQ-053), and the term text of each code that phrase lists,
+// the text a coded node name takes. A defining_code the template constrains in
+// any other way, or not at all, and a code phrase that names no terminology
+// and no such URI give nothing.
+func codedTermsOf(n *templatecompile.CompiledNode) codedTerms {
+	phrase, ok := constraints.CodePhraseWithTerminologyOf(onePrimitive(n, "defining_code"))
+	if !ok || phrase.Terminology == "" {
+		return codedTerms{}
+	}
+	t := codedTerms{terminology: phrase.Terminology, texts: make(map[string]string, len(phrase.CodeList))}
+	for _, code := range phrase.CodeList {
+		if text, ok := codeTermText(n, phrase.Terminology, code); ok {
+			t.texts[code] = text
+		}
+	}
+	return t
+}
+
+// addCodedTerms records t, what a DV_CODED_TEXT node at path gives a coded
+// value there. A second node at that path, an alternative, that names
+// another terminology, or none, leaves the path with nothing; one that names
+// the same adds the texts of its codes, and a code the two give different
+// texts is left with none.
+func (x *templateIndex) addCodedTerms(path string, t codedTerms) {
+	prev, seen := x.codedValues[path]
+	switch {
+	case !seen:
+		x.codedValues[path] = t
+	case prev.terminology != t.terminology:
+		x.codedValues[path] = codedTerms{}
+	default:
+		// A node's texts are recorded under its compiled path and its bare
+		// alias alike, so they are merged into a copy. A reference set read
+		// by its URI records no texts, a nil map.
+		texts := make(map[string]string, len(prev.texts)+len(t.texts))
+		maps.Copy(texts, prev.texts)
+		for code, text := range t.texts {
+			if held, both := texts[code]; both {
+				text = agreedText(held, text)
+			}
+			texts[code] = text
+		}
+		x.codedValues[path] = codedTerms{terminology: prev.terminology, texts: texts}
+	}
+}
+
+// codedTermsAt returns what the template gives a coded value at path
+// ([codedTerms]), looked up as [templateIndex.ordinalTerminologies] looks up
+// an ordinal's pairs.
+func (x *templateIndex) codedTermsAt(path string) codedTerms {
+	if t, ok := x.codedValues[path]; ok {
+		return t
+	}
+	return x.codedValues[bareAQLPath(path)]
+}
+
+// completeCodedValue gives dv, a value decode built from a leaf's suffixes
+// and placed at path, the suffixes the body leaves out and the template
+// determines (REQ-053), and refuses one it leaves out and the template does
+// not determine, as a missing required suffix. Only a coded text and an
+// ordinal leave any out, and only in a decode with the template
+// ([clinicalLeafValue]); every other value is left as it is, and so is every
+// value in a decode without the template.
+//
+// A coded text that names no terminology takes the one the template's
+// defining_code constraint names at path ([codedTerms]), and one with no
+// value takes the term text that constraint lists for its code, where the
+// coded text's terminology is that constraint's: the text a coded node name
+// takes. A terminology the template does not determine is refused, except at
+// an ISM transition, which [settleIsmTransitions] gives one
+// ([ismSettlesTerminology]). An ordinal with no ordinal value, or no symbol
+// text, takes the value and the term text the template's pairs at path give
+// its code, where they give it one value ([ordinalCode]); its terminology is
+// settled after ([settleOrdinalTerminology]). What the body gives is kept as
+// written, for validation to judge.
+func (x *templateIndex) completeCodedValue(dv any, path string) error {
+	m, _ := dv.(map[string]any)
+	if x == nil || m == nil {
+		return nil
+	}
+	switch m["_type"] {
+	case "DV_CODED_TEXT":
+		return x.completeCodedText(m, path)
+	case "DV_ORDINAL":
+		return x.completeOrdinal(m, path)
+	}
+	return nil
+}
+
+// completeCodedText is [templateIndex.completeCodedValue] for a coded text.
+func (x *templateIndex) completeCodedText(dv map[string]any, path string) error {
+	dc, _ := dv["defining_code"].(map[string]any)
+	terms := x.codedTermsAt(path)
+	if _, named := dc["terminology_id"]; !named && terms.terminology != "" {
+		dc["terminology_id"] = map[string]any{"_type": "TERMINOLOGY_ID", "value": terms.terminology}
+	}
+	if _, valued := dv["value"]; !valued {
+		text := ""
+		if tid, _ := dc["terminology_id"].(map[string]any); terms.terminology != "" && tid["value"] == terms.terminology {
+			code, _ := dc["code_string"].(string)
+			text = terms.texts[code]
+		}
+		if text == "" {
+			return errMissingSuffix("DV_CODED_TEXT", "value")
+		}
+		dv["value"] = text
+	}
+	if _, named := dc["terminology_id"]; !named && !ismSettlesTerminology(path) {
+		return errMissingSuffix("DV_CODED_TEXT", "terminology")
+	}
+	return nil
+}
+
+// completeOrdinal is [templateIndex.completeCodedValue] for an ordinal.
+func (x *templateIndex) completeOrdinal(dv map[string]any, path string) error {
+	symbol, _ := dv["symbol"].(map[string]any)
+	dc, _ := symbol["defining_code"].(map[string]any)
+	code, _ := dc["code_string"].(string)
+	c, ok := x.ordinalCodeAt(path, code)
+	if _, valued := symbol["value"]; !valued {
+		if !ok || c.text == "" {
+			return errMissingSuffix("DV_ORDINAL", "value")
+		}
+		symbol["value"] = c.text
+	}
+	if _, valued := dv["value"]; !valued {
+		if !ok {
+			return errMissingSuffix("DV_ORDINAL", "ordinal")
+		}
+		dv["value"] = c.value
+	}
+	return nil
+}
+
+// ismSettlesTerminology reports whether path names an ISM transition's current
+// state or careflow step, whose terminology [settleIsmTransitions] gives where
+// the body names none: RM Current_state_valid admits `openehr` alone, and a
+// careflow step is coded with its node's at-code. Only ISM_TRANSITION has an
+// attribute of either name.
+func ismSettlesTerminology(path string) bool {
+	_, attr, _ := strings.CutLast(path, "/")
+	return attr == "current_state" || attr == "careflow_step"
 }
 
 // ordinalTerminologies returns the terminology the template's C_DV_ORDINAL at
@@ -2643,11 +3009,13 @@ func templateIndexFor(c *templatecompile.Compiled) *templateIndex {
 // language, so the rubric is in that language.
 func buildTemplateIndex(c *templatecompile.Compiled) *templateIndex {
 	x := &templateIndex{
-		names:      make(map[string]string),
-		codedNames: make(map[string]codedName),
-		rmTypes:    make(map[string]string),
-		structures: make(map[string][]emptyStructure),
-		ordinals:   make(map[string]map[ordinalPair]string),
+		names:        make(map[string]string),
+		codedNames:   make(map[string]codedName),
+		rmTypes:      make(map[string]string),
+		structures:   make(map[string][]emptyStructure),
+		ordinals:     make(map[string]map[ordinalPair]string),
+		ordinalCodes: make(map[string]map[string]ordinalCode),
+		codedValues:  make(map[string]codedTerms),
 	}
 	var walk func(n *templatecompile.CompiledNode)
 	walk = func(n *templatecompile.CompiledNode) {
@@ -2655,9 +3023,16 @@ func buildTemplateIndex(c *templatecompile.Compiled) *templateIndex {
 		// bare alias ([templateIndex.ordinalTerminologies]).
 		if ord, ok := n.PrimitiveConstraint().(constraints.CDvOrdinal); ok {
 			path := n.AQLPath()
-			x.addOrdinals(path, ord)
+			x.addOrdinals(path, n, ord)
 			if bare := bareAQLPath(path); bare != path {
-				x.addOrdinals(bare, ord)
+				x.addOrdinals(bare, n, ord)
+			}
+		}
+		if n.RMTypeName() == "DV_CODED_TEXT" {
+			path, terms := n.AQLPath(), codedTermsOf(n)
+			x.addCodedTerms(path, terms)
+			if bare := bareAQLPath(path); bare != path {
+				x.addCodedTerms(bare, terms)
 			}
 		}
 		if s := emptyStructuresOf(n); len(s) > 0 {
@@ -3309,6 +3684,27 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any, keyOf func
 // _type is holds or an RM subtype of it and its members decode as that _type,
 // which is what canonical JSON admits.
 func dvFromSuffixesAt(holds, rmType string, listOpen bool, sfx map[string]any, keyOf func(suffix string) string) (map[string]any, error) {
+	return dvFromSuffixesWith(holds, rmType, listOpen, sfx, keyOf, false)
+}
+
+// clinicalLeafValue is [leafFromSuffixes] for a leaf of the clinical leaf
+// loop. In a decode with the template (deferred), a coded text and an ordinal
+// are built without the suffixes the body leaves out and the template may
+// supply, which [templateIndex.completeCodedValue] gives, or refuses, once the
+// value is placed and its path in the template is known.
+func clinicalLeafValue(leaf *webtemplate.Node, sfx map[string]any, keyOf func(suffix string) string, deferred bool) (any, error) {
+	rmType := nodeRMType(leaf)
+	if !deferred || rmType == stringLeafType {
+		return leafFromSuffixes(leafHolds(leaf), rmType, leafListOpen(leaf), sfx, keyOf)
+	}
+	return dvFromSuffixesWith(leafHolds(leaf), rmType, leafListOpen(leaf), sfx, keyOf, true)
+}
+
+// dvFromSuffixesWith is [dvFromSuffixesAt], with deferred set where a decode
+// with the template may supply what the body leaves out: a coded text's
+// |value and an ordinal's |value and |ordinal are then left out of the value
+// rather than refused ([deferrableSuffix]).
+func dvFromSuffixesWith(holds, rmType string, listOpen bool, sfx map[string]any, keyOf func(suffix string) string, deferred bool) (map[string]any, error) {
 	sfx = withoutNulls(sfx)
 	// |raw bypass: a pre-serialised canonical fragment (carrying its own string
 	// _type); used directly, whatever the leaf rmType, once the attribute it
@@ -3337,22 +3733,26 @@ func dvFromSuffixesAt(holds, rmType string, listOpen bool, sfx map[string]any, k
 	// stored at a DV_TEXT-typed leaf (the corpus's dv_coded_text_as_dv_text
 	// shape). |code is the discriminator: its presence re-selects the
 	// DV_CODED_TEXT builder, and the group then follows that type's own rules —
-	// |value required, |terminology / |formatting optional, bare value refused.
-	// Without |code the leaf stays a plain DV_TEXT and a stray |value /
-	// |terminology is refused by the allowlist below, as before. The encoder is
-	// the exact inverse: leafToFlat routes a fully-captured DV_CODED_TEXT at a
-	// DV_TEXT leaf to the coded suffix set instead of |raw.
+	// |value required, |terminology / |formatting optional, bare value refused
+	// (a decode with the template completes the coded text as it completes any
+	// other, [templateIndex.completeCodedValue]).
+	// Without |code the leaf stays a plain DV_TEXT, whose |value is its bare
+	// value ([shorthandSpellings]), and a stray |terminology is refused by the
+	// allowlist below, as before. The encoder is the exact inverse:
+	// leafToFlat routes a fully-captured DV_CODED_TEXT at a DV_TEXT leaf to the
+	// coded suffix set instead of |raw.
 	// The discriminator is a |code that is not the empty string, not the key's
 	// mere presence: `|code: ""` and `|code: null` are what a form emits for
 	// "free text, no code selected", and promoting those would mint a
 	// DV_CODED_TEXT whose CODE_PHRASE.code_string is empty — RM-invalid, yet
 	// stable enough on re-encode that nothing downstream flags it, and matched by
 	// any AQL predicate testing defining_code/code_string against ''. They stay a
-	// plain DV_TEXT: a null |code is absent (REQ-053, dropped above), and the
-	// allowlist below refuses the stray `|code: ""`, or the |value beside a null
-	// one, as it did before this carve-out. A |code of another JSON kind does
-	// select the coded builder, so the fit check refuses it naming the |code key
-	// (REQ-053), rather than the allowlist refusing the leaf.
+	// plain DV_TEXT: a null |code is absent (REQ-053, dropped above), so a
+	// |value beside one is the text's value, and the allowlist below refuses
+	// the stray `|code: ""`, as it did before this carve-out. A |code of
+	// another JSON kind does select the coded builder, so the fit check refuses
+	// it naming the |code key (REQ-053), rather than the allowlist refusing the
+	// leaf.
 	if rmType == "DV_TEXT" {
 		if code, coded := sfx["code"]; coded {
 			if s, isString := code.(string); !isString || s != "" {
@@ -3364,6 +3764,10 @@ func dvFromSuffixesAt(holds, rmType string, listOpen bool, sfx map[string]any, k
 		return nil, err
 	}
 	if err := checkSuffixFits(rmType, sfx, keyOf); err != nil {
+		return nil, err
+	}
+	sfx, err := foldShorthand(rmType, sfx, keyOf)
+	if err != nil {
 		return nil, err
 	}
 	// The bare-leaf datatypes all rebuild as {_type, <attr>: value} from the ""
@@ -3416,7 +3820,7 @@ func dvFromSuffixesAt(holds, rmType string, listOpen bool, sfx map[string]any, k
 		if err != nil {
 			return nil, err
 		}
-		val, err := requireSuffix(rmType, sfx, "value")
+		val, valued, err := deferrableSuffix(rmType, sfx, "value", deferred)
 		if err != nil {
 			return nil, err
 		}
@@ -3424,7 +3828,10 @@ func dvFromSuffixesAt(holds, rmType string, listOpen bool, sfx map[string]any, k
 		if t, ok := sfx["terminology"]; ok {
 			dc["terminology_id"] = map[string]any{"_type": "TERMINOLOGY_ID", "value": t}
 		}
-		dv := map[string]any{"_type": "DV_CODED_TEXT", "value": val, "defining_code": dc}
+		dv := map[string]any{"_type": "DV_CODED_TEXT", "defining_code": dc}
+		if valued {
+			dv["value"] = val
+		}
 		if err := applyOrderedSuffixes(dv, sfx); err != nil {
 			return nil, err
 		}
@@ -3434,11 +3841,11 @@ func dvFromSuffixesAt(holds, rmType string, listOpen bool, sfx map[string]any, k
 		if err != nil {
 			return nil, err
 		}
-		val, err := requireSuffix(rmType, sfx, "value")
+		val, valued, err := deferrableSuffix(rmType, sfx, "value", deferred)
 		if err != nil {
 			return nil, err
 		}
-		ordinal, err := requireSuffix(rmType, sfx, "ordinal")
+		ordinal, ordered, err := deferrableSuffix(rmType, sfx, "ordinal", deferred)
 		if err != nil {
 			return nil, err
 		}
@@ -3446,13 +3853,20 @@ func dvFromSuffixesAt(holds, rmType string, listOpen bool, sfx map[string]any, k
 		// "local", as the reference does, and a WithTemplate decode then gives
 		// it the template's ([settleOrdinalTerminology]).
 		symbol := map[string]any{
-			"_type": "DV_CODED_TEXT", "value": val,
+			"_type": "DV_CODED_TEXT",
 			"defining_code": map[string]any{
 				"_type": "CODE_PHRASE", "code_string": code,
 				"terminology_id": map[string]any{"_type": "TERMINOLOGY_ID", "value": "local"},
 			},
 		}
-		return map[string]any{"_type": "DV_ORDINAL", "value": ordinal, "symbol": symbol}, nil
+		if valued {
+			symbol["value"] = val
+		}
+		dv := map[string]any{"_type": "DV_ORDINAL", "symbol": symbol}
+		if ordered {
+			dv["value"] = ordinal
+		}
+		return dv, nil
 	case "DV_SCALE":
 		// The DV_ORDINAL grammar one class over: same symbol, same three
 		// suffixes, `|ordinal` carrying DV_SCALE's Real `value` (scaleToFlat).
@@ -3625,7 +4039,7 @@ func multimediaFromSuffixes(sfx map[string]any) (map[string]any, error) {
 // decorated attribute like |accuracy that only rides |raw) is rejected rather
 // than silently dropped. |other and |raw are handled before this check.
 var allowedSuffixes = map[string]map[string]bool{
-	"DV_TEXT":       {"": true, "formatting": true},
+	"DV_TEXT":       {"": true, "value": true, "formatting": true},
 	"DV_CODED_TEXT": {"code": true, "value": true, "terminology": true, "formatting": true},
 	"DV_DATE_TIME":  {"": true, "magnitude_status": true, "normal_status": true},
 	"DV_DATE":       {"": true, "magnitude_status": true, "normal_status": true},
@@ -3648,14 +4062,56 @@ var allowedSuffixes = map[string]map[string]bool{
 		"magnitude_status": true, "normal_status": true,
 		"accuracy": true, "accuracy_is_percent": true, "precision": true,
 	},
-	"DV_IDENTIFIER": {"id": true, "issuer": true, "assigner": true, "type": true},
+	"DV_IDENTIFIER": {"": true, "id": true, "issuer": true, "assigner": true, "type": true},
 	"CODE_PHRASE":   {"code": true, "terminology": true, "preferred_term": true},
-	"DV_PARSABLE":   {"": true, "formalism": true},
+	"DV_PARSABLE":   {"": true, "value": true, "formalism": true},
 	"DV_MULTIMEDIA": {
 		"": true, "mediatype": true, "size": true, "data": true,
 		"alternatetext": true, "integrity_check": true,
 		"integrity_check_algorithm": true, "compression_algorithm": true,
 	},
+}
+
+// shorthandSpelling is a second spelling decode reads for one attribute of a
+// datatype: short is the suffix ("" for the bare value) a client may write in
+// place of full, the suffix encode writes.
+type shorthandSpelling struct {
+	short, full, attr string
+}
+
+// shorthandSpellings are the input shorthands of the ITS-REST 1.1.0
+// Simplified Formats: a DV_IDENTIFIER's id may be written as the bare value
+// ("For the input |id might be left out"), and a DV_TEXT's or a DV_PARSABLE's
+// value as `|value`. Decode reads either spelling; encode writes full only.
+var shorthandSpellings = map[string]shorthandSpelling{
+	"DV_IDENTIFIER": {short: "", full: "id", attr: "id"},
+	"DV_TEXT":       {short: "value", full: "", attr: "value"},
+	"DV_PARSABLE":   {short: "value", full: "", attr: "value"},
+}
+
+// foldShorthand rewrites the shorthand spelling in sfx, a suffix map of rmType
+// with no nulls left, onto the suffix its datatype is built from
+// ([shorthandSpellings]). Both spellings may be present when they hold the
+// same value. Two that differ are refused naming both keys and neither value,
+// rather than one being chosen (REQ-053). The map returned is sfx itself when
+// there is nothing to rewrite.
+func foldShorthand(rmType string, sfx map[string]any, keyOf func(string) string) (map[string]any, error) {
+	sp, has := shorthandSpellings[rmType]
+	if !has {
+		return sfx, nil
+	}
+	v, short := sfx[sp.short]
+	if !short {
+		return sfx, nil
+	}
+	if w, both := sfx[sp.full]; both && !sameCtxValue(v, w) {
+		return nil, fmt.Errorf("%w: %s and %s spell the %s %s twice and disagree; remove one",
+			ErrUnknownPath, suffixLabel(keyOf, sp.full), suffixLabel(keyOf, sp.short), rmType, sp.attr)
+	}
+	out := maps.Clone(sfx)
+	delete(out, sp.short)
+	out[sp.full] = v
+	return out, nil
 }
 
 // orderedPassThrough are the optional DV_ORDERED / DV_QUANTIFIED / DV_AMOUNT
@@ -3780,13 +4236,30 @@ func leafHolds(leaf *webtemplate.Node) string {
 func requireSuffix(rmType string, sfx map[string]any, name string) (any, error) {
 	v, ok := sfx[name]
 	if !ok {
-		label := "|" + name
-		if name == "" {
-			label = "bare value"
-		}
-		return nil, fmt.Errorf("%w: %s missing required %s", ErrUnsupportedDatatype, rmType, label)
+		return nil, errMissingSuffix(rmType, name)
 	}
 	return v, nil
+}
+
+// deferrableSuffix is [requireSuffix] for a suffix a decode with the template
+// may supply once the value is placed ([templateIndex.completeCodedValue]):
+// where deferred, an absent one is no error, and ok reports whether sfx holds
+// it.
+func deferrableSuffix(rmType string, sfx map[string]any, name string, deferred bool) (v any, ok bool, err error) {
+	if v, ok = sfx[name]; ok || deferred {
+		return v, ok, nil
+	}
+	return nil, false, errMissingSuffix(rmType, name)
+}
+
+// errMissingSuffix refuses a value of rmType whose required suffix name the
+// body leaves out, "" naming the bare value.
+func errMissingSuffix(rmType, name string) error {
+	label := "|" + name
+	if name == "" {
+		label = "bare value"
+	}
+	return fmt.Errorf("%w: %s missing required %s", ErrUnsupportedDatatype, rmType, label)
 }
 
 // impliedCompositionName is the name decode gives a composition whose body

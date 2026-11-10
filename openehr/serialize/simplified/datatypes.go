@@ -220,6 +220,20 @@ func emitLeafValue(out map[string]any, flatPath string, v any, rmType string, li
 		if err != nil {
 			return "", err
 		}
+		// An empty date, time, date-time, duration, URI or EHR URI that
+		// carries nothing else is not set, as Go has no other spelling of that
+		// for the RM-mandatory value string, so a Web Template leaf writes no
+		// key for it: a decode that gives an EVENT with no time, or an
+		// INTERVAL_EVENT with no width, an empty one re-encodes without a key
+		// the input never carried. Decode reads a lone "" at such a leaf as
+		// absent ([leafSuffixes]), so the round trip keeps the composition. One
+		// that carries a decoration keeps its "" key, because decode refuses a
+		// decoration with no value. An interval bound is not a leaf (decorated
+		// is false there), and keeps its "" for the bound refusals of
+		// [intervalBoundToFlat].
+		if decorated && unsetStringValue(sfxType, m) {
+			return "", nil
+		}
 		if capturedFully(sfxType, m, captured) {
 			return sfxType, emitCoreLeaf(out, flatPath, v, sfxType, listOpen)
 		}
@@ -235,6 +249,38 @@ func emitLeafValue(out map[string]any, flatPath string, v any, rmType string, li
 	// path and type, never by value.
 	return "", fmt.Errorf("%w: %q is a Web Template leaf typed %q, which has no FLAT spelling, and the composition carries a value there",
 		ErrUnsupportedDatatype, flatPath, rmType)
+}
+
+// unsetStringType reports whether rmType is a DV_DATE_TIME, DV_DATE,
+// DV_TIME, DV_DURATION, DV_URI or DV_EHR_URI: a datatype whose RM-mandatory
+// value is a string, the empty one of which stands for "not set".
+func unsetStringType(rmType string) bool {
+	switch rmType {
+	case "DV_DATE_TIME", "DV_DATE", "DV_TIME", "DV_DURATION", "DV_URI", "DV_EHR_URI":
+		return true
+	}
+	return false
+}
+
+// unsetStringValue reports whether m, the canonical form of a value of
+// rmType, is one of [unsetStringType] whose value is the empty string and
+// which carries no other attribute.
+func unsetStringValue(rmType string, m map[string]any) bool {
+	if !unsetStringType(rmType) {
+		return false
+	}
+	for k, v := range m {
+		switch k {
+		case "_type":
+		case "value":
+			if s, _ := v.(string); s != "" {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // isValueLeafType reports whether a childless Web Template node of this RM type

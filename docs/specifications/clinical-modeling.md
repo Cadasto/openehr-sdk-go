@@ -258,7 +258,10 @@ Concretely:
 - `ConstraintRef.Validate` accepts a bare `string` or a `constraints.CodedTermRef` and reports no violation for either, since the value set it names is external terminology; any other Go type is `CodeWrongType`.
 - `CodeReference.Validate` accepts what `CodePhrase.Validate` accepts and judges a value by the code phrase constraint it carries.
   It does not look up the value set its `reference_set_uri` names, which is external terminology.
-  `constraints.CodePhraseOf` returns the code phrase constraint a `CodePhrase` or a `CodeReference` carries, so a consumer with no use for the reference set reads the two alike: the validator, the example generator, the Web Template builder and the FLAT decode read a `C_CODE_REFERENCE` as its code phrase constraint.
+  `constraints.CodePhraseOf` returns the code phrase constraint a `CodePhrase` or a `CodeReference` carries, so a consumer with no use for the reference set reads the two alike: the validator reads a `C_CODE_REFERENCE` as its code phrase constraint.
+  `CodeReference.ReferenceSetTerminology` reads the terminology id its `reference_set_uri` names, where that is a `terminology:` URI: `terminology:<name>[/<version>]`, with any query or fragment, names `<name>`, or `<name>(<version>)` where it gives a version, and a URI of another scheme, or one that names no terminology or does not take that form, names none.
+  `constraints.CodePhraseWithTerminologyOf` reads the two alike too, but gives a `CodeReference` whose code phrase names no terminology the one its URI names; a terminology the code phrase names is kept.
+  The example generator ([§ REQ-107](#req-107--template-driven-rm-instance-example-generator)), the Web Template builder ([§ REQ-106](#req-106--webtemplate-json-export)) and the FLAT decode with the template ([wire.md § REQ-053](wire.md#req-053)) read a `C_CODE_REFERENCE` through `constraints.CodePhraseWithTerminologyOf`.
 - `DvQuantity.Validate` accepts a `constraints.QuantityValue` `{Magnitude, Units, Precision}` triple.
   It **MUST** judge units by `Units` where that list is non-empty and by `PropertyUnits` only where it is empty, reporting a value whose units the list in force does not hold as a `CodeUnitUnknown`: with entries listed, a value whose units no entry lists is refused and `PropertyUnits` is not consulted, so a listed unit the property does not admit is accepted; with an empty `Units` list, a value whose units are not in a non-empty `PropertyUnits` is refused, as the specifications-CNF conformance schedule's case `CONT-DV_QUANTITY-validate_property` rejects `mg` under the property `openehr::122` (length); with both empty, any units are accepted.
   The compile step **MUST** fill `PropertyUnits` when `Property` is an `openehr` code that the property-unit table of [reference-model.md § REQ-034](reference-model.md#openehr-terminology-vocabulary-req-034) (TERM `PropertyUnitData.xml`) lists, with that property's UCUM units, its primary units first and each part in source order, and **MUST** leave it empty for any other terminology or code.
@@ -886,7 +889,10 @@ The template validator reads the same compiled tree, so it cannot count a slot's
 ### Primitive-leaf value fill
 
 `Policy` selects *which* nodes are materialised; an orthogonal **`ValueFill`** selects *how* primitive leaves are valued.
-The SDK **MUST** offer two fills, and read a `ValueFill` other than `RandomFill` as `ExampleFill`, with no error: `ExampleFill` (default) populates each leaf with its REQ-103 `PrimitiveConstraint.ExampleValue` — a single representative value, byte-identical across calls for one OPT; `RandomFill` draws each leaf from within its constraint (in-range magnitudes, value-set-member codes, enumeration entries), valid by construction and varying between calls.
+The SDK **MUST** offer two fills, and read a `ValueFill` other than `RandomFill` as `ExampleFill`, with no error:
+
+- `ExampleFill` (default) populates each leaf with its REQ-103 `PrimitiveConstraint.ExampleValue`, a single representative value, byte-identical across calls for one OPT; a `C_CODE_REFERENCE` leaf takes that of the code phrase `constraints.CodePhraseWithTerminologyOf` reads ([§ REQ-103](#req-103--primitive-constraint-introspection)).
+- `RandomFill` draws each leaf from within its constraint (in-range magnitudes, value-set-member codes, enumeration entries), valid by construction and varying between calls; a `C_CODE_REFERENCE` leaf draws from the code phrase `constraints.CodePhraseWithTerminologyOf` reads.
 
 `RandomFill` reproducibility is caller-controlled via **`Options.ValueSource`** (a `math/rand/v2.Source`): a fixed source makes leaf values byte-reproducible (§ Contract *Reproducible uids*); `nil`, or a typed-nil source such as a nil `*rand.PCG`, draws from the auto-seeded package global so successive calls differ — mirroring the `UIDSource` determinism seam.
 A `Source` is not safe for concurrent use, so each concurrent `Generate` takes its own source, or leaves it `nil` for the concurrency-safe global.
@@ -1359,6 +1365,8 @@ Any structural difference on that pinned surface is a failure; the following cat
 3. **Input-content omissions** — `defaultValue`; DV_DURATION per-field ranges; DV_QUANTITY `precision`; per-unit and multi-unit magnitude validation; list `label` for external-terminology codes; `localizedLabels` and per-item `termBindings`.
 4. **Local terminology** — `terminology` is emitted only for external bindings (e.g. `openehr`); the archetype-internal `local` value is omitted, mirroring the reference.
 5. **Fixture-outlier `min` on in-context leaves** — where a vendored golden marks synthesized RM-attribute leaves `min=1` and the OPT constrains no `existence`, the export **MAY** emit `min=0`: the `GECCO_Diagnose` golden is the sole such outlier across the three vendored references (14 nodes), and the other two agree with `min=0`.
+6. **Reference-set terminology** — for a `C_CODE_REFERENCE`, `terminology` is the one its code phrase names, else the one its `terminology:` URI names, spelled as a TERMINOLOGY_ID ([§ REQ-103](#req-103--primitive-constraint-introspection)): `terminology:LOINC/2.73` gives `LOINC(2.73)`, and a URI of another scheme gives none.
+   The reference takes the URI with its scheme dropped, `LOINC/2.73`, whatever the code phrase names.
 
 An informative per-field catalogue behind these categories ships with the package; this section is the contract.
 

@@ -371,7 +371,6 @@ func TestREQ170StructuredUnmatchedIgnoredReportedRefused(t *testing.T) {
 // option and under strict, and the report receives nothing for it.
 func TestREQ170CarrierlessKeysRefusedInEveryMode(t *testing.T) {
 	wt, _ := conformanceWT(t)
-	const instruction = rmattrSection + "/conformance_instruction"
 	for _, tc := range []struct {
 		name string
 		keys map[string]any
@@ -402,7 +401,6 @@ func TestREQ170CarrierlessKeysRefusedInEveryMode(t *testing.T) {
 			rmattrObs + "/_feeder_audit/originating_system_audit|other_details": "boom",
 		}, ErrUnsupportedDatatype},
 		{"_instruction_details", map[string]any{rmattrAction + "/_instruction_details|activity_id": "activities[at0001]"}, ErrUnknownPath},
-		{"_wf_definition", map[string]any{instruction + "/_wf_definition|value": "wf"}, ErrUnknownPath},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := refusedInEveryMode(t, wt, rmattrBody(tc.keys))
@@ -432,6 +430,12 @@ func TestREQ170MalformedMatchedContentRefusedInEveryMode(t *testing.T) {
 		{"index past its bound", map[string]any{rmattrRoot + "/context:1/_location": "lab"}},
 		{"composer reference without its namespace", map[string]any{rmattrRoot + "/composer|id": "1234"}},
 		{"composer reference type without an id", map[string]any{rmattrRoot + "/composer|type": "PERSON"}},
+		// `_wf_definition` sat in the carrier-less table while the family was
+		// deferred; it is a DV_PARSABLE now, and half of one is a missing
+		// required suffix.
+		{"wf_definition without its formalism", map[string]any{
+			rmattrSection + "/conformance_instruction/_wf_definition|value": "wf",
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			assertRefusedInEveryMode(t, wt, rmattrBody(tc.keys))
@@ -1246,10 +1250,11 @@ func TestREQ170StrictWithReportPassesTheFirstPath(t *testing.T) {
 // TestREQ170LoneBareValueIsAMissingSuffix — REQ-170 refuses in every mode
 // "matched content that is malformed: … a missing required suffix". A bare
 // value alone at a leaf whose datatype has no bare spelling is that datatype
-// missing every suffix it requires, and a bare ctx/setting is the setting
-// missing its |code and |value: both fail by default, under the report option
-// and under strict, naming no value. Beside a suffix the datatype reads,
-// DV_PROPORTION's derived bare magnitude stays unmatched content.
+// missing every suffix it requires, and a bare ctx/setting that is neither a
+// code nor a rubric of the openEHR setting group names no setting (REQ-053):
+// both fail by default, under the report option and under strict, naming no
+// value. Beside a suffix the datatype reads, DV_PROPORTION's derived bare
+// magnitude stays unmatched content.
 func TestREQ170LoneBareValueIsAMissingSuffix(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	const secret = "secret-value-0451"
@@ -1259,7 +1264,7 @@ func TestREQ170LoneBareValueIsAMissingSuffix(t *testing.T) {
 	for name, body := range map[string]map[string]any{
 		"DV_CODED_TEXT": rmattrBody(map[string]any{rmattrCodedText: secret}),
 		"DV_QUANTITY":   quantity,
-		"DV_IDENTIFIER": rmattrBody(map[string]any{rmattrEvent + "/dv_identifier": secret}),
+		"DV_ORDINAL":    rmattrBody(map[string]any{rmattrEvent + "/dv_ordinal": secret}),
 		"ctx/setting":   rmattrBody(map[string]any{"ctx/setting": secret}),
 	} {
 		t.Run(name, func(t *testing.T) {

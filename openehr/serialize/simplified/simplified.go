@@ -29,7 +29,7 @@ type decodeConfig struct {
 // unmatched, even where the decode then
 // refuses it, and these fail the decode in every mode: the keys with no
 // carrier (a PARTICIPATION `time`, a FEEDER_AUDIT_DETAILS `other_details`,
-// `_instruction_details`, `_wf_definition`); the reference's in-context
+// `_instruction_details`); the reference's in-context
 // spelling of RM data this codec's Web Template does not model (an ACTION's
 // ISM transition and time, an INTERVAL_EVENT's `math_function`, `width` and
 // `sample_count`, an OBSERVATION's `history_origin`); at a leaf whose datatype
@@ -103,13 +103,18 @@ func (c decodeConfig) tracked() bool {
 // in the formats, so decode adds it back, empty, under a parent the body
 // rebuilt, with the type, node id and name the template gives it. It is
 // synthesised too, and decode adds none where the template asks the
-// structure for a member. The decoded composition then validates against the
+// structure for a member. A coded text or an ordinal that leaves out what the
+// format lets a client leave out takes it from the template: a coded text's
+// terminology and text, an ordinal's value and text. A coded text whose
+// terminology neither the body nor the template gives is refused as missing
+// its |terminology. The decoded composition then validates against the
 // OPT, provided ctx/time is present when the template carries HISTORY/EVENT
 // nodes (their mandatory origin/time have no other source; see
 // deviations.md).
 //
-// Without this option decode omits names, defaults and empty structures, and
-// infers a folded structure's subtype from its path: the round-trip stays
+// Without this option decode omits names, defaults and empty structures,
+// completes no coded value, and infers a folded structure's subtype from its
+// path: the round-trip stays
 // format-idempotent but the result is not canonically complete.
 func WithTemplate(c *templatecompile.Compiled) Option {
 	return func(cfg *decodeConfig) { cfg.template = c }
@@ -157,12 +162,12 @@ var (
 	// composition-metadata field that disagree, a ctx/composer_self of true
 	// beside a composer name, identifier or relationship (a PARTY_SELF has
 	// none of them),
-	// two spellings of one single-valued underscore attribute, or a key the
+	// two spellings of one single-valued underscore attribute, a bare value
+	// and its `|id` or `|value` spelling with differing values, or a key the
 	// decode reads and the same key ending in a bare `|` with differing values.
-	// The codec fails
-	// rather than dropping the entry or inventing a precedence rule. The two
-	// deferred underscore families, `_instruction_details` and `_wf_definition`,
-	// and the reference's in-context spelling of an ACTION's ISM transition and
+	// The codec fails rather than dropping the entry or inventing a precedence
+	// rule. The deferred underscore family `_instruction_details` and the
+	// reference's in-context spelling of an ACTION's ISM transition and
 	// time, an INTERVAL_EVENT's `math_function`, `width` and `sample_count`
 	// and an OBSERVATION's `history_origin` return it in every mode too.
 	ErrUnknownPath = errors.New("simplified: path not in web template")

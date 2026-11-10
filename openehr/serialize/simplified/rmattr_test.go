@@ -547,13 +547,15 @@ func TestRMAttrEndTimeDecoratedRefusedOnEncode(t *testing.T) {
 
 // --- router: refusals ---------------------------------------------------
 
-// TestRMAttrDeferredFamiliesRefused — REQ-140 / REQ-170. The two families this
-// codec defers, at an owner that declares them, resolve but have no carrier, so
-// they refuse loudly in every mode. A family that names nothing at its owner —
-// a deferred one where the owner declares no such attribute, `_identifier`
-// (not a router family at all), a typo — is unmatched content: ignored by
-// default, ErrUnknownPath under strict. Either way the refusal names the family
-// prefix, which is what the PROBE-086 census scopes its exclusions by.
+// TestRMAttrDeferredFamiliesRefused — REQ-140 / REQ-170. The family this codec
+// defers, at an owner that declares it, resolves but has no carrier, so it
+// refuses loudly in every mode. A family that names nothing at its owner —
+// `_wf_definition` where the owner is no INSTRUCTION, `_identifier` (not a
+// router family at all), a typo — is unmatched content: ignored by default,
+// ErrUnknownPath under strict. Either way the refusal names the family prefix,
+// which is what the PROBE-086 census scopes its exclusions by. The
+// `_wf_definition` an INSTRUCTION declares is carried, and its refusals are
+// in wf_definition_test.go.
 func TestRMAttrDeferredFamiliesRefused(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	for _, tc := range []struct {
@@ -561,7 +563,6 @@ func TestRMAttrDeferredFamiliesRefused(t *testing.T) {
 		want error
 	}{
 		{rmattrAction + "/_instruction_details|activity_id", ErrUnknownPath},
-		{rmattrSection + "/conformance_instruction/_wf_definition|value", ErrUnknownPath},
 		// `_identifier` is not a router family at all: every position that
 		// reaches a party reaches its identifier list through the party grammar
 		// (rmattr_party.go), so an ENTRY owner is a path that names no family.
@@ -589,22 +590,20 @@ func TestRMAttrDeferredFamiliesRefused(t *testing.T) {
 	}
 }
 
-// TestRMAttrBothDirectionRefusalsOnEncode — REQ-140. wire.md lists four
+// TestRMAttrBothDirectionRefusalsOnEncode — REQ-140. wire.md lists three
 // attributes as refused in both directions: PARTICIPATION `time`,
-// FEEDER_AUDIT_DETAILS `other_details`, ACTION `instruction_details` and
-// INSTRUCTION `wf_definition`. Decode refuses their keys (the test above, and the
-// party and feeder-audit tests). Encode must refuse a populated one too, with a
-// typed error naming the owner's FLAT path and the attribute but never the value
-// or a requirement id, and must stay silent when the attribute is absent.
+// FEEDER_AUDIT_DETAILS `other_details` and ACTION `instruction_details`.
+// Decode refuses their keys (the test above, and the party and feeder-audit
+// tests). Encode must refuse a populated one too, with a typed error naming the
+// owner's FLAT path and the attribute but never the value or a requirement id,
+// and must stay silent when the attribute is absent. INSTRUCTION
+// `wf_definition` was the fourth until it gained its DV_PARSABLE carrier:
+// [TestRMAttrWfDefinitionWrittenOnEncode] pins what encode writes for it now.
 func TestRMAttrBothDirectionRefusalsOnEncode(t *testing.T) {
 	wt, _ := conformanceWT(t)
-	const (
-		instruction = rmattrSection + "/conformance_instruction"
-		secret      = "do-not-echo-this-value"
-	)
+	const secret = "do-not-echo-this-value"
 	body := rmattrBody(map[string]any{
-		rmattrAction + "/dv_text":  "action text",
-		instruction + "/narrative": "instruction narrative",
+		rmattrAction + "/dv_text": "action text",
 	})
 	for _, tc := range []struct {
 		name string
@@ -648,17 +647,6 @@ func TestRMAttrBothDirectionRefusalsOnEncode(t *testing.T) {
 				}
 			},
 		},
-		{
-			name: "INSTRUCTION wf_definition",
-			key:  instruction + "/_wf_definition",
-			set: func(t *testing.T, c *rm.Composition, populated bool) {
-				i := firstInstruction(t, c)
-				i.WfDefinition = nil
-				if populated {
-					i.WfDefinition = &rm.DVParsable{Value: secret, Formalism: secret}
-				}
-			},
-		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			absent := decodeRMAttr(t, wt, body)
@@ -683,6 +671,37 @@ func TestRMAttrBothDirectionRefusalsOnEncode(t *testing.T) {
 				t.Errorf("err = %v names a requirement id", err)
 			}
 		})
+	}
+}
+
+// TestRMAttrWfDefinitionWrittenOnEncode — REQ-140, replacing the INSTRUCTION
+// `wf_definition` row the both-direction refusal table held while the family
+// was deferred. A populated wf_definition on a composition the decode did not
+// build is written as `_wf_definition|value` + `|formalism`, the corpus
+// spelling, and an absent one writes no `_wf_definition` key.
+func TestRMAttrWfDefinitionWrittenOnEncode(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	instruction := rmattrSection + "/conformance_instruction"
+	body := rmattrBody(map[string]any{instruction + "/narrative": "instruction narrative"})
+
+	absent := decodeRMAttr(t, wt, body)
+	firstInstruction(t, absent).WfDefinition = nil
+	for key := range reencodeRMAttr(t, wt, absent) {
+		if strings.Contains(key, "/_wf_definition") {
+			t.Errorf("MarshalFlat with wf_definition absent wrote %q", key)
+		}
+	}
+
+	populated := decodeRMAttr(t, wt, body)
+	firstInstruction(t, populated).WfDefinition = &rm.DVParsable{Value: "wf_definition", Formalism: "formalism"}
+	got := reencodeRMAttr(t, wt, populated)
+	for key, want := range map[string]any{
+		instruction + "/_wf_definition|value":     "wf_definition",
+		instruction + "/_wf_definition|formalism": "formalism",
+	} {
+		if got[key] != want {
+			t.Errorf("MarshalFlat wrote %q = %#v, want %#v", key, got[key], want)
+		}
 	}
 }
 

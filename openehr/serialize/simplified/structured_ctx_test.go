@@ -154,31 +154,38 @@ func TestREQ140CtxValueBesideSuffixesRoundTrips(t *testing.T) {
 // TestREQ140CtxValueBesideSuffixesDecodesAlikeInBothForms — REQ-140 and
 // REQ-170: a FLAT body carrying a ctx/ field's value beside its suffixes and
 // the STRUCTURED form FLAT → STRUCTURED gives it decode alike. A
-// `ctx/language` beside a `|code` the field does not read decodes in both,
-// and a bare `ctx/setting` beside its pair is refused in both, naming the key.
+// `ctx/language` beside a `|code` the field does not read, and a bare
+// `ctx/setting` beside the pair it agrees with (REQ-053), decode in both; a
+// bare `ctx/setting` that disagrees with its pair is refused in both, naming
+// the key.
 func TestREQ140CtxValueBesideSuffixesDecodesAlikeInBothForms(t *testing.T) {
 	wt, _ := conformanceWT(t)
-	t.Run("decoded", func(t *testing.T) {
-		body := rmattrBody(map[string]any{"ctx/language|code": "en"})
-		flat, err := UnmarshalFlat(mustJSON(t, body), wt)
-		if err != nil {
-			t.Fatalf("UnmarshalFlat = %v", err)
-		}
-		structured, err := UnmarshalStructured(convertToStructured(t, body), wt)
-		if err != nil {
-			t.Fatalf("UnmarshalStructured = %v", err)
-		}
-		if got, want := canonical(t, structured), canonical(t, flat); !bytes.Equal(got, want) {
-			t.Errorf("STRUCTURED decodes to\n%s\nwant what FLAT decodes to\n%s", got, want)
-		}
-	})
+	for name, extra := range map[string]map[string]any{
+		"a field beside a suffix it does not read": {"ctx/language|code": "en"},
+		"a bare setting beside its agreeing pair":  {"ctx/setting": "other care", "ctx/setting|code": "238", "ctx/setting|value": "other care"},
+	} {
+		t.Run("decoded/"+name, func(t *testing.T) {
+			body := rmattrBody(extra)
+			flat, err := UnmarshalFlat(mustJSON(t, body), wt)
+			if err != nil {
+				t.Fatalf("UnmarshalFlat = %v", err)
+			}
+			structured, err := UnmarshalStructured(convertToStructured(t, body), wt)
+			if err != nil {
+				t.Fatalf("UnmarshalStructured = %v", err)
+			}
+			if got, want := canonical(t, structured), canonical(t, flat); !bytes.Equal(got, want) {
+				t.Errorf("STRUCTURED decodes to\n%s\nwant what FLAT decodes to\n%s", got, want)
+			}
+		})
+	}
 	t.Run("refused", func(t *testing.T) {
-		body := rmattrBody(map[string]any{"ctx/setting": "other care", "ctx/setting|code": "238", "ctx/setting|value": "other care"})
+		body := rmattrBody(map[string]any{"ctx/setting": "home", "ctx/setting|code": "238", "ctx/setting|value": "other care"})
 		_, flatErr := UnmarshalFlat(mustJSON(t, body), wt)
 		_, structuredErr := UnmarshalStructured(convertToStructured(t, body), wt)
 		for form, err := range map[string]error{"FLAT": flatErr, "STRUCTURED": structuredErr} {
-			if !errors.Is(err, ErrUnsupportedDatatype) || !strings.Contains(err.Error(), `"ctx/setting"`) {
-				t.Errorf("%s: decode = %v, want ErrUnsupportedDatatype naming \"ctx/setting\"", form, err)
+			if !errors.Is(err, ErrUnknownPath) || !strings.Contains(err.Error(), `"ctx/setting"`) {
+				t.Errorf("%s: decode = %v, want ErrUnknownPath naming \"ctx/setting\"", form, err)
 			}
 		}
 	})

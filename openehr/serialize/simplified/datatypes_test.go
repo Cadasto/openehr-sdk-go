@@ -337,16 +337,17 @@ func TestDecoratedCodedTextAtTextLeaf(t *testing.T) {
 // carve-out (REQ-053): |code selects the coded builder, which then follows
 // DV_CODED_TEXT's own rules — |value is required, and the coded form has no
 // bare spelling. Without |code the leaf stays a plain DV_TEXT, so a stray
-// |value or |terminology is refused by the DV_TEXT allowlist as before.
+// |terminology is refused by the DV_TEXT allowlist as before, and a |value
+// is the plain text's own value, never a coded one.
 func TestCodedSuffixesAtTextLeafErrors(t *testing.T) {
 	for name, sfx := range map[string]map[string]any{
-		"code without value":          {"code": "21794005"},
-		"bare value beside code":      {"code": "21794005", "value": "v", "": "v"},
-		"value without code":          {"value": "v"},
-		"terminology without code":    {"": "v", "terminology": "SNOMED-CT"},
-		"code with unmodelled suffix": {"code": "21794005", "value": "v", "mapping": "x"},
-		"other is not a DV_TEXT form": {"other": "v"},
-		"code beside other refused":   {"code": "21794005", "value": "v", "other": "x"},
+		"code without value":                 {"code": "21794005"},
+		"bare value beside code":             {"code": "21794005", "value": "v", "": "v"},
+		"terminology without code":           {"": "v", "terminology": "SNOMED-CT"},
+		"value and terminology without code": {"value": "v", "terminology": "SNOMED-CT"},
+		"code with unmodelled suffix":        {"code": "21794005", "value": "v", "mapping": "x"},
+		"other is not a DV_TEXT form":        {"other": "v"},
+		"code beside other refused":          {"code": "21794005", "value": "v", "other": "x"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := dvFromSuffixes("DV_TEXT", false, sfx, nil); !errors.Is(err, ErrUnsupportedDatatype) {
@@ -362,6 +363,12 @@ func TestCodedSuffixesAtTextLeafErrors(t *testing.T) {
 	}
 	if dv["_type"] != "DV_TEXT" || dv["value"] != "plain text" {
 		t.Errorf("plain DV_TEXT decode = %#v", dv)
+	}
+	// |value without |code is the plain text's value, the input shorthand the
+	// format gives a DV_TEXT: it does not select the coded builder.
+	dv, err = dvFromSuffixes("DV_TEXT", false, map[string]any{"value": "v"}, nil)
+	if err != nil || len(dv) != 2 || dv["_type"] != "DV_TEXT" || dv["value"] != "v" {
+		t.Errorf("dvFromSuffixes(DV_TEXT, |value alone) = %#v, %v; want a plain DV_TEXT with value v", dv, err)
 	}
 }
 
@@ -1140,12 +1147,12 @@ func TestDateAccuracyRidesUnderscoreFamily(t *testing.T) {
 // CODE_PHRASE.code_string is empty — RM-invalid, stable enough on re-encode that
 // nothing downstream flags it, and matched by any AQL predicate testing
 // defining_code/code_string against ”. They stay a plain DV_TEXT, so the stray
-// |code is refused by the allowlist exactly as it was before the carve-out
-// (PR #88 review).
+// `|code: ""` is refused by the allowlist exactly as it was before the
+// carve-out (PR #88 review), and a null |code is absent, so the |value beside
+// it is the plain text's value (REQ-053, the DV_TEXT input shorthand).
 func TestEmptyCodeDoesNotPromoteTextLeaf(t *testing.T) {
 	for name, sfx := range map[string]map[string]any{
 		"empty string code":              {"code": "", "value": "free text"},
-		"null code":                      {"code": nil, "value": "free text"},
 		"empty code beside a bare value": {"code": "", "": "free text"},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -1155,6 +1162,13 @@ func TestEmptyCodeDoesNotPromoteTextLeaf(t *testing.T) {
 			}
 		})
 	}
+	t.Run("null code", func(t *testing.T) {
+		sfx := map[string]any{"code": nil, "value": "free text"}
+		dv, err := dvFromSuffixes("DV_TEXT", false, sfx, nil)
+		if err != nil || len(dv) != 2 || dv["_type"] != "DV_TEXT" || dv["value"] != "free text" {
+			t.Errorf("dvFromSuffixes(DV_TEXT, %v) = %#v, err = %v; want a plain DV_TEXT (must not promote to DV_CODED_TEXT)", sfx, dv, err)
+		}
+	})
 }
 
 // TestUnsetCodedTextWritesNoKeys — REQ-053. A DV_CODED_TEXT the composition

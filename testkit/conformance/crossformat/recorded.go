@@ -203,15 +203,12 @@ var Recorded = map[string]map[Leg]Record{
 				"them on document_attachment and FLAT encode writes them (4 keys).",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 150, Missing: 7, Altered: 6, Excluded: 4},
-			Reason: "The 4 excluded keys are ctx/time and ctx/setting, refused, " +
+			Outcome: Outcome{Compared: 150, Missing: 7, Altered: 4, Excluded: 3},
+			Reason: "The 3 excluded keys are ctx/time, refused, " +
 				"and ctx/location and created/date_time_value, reported as unmatched content, as " +
 				"follows. UPSTREAM consult_record ctx conflict: the " +
 				"FLAT gives ctx/time and context/start_time different values, decode refuses the pair and the " +
-				"harness removes ctx/time; the start time left agrees with the canonical. ctx/setting: the FLAT " +
-				"writes ctx/setting as bare text, the setting without the |code and |value the codec reads it as, " +
-				"which decode refuses in every mode as a missing required suffix; the harness removes it, " +
-				"so decode fills the default 238 other care against the canonical 228 primary medical care. " +
+				"harness removes ctx/time; the start time left agrees with the canonical. " +
 				"ctx/location: the codec does not read ctx/location (it reads context/_location), so the " +
 				"location is missing. Choice element: decode does not read media_file/created/date_time_value " +
 				"(the SDK spells it created), so the media_file cluster lacks its created element (6 leaves). " +
@@ -343,17 +340,16 @@ var Recorded = map[string]map[Leg]Record{
 				"and proportion type spellings above.",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 423, Missing: 51, Extra: 36, Altered: 39, Excluded: 11},
-			Reason: "The 11 excluded keys are the section_3 ACTION's in-context ism_transition/current_state (3) " +
-				"and time (1) and the identifier keys (4), refused, and " +
+			Outcome: Outcome{Compared: 423, Missing: 40, Extra: 34, Altered: 35, Excluded: 7},
+			Reason: "The 7 excluded keys are the section_3 ACTION's in-context ism_transition/current_state (3) " +
+				"and time (1), refused, and " +
 				"choice/quantity_value|magnitude and |unit (2) and the bare proportion_any (1), reported as " +
 				"unmatched content, as follows. Web Template projection: decode refuses the ACTION's in-context " +
 				"ism_transition and time in every mode as RM data it would otherwise drop or replace, so " +
 				"the decoded ACTION has an empty current_state (3 leaves) and the context start time as its time. " +
 				"party reference type: the upstream FLAT writes no composer|type, so decode gives the composer's " +
-				"reference the type PARTY against the canonical's PERSON. DV_IDENTIFIER: the FLAT writes the id as the bare value, and " +
-				"decode refuses the four identifier keys as missing the required |id, so the identifier element " +
-				"is missing. Choice element: decode does not read choice/quantity_value (the SDK spells it choice), " +
+				"reference the type PARTY against the canonical's PERSON. " +
+				"Choice element: decode does not read choice/quantity_value (the SDK spells it choice), " +
 				"so the choice element is missing. DV_PROPORTION: decode reports the bare proportion_any, the " +
 				"derived magnitude, as unmatched content, and reads |type 1.0 as the Integer 1. " +
 				"Upstream conversion differences: a DV_URI and the proportion's " +
@@ -362,10 +358,9 @@ var Recorded = map[string]map[Leg]Record{
 				"with a comma and +00:00, the FLAT in the extended format with a full stop and Z (6 leaves). " +
 				"HISTORY.origin: the FLAT has no origin key and decode fills it from the context start time " +
 				"(openehr/serialize/simplified/deviations.md), where the canonical sets it otherwise. Shifted " +
-				"positions: the elements decode lacks move their later siblings up, the identifier in the " +
-				"OBSERVATION and the DV_URI and the choice element in the EVALUATION, so the OBSERVATION's " +
-				"proportion and the EVALUATION's intervals and cluster compare against the canonical's next " +
-				"element; this accounts for most of the missing, extra and altered leaves. RM-FLOOR " +
+				"positions: the elements decode lacks move their later siblings up, the DV_URI and the choice " +
+				"element in the EVALUATION, so the EVALUATION's intervals and cluster compare against the " +
+				"canonical's next element; this accounts for most of the missing, extra and altered leaves. RM-FLOOR " +
 				"archetype_details: the canonical SECTION and the " +
 				"ACTION's description CLUSTER have none, decode adds them (8 extra leaves), and rm_version is " +
 				"1.2.0 against 1.0.2 and 1.0.4.",

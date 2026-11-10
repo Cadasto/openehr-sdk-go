@@ -2777,8 +2777,15 @@ func (g *generator) setLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, 
 // ErrConstraintUnsatisfiable where nothing is left. A C_INTEGER on a
 // DV_ORDINAL itself, which AOM 1.4 builds no node for but an OPT can name,
 // gives the ordinal its value (applyOrdinal), so it is narrowed as one on
-// the value is.
+// the value is. A C_CODE_REFERENCE is valued as the code phrase it
+// carries, in the terminology its terminology: URI names where that phrase
+// names none (constraints.CodePhraseWithTerminologyOf), so its example and
+// its draw are coded as the FLAT decode and the Web Template read it
+// (REQ-103).
 func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any, attr string, pc constraints.PrimitiveConstraint) error {
+	if ref, isRef := pc.(constraints.CodeReference); isRef {
+		pc, _ = constraints.CodePhraseWithTerminologyOf(ref)
+	}
 	narrowedAttr := attr
 	if _, isOrdinal := rmValue.(*rm.DVOrdinal); isOrdinal && attr == "" {
 		if _, isInteger := pc.(constraints.CInteger); isInteger {
