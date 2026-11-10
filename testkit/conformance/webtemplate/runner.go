@@ -566,6 +566,10 @@ func offendingKey(err error) string {
 func reasonOf(err error, key string) string {
 	msg := strings.ReplaceAll(err.Error(), key, "<key>")
 	switch {
+	case errors.Is(err, simplified.ErrNotModelled):
+		// A key the format defines and the SDK does not model; it matches
+		// ErrUnknownPath too, so it is told apart first.
+		return "path not modelled"
 	case errors.Is(err, simplified.ErrUnknownPath):
 		return "path not in web template"
 	case errors.Is(err, simplified.ErrUnsupportedDatatype):
