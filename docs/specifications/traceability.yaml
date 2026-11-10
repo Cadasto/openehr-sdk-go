@@ -594,6 +594,7 @@ requirements:
       - openehr/serialize/simplified/context_test.go
       - openehr/serialize/simplified/ctx_error_values_test.go
       - openehr/serialize/simplified/datatypes_test.go
+      - openehr/serialize/simplified/empty_duration_uri_test.go
       - openehr/serialize/simplified/empty_structure_test.go
       - openehr/serialize/simplified/empty_temporal_test.go
       - openehr/serialize/simplified/error_text_test.go
