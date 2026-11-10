@@ -589,6 +589,7 @@ requirements:
       - PROBE-105
     tests:
       - internal/cstringvalue/cstringvalue_test.go
+      - openehr/serialize/simplified/action_archetype_id_internal_test.go
       - openehr/serialize/simplified/archetype_details_test.go
       - openehr/serialize/simplified/coded_name_internal_test.go
       - openehr/serialize/simplified/coded_name_test.go

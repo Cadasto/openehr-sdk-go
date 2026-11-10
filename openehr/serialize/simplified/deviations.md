@@ -429,12 +429,13 @@ partially or silently accepted.
   `431|persistent`), and `433|event` only where the template fixes none; until then every
   such decode wrote `433|event`, so a persistent template's composition failed validation.
   Since 2026-11-10 an ACTIVITY with no `action_archetype_id` takes the one the instance
-  generator writes for the template: a value the first `C_STRING` there accepts, or the RM
-  default `/.*/` where that `C_STRING` has neither a list nor a pattern or the template
-  allows none. Decode still leaves it out where that `C_STRING` accepts no value the
-  generator builds, or where the template's ACTIVITY nodes at its path disagree on it
-  (pinned by `TestREQ053ActivityTakesNoActionArchetypeIDTheTemplateDoesNotSettle`). Until
-  then decode left out every one, and the ACTIVITY failed validation.
+  generator writes on its own template node, an unnamed one beside a twin that pins a
+  name included (`TestREQ053ActivityTakesItsOwnNodesActionArchetypeID`): a value the first
+  `C_STRING` there accepts, or the RM default `/.*/` where that `C_STRING` has neither a
+  list nor a pattern or the node allows none. Decode still leaves it out where that
+  `C_STRING` accepts no value the generator builds (pinned by
+  `TestREQ053ActivityTakesNoActionArchetypeIDTheTemplateDoesNotSettle`). Until then decode
+  left out every one, and the ACTIVITY failed validation.
   **Qualifier:** `EVENT.time` and `HISTORY.origin` have no source other than the event
   times the body gives, its start time (`ctx/time` or `<root>/context/start_time`) and,
   since 2026-11-10, `WithDefaultTime`; `ACTION.time` has only the last two. The format gives a missing `ctx/time` the server's

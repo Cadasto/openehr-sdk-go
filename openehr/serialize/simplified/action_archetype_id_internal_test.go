@@ -3,7 +3,9 @@ package simplified
 // REQ-053 — the template index gives an ACTIVITY's path the
 // action_archetype_id of the ACTIVITY node there only where every node at
 // that path gives the same one: nodes there that disagree leave the path with
-// none, and decode then leaves the attribute out.
+// none, and decode then leaves the attribute out. Only reused siblings the
+// path cannot tell apart share one, and decode refuses a body that reaches
+// them, so the rule is pinned on the index itself.
 
 import "testing"
 

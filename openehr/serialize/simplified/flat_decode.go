@@ -2557,12 +2557,11 @@ type templateIndex struct {
 	// template's: the cached index ([templateIndexFor]) never holds one, and
 	// [decodeFlatMap] sets it on a copy that one decode reads.
 	startTime string
-	// actionArchetypeIDs maps the compiled path of an ACTIVITY node, and its
-	// bare path, to the action_archetype_id decode gives an ACTIVITY there
-	// that the body gives none ([actionArchetypeIDOf]). It maps to "" where
-	// the nodes at one path disagree on it, or where the generator writes
-	// none: the template then gives no single answer, and decode leaves the
-	// attribute out.
+	// actionArchetypeIDs maps the compiled path of an ACTIVITY node to the
+	// action_archetype_id decode gives an ACTIVITY there that the body gives
+	// none ([actionArchetypeIDOf]). It maps to "" where the nodes at one
+	// path disagree on it, or where the generator writes none: the template
+	// then gives no single answer, and decode leaves the attribute out.
 	actionArchetypeIDs map[string]string
 }
 
@@ -3239,11 +3238,11 @@ func buildTemplateIndex(c *templatecompile.Compiled) *templateIndex {
 			}
 		}
 		if n.RMTypeName() == "ACTIVITY" {
-			path, id := n.AQLPath(), actionArchetypeIDOf(n)
-			x.addActionArchetypeID(path, id)
-			if bare := bareAQLPath(path); bare != path {
-				x.addActionArchetypeID(bare, id)
-			}
+			// Under the compiled path alone: the completion walk keeps the
+			// names the template pins, so an ACTIVITY's path is its own
+			// node's, and a bare alias would let a named twin's id meet the
+			// id of the unnamed node whose path that alias is.
+			x.addActionArchetypeID(n.AQLPath(), actionArchetypeIDOf(n))
 		}
 		if n.RMTypeName() == "DV_CODED_TEXT" {
 			path, terms := n.AQLPath(), codedTermsOf(n)
