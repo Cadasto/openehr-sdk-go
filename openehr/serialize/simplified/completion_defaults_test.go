@@ -279,14 +279,70 @@ func alternativesInstructionTemplate(t *testing.T) (*webtemplate.WebTemplate, *t
 // opts, and builds its Web Template.
 func editedInstructionTemplate(t *testing.T, edit func(attribute string) string, opts ...templatecompile.Option) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
 	t.Helper()
+	return rewrittenInstructionTemplate(t, func(opt string) string {
+		if n := len(actionArchetypeAttribute.FindAllStringIndex(opt, -1)); n != 1 {
+			t.Fatalf("%s holds %d action_archetype_id attributes, want one — fixture changed?", minimalInstructionID, n)
+		}
+		return actionArchetypeAttribute.ReplaceAllStringFunc(opt, edit)
+	}, opts...)
+}
+
+// activityStart matches the opening of the one ACTIVITY node of the
+// minimal_instruction OPT.
+var activityStart = regexp.MustCompile(`<children xsi:type="C_COMPLEX_OBJECT">\s*<rm_type_name>ACTIVITY</rm_type_name>`)
+
+// twinName is the name the twin ACTIVITY of twinActivityTemplate pins, as a
+// name attribute.
+const twinName = `<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>name</rm_attribute_name><children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>DV_TEXT</rm_type_name><node_id /><attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>value</rm_attribute_name><children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>STRING</rm_type_name><node_id /><item xsi:type="C_STRING"><list>Twin activity</list></item></children></attributes></children></attributes>`
+
+// twinActivityTemplate compiles the minimal_instruction OPT with a twin of
+// its one ACTIVITY node put after it: the same node id, but the name 'Twin
+// activity' pinned and an action_archetype_id pattern naming another ACTION
+// archetype. The two ACTIVITY nodes share the path that spells no name,
+// /activities[at0001], which is the unnamed one's own. It builds its Web
+// Template too.
+func twinActivityTemplate(t *testing.T) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
+	t.Helper()
+	return rewrittenInstructionTemplate(t, func(opt string) string {
+		found := activityStart.FindAllStringIndex(opt, -1)
+		if len(found) != 1 {
+			t.Fatalf("%s holds %d ACTIVITY nodes, want one — fixture changed?", minimalInstructionID, len(found))
+		}
+		start := found[0][0]
+		// The node ends at the </children> that closes its <children>.
+		depth := 0
+		for i := start; i < len(opt); i++ {
+			switch {
+			case strings.HasPrefix(opt[i:], "<children"):
+				depth++
+			case strings.HasPrefix(opt[i:], "</children>"):
+				depth--
+				if depth == 0 {
+					end := i + len("</children>")
+					activity := opt[start:end]
+					twin := strings.Replace(activity, `openEHR-EHR-ACTION\.minimal\.v1`, `openEHR-EHR-ACTION\.twin\.v1`, 1)
+					if twin == activity {
+						t.Fatalf("%s: the ACTIVITY's action_archetype_id pattern changed — fixture changed?", minimalInstructionID)
+					}
+					twin = strings.Replace(twin, `<attributes xsi:type="C_SINGLE_ATTRIBUTE">`, twinName+`<attributes xsi:type="C_SINGLE_ATTRIBUTE">`, 1)
+					return opt[:end] + twin + opt[end:]
+				}
+			}
+		}
+		t.Fatalf("%s: the ACTIVITY node is never closed", minimalInstructionID)
+		return ""
+	})
+}
+
+// rewrittenInstructionTemplate compiles the minimal_instruction OPT as
+// rewrite returns it, under opts, and builds its Web Template.
+func rewrittenInstructionTemplate(t *testing.T, rewrite func(opt string) string, opts ...templatecompile.Option) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
+	t.Helper()
 	raw, err := os.ReadFile(fixtures.TemplateOpt(minimalInstructionID))
 	if err != nil {
 		t.Fatalf("read %s: %v", minimalInstructionID, err)
 	}
-	if n := len(actionArchetypeAttribute.FindAllIndex(raw, -1)); n != 1 {
-		t.Fatalf("%s holds %d action_archetype_id attributes, want one — fixture changed?", minimalInstructionID, n)
-	}
-	edited := actionArchetypeAttribute.ReplaceAllStringFunc(string(raw), edit)
+	edited := rewrite(string(raw))
 	model, err := aom14.ReadOperationalTemplate(strings.NewReader(edited))
 	if err != nil {
 		t.Fatalf("ReadOperationalTemplate(edited %s): %v", minimalInstructionID, err)
@@ -306,14 +362,35 @@ func editedInstructionTemplate(t *testing.T, edit func(attribute string) string,
 // the ACTIVITY's archetype_node_id; an ACTIVITY with none maps to "".
 func activityIDs(t *testing.T, comp *rm.Composition) map[string]string {
 	t.Helper()
+	return activityIDsBy(t, comp, func(activity map[string]any) string {
+		id, _ := activity["archetype_node_id"].(string)
+		return id
+	})
+}
+
+// activityNamedIDs returns the action_archetype_id of every ACTIVITY in comp,
+// by the ACTIVITY's name; an ACTIVITY with none maps to "".
+func activityNamedIDs(t *testing.T, comp *rm.Composition) map[string]string {
+	t.Helper()
+	return activityIDsBy(t, comp, func(activity map[string]any) string {
+		name, _ := activity["name"].(map[string]any)
+		value, _ := name["value"].(string)
+		return value
+	})
+}
+
+// activityIDsBy returns the action_archetype_id of every ACTIVITY in comp, by
+// what key returns for the ACTIVITY's canonical object; an ACTIVITY with none
+// maps to "".
+func activityIDsBy(t *testing.T, comp *rm.Composition, key func(activity map[string]any) string) map[string]string {
+	t.Helper()
 	ids := make(map[string]string)
 	var walk func(v any)
 	walk = func(v any) {
 		switch x := v.(type) {
 		case map[string]any:
 			if x["_type"] == "ACTIVITY" {
-				id, _ := x["archetype_node_id"].(string)
-				ids[id], _ = x["action_archetype_id"].(string)
+				ids[key(x)], _ = x["action_archetype_id"].(string)
 			}
 			for _, child := range x {
 				walk(child)
@@ -444,6 +521,68 @@ func TestREQ053ActivityTakesTheTemplatesActionArchetypeID(t *testing.T) {
 					}
 				}
 				wantValidates(t, format, comp, tc.compiled, true)
+			}
+		})
+	}
+}
+
+// unbuildableAlternative is a C_STRING on action_archetype_id that accepts no
+// value the generator builds: its one list member fails its pattern.
+const unbuildableAlternative = `<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>STRING</rm_type_name><node_id /><item xsi:type="C_STRING"><pattern>[0-9]+</pattern><list>abc</list></item></children>`
+
+// TestREQ053ActivityTakesNoActionArchetypeIDTheTemplateDoesNotSettle —
+// REQ-053: with the template, decode leaves out the action_archetype_id of an
+// ACTIVITY the body gives none where the template settles no one value
+// there. Either the first C_STRING on that attribute accepts no value the
+// generator builds, and the generator refuses the template too; or the
+// ACTIVITY nodes at the ACTIVITY's path disagree on it, though each alone
+// gives one. A twin that pins its name has a path of its own, and takes its
+// own value.
+func TestREQ053ActivityTakesNoActionArchetypeIDTheTemplateDoesNotSettle(t *testing.T) {
+	unbuildableWT, unbuildable := editedInstructionTemplate(t, func(attribute string) string {
+		head, _, _ := strings.Cut(attribute, "<children")
+		return head + unbuildableAlternative + "</attributes>"
+	})
+	twinWT, twin := twinActivityTemplate(t)
+	cases := []struct {
+		name     string
+		wt       *webtemplate.WebTemplate
+		compiled *templatecompile.Compiled
+		body     map[string]any
+		// want maps each ACTIVITY's name to its action_archetype_id, ""
+		// where decode leaves it out.
+		want map[string]string
+		// generatorRefuses is whether the instance generator refuses the
+		// template.
+		generatorRefuses bool
+	}{
+		{
+			name: "a C_STRING no built value satisfies", wt: unbuildableWT, compiled: unbuildable,
+			body: instructionBody(nil), want: map[string]string{"Current Activity": ""}, generatorRefuses: true,
+		},
+		{
+			name: "ACTIVITY nodes at one path that disagree", wt: twinWT, compiled: twin,
+			body: instructionBody(map[string]any{"minimal/minimal:0/twin_activity/duration": "PT20M"}),
+			want: map[string]string{"Current Activity": "", "Twin activity": "openEHR-EHR-ACTION.twin.v1"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.generatorRefuses {
+				composer := "Test Composer"
+				if _, err := instance.Generate(t.Context(), tc.compiled, instance.Options{
+					Policy:    instance.Large,
+					Territory: "NL",
+					Composer:  &rm.PartyIdentified{Name: &composer},
+					Now:       time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+				}); err == nil {
+					t.Errorf("instance.Generate = nil error, want the template refused")
+				}
+			}
+			for format, comp := range decodeBothFormats(t, tc.wt, tc.body, simplified.WithTemplate(tc.compiled)) {
+				if got := activityNamedIDs(t, comp); !maps.Equal(got, tc.want) {
+					t.Errorf("%s: action_archetype_id by ACTIVITY name = %v, want %v", format, got, tc.want)
+				}
 			}
 		})
 	}
