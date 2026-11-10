@@ -419,10 +419,18 @@ partially or silently accepted.
   **validates against the OPT** (verified over the vendored corpus by PROBE-076's conformance
   leg and `names_test.go`). These are **synthesised defaults**, not recovered data — the
   formats never carried them, so e.g. every `EVENT.time`/`HISTORY.origin` takes the context
-  `start_time` and `subject` becomes `PARTY_SELF`. **Qualifier:** `EVENT.time` and
-  `HISTORY.origin` have no source other than `ctx/time` — a payload without `ctx/time`
-  decodes successfully but does not validate when the template carries HISTORY/EVENT nodes
-  (pinned by `names_test.go`). **A required structure with no member is rebuilt too**
+  `start_time` and `subject` becomes `PARTY_SELF`. Since 2026-11-10 `COMPOSITION.category`
+  is the code the template's category constraint fixes (one `openehr` code, such as
+  `431|persistent`), and `433|event` only where the template fixes none; until then every
+  such decode wrote `433|event`, so a persistent template's composition failed validation.
+  **Qualifier:** `EVENT.time` and `HISTORY.origin` have no source other than the body's
+  start time (`ctx/time` or `<root>/context/start_time`) and, since 2026-11-10,
+  `WithDefaultTime`. The format gives a missing `ctx/time` the server's current time;
+  decode reads no clock, so the caller passes one, and the body then decodes as if its
+  `ctx/time` held it, except that on a persistent composition the default builds no
+  `EVENT_CONTEXT`. Without either, a payload decodes successfully but does not validate
+  when the template carries HISTORY/EVENT nodes (pinned by `names_test.go`).
+  **A required structure with no member is rebuilt too**
   (since 2026-10-26, issue 311). Where a rebuilt node lacks a single-valued attribute that
   the template's existence, or the RM, requires of it, and the template gives there one
   concrete `ITEM_STRUCTURE` it lets hold no member (or alternatives that agree on its
