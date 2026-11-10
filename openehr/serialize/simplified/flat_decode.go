@@ -149,6 +149,10 @@ func decodeFlatMap(flat map[string]any, wt *webtemplate.WebTemplate, cfg decodeC
 // node path ([templateIndex]). Every key it does not read goes to sink, and the
 // decode carries on without it.
 func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *templateIndex, sink *unmatchedSink) (map[string]any, error) {
+	// A key that is no path in the FLAT grammar is refused before any is read.
+	if err := checkFlatKeys(flat); err != nil {
+		return nil, err
+	}
 	root := wt.Tree
 	compJSON := map[string]any{
 		"_type":             "COMPOSITION",
@@ -4616,6 +4620,47 @@ func splitSuffix(key string) (base, suffix string) {
 		return key, ""
 	}
 	return base, suffix
+}
+
+// checkFlatKeys refuses the first key of flat, in sorted order, that is not a
+// well-formed FLAT key ([flatKeyMalformation]), with [ErrUnknownPath], naming
+// the key and none of its value (REQ-170). Such a key is no path at all, so
+// it is refused in every mode rather than set aside as unmatched content.
+func checkFlatKeys(flat map[string]any) error {
+	for _, key := range slices.Sorted(maps.Keys(flat)) {
+		if why := flatKeyMalformation(key); why != "" {
+			return fmt.Errorf("%w: %q is not a well-formed FLAT key: %s", ErrUnknownPath, key, why)
+		}
+	}
+	return nil
+}
+
+// flatKeyMalformation says how key breaks the FLAT key grammar, or returns ""
+// where it keeps it. A key is a path of "/"-separated segments, each a
+// non-empty id with an optional ":<index>", then at most one "|<suffix>" that
+// holds no "/". A last bare "|" spells the empty suffix ([foldEmptySuffix]),
+// so it is set aside before the check.
+func flatKeyMalformation(key string) string {
+	path, suffix, piped := strings.Cut(strings.TrimSuffix(key, "|"), "|")
+	for seg := range strings.SplitSeq(path, "/") {
+		switch {
+		case seg == "":
+			return "it has an empty path segment"
+		case strings.HasPrefix(seg, ":"):
+			return "a path segment has no id before its :index"
+		}
+	}
+	switch {
+	case !piped:
+		return ""
+	case suffix == "":
+		return "it has an empty |suffix before its end"
+	case strings.Contains(suffix, "|"):
+		return "it has more than one |suffix"
+	case strings.Contains(suffix, "/"):
+		return "a path segment follows its |suffix"
+	}
+	return ""
 }
 
 // flatSeg is one "/"-separated FLAT path segment: a Web Template id with an
