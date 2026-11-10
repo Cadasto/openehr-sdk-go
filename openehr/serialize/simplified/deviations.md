@@ -353,7 +353,7 @@ partially or silently accepted.
   outside `local` decodes to the value it lists rather than one its validation refuses as
   `primitive_not_in_list`. A leaf or a bound that carries `\|code` and leaves out `\|ordinal` or
   `\|value`, which ITS-REST 1.1.0 *Simplified Formats* § DV_ORDINAL allows "if symbol is
-  defined in template", takes them from the same pairs (a bound's since 2026-11-10): the ordinal value where the pairs at its
+  defined in template", takes them from the same pairs (since 2026-11-10): the ordinal value where the pairs at its
   path give its code exactly one, and the code's term text in the pair's terminology, read as for
   a coded name. Pairs that give the code two values give it neither, and pairs that give it two
   texts give it no text. What they do not give stays a missing required suffix, refused naming
