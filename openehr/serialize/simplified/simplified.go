@@ -207,6 +207,18 @@ var (
 	// time, an INTERVAL_EVENT's `math_function`, `width` and `sample_count`
 	// and an OBSERVATION's `history_origin` return it in every mode too.
 	ErrUnknownPath = errors.New("simplified: path not in web template")
+	// ErrNotModelled is returned, in every mode, for a key the Simplified
+	// Formats define and the decode reads but this SDK does not model: an
+	// ACTION's ISM transition and time in the spelling the reference writes
+	// where the Web Template has no node for them, and the
+	// `_instruction_details` family. The decode refuses such a key rather than
+	// drop its data or replace it with a default.
+	//
+	// It also matches [ErrUnknownPath], so a check for that sentinel matches
+	// these refusals as before. A check for this one tells a key this SDK does
+	// not support yet from a key the template has no place for, such as a
+	// mistyped key [WithStrict] refuses.
+	ErrNotModelled error = notModelledError{}
 	// ErrUnsupportedDatatype is returned when a leaf's RM datatype is not mapped
 	// to/from a FLAT suffix set and cannot ride |raw, when a suffix or ctx/
 	// value is not valid for its slot (a value the canonical-JSON decode of its
@@ -231,6 +243,15 @@ var (
 	// encode.
 	ErrNilComposition = errors.New("simplified: nil composition")
 )
+
+// notModelledError is the type of [ErrNotModelled]: a sentinel with text of
+// its own that also matches [ErrUnknownPath].
+type notModelledError struct{}
+
+func (notModelledError) Error() string { return "simplified: path not modelled" }
+
+// Unwrap returns [ErrUnknownPath].
+func (notModelledError) Unwrap() error { return ErrUnknownPath }
 
 // MarshalFlat is implemented in flat_encode.go.
 // UnmarshalFlat is implemented in flat_decode.go.

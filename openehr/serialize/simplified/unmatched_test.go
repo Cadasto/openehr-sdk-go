@@ -908,8 +908,8 @@ func TestREQ170IsmTransitionReferenceKeysRefusedInEveryMode(t *testing.T) {
 				keys[k] = secret
 			}
 			err := refusedInEveryMode(t, wt, rmattrBody(keys))
-			if !errors.Is(err, ErrUnknownPath) {
-				t.Errorf("err = %v, want ErrUnknownPath", err)
+			if !errors.Is(err, ErrNotModelled) || !errors.Is(err, ErrUnknownPath) {
+				t.Errorf("err = %v, want ErrNotModelled and ErrUnknownPath", err)
 			}
 			if !strings.Contains(err.Error(), strconv.Quote(tc.names)) {
 				t.Errorf("err = %v, want it to name %q", err, tc.names)
@@ -922,10 +922,9 @@ func TestREQ170IsmTransitionReferenceKeysRefusedInEveryMode(t *testing.T) {
 			}
 			// The STRUCTURED form of the same body reaches the same refusal.
 			serr := structuredRefusedInEveryMode(t, wt, rmattrBody(keys))
-			if !errors.Is(serr, ErrUnknownPath) || !strings.Contains(serr.Error(), "in-context spelling") ||
-				!strings.Contains(serr.Error(), tc.attr) || strings.Contains(serr.Error(), "REQ-") ||
-				strings.Contains(serr.Error(), secret) {
-				t.Errorf("STRUCTURED err = %v, want the in-context refusal naming %q, no requirement id and no value", serr, tc.attr)
+			if !errors.Is(serr, ErrNotModelled) || !strings.Contains(serr.Error(), tc.attr) ||
+				strings.Contains(serr.Error(), "REQ-") || strings.Contains(serr.Error(), secret) {
+				t.Errorf("STRUCTURED err = %v, want the ErrNotModelled refusal naming %q, no requirement id and no value", serr, tc.attr)
 			}
 		})
 	}
