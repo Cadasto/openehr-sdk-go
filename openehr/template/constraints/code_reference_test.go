@@ -82,3 +82,61 @@ func violationCodes(vs []constraints.Violation) []constraints.ViolationCode {
 	}
 	return codes
 }
+
+// REQ-103: ReferenceSetTerminology reads the terminology id a terminology:
+// URI names, terminology:<name>[/<version>] with any query or fragment after
+// it, as the TERMINOLOGY_ID <name> or <name>(<version>). The scheme is
+// matched in any case and the name is kept as written. A URI of another
+// scheme, one with no name, and one that does not take that form name none.
+func TestREQ103_CodeReference_ReferenceSetTerminology(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		uri    string
+		want   string
+		wantOK bool
+	}{
+		{uri: "terminology:SNOMED-CT", want: "SNOMED-CT", wantOK: true},
+		{uri: "terminology:SNOMED-CT?subset=x", want: "SNOMED-CT", wantOK: true},
+		{uri: "terminology:LOINC/2.73", want: "LOINC(2.73)", wantOK: true},
+		{uri: "terminology:LOINC/2.73?subset=x#part", want: "LOINC(2.73)", wantOK: true},
+		{uri: "terminology:ICD10#part?x", want: "ICD10", wantOK: true},
+		{uri: "TERMINOLOGY:ICD10", want: "ICD10", wantOK: true},
+		{uri: "Terminology:snomed-ct", want: "snomed-ct", wantOK: true},
+		{uri: "terminology:"},
+		{uri: "terminology:/v1"},
+		{uri: "terminology:?subset=x"},
+		{uri: "terminology://snomed.info/sct"},
+		{uri: "terminology:LOINC/"},
+		{uri: "terminology:LOINC/2.73/x"},
+		{uri: "terminology:SNOMED CT"},
+		{uri: "terminology:LOINC/2.73 x"},
+		{uri: "terminology:SNOMED\tCT"},
+		{uri: "terminology:SNOMED\x7fCT"},
+		{uri: "terminology:LOINC(2.73)"},
+		{uri: "terminology:LOINC/(2.73)"},
+		{uri: "terminology:LOINC)"},
+		{uri: "http://snomed.info/sct"},
+		{uri: "urn:oid:2.16.840.1.113883.6.96"},
+		{uri: "//fhir.hl7.org/ValueSet/$expand?url=http://snomed.info/sct"},
+		{uri: "terminologies:SNOMED-CT"},
+		{uri: "SNOMED-CT"},
+		{uri: ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.uri, func(t *testing.T) {
+			t.Parallel()
+			ref := constraints.CodeReference{ReferenceSetURI: tc.uri}
+			got, ok := ref.ReferenceSetTerminology()
+			if got != tc.want || ok != tc.wantOK {
+				t.Errorf("CodeReference{ReferenceSetURI: %q}.ReferenceSetTerminology() = %q, %t; want %q, %t", tc.uri, got, ok, tc.want, tc.wantOK)
+			}
+		})
+	}
+	t.Run("a code phrase that names a terminology", func(t *testing.T) {
+		t.Parallel()
+		ref := constraints.CodeReference{Terminology: "LOINC", ReferenceSetURI: "terminology:SNOMED-CT"}
+		if got, ok := ref.ReferenceSetTerminology(); got != "SNOMED-CT" || !ok {
+			t.Errorf("ReferenceSetTerminology() = %q, %t; want the URI's SNOMED-CT, true: it reads the URI alone", got, ok)
+		}
+	})
+}
