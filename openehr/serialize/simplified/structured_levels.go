@@ -111,7 +111,7 @@ func (b indexBound) check(path, id string, idx int) error {
 		}
 	case subPathOne:
 		if idx > 0 {
-			return fmt.Errorf("%w: %q carries a :index, but %s addresses a single-valued RM attribute", ErrUnsupportedDatatype, seg, id)
+			return fmt.Errorf("%w: %q carries a :index, but %s addresses a single-valued RM attribute", ErrUnknownPath, seg, id)
 		}
 	case familyList, childList, subPathList:
 		if idx > maxRepeatIndex {

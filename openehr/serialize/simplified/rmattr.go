@@ -116,7 +116,7 @@ func (g rmattrGroup) settleDups() error {
 				ErrUnknownPath, g.metadata, d.first, d.second)
 		}
 		return fmt.Errorf("%w: %q and %q spell one sub-path twice and disagree; remove one",
-			ErrUnsupportedDatatype, d.first, d.second)
+			ErrUnknownPath, d.first, d.second)
 	}
 	return nil
 }
@@ -406,13 +406,15 @@ type rmattrDecoded struct {
 //     unrecognised, or whose family the owner's RM class does not declare is
 //     unmatched content (REQ-170): every key goes to the sink and the group is
 //     skipped. A deferred family is the exception where the owner declares
-//     it: [ErrUnknownPath] in every mode;
+//     it: [ErrNotModelled], which matches [ErrUnknownPath], in every mode;
 //  2. an instance whose `:index` is past its family's bound is ErrUnknownPath,
 //     judged before its tails, since the index makes every key of the
 //     instance malformed whatever follows it (REQ-170);
 //  3. a recognised family carrying a key outside its grammar hands that key to
-//     the sink; two spellings of one sub-path are judged once the decode knows
-//     whether it reads the sub-path ([rmattrGroup.settleDups]); one missing an
+//     the sink; a key that cannot be placed inside the grammar (a sub-path
+//     segment past :0 on a single-valued attribute, two spellings of one
+//     sub-path that disagree, judged once the decode knows whether it reads
+//     the sub-path, [rmattrGroup.settleDups]) is ErrUnknownPath; one missing an
 //     RM-mandatory key, or holding a value its suffixes cannot express, is
 //     ErrUnsupportedDatatype naming the key;
 //  4. a sequence of instances that breaks the FLAT indexing rules (a
@@ -661,7 +663,7 @@ func placeRMAttrList(node map[string]any, attr string, g rmattrGroup, val any, b
 		// leaf or another family reaching the same canonical slot. Growing an
 		// empty array over it would drop that value without a word.
 		return fmt.Errorf("%w: %s writes the list attribute %q, which already holds a %T",
-			ErrUnsupportedDatatype, g.prefix(), attr, existing)
+			ErrUnknownPath, g.prefix(), attr, existing)
 	}
 	slot := g.slot()
 	if need := slot + 1 - len(arr); need > 0 {
