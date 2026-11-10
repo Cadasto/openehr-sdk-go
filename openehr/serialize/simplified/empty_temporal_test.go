@@ -9,8 +9,10 @@ package simplified_test
 
 import (
 	"encoding/json"
+	"errors"
 	"maps"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
@@ -114,5 +116,32 @@ func TestREQ053EmptyTemporalDecoratedKeepsItsKey(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestREQ053EmptyTemporalBoundStaysRefused — REQ-053, REQ-140. An interval
+// bound is no Web Template leaf, so an empty temporal bound is not dropped as
+// an unset leaf value is: one carrying a |magnitude_status beside its empty
+// value is still refused on encode as an empty RM-mandatory value, naming the
+// bound's key.
+func TestREQ053EmptyTemporalBoundStaysRefused(t *testing.T) {
+	wt, _ := conformanceTarget(t)
+	leaf := emptyTemporalEvent + "/dv_date_time"
+	comp, err := simplified.UnmarshalFlat(mustJSON(t, emptyTemporalBody(map[string]any{
+		emptyTemporalEvent + "/time":  "2021-12-21T16:02:58.0094262+01:00",
+		leaf:                          "2021-12-21T16:02:58+01:00",
+		leaf + "/_normal_range/lower": "",
+		leaf + "/_normal_range/lower|magnitude_status": "=",
+		leaf + "/_normal_range/upper":                  "2022-12-21T16:02:58+01:00",
+	})), wt)
+	if err != nil {
+		t.Fatalf("UnmarshalFlat: %v", err)
+	}
+	_, err = simplified.MarshalFlat(comp, wt)
+	if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
+		t.Fatalf("MarshalFlat err = %v, want ErrUnsupportedDatatype for the empty bound", err)
+	}
+	if want := leaf + "/_normal_range/lower"; !strings.Contains(err.Error(), want) {
+		t.Errorf("err = %v, want it to name %q", err, want)
 	}
 }

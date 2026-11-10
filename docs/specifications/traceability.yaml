@@ -595,6 +595,7 @@ requirements:
       - openehr/serialize/simplified/ctx_error_values_test.go
       - openehr/serialize/simplified/datatypes_test.go
       - openehr/serialize/simplified/empty_structure_test.go
+      - openehr/serialize/simplified/empty_temporal_test.go
       - openehr/serialize/simplified/error_text_test.go
       - openehr/serialize/simplified/fit_test.go
       - openehr/serialize/simplified/flat_decode_test.go
@@ -2154,6 +2155,7 @@ requirements:
       - openehr/serialize/simplified/composition_name_test.go
       - openehr/serialize/simplified/context_test.go
       - openehr/serialize/simplified/datatypes_test.go
+      - openehr/serialize/simplified/empty_temporal_test.go
       - openehr/serialize/simplified/error_text_test.go
       - openehr/serialize/simplified/flat_encode_test.go
       - openehr/serialize/simplified/flat_pinned_test.go
