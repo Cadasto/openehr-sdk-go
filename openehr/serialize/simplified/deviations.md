@@ -418,18 +418,27 @@ partially or silently accepted.
   conventions (`rminfo.RequiredAttributes` drives the walk), so the decoded composition
   **validates against the OPT** (verified over the vendored corpus by PROBE-076's conformance
   leg and `names_test.go`). These are **synthesised defaults**, not recovered data — the
-  formats never carried them, so e.g. every `EVENT.time`/`HISTORY.origin` takes the context
-  `start_time` and `subject` becomes `PARTY_SELF`. Since 2026-11-10 `COMPOSITION.category`
+  formats never carried them, so e.g. a `HISTORY.origin` takes the earliest time its own
+  events carry, compared as instants, else the context `start_time`; an `EVENT.time` the
+  body leaves out takes its HISTORY's origin; and `subject` becomes `PARTY_SELF`. Until
+  2026-11-10 every `EVENT.time`/`HISTORY.origin` took the context `start_time`; the
+  earliest event time now comes first, as the reference orders the two. The reference's
+  explicit `<observation>/history_origin` key is still refused (above). Since 2026-11-10
+  `COMPOSITION.category`
   is the code the template's category constraint fixes (one `openehr` code, such as
   `431|persistent`), and `433|event` only where the template fixes none; until then every
   such decode wrote `433|event`, so a persistent template's composition failed validation.
-  **Qualifier:** `EVENT.time` and `HISTORY.origin` have no source other than the body's
-  start time (`ctx/time` or `<root>/context/start_time`) and, since 2026-11-10,
-  `WithDefaultTime`. The format gives a missing `ctx/time` the server's current time;
+  Since 2026-11-10 an ACTIVITY with no `action_archetype_id` takes the one the instance
+  generator writes for the template: a value the template's `C_STRING` there accepts, else
+  the RM default `/.*/`; until then decode left it out, and the ACTIVITY failed validation.
+  **Qualifier:** `EVENT.time` and `HISTORY.origin` have no source other than the event
+  times the body gives, its start time (`ctx/time` or `<root>/context/start_time`) and,
+  since 2026-11-10, `WithDefaultTime`. The format gives a missing `ctx/time` the server's
+  current time;
   decode reads no clock, so the caller passes one, and the body then decodes as if its
   `ctx/time` held it, except that on a persistent composition the default builds no
-  `EVENT_CONTEXT`. Without either, a payload decodes successfully but does not validate
-  when the template carries HISTORY/EVENT nodes (pinned by `names_test.go`).
+  `EVENT_CONTEXT`. Without any of them, a payload decodes successfully but does not
+  validate when the template carries HISTORY/EVENT nodes (pinned by `names_test.go`).
   **A required structure with no member is rebuilt too**
   (since 2026-10-26, issue 311). Where a rebuilt node lacks a single-valued attribute that
   the template's existence, or the RM, requires of it, and the template gives there one
@@ -457,7 +466,9 @@ partially or silently accepted.
   setting, so a `WithTemplate` decode of a body that carried no setting re-encodes with
   exactly those two keys gained — a *faithful* encoding of the completed composition, not
   drift; an OPT-free decode synthesises nothing and stays byte-identical (both pinned by
-  `TestSettingWithTemplateDefaultRoundTrip`). The other completions stay invisible on
+  `TestSettingWithTemplateDefaultRoundTrip`). The ACTIVITY `action_archetype_id` default
+  (since 2026-11-10) is visible too: encode writes the in-context leaf, so a body that left
+  it out re-encodes with `…/action_archetype_id` gained. The other completions stay invisible on
   re-encode: the names it gives the nodes below the root never leak into FLAT, and
   origin/encoding have no emitted
   surface. `subject` acquired one on 2026-08-05 (Phase C2) and stays invisible anyway,

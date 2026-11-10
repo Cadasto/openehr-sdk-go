@@ -102,6 +102,11 @@ func (c decodeConfig) tracked() bool {
 // (HISTORY.origin, EVENT.time, ENTRY language/encoding/subject,
 // EVENT_CONTEXT.setting, …) are completed from ctx defaults and RM
 // conventions; these are synthesised defaults, not recovered data. A
+// HISTORY with no origin takes the earliest time its own events carry,
+// compared as instants, else the start time, and an event with no time takes
+// its HISTORY's origin. An ACTIVITY with no action_archetype_id takes the one
+// the instance generator writes for the template: a value the template's
+// C_STRING on that attribute accepts, else the default /.*/. A
 // composition category the body does not spell is the one the template
 // fixes, a single openehr code such as 431|persistent, or else 433|event. An empty structure (an ITEM_TREE or ITEM_LIST with no
 // items, say) that the template requires and allows to stay empty has no key
@@ -113,9 +118,10 @@ func (c decodeConfig) tracked() bool {
 // terminology and text, an ordinal's value and text. A coded text whose
 // terminology neither the body nor the template gives is refused as missing
 // its |terminology. The decoded composition then validates against the
-// OPT, provided the body gives a start time, or the caller passes
-// [WithDefaultTime], when the template carries HISTORY/EVENT nodes: their
-// mandatory origin and time have no other source (see deviations.md).
+// OPT, provided each HISTORY has an event time, or the body gives a start
+// time, or the caller passes [WithDefaultTime], when the template carries
+// HISTORY/EVENT nodes: their mandatory origin and time have no other source
+// (see deviations.md).
 //
 // Without this option decode omits names, defaults and empty structures,
 // completes no coded value, and infers a folded structure's subtype from its
@@ -130,8 +136,9 @@ func WithTemplate(c *templatecompile.Compiled) Option {
 // object's time member in STRUCTURED, or at "<root>/context/start_time"; an
 // empty or null value there carries none. Decode then reads the body as if
 // its ctx/time held t, in UTC and to the second: t is the context's
-// start_time, and the HISTORY origin and the EVENT and ACTION times the body
-// leaves out, and the context it builds takes the 238|other care setting.
+// start_time, the time of an ACTION the body gives none, and the origin of a
+// HISTORY whose events carry no time, which its events then take (see
+// [WithTemplate]); the context it builds takes the 238|other care setting.
 //
 // On a composition whose category is 431|persistent, the one the body spells
 // or else the one the template fixes, t builds no EVENT_CONTEXT. It still
