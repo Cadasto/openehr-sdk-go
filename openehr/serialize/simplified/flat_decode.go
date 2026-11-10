@@ -1143,8 +1143,8 @@ type ctxInfo struct {
 	time                string
 	haveTime            bool
 	// setting carries the ctx/setting|code + |value pair (REQ-053). parseCtx
-	// enforces that the two arrive together, so applyContext keys on
-	// haveSettingCode alone.
+	// completes half of it from the openEHR setting group or refuses it, so
+	// applyContext keys on haveSettingCode alone.
 	settingCode, settingValue         string
 	haveSettingCode, haveSettingValue bool
 }
@@ -1202,22 +1202,32 @@ func parseCtx(ctx map[string]any, origin map[string]string) (ctxInfo, error) {
 			return ci, err
 		}
 	}
-	// ctx/setting|code and |value travel as a pair (REQ-053): half of it is
-	// refused naming the missing key, the shape requireSuffix enforces for a
-	// leaf's mandatory suffixes. A setting named by its code or its rubric alone
-	// is spelled as a bare ctx/setting, which [putBareSetting] reads in the
-	// openEHR setting group.
+	// Half of the ctx/setting pair, in either spelling, is completed from the
+	// openEHR setting group, as a bare ctx/setting is ([putBareSetting]) —
+	// REQ-053: |code alone takes its member's rubric, and |value alone its
+	// member's code. A |code is read as a code only and a |value as a rubric
+	// only. Completion runs here, once every spelling has met in [putCtx], so a
+	// half beside another spelling naming another member was already refused
+	// there as a disagreement. A half the group does not complete (a code outside
+	// it, a value that is no rubric of it, an empty half) is refused naming the
+	// missing key, the shape requireSuffix enforces for a leaf's mandatory
+	// suffixes.
 	if ci.haveSettingCode != ci.haveSettingValue {
 		present, missing := "ctx/setting|code", "ctx/setting|value"
-		if !ci.haveSettingCode {
+		if ci.haveSettingCode {
+			ci.settingValue, ci.haveSettingValue = terminology.Setting.Rubric(ci.settingCode)
+		} else {
 			present, missing = "ctx/setting|value", "ctx/setting|code"
+			ci.settingCode, ci.haveSettingCode = terminology.Setting.Code(ci.settingValue)
 		}
 		// Both halves are named in the spelling the payload used: telling a
 		// real-path author to add a `ctx/`-spelled key they never wrote sends them
 		// to the wrong place. ctxSpelling falls back to the ctx/ form when the
 		// missing key has no origin, which is exactly right — it was not written.
-		return ci, fmt.Errorf("%w: %s without %s — the ctx/setting pair travels together",
-			ErrUnsupportedDatatype, ctxSpelling(origin, present), ctxSpelling(origin, missing))
+		if !ci.haveSettingCode || !ci.haveSettingValue {
+			return ci, fmt.Errorf("%w: %s without %s, and the openEHR setting group has no member to complete it from",
+				ErrUnsupportedDatatype, ctxSpelling(origin, present), ctxSpelling(origin, missing))
+		}
 	}
 	// Neither half may be empty. An empty code would rebuild a CODE_PHRASE with no
 	// code_string — RM-invalid, and refused by emitContextSetting on the way back
