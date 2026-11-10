@@ -23,7 +23,7 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 | Set | Leg | Outcome |
 |---|---|---|
 | alternative_events | canonical-flat | compared 21, missing 4, extra 0, altered 0, excluded 0 |
-| alternative_events | flat-canonical | compared 115, missing 8, extra 4, altered 13, excluded 4 |
+| alternative_events | flat-canonical | compared 115, missing 8, extra 4, altered 12, excluded 4 |
 | consult_record | json-xml | compared 150, missing 0, extra 0, altered 0, excluded 0 |
 | consult_record | canonical-flat | compared 26, missing 1, extra 6, altered 0, excluded 0 |
 | consult_record | flat-canonical | compared 150, missing 7, extra 0, altered 4, excluded 3 |
@@ -61,8 +61,8 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 
 ### flat-canonical
 
-- Outcome: compared 115, missing 8, extra 4, altered 13, excluded 4
-- Reason: INTERVAL_EVENT attributes: decode refuses math_function and width in every mode (the 4 excluded keys), so the interval event loses both and decodes as a POINT_EVENT. Sibling order: FLAT carries no order between the birth_en and any_event_en events; decode lists them in template order (openehr/serialize/simplified/deviations.md), any_event_en before birth_en, the canonical lists Birth first, so the leaves of all three events compare at shifted positions. HISTORY.origin: the FLAT has no origin key and decode fills it from the context start time (openehr/serialize/simplified/deviations.md), where the canonical sets it to the Birth time. RM-FLOOR archetype_details: the canonical OBSERVATION has none, decode adds it (4 extra leaves), and rm_version is 1.2.0 against 1.0.4.
+- Outcome: compared 115, missing 8, extra 4, altered 12, excluded 4
+- Reason: INTERVAL_EVENT attributes: decode refuses math_function and width in every mode (the 4 excluded keys), so the interval event loses both and decodes as a POINT_EVENT. Sibling order: FLAT carries no order between the birth_en and any_event_en events; decode lists them in template order (openehr/serialize/simplified/deviations.md), any_event_en before birth_en, the canonical lists Birth first, so the leaves of all three events compare at shifted positions. HISTORY.origin: the FLAT has no origin key and decode gives it the earliest event time, the Birth time, as the canonical does (openehr/serialize/simplified/deviations.md). RM-FLOOR archetype_details: the canonical OBSERVATION has none, decode adds it (4 extra leaves), and rm_version is 1.2.0 against 1.0.4.
 - Missing (8):
   - `/content/0/data/events/2/math_function/_type`
   - `/content/0/data/events/2/math_function/defining_code/_type`
@@ -77,7 +77,7 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - `/content/0/archetype_details/archetype_id/_type`
   - `/content/0/archetype_details/archetype_id/value`
   - `/content/0/archetype_details/rm_version`
-- Altered (13, first 10 shown):
+- Altered (12, first 10 shown):
   - `/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
   - `/content/0/data/events/0/archetype_node_id`: reference `"at0026"`, ours `"at0003"`
   - `/content/0/data/events/0/data/items/0/value/magnitude`: reference `30`, ours `55`
@@ -261,7 +261,7 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 ### flat-canonical
 
 - Outcome: compared 249, missing 0, extra 8, altered 9, excluded 0
-- Reason: RM-FLOOR archetype_details: the two canonical OBSERVATIONs have none, decode adds them (8 extra leaves), and rm_version is 1.2.0 against 1.0.4. Upstream date-time spelling: the FLAT writes the four event times and the context start and end times with a full stop before the fraction, the canonical with a comma. HISTORY.origin: the FLAT has no origin key and decode fills both origins from the context start time (openehr/serialize/simplified/deviations.md), where the canonical sets them otherwise.
+- Reason: RM-FLOOR archetype_details: the two canonical OBSERVATIONs have none, decode adds them (8 extra leaves), and rm_version is 1.2.0 against 1.0.4. Upstream date-time spelling: the FLAT writes the four event times and the context start and end times with a full stop before the fraction, the canonical with a comma. HISTORY.origin: the FLAT has no origin key and decode gives each origin the earliest time its events carry (openehr/serialize/simplified/deviations.md): the first OBSERVATION's canonical origin is earlier than its events, and the second's differs only in the comma before the fraction.
 - Extra (8):
   - `/content/0/archetype_details/_type`
   - `/content/0/archetype_details/archetype_id/_type`
@@ -275,10 +275,10 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - `/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
   - `/content/0/data/events/0/time/value`: reference `"2020-10-06T13:30:34,328873+02:00"`, ours `"2020-10-06T13:30:34.328873+02:00"`
   - `/content/0/data/events/1/time/value`: reference `"2020-10-06T13:30:34,328873+02:00"`, ours `"2020-10-06T13:30:34.328873+02:00"`
-  - `/content/0/data/origin/value`: reference `"2020-10-06T13:30:34,326872+02:00"`, ours `"2020-10-06T13:30:34.314872+02:00"`
+  - `/content/0/data/origin/value`: reference `"2020-10-06T13:30:34,326872+02:00"`, ours `"2020-10-06T13:30:34.328873+02:00"`
   - `/content/1/data/events/0/time/value`: reference `"2020-10-06T13:30:34,328873+02:00"`, ours `"2020-10-06T13:30:34.328873+02:00"`
   - `/content/1/data/events/1/time/value`: reference `"2020-10-06T13:30:34,328873+02:00"`, ours `"2020-10-06T13:30:34.328873+02:00"`
-  - `/content/1/data/origin/value`: reference `"2020-10-06T13:30:34,328873+02:00"`, ours `"2020-10-06T13:30:34.314872+02:00"`
+  - `/content/1/data/origin/value`: reference `"2020-10-06T13:30:34,328873+02:00"`, ours `"2020-10-06T13:30:34.328873+02:00"`
   - `/context/end_time/value`: reference `"2020-10-06T13:30:34,317875+02:00"`, ours `"2020-10-06T13:30:34.317875+02:00"`
   - `/context/start_time/value`: reference `"2020-10-06T13:30:34,314872+02:00"`, ours `"2020-10-06T13:30:34.314872+02:00"`
 
@@ -306,7 +306,7 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 ### flat-canonical
 
 - Outcome: compared 156, missing 34, extra 4, altered 8, excluded 0
-- Reason: party reference type: the upstream FLAT writes no composer|type, so decode gives the composer's reference the type PARTY against the canonical's PERSON. Upstream FLAT omissions: the FLAT carries no context (start time, setting, participation) and no ACTIVITY action_archetype_id, so the decoded composition has no context and an empty action_archetype_id. DV_ORDINAL terminology: the ordinal decodes in the local terminology its |code form implies, against the canonical's com.cabolabs.openehr.opt. RM-FLOOR archetype_details: the canonical SECTION has none and decode adds it (4 extra leaves), the canonical carries template_id on inner archetype roots where decode adds it on the root only, and rm_version is 1.2.0 against 1.0.2.
+- Reason: party reference type: the upstream FLAT writes no composer|type, so decode gives the composer's reference the type PARTY against the canonical's PERSON. Upstream FLAT omissions: the FLAT carries no context (start time, setting, participation) and no ACTIVITY action_archetype_id, so the decoded composition has no context, and the ACTIVITY takes the RM default action_archetype_id /.*/, since nested.en.v1.opt does not constrain it. DV_ORDINAL terminology: the ordinal decodes in the local terminology its |code form implies, against the canonical's com.cabolabs.openehr.opt. RM-FLOOR archetype_details: the canonical SECTION has none and decode adds it (4 extra leaves), the canonical carries template_id on inner archetype roots where decode adds it on the root only, and rm_version is 1.2.0 against 1.0.2.
 - Missing (34, first 10 shown):
   - `/content/0/items/0/activities/0/description/archetype_details/template_id/_type`
   - `/content/0/items/0/activities/0/description/archetype_details/template_id/value`
@@ -326,7 +326,7 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 - Altered (8):
   - `/archetype_details/rm_version`: reference `"1.0.2"`, ours `"1.2.0"`
   - `/composer/external_ref/type`: reference `"PERSON"`, ours `"PARTY"`
-  - `/content/0/items/0/activities/0/action_archetype_id`: reference `"openEHR-EHR-ACTION\\.sample_action\\.v1"`, ours `""`
+  - `/content/0/items/0/activities/0/action_archetype_id`: reference `"openEHR-EHR-ACTION\\.sample_action\\.v1"`, ours `"/.*/"`
   - `/content/0/items/0/activities/0/description/archetype_details/rm_version`: reference `"1.0.2"`, ours `"1.2.0"`
   - `/content/0/items/0/activities/0/description/items/0/value/symbol/defining_code/terminology_id/value`: reference `"com.cabolabs.openehr.opt"`, ours `"local"`
   - `/content/0/items/0/activities/0/description/items/1/archetype_details/rm_version`: reference `"1.0.2"`, ours `"1.2.0"`
@@ -347,7 +347,7 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 ### flat-canonical
 
 - Outcome: compared 72, missing 2, extra 0, altered 5, excluded 0
-- Reason: party reference type: the upstream FLAT writes no composer|type, so decode gives the composer's reference the type PARTY against the canonical's PERSON. Upstream date-time spelling: the event time is 21:11:36.7 in the FLAT and 21:11:36.700 in the canonical XML. HISTORY.origin: a persistent composition has no context start time, and decode, which fills origin from it (openehr/serialize/simplified/deviations.md), leaves the origin empty. RM-FLOOR archetype_details: the canonical carries template_id on the inner archetype root where decode adds it on the root only, and rm_version is 1.2.0 against 1.0.2.
+- Reason: party reference type: the upstream FLAT writes no composer|type, so decode gives the composer's reference the type PARTY against the canonical's PERSON. Upstream date-time spelling: the event time is 21:11:36.7 in the FLAT and 21:11:36.700 in the canonical XML. HISTORY.origin: the FLAT has no origin key and decode gives it the event time (openehr/serialize/simplified/deviations.md), where the canonical sets it earlier. RM-FLOOR archetype_details: the canonical carries template_id on the inner archetype root where decode adds it on the root only, and rm_version is 1.2.0 against 1.0.2.
 - Missing (2):
   - `/content/0/archetype_details/template_id/_type`
   - `/content/0/archetype_details/template_id/value`
@@ -356,7 +356,7 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - `/composer/external_ref/type`: reference `"PERSON"`, ours `"PARTY"`
   - `/content/0/archetype_details/rm_version`: reference `"1.0.2"`, ours `"1.2.0"`
   - `/content/0/data/events/0/time/value`: reference `"2021-09-21T21:11:36.700-03:00"`, ours `"2021-09-21T21:11:36.7-03:00"`
-  - `/content/0/data/origin/value`: reference `"2021-09-21T21:11:36.652-03:00"`, ours `""`
+  - `/content/0/data/origin/value`: reference `"2021-09-21T21:11:36.652-03:00"`, ours `"2021-09-21T21:11:36.7-03:00"`
 
 ## test_all_types
 
@@ -395,7 +395,7 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 ### flat-canonical
 
 - Outcome: compared 423, missing 40, extra 34, altered 35, excluded 7
-- Reason: The 7 excluded keys are the section_3 ACTION's in-context ism_transition/current_state (3) and time (1), refused, and choice/quantity_value|magnitude and |unit (2) and the bare proportion_any (1), reported as unmatched content, as follows. Web Template projection: decode refuses the ACTION's in-context ism_transition and time in every mode as RM data it would otherwise drop or replace, so the decoded ACTION has an empty current_state (3 leaves) and the context start time as its time. party reference type: the upstream FLAT writes no composer|type, so decode gives the composer's reference the type PARTY against the canonical's PERSON. Choice element: decode does not read choice/quantity_value (the SDK spells it choice), so the choice element is missing. DV_PROPORTION: decode reports the bare proportion_any, the derived magnitude, as unmatched content, and reads |type 1.0 as the Integer 1. Upstream conversion differences: a DV_URI and the proportion's precision only the canonical carries, and duration_any (P1Y2M10DT2H30M against PT30M). Upstream date and time spelling: the canonical writes dates in the basic format (20190114) and date-times with a comma and +00:00, the FLAT in the extended format with a full stop and Z (6 leaves). HISTORY.origin: the FLAT has no origin key and decode fills it from the context start time (openehr/serialize/simplified/deviations.md), where the canonical sets it otherwise. Shifted positions: the elements decode lacks move their later siblings up, the DV_URI and the choice element in the EVALUATION, so the EVALUATION's intervals and cluster compare against the canonical's next element; this accounts for most of the missing, extra and altered leaves. RM-FLOOR archetype_details: the canonical SECTION and the ACTION's description CLUSTER have none, decode adds them (8 extra leaves), and rm_version is 1.2.0 against 1.0.2 and 1.0.4.
+- Reason: The 7 excluded keys are the section_3 ACTION's in-context ism_transition/current_state (3) and time (1), refused, and choice/quantity_value|magnitude and |unit (2) and the bare proportion_any (1), reported as unmatched content, as follows. Web Template projection: decode refuses the ACTION's in-context ism_transition and time in every mode as RM data it would otherwise drop or replace, so the decoded ACTION has an empty current_state (3 leaves) and the context start time as its time. party reference type: the upstream FLAT writes no composer|type, so decode gives the composer's reference the type PARTY against the canonical's PERSON. Choice element: decode does not read choice/quantity_value (the SDK spells it choice), so the choice element is missing. DV_PROPORTION: decode reports the bare proportion_any, the derived magnitude, as unmatched content, and reads |type 1.0 as the Integer 1. Upstream conversion differences: a DV_URI and the proportion's precision only the canonical carries, and duration_any (P1Y2M10DT2H30M against PT30M). Upstream date and time spelling: the canonical writes dates in the basic format (20190114) and date-times with a comma and +00:00, the FLAT in the extended format with a full stop and Z (6 leaves). HISTORY.origin: the FLAT has no origin key and decode gives it the event time (openehr/serialize/simplified/deviations.md), where the canonical sets it earlier. Shifted positions: the elements decode lacks move their later siblings up, the DV_URI and the choice element in the EVALUATION, so the EVALUATION's intervals and cluster compare against the canonical's next element; this accounts for most of the missing, extra and altered leaves. RM-FLOOR archetype_details: the canonical SECTION and the ACTION's description CLUSTER have none, decode adds them (8 extra leaves), and rm_version is 1.2.0 against 1.0.2 and 1.0.4.
 - Missing (40, first 10 shown):
   - `/content/0/data/events/0/data/items/15/value/precision`
   - `/content/1/data/items/0/value/value`
@@ -427,7 +427,7 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - `/content/0/data/events/0/data/items/6/value/value`: reference `"2019-01-28T21:22:49,426+00:00"`, ours `"2019-01-28T21:22:49.426Z"`
   - `/content/0/data/events/0/data/items/7/value/value`: reference `"2019-01-28T21:22:49,427+00:00"`, ours `"2019-01-28T21:22:49.427Z"`
   - `/content/0/data/events/0/time/value`: reference `"2019-01-28T21:22:49,332+00:00"`, ours `"2019-01-28T21:22:49.332Z"`
-  - `/content/0/data/origin/value`: reference `"2019-01-28T21:22:49,326+00:00"`, ours `"2019-01-14T18:36:49.294Z"`
+  - `/content/0/data/origin/value`: reference `"2019-01-28T21:22:49,326+00:00"`, ours `"2019-01-28T21:22:49.332Z"`
   - `/content/1/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
 - Reducing decode removed 7 keys from the upstream FLAT:
   - 3: `reported as unmatched content`

@@ -180,15 +180,15 @@ var Recorded = map[string]map[Leg]Record{
 				"math_function or width, so FLAT encode writes none of their four keys.",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 115, Missing: 8, Extra: 4, Altered: 13, Excluded: 4},
+			Outcome: Outcome{Compared: 115, Missing: 8, Extra: 4, Altered: 12, Excluded: 4},
 			Reason: "INTERVAL_EVENT attributes: decode refuses math_function and width in every mode (the 4 " +
 				"excluded keys), so the interval event loses both and decodes as a POINT_EVENT. Sibling order: FLAT " +
 				"carries no order " +
 				"between the birth_en and any_event_en events; decode lists them in template order " +
 				"(openehr/serialize/simplified/deviations.md), any_event_en before birth_en, the canonical lists " +
 				"Birth first, so the leaves of all three events compare at shifted positions. HISTORY.origin: the " +
-				"FLAT has no origin key and decode fills it from the context start time (openehr/serialize/simplified/deviations.md), where the " +
-				"canonical sets it to the Birth time. RM-FLOOR archetype_details: the canonical OBSERVATION has none, " +
+				"FLAT has no origin key and decode gives it the earliest event time, the Birth time, as the canonical " +
+				"does (openehr/serialize/simplified/deviations.md). RM-FLOOR archetype_details: the canonical OBSERVATION has none, " +
 				"decode adds it (4 extra leaves), and rm_version is 1.2.0 against 1.0.4.",
 		},
 	},
@@ -274,8 +274,10 @@ var Recorded = map[string]map[Leg]Record{
 			Reason: "RM-FLOOR archetype_details: the two canonical OBSERVATIONs have none, decode adds them (8 " +
 				"extra leaves), and rm_version is 1.2.0 against 1.0.4. Upstream date-time spelling: the FLAT writes " +
 				"the four event times and the context start and end times with a full stop before the fraction, " +
-				"the canonical with a comma. HISTORY.origin: the FLAT has no origin key and decode fills both " +
-				"origins from the context start time (openehr/serialize/simplified/deviations.md), where the canonical sets them otherwise.",
+				"the canonical with a comma. HISTORY.origin: the FLAT has no origin key and decode gives each origin " +
+				"the earliest time its events carry (openehr/serialize/simplified/deviations.md): the first " +
+				"OBSERVATION's canonical origin is earlier than its events, and the second's differs only in the " +
+				"comma before the fraction.",
 		},
 	},
 	"nested": {
@@ -293,7 +295,8 @@ var Recorded = map[string]map[Leg]Record{
 			Reason: "party reference type: the upstream FLAT writes no composer|type, so decode gives the " +
 				"composer's reference the type PARTY against the canonical's PERSON. Upstream FLAT " +
 				"omissions: the FLAT carries no context (start time, setting, participation) and no ACTIVITY action_archetype_id, so the decoded " +
-				"composition has no context and an empty action_archetype_id. DV_ORDINAL terminology: the " +
+				"composition has no context, and the ACTIVITY takes the RM default action_archetype_id /.*/, since " +
+				"nested.en.v1.opt does not constrain it. DV_ORDINAL terminology: the " +
 				"ordinal decodes in the local terminology its |code form implies, against the canonical's " +
 				"com.cabolabs.openehr.opt. RM-FLOOR archetype_details: the " +
 				"canonical SECTION has none and decode adds it (4 extra leaves), the canonical carries template_id " +
@@ -313,9 +316,9 @@ var Recorded = map[string]map[Leg]Record{
 			Outcome: Outcome{Compared: 72, Missing: 2, Altered: 5},
 			Reason: "party reference type: the upstream FLAT writes no composer|type, so decode gives the " +
 				"composer's reference the type PARTY against the canonical's PERSON. Upstream date-time " +
-				"spelling: the event time is 21:11:36.7 in the FLAT and 21:11:36.700 in the canonical XML. HISTORY.origin: a persistent " +
-				"composition has no context start time, and decode, which fills origin from it (openehr/serialize/simplified/deviations.md), " +
-				"leaves the origin empty. RM-FLOOR archetype_details: the canonical carries template_id on the " +
+				"spelling: the event time is 21:11:36.7 in the FLAT and 21:11:36.700 in the canonical XML. HISTORY.origin: the " +
+				"FLAT has no origin key and decode gives it the event time (openehr/serialize/simplified/deviations.md), " +
+				"where the canonical sets it earlier. RM-FLOOR archetype_details: the canonical carries template_id on the " +
 				"inner archetype root where decode adds it on the root only, and rm_version is 1.2.0 against 1.0.2.",
 		},
 	},
@@ -356,8 +359,8 @@ var Recorded = map[string]map[Leg]Record{
 				"precision only the canonical carries, and duration_any (P1Y2M10DT2H30M against PT30M). Upstream " +
 				"date and time spelling: the canonical writes dates in the basic format (20190114) and date-times " +
 				"with a comma and +00:00, the FLAT in the extended format with a full stop and Z (6 leaves). " +
-				"HISTORY.origin: the FLAT has no origin key and decode fills it from the context start time " +
-				"(openehr/serialize/simplified/deviations.md), where the canonical sets it otherwise. Shifted " +
+				"HISTORY.origin: the FLAT has no origin key and decode gives it the event time " +
+				"(openehr/serialize/simplified/deviations.md), where the canonical sets it earlier. Shifted " +
 				"positions: the elements decode lacks move their later siblings up, the DV_URI and the choice " +
 				"element in the EVALUATION, so the EVALUATION's intervals and cluster compare against the " +
 				"canonical's next element; this accounts for most of the missing, extra and altered leaves. RM-FLOOR " +

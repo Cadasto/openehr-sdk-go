@@ -251,10 +251,33 @@ const (
 // the minimal_instruction OPT, its C_STRING included.
 var actionArchetypeAttribute = regexp.MustCompile(`(?s)<attributes xsi:type="C_SINGLE_ATTRIBUTE">\s*<rm_attribute_name>action_archetype_id</rm_attribute_name>.*?</attributes>`)
 
+// firstAlternative is a C_STRING alternative on action_archetype_id, with a
+// pattern of its own, that alternativesInstructionTemplate puts before the
+// OPT's.
+const firstAlternative = `<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>STRING</rm_type_name><node_id /><item xsi:type="C_STRING"><pattern>openEHR-EHR-ACTION\.first\.v1</pattern></item></children>`
+
 // silentInstructionTemplate compiles the minimal_instruction OPT with its
 // action_archetype_id attribute removed, so the template says nothing of it,
-// and builds its Web Template.
-func silentInstructionTemplate(t *testing.T) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
+// under opts, and builds its Web Template.
+func silentInstructionTemplate(t *testing.T, opts ...templatecompile.Option) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
+	t.Helper()
+	return editedInstructionTemplate(t, func(string) string { return "" }, opts...)
+}
+
+// alternativesInstructionTemplate compiles the minimal_instruction OPT with
+// firstAlternative put before the C_STRING its action_archetype_id attribute
+// holds, and builds its Web Template.
+func alternativesInstructionTemplate(t *testing.T) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
+	t.Helper()
+	return editedInstructionTemplate(t, func(attribute string) string {
+		return strings.Replace(attribute, "<children", firstAlternative+"<children", 1)
+	})
+}
+
+// editedInstructionTemplate compiles the minimal_instruction OPT with its one
+// action_archetype_id attribute replaced by what edit returns for it, under
+// opts, and builds its Web Template.
+func editedInstructionTemplate(t *testing.T, edit func(attribute string) string, opts ...templatecompile.Option) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
 	t.Helper()
 	raw, err := os.ReadFile(fixtures.TemplateOpt(minimalInstructionID))
 	if err != nil {
@@ -263,12 +286,20 @@ func silentInstructionTemplate(t *testing.T) (*webtemplate.WebTemplate, *templat
 	if n := len(actionArchetypeAttribute.FindAllIndex(raw, -1)); n != 1 {
 		t.Fatalf("%s holds %d action_archetype_id attributes, want one — fixture changed?", minimalInstructionID, n)
 	}
-	edited := actionArchetypeAttribute.ReplaceAllString(string(raw), "")
+	edited := actionArchetypeAttribute.ReplaceAllStringFunc(string(raw), edit)
 	model, err := aom14.ReadOperationalTemplate(strings.NewReader(edited))
 	if err != nil {
 		t.Fatalf("ReadOperationalTemplate(edited %s): %v", minimalInstructionID, err)
 	}
-	return compileTemplate(t, minimalInstructionID, model)
+	compiled, err := templatecompile.Compile(model, opts...)
+	if err != nil {
+		t.Fatalf("Compile(edited %s): %v", minimalInstructionID, err)
+	}
+	wt, err := webtemplate.Build(compiled)
+	if err != nil {
+		t.Fatalf("Build(edited %s): %v", minimalInstructionID, err)
+	}
+	return wt, compiled
 }
 
 // activityIDs returns the action_archetype_id of every ACTIVITY in comp, by
@@ -357,11 +388,15 @@ func structureBody() map[string]any {
 // the generator writes for the C_STRING its template puts on that attribute:
 // a list member or a pattern match the C_STRING accepts, else the RM default
 // /.*/ where the C_STRING has neither or the template says nothing of the
-// attribute. The composition then validates, and the value is the
+// attribute, whether or not the compiled template holds the attribute the RM
+// requires there. Of several alternatives, the first decides, as it does for
+// the generator. The composition then validates, and the value is the
 // generator's.
 func TestREQ053ActivityTakesTheTemplatesActionArchetypeID(t *testing.T) {
 	instructionWT, instruction := templateOf(t, minimalInstructionID)
 	silentWT, silent := silentInstructionTemplate(t)
+	explicitWT, explicit := silentInstructionTemplate(t, templatecompile.WithoutImplicitAttributes())
+	alternativesWT, alternatives := alternativesInstructionTemplate(t)
 	structureWT, structure := templateOf(t, structureID)
 	cases := []struct {
 		name     string
@@ -379,6 +414,16 @@ func TestREQ053ActivityTakesTheTemplatesActionArchetypeID(t *testing.T) {
 		{
 			name: "a template silent on it", wt: silentWT, compiled: silent, body: instructionBody(nil),
 			want: map[string]string{"at0001": "/.*/"},
+		},
+		{
+			// Compiled with only the attributes the OPT declares, the
+			// ACTIVITY node holds no action_archetype_id attribute at all.
+			name: "a template silent on it, compiled without implicit attributes", wt: explicitWT, compiled: explicit, body: instructionBody(nil),
+			want: map[string]string{"at0001": "/.*/"},
+		},
+		{
+			name: "two alternatives: the first", wt: alternativesWT, compiled: alternatives, body: instructionBody(nil),
+			want: map[string]string{"at0001": "openEHR-EHR-ACTION.first.v1"},
 		},
 		{
 			name: "neither a pattern nor a list, and a list", wt: structureWT, compiled: structure, body: structureBody(),

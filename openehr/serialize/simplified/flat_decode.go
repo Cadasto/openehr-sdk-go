@@ -24,6 +24,8 @@ import (
 	"weak"
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
+	"github.com/cadasto/openehr-sdk-go/internal/cstringvalue"
+	"github.com/cadasto/openehr-sdk-go/internal/iso8601"
 	"github.com/cadasto/openehr-sdk-go/internal/rmlists"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -331,9 +333,12 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 	// is placed, so each rebuilt node gets the required structures with no
 	// member the formats have no key for (REQ-053); then the RM-mandatory
 	// attributes the formats do not carry are filled, from ctx defaults + RM
-	// conventions, so the decoded composition is OPT-validatable.
+	// conventions, so the decoded composition is OPT-validatable. An ACTIVITY's
+	// action_archetype_id, which the body may leave out, is the one the
+	// generator writes for the template (REQ-053).
 	if tmpl != nil {
 		rebuildEmptyStructures(compJSON, tmpl)
+		completeActionArchetypeIDs(compJSON, tmpl)
 		completeRequired(compJSON, ci)
 	}
 	// Both modes: archetype_details has no FLAT key, and the Web Template
@@ -1364,12 +1369,17 @@ func persistentComposition(compJSON map[string]any, ci ctxInfo) bool {
 // conventions, so a WithTemplate decode yields an OPT-validatable composition.
 // It only runs in conformant (WithTemplate) mode. The values it synthesises
 // (event times, subject, setting) are defaults, not recovered data — the formats
-// never carried them; see deviations.md.
+// never carried them; see deviations.md. A HISTORY's origin and its events'
+// times follow [historyTimes].
 func completeRequired(node map[string]any, ci ctxInfo) {
 	if t, _ := node["_type"].(string); t != "" {
 		// rminfo knows each class by its bare BMM name; a caller's |raw fragment
 		// may spell a generic instantiation (DV_INTERVAL<DV_QUANTITY>).
-		for _, attr := range rminfo.Default.RequiredAttributes(bmmtype.Class(t)) {
+		class := bmmtype.Class(t)
+		if class == "HISTORY" {
+			ci = historyTimes(node, ci)
+		}
+		for _, attr := range rminfo.Default.RequiredAttributes(class) {
 			if _, has := node[attr]; has {
 				continue
 			}
@@ -1390,6 +1400,68 @@ func completeRequired(node map[string]any, ci ctxInfo) {
 			}
 		}
 	}
+}
+
+// historyTimes gives history, a HISTORY the body gives no origin, the origin
+// the reference implementation gives it (REQ-053): the earliest time its own
+// events carry ([earliestEventTime]), else the start time in ci, else none.
+// It returns ci with the HISTORY's origin as its time, where it has one, so
+// each event below it that the body gives no time takes that origin, as the
+// Simplified Formats say (§ time: "EVENT.time will be set to history.origin").
+// An origin the body gives, in a |raw fragment say, is kept, and its events
+// take it too.
+func historyTimes(history map[string]any, ci ctxInfo) ctxInfo {
+	if _, has := history["origin"]; !has {
+		if earliest, ok := earliestEventTime(history); ok {
+			history["origin"] = map[string]any{"_type": "DV_DATE_TIME", "value": earliest}
+		} else if ci.haveTime {
+			history["origin"] = map[string]any{"_type": "DV_DATE_TIME", "value": ci.time}
+		}
+	}
+	origin, _ := history["origin"].(map[string]any)
+	if value, _ := origin["value"].(string); value != "" {
+		ci.time, ci.haveTime = value, true
+	}
+	return ci
+}
+
+// earliestEventTime returns, as written, the earliest time the events of
+// history carry, and whether any carries one. Times are compared as instants
+// ([eventInstant]); a time that does not parse takes no part. Of two times
+// that name one instant, the first event's is returned.
+func earliestEventTime(history map[string]any) (string, bool) {
+	events, _ := history["events"].([]any)
+	var earliest string
+	var least float64
+	found := false
+	for _, e := range events {
+		event, _ := e.(map[string]any)
+		at, _ := event["time"].(map[string]any)
+		value, _ := at["value"].(string)
+		instant, ok := eventInstant(value)
+		if ok && (!found || instant < least) {
+			earliest, least, found = value, instant, true
+		}
+	}
+	return earliest, found
+}
+
+// eventInstant returns the instant the ISO 8601 date-time s names, in seconds
+// from 0001-01-01T00:00:00 UTC, and whether s parses as one ([iso8601]). A
+// time with a zone is its clock less the zone's offset from UTC, and one with
+// no zone is read in UTC, as the reference implementation reads it
+// (DV_DATE_TIME magnitude). A partial value stands for the start of the period
+// it names.
+func eventInstant(s string) (float64, bool) {
+	d, t, err := iso8601.ParseDateTime(s)
+	if err != nil {
+		return 0, false
+	}
+	magnitude := iso8601.DateTimeMagnitude(d, t)
+	if t.Zone == "" {
+		return magnitude, true
+	}
+	return iso8601.UTCMagnitude(magnitude, t.Zone)
 }
 
 // defaultAttr synthesises a default value for an RM-mandatory attribute the
@@ -2485,6 +2557,13 @@ type templateIndex struct {
 	// template's: the cached index ([templateIndexFor]) never holds one, and
 	// [decodeFlatMap] sets it on a copy that one decode reads.
 	startTime string
+	// actionArchetypeIDs maps the compiled path of an ACTIVITY node, and its
+	// bare path, to the action_archetype_id decode gives an ACTIVITY there
+	// that the body gives none ([actionArchetypeIDOf]). It maps to "" where
+	// the nodes at one path disagree on it, or where the generator writes
+	// none: the template then gives no single answer, and decode leaves the
+	// attribute out.
+	actionArchetypeIDs map[string]string
 }
 
 // categoryOf returns the category the template fixes on root, its
@@ -3022,6 +3101,50 @@ func (x *templateIndex) rmType(path string) string {
 	return x.rmTypes[x.indexed(path)]
 }
 
+// addActionArchetypeID records id for the ACTIVITY node at path. A second
+// node at that path with another id leaves the path with no single answer.
+func (x *templateIndex) addActionArchetypeID(path, id string) {
+	if prev, seen := x.actionArchetypeIDs[path]; seen && prev != id {
+		id = ""
+	}
+	x.actionArchetypeIDs[path] = id
+}
+
+// actionArchetypeID returns the action_archetype_id decode gives an ACTIVITY
+// at path that the body gives none, or "" where the template gives no single
+// one. Every ACTIVITY decode rebuilds stands for a node of the template, so
+// its path is indexed.
+func (x *templateIndex) actionArchetypeID(path string) string {
+	return x.actionArchetypeIDs[x.indexed(path)]
+}
+
+// actionArchetypeIDOf returns the action_archetype_id the generator writes on
+// the ACTIVITY n under its example fill, or "" where it writes none. Like the
+// generator, it reads the first child the template allows on that attribute:
+// the value [cstringvalue.ActionArchetypeID] picks from that child's
+// C_STRING, or "" where the C_STRING admits no value the pick builds. Where
+// n holds no such attribute (a template compiled without implicit
+// attributes) or the template allows no child there, the template names no
+// archetype, and the RM default [cstringvalue.AnyActionArchetype] stands.
+func actionArchetypeIDOf(n *templatecompile.CompiledNode) string {
+	a := n.Attribute("action_archetype_id")
+	if a == nil {
+		return cstringvalue.AnyActionArchetype
+	}
+	children := tcimpl.AllowedChildNodes(a)
+	if len(children) == 0 {
+		return cstringvalue.AnyActionArchetype
+	}
+	// A child with no C_STRING, a C_PRIMITIVE_OBJECT with no item say, gives
+	// the zero constraint, which names no archetype either.
+	cs, _ := children[0].PrimitiveConstraint().(constraints.CString)
+	id, err := cstringvalue.ActionArchetypeID(cs, cs.ExampleValue())
+	if err != nil {
+		return ""
+	}
+	return id
+}
+
 // addRMType records rmType for the node at path. A second node at that path
 // with another type leaves the path with no single answer.
 func (x *templateIndex) addRMType(path, rmType string) {
@@ -3095,13 +3218,14 @@ func templateIndexFor(c *templatecompile.Compiled) *templateIndex {
 // language, so the rubric is in that language.
 func buildTemplateIndex(c *templatecompile.Compiled) *templateIndex {
 	x := &templateIndex{
-		names:        make(map[string]string),
-		codedNames:   make(map[string]codedName),
-		rmTypes:      make(map[string]string),
-		structures:   make(map[string][]emptyStructure),
-		ordinals:     make(map[string]map[ordinalPair]string),
-		ordinalCodes: make(map[string]map[string]ordinalCode),
-		codedValues:  make(map[string]codedTerms),
+		names:              make(map[string]string),
+		codedNames:         make(map[string]codedName),
+		rmTypes:            make(map[string]string),
+		structures:         make(map[string][]emptyStructure),
+		ordinals:           make(map[string]map[ordinalPair]string),
+		ordinalCodes:       make(map[string]map[string]ordinalCode),
+		codedValues:        make(map[string]codedTerms),
+		actionArchetypeIDs: make(map[string]string),
 	}
 	var walk func(n *templatecompile.CompiledNode)
 	walk = func(n *templatecompile.CompiledNode) {
@@ -3112,6 +3236,13 @@ func buildTemplateIndex(c *templatecompile.Compiled) *templateIndex {
 			x.addOrdinals(path, n, ord)
 			if bare := bareAQLPath(path); bare != path {
 				x.addOrdinals(bare, n, ord)
+			}
+		}
+		if n.RMTypeName() == "ACTIVITY" {
+			path, id := n.AQLPath(), actionArchetypeIDOf(n)
+			x.addActionArchetypeID(path, id)
+			if bare := bareAQLPath(path); bare != path {
+				x.addActionArchetypeID(bare, id)
 			}
 		}
 		if n.RMTypeName() == "DV_CODED_TEXT" {
@@ -3383,6 +3514,47 @@ func rebuildEmptyStructures(compJSON map[string]any, tmpl *templateIndex) {
 		}
 	}
 	walk(compJSON, make([]byte, 0, 256), make([]byte, 0, 256))
+}
+
+// completeActionArchetypeIDs gives each ACTIVITY in compJSON that the body
+// gives no action_archetype_id the one the template index gives its path
+// ([templateIndex.actionArchetypeID]): the value the generator writes there,
+// so the RM-mandatory attribute the formats let a client leave out is
+// filled as the generator fills it (REQ-053). An id the body gives is kept;
+// an empty one was refused where the leaf was read. The walk composes each
+// node's path as [rebuildEmptyStructures] does, a predicate only on a list
+// member, with the names the template pins on the way kept where the index
+// holds that spelling. A template with no ACTIVITY skips the walk.
+func completeActionArchetypeIDs(compJSON map[string]any, tmpl *templateIndex) {
+	if len(tmpl.actionArchetypeIDs) == 0 {
+		return
+	}
+	var walk func(node map[string]any, named []byte)
+	walk = func(node map[string]any, named []byte) {
+		if t, _ := node["_type"].(string); t == "ACTIVITY" {
+			if _, has := node["action_archetype_id"]; !has {
+				if id := tmpl.actionArchetypeID(string(named)); id != "" {
+					node["action_archetype_id"] = id
+				}
+			}
+		}
+		base := len(named)
+		for attr, v := range node {
+			switch x := v.(type) {
+			case map[string]any:
+				named = append(append(named[:base], '/'), attr...)
+				walk(x, named)
+			case []any:
+				for _, e := range x {
+					if m, ok := e.(map[string]any); ok {
+						named = appendMemberName(appendMemberPath(named[:base], attr, m), m, tmpl.rmTypes)
+						walk(m, named)
+					}
+				}
+			}
+		}
+	}
+	walk(compJSON, make([]byte, 0, 256))
 }
 
 // rmRequires reports whether the RM requires attr of node's class, as the
