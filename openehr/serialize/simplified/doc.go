@@ -67,8 +67,9 @@
 // whatever its value holds, and is reported as that member; a name it reads
 // keeps the shape refusals. A key the decode reads is never unmatched, even
 // where the decode then refuses it: a PARTICIPATION `time`, a
-// FEEDER_AUDIT_DETAILS `other_details`, `_instruction_details` and
-// `_wf_definition` have no carrier and fail the decode in every mode. So do, in the reference's in-context spelling and
+// FEEDER_AUDIT_DETAILS `other_details` and `_instruction_details` have no
+// carrier and fail the decode in every mode. So do, in the reference's
+// in-context spelling and
 // where the Web Template does not resolve them, an ACTION's ISM transition and
 // time (a `current_state`, `transition` or `careflow_step` leaf or a `_reason`
 // family under an `ism_transition` node, and the ACTION's own `time` leaf), an

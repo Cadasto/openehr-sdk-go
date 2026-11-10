@@ -29,7 +29,7 @@ type decodeConfig struct {
 // unmatched, even where the decode then
 // refuses it, and these fail the decode in every mode: the keys with no
 // carrier (a PARTICIPATION `time`, a FEEDER_AUDIT_DETAILS `other_details`,
-// `_instruction_details`, `_wf_definition`); the reference's in-context
+// `_instruction_details`); the reference's in-context
 // spelling of RM data this codec's Web Template does not model (an ACTION's
 // ISM transition and time, an INTERVAL_EVENT's `math_function`, `width` and
 // `sample_count`, an OBSERVATION's `history_origin`); at a leaf whose datatype
@@ -159,10 +159,9 @@ var (
 	// none of them),
 	// two spellings of one single-valued underscore attribute, or a key the
 	// decode reads and the same key ending in a bare `|` with differing values.
-	// The codec fails
-	// rather than dropping the entry or inventing a precedence rule. The two
-	// deferred underscore families, `_instruction_details` and `_wf_definition`,
-	// and the reference's in-context spelling of an ACTION's ISM transition and
+	// The codec fails rather than dropping the entry or inventing a precedence
+	// rule. The deferred underscore family `_instruction_details` and the
+	// reference's in-context spelling of an ACTION's ISM transition and
 	// time, an INTERVAL_EVENT's `math_function`, `width` and `sample_count`
 	// and an OBSERVATION's `history_origin` return it in every mode too.
 	ErrUnknownPath = errors.New("simplified: path not in web template")
