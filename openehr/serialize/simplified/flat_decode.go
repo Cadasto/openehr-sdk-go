@@ -300,6 +300,9 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 	if err != nil {
 		return nil, err
 	}
+	if tmpl != nil {
+		ci.category = tmpl.category
+	}
 	composerJSON, err := decodeComposer(composer, ci, ctxOrigin)
 	if err != nil {
 		return nil, err
@@ -1152,6 +1155,11 @@ type ctxInfo struct {
 	// applyContext keys on haveSettingCode alone.
 	settingCode, settingValue         string
 	haveSettingCode, haveSettingValue bool
+	// category is the composition category the template fixes
+	// ([templateIndex.category]), which [defaultAttr] gives a body that spells
+	// none. It is the zero codedName where the template fixes none, and in a
+	// decode without the template.
+	category codedName
 }
 
 // parseCtx decodes the ctx/ entries. Only the core context fields reach it:
@@ -1368,6 +1376,10 @@ func defaultAttr(attr string, ci ctxInfo) map[string]any {
 	case "setting":
 		return ctxCodedDefault(terminology.Setting, "238")
 	case "category":
+		// The category the template fixes, else 433 `event`.
+		if ci.category != (codedName{}) {
+			return ci.category.json()
+		}
 		return ctxCodedDefault(terminology.CompositionCategory, "433")
 	case "math_function":
 		// 640 is `actual` — the earlier 146|actual pair was inconsistent (146 is
@@ -2428,6 +2440,38 @@ type templateIndex struct {
 	// structureRoute holds the bare path of every node on the way to a key of
 	// structures, that key included, so the rebuild walk enters no other node.
 	structureRoute map[string]bool
+	// category is the composition category the template fixes ([categoryOf]),
+	// or the zero codedName where it fixes none.
+	category codedName
+}
+
+// categoryOf returns the category the template fixes on root, its
+// COMPOSITION: where the one child the template allows on root's category is
+// a DV_CODED_TEXT whose defining_code is constrained by one C_CODE_PHRASE, or
+// one C_CODE_REFERENCE read as the code phrase it carries, of the openehr
+// terminology listing exactly one code, it is that code with its openEHR
+// rubric as its text ([codeTermText]). A template that constrains the
+// category in any other way, or not at all, and a code with no single rubric
+// fix none: categoryOf then returns the zero codedName.
+func categoryOf(root *templatecompile.CompiledNode) codedName {
+	a := root.Attribute("category")
+	if a == nil {
+		return codedName{}
+	}
+	children := tcimpl.AllowedChildNodes(a)
+	if len(children) != 1 || children[0].RMTypeName() != "DV_CODED_TEXT" {
+		return codedName{}
+	}
+	phrase, ok := constraints.CodePhraseOf(onePrimitive(children[0], "defining_code"))
+	if !ok || phrase.Terminology != terminology.ID || len(phrase.CodeList) != 1 {
+		return codedName{}
+	}
+	code := phrase.CodeList[0]
+	text, ok := codeTermText(children[0], terminology.ID, code)
+	if !ok {
+		return codedName{}
+	}
+	return codedName{value: text, code: code, terminology: terminology.ID}
 }
 
 // emptyStructure is a structure decode rebuilds with no member, under a
@@ -2756,9 +2800,9 @@ func (x *templateIndex) addCodedName(path string, name codedName) {
 	x.codedNames[path] = name
 }
 
-// codedName is a DV_CODED_TEXT name the template determines for a node: its
-// text, and the code and terminology of its defining code. The zero value is
-// no coded name.
+// codedName is a DV_CODED_TEXT name the template determines for a node, or
+// the composition category it fixes ([categoryOf]): its text, and the code and
+// terminology of its defining code. The zero value is no coded value.
 type codedName struct {
 	value, code, terminology string
 }
@@ -3077,6 +3121,7 @@ func buildTemplateIndex(c *templatecompile.Compiled) *templateIndex {
 	if root := c.Root(); root != nil {
 		walk(root)
 		dropDisagreeingStructures(root, x.structures)
+		x.category = categoryOf(root)
 	}
 	x.structureRoute = make(map[string]bool)
 	for p := range x.structures {
