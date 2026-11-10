@@ -303,8 +303,8 @@ func TestSettingDecodePair(t *testing.T) {
 
 // TestSettingDecodeHalfPairRejected — REQ-053: one of the ctx/setting pair
 // without the other is a typed error naming the missing key, not a guessed
-// completion (the rubric is not derivable from the code without a terminology
-// service, and a code is not derivable from the rubric at all).
+// completion; a setting named by its code or its rubric alone is spelled as a
+// bare ctx/setting.
 func TestSettingDecodeHalfPairRejected(t *testing.T) {
 	_, wt := genComposition(t, minimalObsOPT)
 	tests := []struct {

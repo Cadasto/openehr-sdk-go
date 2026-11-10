@@ -1202,11 +1202,11 @@ func parseCtx(ctx map[string]any, origin map[string]string) (ctxInfo, error) {
 			return ci, err
 		}
 	}
-	// ctx/setting travels as a pair: the rubric is not derivable from the code
-	// without a terminology service, and a code is not derivable from the rubric
-	// at all, so half of it cannot be completed — it is refused naming the
-	// missing key (REQ-053). The same shape requireSuffix enforces for a leaf's
-	// mandatory suffixes.
+	// ctx/setting|code and |value travel as a pair (REQ-053): half of it is
+	// refused naming the missing key, the shape requireSuffix enforces for a
+	// leaf's mandatory suffixes. A setting named by its code or its rubric alone
+	// is spelled as a bare ctx/setting, which [putBareSetting] reads in the
+	// openEHR setting group.
 	if ci.haveSettingCode != ci.haveSettingValue {
 		present, missing := "ctx/setting|code", "ctx/setting|value"
 		if !ci.haveSettingCode {
@@ -4091,7 +4091,7 @@ func foldShorthand(rmType string, sfx map[string]any, keyOf func(string) string)
 	}
 	if w, both := sfx[sp.full]; both && !sameCtxValue(v, w) {
 		return nil, fmt.Errorf("%w: %s and %s spell the %s %s twice and disagree; remove one",
-			ErrUnsupportedDatatype, suffixLabel(keyOf, sp.full), suffixLabel(keyOf, sp.short), rmType, sp.attr)
+			ErrUnknownPath, suffixLabel(keyOf, sp.full), suffixLabel(keyOf, sp.short), rmType, sp.attr)
 	}
 	out := maps.Clone(sfx)
 	delete(out, sp.short)

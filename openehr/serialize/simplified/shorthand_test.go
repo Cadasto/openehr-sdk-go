@@ -323,25 +323,25 @@ func TestREQ053DisagreeingShorthandRefused(t *testing.T) {
 		{
 			name:  "DV_IDENTIFIER bare value and |id",
 			extra: map[string]any{id: first, id + "|id": second, id + "|issuer": "Hospital"},
-			want:  simplified.ErrUnsupportedDatatype,
+			want:  simplified.ErrUnknownPath,
 			named: []string{`"` + id + `"`, `"` + id + `|id"`},
 		},
 		{
 			name:  "DV_TEXT bare value and |value",
 			extra: map[string]any{text: first, text + "|value": second},
-			want:  simplified.ErrUnsupportedDatatype,
+			want:  simplified.ErrUnknownPath,
 			named: []string{`"` + text + `"`, `"` + text + `|value"`},
 		},
 		{
 			name:  "reference range meaning and meaning|value",
 			extra: withMeaning(map[string]any{meaning: first, meaning + "|value": second}),
-			want:  simplified.ErrUnsupportedDatatype,
+			want:  simplified.ErrUnknownPath,
 			named: []string{`"` + meaning + `"`, `"` + meaning + `|value"`},
 		},
 		{
 			name:  "DV_PARSABLE bare value and |value",
 			extra: map[string]any{parsable: first, parsable + "|value": second, parsable + "|formalism": "GLIF 1.0"},
-			want:  simplified.ErrUnsupportedDatatype,
+			want:  simplified.ErrUnknownPath,
 			named: []string{`"` + parsable + `"`, `"` + parsable + `|value"`},
 		},
 		{

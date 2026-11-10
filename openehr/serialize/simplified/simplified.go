@@ -157,7 +157,8 @@ var (
 	// composition-metadata field that disagree, a ctx/composer_self of true
 	// beside a composer name, identifier or relationship (a PARTY_SELF has
 	// none of them),
-	// two spellings of one single-valued underscore attribute, or a key the
+	// two spellings of one single-valued underscore attribute, a bare value
+	// and its `|id` or `|value` spelling with differing values, or a key the
 	// decode reads and the same key ending in a bare `|` with differing values.
 	// The codec fails rather than dropping the entry or inventing a precedence
 	// rule. The deferred underscore family `_instruction_details` and the
