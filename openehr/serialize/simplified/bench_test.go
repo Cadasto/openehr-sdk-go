@@ -24,13 +24,15 @@ import (
 // must accept before the corpus sweep is worth measuring. It plays the part
 // minParityDocuments plays for the parity net in openehr/serialize/canjson: the
 // per-operation figure is a cost over a set discovered at setup, so the set has
-// to be prevented from shrinking quietly. 30 of the 34 bodies clear it today,
+// to be prevented from shrinking quietly. 31 of the 34 bodies clear it today,
 // and the floor sits at that count because a drop of even one body moves the
-// number and invalidates the comparison the baseline exists for. (26 cleared
-// it before the composer's real path became its carrier, ADR 0029, which
-// brought in the four bodies whose composer carries a reference, identifiers
-// or a relationship; the floor had stayed at 24.)
-const minFlatCorpusBodies = 30
+// number and invalidates the comparison the baseline exists for. (30 cleared
+// it before INSTRUCTION `_wf_definition` gained its DV_PARSABLE carrier, which
+// brought in the instruction body; 26 before the composer's real path became
+// its carrier, ADR 0029, which brought in the four bodies whose composer
+// carries a reference, identifiers or a relationship; the floor had stayed at
+// 24.)
+const minFlatCorpusBodies = 31
 
 // benchFlatBody is the body the per-body benchmarks measure (10 164 bytes).
 //
@@ -67,11 +69,11 @@ func benchFlatTarget(b *testing.B) (*webtemplate.WebTemplate, *templatecompile.C
 // benchFlatCorpus reads the FLAT conformance corpus and returns the bodies this
 // SDK's codec accepts end to end, together with their total size.
 //
-// The corpus holds 34 bodies and the codec accepts 30 of them today. The other
-// four exercise upstream key families the codec declines by design: the
+// The corpus holds 34 bodies and the codec accepts 31 of them today. The other
+// three exercise upstream key families the codec declines by design: the
 // reference's in-context keys for RM attributes the Web Template this SDK
 // builds does not model (an ISM transition's `_reason`, an interval event's
-// `math_function`, a HISTORY's `origin`) and the deferred `_wf_definition`.
+// `math_function`, a HISTORY's `origin`).
 // The split is discovered here rather than written down, so a codec that
 // learns one of those families widens the sweep on its own.
 //

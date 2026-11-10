@@ -2175,6 +2175,7 @@ requirements:
       - openehr/serialize/simplified/structured_test.go
       - openehr/serialize/simplified/unmatched_test.go
       - openehr/serialize/simplified/unspelled_node_test.go
+      - openehr/serialize/simplified/wf_definition_test.go
       - openehr/template/webtemplate/incontext_rmpath_test.go
       - testkit/conformance/webtemplate/archetype_details_test.go
       - testkit/probes/serialize/probe_089_underscore_round_trip.go
@@ -2519,6 +2520,7 @@ requirements:
       - openehr/serialize/simplified/structured_ctx_test.go
       - openehr/serialize/simplified/template_completion_test.go
       - openehr/serialize/simplified/unmatched_test.go
+      - openehr/serialize/simplified/wf_definition_test.go
       - testkit/conformance/webtemplate/archetype_details_test.go
       - testkit/conformance/webtemplate/decode_reducing_test.go
       - testkit/conformance/webtemplate/helpers_test.go

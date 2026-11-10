@@ -358,6 +358,7 @@ func TestProbe089(t *testing.T) {
 		"ENTRY: _work_flow_id",
 		"ENTRY: _other_participation:N",
 		"ENTRY: _provider",
+		"INSTRUCTION: _wf_definition",
 		"EVENT_CONTEXT: _health_care_facility",
 		"EVENT_CONTEXT: _participation:N",
 		"DV_ORDERED leaf: _normal_range",
