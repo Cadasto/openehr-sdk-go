@@ -34,12 +34,12 @@ type decodeConfig struct {
 // carrier (a PARTICIPATION `time`, a FEEDER_AUDIT_DETAILS `other_details`,
 // `_instruction_details`); the reference's in-context
 // spelling of RM data this codec's Web Template does not model (an ACTION's
-// ISM transition and time, an INTERVAL_EVENT's `math_function`, `width` and
-// `sample_count`, an OBSERVATION's `history_origin`); at a leaf whose datatype
+// ISM transition and time); at a leaf whose datatype
 // has neither a suffix set nor a sub-path grammar, its bare value and a suffix
-// naming an attribute of its RM class; and any malformed value, missing required suffix (a lone bare value
+// naming an attribute of its RM class; any malformed value, missing required suffix (a lone bare value
 // where the datatype has no bare spelling among them), disagreeing pair of
-// spellings of a key the decode reads, or index past its bound.
+// spellings of a key the decode reads, or index past its bound; and a key
+// that is not well formed in the FLAT grammar, such as "a//b|".
 //
 // By default the decoder ignores unmatched content: the value it returns
 // holds the rest of the input and none of it. With this option fn receives
@@ -102,9 +102,9 @@ func (c decodeConfig) tracked() bool {
 // (HISTORY.origin, EVENT.time, ENTRY language/encoding/subject,
 // EVENT_CONTEXT.setting, …) are completed from ctx defaults and RM
 // conventions; these are synthesised defaults, not recovered data. A
-// HISTORY with no origin takes the earliest time its own events carry,
-// compared as instants, else the start time, and an event with no time takes
-// its HISTORY's origin. An ACTIVITY with no action_archetype_id takes the one
+// HISTORY whose "<observation>/history_origin" the body leaves out takes the
+// earliest time its own events carry, compared as instants, else the start
+// time, and an event with no time takes its HISTORY's origin. An ACTIVITY with no action_archetype_id takes the one
 // the instance generator writes on its own template node: a value the first
 // C_STRING that node allows on that attribute accepts, or the default /.*/
 // where that C_STRING has neither a list nor a pattern, or the node allows
@@ -198,14 +198,16 @@ var (
 	// composition-metadata field that disagree, a ctx/composer_self of true
 	// beside a composer name, identifier or relationship (a PARTY_SELF has
 	// none of them),
-	// two spellings of one single-valued underscore attribute, a bare value
+	// two spellings of one single-valued underscore attribute or of one
+	// sub-path inside an underscore family, a bare value
 	// and its `|id` or `|value` spelling with differing values, or a key the
 	// decode reads and the same key ending in a bare `|` with differing values.
 	// The codec fails rather than dropping the entry or inventing a precedence
-	// rule. The deferred underscore family `_instruction_details` and the
-	// reference's in-context spelling of an ACTION's ISM transition and
-	// time, an INTERVAL_EVENT's `math_function`, `width` and `sample_count`
-	// and an OBSERVATION's `history_origin` return it in every mode too.
+	// rule. A key that is not well formed in the FLAT grammar (an empty path
+	// segment, as in "a//b|", a segment with no id before its :index, a second
+	// |suffix or a segment after its |suffix) returns it in every mode, from
+	// decode and from [FlatToStructured]. So does every refusal that wraps
+	// [ErrNotModelled].
 	ErrUnknownPath = errors.New("simplified: path not in web template")
 	// ErrNotModelled is returned, in every mode, for a key the Simplified
 	// Formats define and the decode reads but this SDK does not model: an
