@@ -258,6 +258,21 @@ func TestREQ053EmptyStartTimeBesideCtxTime(t *testing.T) {
 	}
 }
 
+// TestREQ053EmptyValueBesideNullDecorationReadsAsNull — REQ-053. An _accuracy
+// whose keys all hold null is absent, so it decorates no "" beside it: the ""
+// reads as absent, as with a null value, in FLAT and in STRUCTURED, with and
+// without the template.
+func TestREQ053EmptyValueBesideNullDecorationReadsAsNull(t *testing.T) {
+	wt, compiled := shorthandTarget(t)
+	key := shorthandObs + "/datetime"
+	for _, mode := range shorthandModes(compiled) {
+		t.Run(mode.name, func(t *testing.T) {
+			_, want := decodeLoneValue(t, wt, mustJSON(t, completionBody(map[string]any{key: nil, key + "/_accuracy": nil})), mode.opts...)
+			assertReadsAsNull(t, wt, key, completionBody(map[string]any{key: "", key + "/_accuracy": nil}), want, mode.opts...)
+		})
+	}
+}
+
 // TestREQ053EmptyCtxTimeReadsAsNull — REQ-053. ctx/time spells the start
 // time, a DV_DATE_TIME, so a "" there reads as absent, as a null there does
 // and as a "" at <root>/context/start_time does: the body decodes as one with
