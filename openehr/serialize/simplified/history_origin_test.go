@@ -170,6 +170,34 @@ func TestREQ053CodecLeavesAreSingleValued(t *testing.T) {
 	}
 }
 
+// TestREQ170CodecLeafIndexRefusedWhateverFollows — REQ-170, REQ-053. A FLAT
+// key is judged from the left, so an index past :0 on one of the codec's own
+// single-valued leaves is refused by default even where what follows it would
+// leave the key unmatched, as the STRUCTURED spelling and a Web Template leaf
+// such as `language:1` are. Without the index, a segment below the leaf is
+// unmatched content, as below any leaf.
+func TestREQ170CodecLeafIndexRefusedWhateverFollows(t *testing.T) {
+	wt, _ := conformanceTarget(t)
+	for _, key := range []string{
+		eventAt + "/width:1/x_unknown",
+		eventAt + "/math_function:1/x_unknown|code",
+		historyOriginKey + ":1/x_unknown",
+	} {
+		_, err := simplified.UnmarshalFlat(mustJSON(t, eventBody(map[string]any{key: "x"})), wt)
+		if !errors.Is(err, simplified.ErrUnknownPath) || !strings.Contains(err.Error(), "single-valued") {
+			t.Errorf("%s: err = %v, want ErrUnknownPath naming it single-valued", key, err)
+		}
+	}
+	for _, key := range []string{eventAt + "/width/x_unknown", historyOriginKey + "/x_unknown"} {
+		var reported []string
+		_, err := simplified.UnmarshalFlat(mustJSON(t, eventBody(map[string]any{key: "x"})), wt,
+			simplified.WithUnmatched(func(p string) { reported = append(reported, p) }))
+		if err != nil || len(reported) != 1 || reported[0] != key {
+			t.Errorf("%s: err = %v, reported %q; want it decoded and reported as unmatched", key, err, reported)
+		}
+	}
+}
+
 // firstElement returns the first object of the STRUCTURED array v.
 func firstElement(t *testing.T, v any) map[string]any {
 	t.Helper()
