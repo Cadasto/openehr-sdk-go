@@ -451,7 +451,7 @@ func TestREQ053ComposerRealPathRefusals(t *testing.T) {
 		{
 			name:  "an indexed relationship",
 			keys:  map[string]any{"ctx/composer_name": "Dr Ctx", root + "/composer/relationship:1|code": secret},
-			want:  simplified.ErrUnsupportedDatatype,
+			want:  simplified.ErrUnknownPath,
 			named: []string{root + "/composer/relationship:1|code"},
 		},
 		{

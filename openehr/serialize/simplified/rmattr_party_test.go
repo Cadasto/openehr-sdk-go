@@ -572,7 +572,7 @@ func TestRMAttrPartyRefusals(t *testing.T) {
 		},
 		"indexed relationship": {
 			keys: map[string]any{rmattrContext + "/_health_care_facility/relationship:1|code": "10"},
-			want: ErrUnsupportedDatatype,
+			want: ErrUnknownPath,
 			name: rmattrContext + "/_health_care_facility/relationship:1|code",
 		},
 		"sparse identifier index": {

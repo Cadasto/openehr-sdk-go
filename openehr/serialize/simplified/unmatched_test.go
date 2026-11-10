@@ -647,11 +647,11 @@ func TestREQ170IgnoredKeysLeaveNoStructuralTrace(t *testing.T) {
 // the key, with the sentinel of the grammar the segment belongs to: a segment
 // of the Web Template path (a single-valued attribute, a party leaf, an
 // interval leaf on a single-valued attribute, the last in
-// [TestREQ170RepeatableIntervalElement]), a `_family:N` list and a
-// FEEDER_AUDIT sub-path give ErrUnknownPath; a
-// sub-path inside an underscore family's value or an interval value gives
-// ErrUnsupportedDatatype. deviations.md states the same split. STRUCTURED
-// judges an element's position the same way, whatever the element holds.
+// [TestREQ170RepeatableIntervalElement]), a `_family:N` list, a FEEDER_AUDIT
+// sub-path, and a sub-path inside an underscore family's value, an interval
+// value or a party's grammar all give ErrUnknownPath, as deviations.md states.
+// STRUCTURED judges an element's position the same way, whatever the element
+// holds.
 func TestREQ170IndexPastBoundSentinels(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	for _, tc := range []struct {
@@ -669,16 +669,16 @@ func TestREQ170IndexPastBoundSentinels(t *testing.T) {
 		// Inside a family or a composite leaf's grammar the key is judged from
 		// the left too: a sub-path past its bound is refused even where what
 		// follows it would leave the key unmatched.
-		{"interval bound, an unread key below", rmattrInterval + "/lower:1/x_unknown", 1.0, ErrUnsupportedDatatype, rmattrInterval + "/lower:1"},
-		{"range bound, an unread key below", rmattrCount + "/_normal_range/lower:1/x_unknown", 1, ErrUnsupportedDatatype, rmattrCount + "/_normal_range/lower:1"},
-		{"range meaning, an unread key below", rmattrElement + "/_other_reference_ranges:0/meaning:1/x_unknown", "m", ErrUnsupportedDatatype, rmattrElement + "/_other_reference_ranges:0/meaning:1"},
-		{"mapping target, an unread key below", rmattrText + "/_mapping:0/target:1/x_unknown", "t", ErrUnsupportedDatatype, rmattrText + "/_mapping:0/target:1"},
-		{"party relationship, an unread key below", rmattrObs + "/subject/relationship:1/x_unknown|code", "x", ErrUnsupportedDatatype, rmattrObs + "/subject/relationship:1"},
+		{"interval bound, an unread key below", rmattrInterval + "/lower:1/x_unknown", 1.0, ErrUnknownPath, rmattrInterval + "/lower:1"},
+		{"range bound, an unread key below", rmattrCount + "/_normal_range/lower:1/x_unknown", 1, ErrUnknownPath, rmattrCount + "/_normal_range/lower:1"},
+		{"range meaning, an unread key below", rmattrElement + "/_other_reference_ranges:0/meaning:1/x_unknown", "m", ErrUnknownPath, rmattrElement + "/_other_reference_ranges:0/meaning:1"},
+		{"mapping target, an unread key below", rmattrText + "/_mapping:0/target:1/x_unknown", "t", ErrUnknownPath, rmattrText + "/_mapping:0/target:1"},
+		{"party relationship, an unread key below", rmattrObs + "/subject/relationship:1/x_unknown|code", "x", ErrUnknownPath, rmattrObs + "/subject/relationship:1"},
 		{"party identifier list, an unread key below", rmattrObs + "/subject/_identifier:10001/x_unknown|id", "x", ErrUnknownPath, rmattrObs + "/subject/_identifier:10001"},
 		{"scalar underscore family", rmattrObs + "/_uid:1", "8f8f8f8f-0000-4000-8000-000000000000", ErrUnknownPath, rmattrObs + "/_uid:1"},
 		{"FEEDER_AUDIT sub-path", rmattrObs + "/_feeder_audit/originating_system_audit:1|system_id", "orig", ErrUnknownPath, rmattrObs + "/_feeder_audit/originating_system_audit"},
-		{"interval value sub-path", rmattrInterval + "/lower:1|magnitude", 1.0, ErrUnsupportedDatatype, rmattrInterval + "/lower:1"},
-		{"underscore family value sub-path", rmattrCount + "/_normal_range/lower:1", 1, ErrUnsupportedDatatype, rmattrCount + "/_normal_range/lower:1"},
+		{"interval value sub-path", rmattrInterval + "/lower:1|magnitude", 1.0, ErrUnknownPath, rmattrInterval + "/lower:1"},
+		{"underscore family value sub-path", rmattrCount + "/_normal_range/lower:1", 1, ErrUnknownPath, rmattrCount + "/_normal_range/lower:1"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := refusalLegs(t, wt, rmattrBody(map[string]any{tc.key: tc.val}), nil, tc.want)
@@ -711,11 +711,11 @@ func TestREQ170IndexPastBoundSentinels(t *testing.T) {
 			rmattrIntervalEvent + "/time":       "2022-01-12T09:00:11.7842493+01:00",
 			rmattrInterval + "/lower|magnitude": 1.0, rmattrInterval + "/lower|unit": "Unit",
 			rmattrInterval + "/upper|magnitude": 2.0, rmattrInterval + "/upper|unit": "Unit",
-		}, rmattrRoot + "/conformance_section/0/conformance_interval/0/any_event/0/interval_dv_quantity/0", "lower", ErrUnsupportedDatatype},
+		}, rmattrRoot + "/conformance_section/0/conformance_interval/0/any_event/0/interval_dv_quantity/0", "lower", ErrUnknownPath},
 		{"range bound", map[string]any{
 			rmattrElement + "/_normal_range/lower|magnitude": 20.5, rmattrElement + "/_normal_range/lower|unit": "unit",
 			rmattrElement + "/_normal_range/upper|magnitude": 66.6, rmattrElement + "/_normal_range/upper|unit": "unit",
-		}, rmattrRoot + "/conformance_section/0/conformance_observation/0/any_event/0/dv_quantity/0/_normal_range/0", "lower", ErrUnsupportedDatatype},
+		}, rmattrRoot + "/conformance_section/0/conformance_observation/0/any_event/0/dv_quantity/0/_normal_range/0", "lower", ErrUnknownPath},
 		{"range meaning", map[string]any{
 			rmattrElement + "/_other_reference_ranges:0/lower|magnitude":     70.5,
 			rmattrElement + "/_other_reference_ranges:0/lower|unit":          "unit",
@@ -723,24 +723,24 @@ func TestREQ170IndexPastBoundSentinels(t *testing.T) {
 			rmattrElement + "/_other_reference_ranges:0/meaning|terminology": "SNOMED-CT",
 			rmattrElement + "/_other_reference_ranges:0/meaning|value":       "very high",
 			rmattrElement + "/_other_reference_ranges:0|upper_unbounded":     true,
-		}, rmattrRoot + "/conformance_section/0/conformance_observation/0/any_event/0/dv_quantity/0/_other_reference_ranges/0", "meaning", ErrUnsupportedDatatype},
+		}, rmattrRoot + "/conformance_section/0/conformance_observation/0/any_event/0/dv_quantity/0/_other_reference_ranges/0", "meaning", ErrUnknownPath},
 		{"mapping target", map[string]any{
 			rmattrText: "text value", rmattrText + "/_mapping:0|match": "=",
 			rmattrText + "/_mapping:0/target|code": "Z.1", rmattrText + "/_mapping:0/target|terminology": "ICD10",
-		}, rmattrRoot + "/conformance_section/0/conformance_observation/0/any_event/0/dv_text/0/_mapping/0", "target", ErrUnsupportedDatatype},
+		}, rmattrRoot + "/conformance_section/0/conformance_observation/0/any_event/0/dv_text/0/_mapping/0", "target", ErrUnknownPath},
 		{"party relationship", map[string]any{
 			rmattrObs + "/subject|name":                     "Silvia Blake",
 			rmattrObs + "/subject/relationship|code":        "10",
 			rmattrObs + "/subject/relationship|terminology": "openehr",
 			rmattrObs + "/subject/relationship|value":       "mother",
-		}, rmattrRoot + "/conformance_section/0/conformance_observation/0/subject/0", "relationship", ErrUnsupportedDatatype},
+		}, rmattrRoot + "/conformance_section/0/conformance_observation/0/subject/0", "relationship", ErrUnknownPath},
 		{"party inside FEEDER_AUDIT", map[string]any{
 			rmattrObs + "/_feeder_audit/originating_system_audit|system_id":                         "orig",
 			rmattrObs + "/_feeder_audit/originating_system_audit/provider|name":                     "Per 1",
 			rmattrObs + "/_feeder_audit/originating_system_audit/provider/relationship|code":        "10",
 			rmattrObs + "/_feeder_audit/originating_system_audit/provider/relationship|value":       "mother",
 			rmattrObs + "/_feeder_audit/originating_system_audit/provider/relationship|terminology": "openehr",
-		}, rmattrRoot + "/conformance_section/0/conformance_observation/0/_feeder_audit/0/originating_system_audit/0/provider/0", "relationship", ErrUnsupportedDatatype},
+		}, rmattrRoot + "/conformance_section/0/conformance_observation/0/_feeder_audit/0/originating_system_audit/0/provider/0", "relationship", ErrUnknownPath},
 	} {
 		t.Run("STRUCTURED "+tc.name+"/1 holding only unmatched members", func(t *testing.T) {
 			_, doc := structuredDoc(t, rmattrBody(tc.extra))
@@ -771,8 +771,8 @@ func TestREQ170IndexPastBoundSentinels(t *testing.T) {
 			audit + "/provider/relationship:1/x_unknown|code": "x",
 		})
 		err := refusedInEveryMode(t, wt, body)
-		if !errors.Is(err, ErrUnsupportedDatatype) || !strings.Contains(err.Error(), audit+"/provider/relationship:1") {
-			t.Errorf("err = %v, want ErrUnsupportedDatatype naming %q", err, audit+"/provider/relationship:1")
+		if !errors.Is(err, ErrUnknownPath) || !strings.Contains(err.Error(), audit+"/provider/relationship:1") {
+			t.Errorf("err = %v, want ErrUnknownPath naming %q", err, audit+"/provider/relationship:1")
 		}
 	})
 	t.Run("STRUCTURED party identifier list past its bound, holding only unmatched members", func(t *testing.T) {
@@ -1195,8 +1195,8 @@ func TestREQ170SpellingPairsJudgedWhereRead(t *testing.T) {
 		t.Error("two equal spellings of a read sub-path decode differently from one")
 	}
 	err := refusedInEveryMode(t, wt, read("11"))
-	if !errors.Is(err, ErrUnsupportedDatatype) {
-		t.Errorf("err = %v, want ErrUnsupportedDatatype", err)
+	if !errors.Is(err, ErrUnknownPath) {
+		t.Errorf("err = %v, want ErrUnknownPath", err)
 	}
 	for _, k := range []string{facility + "/relationship|code", facility + "/relationship:0|code"} {
 		if !strings.Contains(err.Error(), strconv.Quote(k)) {
@@ -1608,8 +1608,8 @@ func TestREQ170FeederAuditSlotSpellingsMerge(t *testing.T) {
 		}
 		const secret = "secret-value-0451"
 		err := refusedInEveryMode(t, wt, rmattrBody(map[string]any{audit + "|system_id": "orig", audit + ":0|system_id": secret}))
-		if !errors.Is(err, ErrUnsupportedDatatype) {
-			t.Errorf("err = %v, want ErrUnsupportedDatatype", err)
+		if !errors.Is(err, ErrUnknownPath) {
+			t.Errorf("err = %v, want ErrUnknownPath", err)
 		}
 		for _, k := range []string{audit + "|system_id", audit + ":0|system_id"} {
 			if !strings.Contains(err.Error(), strconv.Quote(k)) {
