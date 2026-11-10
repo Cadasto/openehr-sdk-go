@@ -340,6 +340,79 @@ func TestCodedTextInput_REQ106_REQ103_CodeReference(t *testing.T) {
 	}
 }
 
+// REQ-106, REQ-103 — a DV_CODED_TEXT whose C_CODE_REFERENCE names no
+// terminology in its code phrase gives its code input the terminology its
+// terminology: URI names, spelled as a TERMINOLOGY_ID: the name, with the
+// version in parentheses where the URI gives one. A terminology the code
+// phrase names is kept over the URI's, local still left out, and a URI of
+// another scheme names none. The vendored test_all_types OPT's
+// coded_text_terminology node has the URI terminology:SNOMED-CT and no
+// terminology_id, as the reference's Web Template, which writes SNOMED-CT
+// there, reads it; the other cases edit that one reference set.
+func TestCodedTextInput_REQ106_REQ103_ReferenceSetTerminology(t *testing.T) {
+	t.Parallel()
+	const fixture = "../../../testkit/corpus/crossformat/test_all_types/template.opt"
+	raw, err := os.ReadFile(fixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const uri = "<referenceSetUri>terminology:SNOMED-CT</referenceSetUri>"
+	if n := bytes.Count(raw, []byte(uri)); n != 1 {
+		t.Fatalf("fixture %s holds %q %d times, want once", fixture, uri, n)
+	}
+	// edited is the fixture with the reference set's URI replaced by
+	// with, after a terminology_id of terminology where that is not "".
+	edited := func(with, terminology string) []byte {
+		repl := "<referenceSetUri>" + with + "</referenceSetUri>"
+		if terminology != "" {
+			repl = "<terminology_id><value>" + terminology + "</value></terminology_id>" + repl
+		}
+		return bytes.Replace(raw, []byte(uri), []byte(repl), 1)
+	}
+	tests := []struct {
+		name string
+		opt  []byte
+		want string
+	}{
+		{name: "the URI's name", opt: raw, want: "SNOMED-CT"},
+		{name: "the URI's name and version", opt: edited("terminology:LOINC/2.73", ""), want: "LOINC(2.73)"},
+		{name: "the code phrase's terminology", opt: edited("terminology:SNOMED-CT", "LOINC"), want: "LOINC"},
+		{name: "the code phrase's local terminology", opt: edited("terminology:SNOMED-CT", "local"), want: ""},
+		{name: "a URI of another scheme", opt: edited("http://snomed.info/sct", ""), want: ""},
+		{name: "a terminology URI that names none", opt: edited("terminology:", ""), want: ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			model, err := aom14.ReadOperationalTemplate(bytes.NewReader(tc.opt))
+			if err != nil {
+				t.Fatalf("ReadOperationalTemplate: %v", err)
+			}
+			c, err := templatecompile.Compile(model)
+			if err != nil {
+				t.Fatalf("Compile: %v", err)
+			}
+			wt, err := webtemplate.Build(c)
+			if err != nil {
+				t.Fatalf("Build: %v", err)
+			}
+			var got *webtemplate.Node
+			walkOurTree(wt.Tree, func(n *webtemplate.Node) {
+				if n.ID == "coded_text_terminology" {
+					got = n
+				}
+			})
+			if got == nil {
+				t.Fatal("no node coded_text_terminology in the built tree")
+			}
+			want := []webtemplate.Input{{Suffix: "code", Type: "CODED_TEXT", ListOpen: true, Terminology: tc.want}}
+			if !reflect.DeepEqual(got.Inputs, want) {
+				t.Errorf("coded_text_terminology inputs = %+v, want %+v", got.Inputs, want)
+			}
+		})
+	}
+}
+
 // TestQuantityInput_REQ106_PropertyOnly — REQ-106. A C_DV_QUANTITY that names a
 // property and lists no units gives a unit input with no list, as the
 // reference does: its OPTParser builds the unit list from the C_DV_QUANTITY
