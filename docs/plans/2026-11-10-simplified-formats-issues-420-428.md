@@ -5,7 +5,7 @@ kind: plan
 # Plan — Simplified Formats: issues 420 to 428 and the FLAT backlog
 
 **Date:** 2026-11-10
-**Status:** Wave 1, PR A in delivery
+**Status:** Wave 1, PR A in review
 **Covers:** [REQ-053](../specifications/wire.md#req-053), [REQ-140](../specifications/wire.md#req-140--underscore-prefixed-rm-attributes), [REQ-170](../specifications/wire.md#req-170--unmatched-content-on-decode), [REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export)
 **Probes:** PROBE-075, PROBE-086, PROBE-105
 **Defers:** the 15 `ctx/` fields the format sketches for EVENT_CONTEXT optionals; the STRUCTURED `"|value"` spelling; Web Template inputs for DV_URI, DV_IDENTIFIER, DV_MULTIMEDIA, DV_PARSABLE and DV_INTERVAL; the compiled path index (backlog, `internal/templatecompile/compile.go:670`)
@@ -26,6 +26,7 @@ Each issue was reproduced on `main` at `10e6a2f8` and checked three ways: agains
 | D2 | Duplicate sibling ids follow the format's own table: "Blood Pressure" is `blood_pressure`, its duplicate `blood_pressure_1` | A divergence from the reference's `blood_pressure2`, recorded against ADR 0014 |
 | D3 | A default composition time is an option, `WithDefaultTime(t time.Time)`; the zero time leaves it off | A body without `ctx/time` still decodes as today unless the caller asks |
 | D4 | The census stays a scratch tool | No CC BY-SA content enters the tree |
+| D5 | A reference set named by a `terminology:` URI names its terminology: `terminology:LOINC/2.73` is `LOINC(2.73)` | Decode fills a missing `\|terminology` from it; the openEHR specifications leave this open |
 
 ## Wave 1 — decode changes; callers change nothing
 
@@ -38,6 +39,7 @@ A, B and C touch the same decoder and the same REQ-053 text, so they run one aft
 1. Input shorthands ([422](https://github.com/Cadasto/openehr-sdk-go/issues/422)): a bare DV_IDENTIFIER value is its `|id`; `|value` is the bare value of a DV_TEXT (a reference range's `meaning` included) and of a DV_PARSABLE; a bare `ctx/setting` is resolved in the openEHR `setting` group by code, then by rubric. Two spellings of one field that disagree stay an error. The `ctx/setting` error message is completed. Encode is unchanged.
 2. Template completion of coded values under `WithTemplate` ([423](https://github.com/Cadasto/openehr-sdk-go/issues/423), widened): a DV_CODED_TEXT `|code` with no `|terminology` takes the terminology the template determines (`local` for a code in a local list, the constrained terminology where the template fixes one), and with no `|value` the code's term text; a DV_ORDINAL `|code` alone takes `|value` and `|ordinal` from the template's C_DV_ORDINAL. Where the template determines nothing, a missing `|terminology` is refused as a missing required suffix rather than decoded to an empty terminology. A decode without the template is unchanged.
 3. INSTRUCTION `_wf_definition` ([426](https://github.com/Cadasto/openehr-sdk-go/issues/426)) is carried as a DV_PARSABLE in both directions, encoded as `|value` + `|formalism` as the PROBE-086 corpus writes it; and an empty DV_DATE_TIME writes no key (backlog, `datatypes.go:571`).
+4. D5: `constraints.CodeReference` reads the terminology its `terminology:` URI names, and decode uses it where the code phrase names none; an empty duration or URI at a Web Template leaf writes no key either.
 
 **Definition of done:** the issue reproductions decode and validate; PROBE-086 compares the two `_wf_definition` keys; `make ci` green.
 
