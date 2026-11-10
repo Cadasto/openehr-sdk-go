@@ -10,7 +10,7 @@ import (
 )
 
 // TestREQ107ActionArchetypeIDFollowsTheConstraint pins the value the
-// generator writes on an ACTIVITY's action_archetype_id, which the FLAT
+// generator writes on an ACTIVITY's action_archetype_id (REQ-107), which the FLAT
 // decode's template completion (REQ-053) takes from the same function: the
 // RM default where the C_STRING names no archetype, else the example the
 // constraint accepts, a list member, or the shortest match of a pattern.

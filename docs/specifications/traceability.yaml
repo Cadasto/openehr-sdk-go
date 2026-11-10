@@ -71,6 +71,7 @@ requirements:
     implementation: landed
     packages: [openehr/rm, openehr/bmm, openehr/serialize, openehr/validation, openehr/instance, openehr/composition, openehr/template, openehr/templatecompile, openehr/template/webtemplate, openehr/terminology, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain, openehr/aql/internal/semcheck, openehr/rm/rminfo, openehr/template/constraints]
     tests:
+      - internal/cstringvalue/cstringvalue_test.go
       - internal/importguard/anybuild_internal_test.go
       - internal/importguard/importguard_test.go
       - internal/rmaccess/imports_test.go
@@ -576,6 +577,7 @@ requirements:
     packages:
       - openehr/serialize/simplified
       - internal/rmlists
+      - internal/cstringvalue
       - testkit/corpus/flat-conformance
       - testkit/conformance/webtemplate
       - testkit/corpus/crossformat
@@ -586,9 +588,11 @@ requirements:
       - PROBE-089
       - PROBE-105
     tests:
+      - internal/cstringvalue/cstringvalue_test.go
       - openehr/serialize/simplified/archetype_details_test.go
       - openehr/serialize/simplified/coded_name_internal_test.go
       - openehr/serialize/simplified/coded_name_test.go
+      - openehr/serialize/simplified/completion_defaults_test.go
       - openehr/serialize/simplified/composer_test.go
       - openehr/serialize/simplified/composition_name_test.go
       - openehr/serialize/simplified/context_test.go
@@ -627,6 +631,7 @@ requirements:
       - openehr/serialize/simplified/structured_ctx_test.go
       - openehr/serialize/simplified/structured_test.go
       - openehr/serialize/simplified/template_completion_test.go
+      - openehr/serialize/simplified/template_defaults_test.go
       - openehr/serialize/simplified/template_index_cache_test.go
       - openehr/serialize/simplified/template_order_test.go
       - openehr/serialize/simplified/template_roundtrip_test.go
@@ -1556,12 +1561,14 @@ requirements:
       - internal/templateinstance/rmwrite
       - internal/rmroots
       - internal/rmlists
+      - internal/cstringvalue
       - testkit/fixtures
       - testkit/probes/instance
     probes: [PROBE-027]
     tests:
       - cmd/cdrcheck/main_test.go
       - cmd/examples/generate-example/main_test.go
+      - internal/cstringvalue/cstringvalue_test.go
       - internal/rmaccess/reads_test.go
       - internal/templatecompile/members_internal_test.go
       - internal/templatecompile/members_test.go
