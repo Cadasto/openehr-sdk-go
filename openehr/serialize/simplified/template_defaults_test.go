@@ -185,10 +185,10 @@ func TestREQ053TemplateFixesTheCategory(t *testing.T) {
 		text      string
 		validates bool
 	}{
-		{"a persistent template", persistentWT, persistent, "persistent_minimal", "431", "persistent", true},
-		{"an event template", eventWT, event, "minimal", "433", "event", true},
-		{"a template listing two codes", twoCodesWT, twoCodes, "persistent_minimal", "433", "event", true},
-		{"a template fixing a local code", localWT, local, "persistent_minimal", "433", "event", false},
+		{name: "a persistent template", wt: persistentWT, compiled: persistent, root: "persistent_minimal", code: "431", text: "persistent", validates: true},
+		{name: "an event template", wt: eventWT, compiled: event, root: "minimal", code: "433", text: "event", validates: true},
+		{name: "a template listing two codes", wt: twoCodesWT, compiled: twoCodes, root: "persistent_minimal", code: "433", text: "event", validates: true},
+		{name: "a template fixing a local code", wt: localWT, compiled: local, root: "persistent_minimal", code: "433", text: "event", validates: false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -305,14 +305,14 @@ func TestREQ053DefaultTimeOff(t *testing.T) {
 		without []simplified.Option
 	}{
 		{
-			"the zero time",
-			[]simplified.Option{simplified.WithTemplate(compiled), simplified.WithDefaultTime(time.Time{})},
-			[]simplified.Option{simplified.WithTemplate(compiled)},
+			name:    "the zero time",
+			with:    []simplified.Option{simplified.WithTemplate(compiled), simplified.WithDefaultTime(time.Time{})},
+			without: []simplified.Option{simplified.WithTemplate(compiled)},
 		},
 		{
-			"no template",
-			[]simplified.Option{simplified.WithDefaultTime(callerClock)},
-			nil,
+			name:    "no template",
+			with:    []simplified.Option{simplified.WithDefaultTime(callerClock)},
+			without: nil,
 		},
 	}
 	for _, tc := range cases {

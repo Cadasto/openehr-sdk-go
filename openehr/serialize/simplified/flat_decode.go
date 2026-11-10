@@ -1408,8 +1408,7 @@ func completeRequired(node map[string]any, ci ctxInfo) {
 // It returns ci with the HISTORY's origin as its time, where it has one, so
 // each event below it that the body gives no time takes that origin, as the
 // Simplified Formats say (§ time: "EVENT.time will be set to history.origin").
-// An origin the body gives, in a |raw fragment say, is kept, and its events
-// take it too.
+// An origin the HISTORY already holds is kept, and its events take it too.
 func historyTimes(history map[string]any, ci ctxInfo) ctxInfo {
 	if _, has := history["origin"]; !has {
 		if earliest, ok := earliestEventTime(history); ok {
