@@ -5,15 +5,25 @@ package simplified_test
 // carry, compared as instants, else the start time, as the reference
 // implementation orders the two; an event with no time then takes its
 // HISTORY's origin (Simplified Formats § time: "EVENT.time will be set to
-// history.origin").
+// history.origin"). An ACTIVITY with no action_archetype_id takes the one
+// the generator writes for the C_STRING its template puts there.
 
 import (
 	"fmt"
 	"maps"
+	"os"
+	"regexp"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
+	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
+	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 // vitalSignsID is the corpus template whose body_temperature OBSERVATION, and
@@ -225,5 +235,191 @@ func TestREQ053HistoryOriginOrder(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// The corpus templates the action_archetype_id cases decode against. The
+// first's one ACTIVITY constrains the id by a pattern; the second's two by a
+// C_STRING with neither a pattern nor a list (open_activity) and by a list
+// (listed_activity).
+const (
+	minimalInstructionID = "minimal_instruction.en.v1"
+	structureID          = "sdk_crosscheck_structure.v1"
+)
+
+// actionArchetypeAttribute matches the one action_archetype_id attribute of
+// the minimal_instruction OPT, its C_STRING included.
+var actionArchetypeAttribute = regexp.MustCompile(`(?s)<attributes xsi:type="C_SINGLE_ATTRIBUTE">\s*<rm_attribute_name>action_archetype_id</rm_attribute_name>.*?</attributes>`)
+
+// silentInstructionTemplate compiles the minimal_instruction OPT with its
+// action_archetype_id attribute removed, so the template says nothing of it,
+// and builds its Web Template.
+func silentInstructionTemplate(t *testing.T) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
+	t.Helper()
+	raw, err := os.ReadFile(fixtures.TemplateOpt(minimalInstructionID))
+	if err != nil {
+		t.Fatalf("read %s: %v", minimalInstructionID, err)
+	}
+	if n := len(actionArchetypeAttribute.FindAllIndex(raw, -1)); n != 1 {
+		t.Fatalf("%s holds %d action_archetype_id attributes, want one — fixture changed?", minimalInstructionID, n)
+	}
+	edited := actionArchetypeAttribute.ReplaceAllString(string(raw), "")
+	model, err := aom14.ReadOperationalTemplate(strings.NewReader(edited))
+	if err != nil {
+		t.Fatalf("ReadOperationalTemplate(edited %s): %v", minimalInstructionID, err)
+	}
+	return compileTemplate(t, minimalInstructionID, model)
+}
+
+// activityIDs returns the action_archetype_id of every ACTIVITY in comp, by
+// the ACTIVITY's archetype_node_id; an ACTIVITY with none maps to "".
+func activityIDs(t *testing.T, comp *rm.Composition) map[string]string {
+	t.Helper()
+	ids := make(map[string]string)
+	var walk func(v any)
+	walk = func(v any) {
+		switch x := v.(type) {
+		case map[string]any:
+			if x["_type"] == "ACTIVITY" {
+				id, _ := x["archetype_node_id"].(string)
+				ids[id], _ = x["action_archetype_id"].(string)
+			}
+			for _, child := range x {
+				walk(child)
+			}
+		case []any:
+			for _, child := range x {
+				walk(child)
+			}
+		}
+	}
+	walk(canonicalDoc(t, comp))
+	return ids
+}
+
+// generatedActivityIDs returns what activityIDs returns for the composition
+// the instance generator writes for compiled under its Large policy.
+func generatedActivityIDs(t *testing.T, compiled *templatecompile.Compiled) map[string]string {
+	t.Helper()
+	composer := "Test Composer"
+	out, err := instance.Generate(t.Context(), compiled, instance.Options{
+		Policy:    instance.Large,
+		Territory: "NL",
+		Composer:  &rm.PartyIdentified{Name: &composer},
+		Now:       time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("instance.Generate: %v", err)
+	}
+	comp, err := instance.AsComposition(out)
+	if err != nil {
+		t.Fatalf("instance.AsComposition: %v", err)
+	}
+	return activityIDs(t, comp)
+}
+
+// instructionBody is a minimal_instruction FLAT body whose one ACTIVITY holds
+// a duration, with extra merged over it.
+func instructionBody(extra map[string]any) map[string]any {
+	body := map[string]any{
+		"ctx/language":      "en",
+		"ctx/territory":     "NL",
+		"ctx/composer_name": "Silvia Blake",
+		"ctx/time":          originBodyStart,
+		"minimal/minimal:0/current_activity/duration": "PT10M",
+		"minimal/minimal:0/narrative":                 "narrative",
+	}
+	maps.Copy(body, extra)
+	return body
+}
+
+// structureBody is an sdk_crosscheck_structure FLAT body: the participation
+// its context requires, its mandatory OBSERVATION, and its INSTRUCTION's two
+// ACTIVITY nodes, each holding a text.
+func structureBody() map[string]any {
+	const root = "sdk_cross-check_structure"
+	return map[string]any{
+		"ctx/language":      "en",
+		"ctx/territory":     "NL",
+		"ctx/composer_name": "Silvia Blake",
+		"ctx/time":          originBodyStart,
+		root + "/context/_participation:0|function":    "requester",
+		root + "/context/_participation:0|name":        "Dr. Lee",
+		root + "/sdk_structure/any_event:0/text":       "observed",
+		root + "/sdk_instruction/open_activity/text":   "open",
+		root + "/sdk_instruction/listed_activity/text": "listed",
+		root + "/sdk_instruction/narrative":            "narrative",
+	}
+}
+
+// TestREQ053ActivityTakesTheTemplatesActionArchetypeID — REQ-053: with the
+// template, an ACTIVITY the body gives no action_archetype_id takes the value
+// the generator writes for the C_STRING its template puts on that attribute:
+// a list member or a pattern match the C_STRING accepts, else the RM default
+// /.*/ where the C_STRING has neither or the template says nothing of the
+// attribute. The composition then validates, and the value is the
+// generator's.
+func TestREQ053ActivityTakesTheTemplatesActionArchetypeID(t *testing.T) {
+	instructionWT, instruction := templateOf(t, minimalInstructionID)
+	silentWT, silent := silentInstructionTemplate(t)
+	structureWT, structure := templateOf(t, structureID)
+	cases := []struct {
+		name     string
+		wt       *webtemplate.WebTemplate
+		compiled *templatecompile.Compiled
+		body     map[string]any
+		// want maps each ACTIVITY's archetype_node_id to its
+		// action_archetype_id.
+		want map[string]string
+	}{
+		{
+			name: "a pattern", wt: instructionWT, compiled: instruction, body: instructionBody(nil),
+			want: map[string]string{"at0001": "openEHR-EHR-ACTION.minimal.v1"},
+		},
+		{
+			name: "a template silent on it", wt: silentWT, compiled: silent, body: instructionBody(nil),
+			want: map[string]string{"at0001": "/.*/"},
+		},
+		{
+			name: "neither a pattern nor a list, and a list", wt: structureWT, compiled: structure, body: structureBody(),
+			want: map[string]string{"at0001": "/.*/", "at0004": "openEHR-EHR-ACTION.sdk_unwritten.v1"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			generated := generatedActivityIDs(t, tc.compiled)
+			for format, comp := range decodeBothFormats(t, tc.wt, tc.body, simplified.WithTemplate(tc.compiled)) {
+				got := activityIDs(t, comp)
+				if !maps.Equal(got, tc.want) {
+					t.Errorf("%s: action_archetype_id by ACTIVITY = %v, want %v", format, got, tc.want)
+				}
+				for id, want := range got {
+					if generated[id] != want {
+						t.Errorf("%s: ACTIVITY %s: action_archetype_id = %q, the generator writes %q", format, id, want, generated[id])
+					}
+				}
+				wantValidates(t, format, comp, tc.compiled, true)
+			}
+		})
+	}
+}
+
+// TestREQ053ActivityKeepsTheBodysActionArchetypeID — REQ-053: an
+// action_archetype_id the body gives is kept as written, even one the
+// template's C_STRING refuses, and an empty one stays refused.
+func TestREQ053ActivityKeepsTheBodysActionArchetypeID(t *testing.T) {
+	const key = "minimal/minimal:0/current_activity/action_archetype_id"
+	wt, compiled := templateOf(t, minimalInstructionID)
+	for _, given := range []string{"openEHR-EHR-ACTION.minimal.v1", "/openEHR-EHR-ACTION\\.other\\.v1/"} {
+		body := instructionBody(map[string]any{key: given})
+		for format, comp := range decodeBothFormats(t, wt, body, simplified.WithTemplate(compiled)) {
+			if got := activityIDs(t, comp)["at0001"]; got != given {
+				t.Errorf("%s: action_archetype_id = %q, want the body's %q", format, got, given)
+			}
+		}
+	}
+	body := instructionBody(map[string]any{key: ""})
+	if _, err := simplified.UnmarshalFlat(mustJSON(t, body), wt, simplified.WithTemplate(compiled)); err == nil {
+		t.Errorf("UnmarshalFlat(empty %s) = nil error, want the empty id refused", key)
 	}
 }
