@@ -4,6 +4,7 @@ package simplified_test
 // composer, time, setting) is carried under the ctx/ prefix (FLAT) / a ctx
 // object (STRUCTURED). Language + territory are mandatory on decode.
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"maps"
@@ -301,35 +302,156 @@ func TestSettingDecodePair(t *testing.T) {
 	}
 }
 
-// TestSettingDecodeHalfPairRejected — REQ-053: one of the ctx/setting pair
-// without the other is a typed error naming the missing key, not a guessed
-// completion; a setting named by its code or its rubric alone is spelled as a
-// bare ctx/setting.
-func TestSettingDecodeHalfPairRejected(t *testing.T) {
+// TestSettingDecodeHalfPairCompleted — REQ-053: half the ctx/setting pair, in
+// either spelling, is completed from the openEHR setting group as a bare
+// ctx/setting is: |code alone takes its member's rubric, and |value alone its
+// member's code. In FLAT and in STRUCTURED, with and without the template, it
+// decodes to what the whole pair decodes to.
+func TestSettingDecodeHalfPairCompleted(t *testing.T) {
+	comp, wt := genComposition(t, minimalObsOPT)
+	parsed, err := readOPTFile(minimalObsOPT)
+	if err != nil {
+		t.Fatalf("readOPTFile: %v", err)
+	}
+	compiled, err := templatecompile.Compile(parsed)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	root := wt.Tree.ID
+	// body is the generated composition's FLAT form with its setting pair
+	// replaced by setting.
+	body := func(setting map[string]any) []byte {
+		return reflatten(t, comp, wt, func(_ string, m map[string]any) {
+			delete(m, "ctx/setting|code")
+			delete(m, "ctx/setting|value")
+			maps.Copy(m, setting)
+		})
+	}
+	forms := []struct {
+		name   string
+		decode func(flat []byte, opts ...simplified.Option) (*rm.Composition, error)
+	}{
+		{"FLAT", func(flat []byte, opts ...simplified.Option) (*rm.Composition, error) {
+			return simplified.UnmarshalFlat(flat, wt, opts...)
+		}},
+		{"STRUCTURED", func(flat []byte, opts ...simplified.Option) (*rm.Composition, error) {
+			doc, err := simplified.FlatToStructured(flat)
+			if err != nil {
+				return nil, err
+			}
+			return simplified.UnmarshalStructured(doc, wt, opts...)
+		}},
+	}
+	modes := []struct {
+		name string
+		opts []simplified.Option
+	}{
+		{"without template", nil},
+		{"with template", []simplified.Option{simplified.WithTemplate(compiled)}},
+	}
+	spellings := []struct{ name, field string }{
+		{"ctx", "ctx/setting"},
+		{"real path", root + "/context/setting"},
+	}
+	for _, half := range []struct {
+		name, suffix, val string
+		code, rubric      string
+	}{
+		{"code alone", "|code", "238", "238", "other care"},
+		{"value alone", "|value", "other care", "238", "other care"},
+		{"code alone, another member", "|code", "225", "225", "home"},
+		{"value alone, another member", "|value", "home", "225", "home"},
+	} {
+		for _, sp := range spellings {
+			for _, form := range forms {
+				for _, mode := range modes {
+					t.Run(half.name+"/"+sp.name+"/"+form.name+"/"+mode.name, func(t *testing.T) {
+						in := map[string]any{sp.field + half.suffix: half.val}
+						got, err := form.decode(body(in), mode.opts...)
+						if err != nil {
+							t.Fatalf("decode %v = %v, want it completed to %s|%s", in, err, half.code, half.rubric)
+						}
+						s := got.Context.Setting
+						if s.DefiningCode.CodeString != half.code || s.Value != half.rubric {
+							t.Errorf("decode %v: setting = %q|%q, want %q|%q",
+								in, s.DefiningCode.CodeString, s.Value, half.code, half.rubric)
+						}
+						pair := map[string]any{"ctx/setting|code": half.code, "ctx/setting|value": half.rubric}
+						want, err := simplified.UnmarshalFlat(body(pair), wt, mode.opts...)
+						if err != nil {
+							t.Fatalf("UnmarshalFlat(whole pair %v) = %v", pair, err)
+						}
+						if g, w := canonicalComposition(t, got), canonicalComposition(t, want); !bytes.Equal(g, w) {
+							t.Errorf("decode %v gives\n%s\nwant what the whole pair %v gives\n%s", in, g, pair, w)
+						}
+					})
+				}
+			}
+		}
+	}
+}
+
+// TestSettingDecodeHalfPairNotCompletedRefused — REQ-053: a half of the
+// ctx/setting pair that the openEHR setting group does not complete is refused
+// naming the missing key. |code is read as a code only and |value as a rubric
+// only, so a rubric given as the code, or a code given as the value, completes
+// nothing.
+func TestSettingDecodeHalfPairNotCompletedRefused(t *testing.T) {
 	_, wt := genComposition(t, minimalObsOPT)
-	tests := []struct {
-		name, body, missing string
+	for _, tc := range []struct {
+		name, key, val, missing string
+	}{
+		{"code outside the group", "ctx/setting|code", "999", "ctx/setting|value"},
+		{"rubric given as the code", "ctx/setting|code", "other care", "ctx/setting|value"},
+		{"empty code", "ctx/setting|code", "", "ctx/setting|value"},
+		{"value outside the group", "ctx/setting|value", "intensive care", "ctx/setting|code"},
+		{"code given as the value", "ctx/setting|value", "238", "ctx/setting|code"},
+		{"empty value", "ctx/setting|value", "", "ctx/setting|code"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			in := map[string]any{"ctx/language": "en", "ctx/territory": "NL", tc.key: tc.val}
+			_, err := simplified.UnmarshalFlat(mustJSON(t, in), wt)
+			if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
+				t.Fatalf("UnmarshalFlat(%v) err = %v, want ErrUnsupportedDatatype", in, err)
+			}
+			for _, named := range []string{tc.missing, "setting group"} {
+				if !strings.Contains(err.Error(), named) {
+					t.Errorf("error %q does not name %q", err, named)
+				}
+			}
+		})
+	}
+}
+
+// TestSettingDecodeCompletedHalfDisagreementRefused — REQ-053: "Where two keys
+// for one field disagree, the codec MUST refuse rather than choose". A half
+// the group would complete, beside a bare setting naming another member, is
+// two spellings of the field that disagree: refused naming both keys, never
+// completed.
+func TestSettingDecodeCompletedHalfDisagreementRefused(t *testing.T) {
+	_, wt := genComposition(t, minimalObsOPT)
+	root := wt.Tree.ID
+	for _, tc := range []struct {
+		name  string
+		extra map[string]any
+		named []string
 	}{
 		{
-			"code without value",
-			`{"ctx/language":"en","ctx/territory":"NL","ctx/setting|code":"238"}`,
-			"ctx/setting|value",
+			"code beside a bare ctx/setting",
+			map[string]any{"ctx/setting|code": "238", "ctx/setting": "home"},
+			[]string{`"ctx/setting"`, `"ctx/setting|code"`},
 		},
 		{
-			"value without code",
-			`{"ctx/language":"en","ctx/territory":"NL","ctx/setting|value":"other care"}`,
-			"ctx/setting|code",
+			"value beside a bare real-path setting",
+			map[string]any{"ctx/setting|value": "other care", root + "/context/setting": "225"},
+			[]string{`"ctx/setting|value"`, `"` + root + `/context/setting"`},
 		},
-	}
-	for _, tc := range tests {
+	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := simplified.UnmarshalFlat([]byte(tc.body), wt)
-			if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
-				t.Fatalf("err = %v, want ErrUnsupportedDatatype", err)
-			}
-			if !strings.Contains(err.Error(), tc.missing) {
-				t.Errorf("error %q does not name the missing key %q", err, tc.missing)
-			}
+			in := map[string]any{"ctx/language": "en", "ctx/territory": "NL"}
+			maps.Copy(in, tc.extra)
+			_, err := simplified.UnmarshalFlat(mustJSON(t, in), wt)
+			wantRefusal(t, err, simplified.ErrUnknownPath, tc.named...)
 		})
 	}
 }
@@ -1212,14 +1334,15 @@ func TestSettingDecodeEmptyHalfRefused(t *testing.T) {
 
 // TestSettingHalfPairNamesTheAuthorsSpelling — REQ-053. Both halves are reported
 // in the spelling the payload used; telling a real-path author to add a
-// ctx/-spelled key they never wrote points them at the wrong place.
+// ctx/-spelled key they never wrote points them at the wrong place. The code is
+// outside the openEHR setting group, so the half is not completed.
 func TestSettingHalfPairNamesTheAuthorsSpelling(t *testing.T) {
 	comp, wt := genComposition(t, minimalObsOPT)
 	root := wt.Tree.ID
 	body := reflatten(t, comp, wt, func(root string, m map[string]any) {
 		delete(m, "ctx/setting|code")
 		delete(m, "ctx/setting|value")
-		m[root+"/context/setting|code"] = "238"
+		m[root+"/context/setting|code"] = "999"
 		m[root+"/context/setting|terminology"] = "openehr"
 	})
 	_, err := simplified.UnmarshalFlat(body, wt)
