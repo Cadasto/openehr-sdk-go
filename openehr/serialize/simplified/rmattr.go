@@ -607,13 +607,44 @@ func (f rmattrFamily) host() string {
 // which would invent a magnitude or a rubric the author never wrote. (An ELEMENT
 // legitimately *without* a value carries `_null_flavour` instead, which is an
 // owner family and never reaches here.)
+//
+// The decoration is decoded against the anchor, so it fits a value of the
+// anchor's type, a subtype of it or a supertype of it (a coded text at a text
+// leaf, a free text at a coded one). A value of an unrelated type, a `|raw`
+// fragment of another datatype, is refused with ErrUnsupportedDatatype naming
+// the decoration's key, where canonical JSON would refuse it naming a path the
+// body does not spell (REQ-053).
 func rmattrValueNode(node map[string]any, g rmattrGroup, anchor string) (map[string]any, error) {
 	dv, ok := node["value"].(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("%w: %q decorates a %s value the body does not carry; spell the leaf itself beside it",
 			ErrUnsupportedDatatype, g.prefix(), anchor)
 	}
+	if typ, _ := dv["_type"].(string); !relatedTypes(typ, anchor) {
+		return nil, fmt.Errorf("%w: %q decorates a %s value, but the value spelled beside it is of an unrelated type",
+			ErrUnsupportedDatatype, g.prefix(), anchor)
+	}
 	return dv, nil
+}
+
+// relatedTypes reports whether one of the RM types a and b conforms to the
+// other. A type the RM hierarchy does not judge is taken as related, and left
+// to canonical JSON.
+func relatedTypes(a, b string) bool {
+	h, ok := rminfo.Default.(rminfo.Hierarchy)
+	if !ok || a == "" || b == "" {
+		return true
+	}
+	ca, cb := bmmtype.Class(a), bmmtype.Class(b)
+	if _, known := h.Ancestors(ca); !known {
+		return true
+	}
+	if _, known := h.Ancestors(cb); !known {
+		return true
+	}
+	aToB, _ := h.ConformsTo(ca, cb)
+	bToA, _ := h.ConformsTo(cb, ca)
+	return aToB || bToA
 }
 
 // checkRMAttrIndexes applies the FLAT `:index` rules to a `_family:N` sequence.
