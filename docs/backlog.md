@@ -8,6 +8,7 @@ Leftovers of merged branches: defects the branch that found them did not fix, an
 
 ## Unsorted
 - openehr/serialize/simplified/flat_decode.go:3255 · Empty structures are indexed under the bare path alone, though rebuildEmptyStructures walks the names the template pins, so an unnamed node beside a named twin that gives other empty structures loses them for both (dropDisagreeingStructures); no corpus template shows the shape · by: triage · from: feat/simplified-template-defaults
+- openehr/instance/generate.go:2985 · A C_DV_ORDINAL whose listed symbol has an empty code_string gets a symbol with empty text and code that nothing fills afterwards, so both validators report required mandatory at /value/symbol/value and /value/symbol/defining_code/code_string; no vendored OPT has the shape · by: sdd-implementer · from: fix/generator-plan-leftovers
 
 ## FLAT and the Web Template: what a round trip drops, adds or misroutes (REQ-053, REQ-106, REQ-111, PROBE-086, PROBE-105)
 Code in internal/templatecompile where only the first of several alternatives is kept, so a path below a later alternative resolves to the first: the path index. Lane: maintenance. Size: M–L.
