@@ -11,11 +11,15 @@ package webtemplate_test
 
 import (
 	"encoding/json"
+	"os"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 // actionNodes returns every ACTION node of wt, in tree order.
@@ -102,6 +106,99 @@ func TestREQ106NoInContextIsmTransitionForArchetypedAction(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// testAllTypesOPT is the vendored test_all_types operational template, whose
+// one ACTION models three archetyped ISM transitions, at0003 to at0005.
+const testAllTypesOPT = "../../../testkit/corpus/crossformat/test_all_types/template.opt"
+
+// stripIsmTransition returns opt with every attribute of the archetyped
+// ISM_TRANSITION nodeID removed, so that it constrains neither its
+// current_state nor its careflow_step. It fails the test unless opt holds
+// that node once, laid out one element per line as the vendored OPTs are.
+func stripIsmTransition(t *testing.T, opt []byte, nodeID string) []byte {
+	t.Helper()
+	lines := strings.SplitAfter(string(opt), "\n")
+	indentOf := func(l string) int { return len(l) - len(strings.TrimLeft(l, " \t")) }
+	found := 0
+	for i := 0; i < len(lines); i++ {
+		if strings.TrimSpace(lines[i]) != "<rm_type_name>ISM_TRANSITION</rm_type_name>" {
+			continue
+		}
+		indent := indentOf(lines[i])
+		j := i + 1
+		for j < len(lines) && (indentOf(lines[j]) != indent || !strings.HasPrefix(strings.TrimSpace(lines[j]), "<node_id>")) {
+			j++
+		}
+		if j == len(lines) || strings.TrimSpace(lines[j]) != "<node_id>"+nodeID+"</node_id>" {
+			continue
+		}
+		k := j + 1
+		for k < len(lines) && indentOf(lines[k]) >= indent {
+			k++
+		}
+		if k == j+1 || !strings.HasPrefix(strings.TrimSpace(lines[j+1]), "<attributes") {
+			t.Fatalf("ISM_TRANSITION %s has no attributes to strip", nodeID)
+		}
+		lines = slices.Delete(lines, j+1, k)
+		found++
+	}
+	if found != 1 {
+		t.Fatalf("the OPT holds ISM_TRANSITION %s %d times, want once", nodeID, found)
+	}
+	return []byte(strings.Join(lines, ""))
+}
+
+// buildOPT reads, compiles and builds the operational template raw.
+func buildOPT(t *testing.T, raw []byte) *webtemplate.WebTemplate {
+	t.Helper()
+	opt, err := fixtures.ReadOperationalTemplate(raw)
+	if err != nil {
+		t.Fatalf("ReadOperationalTemplate: %v", err)
+	}
+	c, err := templatecompile.Compile(opt)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	wt, err := webtemplate.Build(c)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	return wt
+}
+
+// TestREQ106InContextIsmTransitionWhenEveryArchetypedOneIsPruned — REQ-106:
+// an archetyped ISM_TRANSITION that constrains neither its current_state nor
+// its careflow_step contributes no node, as any empty container does. An
+// ACTION all of whose archetyped transitions are dropped so still gets the
+// in-context `ism_transition` node, or the RM-mandatory transition would have
+// no node to be written at. No vendored OPT has such a transition, so the case
+// strips the three of test_all_types.
+func TestREQ106InContextIsmTransitionWhenEveryArchetypedOneIsPruned(t *testing.T) {
+	raw, err := os.ReadFile(testAllTypesOPT)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"at0003", "at0004", "at0005"} {
+		raw = stripIsmTransition(t, raw, id)
+	}
+	actions := actionNodes(buildOPT(t, raw))
+	if len(actions) != 1 {
+		t.Fatalf("test_all_types has %d ACTION nodes, want 1 — fixture changed?", len(actions))
+	}
+	action := actions[0]
+	var isms []*webtemplate.Node
+	for _, ch := range action.Children {
+		if ch.RMType == "ISM_TRANSITION" {
+			isms = append(isms, ch)
+		}
+	}
+	if len(isms) != 1 {
+		t.Fatalf("ACTION %s has %d ISM_TRANSITION children, want the in-context one alone; children = %v", action.AQLPath, len(isms), childIDs(action))
+	}
+	if ism := isms[0]; ism.NodeID != "" || ism.AQLPath != action.AQLPath+"/ism_transition" || !slices.Contains(childIDs(ism), "current_state") {
+		t.Errorf("ISM transition node = %s, want the in-context node at %s/ism_transition holding current_state", jsonOf(t, ism), action.AQLPath)
 	}
 }
 

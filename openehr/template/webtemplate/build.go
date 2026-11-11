@@ -142,27 +142,25 @@ func childrenOf(n *templatecompile.CompiledNode, parentPath string, cfg *config)
 		ic.Inputs = cloneInputs(ic.Inputs) // never alias the table's slices or pointers into returned trees
 		out = append(out, &ic)
 	}
-	if n.RMTypeName() == "ACTION" && !constrainsIsmTransition(n) {
+	if n.RMTypeName() == "ACTION" && !slices.ContainsFunc(out, isIsmTransition) {
 		out = append(out, ismTransitionIC(parentPath))
 	}
 	return out
 }
 
-// constrainsIsmTransition reports whether the ACTION a constrains an
-// ISM_TRANSITION under its `ism_transition` attribute: the archetyped
-// `ism_transition[atNNNN]` nodes, one per careflow step, that the walk emits.
-func constrainsIsmTransition(a *templatecompile.CompiledNode) bool {
-	attr := a.Attribute("ism_transition")
-	return attr != nil && slices.ContainsFunc(impl.ChildNodes(attr), func(c *templatecompile.CompiledNode) bool {
-		return c.RMTypeName() == "ISM_TRANSITION"
-	})
-}
+// isIsmTransition reports whether n is an ISM_TRANSITION node: under an
+// ACTION, one of the archetyped `ism_transition[atNNNN]` nodes, one per
+// careflow step. It is read from the emitted nodes rather than from the
+// template, because an archetyped transition that constrains neither its
+// current_state nor its careflow_step is pruned as an empty container and
+// so carries nothing.
+func isIsmTransition(n *Node) bool { return n.RMType == "ISM_TRANSITION" }
 
 // ismTransitionIC returns the reference's in-context ISM transition node for
-// the ACTION at actionPath, which the builder adds where the template
-// constrains no ISM transition ([constrainsIsmTransition]). ACTION
-// `ism_transition` is RM-mandatory, so without a node the FLAT encoder would
-// have nowhere to write it.
+// the ACTION at actionPath, which the builder adds where the walk emits no
+// archetyped ISM transition ([isIsmTransition]). ACTION `ism_transition` is
+// RM-mandatory, so without a node the FLAT encoder would have nowhere to
+// write it.
 //
 // The node holds one leaf, the transition's `current_state`, a code of the
 // openehr terminology written as `|code` and `|value`, as EVENT_CONTEXT
