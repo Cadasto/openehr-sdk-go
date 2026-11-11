@@ -3,6 +3,7 @@ package instance_test
 import (
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -299,24 +300,39 @@ func optEHRURIElement(body string) string {
 		optNode("DV_EHR_URI", "", optSingle("value", optPrimitive("STRING", "C_STRING", body)))))
 }
 
-// TestREQ107_EHRURIPlaceholderUnderOpenCString is the REQ-107 check that a
-// DV_EHR_URI whose value the OPT constrains by a C_STRING that admits the
-// placeholder ehr://example gets that placeholder, not the open-string
-// example, which DV_EHR_URI Scheme_valid refuses: a C_STRING with neither a
-// list nor a pattern, one with an empty list, and one whose pattern admits
-// the placeholder. A C_STRING that refuses the placeholder keeps the value
-// it admits. The root passes the RM floor and the template validator under
-// every policy and both value fills.
-func TestREQ107_EHRURIPlaceholderUnderOpenCString(t *testing.T) {
+// TestREQ107_EHRURIValueNarrowedToTheEHRScheme is the REQ-107 check that
+// DV_EHR_URI Scheme_valid narrows the value of a DV_EHR_URI whose OPT
+// constrains it by a C_STRING (Precedence 3). The value the C_STRING path
+// picks stays where its scheme is ehr: a list keeps its first member under
+// ExampleFill, even beside the placeholder, and a listed member under
+// RandomFill, and a pattern of the ehr scheme keeps its own pick or draw.
+// Where the pick has no ehr scheme, the C_STRING's placeholder
+// ehr://example is written where the C_STRING admits it, as one with
+// neither a list nor a pattern, one with an empty list, and the pattern .*
+// do, whose pick example has no scheme. The root passes the RM floor and
+// the template validator under every policy and both value fills.
+func TestREQ107_EHRURIValueNarrowedToTheEHRScheme(t *testing.T) {
 	cases := []struct {
 		name string
 		body string
-		want string
+		// example is the value under ExampleFill.
+		example string
+		// random holds the values the draw can give under RandomFill, or is
+		// nil where any value with the ehr scheme that the C_STRING
+		// accepts will do.
+		random []string
 	}{
-		{name: "neither list nor pattern", body: "", want: "ehr://example"},
-		{name: "empty list", body: "<list></list>", want: "ehr://example"},
-		{name: "pattern admitting the placeholder", body: "<pattern>ehr://.+</pattern>", want: "ehr://example"},
-		{name: "list refusing the placeholder", body: "<list>ehr://abc</list>", want: "ehr://abc"},
+		{name: "neither list nor pattern", body: "", example: "ehr://example", random: []string{"ehr://example"}},
+		{name: "empty list", body: "<list></list>", example: "ehr://example", random: []string{"ehr://example"}},
+		{name: "pattern whose pick has no scheme", body: "<pattern>.*</pattern>", example: "ehr://example", random: []string{"ehr://example"}},
+		{name: "pattern of the ehr scheme", body: "<pattern>ehr://.+</pattern>", example: "ehr://a"},
+		{
+			name:    "list holding the placeholder second",
+			body:    "<list>ehr://a</list><list>ehr://example</list>",
+			example: "ehr://a",
+			random:  []string{"ehr://a", "ehr://example"},
+		},
+		{name: "list refusing the placeholder", body: "<list>ehr://abc</list>", example: "ehr://abc", random: []string{"ehr://abc"}},
 	}
 	for _, tc := range cases {
 		for _, implicit := range []bool{false, true} {
@@ -327,8 +343,20 @@ func TestREQ107_EHRURIPlaceholderUnderOpenCString(t *testing.T) {
 					if err != nil {
 						t.Fatalf("Generate: %v", err)
 					}
-					if got := rootElementValue[*rm.DVEHRURI](t, out).Value; got != tc.want {
-						t.Errorf("DV_EHR_URI.value = %q, want %q", got, tc.want)
+					value := rootElementValue[*rm.DVEHRURI](t, out)
+					switch {
+					case opts.ValueFill == instance.ExampleFill:
+						if value.Value != tc.example {
+							t.Errorf("DV_EHR_URI.value = %q, want %q", value.Value, tc.example)
+						}
+					case tc.random != nil:
+						if !slices.Contains(tc.random, value.Value) {
+							t.Errorf("DV_EHR_URI.value = %q, want one of %q", value.Value, tc.random)
+						}
+					default:
+						if !strings.EqualFold(value.Scheme(), "ehr") {
+							t.Errorf("DV_EHR_URI.value = %q, want the ehr scheme", value.Value)
+						}
 					}
 					checkValid(t, out, c)
 				})
