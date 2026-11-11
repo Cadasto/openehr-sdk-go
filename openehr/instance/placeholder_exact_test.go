@@ -2,11 +2,13 @@ package instance_test
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
 // localPlaceholder is the code REQ-107 makes the generator write on a code
@@ -329,6 +331,102 @@ func TestREQ107_EHRURIPlaceholderUnderOpenCString(t *testing.T) {
 						t.Errorf("DV_EHR_URI.value = %q, want %q", got, tc.want)
 					}
 					checkValid(t, out, c)
+				})
+			}
+		}
+	}
+}
+
+// emptyOnlyPattern is a C_STRING whose pattern admits only the empty
+// string, so the walk writes "" under it, under either value fill.
+var emptyOnlyPattern = optPrimitive("STRING", "C_STRING", "<pattern>x{0}</pattern>")
+
+// optEmptyOnlySymbol is an OPT whose root ELEMENT holds a DV_ORDINAL or a
+// DV_SCALE, as rmType names, whose symbol carries emptyOnlyPattern on its
+// text and on its defining_code's code_string.
+func optEmptyOnlySymbol(rmType string) string {
+	return optTemplate("ELEMENT", optSingle("value", optNode(rmType, "",
+		optSingle("symbol", optNode("DV_CODED_TEXT", "",
+			optSingle("value", emptyOnlyPattern),
+			optSingle("defining_code", optNode("CODE_PHRASE", "", optSingle("code_string", emptyOnlyPattern))))))))
+}
+
+// TestREQ107_PlaceholderUnderEmptyOnlyPattern is the REQ-107 check of the
+// placeholders the generator writes where the walk leaves a value empty,
+// because the OPT puts a C_STRING whose pattern admits only the empty
+// string, x{0}, on it: ehr://example on a DV_EHR_URI's value, and the code
+// at0000 in local with the text example on a DV_ORDINAL's or DV_SCALE's
+// symbol whose text and code_string carry it. The RM floor reports
+// nothing. The template validator reports exactly the pattern mismatch at
+// each such leaf, since the OPT's own pattern refuses the placeholder
+// (REQ-107 Exceptions: an OPT constraint that admits no value an RM rule
+// accepts).
+func TestREQ107_PlaceholderUnderEmptyOnlyPattern(t *testing.T) {
+	symbolMismatches := []string{
+		"template primitive_pattern_mismatch pattern_mismatch @ /value/symbol/value",
+		"template primitive_pattern_mismatch pattern_mismatch @ /value/symbol/defining_code/code_string",
+	}
+	checkSymbol := func(t *testing.T, name string, symbol rm.DVCodedText) {
+		t.Helper()
+		if symbol.DefiningCode != localPlaceholder || symbol.Value != nestedTextValue {
+			t.Errorf("%s.symbol = %q %+v, want %q %+v", name, symbol.Value, symbol.DefiningCode, nestedTextValue, localPlaceholder)
+		}
+	}
+	cases := []struct {
+		name     string
+		opt      string
+		check    func(t *testing.T, out any)
+		template []string
+	}{
+		{
+			name: "DV_EHR_URI value",
+			opt:  optEHRURIElement("<pattern>x{0}</pattern>"),
+			check: func(t *testing.T, out any) {
+				if got := rootElementValue[*rm.DVEHRURI](t, out).Value; got != "ehr://example" {
+					t.Errorf("DV_EHR_URI.value = %q, want %q", got, "ehr://example")
+				}
+			},
+			template: []string{"template primitive_pattern_mismatch pattern_mismatch @ /value/value"},
+		},
+		{
+			name: "DV_ORDINAL symbol",
+			opt:  optEmptyOnlySymbol("DV_ORDINAL"),
+			check: func(t *testing.T, out any) {
+				checkSymbol(t, "DV_ORDINAL", rootElementValue[*rm.DVOrdinal](t, out).Symbol)
+			},
+			template: symbolMismatches,
+		},
+		{
+			name: "DV_SCALE symbol",
+			opt:  optEmptyOnlySymbol("DV_SCALE"),
+			check: func(t *testing.T, out any) {
+				checkSymbol(t, "DV_SCALE", rootElementValue[*rm.DVScale](t, out).Symbol)
+			},
+			template: symbolMismatches,
+		},
+	}
+	for _, tc := range cases {
+		for _, implicit := range []bool{false, true} {
+			c := compileOPTText(t, tc.opt, implicit)
+			for _, opts := range defaultsOptions() {
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, opts)
+					if err != nil {
+						t.Fatalf("Generate: %v", err)
+					}
+					tc.check(t, out)
+					for _, iss := range validation.ValidateRM(out).Issues {
+						if iss.Severity == validation.Error {
+							t.Errorf("ValidateRM: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+						}
+					}
+					var got []string
+					for _, iss := range templateErrors(out, c) {
+						got = append(got, fmt.Sprintf("%v %s %s @ %s", iss.Layer, iss.Code, iss.Rule, iss.Path))
+					}
+					if !slices.Equal(got, tc.template) {
+						t.Errorf("Validate errors = %q, want %q", got, tc.template)
+					}
 				})
 			}
 		}
