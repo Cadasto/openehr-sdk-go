@@ -992,3 +992,106 @@ func modelledQuantityLeaf(t *testing.T, target *Target) (string, map[string]any)
 		"build a real refusal; pick another datatype")
 	return "", nil
 }
+
+// TestProbe086RespellSiblingIDs pins the respelling PROBE-086 and PROBE-105
+// apply to the upstream side before they compare (REQ-053): the Web Template
+// spells a duplicate sibling id `<id>_N`, and the reference's `<id><N+1>`
+// is read as this SDK's `<id>_<N>` only where the Web Template holds the
+// whole duplicate group, the `:index` and `|suffix` kept, and every other key
+// is copied as written.
+func TestProbe086RespellSiblingIDs(t *testing.T) {
+	leaf := func(id string) *wt.Node { return &wt.Node{ID: id} }
+	root := &wt.Node{ID: "r", Children: []*wt.Node{
+		{ID: "obs", Children: []*wt.Node{
+			leaf("dv_text"), leaf("dv_text_1"), leaf("dv_text_2"),
+			leaf("x1"), leaf("x1_1"),
+			leaf("y"), leaf("y_1"), leaf("y2"),
+			leaf("z"), leaf("z_2"),
+			leaf("w_1"),
+		}},
+		{ID: "obs_1", Children: []*wt.Node{leaf("dv_text"), leaf("dv_text_1")}},
+		leaf("section_2"),
+	}}
+	tests := []struct {
+		name, key, want string
+	}{
+		{name: "second claimant", key: "r/obs:0/dv_text2", want: "r/obs:0/dv_text_1"},
+		{name: "third claimant with a suffix", key: "r/obs:0/dv_text3|value", want: "r/obs:0/dv_text_2|value"},
+		{name: "every segment on the walk", key: "r/obs2:0/dv_text2", want: "r/obs_1:0/dv_text_1"},
+		{name: "a sub-path after the leaf", key: "r/obs:0/dv_text2/lower", want: "r/obs:0/dv_text_1/lower"},
+		{name: "an indexed root", key: "r:0/obs:0/dv_text2", want: "r:0/obs:0/dv_text_1"},
+		{name: "a base ending in a digit", key: "r/obs:0/x12", want: "r/obs:0/x1_1"},
+		{name: "already this SDK's spelling", key: "r/obs:0/dv_text_1", want: "r/obs:0/dv_text_1"},
+		{name: "a child's own id ending in a digit", key: "r/obs:0/y2", want: "r/obs:0/y2"},
+		{name: "past the duplicate group", key: "r/obs:0/dv_text4", want: "r/obs:0/dv_text4"},
+		{name: "a gap in the duplicate group", key: "r/obs:0/z3", want: "r/obs:0/z3"},
+		{name: "no bare id beside the suffix", key: "r/obs:0/w2", want: "r/obs:0/w2"},
+		{name: "an ordinary suffixed id", key: "r/section2", want: "r/section2"},
+		{name: "a leading zero", key: "r/obs:0/dv_text02", want: "r/obs:0/dv_text02"},
+		{name: "after the walk leaves the template", key: "r/obs:0/_feeder_audit/dv_text2", want: "r/obs:0/_feeder_audit/dv_text2"},
+		{name: "after an unknown segment", key: "r/nope/obs2", want: "r/nope/obs2"},
+		{name: "a ctx key", key: "ctx/dv_text2", want: "ctx/dv_text2"},
+		{name: "another root", key: "q/obs2:0/dv_text2", want: "q/obs2:0/dv_text2"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			body := map[string]any{tc.key: "v", "r/obs:0/dv_text": "w"}
+			got, respelled, err := RespellSiblingIDs(root, body)
+			if err != nil {
+				t.Fatalf("RespellSiblingIDs(%q) error = %v", tc.key, err)
+			}
+			want := map[string]any{tc.want: "v", "r/obs:0/dv_text": "w"}
+			if !maps.Equal(got, want) {
+				t.Errorf("RespellSiblingIDs(%q) = %v, want %v", tc.key, got, want)
+			}
+			var wantRespelled []Respelling
+			if tc.want != tc.key {
+				wantRespelled = []Respelling{{Upstream: tc.key, Ours: tc.want}}
+			}
+			if !slices.Equal(respelled, wantRespelled) {
+				t.Errorf("RespellSiblingIDs(%q) respellings = %v, want %v", tc.key, respelled, wantRespelled)
+			}
+			if _, kept := body[tc.key]; !kept || len(body) != 2 {
+				t.Errorf("RespellSiblingIDs(%q) changed its input: %v", tc.key, body)
+			}
+		})
+	}
+}
+
+// TestProbe086RespellSiblingIDsRefusesTwoSpellings pins that a body spelling
+// one duplicate sibling twice is an error naming both keys, never a key the
+// comparison silently drops; and that the respellings come back sorted.
+func TestProbe086RespellSiblingIDsRefusesTwoSpellings(t *testing.T) {
+	root := &wt.Node{ID: "r", Children: []*wt.Node{
+		{ID: "a"}, {ID: "a_1"}, {ID: "b"}, {ID: "b_1", Children: []*wt.Node{{ID: "c"}, {ID: "c_1"}}},
+	}}
+	for _, tc := range []struct {
+		name string
+		body map[string]any
+		keys []string
+	}{
+		{name: "both spellings written", body: map[string]any{"r/a2": "x", "r/a_1": "x"}, keys: []string{`"r/a2"`, `"r/a_1"`}},
+		{name: "two keys respelled to one", body: map[string]any{"r/b2/c2": "x", "r/b_1/c2": "x"}, keys: []string{`"r/b2/c2"`, `"r/b_1/c2"`}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, err := RespellSiblingIDs(root, tc.body)
+			if err == nil {
+				t.Fatalf("RespellSiblingIDs(%v) error = nil, want one naming %v", tc.body, tc.keys)
+			}
+			for _, k := range tc.keys {
+				if !strings.Contains(err.Error(), k) {
+					t.Errorf("RespellSiblingIDs(%v) error = %q, want it to name %s", tc.body, err, k)
+				}
+			}
+		})
+	}
+
+	_, respelled, err := RespellSiblingIDs(root, map[string]any{"r/b2/c": "x", "r/a2": "y", "r/b": "z"})
+	if err != nil {
+		t.Fatalf("RespellSiblingIDs() error = %v", err)
+	}
+	want := []Respelling{{Upstream: "r/a2", Ours: "r/a_1"}, {Upstream: "r/b2/c", Ours: "r/b_1/c"}}
+	if !slices.Equal(respelled, want) {
+		t.Errorf("RespellSiblingIDs() respellings = %v, want %v, sorted by upstream key", respelled, want)
+	}
+}

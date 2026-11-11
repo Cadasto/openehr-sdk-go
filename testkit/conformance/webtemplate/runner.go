@@ -61,8 +61,9 @@ func NewTargetFromOPT(path string) (*Target, error) {
 	}
 	w, err := wt.Build(c)
 	if err != nil {
-		// Until REQ-111 landed the name-derived id + ordinal fallback, this
-		// was ErrIDCollision and the whole probe was blocked on it.
+		// Until REQ-111 gave siblings name-derived ids, made unique where
+		// they still collide (REQ-106: `<id>_1`, `<id>_2`), this was
+		// ErrIDCollision and the whole probe was blocked on it.
 		return nil, fmt.Errorf("build corpus Web Template: %w", err)
 	}
 	return &Target{Compiled: c, Web: w, Root: w.Tree.ID}, nil
@@ -116,6 +117,11 @@ type Report struct {
 	Excluded int
 	// Compared is how many upstream keys survived into the comparison.
 	Compared int
+	// Respelled are the surviving upstream keys the comparison reads in this
+	// SDK's spelling of a duplicate sibling id (see [RespellSiblingIDs]),
+	// sorted by upstream key. Missing and Mismatched name such a key in this
+	// SDK's spelling.
+	Respelled []Respelling
 
 	// Missing are surviving upstream keys the re-encode did not produce: a
 	// leaf this SDK decoded and then dropped. Failure, not skip: there is no
@@ -185,7 +191,17 @@ func Run(t *Target, c Case) (Report, error) {
 		return Report{}, fmt.Errorf("%s: re-encoded FLAT is not valid JSON: %w", c.Name, err)
 	}
 
-	rep.Missing, rep.Extra, rep.Mismatched = compare(candidate, emitted, t.Root)
+	// The reference spells a duplicate sibling id `<id>2` where this SDK
+	// writes `<id>_1`: read the upstream side in this SDK's spelling, so the
+	// key is compared rather than reported both missing and extra. Decode has
+	// already read the key as written.
+	ours, respelled, err := RespellSiblingIDs(t.Web.Tree, candidate)
+	if err != nil {
+		return Report{}, fmt.Errorf("%s: %w", c.Name, err)
+	}
+	rep.Respelled = respelled
+
+	rep.Missing, rep.Extra, rep.Mismatched = compare(ours, emitted, t.Root)
 	return rep, nil
 }
 
