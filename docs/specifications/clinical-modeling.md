@@ -1334,8 +1334,25 @@ JSON field names are camelCase.
 Encoding **MUST** be deterministic: the same compiled template produces byte-identical output across runs and SDK patch releases (fixed field order; map keys sorted).
 
 The exported tree is **not** a 1:1 mirror of the compiled OPT; it follows the reference implementation's node model.
-The transform **MUST**: keep `COMPOSITION`, the ENTRY types (`OBSERVATION` / `EVALUATION` / `INSTRUCTION` / `ACTION` / `ADMIN_ENTRY`), `EVENT_CONTEXT`, and `CLUSTER` as nodes; keep the event types (`EVENT` / `POINT_EVENT` / `INTERVAL_EVENT`) as nodes **except** an abstract `EVENT` constrained to at most one occurrence, which is **lifted** — the reference emits no node for such a degenerate wrapper, while retaining its `events[…]` path segment on descendants and its synthesized `time` leaf (a repeating `EVENT`, and any concrete `POINT_EVENT` / `INTERVAL_EVENT` even at `max=1`, stays a node — both halves of the discriminator are measured across the vendored goldens); **collapse** each `ELEMENT` into a single leaf carrying the constrained value type as `rmType`, the ELEMENT's node id as `nodeId`, and the ELEMENT path extended by `/value` as `aqlPath`; **drop** the pure structural wrappers (`HISTORY` and the `ITEM_STRUCTURE` family — `ITEM_TREE` / `ITEM_LIST` / `ITEM_SINGLE` / `ITEM_TABLE`) as nodes while **folding their node predicates into the `aqlPath`** of the descendants they enclose; and emit RM-attribute values that carry data directly (e.g. `EVENT_CONTEXT.start_time` / `setting`, `EVENT.time`, the ENTRY `language` / `encoding` / `subject`, `INTERVAL_EVENT.math_function` / `width`) as leaves whose `id` is the attribute name; and give an ACTION whose template constrains no `ISM_TRANSITION` under `ism_transition` the reference's in-context `ism_transition` node, with no `nodeId`, holding the transition's `current_state` as a leaf, since the RM requires the transition and the format has no other place for it (an ACTION whose template models archetyped `ism_transition[atNNNN]` nodes gets none: those nodes carry its transition).
+The transform **MUST**:
+
+- keep `COMPOSITION`, the ENTRY types (`OBSERVATION` / `EVALUATION` / `INSTRUCTION` / `ACTION` / `ADMIN_ENTRY`), `EVENT_CONTEXT`, and `CLUSTER` as nodes;
+- keep the event types (`EVENT` / `POINT_EVENT` / `INTERVAL_EVENT`) as nodes **except** an abstract `EVENT` constrained to at most one occurrence, which is **lifted**.
+  The reference emits no node for such a degenerate wrapper, while retaining its `events[…]` path segment on descendants and its synthesized `time` leaf (a repeating `EVENT`, and any concrete `POINT_EVENT` / `INTERVAL_EVENT` even at `max=1`, stays a node — both halves of the discriminator are measured across the vendored goldens);
+- **collapse** each `ELEMENT` into a single leaf carrying the constrained value type as `rmType`, the ELEMENT's node id as `nodeId`, and the ELEMENT path extended by `/value` as `aqlPath`;
+- **drop** the pure structural wrappers (`HISTORY` and the `ITEM_STRUCTURE` family — `ITEM_TREE` / `ITEM_LIST` / `ITEM_SINGLE` / `ITEM_TABLE`) as nodes while **folding their node predicates into the `aqlPath`** of the descendants they enclose;
+- emit RM-attribute values that carry data directly (e.g. `EVENT_CONTEXT.start_time` / `setting`, `EVENT.time`, `ACTION.time`, the ENTRY `language` / `encoding` / `subject`, `INTERVAL_EVENT.math_function` / `width`) as leaves whose `id` is the attribute name.
+
 The `aqlPath` therefore carries every archetype-id and at-code node predicate along the retained path.
+
+Every ACTION **MUST** carry the reference's in-context `ism_transition` node, with no `nodeId`, since the RM requires the transition and the format has no other place for it:
+
+| The ACTION's template | The `ism_transition` node |
+|---|---|
+| models archetyped `ism_transition[atNNNN]` nodes, one per careflow step | merges them as the reference does: `min` and `max` from the first, and the leaves `careflow_step` (each step's code, with the `currentStates` that step admits), `current_state` (every step's states, in step order, a repeat dropped) and `transition` |
+| models none, or only ones that constrain neither `current_state` nor `careflow_step` | holds the transition's `current_state` and `transition` as leaves |
+
+The archetyped `ism_transition[atNNNN]` nodes stay beside the merged node.
 
 ### `id` generation (ADR 0014)
 
@@ -1357,16 +1374,19 @@ Datatypes outside this subset (e.g. `DV_MULTIMEDIA`, `DV_PARSABLE`, `DV_IDENTIFI
 
 ### Conformance and deviations
 
-Conformance against the reference is **structural, not byte-exact**: PROBE-075 compares the SDK output to the vendored EHRbase fixture on the `id` set, `rmType`, `aqlPath`, `min`/`max`, and per-node input `suffix`/`type` extended with coded/ordinal list values, `listOpen`, `terminology`, temporal validation patterns, and numeric validation ranges.
+Conformance against the reference is **structural, not byte-exact**: PROBE-075 compares the SDK output to the vendored EHRbase fixture on the `id` set, `rmType`, `aqlPath`, `min`/`max`, and per-node input `suffix`/`type` extended with coded/ordinal list values, a careflow step's `currentStates`, `listOpen`, `terminology`, temporal validation patterns, and numeric validation ranges.
 Any structural difference on that pinned surface is a failure; the following categories of divergence are **permitted deviations**, which PROBE-075 does not count as failures:
 
 1. **Field-level presentation** — JSON field ordering, absent optional fields, and localized-string packaging (`localizedName` / localized maps emitted for the compiled template's single document language only).
 2. **Reference-only node metadata** — `termBindings`, `annotations`, and the `inContext` flag on synthesized RM-attribute leaves.
 3. **Input-content omissions** — `defaultValue`; DV_DURATION per-field ranges; DV_QUANTITY `precision`; per-unit and multi-unit magnitude validation; list `label` for external-terminology codes; `localizedLabels` and per-item `termBindings`.
 4. **Local terminology** — `terminology` is emitted only for external bindings (e.g. `openehr`); the archetype-internal `local` value is omitted, mirroring the reference.
-5. **Fixture-outlier `min` on in-context leaves** — where a vendored golden marks synthesized RM-attribute leaves `min=1` and the OPT constrains no `existence`, the export **MAY** emit `min=0`: the `GECCO_Diagnose` golden is the sole such outlier across the three vendored references (14 nodes), and the other two agree with `min=0`.
+5. **Fixture-outlier `min` on in-context leaves** — where a vendored golden marks synthesized RM-attribute leaves `min=1` and the OPT constrains no `existence`, the export **MAY** emit `min=0`.
+   The `GECCO_Diagnose` golden (14 nodes) and the `test_all_types` golden (4 nodes on the ACTION subtree PROBE-075 compares) are such outliers; `constrain_test` and `Corona_Anamnese` agree with `min=0`.
 6. **Reference-set terminology** — for a `C_CODE_REFERENCE`, `terminology` is the one its code phrase names, else the one its `terminology:` URI names, spelled as a TERMINOLOGY_ID ([§ REQ-103](#req-103--primitive-constraint-introspection)): `terminology:LOINC/2.73` gives `LOINC(2.73)`, and a URI of another scheme gives none.
    The reference takes the URI with its scheme dropped, `LOINC/2.73`, whatever the code phrase names.
+7. **Per-careflow-step ISM transition nodes** — the export keeps an ACTION's archetyped `ism_transition[atNNNN]` nodes beside the merged in-context `ism_transition` node; the reference drops them.
+8. **ACTION instruction details** — the reference's `instruction_details/activity_id` and `instruction_details/instruction_id` leaves under an ACTION are not emitted.
 
 An informative per-field catalogue behind these categories ships with the package; this section is the contract.
 
@@ -1376,7 +1396,7 @@ Also out of scope: the WebTemplate → OPT round-trip (the format is lossy by de
 
 Templates that **reuse one archetype under a multi-valued slot** (name-distinguished instances) **are exported**: the compiled template keeps shared-path subtrees, and node identity comes from the template-level node name, with `aqlPath` carrying the matching name predicate ([§ REQ-111 § Node names and name predicates](#node-names-and-name-predicates), [ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md)), so each reused sibling is distinct by construction instead of colliding on the shared concept term.
 
-- **Probes:** PROBE-075, structural parity against three vendored EHRbase references: `constrain_test` and the two archetype-reuse oracles, `Corona_Anamnese` and `GECCO_Diagnose`, whose node `id` and `aqlPath` sets match their goldens within the documented deviations ([conformance.md](conformance.md)); [PROBE-086](conformance.md#probe-086--upstream-flat-serialisation-parity), upstream FLAT serialisation parity.
+- **Probes:** PROBE-075, structural parity against vendored EHRbase references: `constrain_test` and the two archetype-reuse oracles, `Corona_Anamnese` and `GECCO_Diagnose`, whose node `id` and `aqlPath` sets match their goldens within the documented deviations, and `test_all_types` on its ACTION subtree ([conformance.md](conformance.md)); [PROBE-086](conformance.md#probe-086--upstream-flat-serialisation-parity), upstream FLAT serialisation parity.
 
 ## REQ-112 — Template-less Reference Model validation floor
 
