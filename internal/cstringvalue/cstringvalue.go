@@ -67,14 +67,16 @@ func Pick(cs constraints.CString, example any) (string, error) {
 
 // ActionArchetypeID returns the action_archetype_id of an ACTIVITY whose
 // template constrains that attribute by cs: [AnyActionArchetype] where cs
-// accepts it, as a constraint with neither a pattern nor a list does, and
-// otherwise what [Pick] returns for cs and example. The RM default comes
-// before a list member and the example, because a string such as the
+// lists no string and accepts it, as a constraint with neither a pattern
+// nor a list does, and otherwise what [Pick] returns for cs and example. The
+// RM default comes before the example there, because a string such as the
 // example, which a pattern like .* also accepts, names no action
-// archetype. A template that does not constrain the attribute gives
-// [AnyActionArchetype] too.
+// archetype. A list gives the values itself, so cs with a list gets what
+// Pick returns, even where the list holds the RM default as well. A
+// template that does not constrain the attribute gives [AnyActionArchetype]
+// too.
 func ActionArchetypeID(cs constraints.CString, example any) (string, error) {
-	if len(cs.Validate(AnyActionArchetype)) == 0 {
+	if len(cs.List) == 0 && len(cs.Validate(AnyActionArchetype)) == 0 {
 		return AnyActionArchetype, nil
 	}
 	return Pick(cs, example)

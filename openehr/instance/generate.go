@@ -4032,11 +4032,13 @@ const defaultTransition = "535"
 // value is a list member or a pattern match that the constraint accepts,
 // or the example under a C_STRING with neither (stringForConstraint).
 //
-// An ACTIVITY's action_archetype_id gets, where the C_STRING admits it,
-// the RM default /.*/ the generator writes where the OPT leaves it silent
-// (bmmStringDefault), because the example names no archetype. A C_STRING
-// with neither a list nor a pattern admits it. Under any other C_STRING it
-// gets a string the C_STRING admits (cstringvalue.ActionArchetypeID).
+// An ACTIVITY's action_archetype_id gets, where the C_STRING lists no
+// string and admits it, the RM default /.*/ the generator writes where the
+// OPT leaves it silent (bmmStringDefault), because the example names no
+// archetype. A C_STRING with neither a list nor a pattern admits it, as
+// the pattern .* does. Under a C_STRING with a list, or one that rejects
+// /.*/, it gets the string stringForConstraint picks, so a list keeps its
+// example value and RandomFill its draw (cstringvalue.ActionArchetypeID).
 //
 // DV_EHR_URI Scheme_valid narrows a DV_EHR_URI's value: the string
 // stringForConstraint picks stays where its scheme is ehr, so a list keeps
@@ -4085,10 +4087,12 @@ func applyStringLeaf(leaf *tcimpl.CompiledNode, rmValue any, attr string, cs con
 			s, err = termMappingMatch(cs, s)
 		}
 	case *rm.Activity:
-		// A C_STRING that admits the RM default gets it, as where the OPT
-		// leaves the attribute silent (bmmStringDefault): the example, which
-		// a pattern such as .* also admits, names no archetype. The FLAT
-		// decode's template completion shares the pick
+		// A C_STRING that lists no string and admits the RM default gets
+		// it, as where the OPT leaves the attribute silent
+		// (bmmStringDefault): the example, which a pattern such as .* also
+		// admits, names no archetype. A list gives values itself, so it
+		// keeps the pick, even where it holds /.*/ too. The FLAT decode's
+		// template completion shares the pick
 		// (cstringvalue.ActionArchetypeID).
 		if attr == "action_archetype_id" {
 			s, err = cstringvalue.ActionArchetypeID(cs, ex)

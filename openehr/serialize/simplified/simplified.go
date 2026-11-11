@@ -107,9 +107,9 @@ func (c decodeConfig) tracked() bool {
 // time, and an event with no time takes its HISTORY's origin. An ACTIVITY
 // with no action_archetype_id takes the one the instance generator writes on
 // its own template node: the default /.*/ where the first C_STRING that node
-// allows on that attribute admits it, as one with neither a list nor a
-// pattern does, or where the node allows none there, and otherwise a value
-// that C_STRING accepts. Decode leaves the id out where that C_STRING accepts
+// allows on that attribute lists no string and admits it, as one with
+// neither a list nor a pattern does, or where the node allows none there,
+// and otherwise a value that C_STRING accepts, a member where it has a list. Decode leaves the id out where that C_STRING accepts
 // no value the generator builds. A composition category the body does not spell is the one
 // the template fixes, a single openehr code such as 431|persistent, or else
 // 433|event. An empty structure (an ITEM_TREE or ITEM_LIST with no
