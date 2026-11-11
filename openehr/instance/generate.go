@@ -3410,18 +3410,18 @@ func (g *generator) finishValue(opt *tcimpl.CompiledNode, rmValue any) {
 	case *rm.DVEHRURI:
 		// populatePrimitiveDefault has written this value on every
 		// DV_EHR_URI the generator builds. The walk empties it where the
-		// C_STRING the OPT puts on the value gives the empty string,
-		// under either value fill, as a pattern that rejects "example" and
-		// whose shortest string is "" does, such as x?. The placeholder
-		// then keeps the value the RM requires, and the template validator
-		// reports the pattern mismatch.
+		// C_STRING the OPT puts on the value gives the empty string, under
+		// either value fill, as a pattern that builds no other string, such
+		// as x{0}, does. The placeholder then keeps the value the RM
+		// requires, and the template validator reports the pattern
+		// mismatch.
 		if v.Value == "" {
 			v.Value = ehrURIPlaceholder
 		}
 	case *rm.DVOrdinal:
 		// As for a DV_EHR_URI: the walk blanks the symbol where the OPT
 		// builds it as a coded text whose text and code_string each carry
-		// such a C_STRING.
+		// a C_STRING that gives the empty string, such as the pattern x{0}.
 		if symbolBlank(v.Symbol) {
 			v.Symbol = localSymbol()
 		}
@@ -4134,11 +4134,14 @@ var errNoStringValue = cstringvalue.ErrNoValue
 // stringForConstraint returns a string cs accepts: the example ex when cs
 // accepts it, else the first list member cs accepts, else, for a
 // pattern-only constraint, the shortest string the pattern's syntax
-// builds. Acceptance is cs.Validate, which matches a pattern against the
-// whole string, so a value that only contains a match is never
-// chosen. It returns errNoStringValue when none of these is accepted. The
-// pick is cstringvalue.Pick, which the FLAT decode's template completion
-// shares, so the two write the same value for one constraint.
+// builds, or, where that is the empty string, a non-empty string the
+// syntax builds that cs accepts. The empty string stays only where cs
+// accepts no such string, as under the pattern x{0}. Acceptance is
+// cs.Validate, which matches a pattern against the whole string, so a
+// value that only contains a match is never chosen. It returns
+// errNoStringValue when none of these is accepted. The pick is
+// cstringvalue.Pick, which the FLAT decode's template completion shares,
+// so the two write the same value for one constraint.
 func stringForConstraint(cs constraints.CString, ex any) (string, error) {
 	return cstringvalue.Pick(cs, ex)
 }
