@@ -12,20 +12,21 @@ import (
 // malformed indexes is refused for: the first in sorted order, on every run.
 // The keys are of each kind the passes before the leaf loop read (an underscore
 // family, a party leaf, an in-context spelling, an ordinary leaf), and
-// compositeLeafGroups, the first pass that refuses a malformed key, meets them
+// compositeLeafGroups, the first pass that refuses a malformed index, meets them
 // all. The refusal is the key's own parse error, unwrapped.
 func TestFlatDecodeRefusesFirstMalformedKey(t *testing.T) {
 	wt, _ := conformanceWT(t)
+	action := rmattrSection + "/conformance_action"
 	malformed := []string{
 		rmattrElement + "/_uid:-1",
 		rmattrObs + "/subject:01|name",
-		rmattrEvent + "/width:00",
+		action + "/time:00",
 		rmattrObs + "/any_event:00/dv_text",
 		rmattrSection + ":+1/conformance_observation/any_event:0/dv_text",
 	}
 	extra := map[string]any{
 		// A null in-context key, which the first pass removes from content.
-		rmattrEvent + "/math_function": nil,
+		action + "/time": nil,
 	}
 	for _, k := range malformed {
 		extra[k] = "x"
