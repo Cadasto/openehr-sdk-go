@@ -219,8 +219,7 @@ failure, not a deviation.
   code that archetype does not define is left out of a coded list, as the reference leaves it
   out, even where an enclosing archetype defines it), but is **empty for external-terminology codes**
   (e.g. `openehr::433`), and `localizedLabels` / `localizedDescriptions` / per-item
-  `termBindings` are not emitted, except the `localizedLabels` of a merged ACTION
-  `careflow_step` item that lists a step by its node id (the ISM transition entry above).
+  `termBindings` are not emitted.
 - **`terminology`** — emitted for external bindings only (e.g. `openehr`). The
   archetype-internal `local` value is omitted, mirroring the reference (pinned by
   `TestInputParity`), which itself writes it on one input: the merged ACTION

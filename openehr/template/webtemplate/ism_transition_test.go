@@ -114,11 +114,9 @@ func unconstrainedIsm(actionPath string) *webtemplate.Node {
 }
 
 // step is one archetyped careflow step as the merged node lists it: its
-// careflow-step code and label, its localized labels, and the current states
-// it admits.
+// careflow-step code and label, and the current states it admits.
 type step struct {
 	code, label string
-	localized   map[string]string
 	states      []string
 }
 
@@ -130,7 +128,7 @@ func mergedIsm(actionPath string, minNode, minStep, minState int, steps []step, 
 	base := actionPath + "/ism_transition"
 	var careflow, states []webtemplate.InputListItem
 	for _, s := range steps {
-		careflow = append(careflow, webtemplate.InputListItem{Value: s.code, Label: s.label, LocalizedLabels: s.localized, CurrentStates: s.states})
+		careflow = append(careflow, webtemplate.InputListItem{Value: s.code, Label: s.label, CurrentStates: s.states})
 	}
 	for _, c := range currentStates {
 		states = append(states, webtemplate.InputListItem{Value: c})
@@ -276,9 +274,9 @@ func TestREQ106MergedIsmTransitionForArchetypedAction(t *testing.T) {
 // the merged node holds `careflow_step` whenever it merges steps. A step whose
 // archetype constrains no careflow step still names one, its node id, which a
 // transition decoded under it is given; the merged list carries it as one
-// item, the node id with the step's Web Template name as its label and its
-// localized names as localized labels, and the current states that step
-// admits. Otherwise encode, which writes a transition at the merged node
+// item, the node id with the step's Web Template name as its label (and, like
+// every other list item, no localized labels), and the current states that
+// step admits. Otherwise encode, which writes a transition at the merged node
 // alone, would drop that careflow step. The leaf's min is the first step's
 // that constrains one, else 0. No vendored OPT has such a step, so the cases
 // strip careflow_step from test_all_types steps.
@@ -287,10 +285,6 @@ func TestREQ106MergedCareflowStepListsStepsConstrainingNone(t *testing.T) {
 	planned := step{code: "at0003", label: "Planned", states: []string{"526"}}
 	active := step{code: "at0004", label: "Active", states: []string{"245"}}
 	completed := step{code: "at0005", label: "Completed", states: []string{"532"}}
-	byNodeID := func(s step) step {
-		s.localized = map[string]string{"en": s.label}
-		return s
-	}
 	allStates := []string{"526", "245", "532"}
 	tests := []struct {
 		name  string
@@ -301,21 +295,21 @@ func TestREQ106MergedCareflowStepListsStepsConstrainingNone(t *testing.T) {
 			name:  "the middle step",
 			strip: []string{"at0004"},
 			want: func(p string) *webtemplate.Node {
-				return mergedIsm(p, 1, 1, 1, []step{planned, byNodeID(active), completed}, allStates)
+				return mergedIsm(p, 1, 1, 1, []step{planned, active, completed}, allStates)
 			},
 		},
 		{
 			name:  "the first step",
 			strip: []string{"at0003"},
 			want: func(p string) *webtemplate.Node {
-				return mergedIsm(p, 1, 1, 1, []step{byNodeID(planned), active, completed}, allStates)
+				return mergedIsm(p, 1, 1, 1, []step{planned, active, completed}, allStates)
 			},
 		},
 		{
 			name:  "every step",
 			strip: []string{"at0003", "at0004", "at0005"},
 			want: func(p string) *webtemplate.Node {
-				return mergedIsm(p, 1, 0, 1, []step{byNodeID(planned), byNodeID(active), byNodeID(completed)}, allStates)
+				return mergedIsm(p, 1, 0, 1, []step{planned, active, completed}, allStates)
 			},
 		},
 	}

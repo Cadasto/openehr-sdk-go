@@ -223,7 +223,7 @@ func mergedIsmTransition(path string, steps []*Node) *Node {
 		items, open := codeInput(stepCareflow)
 		switch {
 		case stepCareflow == nil:
-			items = []InputListItem{{Value: s.NodeID, Label: s.Name, LocalizedLabels: maps.Clone(s.LocalizedNames)}}
+			items = []InputListItem{{Value: s.NodeID, Label: s.Name}}
 		case !hasCareflow:
 			careflow.Min, hasCareflow = stepCareflow.Min, true
 		}
