@@ -219,13 +219,14 @@ Two OPTs in this table are not CODE24's. `alternative_types.en.v1` is byte-ident
 | `IDCR - Laboratory Test Report.v0` | yes | — | yes | XML round-trip |
 | `IDCR -  Adverse Reaction List.v1` | yes | — | yes | XML round-trip (upstream double space in id) |
 
-**WebTemplate oracles** (`webtemplate/`, pinned at commit `e57511c6aca27ed501d31d663762c37c3491e74e`; each OPT sits beside its reference WebTemplate golden, and file stems match `template_id`):
+**WebTemplate oracles** (`webtemplate/`, from commit `e07110a2d969d6971ff157b93288f64ee30764af`, the openEHR_SDK line of [`UPSTREAM_PINS.txt`](UPSTREAM_PINS.txt), as [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) records; file stems match `template_id`, and each OPT sits beside its reference WebTemplate golden except `test_all_types.en.v1`'s, which the cross-format set already vendors):
 
 | Template id | Role | Size (OPT + golden) |
 |---|---|---|
 | `constrain_test` | PROBE-075 parity oracle (104/104). Pins **no** node name, so its golden carries **0** name predicates | 444 KB + 139 KB |
 | `Corona_Anamnese` | REQ-111 oracle. It was the loud mode (`Build` → `ErrIDCollision`: four `SECTION.adhoc.v1` siblings; eight reused screening OBSERVATIONs under Symptome). Its golden carries 350 name-predicate segments over 213 `aqlPath`s. Since REQ-111 Phase 4 it builds and holds **230/230** structural parity | 1.2 MB + 230 KB |
 | `GECCO_Diagnose` | REQ-111 oracle, silent mode. It always built, but it emitted bare paths where its golden carries 30 name-predicate segments over 24 `aqlPath`s (its three `/content` children have **distinct** archetype ids and are all predicated). Since REQ-111 Phase 4: **34/34** structural parity. The residuals are the golden's own `min=1` outlier (14 nodes) and 1 input delta, both documented | 210 KB + 73 KB |
+| `test_all_types.en.v1` | PROBE-075 ACTION oracle: the golden alone, its OPT being `crossformat/test_all_types/template.opt`. Parity is checked on the ACTION subtree only, where it pins the in-context `time` and the merged `ism_transition` node; its other deltas are counted by category | — + 62 KB |
 
 The Corona pair is the largest fixture in the repo. That size is the cost of guarding the archetype-reuse-under-slot class with the real reference fixture instead of a synthetic cut-down.
 
