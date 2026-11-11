@@ -2,6 +2,8 @@ package instance_test
 
 import (
 	"fmt"
+	mrand "math/rand/v2"
+	"slices"
 	"strings"
 	"testing"
 
@@ -190,4 +192,122 @@ func TestREQ107_UnconstrainedTerminologyIDKeepsLocal(t *testing.T) {
 			}
 		}
 	}
+}
+
+// TestREQ107_CodeListWithNoTerminologyKeepsLocal is the REQ-107 check that
+// a C_CODE_PHRASE that lists codes and names no terminology, by an empty
+// TERMINOLOGY_ID value or by no terminology_id at all, gives a listed code
+// in terminology local: the first listed code under ExampleFill, and a
+// listed code under RandomFill for each of a few fixed seeds, never in
+// another terminology or in an empty one. It holds on a DV_CODED_TEXT's
+// defining_code and on a TERM_MAPPING's target, a bare CODE_PHRASE, under
+// every policy, since each visits both, and both compile modes. Neither the
+// RM floor nor the template validator reports anything on the result.
+func TestREQ107_CodeListWithNoTerminologyKeepsLocal(t *testing.T) {
+	codes := []string{"at0001", "at0002"}
+	emptyTermID := optCodePhrase("", codes...)
+	noTermID := strings.Replace(emptyTermID, `<terminology_id><value></value></terminology_id>`, "", 1)
+	if noTermID == emptyTermID {
+		t.Fatal("optCodePhrase no longer writes an empty terminology_id to remove")
+	}
+	phrases := []struct {
+		name string
+		opt  string
+	}{
+		{name: "empty terminology_id", opt: emptyTermID},
+		{name: "no terminology_id", opt: noTermID},
+	}
+	shapes := []struct {
+		name string
+		opt  func(codePhrase string) string
+		code func(t *testing.T, out any) rm.CodePhrase
+	}{
+		{
+			name: "DV_CODED_TEXT defining_code",
+			opt: func(codePhrase string) string {
+				return optTemplate("ELEMENT", optSingle("value",
+					optNode("DV_CODED_TEXT", "", optSingle("defining_code", codePhrase))))
+			},
+			code: func(t *testing.T, out any) rm.CodePhrase {
+				value := generatedElement(t, out).Value
+				ct, ok := value.(*rm.DVCodedText)
+				if !ok {
+					t.Fatalf("ELEMENT.value is %T, want *rm.DVCodedText", value)
+				}
+				return ct.DefiningCode
+			},
+		},
+		{
+			name: "TERM_MAPPING target",
+			opt: func(codePhrase string) string {
+				return mappedValueOPT(optSingle("target", codePhrase))
+			},
+			code: func(t *testing.T, out any) rm.CodePhrase {
+				ms := valueMappings(t, out)
+				if len(ms) != 1 {
+					t.Fatalf("%d mappings generated, want 1", len(ms))
+				}
+				return ms[0].Target
+			},
+		},
+	}
+	firstListed := rm.CodePhrase{CodeString: codes[0], TerminologyID: rm.TerminologyID{Value: "local"}}
+	for _, shape := range shapes {
+		for _, phrase := range phrases {
+			for _, implicit := range []bool{true, false} {
+				c := compileOPTText(t, shape.opt(phrase.opt), implicit)
+				for _, run := range codeListRuns(everyPolicy, codeListSeeds) {
+					opts := run.opts
+					t.Run(fmt.Sprintf("%s/%s/implicit=%t/%s", shape.name, phrase.name, implicit, run.name), func(t *testing.T) {
+						out, err := instance.Generate(t.Context(), c, opts)
+						if err != nil {
+							t.Fatalf("Generate: %v", err)
+						}
+						got := shape.code(t, out)
+						if opts.ValueFill == instance.ExampleFill {
+							checkCode(t, shape.name, got, firstListed)
+						} else if got.TerminologyID.Value != "local" || !slices.Contains(codes, got.CodeString) {
+							t.Errorf("%s = %+v, want a code of %v in local", shape.name, got, codes)
+						}
+						noFloorErrors(t, out)
+						for _, iss := range templateErrors(out, c) {
+							t.Errorf("template validator: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+						}
+					})
+				}
+			}
+		}
+	}
+}
+
+// codeListSeeds are the PCG seeds a RandomFill case draws a listed code
+// with, one generation each.
+var codeListSeeds = [][2]uint64{{1, 2}, {3, 4}, {5, 6}, {7, 8}}
+
+// codeListRun is one generator setting a case runs under, with the name of
+// its subtest.
+type codeListRun struct {
+	name string
+	opts instance.Options
+}
+
+// codeListRuns are the settings of optionsFor under policies, with
+// RandomFill run once per seed in seeds instead of once. ExampleFill
+// ignores its source, so it runs once per policy.
+func codeListRuns(policies []instance.Policy, seeds [][2]uint64) []codeListRun {
+	var out []codeListRun
+	for _, opts := range optionsFor(policies) {
+		if opts.ValueFill == instance.ExampleFill {
+			out = append(out, codeListRun{name: fmt.Sprintf("%v/%v", opts.Policy, opts.ValueFill), opts: opts})
+			continue
+		}
+		for _, seed := range seeds {
+			opts.ValueSource = mrand.NewPCG(seed[0], seed[1])
+			out = append(out, codeListRun{
+				name: fmt.Sprintf("%v/%v/seed=%d,%d", opts.Policy, opts.ValueFill, seed[0], seed[1]),
+				opts: opts,
+			})
+		}
+	}
+	return out
 }
