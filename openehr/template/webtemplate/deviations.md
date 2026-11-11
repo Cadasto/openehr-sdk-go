@@ -40,14 +40,16 @@ failure, not a deviation.
     (`OPTParser.handleActionIsmTransitions`). Its `min`/`max` are the first step's,
     and it holds `careflow_step` (each step's careflow-step code, with the
     `currentStates` that step admits), `current_state` (every step's states in step
-    order, a repeat dropped) and `transition` (`|code` / `|value`). Two readings go
-    beyond the golden, where the reference fails on a step that constrains no
-    `careflow_step` or no `current_state`. Such a step still names a careflow step,
-    its node id, which the FLAT codec gives a transition decoded under it, so
-    `careflow_step` lists it by its node id, labelled with its name and localized
-    names, and is never left out; a step with no `current_state` adds nothing to that
-    list. And `careflow_step`'s `max` is 1 where the reference copies the step's `min`
-    into it, and its `min` is the first step's that constrains one, else 0.
+    order, a state two steps admit listed twice, as the reference lists it) and
+    `transition` (`|code` / `|value`). Three readings go beyond the golden:
+    - a step that constrains no `careflow_step` still names one, its node id, which
+      the FLAT codec gives a transition decoded under it, so `careflow_step` lists it
+      by its node id, labelled with its name and localized names, where the
+      reference fails on it;
+    - a step that constrains no `current_state` adds nothing to that list, where the
+      reference fails on it;
+    - `careflow_step`'s `max` is 1 where the reference copies the step's `min` into
+      it, and its `min` is the first step's that constrains one, else 0.
   - **Unconstrained**, where the walk emits none: `current_state` and `transition`,
     each with `|code` / `|value` inputs, and no `careflow_step`, as the reference's
     filter leaves it out; `min` 0, and the name `Ism_transition` in the in-context

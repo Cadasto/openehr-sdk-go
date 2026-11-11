@@ -195,7 +195,8 @@ func ismTransitionIC(actionPath string, siblings []*Node) *Node {
 //     gives a transition spelled under it, so that step is listed by its node
 //     id, labelled with its name, where the reference fails on it;
 //   - current_state, listing every step's current_state codes in step order,
-//     a repeat dropped, in the openehr terminology;
+//     each step's list as is, so a state two steps admit is listed twice, in
+//     the openehr terminology;
 //   - transition, as on the unconstrained node.
 //
 // A leaf's min is the first step's that has it, else 0, and its max 1. A step
@@ -208,7 +209,6 @@ func mergedIsmTransition(path string, steps []*Node) *Node {
 	careflowIn := Input{Suffix: "code", Type: "CODED_TEXT"}
 	stateIn := Input{Suffix: "code", Type: "CODED_TEXT", Terminology: "openehr"}
 	var hasCareflow, hasState bool
-	listed := map[string]bool{}
 	for _, s := range steps {
 		stepState := childAt(s, s.AQLPath+"/current_state")
 		states, stateOpen := codeInput(stepState)
@@ -217,12 +217,7 @@ func mergedIsmTransition(path string, steps []*Node) *Node {
 				state.Min, hasState = stepState.Min, true
 			}
 			stateIn.ListOpen = stateIn.ListOpen || stateOpen
-			for _, it := range states {
-				if !listed[it.Value] {
-					listed[it.Value] = true
-					stateIn.List = append(stateIn.List, it)
-				}
-			}
+			stateIn.List = append(stateIn.List, states...)
 		}
 		stepCareflow := childAt(s, s.AQLPath+"/careflow_step")
 		items, open := codeInput(stepCareflow)
