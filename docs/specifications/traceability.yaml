@@ -613,6 +613,7 @@ requirements:
       - openehr/serialize/simplified/index_bound_test.go
       - openehr/serialize/simplified/interval_event_test.go
       - openehr/serialize/simplified/interval_unbounded_test.go
+      - openehr/serialize/simplified/ism_transition_merged_test.go
       - openehr/serialize/simplified/ism_transition_test.go
       - openehr/serialize/simplified/leaf_rmtype_test.go
       - openehr/serialize/simplified/mediatype_fuzz_test.go
@@ -620,6 +621,7 @@ requirements:
       - openehr/serialize/simplified/mediatype_test.go
       - openehr/serialize/simplified/metadata_index_test.go
       - openehr/serialize/simplified/names_test.go
+      - openehr/serialize/simplified/not_modelled_test.go
       - openehr/serialize/simplified/null_test.go
       - openehr/serialize/simplified/raw_fit_test.go
       - openehr/serialize/simplified/raw_test.go
@@ -2103,6 +2105,7 @@ requirements:
     tests:
       - openehr/rm/rmpath/action_test.go
       - openehr/rm/rmpath/rmpath_test.go
+      - openehr/serialize/simplified/ism_transition_merged_test.go
       - openehr/serialize/simplified/ism_transition_test.go
       - openehr/template/webtemplate/incontext_rmpath_test.go
       - openehr/template/webtemplate/paths_rmpath_test.go
@@ -2175,6 +2178,7 @@ requirements:
       - openehr/serialize/simplified/flat_pinned_test.go
       - openehr/serialize/simplified/index_bound_test.go
       - openehr/serialize/simplified/interval_leaf_anchor_test.go
+      - openehr/serialize/simplified/ism_transition_merged_test.go
       - openehr/serialize/simplified/ism_transition_test.go
       - openehr/serialize/simplified/leaf_rmtype_test.go
       - openehr/serialize/simplified/null_test.go
@@ -2526,6 +2530,7 @@ requirements:
       - openehr/serialize/simplified/hardening_test.go
       - openehr/serialize/simplified/history_origin_test.go
       - openehr/serialize/simplified/index_bound_test.go
+      - openehr/serialize/simplified/ism_transition_merged_test.go
       - openehr/serialize/simplified/ism_transition_test.go
       - openehr/serialize/simplified/malformed_key_test.go
       - openehr/serialize/simplified/not_modelled_test.go

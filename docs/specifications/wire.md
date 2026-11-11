@@ -574,6 +574,7 @@ The grammar is **recursive and typed by the owning RM class**, not a flat key li
 | ENTRY subtypes | `_work_flow_id`, `_guideline_id` | OBJECT_REF — `\|id`, `\|id_scheme`, `\|namespace`, `\|type` |
 | | `_other_participation:N` | PARTICIPATION (below) |
 | | `_provider` | PARTY_PROXY (below) — the party grammar, with PARTY_SELF spelled by `\|_type` |
+| ISM_TRANSITION (an ACTION's in-context `ism_transition` node or a per-step `ism_transition[atNNNN]` node) | `_reason:N` | DV_TEXT — the DV_TEXT leaf grammar, one key per reason; the corpus writes the bare value |
 | INSTRUCTION | `_wf_definition` | DV_PARSABLE per [§ REQ-053 *Leaf datatypes*](#leaf-datatypes) — written `\|value` + `\|formalism`, the spelling of ITS-REST 1.1.0 *Simplified Formats* § INSTRUCTION and of the corpus; decode reads the value bare too |
 | EVENT_CONTEXT (under the real `context` segment) | `_health_care_facility` | PARTY_IDENTIFIED (below) |
 | | `_participation:N` | PARTICIPATION (below) |
