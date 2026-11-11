@@ -18,7 +18,7 @@
 # go.mod's `go` line (which stays at the minor's `.0`, e.g. 1.27.0, per
 # docs/releases.md § Minimum Go version). Bump explicitly when a new stable
 # patch ships — same policy as the Makefile's LINT_IMAGE pin.
-ARG GO_VERSION=1.27.3
+ARG GO_VERSION=1.27.4
 # No Alpine pin: the `dev` stage inherits whatever Alpine
 # `golang:${GO_VERSION}-alpine` ships. Pinning it separately needs the
 # `-alpineX.Y` tag form, which is not published for every Go patch, so a fixed
