@@ -20,6 +20,7 @@ package simplified
 // (rmattr_value_encode.go emits through [emitLeafValue], its inverse).
 
 import (
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -561,8 +562,22 @@ func includedOpenSideError(key, end string) error {
 // template (deferred) those bounds are built without the |value and |ordinal
 // the body leaves out, which [templateIndex.completeCodedValue] gives, or
 // refuses, once the leaf is placed.
-func intervalLeafSuffixes(g rmattrGroup, anchor string, deferred bool) (map[string]any, []string, error) {
+//
+// A |raw at the leaf carries the whole value, as at every other leaf
+// (REQ-053), of any type the attribute it fills, holds, admits: an ELEMENT
+// with value types writes one under an interval child for a value of no
+// child's type. It stands alone, refused beside a key the interval grammar
+// reads.
+func intervalLeafSuffixes(g rmattrGroup, holds, anchor string, deferred bool) (map[string]any, []string, error) {
+	raw, hasRaw := g.tails[ownTail("raw")]
+	if hasRaw {
+		g.tails = maps.Clone(g.tails)
+		delete(g.tails, ownTail("raw"))
+	}
 	ts, err := intervalTails(g, anchor, intervalSubTails)
+	if hasRaw && raw != nil {
+		return intervalLeafRaw(g, holds, anchor, raw, err)
+	}
 	if err != nil {
 		return nil, nil, err
 	}
@@ -581,6 +596,27 @@ func intervalLeafSuffixes(g rmattrGroup, anchor string, deferred bool) (map[stri
 		}
 	}
 	return iv, ordinalBounds, nil
+}
+
+// intervalLeafRaw decodes raw, the |raw fragment at the DV_INTERVAL leaf g,
+// as the leaf's whole value, intervalErr being what the interval grammar made
+// of the leaf's other keys: [errNothingMatched] where it reads none, nil
+// where it reads one, which the |raw then contradicts.
+func intervalLeafRaw(g rmattrGroup, holds, anchor string, raw any, intervalErr error) (map[string]any, []string, error) {
+	rawKey := g.key(ownTail("raw"))
+	switch {
+	case intervalErr == nil:
+		return nil, nil, fmt.Errorf("simplified: decode %q: %w: |raw is mutually exclusive with the interval's own keys",
+			rawKey, ErrUnsupportedDatatype)
+	case !errors.Is(intervalErr, errNothingMatched):
+		return nil, nil, intervalErr
+	}
+	dv, err := dvFromSuffixesAt(holds, "DV_INTERVAL<"+anchor+">", false, map[string]any{"raw": raw},
+		func(string) string { return rawKey })
+	if err != nil {
+		return nil, nil, fmt.Errorf("simplified: decode %q: %w", g.prefix(), err)
+	}
+	return dv, nil, nil
 }
 
 // intervalTails splits g's tails for the interval grammar, sub being the
