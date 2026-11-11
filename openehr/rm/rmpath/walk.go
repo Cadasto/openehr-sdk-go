@@ -331,8 +331,9 @@ func actionChildren(a *rm.Action, attr string) []any {
 	case "name":
 		return iface(a.Name)
 	case "time":
-		// Inert on encode today — the WebTemplate builder synthesizes no
-		// ACTION `time` leaf — but ItemAtPath is a public reader (REQ-121).
+		// Held by value, so it always resolves: the WebTemplate builder gives
+		// every ACTION an in-context `time` leaf, which FLAT encode reads
+		// through here (REQ-121).
 		return []any{a.Time}
 	case "ism_transition":
 		// RM-mandatory and held by value, so it always resolves, to a pointer

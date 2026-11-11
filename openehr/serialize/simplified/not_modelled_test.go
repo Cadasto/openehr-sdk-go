@@ -18,8 +18,9 @@ import (
 // notModelledAction is the PROBE-086 corpus template's ACTION.
 const notModelledAction = "conformance-ehrbase.de.v0/conformance_section/conformance_action"
 
-// TestREQ170NotModelledKeys — REQ-170. The reference's in-context spelling of
-// an ACTION's ISM transition and time, and the deferred family
+// TestREQ170NotModelledKeys — REQ-170. The reference's spelling of a
+// `transition` under an archetyped per-step ISM transition node, which the Web
+// Template does not model there, and the deferred family
 // `_instruction_details`, are refused in FLAT and in STRUCTURED, by default
 // and under strict, with ErrNotModelled and ErrUnknownPath, the key named and
 // its value not.
@@ -27,11 +28,7 @@ func TestREQ170NotModelledKeys(t *testing.T) {
 	wt, _ := conformanceTarget(t)
 	const secret = "secret-value-0451"
 	for _, key := range []string{
-		notModelledAction + "/ism_transition/current_state|code",
-		notModelledAction + "/ism_transition/transition|code",
-		notModelledAction + "/ism_transition/careflow_step|code",
 		notModelledAction + "/transition/transition|code",
-		notModelledAction + "/time",
 		notModelledAction + "/_instruction_details|activity_id",
 	} {
 		body := mustJSON(t, eventBody(map[string]any{key: secret}))
@@ -59,6 +56,44 @@ func TestREQ170NotModelledKeys(t *testing.T) {
 					}
 				})
 			}
+		}
+	}
+}
+
+// TestREQ170InContextActionKeysAreRead — REQ-170, REQ-053. The reference's
+// in-context spelling of an ACTION's ISM transition, `_reason` family
+// included, and its own `time` resolve in the Web Template, so they decode in
+// FLAT and in STRUCTURED, by default and under strict: none is refused as a
+// key this SDK does not model.
+func TestREQ170InContextActionKeysAreRead(t *testing.T) {
+	wt, _ := conformanceTarget(t)
+	ism := notModelledAction + "/ism_transition"
+	body := mustJSON(t, eventBody(map[string]any{
+		ism + "/current_state|code":        "532",
+		ism + "/current_state|value":       "completed",
+		ism + "/current_state|terminology": "openehr",
+		ism + "/transition|code":           "548",
+		ism + "/transition|value":          "finish",
+		ism + "/transition|terminology":    "openehr",
+		ism + "/careflow_step|code":        "at0006",
+		ism + "/careflow_step|value":       "transition",
+		ism + "/careflow_step|terminology": "local",
+		ism + "/_reason:0":                 "reason 1",
+		notModelledAction + "/time":        "2022-01-31T10:33:28.72414+01:00",
+	}))
+	structured, err := simplified.FlatToStructured(body)
+	if err != nil {
+		t.Fatalf("FlatToStructured: %v", err)
+	}
+	for format, decode := range map[string]func() error{
+		"FLAT": func() error { _, err := simplified.UnmarshalFlat(body, wt, simplified.WithStrict()); return err },
+		"STRUCTURED": func() error {
+			_, err := simplified.UnmarshalStructured(structured, wt, simplified.WithStrict())
+			return err
+		},
+	} {
+		if err := decode(); err != nil {
+			t.Errorf("Unmarshal %s (strict) = %v, want the in-context keys read", format, err)
 		}
 	}
 }

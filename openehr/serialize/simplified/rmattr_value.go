@@ -744,6 +744,13 @@ func decodeRMAttrNullReason(g rmattrGroup, _ string) (any, error) {
 	return decodeRMAttrLeafValue(g, "DV_TEXT")
 }
 
+// decodeRMAttrIsmReason decodes one `_reason:N` instance — one DV_TEXT of an
+// ISM_TRANSITION's `reason` list, spelled as `_null_reason` is: a bare value
+// with the DV_TEXT suffixes, or a coded text in the `|code` spelling (REQ-140).
+func decodeRMAttrIsmReason(g rmattrGroup, _ string) (any, error) {
+	return decodeRMAttrLeafValue(g, "DV_TEXT")
+}
+
 // --- the DataValue members that are themselves datatypes ----------------
 
 // decodeRMAttrCodePhraseMember decodes `_charset`, `_language` and `_encoding` —

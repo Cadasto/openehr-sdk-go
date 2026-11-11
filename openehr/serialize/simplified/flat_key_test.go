@@ -20,13 +20,14 @@ func TestFlatDecodeRefusesFirstMalformedKey(t *testing.T) {
 	malformed := []string{
 		rmattrElement + "/_uid:-1",
 		rmattrObs + "/subject:01|name",
-		action + "/time:00",
+		action + "/transition/transition:00",
 		rmattrObs + "/any_event:00/dv_text",
 		rmattrSection + ":+1/conformance_observation/any_event:0/dv_text",
 	}
 	extra := map[string]any{
-		// A null in-context key, which the first pass removes from content.
-		action + "/time": nil,
+		// A null in-context key the Web Template does not resolve (a per-step
+		// node's transition), which the first pass removes from content.
+		action + "/transition/transition": nil,
 	}
 	for _, k := range malformed {
 		extra[k] = "x"

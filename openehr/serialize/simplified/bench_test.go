@@ -24,15 +24,17 @@ import (
 // must accept before the corpus sweep is worth measuring. It plays the part
 // minParityDocuments plays for the parity net in openehr/serialize/canjson: the
 // per-operation figure is a cost over a set discovered at setup, so the set has
-// to be prevented from shrinking quietly. 31 of the 34 bodies clear it today,
+// to be prevented from shrinking quietly. 33 of the 34 bodies clear it today,
 // and the floor sits at that count because a drop of even one body moves the
-// number and invalidates the comparison the baseline exists for. (30 cleared
-// it before INSTRUCTION `_wf_definition` gained its DV_PARSABLE carrier, which
-// brought in the instruction body; 26 before the composer's real path became
-// its carrier, ADR 0029, which brought in the four bodies whose composer
-// carries a reference, identifiers or a relationship; the floor had stayed at
-// 24.)
-const minFlatCorpusBodies = 31
+// number and invalidates the comparison the baseline exists for. (31 cleared
+// it before the codec began to read an INTERVAL_EVENT's math_function, width
+// and sample count and a HISTORY's origin, which brought in the interval_event
+// and observation bodies, though the floor stayed at 31; 30 before INSTRUCTION
+// `_wf_definition` gained its DV_PARSABLE carrier, which brought in the
+// instruction body; 26 before the composer's real path became its carrier,
+// ADR 0029, which brought in the four bodies whose composer carries a
+// reference, identifiers or a relationship; the floor had stayed at 24.)
+const minFlatCorpusBodies = 33
 
 // benchFlatBody is the body the per-body benchmarks measure (10 164 bytes).
 //
@@ -69,11 +71,10 @@ func benchFlatTarget(b *testing.B) (*webtemplate.WebTemplate, *templatecompile.C
 // benchFlatCorpus reads the FLAT conformance corpus and returns the bodies this
 // SDK's codec accepts end to end, together with their total size.
 //
-// The corpus holds 34 bodies and the codec accepts 31 of them today. The other
-// three exercise upstream key families the codec declines by design: the
-// reference's in-context keys for RM attributes the Web Template this SDK
-// builds does not model (an ISM transition's `_reason`, an interval event's
-// `math_function`, a HISTORY's `origin`).
+// The corpus holds 34 bodies and the codec accepts 33 of them today. The other
+// one exercises an upstream key family the codec declines by design: an
+// ACTION's `_instruction_details`, which it refuses as a path it does not
+// model.
 // The split is discovered here rather than written down, so a codec that
 // learns one of those families widens the sweep on its own.
 //

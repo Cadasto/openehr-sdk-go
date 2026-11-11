@@ -142,46 +142,153 @@ func childrenOf(n *templatecompile.CompiledNode, parentPath string, cfg *config)
 		ic.Inputs = cloneInputs(ic.Inputs) // never alias the table's slices or pointers into returned trees
 		out = append(out, &ic)
 	}
-	if n.RMTypeName() == "ACTION" && !constrainsIsmTransition(n) {
-		out = append(out, ismTransitionIC(parentPath))
+	if path := parentPath + "/ism_transition"; n.RMTypeName() == "ACTION" && !seen[path] {
+		out = append(out, ismTransitionIC(parentPath, out))
 	}
 	return out
 }
 
-// constrainsIsmTransition reports whether the ACTION a constrains an
-// ISM_TRANSITION under its `ism_transition` attribute: the archetyped
-// `ism_transition[atNNNN]` nodes, one per careflow step, that the walk emits.
-func constrainsIsmTransition(a *templatecompile.CompiledNode) bool {
-	attr := a.Attribute("ism_transition")
-	return attr != nil && slices.ContainsFunc(impl.ChildNodes(attr), func(c *templatecompile.CompiledNode) bool {
-		return c.RMTypeName() == "ISM_TRANSITION"
-	})
-}
-
 // ismTransitionIC returns the reference's in-context ISM transition node for
-// the ACTION at actionPath, which the builder adds where the template
-// constrains no ISM transition ([constrainsIsmTransition]). ACTION
-// `ism_transition` is RM-mandatory, so without a node the FLAT encoder would
+// the ACTION at actionPath whose other emitted children are siblings. ACTION
+// `ism_transition` is RM-mandatory, so without the node the FLAT encoder would
 // have nowhere to write it.
 //
-// The node holds one leaf, the transition's `current_state`, a code of the
-// openehr terminology written as `|code` and `|value`, as EVENT_CONTEXT
-// `setting` is. The reference also writes `transition`, `careflow_step` and a
-// `_reason` family under the node; the builder models none of them, and FLAT
-// decode refuses them. min is 0, the in-context convention (§ REQ-106
-// deviation 5), and the names follow the in-context capitalisation
-// (`Start_time`): no vendored reference fixture pins an ACTION node, so
-// neither, nor the node's place after the ENTRY leaves, is checked against
-// one.
-func ismTransitionIC(actionPath string) *Node {
+// Where the template models the transition as archetyped
+// `ism_transition[atNNNN]` nodes, one per careflow step, the node merges the
+// ones the walk emitted ([mergedIsmTransition]); those nodes stay beside it.
+// They are read from the emitted nodes rather than from the template, because
+// an archetyped transition that constrains none of its attributes is pruned
+// as an empty container and so carries nothing. Where the walk emitted none,
+// the node is the unconstrained transition: its
+// `current_state`, a code of the openehr terminology written as `|code` and
+// `|value` as EVENT_CONTEXT `setting` is, and its `transition`. The reference
+// leaves `careflow_step` out there, and writes a `_reason` family under either
+// shape, which the builder does not model. That node's min is 0, the
+// in-context convention (§ REQ-106 deviation 5), and its name follows the
+// in-context capitalisation (`Start_time`).
+func ismTransitionIC(actionPath string, siblings []*Node) *Node {
 	path := actionPath + "/ism_transition"
+	var steps []*Node
+	for _, s := range siblings {
+		if s.RMType == "ISM_TRANSITION" && s.NodeID != "" {
+			steps = append(steps, s)
+		}
+	}
+	if len(steps) > 0 {
+		return mergedIsmTransition(path, steps)
+	}
 	return &Node{
 		ID: "ism_transition", Name: "Ism_transition", RMType: "ISM_TRANSITION", Max: 1, AQLPath: path,
-		Children: []*Node{{
-			ID: "current_state", Name: "Current_state", RMType: "DV_CODED_TEXT", Max: 1,
-			AQLPath: path + "/current_state", Inputs: cloneInputs(settingIC),
-		}},
+		Children: []*Node{unconstrainedCurrentState(path), transitionIC(path)},
 	}
+}
+
+// mergedIsmTransition returns the in-context ISM transition node at path that
+// the reference builds from an ACTION's archetyped transitions, steps, in
+// document order (OPTParser.handleActionIsmTransitions). Its min and max are
+// the first step's, and it holds three leaves:
+//
+//   - careflow_step, listing every step's careflow-step codes, each with the
+//     current_state codes that step admits as its currentStates; local codes,
+//     so the input names no terminology, as on any coded input. A step that
+//     constrains no careflow_step still names one, its node id, which decode
+//     gives a transition spelled under it, so that step is listed by its node
+//     id, labelled with its name, where the reference fails on it;
+//   - current_state, listing every step's current_state codes in step order,
+//     each step's list as is, so a state two steps admit is listed twice, in
+//     the openehr terminology;
+//   - transition, as on the unconstrained node.
+//
+// A leaf's min is the first step's that has it, else 0, and its max 1. A step
+// that constrains no current_state adds nothing to that list; with no step
+// constraining one, current_state is the unconstrained one. A list is open
+// where a step's own list is, or where it lists no code.
+func mergedIsmTransition(path string, steps []*Node) *Node {
+	careflow := &Node{ID: "careflow_step", Name: "Careflow_step", RMType: "DV_CODED_TEXT", Max: 1, AQLPath: path + "/careflow_step"}
+	state := &Node{ID: "current_state", Name: "Current_state", RMType: "DV_CODED_TEXT", Max: 1, AQLPath: path + "/current_state"}
+	careflowIn := Input{Suffix: "code", Type: "CODED_TEXT"}
+	stateIn := Input{Suffix: "code", Type: "CODED_TEXT", Terminology: "openehr"}
+	var hasCareflow, hasState bool
+	for _, s := range steps {
+		stepState := childAt(s, s.AQLPath+"/current_state")
+		states, stateOpen := codeInput(stepState)
+		if stepState != nil {
+			if !hasState {
+				state.Min, hasState = stepState.Min, true
+			}
+			stateIn.ListOpen = stateIn.ListOpen || stateOpen
+			stateIn.List = append(stateIn.List, states...)
+		}
+		stepCareflow := childAt(s, s.AQLPath+"/careflow_step")
+		items, open := codeInput(stepCareflow)
+		switch {
+		case stepCareflow == nil:
+			items = []InputListItem{{Value: s.NodeID, Label: s.Name}}
+		case !hasCareflow:
+			careflow.Min, hasCareflow = stepCareflow.Min, true
+		}
+		careflowIn.ListOpen = careflowIn.ListOpen || open
+		for _, it := range items {
+			for _, st := range states {
+				it.CurrentStates = append(it.CurrentStates, st.Value)
+			}
+			careflowIn.List = append(careflowIn.List, it)
+		}
+	}
+	careflowIn.ListOpen = careflowIn.ListOpen || len(careflowIn.List) == 0
+	stateIn.ListOpen = stateIn.ListOpen || len(stateIn.List) == 0
+	careflow.Inputs = []Input{careflowIn}
+	if hasState {
+		state.Inputs = []Input{stateIn}
+	} else {
+		state = unconstrainedCurrentState(path)
+	}
+	return &Node{
+		ID: "ism_transition", Name: "ism_transition", RMType: "ISM_TRANSITION", Min: steps[0].Min, Max: steps[0].Max, AQLPath: path,
+		Children: []*Node{careflow, state, transitionIC(path)},
+	}
+}
+
+// unconstrainedCurrentState returns the current_state leaf of the in-context
+// ISM transition node at path for a template that constrains none.
+func unconstrainedCurrentState(path string) *Node {
+	return &Node{
+		ID: "current_state", Name: "Current_state", RMType: "DV_CODED_TEXT", Max: 1,
+		AQLPath: path + "/current_state", Inputs: cloneInputs(settingIC),
+	}
+}
+
+// transitionIC returns the transition leaf of the in-context ISM transition
+// node at path: the ISM transition that led to the current state, a code of
+// the openehr terminology written as `|code` and `|value`, optional and named
+// as the reference's test_all_types golden names it.
+func transitionIC(path string) *Node {
+	return &Node{
+		ID: "transition", Name: "transition", RMType: "DV_CODED_TEXT", Max: 1,
+		AQLPath: path + "/transition", Inputs: cloneInputs(settingIC),
+	}
+}
+
+// childAt returns the child of n at aqlPath, or nil.
+func childAt(n *Node, aqlPath string) *Node {
+	if i := slices.IndexFunc(n.Children, func(c *Node) bool { return c.AQLPath == aqlPath }); i >= 0 {
+		return n.Children[i]
+	}
+	return nil
+}
+
+// codeInput returns a copy of the list of leaf's `code` input, and whether
+// that list is open; none and false for a nil leaf or one without the input.
+func codeInput(leaf *Node) ([]InputListItem, bool) {
+	if leaf == nil {
+		return nil, false
+	}
+	i := slices.IndexFunc(leaf.Inputs, func(in Input) bool { return in.Suffix == "code" })
+	if i < 0 {
+		return nil, false
+	}
+	in := cloneInputs(leaf.Inputs[i : i+1])[0]
+	return in.List, in.ListOpen
 }
 
 // cloneInputs deep-copies an in-context input set. The table prototypes now
@@ -199,6 +306,7 @@ func cloneInputs(in []Input) []Input {
 				it.Ordinal = &o
 			}
 			it.LocalizedLabels = maps.Clone(it.LocalizedLabels)
+			it.CurrentStates = slices.Clone(it.CurrentStates)
 		}
 		if v := out[i].Validation; v != nil {
 			nv := *v
@@ -276,6 +384,9 @@ var (
 		// other in-context leaf — copied verbatim rather than normalised.
 		Node{ID: "expiry_time", Name: "expiry_time", RMType: "DV_DATE_TIME", Max: 1, Inputs: dateTimeIC},
 	)
+	// ACTION adds its `time`, shaped as an EVENT's, after the ENTRY leaves,
+	// as the reference's test_all_types golden places it.
+	actionIC   = append(slices.Clone(entryIC), eventIC...)
 	activityIC = []Node{
 		{ID: "timing", Name: "Timing", RMType: "DV_PARSABLE", Max: 1, Inputs: []Input{{Suffix: "value", Type: "TEXT"}, {Suffix: "formalism", Type: "TEXT"}}},
 		{ID: "action_archetype_id", Name: "Action_archetype_id", RMType: "STRING", Max: 1, Inputs: []Input{{Type: "TEXT"}}},
@@ -296,7 +407,7 @@ var (
 			{ID: "setting", Name: "Setting", RMType: "DV_CODED_TEXT", Max: 1, Inputs: settingIC},
 		},
 		"OBSERVATION": entryIC, "EVALUATION": entryIC, "INSTRUCTION": instructionIC,
-		"ACTION": entryIC, "ADMIN_ENTRY": entryIC, "ACTIVITY": activityIC,
+		"ACTION": actionIC, "ADMIN_ENTRY": entryIC, "ACTIVITY": activityIC,
 		"EVENT": eventIC, "POINT_EVENT": eventIC, "INTERVAL_EVENT": intervalEventIC,
 	}
 )

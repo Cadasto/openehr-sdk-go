@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -485,7 +486,14 @@ func emitValue(out map[string]any, node *webtemplate.Node, flatPath string, v an
 			// children (each repeatable instance is resolved independently).
 			root, rootAql = loc, sib.nodePath(node)
 		}
+		inContextIsm := hasInContextIsmTransition(node)
 		for _, ch := range node.Children {
+			if inContextIsm && archetypedIsmTransition(ch) {
+				// The in-context node writes the ACTION's transition, in the
+				// reference's spelling; writing it under its per-step node too
+				// would spell one transition twice (REQ-053).
+				continue
+			}
 			if err := emitNode(out, ch, flatPath, root, rootAql, sib); err != nil {
 				return err
 			}
@@ -497,11 +505,15 @@ func emitValue(out map[string]any, node *webtemplate.Node, flatPath string, v an
 			return err
 		}
 		// REQ-140 — after the node's own emission, its underscore attributes.
-		// Only a LOCATABLE owns any: EVENT_CONTEXT is handled from the root (its
-		// FLAT prefix is fixed, template node or not), and a non-Locatable
-		// container (ISM_TRANSITION) has no underscore attribute in the grammar.
+		// A LOCATABLE owns most: EVENT_CONTEXT is handled from the root (its
+		// FLAT prefix is fixed, template node or not). The one non-Locatable
+		// container with a family is ISM_TRANSITION, whose `reason` list is
+		// `_reason:N`.
 		if isLocatable {
 			return rmattrEncode(loc, flatPath, out)
+		}
+		if tr, ok := as[rm.IsmTransition](v); ok {
+			return ismReasonRMAttr(out, flatPath, tr.Reason)
 		}
 		return nil
 	}
@@ -509,6 +521,40 @@ func emitValue(out map[string]any, node *webtemplate.Node, flatPath string, v an
 		return err
 	}
 	return emitLeafOwnerRMAttrs(out, node, flatPath, ancestorRoot, ancestorAql, sib)
+}
+
+// hasInContextIsmTransition reports whether node, an ACTION's Web Template
+// node, has the in-context `ism_transition` child: an ISM_TRANSITION node with
+// no node id.
+func hasInContextIsmTransition(node *webtemplate.Node) bool {
+	return nodeRMType(node) == "ACTION" && slices.ContainsFunc(node.Children, func(ch *webtemplate.Node) bool {
+		return nodeRMType(ch) == "ISM_TRANSITION" && ch.NodeID == ""
+	})
+}
+
+// archetypedIsmTransition reports whether node is an archetyped per-step
+// `ism_transition[atNNNN]` node.
+func archetypedIsmTransition(node *webtemplate.Node) bool {
+	return nodeRMType(node) == "ISM_TRANSITION" && node.NodeID != ""
+}
+
+// ismReasonRMAttr writes an ISM_TRANSITION's reasons as `<base>/_reason:N`
+// (REQ-140), each in the DV_TEXT leaf form `_null_reason` takes: a bare value
+// with its `|formatting`, the `|code` spelling of a coded text, and `|raw`
+// for one those cannot carry. The :index counts the reasons written, so a nil
+// entry, which carries nothing, takes none.
+func ismReasonRMAttr(out map[string]any, base string, reasons []rm.DVTextLike) error {
+	idx := 0
+	for _, r := range reasons {
+		if r == nil || rm.IsTypedNil(r) {
+			continue
+		}
+		if _, err := emitLeafValue(out, base+"/"+ismReasonFamily+":"+strconv.Itoa(idx), r, "DV_TEXT", false, false); err != nil {
+			return err
+		}
+		idx++
+	}
+	return nil
 }
 
 // emitLeafOwnerRMAttrs writes the REQ-140 underscore attributes of the LOCATABLE

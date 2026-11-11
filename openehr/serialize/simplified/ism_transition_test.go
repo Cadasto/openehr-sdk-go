@@ -1,13 +1,15 @@
 package simplified
 
 // REQ-053 / REQ-140 — an ACTION's ISM transition round-trips through the Web
-// Template's ISM_TRANSITION nodes. The corpus template models two of them,
-// `transition` (ism_transition[at0005]) and `transition2`
-// (ism_transition[at0006]). Decode already rebuilt the transition, but encode
-// read it through rmpath, which did not resolve ACTION `ism_transition`, and
-// so dropped the RM-mandatory attribute without an error.
+// Template's ISM_TRANSITION nodes. Every ACTION has the reference's in-context
+// `ism_transition` node. The corpus template also models two archetyped
+// per-step nodes, `transition` (ism_transition[at0005]) and `transition2`
+// (ism_transition[at0006]), which its in-context node merges. Encode writes
+// the in-context spelling alone; decode reads both, and refuses one body that
+// spells one transition both ways.
 
 import (
+	"bytes"
 	"errors"
 	"maps"
 	"slices"
@@ -36,30 +38,66 @@ func ismTransitionKeys(node, state, step string) map[string]any {
 	}
 }
 
-// TestActionIsmTransitionRoundTrips — REQ-053, REQ-140. Each careflow step
-// comes back under the node whose ISM_TRANSITION constraint it belongs to, and
-// under no other.
-func TestActionIsmTransitionRoundTrips(t *testing.T) {
+// conformanceIsm is the in-context ISM transition node of the corpus
+// template's ACTION, which merges its two archetyped per-step nodes.
+const conformanceIsm = rmattrAction + "/ism_transition"
+
+// inContextIsmKeys is one transition of the corpus ACTION in the reference's
+// in-context spelling: its current state, as [ismTransitionKeys] spells it,
+// and its careflow step, whose value is stepValue.
+func inContextIsmKeys(state, step, stepValue string) map[string]any {
+	return map[string]any{
+		conformanceIsm + "/current_state|code":        state,
+		conformanceIsm + "/current_state|value":       "state " + state,
+		conformanceIsm + "/current_state|terminology": "openehr",
+		conformanceIsm + "/careflow_step|code":        step,
+		conformanceIsm + "/careflow_step|value":       stepValue,
+		conformanceIsm + "/careflow_step|terminology": "local",
+	}
+}
+
+// perStepKeys returns, sorted, the keys of a FLAT map under the corpus
+// ACTION's archetyped per-step nodes, `transition` and `transition2`.
+func perStepKeys(flat map[string]any) []string {
+	var out []string
+	for _, k := range slices.Sorted(maps.Keys(flat)) {
+		if strings.HasPrefix(k, rmattrAction+"/transition") {
+			out = append(out, k)
+		}
+	}
+	return out
+}
+
+// holdsKeys reports each key of want that got does not hold with want's value.
+func holdsKeys(t *testing.T, got, want map[string]any) {
+	t.Helper()
+	for _, k := range slices.Sorted(maps.Keys(want)) {
+		if got[k] != want[k] {
+			t.Errorf("re-encode of %s = %#v, want %#v", k, got[k], want[k])
+		}
+	}
+}
+
+// TestREQ053PerStepIsmTransitionReencodesInContext — REQ-053, REQ-121. A
+// transition spelled under an archetyped per-step node decodes as before, and
+// encode writes it in the reference's spelling alone: under the in-context
+// `ism_transition` node, with its careflow step, and under no per-step node.
+// That output decodes to the same composition.
+func TestREQ053PerStepIsmTransitionReencodesInContext(t *testing.T) {
 	wt, _ := conformanceWT(t)
-	for _, tc := range []struct {
-		node, state, step, other string
-	}{
-		{node: "transition", state: "524", step: "at0005", other: "transition2"},
-		{node: "transition2", state: "532", step: "at0006", other: "transition"},
+	for _, tc := range []struct{ node, state, step string }{
+		{node: "transition", state: "524", step: "at0005"},
+		{node: "transition2", state: "532", step: "at0006"},
 	} {
 		t.Run(tc.node, func(t *testing.T) {
-			want := ismTransitionKeys(tc.node, tc.state, tc.step)
-			comp := decodeRMAttr(t, wt, rmattrBody(want))
+			comp := decodeRMAttr(t, wt, rmattrBody(ismTransitionKeys(tc.node, tc.state, tc.step)))
 			got := reencodeRMAttr(t, wt, comp)
-			for _, k := range slices.Sorted(maps.Keys(want)) {
-				if got[k] != want[k] {
-					t.Errorf("re-encode of %s = %#v, want %#v", k, got[k], want[k])
-				}
+			holdsKeys(t, got, inContextIsmKeys(tc.state, tc.step, "step "+tc.step))
+			if keys := perStepKeys(got); len(keys) > 0 {
+				t.Errorf("re-encode wrote %v under a per-step node, want the in-context spelling alone", keys)
 			}
-			for k := range got {
-				if strings.HasPrefix(k, rmattrAction+"/"+tc.other+"/") {
-					t.Errorf("re-encode wrote %s: the careflow step %s belongs to %s alone", k, tc.step, tc.node)
-				}
+			if back := decodeRMAttr(t, wt, got); !bytes.Equal(canonical(t, back), canonical(t, comp)) {
+				t.Errorf("the in-context re-encode decodes to\n%s\nwant the per-step decode\n%s", canonical(t, back), canonical(t, comp))
 			}
 		})
 	}
@@ -98,26 +136,22 @@ func firstAction(t *testing.T, comp *rm.Composition) *rm.Action {
 }
 
 // TestActionIsmTransitionDecodeGivesCareflowStep — REQ-053, REQ-121. A body that
-// spells only a transition's current state still names the node it sits under,
-// and that node id is the careflow step encode matches the transition by. Decode
-// therefore gives the rebuilt ISM_TRANSITION that careflow step — the node id as a
-// `local` code, the node's Web Template name as its value — and the state comes
-// back under the same node. Without it, encode matched no node and the state was
-// lost with no error.
+// spells only a transition's current state under a per-step node still names
+// that node, and the node id is the careflow step the transition belongs to.
+// Decode therefore gives the rebuilt ISM_TRANSITION that careflow step — the node
+// id as a `local` code, the node's Web Template name as its value — and encode
+// writes it with the state in the in-context spelling. Without it, the
+// careflow step the archetype gives the transition was lost with no error.
 func TestActionIsmTransitionDecodeGivesCareflowStep(t *testing.T) {
 	wt, _ := conformanceWT(t)
-	for _, tc := range []struct {
-		node, state, step, other string
-	}{
-		{node: "transition", state: "524", step: "at0005", other: "transition2"},
-		{node: "transition2", state: "532", step: "at0006", other: "transition"},
+	for _, tc := range []struct{ node, state, step string }{
+		{node: "transition", state: "524", step: "at0005"},
+		{node: "transition2", state: "532", step: "at0006"},
 	} {
 		t.Run(tc.node, func(t *testing.T) {
 			name := ismNodeName(t, wt, tc.node)
-			full := ismTransitionKeys(tc.node, tc.state, tc.step)
-			full[rmattrAction+"/"+tc.node+"/careflow_step|value"] = name
 			stateOnly := map[string]any{}
-			for k, v := range full {
+			for k, v := range ismTransitionKeys(tc.node, tc.state, tc.step) {
 				if strings.Contains(k, "/current_state|") {
 					stateOnly[k] = v
 				}
@@ -139,25 +173,19 @@ func TestActionIsmTransitionDecodeGivesCareflowStep(t *testing.T) {
 			}
 
 			got := reencodeRMAttr(t, wt, comp)
-			for _, k := range slices.Sorted(maps.Keys(full)) {
-				if got[k] != full[k] {
-					t.Errorf("re-encode of %s = %#v, want %#v", k, got[k], full[k])
-				}
-			}
-			for k := range got {
-				if strings.HasPrefix(k, rmattrAction+"/"+tc.other+"/") {
-					t.Errorf("re-encode wrote %s: the transition belongs to %s alone", k, tc.node)
-				}
+			holdsKeys(t, got, inContextIsmKeys(tc.state, tc.step, name))
+			if keys := perStepKeys(got); len(keys) > 0 {
+				t.Errorf("re-encode wrote %v under a per-step node, want the in-context spelling alone", keys)
 			}
 		})
 	}
 }
 
 // TestActionIsmTransitionCareflowStepTerminologyDefaultsToLocal — REQ-053,
-// REQ-121. A careflow step that names no terminology (none, or a blank one) takes
-// `local`, the only terminology an archetype's at-code belongs to, so the decoded
-// CODE_PHRASE carries its RM-mandatory terminology_id and the transition
-// re-encodes under its node.
+// REQ-121. At a per-step node a careflow step that names no terminology (none,
+// or a blank one) takes `local`, the only terminology an archetype's at-code
+// belongs to, so the decoded CODE_PHRASE carries its RM-mandatory
+// terminology_id and the transition re-encodes with it.
 func TestActionIsmTransitionCareflowStepTerminologyDefaultsToLocal(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	termKey := rmattrAction + "/transition/careflow_step|terminology"
@@ -180,24 +208,35 @@ func TestActionIsmTransitionCareflowStepTerminologyDefaultsToLocal(t *testing.T)
 				t.Errorf("careflow_step terminology = %q, want local", got)
 			}
 			got := reencodeRMAttr(t, wt, comp)
-			if got[rmattrAction+"/transition/current_state|code"] != "524" {
-				t.Errorf("re-encode lost the transition: %v", got)
-			}
+			holdsKeys(t, got, map[string]any{
+				conformanceIsm + "/current_state|code":        "524",
+				conformanceIsm + "/careflow_step|code":        "at0005",
+				conformanceIsm + "/careflow_step|terminology": "local",
+			})
 		})
 	}
 }
 
-// TestActionIsmTransitionBlankTerminologyEncodes — REQ-121, REQ-140. Encode
-// reads a careflow step the way decode does: a blank terminology counts as
-// `local`, so an ACTION built in Go with only the careflow step's code set keeps
-// its transition instead of losing it with no error.
+// TestActionIsmTransitionBlankTerminologyEncodes — REQ-121, REQ-140. An ACTION
+// built in Go with only its careflow step's code set keeps its transition:
+// encode writes the careflow step with no `|terminology`, and decode reads that
+// as `local`, as it reads one at any careflow step, so the round trip gives the
+// step its terminology instead of losing the transition with no error.
 func TestActionIsmTransitionBlankTerminologyEncodes(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	comp := decodeRMAttr(t, wt, rmattrBody(ismTransitionKeys("transition", "524", "at0005")))
 	firstAction(t, comp).IsmTransition.CareflowStep.DefiningCode.TerminologyID.Value = ""
 	got := reencodeRMAttr(t, wt, comp)
-	if got[rmattrAction+"/transition/current_state|code"] != "524" {
-		t.Errorf("re-encode lost the transition whose careflow step has a blank terminology: %v", got)
+	holdsKeys(t, got, map[string]any{
+		conformanceIsm + "/current_state|code": "524",
+		conformanceIsm + "/careflow_step|code": "at0005",
+	})
+	if term, written := got[conformanceIsm+"/careflow_step|terminology"]; written {
+		t.Errorf("re-encode wrote careflow_step|terminology = %#v for a blank terminology, want no key", term)
+	}
+	step := firstAction(t, decodeRMAttr(t, wt, got)).IsmTransition.CareflowStep
+	if step == nil || step.DefiningCode.CodeString != "at0005" || step.DefiningCode.TerminologyID.Value != "local" {
+		t.Errorf("decoded careflow_step = %+v, want local::at0005", step)
 	}
 }
 
@@ -295,6 +334,52 @@ func TestActionIsmTransitionTwoNodesRefused(t *testing.T) {
 			}
 			if !strings.Contains(err.Error(), "ism_transition") {
 				t.Errorf("err = %v, want it to name the ism_transition attribute", err)
+			}
+		})
+	}
+}
+
+// TestREQ053IsmTransitionSpelledBothWaysRefused — REQ-053. The in-context
+// `ism_transition` node and an archetyped per-step node stand for the one
+// ISM_TRANSITION of an ACTION. A body that spells its transition both ways, in
+// whole or in part, `_reason` family included, is refused with ErrUnknownPath
+// in every mode and in both formats, whichever node a key reaches first; the
+// two spellings are never merged into one object.
+func TestREQ053IsmTransitionSpelledBothWaysRefused(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	only := func(keys map[string]any, member string) map[string]any {
+		out := map[string]any{}
+		for k, v := range keys {
+			if strings.Contains(k, "/"+member+"|") {
+				out[k] = v
+			}
+		}
+		return out
+	}
+	inContext := inContextIsmKeys("524", "at0005", "transition")
+	perStep := ismTransitionKeys("transition", "524", "at0005")
+	for _, tc := range []struct {
+		name string
+		keys map[string]any
+	}{
+		{name: "state in context, step per step", keys: mergeRMAttr(only(inContext, "current_state"), only(perStep, "careflow_step"))},
+		{name: "step in context, state per step", keys: mergeRMAttr(only(inContext, "careflow_step"), only(perStep, "current_state"))},
+		{name: "a whole transition both ways", keys: mergeRMAttr(inContext, perStep)},
+		{name: "a reason per step beside an in-context transition", keys: mergeRMAttr(inContext, map[string]any{rmattrAction + "/transition/_reason:0": "a reason"})},
+		{name: "an in-context reason beside a per-step transition", keys: mergeRMAttr(perStep, map[string]any{conformanceIsm + "/_reason:0": "a reason"})},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body := rmattrBody(tc.keys)
+			for format, err := range map[string]error{
+				"FLAT":       refusedInEveryMode(t, wt, body),
+				"STRUCTURED": structuredRefusedInEveryMode(t, wt, body),
+			} {
+				if !errors.Is(err, ErrUnknownPath) || errors.Is(err, ErrNotModelled) {
+					t.Errorf("%s err = %v, want ErrUnknownPath and not ErrNotModelled", format, err)
+				}
+				if !strings.Contains(err.Error(), "ism_transition is single-valued") {
+					t.Errorf("%s err = %v, want it to say ACTION.ism_transition is single-valued", format, err)
+				}
 			}
 		})
 	}
@@ -495,11 +580,12 @@ func TestREQ053InContextIsmTransitionInventsNoState(t *testing.T) {
 }
 
 // TestREQ170InContextIsmTransitionNodeRefusesUnmodelledKeys — REQ-170, REQ-140.
-// The in-context `ism_transition` node models `current_state` only. Under it,
-// the reference's `transition` and `careflow_step` leaves and its `_reason`
-// family stay refused in every mode and in both formats, carrying none of the
-// value, and FLAT names the key; each refusal names the attribute it refuses
-// and no requirement id. The ACTION's own `time` leaf stays refused too.
+// The in-context `ism_transition` node of an ACTION whose template constrains
+// no ISM transition models `current_state` and `transition`, and carries the
+// `_reason` family, but has no careflow step: the template names none. Under
+// it, the reference's `careflow_step` leaf stays refused in every mode and in
+// both formats, carrying none of the value, and FLAT names the key; the
+// refusal names the attribute it refuses and no requirement id.
 func TestREQ170InContextIsmTransitionNodeRefusesUnmodelledKeys(t *testing.T) {
 	wt, _ := minimalActionWT(t)
 	const secret = "secret-value-0451"
@@ -508,15 +594,10 @@ func TestREQ170InContextIsmTransitionNodeRefusesUnmodelledKeys(t *testing.T) {
 		keys              []string
 	}{
 		{
-			"transition leaf", minimalIsm + "/transition|code", "an ACTION's ISM transition transition",
-			[]string{minimalIsm + "/transition|code", minimalIsm + "/transition|value", minimalIsm + "/transition|terminology"},
-		},
-		{
 			"careflow_step leaf", minimalIsm + "/careflow_step|code", "an ACTION's ISM transition careflow_step",
 			[]string{minimalIsm + "/careflow_step|code", minimalIsm + "/careflow_step|value", minimalIsm + "/careflow_step|terminology"},
 		},
-		{"reason family", minimalIsm + "/_reason:0", "an ACTION's ISM transition reason", []string{minimalIsm + "/_reason:0"}},
-		{"ACTION time leaf", minimalAction + "/time", "an ACTION's time", []string{minimalAction + "/time"}},
+		{"bare careflow_step leaf", minimalIsm + "/careflow_step", "an ACTION's ISM transition careflow_step", []string{minimalIsm + "/careflow_step"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			keys := maps.Clone(referenceCurrentState)
@@ -543,6 +624,88 @@ func TestREQ170InContextIsmTransitionNodeRefusesUnmodelledKeys(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// minimalReferenceKeys is the rest of the reference's in-context spelling of
+// the minimal_action_2 ACTION beside [referenceCurrentState]: the transition's
+// `transition`, two reasons, a plain and a coded one, and the ACTION's own
+// `time`, which differs from the body's ctx/time.
+var minimalReferenceKeys = map[string]any{
+	minimalIsm + "/transition|code":           "548",
+	minimalIsm + "/transition|value":          "finish",
+	minimalIsm + "/transition|terminology":    "openehr",
+	minimalIsm + "/_reason:0":                 "reason 1",
+	minimalIsm + "/_reason:1|code":            "282291009",
+	minimalIsm + "/_reason:1|value":           "a coded reason",
+	minimalIsm + "/_reason:1|terminology":     "SNOMED-CT",
+	minimalAction + "/time":                   "2019-03-22T22:26:01.127+01:00",
+	minimalIsm + "/current_state|code":        "532",
+	minimalIsm + "/current_state|value":       "completed",
+	minimalIsm + "/current_state|terminology": "openehr",
+}
+
+// TestREQ053InContextIsmTransitionReadsReferenceKeys — REQ-053, REQ-140. Under
+// the in-context node of an ACTION whose template constrains no ISM
+// transition, the reference's `transition` leaf and `_reason:N` family decode,
+// and so does the ACTION's own `time`, in every mode and in both formats: a
+// plain reason as a DV_TEXT, a coded one as a DV_CODED_TEXT, and the time as
+// written, not replaced by ctx/time. The WithTemplate decode validates, and
+// encode writes each key back as the body spells it.
+func TestREQ053InContextIsmTransitionReadsReferenceKeys(t *testing.T) {
+	wt, compiled := minimalActionWT(t)
+	flat := mustJSON(t, minimalActionBody(minimalReferenceKeys))
+	structured, err := FlatToStructured(flat)
+	if err != nil {
+		t.Fatalf("FlatToStructured: %v", err)
+	}
+	for format, decode := range map[string]func([]byte, *webtemplate.WebTemplate, ...Option) (*rm.Composition, error){
+		"FLAT": UnmarshalFlat, "STRUCTURED": UnmarshalStructured,
+	} {
+		body := flat
+		if format == "STRUCTURED" {
+			body = structured
+		}
+		for mode, opts := range map[string][]Option{
+			"default":                 nil,
+			"WithStrict":              {WithStrict()},
+			"WithTemplate+WithStrict": {WithTemplate(compiled), WithStrict()},
+		} {
+			t.Run(format+"/"+mode, func(t *testing.T) {
+				comp, err := decode(body, wt, opts...)
+				if err != nil {
+					t.Fatalf("Unmarshal %s (%s): %v", format, mode, err)
+				}
+				a, ok := comp.Content[0].(*rm.Action)
+				if !ok {
+					t.Fatalf("content[0] = %T, want *rm.Action", comp.Content[0])
+				}
+				tr := a.IsmTransition
+				if tr.Transition == nil || tr.Transition.DefiningCode.CodeString != "548" ||
+					tr.Transition.DefiningCode.TerminologyID.Value != "openehr" || tr.Transition.Value != "finish" {
+					t.Errorf("transition = %+v, want openehr::548|finish", tr.Transition)
+				}
+				if len(tr.Reason) != 2 {
+					t.Fatalf("reason = %+v, want two reasons", tr.Reason)
+				}
+				if _, coded := tr.Reason[0].GetDefiningCode(); coded || tr.Reason[0].GetValue() != "reason 1" {
+					t.Errorf("reason[0] = %+v, want the DV_TEXT %q", tr.Reason[0], "reason 1")
+				}
+				if dc, coded := tr.Reason[1].GetDefiningCode(); !coded || dc.CodeString != "282291009" ||
+					dc.TerminologyID.Value != "SNOMED-CT" || tr.Reason[1].GetValue() != "a coded reason" {
+					t.Errorf("reason[1] = %+v, want the DV_CODED_TEXT SNOMED-CT::282291009|a coded reason", tr.Reason[1])
+				}
+				if want := minimalReferenceKeys[minimalAction+"/time"]; a.Time.Value != want {
+					t.Errorf("ACTION time = %q, want %q as the body spells it", a.Time.Value, want)
+				}
+				if mode == "WithTemplate+WithStrict" {
+					for _, is := range validation.ValidateComposition(comp, compiled).Issues {
+						t.Errorf("decoded composition: %s at %s: %s", is.Code, is.Path, is.Detail)
+					}
+				}
+				holdsKeys(t, reencodeRMAttr(t, wt, comp), minimalReferenceKeys)
+			})
+		}
 	}
 }
 
@@ -615,7 +778,8 @@ func TestREQ053InContextIsmCurrentStateImpliesOpenehr(t *testing.T) {
 // TestREQ053ArchetypedIsmCurrentStateImpliesOpenehr — REQ-053. The same reading
 // holds at the archetyped `ism_transition[atNNNN]` nodes, with and without the
 // compiled template: a current state that names no terminology decodes as
-// `openehr`, and re-encodes with `|terminology: "openehr"`.
+// `openehr`, and re-encodes, in the in-context spelling, with
+// `|terminology: "openehr"`.
 func TestREQ053ArchetypedIsmCurrentStateImpliesOpenehr(t *testing.T) {
 	wt, compiled := conformanceWT(t)
 	for _, tc := range []struct{ node, state, step string }{
@@ -639,8 +803,9 @@ func TestREQ053ArchetypedIsmCurrentStateImpliesOpenehr(t *testing.T) {
 					if got.DefiningCode.TerminologyID.Value != "openehr" || got.DefiningCode.CodeString != tc.state {
 						t.Errorf("UnmarshalFlat (%s) current_state = %+v, want openehr::%s", mode, got, tc.state)
 					}
-					if re := reencodeRMAttr(t, wt, comp); re[termKey] != "openehr" {
-						t.Errorf("re-encode of %s = %#v, want \"openehr\"", termKey, re[termKey])
+					const reKey = conformanceIsm + "/current_state|terminology"
+					if re := reencodeRMAttr(t, wt, comp); re[reKey] != "openehr" {
+						t.Errorf("re-encode of %s = %#v, want \"openehr\"", reKey, re[reKey])
 					}
 				})
 			}

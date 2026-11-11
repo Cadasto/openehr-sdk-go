@@ -75,6 +75,24 @@
 // earliest time the events carry. Any other spelling of the four, such as
 // "<event>/sample_count", is unmatched content.
 //
+// # An ACTION's transition and time
+//
+// The Web Template gives every ACTION a "time" leaf and an in-context
+// "ism_transition" node, holding "current_state" and "transition" and, where
+// the template models one transition node per careflow step and the
+// in-context node merges them, "careflow_step". The codecs carry the
+// transition's reasons as "_reason:N" under any transition node, each a
+// DV_TEXT. Encode writes an
+// ACTION's transition at that node alone, never under a per-step node. Decode
+// reads both spellings, and refuses with [ErrUnknownPath] a body that spells
+// one transition both ways. A current state or transition with no
+// |terminology is read as openehr, the only terminology the RM admits for
+// them. At the merged node a careflow step with no |terminology is read as
+// local, one with no |value takes the label the node lists for its code, and
+// a body that spells no careflow step gets the one step whose current states
+// hold its current state's code, where exactly one does. A careflow step there
+// is kept whatever its code, for validation to judge.
+//
 // # Unmatched content
 //
 // Input the decode does not read is unmatched: a key whose path the Web
@@ -87,12 +105,14 @@
 // keeps the shape refusals. A key the decode reads is never unmatched, even
 // where the decode then refuses it: a PARTICIPATION `time`, a
 // FEEDER_AUDIT_DETAILS `other_details` and `_instruction_details` have no
-// carrier and fail the decode in every mode. So do, in the reference's
-// in-context spelling and where the Web Template does not resolve them, an
-// ACTION's ISM transition and time (a `current_state`, `transition` or
-// `careflow_step` leaf or a `_reason` family under an `ism_transition` node,
-// and the ACTION's own `time` leaf), which name RM data decode would otherwise
-// drop or replace. Those keys and `_instruction_details` are paths the
+// carrier and fail the decode in every mode. So do the reference's spellings
+// of an ACTION's ISM transition and time where the Web Template does not
+// resolve them: a `current_state`, `transition` or `careflow_step` leaf under
+// a transition node with no child of that id (such as the careflow step of an
+// ACTION whose template constrains no transition), any of them or a `_reason`
+// family under an `ism_transition` segment the Web Template has no node for,
+// and an ACTION's `time` where it has no such leaf. They name RM data decode
+// would otherwise drop or replace. Those keys and `_instruction_details` are paths the
 // Simplified Formats define and this SDK does not model: their refusal matches
 // [ErrNotModelled] as well as [ErrUnknownPath]. A leaf whose
 // datatype has neither a suffix set nor a sub-path grammar refuses its bare

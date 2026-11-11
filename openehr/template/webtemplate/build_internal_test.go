@@ -46,6 +46,45 @@ func TestKindDenominatorValidationBoundsNotAliased(t *testing.T) {
 	}
 }
 
+// cloneInputs deep-copies a list item's current states: the merged ISM
+// transition's careflow step carries them, and Build returns a mutable tree,
+// so a consumer editing one copy must not reach the other (REQ-106).
+func TestCloneInputsCopiesCurrentStates(t *testing.T) {
+	in := []Input{{Suffix: "code", Type: "CODED_TEXT", List: []InputListItem{{Value: "at0003", CurrentStates: []string{"526"}}}}}
+	out := cloneInputs(in)
+	out[0].List[0].CurrentStates[0] = "245"
+	if got := in[0].List[0].CurrentStates[0]; got != "526" {
+		t.Errorf("mutating the clone's current state changed the original to %q — the clone aliases CurrentStates", got)
+	}
+}
+
+// mergedIsmTransition marks a merged leaf's list open where the steps list no
+// code for it, so a step whose leaf constrains no code does not close the
+// leaf to every code (REQ-106).
+func TestMergedIsmTransitionEmptyListIsOpen(t *testing.T) {
+	const base = "/content[openEHR-EHR-ACTION.a.v1]/ism_transition[at0003]"
+	leaf := func(id, terminology string) *Node {
+		return &Node{
+			ID: id, RMType: "DV_CODED_TEXT", Min: 1, Max: 1, AQLPath: base + "/" + id,
+			Inputs: []Input{{Suffix: "code", Type: "CODED_TEXT", Terminology: terminology}},
+		}
+	}
+	step := &Node{
+		ID: "planned", Name: "Planned", RMType: "ISM_TRANSITION", NodeID: "at0003", Min: 1, Max: 1, AQLPath: base,
+		Children: []*Node{leaf("current_state", "openehr"), leaf("careflow_step", "")},
+	}
+	node := mergedIsmTransition("/content[openEHR-EHR-ACTION.a.v1]/ism_transition", []*Node{step})
+	for _, id := range []string{"careflow_step", "current_state"} {
+		ch := childAt(node, node.AQLPath+"/"+id)
+		if ch == nil {
+			t.Fatalf("merged node has no %s", id)
+		}
+		if len(ch.Inputs) != 1 || len(ch.Inputs[0].List) != 0 || !ch.Inputs[0].ListOpen {
+			t.Errorf("merged %s inputs = %+v, want one code input listing nothing, its list open", id, ch.Inputs)
+		}
+	}
+}
+
 // The reference normalises exclusive INTEGER bounds to inclusive
 // (>10 → >=11, <15 → <=14) for DV_COUNT ranges (REQ-106).
 func TestIntRangeValidationNormalisesExclusiveBounds(t *testing.T) {

@@ -10,13 +10,16 @@ tests that pin it.
 Conformance is **structural, not byte-exact**. PROBE-075 (`TestStructuralParity`
 + `TestInputParity` in this package) pins the load-bearing surface — every node's
 `id`, `rmType`, `nodeId`, `aqlPath`, `min`/`max`, and each input's `suffix`/`type`
-extended with coded/ordinal list values and ordinals, `listOpen`, `terminology`,
-temporal validation patterns, and numeric validation ranges — against **three**
-vendored references since REQ-116 Phase 4: `constrain_test` **104/104** (exact,
-node and input), `Corona_Anamnese` **230/230** and `GECCO_Diagnose` **34/34**
-(exact structurally; their documented input and `min` deltas are pinned by count
-below). The deltas below are the parts of the reference this slice deliberately
-does **not** reproduce. Any change that makes a *pinned* field diverge is a test
+extended with coded/ordinal list values and ordinals, a careflow step's
+`currentStates`, `listOpen`, `terminology`, temporal validation patterns, and
+numeric validation ranges — against **three** vendored references since REQ-116
+Phase 4: `constrain_test` **104/104** (exact, node and input), `Corona_Anamnese`
+**230/230** and `GECCO_Diagnose` **34/34** (exact structurally; their documented
+input and `min` deltas are pinned by count below). A fourth, the reference's
+`test_all_types` golden, is compared on its ACTION subtree alone
+(`TestREQ106ActionParity`), with each delta named and pinned by category below.
+The deltas below are the parts of the reference this slice deliberately does
+**not** reproduce. Any change that makes a *pinned* field diverge is a test
 failure, not a deviation.
 
 ## Node-level
@@ -27,28 +30,48 @@ failure, not a deviation.
   capitalized `name`, are emitted).
 - **inContext coverage** — the fixed RM-attribute leaf table covers COMPOSITION,
   EVENT_CONTEXT, the ENTRY types, the EVENT variants (INTERVAL_EVENT adds
-  `math_function` / `width`), INSTRUCTION (`narrative` / `expiry_time`), and
-  ACTIVITY (`timing` / `action_archetype_id`) — the INSTRUCTION/ACTIVITY sets
-  landed with REQ-116 Phase 4, measured on the corona golden. On ACTION, an
-  in-context `ism_transition` node is emitted only where the ACTION archetype
-  constrains no `ISM_TRANSITION` (the `minimal_action_2` corpus template), and it
-  holds `current_state` only, with `|code` / `|value` inputs and `min` 0, where the
-  reference also emits `transition` / `careflow_step` leaves and a `_reason`
-  family; FLAT decode refuses those (REQ-170). No vendored reference fixture pins
-  an ACTION node, so its names (`Ism_transition`, `Current_state`), its `min` and
-  its place after the ENTRY leaves follow this builder's in-context conventions
-  rather than a golden. Still not emitted on ACTION: `time`, so the upstream
-  FLAT corpus's keys for it fall into PROBE-086's `path not in web template`
-  bucket ([SKIPPED.md](../../../testkit/conformance/webtemplate/SKIPPED.md)).
-  `time` is unemitted only at this layer — `rmpath` resolves `ACTION.time`
-  (REQ-121), so synthesizing the leaf is all that is missing. Where the ACTION
-  archetype itself constrains `ism_transition[atNNNN]` nodes, the builder emits
-  those archetyped nodes (the corpus template's `transition` and `transition2`,
-  each with `current_state` / `careflow_step` leaves) and no in-context node, and
-  the FLAT codec round-trips them, matching each transition by its careflow step
-  (REQ-121). The reference spells one in-context `ism_transition` there instead,
-  so the corpus body's `…/ism_transition/…` keys stay refused on decode.
-  *(Deferred: extend parity with a fixture exercising a full ACTION.)*
+  `math_function` / `width`), INSTRUCTION (`narrative` / `expiry_time`), ACTIVITY
+  (`timing` / `action_archetype_id`) and ACTION (`time`) — the INSTRUCTION/ACTIVITY
+  sets landed with REQ-116 Phase 4, measured on the corona golden, and ACTION's
+  `time` matches the `test_all_types` golden. Every ACTION also gets one in-context
+  `ism_transition` node with no `nodeId`, in one of two shapes:
+  - **Merged**, where the walk emits archetyped `ism_transition[atNNNN]` nodes, one
+    per careflow step: the reference's node, matching the `test_all_types` golden
+    (`OPTParser.handleActionIsmTransitions`). Its `min`/`max` are the first step's,
+    and it holds `careflow_step` (each step's careflow-step code, with the
+    `currentStates` that step admits), `current_state` (every step's states in step
+    order, a state two steps admit listed twice, as the reference lists it) and
+    `transition` (`|code` / `|value`). Three readings go beyond the golden:
+    - a step that constrains no `careflow_step` still names one, its node id, which
+      the FLAT codec gives a transition decoded under it, so `careflow_step` lists it
+      by its node id, labelled with its name and localized names, where the
+      reference fails on it;
+    - a step that constrains no `current_state` adds nothing to that list, where the
+      reference fails on it;
+    - `careflow_step`'s `max` is 1 where the reference copies the step's `min` into
+      it, and its `min` is the first step's that constrains one, else 0.
+  - **Unconstrained**, where the walk emits none: `current_state` and `transition`,
+    each with `|code` / `|value` inputs, and no `careflow_step`, as the reference's
+    filter leaves it out; `min` 0, and the name `Ism_transition` in the in-context
+    capitalisation. The `minimal_action_2` corpus template has this shape, and so
+    does an ACTION whose archetyped transitions constrain no attribute of the
+    transition, since those are pruned as empty containers. A step that constrains its
+    `transition` alone is kept, so it is merged.
+
+  The reference also writes a `_reason` family under the node, which neither shape
+  gives a node of its own: the FLAT codec reads and writes it as the `_reason:N`
+  underscore family (REQ-140).
+- **Per-careflow-step `ism_transition[atNNNN]` nodes are kept** — beside the merged
+  node, the builder still emits each archetyped transition with its own
+  `current_state` / `careflow_step` leaves, where the reference's filter drops them
+  (9 nodes in `test_all_types`; in the FLAT conformance template the steps are
+  `transition` and `transition2`). Kept so that FLAT bodies keyed per step still decode and
+  `rmpath` still matches a transition by its careflow step (REQ-121). Pinned by name
+  in `TestREQ106ActionParity`.
+- **ACTION `instruction_details` not emitted** — the `test_all_types` golden holds
+  `instruction_details/activity_id` (STRING) and `…/instruction_id`
+  (LOCATABLE_REF) under its ACTION; the builder models neither. Pinned by name in
+  `TestREQ106ActionParity` (2 nodes).
 - **`localizedName` / localized maps** — emitted for the compiled template's single
   document language only. The compiled bridge resolves every language to the
   document-language term, so no per-language override options are offered — they
@@ -174,7 +197,9 @@ failure, not a deviation.
   `0/1` and match exactly, and GECCO's OPT constrains no `existence` on those
   attributes. Plausibly generated by an older upstream. Tolerated as a fixture
   deviation with the count pinned at 14 in `TestStructuralParity`, so it cannot
-  widen to cover a real regression.
+  widen to cover a real regression. The `test_all_types` golden does the same: on
+  its ACTION subtree the `encoding`, `language`, `subject` and `time` leaves, pinned
+  by name in `TestREQ106ActionParity`.
 
 ## Input-level (contents beyond suffix/type)
 
@@ -198,7 +223,8 @@ failure, not a deviation.
   `termBindings` are not emitted.
 - **`terminology`** — emitted for external bindings only (e.g. `openehr`). The
   archetype-internal `local` value is omitted, mirroring the reference (pinned by
-  `TestInputParity`).
+  `TestInputParity`), which itself writes it on one input: the merged ACTION
+  `careflow_step` (pinned by name in `TestREQ106ActionParity`).
 - **Reference-set `terminology`** — for a `C_CODE_REFERENCE`, the code input's
   `terminology` is the one its code phrase names, else the one its `terminology:` URI
   names, read as `constraints.CodeReference.ReferenceSetTerminology` reads it:

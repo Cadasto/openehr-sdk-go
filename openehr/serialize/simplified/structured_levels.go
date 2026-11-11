@@ -29,8 +29,9 @@ type levelKind int
 const (
 	// levelOpaque reads every name and judges nothing below it: the content
 	// is the FLAT decode's to refuse (a deferred family, PARTICIPATION.time,
-	// FEEDER_AUDIT_DETAILS.other_details, an ISM transition's `_reason`), or a
-	// body converted without a template.
+	// FEEDER_AUDIT_DETAILS.other_details, a `_reason` family under an
+	// `ism_transition` the Web Template has no node for), or a body converted
+	// without a template.
 	levelOpaque levelKind = iota
 	// levelNode is an object at a Web Template node, a leaf included.
 	levelNode
@@ -215,7 +216,8 @@ var (
 	// ismReferenceLevel is the reference's in-context `ism_transition` node
 	// where the Web Template has no node for it, which the decode refuses
 	// wherever it reads one of its leaves or its `_reason` family; any other
-	// name below it is unmatched.
+	// name below it is unmatched. Where the Web Template has the node, it is a
+	// node level like any other, and `_reason` the family it carries.
 	ismReferenceLevel = grammarOf(ismLeaves).with(ismReasonFamily, opaqueLevel)
 )
 
@@ -309,9 +311,6 @@ func (l memberLevel) judgeNode(name string) (memberLevel, bool) {
 	}
 	rmType := nodeRMType(l.node)
 	if strings.HasPrefix(name, "_") {
-		if rmType == "ISM_TRANSITION" && name == ismReasonFamily {
-			return opaqueLevel, true
-		}
 		return familyLevel(rmType, "", name)
 	}
 	switch {

@@ -200,8 +200,10 @@ type rmattrFamily struct {
 	// owner, when set, is the one RM class that admits the family, wherever
 	// else the RM declares attr. It exists for `_name`: every LOCATABLE declares
 	// `name`, but the grammar carries it at the template root alone, whose class
-	// is COMPOSITION and no other node's (REQ-140). Anywhere else the family
-	// names nothing and is unmatched content.
+	// is COMPOSITION and no other node's (REQ-140). It keeps `_reason` to
+	// ISM_TRANSITION, whose `reason` is the list the family spells, where
+	// ATTESTATION declares a single `reason`. Anywhere else the family names
+	// nothing and is unmatched content.
 	owner string
 	list  bool
 	// value marks a family that decorates the **DataValue** a collapsed ELEMENT
@@ -271,6 +273,7 @@ var rmattrFamilies = map[string]rmattrFamily{
 	"_feeder_audit":  {attr: "feeder_audit", decode: decodeRMAttrFeederAudit},
 	"_provider":      {attr: "provider", decode: decodeRMAttrProvider},
 	"_wf_definition": {attr: "wf_definition", decode: decodeRMAttrWfDefinition},
+	ismReasonFamily:  {attr: "reason", owner: "ISM_TRANSITION", list: true, decode: decodeRMAttrIsmReason},
 }
 
 // rmattrDeferredFamilies are the families the spec names and this codec defers

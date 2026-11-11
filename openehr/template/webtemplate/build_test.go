@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"slices"
 	"strings"
@@ -201,15 +202,20 @@ var deviationCounts = map[string]int{
 	"GECCO_Diagnose":  14,
 }
 
+// minOutliers are the vendored goldens that mark in-context RM-attribute
+// leaves min=1: GECCO_Diagnose, and the test_all_types golden whose ACTION
+// subtree actionParity compares.
+var minOutliers = map[string]bool{"GECCO_Diagnose": true, actionParityStem: true}
+
 // inContextMinDeviation reports whether a mismatch is the documented
-// GECCO-golden outlier: that golden marks in-context RM-attribute leaves
-// (language, encoding, subject, composer, territory, setting, start_time)
-// min=1 where this builder emits min=0. GECCO's OPT constrains no
-// `existence` on them, and both other vendored goldens agree with min=0 —
-// so the golden is the outlier, not the builder. Everything else about the
-// node must still match exactly.
+// golden outlier: the minOutliers goldens mark in-context RM-attribute leaves
+// (language, encoding, subject, composer, territory, setting, start_time,
+// time) min=1 where this builder emits min=0. Their OPTs constrain no
+// `existence` on them, and constrain_test and Corona_Anamnese agree with
+// min=0 — so the golden is the outlier, not the builder. Everything else
+// about the node must still match exactly.
 func inContextMinDeviation(stem string, ref, ours nodeFacts) bool {
-	if stem != "GECCO_Diagnose" || ref.nodeID != "" {
+	if !minOutliers[stem] || ref.nodeID != "" {
 		return false
 	}
 	if ref.min != 1 || ours.min != 0 {
@@ -300,6 +306,125 @@ func assertStructuralParity(t *testing.T, stem string) {
 
 	if len(missing) > 0 || len(extra) > 0 || len(mismatch) > 0 {
 		t.Errorf("structural parity not yet reached (missing=%d extra=%d mismatch=%d)", len(missing), len(extra), len(mismatch))
+	}
+}
+
+// actionParityStem is the reference golden whose template holds an ACTION:
+// the openEHR_SDK Web Template of the cross-format set's test_all_types OPT.
+const actionParityStem = "test_all_types.en.v1"
+
+// actionDeltas are the permitted differences between the reference's ACTION
+// subtree and this builder's, by category, each named by its aqlPath relative
+// to the ACTION (see deviations.md). The lists are pinned whole, so a
+// category can neither widen nor shift to another node unnoticed.
+var actionDeltas = map[string][]string{
+	// The golden marks these in-context leaves min=1, where the builder
+	// emits 0 as the other goldens do (inContextMinDeviation).
+	"in-context min": {"/encoding", "/language", "/subject", "/time"},
+	// The per-careflow-step nodes the builder keeps beside the merged
+	// in-context node; the reference drops them.
+	"per-step node": {
+		"/ism_transition[at0003]", "/ism_transition[at0003]/careflow_step", "/ism_transition[at0003]/current_state",
+		"/ism_transition[at0004]", "/ism_transition[at0004]/careflow_step", "/ism_transition[at0004]/current_state",
+		"/ism_transition[at0005]", "/ism_transition[at0005]/careflow_step", "/ism_transition[at0005]/current_state",
+	},
+	// The reference's instruction_details leaves, which the builder does
+	// not model.
+	"instruction_details": {"/instruction_details/activity_id", "/instruction_details/instruction_id"},
+	// The careflow step's local terminology, which the builder leaves out
+	// as it does on every coded input.
+	"local terminology": {"/ism_transition/careflow_step"},
+}
+
+// TestREQ106ActionParity — REQ-106, PROBE-075. The ACTION subtree of the
+// test_all_types Web Template matches the reference's golden on structure
+// (id, rmType, nodeId, aqlPath, min, max) and inputs, except for the deltas
+// actionDeltas names. The rest of that golden is outside this test: its other
+// entries differ for reasons the ACTION does not touch.
+func TestREQ106ActionParity(t *testing.T) {
+	var refAction map[string]any
+	walkRefTree(refTree(t, loadReferenceStem(t, actionParityStem)), func(m map[string]any) {
+		if refStr(m, "rmType") != "ACTION" {
+			return
+		}
+		if refAction != nil {
+			t.Fatalf("the %s golden holds two ACTION nodes", actionParityStem)
+		}
+		refAction = m
+	})
+	if refAction == nil {
+		t.Fatalf("the %s golden holds no ACTION node", actionParityStem)
+	}
+	base := refStr(refAction, "aqlPath")
+	refFacts, refInputs := map[string]nodeFacts{}, map[string]string{}
+	walkRefTree(refAction, func(m map[string]any) {
+		num := func(k string) int {
+			v, _ := m[k].(float64)
+			return int(v)
+		}
+		rel := strings.TrimPrefix(refStr(m, "aqlPath"), base)
+		refFacts[rel] = nodeFacts{refStr(m, "rmType"), refStr(m, "nodeId"), refStr(m, "id"), num("min"), num("max")}
+		refInputs[rel] = refInputSig(m)
+	})
+
+	action := onlyAction(t, buildOPT(t, readFile(t, testAllTypesOPT)))
+	if action.AQLPath != base {
+		t.Fatalf("ACTION aqlPath = %s, want the golden's %s", action.AQLPath, base)
+	}
+	ourFacts, ourInputs := map[string]nodeFacts{}, map[string]string{}
+	walkOurTree(action, func(n *webtemplate.Node) {
+		rel := strings.TrimPrefix(n.AQLPath, base)
+		ourFacts[rel] = nodeFacts{n.RMType, n.NodeID, n.ID, n.Min, n.Max}
+		ourInputs[rel] = inputSig(n.Inputs)
+	})
+
+	got := map[string][]string{}
+	var unexplained []string
+	for rel, rf := range refFacts {
+		of, ok := ourFacts[rel]
+		switch {
+		case !ok && strings.HasPrefix(rel, "/instruction_details/"):
+			got["instruction_details"] = append(got["instruction_details"], rel)
+			continue
+		case !ok:
+			unexplained = append(unexplained, "missing "+rel+": "+rf.String())
+			continue
+		case of == rf:
+		case inContextMinDeviation(actionParityStem, rf, of):
+			got["in-context min"] = append(got["in-context min"], rel)
+		default:
+			unexplained = append(unexplained, fmt.Sprintf("%s\n    ref:  %s\n    ours: %s", rel, rf, of))
+		}
+		switch rs, ours := refInputs[rel], ourInputs[rel]; {
+		case rs == ours:
+		case strings.ReplaceAll(rs, "%local", "") == ours:
+			got["local terminology"] = append(got["local terminology"], rel)
+		default:
+			unexplained = append(unexplained, fmt.Sprintf("%s inputs\n    ref:  [%s]\n    ours: [%s]", rel, rs, ours))
+		}
+	}
+	for rel, of := range ourFacts {
+		if _, ok := refFacts[rel]; ok {
+			continue
+		}
+		if strings.HasPrefix(rel, "/ism_transition[") {
+			got["per-step node"] = append(got["per-step node"], rel)
+			continue
+		}
+		unexplained = append(unexplained, "extra "+rel+": "+of.String())
+	}
+
+	t.Logf("ACTION PARITY: ref=%d ours=%d", len(refFacts), len(ourFacts))
+	slices.Sort(unexplained)
+	for _, u := range unexplained {
+		t.Errorf("undocumented delta: %s", u)
+	}
+	for _, category := range slices.Sorted(maps.Keys(actionDeltas)) {
+		g := got[category]
+		slices.Sort(g)
+		if want := slices.Sorted(slices.Values(actionDeltas[category])); !slices.Equal(g, want) {
+			t.Errorf("%s deltas = %d %v, want %d %v (see deviations.md)", category, len(g), g, len(want), want)
+		}
 	}
 }
 
