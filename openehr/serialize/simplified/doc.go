@@ -75,6 +75,26 @@
 // earliest time the events carry. Any other spelling of the four, such as
 // "<event>/sample_count", is unmatched content.
 //
+// # An ELEMENT with several value types
+//
+// An ELEMENT whose value admits one type, or a coded text and a free text,
+// is a single leaf, keyed without a trailing "/value". One whose value admits
+// several types, or none, is a node with one child per type, named after the
+// type: "quantity_value", "count_value", "interval_of_date_time_value". Its
+// value is spelled under the child of its type, as
+// "<element>/quantity_value|magnitude", with the value's own underscore
+// attributes such as "_normal_range" below that child, and the ELEMENT's own,
+// such as "_null_flavour", at the ELEMENT. Encode writes a value under the
+// first child of its type; a coded text with no such child under the first
+// free-text child, in the coded-text suffixes; and any other value as "|raw"
+// under the first child. Decode reads a key at the ELEMENT itself, as
+// "<element>|magnitude", the spelling of releases that gave such an ELEMENT a
+// single leaf of its first type, as the same key under its first child. It
+// refuses with [ErrUnknownPath] a body whose keys reach two children of one
+// ELEMENT, or the ELEMENT itself and a child, since an ELEMENT holds one
+// value. A child id the Web Template does not give the ELEMENT is unmatched
+// content.
+//
 // # An ACTION's transition and time
 //
 // The Web Template gives every ACTION a "time" leaf and an in-context

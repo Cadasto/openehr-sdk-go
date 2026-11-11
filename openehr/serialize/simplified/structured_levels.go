@@ -58,6 +58,10 @@ type memberLevel struct {
 	// bound is the bound the FLAT decode puts on the position of an element
 	// of this level in its member's array.
 	bound indexBound
+	// valueType reports a levelNode object at a value type of an ELEMENT with
+	// value types ([hasValueTypes]), which reads the value's decorations and
+	// not the ELEMENT's own families.
+	valueType bool
 }
 
 // indexBound is a bound the FLAT decode puts on a segment's :index whatever
@@ -294,7 +298,8 @@ func (l memberLevel) judge(name string) (memberLevel, bool) {
 // judgeNode judges a member of an object at a Web Template node with
 // children: a child node, an underscore family the node carries, a metadata
 // spelling below the root, and a reference spelling the decode refuses
-// ([refuseInContextKeys]).
+// ([refuseInContextKeys]). At an ELEMENT with value types any other member is
+// judged as at its first value type.
 func (l memberLevel) judgeNode(name string) (memberLevel, bool) {
 	rel := strings.TrimPrefix(l.rel+"/"+name, "/")
 	if child := childByID(l.node, name); child != nil {
@@ -302,7 +307,18 @@ func (l memberLevel) judgeNode(name string) (memberLevel, bool) {
 		if holdsOneValue(l.node, child) {
 			level = level.bounded(oneValue)
 		}
+		level.valueType = hasValueTypes(l.node)
 		return level, true
+	}
+	if hasValueTypes(l.node) {
+		// A member of an ELEMENT with value types that is none of them reads
+		// as its first one's, as a key at the ELEMENT does ([valueLeaf]), and
+		// an underscore family as the ELEMENT's own or that value's decoration.
+		first := valueLeaf(l.node)
+		if strings.HasPrefix(name, "_") {
+			return familyLevel("ELEMENT", nodeRMType(first), name)
+		}
+		return nodeLevel(first, rel).judgeLeaf(name)
 	}
 	if leaf := codecLeaf(l.node, name); leaf != nil {
 		// An attribute the codec reads where the Web Template has no node
@@ -329,9 +345,10 @@ func (l memberLevel) judgeNode(name string) (memberLevel, bool) {
 // `relationship` and `_identifier`, the composer's among them) or an
 // underscore family the leaf's owner carries. A collapsed ELEMENT leaf owns
 // the families of its ELEMENT and, for a value family, of the datatype it
-// holds (REQ-140); a leaf on any other attribute owns none, as
-// [rmattrOwnerAt] resolves no owner for it. An unparameterised DV_INTERVAL
-// reads no sub-path.
+// holds (REQ-140); a value type of an ELEMENT with value types owns the value
+// families alone, since the ELEMENT's own are spelled at the ELEMENT; a leaf
+// on any other attribute owns none, as [rmattrOwnerAt] resolves no owner for
+// it. An unparameterised DV_INTERVAL reads no sub-path.
 func (l memberLevel) judgeLeaf(name string) (memberLevel, bool) {
 	rmType := nodeRMType(l.node)
 	switch {
@@ -341,6 +358,9 @@ func (l memberLevel) judgeLeaf(name string) (memberLevel, bool) {
 		below, read := partyLevel.sub[name]
 		return below, read
 	case !strings.HasPrefix(name, "_") || !strings.HasSuffix(bareAQLPath(l.node.AQLPath), "/value"):
+		return memberLevel{}, false
+	}
+	if fam, _, read := rmattrFamilyOf("ELEMENT", rmType, name); l.valueType && read && !fam.value {
 		return memberLevel{}, false
 	}
 	return familyLevel("ELEMENT", rmType, name)
