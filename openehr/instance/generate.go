@@ -1581,7 +1581,7 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 	case *rm.DVURI:
 		v.Value = "http://example.com"
 	case *rm.DVEHRURI:
-		v.Value = "ehr://example"
+		v.Value = ehrURIPlaceholder
 	case *rm.DVIdentifier:
 		v.ID = "example"
 	case *rm.DVParsable:
@@ -3416,7 +3416,7 @@ func (g *generator) finishValue(opt *tcimpl.CompiledNode, rmValue any) {
 		// then keeps the value the RM requires, and the template validator
 		// reports the pattern mismatch.
 		if v.Value == "" {
-			v.Value = "ehr://example"
+			v.Value = ehrURIPlaceholder
 		}
 	case *rm.DVOrdinal:
 		// As for a DV_EHR_URI: the walk blanks the symbol where the OPT
@@ -3765,6 +3765,11 @@ func localSymbol() rm.DVCodedText {
 	}
 }
 
+// ehrURIPlaceholder is the value the generator writes on a DV_EHR_URI the
+// OPT gives no value: a URI in the ehr scheme, which DV_EHR_URI
+// Scheme_valid requires, that a reader recognises as a placeholder.
+const ehrURIPlaceholder = "ehr://example"
+
 // stampIfLocatable gives a BMM-synthesised locatable the node id and
 // name the floor requires when the OPT did not name the node.
 func (g *generator) stampIfLocatable(rmValue any, rmType string) {
@@ -4011,21 +4016,28 @@ const defaultTransition = "535"
 // applyStringLeaf writes a C_STRING leaf onto the String attribute attr
 // of rmValue, or onto its main string attribute when attr is "". The
 // value is a list member or a pattern match that the constraint accepts,
-// or the example under a C_STRING with neither (stringForConstraint),
-// except on an ACTIVITY's action_archetype_id, where a C_STRING that admits
-// the RM default /.*/, as one with neither does, gets it, as where the OPT
-// leaves the attribute silent (bmmStringDefault), and any other C_STRING a
-// string it admits (cstringvalue.ActionArchetypeID); on a PARTY_REF's type it is also a
-// class name PARTY_REF Type_validity admits (see partyRefType), on an
-// ACCESS_GROUP_REF's type the one type its Type_validity admits, on a
-// TERM_MAPPING's match a character
-// TERM_MAPPING Match_valid admits (see termMappingMatch), and on the
-// magnitude_status of a quantified value one of the strings DV_QUANTIFIED
-// Magnitude_status_valid admits (magnitudeStatuses), the first of them
-// the C_STRING accepts, the default = first, where the C_STRING path
-// picked none of them. When there is none, it writes nothing and returns
-// an error wrapping ErrConstraintUnsatisfiable. An attribute the
-// generator has no field for is left alone, like any other unknown
+// or the example under a C_STRING with neither (stringForConstraint).
+//
+// Two attributes get, where the C_STRING admits it, the value the
+// generator writes where the OPT leaves them silent, because the example
+// names no archetype on the first and breaks DV_EHR_URI Scheme_valid on
+// the second: an ACTIVITY's action_archetype_id gets the RM default /.*/
+// (bmmStringDefault), and a DV_EHR_URI's value the placeholder
+// ehr://example (populatePrimitiveDefault). A C_STRING with neither a list
+// nor a pattern admits both. Under any other C_STRING, the first gets a
+// string it admits (cstringvalue.ActionArchetypeID), and the second the
+// string stringForConstraint picks.
+//
+// On a PARTY_REF's type the value is also a class name PARTY_REF
+// Type_validity admits (see partyRefType), on an ACCESS_GROUP_REF's type
+// the one type its Type_validity admits, on a TERM_MAPPING's match a
+// character TERM_MAPPING Match_valid admits (see termMappingMatch), and on
+// the magnitude_status of a quantified value one of the strings
+// DV_QUANTIFIED Magnitude_status_valid admits (magnitudeStatuses), the
+// first of them the C_STRING accepts, the default = first, where the
+// C_STRING path picked none of them. When there is none, it writes nothing
+// and returns an error wrapping ErrConstraintUnsatisfiable. An attribute
+// the generator has no field for is left alone, like any other unknown
 // primitive target.
 func applyStringLeaf(leaf *tcimpl.CompiledNode, rmValue any, attr string, cs constraints.CString, ex any) error {
 	if attr == "" {
@@ -4063,6 +4075,14 @@ func applyStringLeaf(leaf *tcimpl.CompiledNode, rmValue any, attr string, cs con
 		// (cstringvalue.ActionArchetypeID).
 		if attr == "action_archetype_id" {
 			s, err = cstringvalue.ActionArchetypeID(cs, ex)
+		}
+	case *rm.DVEHRURI:
+		// A C_STRING that admits the placeholder gets it, as where the OPT
+		// leaves the value silent (populatePrimitiveDefault): the example,
+		// which a C_STRING with neither a list nor a pattern admits, breaks
+		// DV_EHR_URI Scheme_valid. Under any other C_STRING the pick stays.
+		if attr == "value" && len(cs.Validate(ehrURIPlaceholder)) == 0 {
+			s, err = ehrURIPlaceholder, nil
 		}
 	default:
 		if attr == "magnitude_status" && quantified(rmValue) {
