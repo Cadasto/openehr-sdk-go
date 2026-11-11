@@ -25,8 +25,13 @@ import (
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
-// wfInstruction is the test_all_types INSTRUCTION issue 426 writes under.
-const wfInstruction = "test_all_types/test_all_types3:0/section_2/section_3/test_all_types:0"
+// wfInstruction is the test_all_types INSTRUCTION issue 426 writes under, and
+// wfInstructionEarlier the spelling the issue gives it, its SECTION's earlier
+// spelling test_all_types3.
+const (
+	wfInstruction        = "test_all_types/test_all_types_2:0/section_2/section_3/test_all_types:0"
+	wfInstructionEarlier = "test_all_types/test_all_types3:0/section_2/section_3/test_all_types:0"
+)
 
 // wfConformanceInstruction is the PROBE-086 corpus template's INSTRUCTION.
 const wfConformanceInstruction = "conformance-ehrbase.de.v0/conformance_section/conformance_instruction"
@@ -71,7 +76,7 @@ func wfDefinitionOf(t *testing.T, wt *webtemplate.WebTemplate, comp *rm.Composit
 // TestREQ140WfDefinitionDecodes — REQ-140. Issue 426's body decodes, with and
 // without the template, in FLAT and in STRUCTURED, and its INSTRUCTION's
 // wf_definition is the DV_PARSABLE the keys spell, whether the value is
-// written `|value` or bare.
+// written `|value` or bare, and under the SECTION's earlier spelling too.
 func TestREQ140WfDefinitionDecodes(t *testing.T) {
 	wt, compiled := shorthandTarget(t)
 	want := rm.DVParsable{Value: "wf_definition", Formalism: "formalism"}
@@ -86,6 +91,10 @@ func TestREQ140WfDefinitionDecodes(t *testing.T) {
 		{"bare value", map[string]any{
 			wfInstruction + "/_wf_definition":           "wf_definition",
 			wfInstruction + "/_wf_definition|formalism": "formalism",
+		}},
+		{"earlier spelling", map[string]any{
+			wfInstructionEarlier + "/_wf_definition|value":     "wf_definition",
+			wfInstructionEarlier + "/_wf_definition|formalism": "formalism",
 		}},
 	} {
 		body := mustJSON(t, wfIssueBody(spelling.keys))

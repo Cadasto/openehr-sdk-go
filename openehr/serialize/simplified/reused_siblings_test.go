@@ -26,7 +26,7 @@ import (
 // two EVENTs of one node id, at most one each, told apart only by the names
 // they pin, 'First event' and 'Second event'. The Web Template lifts both
 // events, so their leaves sit side by side under the OBSERVATION: text and
-// time for the first, text2, count and time2 for the second.
+// time for the first, text_1, count and time_1 for the second.
 func namedEventsTemplate(t *testing.T) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
 	t.Helper()
 	opt, err := readOPTFile("testdata/named_sibling_events.opt")
@@ -100,8 +100,8 @@ func TestREQ053ReusedSiblingEventsRoundTrip(t *testing.T) {
 
 	keys := flatKeys(t, comp, wt)
 	for key, want := range map[string]string{
-		namedEventsObs + "/text":  "first text",
-		namedEventsObs + "/text2": "second text",
+		namedEventsObs + "/text":   "first text",
+		namedEventsObs + "/text_1": "second text",
 	} {
 		if got := keys[key]; got != want {
 			t.Errorf("MarshalFlat %q = %v, want %q", key, got, want)
@@ -114,7 +114,7 @@ func TestREQ053ReusedSiblingEventsRoundTrip(t *testing.T) {
 	if got, ok := keys[namedEventsObs+"/count"].(float64); !ok || rm.Integer64(got) != count.Magnitude {
 		t.Errorf("MarshalFlat %q = %v, want %d", namedEventsObs+"/count", keys[namedEventsObs+"/count"], count.Magnitude)
 	}
-	for _, key := range []string{namedEventsObs + "/time", namedEventsObs + "/time2"} {
+	for _, key := range []string{namedEventsObs + "/time", namedEventsObs + "/time_1"} {
 		if _, ok := keys[key]; !ok {
 			t.Errorf("MarshalFlat wrote no %q", key)
 		}
@@ -157,7 +157,8 @@ func TestREQ053ReusedSiblingEventsRoundTrip(t *testing.T) {
 // TestREQ053ReusedSiblingEventsDecodeIntoTheirOwnEvent — REQ-053, REQ-111: a
 // FLAT key under one named sibling lands in the event carrying that sibling's
 // name, created with it when absent, even where a key of the other sibling
-// sorts first; the events then stand in template order.
+// sorts first; the events then stand in template order. The second event's
+// time is spelled time2, the earlier spelling of time_1.
 func TestREQ053ReusedSiblingEventsDecodeIntoTheirOwnEvent(t *testing.T) {
 	wt, compiled := namedEventsTemplate(t)
 	// count (second event) sorts before text (first event).
@@ -400,10 +401,10 @@ func TestREQ053ReusedSiblingOrdinalTerminology(t *testing.T) {
 		namedEventsObs + "/text|value":                  "Mild",
 		namedEventsObs + "/text|ordinal":                1,
 		namedEventsObs + "/time":                        "2026-10-26T09:00:00Z",
-		namedEventsObs + "/text2|code":                  "X1",
-		namedEventsObs + "/text2|value":                 "Mild",
-		namedEventsObs + "/text2|ordinal":               1,
-		namedEventsObs + "/time2":                       "2026-10-26T10:00:00Z",
+		namedEventsObs + "/text_1|code":                 "X1",
+		namedEventsObs + "/text_1|value":                "Mild",
+		namedEventsObs + "/text_1|ordinal":              1,
+		namedEventsObs + "/time_1":                      "2026-10-26T10:00:00Z",
 		"sdk_named_sibling_events/category|code":        "433",
 		"sdk_named_sibling_events/category|value":       "event",
 		"sdk_named_sibling_events/category|terminology": "openehr",

@@ -296,14 +296,19 @@ func (l memberLevel) judge(name string) (memberLevel, bool) {
 }
 
 // judgeNode judges a member of an object at a Web Template node with
-// children: a child node, an underscore family the node carries, a metadata
-// spelling below the root, and a reference spelling the decode refuses
-// ([refuseInContextKeys]). At an ELEMENT with value types any other member is
-// judged as at its first value type.
+// children: a child node, by its id or a duplicate sibling's earlier spelling
+// ([earlierSpelledSibling]), an underscore family the node carries, a
+// metadata spelling below the root, and a reference spelling the decode
+// refuses ([refuseInContextKeys]). At an ELEMENT with value types any other
+// member is judged as at its first value type.
 func (l memberLevel) judgeNode(name string) (memberLevel, bool) {
 	rel := strings.TrimPrefix(l.rel+"/"+name, "/")
-	if child := childByID(l.node, name); child != nil {
-		level := nodeLevel(child, rel)
+	child := childByID(l.node, name)
+	if child == nil {
+		child = earlierSpelledSibling(l.node, name)
+	}
+	if child != nil {
+		level := nodeLevel(child, strings.TrimPrefix(l.rel+"/"+child.ID, "/"))
 		if holdsOneValue(l.node, child) {
 			level = level.bounded(oneValue)
 		}

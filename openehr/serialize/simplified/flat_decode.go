@@ -162,8 +162,12 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 	// spellings of one field (REQ-170), judged once the decode knows whether it
 	// reads that field.
 	flat, fold := foldEmptySuffix(flat)
+	// A duplicate sibling's earlier spelling, `x2` for `x_1`, is read as the Web
+	// Template's id, and a key spelled both ways is two spellings of one field
+	// too (REQ-053, REQ-170). Every later stage reads the Web Template's id.
+	flat, siblings := foldSiblingSpellings(flat, wt, fold.spellings)
 	if sink != nil {
-		sink.spellings = fold.spellings
+		sink.spellings = siblings.spellings
 	}
 	// Separate composition-level context from clinical content; context is
 	// rebuilt from RM attributes, not from a Web Template leaf path. The
@@ -392,6 +396,9 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 	// alone holds what it records (REQ-053).
 	rebuildArchetypeDetails(compJSON, wt)
 	if err := fold.settle(sink); err != nil {
+		return nil, err
+	}
+	if err := siblings.settle(sink); err != nil {
 		return nil, err
 	}
 	return compJSON, nil

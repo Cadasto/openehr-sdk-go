@@ -27,7 +27,7 @@ import (
 const (
 	// choiceKey is the test_all_types EVALUATION's ELEMENT `choice`, whose value
 	// admits a DV_QUANTITY or a DV_COUNT, in that order.
-	choiceKey = "test_all_types/test_all_types2:0/choice"
+	choiceKey = "test_all_types/test_all_types_1:0/choice"
 	// choicePath is the canonical path of that ELEMENT.
 	choicePath = "/content[openEHR-EHR-EVALUATION.test_all_types.v1]/data[at0001]/items[at0009]"
 	// createdKey is the ehrn_abdm media file's ELEMENT `created`, whose value
@@ -164,7 +164,8 @@ func encodedUnder(t *testing.T, comp *rm.Composition, wt *webtemplate.WebTemplat
 // which validates against the template, and one spelling it under
 // `count_value` to a DV_COUNT, in FLAT and STRUCTURED; each encodes back to the
 // keys of its own child. The leaf spelling of earlier releases, a key at the
-// ELEMENT itself, still decodes, as its first value type.
+// ELEMENT itself, still decodes, as its first value type, and so does the
+// EVALUATION's earlier spelling, test_all_types2.
 func TestREQ053ElementValueAlternativesDecode(t *testing.T) {
 	wt, compiled := allTypesSet(t)
 	quantity := map[string]any{
@@ -191,6 +192,14 @@ func TestREQ053ElementValueAlternativesDecode(t *testing.T) {
 			name:   "the earlier spelling at the ELEMENT, indexed",
 			leaves: map[string]any{choiceKey + ":0|magnitude": 60.91, choiceKey + ":0|unit": "mm[H20]"},
 			value:  `{"_type":"DV_QUANTITY","magnitude":60.91,"units":"mm[H20]"}`, keys: quantity,
+		},
+		{
+			name: "the EVALUATION's earlier spelling",
+			leaves: map[string]any{
+				"test_all_types/test_all_types2:0/choice/quantity_value|magnitude": 60.91,
+				"test_all_types/test_all_types2:0/choice/quantity_value|unit":      "mm[H20]",
+			},
+			value: `{"_type":"DV_QUANTITY","magnitude":60.91,"units":"mm[H20]"}`, keys: quantity,
 		},
 	} {
 		for _, f := range formats {
@@ -447,7 +456,7 @@ func TestREQ053ElementValueAlternativesUnderscoreFamilies(t *testing.T) {
 			value: quantity,
 			unmatched: map[string]string{
 				"FLAT":       choiceKey + "/quantity_value/_uid",
-				"STRUCTURED": "test_all_types/test_all_types2/0/choice/0/quantity_value/0/_uid",
+				"STRUCTURED": "test_all_types/test_all_types_1/0/choice/0/quantity_value/0/_uid",
 			},
 		},
 		{

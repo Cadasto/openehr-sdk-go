@@ -50,7 +50,8 @@ type unmatchedSink struct {
 	seen map[string]bool
 	// spellings maps a key the decode works on to every key as written that
 	// it stands for, where that is not just itself: [foldEmptySuffix] reads
-	// `x|` as `x`, so an unmatched `x` reports each spelling the body carried.
+	// `x|` as `x`, and [foldSiblingSpellings] a duplicate sibling's `x2` as
+	// `x_1`, so an unmatched key reports each spelling the body carried.
 	spellings map[string][]string
 }
 
