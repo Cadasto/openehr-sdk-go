@@ -27,7 +27,11 @@ var ErrNoValue = errors.New("no string satisfies the C_STRING constraint")
 
 // Pick returns a string cs accepts: example when cs accepts it, else the
 // first list member cs accepts, else, for a pattern-only constraint, the
-// shortest string the pattern's syntax builds. Acceptance is
+// shortest string the pattern's syntax builds. Where that is the empty
+// string, which an attribute such as DV_TEXT.value refuses, Pick takes a
+// non-empty string the syntax builds instead, with one repetition of the
+// first optional or starred part that yields a character, and keeps the
+// empty string only where cs accepts no such string. Acceptance is
 // [constraints.CString.Validate], which matches a pattern against the whole
 // string, so a value that only contains a match is never chosen. Pick
 // returns an error when example is not a string, and [ErrNoValue] when none
@@ -47,8 +51,15 @@ func Pick(cs constraints.CString, example any) (string, error) {
 		}
 	}
 	if len(cs.List) == 0 && cs.Pattern != "" {
-		if m, built := patternExample(cs.Pattern); built && accepts(m) {
-			return m, nil
+		if m, built := patternExample(cs.Pattern); built {
+			if m == "" {
+				if n, ok := patternNonEmpty(cs.Pattern); ok && accepts(n) {
+					return n, nil
+				}
+			}
+			if accepts(m) {
+				return m, nil
+			}
 		}
 	}
 	return "", ErrNoValue
@@ -83,6 +94,83 @@ func patternExample(pattern string) (string, bool) {
 		return "", false
 	}
 	return b.String(), true
+}
+
+// patternNonEmpty builds a non-empty string the regular expression
+// pattern describes: the string [patternExample] builds where that is not
+// empty, and where it is, the same walk with one repetition of the first
+// optional or starred part that yields a character, or the first
+// alternative that yields one. built is false when the pattern does not
+// parse or builds no non-empty string, as with x{0}.
+func patternNonEmpty(pattern string) (string, bool) {
+	re, err := syntax.Parse(pattern, syntax.Perl)
+	if err != nil {
+		return "", false
+	}
+	var b strings.Builder
+	if !writeNonEmpty(&b, re.Simplify()) {
+		return "", false
+	}
+	return b.String(), true
+}
+
+// writeNonEmpty writes to b the string writeShortest writes for re when
+// that string is not empty, and otherwise a non-empty string built the
+// same way except at the first part that yields a character. It reports
+// false, and writes nothing, when re builds no non-empty string.
+func writeNonEmpty(b *strings.Builder, re *syntax.Regexp) bool {
+	switch re.Op {
+	case syntax.OpLiteral, syntax.OpCharClass, syntax.OpAnyChar, syntax.OpAnyCharNotNL:
+		// One character or more, or no string at all for an empty class.
+		var part strings.Builder
+		if !writeShortest(&part, re) || part.Len() == 0 {
+			return false
+		}
+		b.WriteString(part.String())
+		return true
+	case syntax.OpCapture, syntax.OpPlus, syntax.OpStar, syntax.OpQuest:
+		// One repetition, which is also the minimum of a plus.
+		return writeNonEmpty(b, re.Sub[0])
+	case syntax.OpConcat:
+		var short strings.Builder
+		if !writeShortest(&short, re) {
+			return false
+		}
+		if short.Len() > 0 {
+			b.WriteString(short.String())
+			return true
+		}
+		// Every part's shortest string is empty, so the first part that
+		// yields a character gives the whole string.
+		for _, sub := range re.Sub {
+			var part strings.Builder
+			if writeNonEmpty(&part, sub) {
+				b.WriteString(part.String())
+				return true
+			}
+		}
+		return false
+	case syntax.OpAlternate:
+		for _, sub := range re.Sub {
+			var alt strings.Builder
+			if writeNonEmpty(&alt, sub) {
+				b.WriteString(alt.String())
+				return true
+			}
+		}
+		return false
+	case syntax.OpEmptyMatch, syntax.OpNoMatch,
+		syntax.OpBeginLine, syntax.OpEndLine, syntax.OpBeginText, syntax.OpEndText,
+		syntax.OpWordBoundary, syntax.OpNoWordBoundary:
+		// Zero width, or no match at all.
+		return false
+	case syntax.OpRepeat:
+		// Simplify rewrites every counted repetition, x{0} into an empty
+		// match, so none reaches here.
+		return false
+	default:
+		return false
+	}
 }
 
 func writeShortest(b *strings.Builder, re *syntax.Regexp) bool {

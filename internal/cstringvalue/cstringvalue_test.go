@@ -74,8 +74,8 @@ func TestREQ107ActionArchetypeIDFollowsTheConstraint(t *testing.T) {
 
 // TestREQ107PickOrder pins the order of choice of Pick: the example when the
 // constraint accepts it, then the first list member it accepts, then, with no
-// list, the shortest string the pattern builds; and an example that is not a
-// string is an error.
+// list, the shortest string the pattern builds, a non-empty one where that is
+// empty; and an example that is not a string is an error.
 func TestREQ107PickOrder(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
