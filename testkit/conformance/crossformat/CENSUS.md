@@ -44,8 +44,8 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 | nested | flat-canonical | compared 156, missing 34, extra 4, altered 8, excluded 0 |
 | persistent_minimal | canonical-flat | compared 11, missing 0, extra 2, altered 1, excluded 0 |
 | persistent_minimal | flat-canonical | compared 72, missing 2, extra 0, altered 5, excluded 0 |
-| test_all_types | canonical-flat | compared 83, missing 8, extra 7, altered 10, excluded 0 |
-| test_all_types | flat-canonical | compared 423, missing 40, extra 34, altered 35, excluded 7 |
+| test_all_types | canonical-flat | compared 83, missing 4, extra 7, altered 11, excluded 0 |
+| test_all_types | flat-canonical | compared 423, missing 40, extra 40, altered 32, excluded 3 |
 
 ## alternative_events
 
@@ -362,15 +362,11 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 
 ### canonical-flat
 
-- Outcome: compared 83, missing 8, extra 7, altered 10, excluded 0
-- Reason: party reference type: the canonical types the composer's reference PERSON, so FLAT encode writes composer|type, which the upstream FLAT omits. HISTORY.origin: the origin is 6 ms before the event time, so FLAT encode writes it as history_origin, which the upstream FLAT omits. Web Template projection: the SDK's Web Template has no in-context time or ism_transition node for the section_3 ACTION (openehr/template/webtemplate/deviations.md, inContext coverage), and its per-careflow-step transition nodes do not match a transition without a careflow_step, so FLAT encode writes neither (4 missing keys). Choice element: upstream spells the value of the choice element choice/quantity_value, the SDK choice. DV_IDENTIFIER: this upstream FLAT writes the id as the bare value, the codec as |id. DV_PROPORTION: upstream writes the derived magnitude as a bare value, which the codec does not write (a PROBE-086 residue), and writes the Integer type and the Real denominator as 1.0 where the codec writes 1. Upstream date and time spelling: the canonical writes dates in the basic format (20190114) and date-times with a comma and +00:00, the FLAT in the extended format with a full stop and Z (7 leaves). Upstream conversion differences: upstream openEHR_SDK's FlatJsonMarshallerTest.toFlatJsonAllTypesErrors encodes this canonical (all_types_no_multimedia.json) as FLAT and expects these differences against this FLAT (test_all_types.json): duration_any (P1Y2M10DT2H30M against PT30M), a DV_URI only the canonical carries and the proportion's precision, which only the canonical carries, besides the DV_IDENTIFIER and proportion type spellings above.
-- Missing (8):
+- Outcome: compared 83, missing 4, extra 7, altered 11, excluded 0
+- Reason: party reference type: the canonical types the composer's reference PERSON, so FLAT encode writes composer|type, which the upstream FLAT omits. HISTORY.origin: the origin is 6 ms before the event time, so FLAT encode writes it as history_origin, which the upstream FLAT omits. Choice element: upstream spells the value of the choice element choice/quantity_value, the SDK choice. DV_IDENTIFIER: this upstream FLAT writes the id as the bare value, the codec as |id. DV_PROPORTION: upstream writes the derived magnitude as a bare value, which the codec does not write (a PROBE-086 residue), and writes the Integer type and the Real denominator as 1.0 where the codec writes 1. Upstream date and time spelling: the canonical writes dates in the basic format (20190114) and date-times with a comma and +00:00, the FLAT in the extended format with a full stop and Z (8 leaves). Upstream conversion differences: upstream openEHR_SDK's FlatJsonMarshallerTest.toFlatJsonAllTypesErrors encodes this canonical (all_types_no_multimedia.json) as FLAT and expects these differences against this FLAT (test_all_types.json): duration_any (P1Y2M10DT2H30M against PT30M), a DV_URI only the canonical carries and the proportion's precision, which only the canonical carries, besides the DV_IDENTIFIER and proportion type spellings above.
+- Missing (4):
   - `test_all_types/test_all_types2:0/choice/quantity_value|magnitude`
   - `test_all_types/test_all_types2:0/choice/quantity_value|unit`
-  - `test_all_types/test_all_types3:0/section_2/section_3/test_all_types2:0/ism_transition/current_state|code`
-  - `test_all_types/test_all_types3:0/section_2/section_3/test_all_types2:0/ism_transition/current_state|terminology`
-  - `test_all_types/test_all_types3:0/section_2/section_3/test_all_types2:0/ism_transition/current_state|value`
-  - `test_all_types/test_all_types3:0/section_2/section_3/test_all_types2:0/time`
   - `test_all_types/test_all_types:0/identifier`
   - `test_all_types/test_all_types:0/proportion_any`
 - Extra (7):
@@ -381,9 +377,10 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - `test_all_types/test_all_types:0/history_origin`
   - `test_all_types/test_all_types:0/identifier|id`
   - `test_all_types/test_all_types:0/proportion_any|precision`
-- Altered (10):
+- Altered (11, first 10 shown):
   - `test_all_types/test_all_types2:0/interval_datetime/lower`: reference `"2019-01-28T21:22:49.426Z"`, ours `"2019-01-28T21:22:49,426+00:00"`
   - `test_all_types/test_all_types2:0/interval_datetime/upper`: reference `"2019-01-28T21:22:49.426Z"`, ours `"2019-01-28T21:22:49,426+00:00"`
+  - `test_all_types/test_all_types3:0/section_2/section_3/test_all_types2:0/time`: reference `"2019-01-28T21:22:50.154Z"`, ours `"2019-01-28T21:22:50,154+00:00"`
   - `test_all_types/test_all_types3:0/section_2/section_3/test_all_types:0/current_activity/partial_datetime`: reference `"2019-01-28T21:22:49.426Z"`, ours `"2019-01-28T21:22:49,426+00:00"`
   - `test_all_types/test_all_types:0/date`: reference `"2019-01-14"`, ours `"20190114"`
   - `test_all_types/test_all_types:0/datetime`: reference `"2019-01-28T21:22:49.426Z"`, ours `"2019-01-28T21:22:49,426+00:00"`
@@ -391,12 +388,11 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - `test_all_types/test_all_types:0/duration_any`: reference `"PT30M"`, ours `"P1Y2M10DT2H30M"`
   - `test_all_types/test_all_types:0/proportion_any|denominator`: reference `1.0`, ours `1`
   - `test_all_types/test_all_types:0/proportion_any|type`: reference `1.0`, ours `1`
-  - `test_all_types/test_all_types:0/time2`: reference `"2019-01-28T21:22:49.332Z"`, ours `"2019-01-28T21:22:49,332+00:00"`
 
 ### flat-canonical
 
-- Outcome: compared 423, missing 40, extra 34, altered 35, excluded 7
-- Reason: The 7 excluded keys are the section_3 ACTION's in-context ism_transition/current_state (3) and time (1), refused, and choice/quantity_value|magnitude and |unit (2) and the bare proportion_any (1), reported as unmatched content, as follows. Web Template projection: decode refuses the ACTION's in-context ism_transition and time in every mode as RM data it would otherwise drop or replace, so the decoded ACTION has an empty current_state (3 leaves) and the context start time as its time. party reference type: the upstream FLAT writes no composer|type, so decode gives the composer's reference the type PARTY against the canonical's PERSON. Choice element: decode does not read choice/quantity_value (the SDK spells it choice), so the choice element is missing. DV_PROPORTION: decode reports the bare proportion_any, the derived magnitude, as unmatched content, and reads |type 1.0 as the Integer 1. Upstream conversion differences: a DV_URI and the proportion's precision only the canonical carries, and duration_any (P1Y2M10DT2H30M against PT30M). Upstream date and time spelling: the canonical writes dates in the basic format (20190114) and date-times with a comma and +00:00, the FLAT in the extended format with a full stop and Z (6 leaves). HISTORY.origin: the FLAT has no origin key and decode gives it the event time (openehr/serialize/simplified/deviations.md), where the canonical sets it earlier. Shifted positions: the elements decode lacks move their later siblings up, the DV_URI and the choice element in the EVALUATION, so the EVALUATION's intervals and cluster compare against the canonical's next element; this accounts for most of the missing, extra and altered leaves. RM-FLOOR archetype_details: the canonical SECTION and the ACTION's description CLUSTER have none, decode adds them (8 extra leaves), and rm_version is 1.2.0 against 1.0.2 and 1.0.4.
+- Outcome: compared 423, missing 40, extra 40, altered 32, excluded 3
+- Reason: The 3 excluded keys are choice/quantity_value|magnitude and |unit (2) and the bare proportion_any (1), reported as unmatched content, as follows. ISM transition careflow step: the upstream FLAT gives the section_3 ACTION's transition a current state (526, planned) and no careflow step, so decode gives it the one careflow step of the template whose current states hold 526 (openehr/serialize/simplified/deviations.md), where the canonical has none (6 extra leaves); this is the intended reading of such a body, not a gap. party reference type: the upstream FLAT writes no composer|type, so decode gives the composer's reference the type PARTY against the canonical's PERSON. Choice element: decode does not read choice/quantity_value (the SDK spells it choice), so the choice element is missing. DV_PROPORTION: decode reports the bare proportion_any, the derived magnitude, as unmatched content, and reads |type 1.0 as the Integer 1. Upstream conversion differences: a DV_URI and the proportion's precision only the canonical carries, and duration_any (P1Y2M10DT2H30M against PT30M). Upstream date and time spelling: the canonical writes dates in the basic format (20190114) and date-times with a comma and +00:00, the FLAT in the extended format with a full stop and Z (7 leaves). HISTORY.origin: the FLAT has no origin key and decode gives it the event time (openehr/serialize/simplified/deviations.md), where the canonical sets it earlier. Shifted positions: the elements decode lacks move their later siblings up, the DV_URI and the choice element in the EVALUATION, so the EVALUATION's intervals and cluster compare against the canonical's next element; this accounts for most of the missing, extra and altered leaves. RM-FLOOR archetype_details: the canonical SECTION and the ACTION's description CLUSTER have none, decode adds them (8 extra leaves), and rm_version is 1.2.0 against 1.0.2 and 1.0.4.
 - Missing (40, first 10 shown):
   - `/content/0/data/events/0/data/items/15/value/precision`
   - `/content/1/data/items/0/value/value`
@@ -408,7 +404,7 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - `/content/1/data/items/3/value/lower/_type`
   - `/content/1/data/items/3/value/lower/value`
   - `/content/1/data/items/3/value/lower_included`
-- Extra (34, first 10 shown):
+- Extra (40, first 10 shown):
   - `/content/1/data/items/0/value/lower/_type`
   - `/content/1/data/items/0/value/lower/magnitude`
   - `/content/1/data/items/0/value/lower_included`
@@ -419,7 +415,7 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - `/content/1/data/items/0/value/upper_unbounded`
   - `/content/1/data/items/1/value/lower/units`
   - `/content/1/data/items/1/value/upper/units`
-- Altered (35, first 10 shown):
+- Altered (32, first 10 shown):
   - `/archetype_details/rm_version`: reference `"1.0.2"`, ours `"1.2.0"`
   - `/composer/external_ref/type`: reference `"PERSON"`, ours `"PARTY"`
   - `/content/0/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
@@ -430,7 +426,5 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - `/content/0/data/events/0/time/value`: reference `"2019-01-28T21:22:49,332+00:00"`, ours `"2019-01-28T21:22:49.332Z"`
   - `/content/0/data/origin/value`: reference `"2019-01-28T21:22:49,326+00:00"`, ours `"2019-01-28T21:22:49.332Z"`
   - `/content/1/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
-- Reducing decode removed 7 keys from the upstream FLAT:
+- Reducing decode removed 3 keys from the upstream FLAT:
   - 3: `reported as unmatched content`
-  - 3: `simplified: path not modelled: "<key>" spells an ACTION's ISM transition current_state, a Simplified Formats path this SDK does not model; refused rather than ignored`
-  - 1: `simplified: path not modelled: "<key>" spells an ACTION's time, a Simplified Formats path this SDK does not model; refused rather than ignored`

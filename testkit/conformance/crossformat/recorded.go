@@ -322,19 +322,17 @@ var Recorded = map[string]map[Leg]Record{
 	},
 	"test_all_types": {
 		LegCanonicalFlat: {
-			Outcome: Outcome{Compared: 83, Missing: 8, Extra: 7, Altered: 10},
+			Outcome: Outcome{Compared: 83, Missing: 4, Extra: 7, Altered: 11},
 			Reason: "party reference type: the canonical types the composer's reference PERSON, so FLAT encode " +
 				"writes composer|type, which the upstream FLAT omits. HISTORY.origin: the origin is 6 ms before " +
-				"the event time, so FLAT encode writes it as history_origin, which the upstream FLAT omits. Web Template projection: the SDK's Web Template has no in-context time or ism_transition " +
-				"node for the section_3 ACTION (openehr/template/webtemplate/deviations.md, inContext coverage), and its " +
-				"per-careflow-step transition nodes do not match a transition without a careflow_step, so FLAT " +
-				"encode writes neither (4 missing keys). Choice element: upstream spells the value of the choice " +
+				"the event time, so FLAT encode writes it as history_origin, which the upstream FLAT omits. " +
+				"Choice element: upstream spells the value of the choice " +
 				"element choice/quantity_value, the SDK choice. DV_IDENTIFIER: this upstream FLAT writes the id as " +
 				"the bare value, the codec as |id. DV_PROPORTION: upstream writes the derived magnitude as a bare " +
 				"value, which the codec does not write (a PROBE-086 residue), and writes the Integer type and the " +
 				"Real denominator as 1.0 where the codec writes 1. Upstream date and time spelling: the canonical " +
 				"writes dates in the basic format (20190114) and date-times with a comma and +00:00, the FLAT in the " +
-				"extended format with a full stop and Z (7 leaves). Upstream conversion differences: upstream " +
+				"extended format with a full stop and Z (8 leaves). Upstream conversion differences: upstream " +
 				"openEHR_SDK's FlatJsonMarshallerTest.toFlatJsonAllTypesErrors encodes this canonical " +
 				"(all_types_no_multimedia.json) as FLAT and expects these differences against this FLAT " +
 				"(test_all_types.json): duration_any (P1Y2M10DT2H30M against PT30M), a DV_URI only the canonical " +
@@ -342,13 +340,14 @@ var Recorded = map[string]map[Leg]Record{
 				"and proportion type spellings above.",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 423, Missing: 40, Extra: 34, Altered: 35, Excluded: 7},
-			Reason: "The 7 excluded keys are the section_3 ACTION's in-context ism_transition/current_state (3) " +
-				"and time (1), refused, and " +
+			Outcome: Outcome{Compared: 423, Missing: 40, Extra: 40, Altered: 32, Excluded: 3},
+			Reason: "The 3 excluded keys are " +
 				"choice/quantity_value|magnitude and |unit (2) and the bare proportion_any (1), reported as " +
-				"unmatched content, as follows. Web Template projection: decode refuses the ACTION's in-context " +
-				"ism_transition and time in every mode as RM data it would otherwise drop or replace, so " +
-				"the decoded ACTION has an empty current_state (3 leaves) and the context start time as its time. " +
+				"unmatched content, as follows. ISM transition careflow step: the upstream FLAT gives the " +
+				"section_3 ACTION's transition a current state (526, planned) and no careflow step, so decode " +
+				"gives it the one careflow step of the template whose current states hold 526 " +
+				"(openehr/serialize/simplified/deviations.md), where the canonical has none (6 extra leaves); " +
+				"this is the intended reading of such a body, not a gap. " +
 				"party reference type: the upstream FLAT writes no composer|type, so decode gives the composer's " +
 				"reference the type PARTY against the canonical's PERSON. " +
 				"Choice element: decode does not read choice/quantity_value (the SDK spells it choice), " +
@@ -357,7 +356,7 @@ var Recorded = map[string]map[Leg]Record{
 				"Upstream conversion differences: a DV_URI and the proportion's " +
 				"precision only the canonical carries, and duration_any (P1Y2M10DT2H30M against PT30M). Upstream " +
 				"date and time spelling: the canonical writes dates in the basic format (20190114) and date-times " +
-				"with a comma and +00:00, the FLAT in the extended format with a full stop and Z (6 leaves). " +
+				"with a comma and +00:00, the FLAT in the extended format with a full stop and Z (7 leaves). " +
 				"HISTORY.origin: the FLAT has no origin key and decode gives it the event time " +
 				"(openehr/serialize/simplified/deviations.md), where the canonical sets it earlier. Shifted " +
 				"positions: the elements decode lacks move their later siblings up, the DV_URI and the choice " +
