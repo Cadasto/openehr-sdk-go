@@ -41,9 +41,13 @@ failure, not a deviation.
     and it holds `careflow_step` (each step's careflow-step code, with the
     `currentStates` that step admits), `current_state` (every step's states in step
     order, a repeat dropped) and `transition` (`|code` / `|value`). Two readings go
-    beyond the golden: `careflow_step`'s `max` is 1 where the reference copies the
-    step's `min` into it, and a step with no `careflow_step` or `current_state`
-    adds nothing to that list, where the reference fails on it.
+    beyond the golden, where the reference fails on a step that constrains no
+    `careflow_step` or no `current_state`. Such a step still names a careflow step,
+    its node id, which the FLAT codec gives a transition decoded under it, so
+    `careflow_step` lists it by its node id, labelled with its name and localized
+    names, and is never left out; a step with no `current_state` adds nothing to that
+    list. And `careflow_step`'s `max` is 1 where the reference copies the step's `min`
+    into it, and its `min` is the first step's that constrains one, else 0.
   - **Unconstrained**, where the walk emits none: `current_state` and `transition`,
     each with `|code` / `|value` inputs, and no `careflow_step`, as the reference's
     filter leaves it out; `min` 0, and the name `Ism_transition` in the in-context
@@ -213,7 +217,8 @@ failure, not a deviation.
   code that archetype does not define is left out of a coded list, as the reference leaves it
   out, even where an enclosing archetype defines it), but is **empty for external-terminology codes**
   (e.g. `openehr::433`), and `localizedLabels` / `localizedDescriptions` / per-item
-  `termBindings` are not emitted.
+  `termBindings` are not emitted, except the `localizedLabels` of a merged ACTION
+  `careflow_step` item that lists a step by its node id (the ISM transition entry above).
 - **`terminology`** — emitted for external bindings only (e.g. `openehr`). The
   archetype-internal `local` value is omitted, mirroring the reference (pinned by
   `TestInputParity`), which itself writes it on one input: the merged ACTION

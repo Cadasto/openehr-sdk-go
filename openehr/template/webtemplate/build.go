@@ -190,16 +190,18 @@ func ismTransitionIC(actionPath string, siblings []*Node) *Node {
 //
 //   - careflow_step, listing every step's careflow-step codes, each with the
 //     current_state codes that step admits as its currentStates; local codes,
-//     so the input names no terminology, as on any coded input;
+//     so the input names no terminology, as on any coded input. A step that
+//     constrains no careflow_step still names one, its node id, which decode
+//     gives a transition spelled under it, so that step is listed by its node
+//     id, labelled with its name, where the reference fails on it;
 //   - current_state, listing every step's current_state codes in step order,
 //     a repeat dropped, in the openehr terminology;
 //   - transition, as on the unconstrained node.
 //
-// A leaf's min is the first step's that has it, and its max 1. A step that
-// constrains no careflow_step or current_state adds nothing to that list; with
-// no step constraining one, careflow_step is left out, as on the unconstrained
-// node, and current_state is the unconstrained one. A list is open where a
-// step's own list is, or where it lists no code.
+// A leaf's min is the first step's that has it, else 0, and its max 1. A step
+// that constrains no current_state adds nothing to that list; with no step
+// constraining one, current_state is the unconstrained one. A list is open
+// where a step's own list is, or where it lists no code.
 func mergedIsmTransition(path string, steps []*Node) *Node {
 	careflow := &Node{ID: "careflow_step", Name: "Careflow_step", RMType: "DV_CODED_TEXT", Max: 1, AQLPath: path + "/careflow_step"}
 	state := &Node{ID: "current_state", Name: "Current_state", RMType: "DV_CODED_TEXT", Max: 1, AQLPath: path + "/current_state"}
@@ -223,13 +225,13 @@ func mergedIsmTransition(path string, steps []*Node) *Node {
 			}
 		}
 		stepCareflow := childAt(s, s.AQLPath+"/careflow_step")
-		if stepCareflow == nil {
-			continue
-		}
-		if !hasCareflow {
+		items, open := codeInput(stepCareflow)
+		switch {
+		case stepCareflow == nil:
+			items = []InputListItem{{Value: s.NodeID, Label: s.Name, LocalizedLabels: maps.Clone(s.LocalizedNames)}}
+		case !hasCareflow:
 			careflow.Min, hasCareflow = stepCareflow.Min, true
 		}
-		items, open := codeInput(stepCareflow)
 		careflowIn.ListOpen = careflowIn.ListOpen || open
 		for _, it := range items {
 			for _, st := range states {
@@ -240,18 +242,16 @@ func mergedIsmTransition(path string, steps []*Node) *Node {
 	}
 	careflowIn.ListOpen = careflowIn.ListOpen || len(careflowIn.List) == 0
 	stateIn.ListOpen = stateIn.ListOpen || len(stateIn.List) == 0
-	node := &Node{ID: "ism_transition", Name: "ism_transition", RMType: "ISM_TRANSITION", Min: steps[0].Min, Max: steps[0].Max, AQLPath: path}
-	if hasCareflow {
-		careflow.Inputs = []Input{careflowIn}
-		node.Children = append(node.Children, careflow)
-	}
+	careflow.Inputs = []Input{careflowIn}
 	if hasState {
 		state.Inputs = []Input{stateIn}
 	} else {
 		state = unconstrainedCurrentState(path)
 	}
-	node.Children = append(node.Children, state, transitionIC(path))
-	return node
+	return &Node{
+		ID: "ism_transition", Name: "ism_transition", RMType: "ISM_TRANSITION", Min: steps[0].Min, Max: steps[0].Max, AQLPath: path,
+		Children: []*Node{careflow, state, transitionIC(path)},
+	}
 }
 
 // unconstrainedCurrentState returns the current_state leaf of the in-context
