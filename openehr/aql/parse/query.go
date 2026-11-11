@@ -46,7 +46,8 @@ type Query struct {
 	// nil when no WHERE clause is present. The concrete shapes
 	// (aql.Comparison / aql.Junction / aql.NotExpr / aql.ExistsExpr /
 	// aql.MatchesExpr / aql.LikeExpr) carry readable fields a consumer
-	// can introspect after a type assertion.
+	// can introspect after a type assertion. A path operand comes both as
+	// written (Path) and split into alias and segments (ParsedPath).
 	Where aql.WhereExpr
 
 	// OrderBy is the ORDER BY list in document order; nil when absent.
