@@ -62,7 +62,7 @@ Each set under testkit/corpus/crossformat/ gives one composition in two or more 
 | flat-structured | the upstream FLAT restructured as STRUCTURED without a template, compared leaf by leaf | the upstream STRUCTURED |
 | structured-flat | the upstream STRUCTURED flattened, decoded and encoded as FLAT, compared key by key | the upstream FLAT decoded and encoded the same way |
 
-A leaf is a JSON pointer to a scalar, an empty object or an empty array, with its value as JSON text. Every FLAT comparison holds composition metadata out on both sides with the PROBE-086 hold-out. Every FLAT decode excludes the keys the codec reports as unmatched content (REQ-170), removes each key family the codec refuses, no wider than the refusal names, and retries. The census lists the removed keys of each decoded side, grouped by the codec's own refusal text with the key shown as ` + "`<key>`" + `, or as reported as unmatched content.
+A leaf is a JSON pointer to a scalar, an empty object or an empty array, with its value as JSON text. Every FLAT comparison holds composition metadata out on both sides with the PROBE-086 hold-out, and reads the reference side's duplicate sibling ids in this SDK's spelling with the PROBE-086 respelling: the reference writes ` + "`<id>2`" + ` where the SDK writes ` + "`<id>_1`" + ` (REQ-106), and the census lists the keys it read that way. Every FLAT decode excludes the keys the codec reports as unmatched content (REQ-170), removes each key family the codec refuses, no wider than the refusal names, and retries. The census lists the removed keys of each decoded side, grouped by the codec's own refusal text with the key shown as ` + "`<key>`" + `, or as reported as unmatched content.
 
 An outcome is either a refusal, the codec error that ended the leg, or five counts: compared (the size of the reference side), missing (reference keys absent from ours), extra (our keys absent from the reference), altered (keys on both sides with different values) and excluded (upstream FLAT keys the reducing decode removed before the comparison, reported as unmatched content or refused). Excluded is counted in flat-canonical and structured-flat, the legs that decode the upstream FLAT. In flat-canonical a removed key's value is also absent from the decoded composition, so it shows up in the comparison. In structured-flat both sides are decoded, so a key family the codec refuses can drop out of both sides and leave no difference: only excluded shows it. Keys removed from the STRUCTURED side are listed but not counted. A refused leg carries no counts; the keys removed before the refusal are listed as information. Each outcome must equal the one recorded in recorded.go, and the reason shown is the recorded one.
 
@@ -95,8 +95,21 @@ func writeLeg(b *bytes.Buffer, lr LegResult, recs map[Leg]Record) {
 			fmt.Fprintf(b, "  - %s: reference %s, ours %s\n", code(a.Key), code(abbreviateValue(a.Reference)), code(abbreviateValue(a.Ours)))
 		}
 	}
+	writeRespelled(b, lr.Respelled)
 	writeRefusals(b, "the upstream FLAT", lr.Refusals)
 	writeRefusals(b, "the flattened upstream STRUCTURED", lr.StructuredRefusals)
+}
+
+// writeRespelled renders the reference keys the comparison read in this SDK's
+// spelling of a duplicate sibling id.
+func writeRespelled(b *bytes.Buffer, respelled []webtemplate.Respelling) {
+	if len(respelled) == 0 {
+		return
+	}
+	fmt.Fprintf(b, "- Read in this SDK's duplicate sibling ids (%s):\n", countOf(len(respelled)))
+	for _, r := range respelled[:min(len(respelled), censusExamples)] {
+		fmt.Fprintf(b, "  - %s as %s\n", code(r.Upstream), code(r.Ours))
+	}
 }
 
 // writeKeys renders one difference class's example keys.
