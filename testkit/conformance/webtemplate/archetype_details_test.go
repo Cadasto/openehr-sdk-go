@@ -35,8 +35,8 @@ var flatFormFloorBreaches = map[string][]string{}
 //
 // The decode is strict, so a body carrying unmatched content (REQ-170) is
 // refused rather than decoded without it: what is left of such a body can be
-// a node whose only data the codec does not read (the CLUSTER of
-// `ehrbase_conformance_cluster`, whose one item has no Web Template node), and
+// a value whose derived content the codec does not read (the bare magnitude of
+// the DV_PROPORTION in `ehrbase_conformance_data_types_dv_proportion`), and
 // that says nothing about decode. A body the codec refuses is not this test's
 // concern: PROBE-086 counts those keys. What is asserted is that a body the
 // codec reads whole never yields a composition the SDK's own floor rejects,

@@ -200,7 +200,7 @@ var pinned = map[string]expectation{
 	"ehrbase_conformance_Element_null_flavor":                 {excluded: 0, compared: 17},
 	"ehrbase_conformance_action":                              {excluded: 3, compared: 82},
 	"ehrbase_conformance_admin_entry":                         {excluded: 0, compared: 66},
-	"ehrbase_conformance_cluster":                             {excluded: 1, compared: 50},
+	"ehrbase_conformance_cluster":                             {excluded: 0, compared: 51},
 	"ehrbase_conformance_composition":                         {excluded: 0, compared: 29},
 	"ehrbase_conformance_data_types_dv_boolean":               {excluded: 0, compared: 14},
 	"ehrbase_conformance_data_types_dv_coded_text":            {excluded: 0, compared: 31},
