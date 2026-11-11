@@ -562,6 +562,58 @@ func TestREQ053ElementValueAlternativesFirstInterval(t *testing.T) {
 	}
 }
 
+// TestREQ053ElementValueAlternativesFirstIntervalRaw — REQ-053. Where an
+// ELEMENT's first value type is an interval, a value of no child's type is
+// written as |raw under that interval child, and decode reads it back, as it
+// reads the |raw at the ELEMENT that earlier releases wrote, in FLAT and
+// STRUCTURED, with nothing unmatched. A |raw beside the interval's own keys
+// is two spellings of one value, refused naming the |raw key.
+func TestREQ053ElementValueAlternativesFirstIntervalRaw(t *testing.T) {
+	wt, compiled, _, _ := crossFormatComposerSet(t, "ehrn_abdm")
+	created := findNode(t, wt.Tree, createdPath)
+	if len(created.Children) != 2 || created.Children[1].ID != "interval_of_date_time_value" {
+		t.Fatalf("ehrn_abdm `created` has children %v, want date_time_value then interval_of_date_time_value — fixture changed?", created.Children)
+	}
+	created.Children[0], created.Children[1] = created.Children[1], created.Children[0]
+	ctx := map[string]any{"ctx/language": "en", "ctx/territory": "IN", "ctx/composer_name": "Max Mustermann", "ctx/time": "2022-02-03T04:05:06"}
+	text := map[string]any{"_type": "DV_TEXT", "value": "free text"}
+	childRaw := createdKey + "/interval_of_date_time_value|raw"
+	for _, key := range []string{childRaw, createdKey + "|raw"} {
+		leaves := maps.Clone(ctx)
+		leaves[key] = text
+		for _, f := range formats {
+			t.Run(f.name+" "+key, func(t *testing.T) {
+				var reported []string
+				comp, err := f.decode(t, wt, leaves, simplified.WithTemplate(compiled), simplified.WithStrict(),
+					simplified.WithUnmatched(func(key string) { reported = append(reported, key) }))
+				if len(reported) > 0 {
+					t.Errorf("decode(%v) reports %v unmatched, want none", leaves, reported)
+				}
+				if err != nil {
+					t.Fatalf("decode(%v) = %v", leaves, err)
+				}
+				if got, _ := canonicalAt(t, comp, createdPath+"/value"); !reflect.DeepEqual(got, text) {
+					t.Errorf("decode(%v): value = %s, want %v", leaves, jsonText(got), text)
+				}
+				if got, want := encodedUnder(t, comp, wt, createdKey), map[string]any{childRaw: text}; !reflect.DeepEqual(got, want) {
+					t.Errorf("encode writes %v, want %v", got, want)
+				}
+			})
+		}
+	}
+	both := maps.Clone(ctx)
+	both[childRaw] = text
+	both[createdKey+"/interval_of_date_time_value/lower"] = "2022-02-03T04:05:06"
+	for _, f := range formats {
+		t.Run(f.name+" |raw beside the interval's keys", func(t *testing.T) {
+			_, err := f.decode(t, wt, both)
+			if !errors.Is(err, simplified.ErrUnsupportedDatatype) || !strings.Contains(err.Error(), "|raw is mutually exclusive") {
+				t.Errorf("decode(%v) = %v, want ErrUnsupportedDatatype refusing the |raw beside the interval's keys", both, err)
+			}
+		})
+	}
+}
+
 // findNode is the Web Template node under n whose aqlPath is path.
 func findNode(t *testing.T, n *webtemplate.Node, path string) *webtemplate.Node {
 	t.Helper()

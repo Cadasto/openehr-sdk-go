@@ -2556,7 +2556,7 @@ func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g 
 	reach, reached := valueTypeReached(pk.segs, node, sib)
 	// A key at an ELEMENT with value types reads as its first one.
 	node = valueLeaf(node)
-	value, ordinalBounds, err := compositeLeafValue(g, nodeRMType(node), tmpl != nil)
+	value, ordinalBounds, err := compositeLeafValue(g, node, tmpl != nil)
 	if err == nil || errors.Is(err, errNothingMatched) {
 		if dupErr := g.settleDups(); dupErr != nil {
 			return dupErr
@@ -2589,15 +2589,15 @@ func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g 
 	return nil
 }
 
-// compositeLeafValue decodes a composite leaf's group by its RM type: the party
-// grammar (rmattr_party.go) or the interval grammar (rmattr_value.go), each the
-// same implementation those families use at every other position. It also
-// returns the bounds of a DV_INTERVAL<DV_ORDINAL> leaf that were built from
-// their suffixes, which a WithTemplate decode (deferred) completes and whose
-// symbols it settles once the leaf is placed.
-func compositeLeafValue(g rmattrGroup, rmType string, deferred bool) (map[string]any, []string, error) {
-	if anchor, isInterval := intervalLeafAnchor(rmType); isInterval {
-		return intervalLeafSuffixes(g, anchor, deferred)
+// compositeLeafValue decodes a composite leaf's group by the leaf's RM type:
+// the party grammar (rmattr_party.go) or the interval grammar
+// (rmattr_value.go), each the same implementation those families use at every
+// other position. It also returns the bounds of a DV_INTERVAL<DV_ORDINAL> leaf
+// that were built from their suffixes, which a WithTemplate decode (deferred)
+// completes and whose symbols it settles once the leaf is placed.
+func compositeLeafValue(g rmattrGroup, leaf *webtemplate.Node, deferred bool) (map[string]any, []string, error) {
+	if anchor, isInterval := intervalLeafAnchor(nodeRMType(leaf)); isInterval {
+		return intervalLeafSuffixes(g, leafHolds(leaf), anchor, deferred)
 	}
 	party, populated, err := partyLeafSuffixes(g)
 	if err != nil {

@@ -295,6 +295,49 @@ func TestDVIntervalLeafBogusSubPathRefused(t *testing.T) {
 	}
 }
 
+// TestDVIntervalLeafRaw — REQ-053. An interval leaf reads a |raw alone as its
+// whole value, as every other leaf does, of any type the ELEMENT's value
+// admits, and encode writes a value of another type back there. A null |raw
+// beside the interval's keys is absent; a populated one beside them is two
+// spellings of one value, refused naming the |raw key.
+func TestDVIntervalLeafRaw(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	rawKey := rmattrInterval + "|raw"
+	text := map[string]any{"_type": "DV_TEXT", "value": "free text"}
+	body := func(extra map[string]any) map[string]any {
+		extra[rmattrIntervalEvent+"/time"] = "2022-01-12T09:00:11.7842493+01:00"
+		return rmattrBody(extra)
+	}
+	comp, err := UnmarshalFlat(mustJSON(t, body(map[string]any{rawKey: text})), wt, WithStrict())
+	if err != nil {
+		t.Fatalf("UnmarshalFlat(%s) = %v", rawKey, err)
+	}
+	if v := elementValueAt[*rm.DVText](t, comp, "interval_dv_quantity"); v.Value != "free text" {
+		t.Errorf("decoded value = %q, want %q", v.Value, "free text")
+	}
+	if got := reencodeRMAttr(t, wt, comp)[rawKey]; !sameCtxValue(got, text) {
+		t.Errorf("re-encode of %q = %#v, want %#v", rawKey, got, text)
+	}
+
+	bounds := map[string]any{rmattrInterval + "/lower|magnitude": 1.0, rmattrInterval + "/lower|unit": "Unit"}
+	nullRaw := maps.Clone(bounds)
+	nullRaw[rawKey] = nil
+	comp, err = UnmarshalFlat(mustJSON(t, body(nullRaw)), wt, WithStrict())
+	if err != nil {
+		t.Fatalf("UnmarshalFlat(null %s beside the bounds) = %v", rawKey, err)
+	}
+	if lower, ok := intervalLeafOf(t, comp).Lower.(*rm.DVQuantity); !ok || lower.Magnitude != 1 {
+		t.Errorf("lower = %#v, want the 1 Unit the body spells", intervalLeafOf(t, comp).Lower)
+	}
+
+	both := maps.Clone(bounds)
+	both[rawKey] = text
+	err = decodeRMAttrErr(t, wt, body(both))
+	if !errors.Is(err, ErrUnsupportedDatatype) || !strings.Contains(err.Error(), rawKey) {
+		t.Errorf("decode of %q beside the bounds = %v, want ErrUnsupportedDatatype naming it", rawKey, err)
+	}
+}
+
 // --- DV_TEXT's CODE_PHRASE members --------------------------------------
 
 // TestDVTextLanguageEncodingRoundTrip — REQ-140. `_language` and `_encoding` are
