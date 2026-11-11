@@ -4012,9 +4012,10 @@ const defaultTransition = "535"
 // of rmValue, or onto its main string attribute when attr is "". The
 // value is a list member or a pattern match that the constraint accepts,
 // or the example under a C_STRING with neither (stringForConstraint),
-// except on an ACTIVITY's action_archetype_id, where such a C_STRING gets
-// the RM default /.*/ (cstringvalue.ActionArchetypeID), as where the OPT
-// leaves the attribute silent (bmmStringDefault); on a PARTY_REF's type it is also a
+// except on an ACTIVITY's action_archetype_id, where a C_STRING that admits
+// the RM default /.*/, as one with neither does, gets it, as where the OPT
+// leaves the attribute silent (bmmStringDefault), and any other C_STRING a
+// string it admits (cstringvalue.ActionArchetypeID); on a PARTY_REF's type it is also a
 // class name PARTY_REF Type_validity admits (see partyRefType), on an
 // ACCESS_GROUP_REF's type the one type its Type_validity admits, on a
 // TERM_MAPPING's match a character
@@ -4055,10 +4056,11 @@ func applyStringLeaf(leaf *tcimpl.CompiledNode, rmValue any, attr string, cs con
 			s, err = termMappingMatch(cs, s)
 		}
 	case *rm.Activity:
-		// A C_STRING with neither a pattern nor a list gives no id, so the
-		// RM default goes there, as where the OPT leaves the attribute
-		// silent (bmmStringDefault). The FLAT decode's template completion
-		// shares the pick (cstringvalue.ActionArchetypeID).
+		// A C_STRING that admits the RM default gets it, as where the OPT
+		// leaves the attribute silent (bmmStringDefault): the example, which
+		// a pattern such as .* also admits, names no archetype. The FLAT
+		// decode's template completion shares the pick
+		// (cstringvalue.ActionArchetypeID).
 		if attr == "action_archetype_id" {
 			s, err = cstringvalue.ActionArchetypeID(cs, ex)
 		}

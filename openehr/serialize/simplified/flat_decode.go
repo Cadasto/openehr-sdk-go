@@ -3350,10 +3350,11 @@ func (x *templateIndex) actionArchetypeID(path string) string {
 // the ACTIVITY n under its example fill, or "" where it writes none. Like the
 // generator, it reads the first child the template allows on that attribute:
 // the value [cstringvalue.ActionArchetypeID] picks from that child's
-// C_STRING, or "" where the C_STRING admits no value the pick builds. Where
-// n holds no such attribute (a template compiled without implicit
-// attributes) or the template allows no child there, the template names no
-// archetype, and the RM default [cstringvalue.AnyActionArchetype] stands.
+// C_STRING, which is the RM default [cstringvalue.AnyActionArchetype] where
+// the C_STRING admits it, or "" where the C_STRING admits no value the pick
+// builds. Where n holds no such attribute (a template compiled without
+// implicit attributes) or the template allows no child there, the template
+// names no archetype, and the RM default stands too.
 func actionArchetypeIDOf(n *templatecompile.CompiledNode) string {
 	a := n.Attribute("action_archetype_id")
 	if a == nil {
