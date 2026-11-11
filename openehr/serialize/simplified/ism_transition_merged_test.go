@@ -539,3 +539,133 @@ func buildEditedWT(t *testing.T, raw []byte) *webtemplate.WebTemplate {
 	}
 	return wt
 }
+
+// siblingActionsWT is a minimal Web Template with two reused ACTION siblings,
+// `a` and `b`, of one archetype, which pin the names A and B (REQ-111). ism
+// builds each one's ISM transition node from the ACTION's aqlPath and pinned
+// name.
+func siblingActionsWT(ism func(base, pin string) *webtemplate.Node) *webtemplate.WebTemplate {
+	action := func(id, pin string) *webtemplate.Node {
+		base := "/content[openEHR-EHR-ACTION.test.v1,'" + pin + "']"
+		return &webtemplate.Node{
+			ID: id, Name: pin, RMType: "ACTION", NodeID: "openEHR-EHR-ACTION.test.v1", Max: 1, AQLPath: base,
+			Children: []*webtemplate.Node{
+				{ID: "time", Name: "Time", RMType: "DV_DATE_TIME", Max: 1, AQLPath: base + "/time", Inputs: []webtemplate.Input{{Type: "DATETIME"}}},
+				ism(base, pin),
+			},
+		}
+	}
+	return &webtemplate.WebTemplate{Tree: &webtemplate.Node{
+		ID: "root", RMType: "COMPOSITION", NodeID: "openEHR-EHR-COMPOSITION.t.v1",
+		Children: []*webtemplate.Node{action("a", "A"), action("b", "B")},
+	}}
+}
+
+// ismLeaf is the careflow_step or current_state leaf of the ISM transition
+// node at base, listing items, coded in terminology ("" for local codes).
+func ismLeaf(base, id, name, terminology string, items ...webtemplate.InputListItem) *webtemplate.Node {
+	return &webtemplate.Node{
+		ID: id, Name: name, RMType: "DV_CODED_TEXT", Min: 1, Max: 1, AQLPath: base + "/" + id,
+		Inputs: []webtemplate.Input{{Suffix: "code", Type: "CODED_TEXT", Terminology: terminology, List: items}},
+	}
+}
+
+// siblingCareflowStep decodes the FLAT body that adds keys to a minimal
+// context against wt, and returns the careflow step of the ACTION named
+// action.
+func siblingCareflowStep(t *testing.T, wt *webtemplate.WebTemplate, action string, keys map[string]any) (*rm.DVCodedText, error) {
+	t.Helper()
+	body := map[string]any{"ctx/language": "en", "ctx/territory": "US", "ctx/time": "2021-12-21T14:19:31+01:00", "ctx/composer_name": "x"}
+	maps.Copy(body, keys)
+	comp, err := UnmarshalFlat(mustJSON(t, body), wt)
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range comp.Content {
+		if a, ok := c.(*rm.Action); ok && a.Name.GetValue() == action {
+			return a.IsmTransition.CareflowStep, nil
+		}
+	}
+	t.Fatalf("the composition holds no ACTION named %s", action)
+	return nil, nil
+}
+
+// TestREQ111ReusedSiblingsSettleTheirOwnIsmTransition — REQ-111, REQ-053.
+// Reused ACTION siblings that pinned names tell apart each have their own ISM
+// transition nodes, at paths that differ only by those names. Decode settles a
+// rebuilt transition against the node it was placed under, never against a
+// sibling's: at the merged in-context node, a careflow step is inferred from
+// and completed with that node's own list; at an archetyped per-step node, a
+// transition gets that node's careflow step, and a careflow step coded
+// otherwise is refused naming that node.
+func TestREQ111ReusedSiblingsSettleTheirOwnIsmTransition(t *testing.T) {
+	stateKeys := func(ism, state string) map[string]any {
+		return map[string]any{ism + "/current_state|code": state, ism + "/current_state|value": "s", ism + "/current_state|terminology": "openehr"}
+	}
+	t.Run("merged", func(t *testing.T) {
+		steps := map[string]struct{ code, state string }{"A": {"at0005", "524"}, "B": {"at0006", "532"}}
+		wt := siblingActionsWT(func(base, pin string) *webtemplate.Node {
+			ism := base + "/ism_transition"
+			s := steps[pin]
+			return &webtemplate.Node{
+				ID: "ism_transition", Name: "ism_transition", RMType: "ISM_TRANSITION", Min: 1, Max: 1, AQLPath: ism,
+				Children: []*webtemplate.Node{
+					ismLeaf(ism, "careflow_step", "Careflow_step", "", webtemplate.InputListItem{Value: s.code, Label: "Step " + pin, CurrentStates: []string{s.state}}),
+					ismLeaf(ism, "current_state", "Current_state", "openehr", webtemplate.InputListItem{Value: s.state}),
+				},
+			}
+		})
+		for _, pin := range []string{"A", "B"} {
+			ism := "root/" + strings.ToLower(pin) + "/ism_transition"
+			s := steps[pin]
+			for name, keys := range map[string]map[string]any{
+				"its state alone":            stateKeys(ism, s.state),
+				"its step's code, no |value": mergeRMAttr(stateKeys(ism, s.state), map[string]any{ism + "/careflow_step|code": s.code}),
+			} {
+				t.Run(pin+"/"+name, func(t *testing.T) {
+					got, err := siblingCareflowStep(t, wt, pin, keys)
+					if err != nil {
+						t.Fatalf("UnmarshalFlat: %v", err)
+					}
+					if got == nil || got.DefiningCode.CodeString != s.code || got.DefiningCode.TerminologyID.Value != "local" || got.Value != "Step "+pin {
+						t.Errorf("ACTION %s careflow_step = %+v, want local::%s|Step %s", pin, got, s.code, pin)
+					}
+				})
+			}
+		}
+	})
+	t.Run("per step", func(t *testing.T) {
+		wt := siblingActionsWT(func(base, pin string) *webtemplate.Node {
+			ism := base + "/ism_transition[at0005]"
+			return &webtemplate.Node{
+				ID: "transition", Name: "Step " + pin, RMType: "ISM_TRANSITION", NodeID: "at0005", Min: 1, Max: 1, AQLPath: ism,
+				Children: []*webtemplate.Node{
+					ismLeaf(ism, "current_state", "Current_state", "openehr", webtemplate.InputListItem{Value: "524"}),
+					ismLeaf(ism, "careflow_step", "Careflow_step", "", webtemplate.InputListItem{Value: "at0005", Label: "Step " + pin}),
+				},
+			}
+		})
+		for _, pin := range []string{"A", "B"} {
+			ism := "root/" + strings.ToLower(pin) + "/transition"
+			t.Run(pin+"/its state alone", func(t *testing.T) {
+				got, err := siblingCareflowStep(t, wt, pin, stateKeys(ism, "524"))
+				if err != nil {
+					t.Fatalf("UnmarshalFlat: %v", err)
+				}
+				if got == nil || got.DefiningCode.CodeString != "at0005" || got.Value != "Step "+pin {
+					t.Errorf("ACTION %s careflow_step = %+v, want local::at0005|Step %s", pin, got, pin)
+				}
+			})
+			t.Run(pin+"/another step's code", func(t *testing.T) {
+				keys := mergeRMAttr(stateKeys(ism, "524"), map[string]any{ism + "/careflow_step|code": "at0006", ism + "/careflow_step|value": "x"})
+				_, err := siblingCareflowStep(t, wt, pin, keys)
+				if !errors.Is(err, ErrUnsupportedDatatype) {
+					t.Fatalf("UnmarshalFlat = %v, want ErrUnsupportedDatatype", err)
+				}
+				if !strings.Contains(err.Error(), ism+"/careflow_step") {
+					t.Errorf("err = %q, want it to name %s/careflow_step", err, ism)
+				}
+			})
+		}
+	})
+}
