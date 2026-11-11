@@ -14,7 +14,7 @@ Each set under testkit/corpus/crossformat/ gives one composition in two or more 
 | flat-structured | the upstream FLAT restructured as STRUCTURED without a template, compared leaf by leaf | the upstream STRUCTURED |
 | structured-flat | the upstream STRUCTURED flattened, decoded and encoded as FLAT, compared key by key | the upstream FLAT decoded and encoded the same way |
 
-A leaf is a JSON pointer to a scalar, an empty object or an empty array, with its value as JSON text. Every FLAT comparison holds composition metadata out on both sides with the PROBE-086 hold-out. Every FLAT decode excludes the keys the codec reports as unmatched content (REQ-170), removes each key family the codec refuses, no wider than the refusal names, and retries. The census lists the removed keys of each decoded side, grouped by the codec's own refusal text with the key shown as `<key>`, or as reported as unmatched content.
+A leaf is a JSON pointer to a scalar, an empty object or an empty array, with its value as JSON text. Every FLAT comparison holds composition metadata out on both sides with the PROBE-086 hold-out, and reads the reference side's duplicate sibling ids in this SDK's spelling with the PROBE-086 respelling: the reference writes `<id>2` where the SDK writes `<id>_1` (REQ-106), and the census lists the keys it read that way. Every FLAT decode excludes the keys the codec reports as unmatched content (REQ-170), removes each key family the codec refuses, no wider than the refusal names, and retries. The census lists the removed keys of each decoded side, grouped by the codec's own refusal text with the key shown as `<key>`, or as reported as unmatched content.
 
 An outcome is either a refusal, the codec error that ended the leg, or five counts: compared (the size of the reference side), missing (reference keys absent from ours), extra (our keys absent from the reference), altered (keys on both sides with different values) and excluded (upstream FLAT keys the reducing decode removed before the comparison, reported as unmatched content or refused). Excluded is counted in flat-canonical and structured-flat, the legs that decode the upstream FLAT. In flat-canonical a removed key's value is also absent from the decoded composition, so it shows up in the comparison. In structured-flat both sides are decoded, so a key family the codec refuses can drop out of both sides and leave no difference: only excluded shows it. Keys removed from the STRUCTURED side are listed but not counted. A refused leg carries no counts; the keys removed before the refusal are listed as information. Each outcome must equal the one recorded in recorded.go, and the reason shown is the recorded one.
 
@@ -342,21 +342,32 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - `test_all_types/test_all_types:0/proportion_any`
 - Extra (5):
   - `test_all_types/composer|type`
-  - `test_all_types/test_all_types2:0/uri`
   - `test_all_types/test_all_types:0/history_origin`
   - `test_all_types/test_all_types:0/identifier|id`
   - `test_all_types/test_all_types:0/proportion_any|precision`
+  - `test_all_types/test_all_types_1:0/uri`
 - Altered (11, first 10 shown):
-  - `test_all_types/test_all_types2:0/interval_datetime/lower`: reference `"2019-01-28T21:22:49.426Z"`, ours `"2019-01-28T21:22:49,426+00:00"`
-  - `test_all_types/test_all_types2:0/interval_datetime/upper`: reference `"2019-01-28T21:22:49.426Z"`, ours `"2019-01-28T21:22:49,426+00:00"`
-  - `test_all_types/test_all_types3:0/section_2/section_3/test_all_types2:0/time`: reference `"2019-01-28T21:22:50.154Z"`, ours `"2019-01-28T21:22:50,154+00:00"`
-  - `test_all_types/test_all_types3:0/section_2/section_3/test_all_types:0/current_activity/partial_datetime`: reference `"2019-01-28T21:22:49.426Z"`, ours `"2019-01-28T21:22:49,426+00:00"`
   - `test_all_types/test_all_types:0/date`: reference `"2019-01-14"`, ours `"20190114"`
   - `test_all_types/test_all_types:0/datetime`: reference `"2019-01-28T21:22:49.426Z"`, ours `"2019-01-28T21:22:49,426+00:00"`
   - `test_all_types/test_all_types:0/datetime_any`: reference `"2019-01-28T21:22:49.427Z"`, ours `"2019-01-28T21:22:49,427+00:00"`
   - `test_all_types/test_all_types:0/duration_any`: reference `"PT30M"`, ours `"P1Y2M10DT2H30M"`
   - `test_all_types/test_all_types:0/proportion_any|denominator`: reference `1.0`, ours `1`
   - `test_all_types/test_all_types:0/proportion_any|type`: reference `1.0`, ours `1`
+  - `test_all_types/test_all_types:0/time_1`: reference `"2019-01-28T21:22:49.332Z"`, ours `"2019-01-28T21:22:49,332+00:00"`
+  - `test_all_types/test_all_types_1:0/interval_datetime/lower`: reference `"2019-01-28T21:22:49.426Z"`, ours `"2019-01-28T21:22:49,426+00:00"`
+  - `test_all_types/test_all_types_1:0/interval_datetime/upper`: reference `"2019-01-28T21:22:49.426Z"`, ours `"2019-01-28T21:22:49,426+00:00"`
+  - `test_all_types/test_all_types_2:0/section_2/section_3/test_all_types:0/current_activity/partial_datetime`: reference `"2019-01-28T21:22:49.426Z"`, ours `"2019-01-28T21:22:49,426+00:00"`
+- Read in this SDK's duplicate sibling ids (40, first 10 shown):
+  - `test_all_types/test_all_types2:0/choice/quantity_value|magnitude` as `test_all_types/test_all_types_1:0/choice/quantity_value|magnitude`
+  - `test_all_types/test_all_types2:0/choice/quantity_value|unit` as `test_all_types/test_all_types_1:0/choice/quantity_value|unit`
+  - `test_all_types/test_all_types2:0/cluster_1/cluster_2/cluster_3/text_2` as `test_all_types/test_all_types_1:0/cluster_1/cluster_2/cluster_3/text_2`
+  - `test_all_types/test_all_types2:0/encoding|code` as `test_all_types/test_all_types_1:0/encoding|code`
+  - `test_all_types/test_all_types2:0/encoding|terminology` as `test_all_types/test_all_types_1:0/encoding|terminology`
+  - `test_all_types/test_all_types2:0/interval_count/lower` as `test_all_types/test_all_types_1:0/interval_count/lower`
+  - `test_all_types/test_all_types2:0/interval_count/upper` as `test_all_types/test_all_types_1:0/interval_count/upper`
+  - `test_all_types/test_all_types2:0/interval_datetime/lower` as `test_all_types/test_all_types_1:0/interval_datetime/lower`
+  - `test_all_types/test_all_types2:0/interval_datetime/upper` as `test_all_types/test_all_types_1:0/interval_datetime/upper`
+  - `test_all_types/test_all_types2:0/interval_quantity/lower|magnitude` as `test_all_types/test_all_types_1:0/interval_quantity/lower|magnitude`
 
 ### flat-canonical
 

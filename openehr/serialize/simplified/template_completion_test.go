@@ -499,15 +499,21 @@ func TestREQ053TemplateCompletionNeedsAgreement(t *testing.T) {
 		snomed := replaceExactlyOnce(t, alternative, "<value>local</value>", "<value>SNOMED-CT</value>")
 		wt, compiled := editedAllTypes(t, replaceExactlyOnce(t, opt, alternative, alternative+snomed))
 		// The two alternatives give the ELEMENT a child each, coded_text_value
-		// and coded_text_value2, at one path. A key under either child, or at
+		// and coded_text_value_1, at one path. A key under either child, or at
 		// the ELEMENT itself, which reads as its first child, is a coded text
-		// at that path.
-		for _, key := range []string{contextCoded + "/coded_text_value", contextCoded + "/coded_text_value2", contextCoded} {
+		// at that path; so is one under the second child's earlier spelling,
+		// coded_text_value2, refused under the Web Template's id.
+		for _, key := range []string{contextCoded + "/coded_text_value", contextCoded + "/coded_text_value_1", contextCoded} {
 			wantMissingSuffix(t, wt, refusalCase{
 				leaves: map[string]any{key + "|code": "at0007", key + "|value": "value2"},
 				key:    key, reason: "DV_CODED_TEXT missing required |terminology",
 			}, simplified.WithTemplate(compiled))
 		}
+		earlier := contextCoded + "/coded_text_value2"
+		wantMissingSuffix(t, wt, refusalCase{
+			leaves: map[string]any{earlier + "|code": "at0007", earlier + "|value": "value2"},
+			key:    contextCoded + "/coded_text_value_1", reason: "DV_CODED_TEXT missing required |terminology",
+		}, simplified.WithTemplate(compiled))
 	})
 	t.Run("ordinal pairs", func(t *testing.T) {
 		opt := replaceExactlyOnce(t, allTypesOPT(t), "<code_string>at0016</code_string>", "<code_string>at0015</code_string>")
@@ -726,7 +732,7 @@ type adminRoot struct{ name, text string }
 
 // adminCoded is the leaf of the ADMIN_ENTRY root of adminEntryPair that pins no
 // name.
-const adminCoded = "test_all_types/test_all_types3:0/section_2/test_all_types:0/count_3"
+const adminCoded = "test_all_types/test_all_types_2:0/section_2/test_all_types:0/count_3"
 
 // adminEntryPair compiles the test_all_types OPT with its ADMIN_ENTRY archetype
 // root held twice, first and second in that order. In each copy the ELEMENT's

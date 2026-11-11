@@ -466,7 +466,7 @@ func TestREQ140CareflowStepOfStepsConstrainingNoneRoundTrips(t *testing.T) {
 	wt := buildEditedWT(t, stripCareflowSteps(t, raw, 2))
 	for _, tc := range []struct{ node, state, step string }{
 		{node: "transition", state: "524", step: "at0005"},
-		{node: "transition2", state: "532", step: "at0006"},
+		{node: "transition_1", state: "532", step: "at0006"},
 	} {
 		t.Run(tc.node, func(t *testing.T) {
 			name := ismNodeName(t, wt, tc.node)

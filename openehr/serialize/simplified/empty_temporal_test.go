@@ -201,7 +201,7 @@ func TestREQ053EmptyLoneValueReadsAsNull(t *testing.T) {
 	for _, key := range []string{
 		shorthandObs + "/datetime",
 		shorthandObs + "/duration_any",
-		"test_all_types/test_all_types2:0/uri",
+		"test_all_types/test_all_types_1:0/uri",
 	} {
 		for _, mode := range shorthandModes(compiled) {
 			t.Run(key[strings.LastIndex(key, "/")+1:]+"/"+mode.name, func(t *testing.T) {

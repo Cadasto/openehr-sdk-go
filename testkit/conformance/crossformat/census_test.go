@@ -53,14 +53,17 @@ func TestCensusHasNoEmDash(t *testing.T) {
 // TestProbe105CensusRendering pins what the census shows for a leg over
 // synthetic results: sets in name order, at most ten examples per difference
 // class, the recorded reason or "no record", a refusal's error shortened and
-// its recorded substring, the reducing decode's removals from each side
-// grouped by the codec's own refusal text, the same wording whichever modal
-// verb encoding/json/v2 picked for the run, and no em dash even when a codec
-// error carries one.
+// its recorded substring, the reference keys read in the SDK's duplicate
+// sibling ids, at most ten of them, the reducing decode's removals from each
+// side grouped by the codec's own refusal text, the same wording whichever
+// modal verb encoding/json/v2 picked for the run, and no em dash even when a
+// codec error carries one.
 func TestProbe105CensusRendering(t *testing.T) {
 	var missing []string
+	var respelled []webtemplate.Respelling
 	for i := range 12 {
 		missing = append(missing, fmt.Sprintf("r/k%02d", i))
+		respelled = append(respelled, webtemplate.Respelling{Upstream: fmt.Sprintf("r/s%02d2", i), Ours: fmt.Sprintf("r/s%02d_1", i)})
 	}
 	results := []crossformat.SetResult{
 		{Set: "zeta", Legs: []crossformat.LegResult{{
@@ -68,6 +71,7 @@ func TestProbe105CensusRendering(t *testing.T) {
 			Outcome:     crossformat.Outcome{Compared: 20, Missing: 12, Altered: 1, Excluded: 7},
 			MissingKeys: missing,
 			Alterations: []crossformat.Alteration{{Key: "r/x", Reference: `"a"`, Ours: `"b"`}},
+			Respelled:   respelled,
 			Refusals: []webtemplate.Refusal{
 				{Key: "r/a", Reason: "path not in web template", Message: `path not in web template: "<key>"`, Keys: 2},
 				{Key: "r/c", Reason: "path not in web template", Message: "\"<key>\": reused sibling \u2014 not yet decodable", Keys: 4},
@@ -106,6 +110,8 @@ func TestProbe105CensusRendering(t *testing.T) {
 		"- Missing (12, first 10 shown):",
 		"  - `r/k09`",
 		"  - `r/x`: reference `\"a\"`, ours `\"b\"`",
+		"- Read in this SDK's duplicate sibling ids (12, first 10 shown):\n  - `r/s002` as `r/s00_1`\n",
+		"  - `r/s092` as `r/s09_1`\n- Reducing decode removed 7 keys",
 		"- Reducing decode removed 7 keys from the upstream FLAT:\n" +
 			"  - 4: `\"<key>\": reused sibling - not yet decodable`\n" +
 			"  - 3: `path not in web template: \"<key>\"`\n" +
@@ -117,7 +123,7 @@ func TestProbe105CensusRendering(t *testing.T) {
 			t.Errorf("Census() lacks %q:\n%s", want, got)
 		}
 	}
-	for _, unwanted := range []string{"`r/k10`", strings.Repeat("A", 41), "\u2014", "unable to"} {
+	for _, unwanted := range []string{"`r/k10`", "`r/s102`", strings.Repeat("A", 41), "\u2014", "unable to"} {
 		if strings.Contains(got, unwanted) {
 			t.Errorf("Census() contains %q:\n%s", unwanted, got)
 		}

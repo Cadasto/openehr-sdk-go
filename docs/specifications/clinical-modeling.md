@@ -1381,17 +1381,25 @@ The archetyped `ism_transition[atNNNN]` nodes stay beside the merged node.
 
 The node `id` is the FLAT-path segment consumers bind to, so its stability and cross-implementation fidelity are the export's load-bearing property.
 The `id` **MUST** mirror the locked EHRbase reference: a lower-snake sanitisation of the node's default-language display name.
+Two spellings below diverge from it, each stated with its evidence: a duplicate sibling's suffix and an interval value alternative's `id`.
 The exact normalisation is **derived from the vendored reference fixture**; a scheme of the SDK's own would break FLAT-path interoperability with existing tooling.
 
 For a node that pins a **template-level name**, that name is the display name the `id` derives from — not the archetype's concept term, which is shared by every occurrence of a reused archetype and so cannot distinguish siblings; see [§ REQ-111 § Node names and name predicates](#node-names-and-name-predicates), which owns the naming rule.
 
-A pinned name is the disambiguator wherever one exists, so no suffixing is needed for it — and none appears in any vendored reference golden.
-Where siblings would **still** collide — no pinned name, and one shared display name, as two ELEMENTs both sanitising to `dv_text` do in the upstream FLAT-conformance template — the export **MUST** apply the reference's ordinal fallback: the first claimant keeps the bare `id` and the second and later claimants take the next **free** ordinal spelling (`dv_text`, `dv_text2`, `dv_text3`) — "free" because a sibling may legitimately sanitise to `dv_text2` on its own, and renaming onto it would recreate the collision.
-The two-claimant spelling is fixed by the reference, not chosen: the upstream FLAT bodies for that template key those two nodes `…/conformance_action/dv_text` and `…/conformance_action/dv_text2`; the next-free extension beyond it is this SDK's conservative reading.
+A pinned name is the disambiguator wherever one exists, so no suffixing is needed for it — and no vendored reference golden suffixes a sibling that pins one.
+Where siblings would **still** collide — no pinned name, and one shared display name, as two ELEMENTs both sanitising to `dv_text` do in the upstream FLAT-conformance template — the export **MUST** make their `id`s unique with the numeric suffix of the *Simplified Formats* specification (§ Node ID Generation Rules, rule 7):
+
+- the first claimant, in document order, keeps the bare `id`;
+- each later claimant takes the next **free** `<id>_N`, N counting from 1 (`dv_text`, `dv_text_1`, `dv_text_2`);
+- "free" is over the whole sibling list: a sibling whose own name sanitises to `<id>_N` ("Blood Pressure 1" is `blood_pressure_1`) keeps it, before or after the claimants, and the claimant skips to the next N, since renaming onto it would recreate the collision.
+
+The spelling is this SDK's reading of the format, whose rule 7 fixes neither the separator nor the first number: its example table gives "Blood Pressure (duplicate)" as `blood_pressure_1`, while its RM-mapping examples write `dv_text2`.
+It diverges from the reference ([ADR 0036](../adr/0036-webtemplate-id-divergences.md)), which writes the second claimant `<id>2`: the upstream FLAT bodies for that template key the two nodes `…/conformance_action/dv_text` and `…/conformance_action/dv_text2`.
+How decode reads a body keyed in the reference's spelling is [§ REQ-053](wire.md#req-053)'s.
 Emitting duplicate sibling `id`s is **never** permitted; an export that still cannot make siblings unique **MUST** fail with a typed error rather than emit an ambiguous tree.
 
 The child an ELEMENT gives one of its value alternatives ([§ *Output shape*](#output-shape)) takes the reference's `id` for the alternative's type: the type without its `DV_` prefix, lower-cased, followed by `_value` (`quantity_value`, `coded_text_value`).
-Two alternatives of one type take the ordinal fallback (`text_value`, `text_value2`).
+Two alternatives of one type take the numeric suffix (`text_value`, `text_value_1`).
 An interval of a type **MUST** take `interval_of_<type>_value` (`interval_of_date_time_value`), the spelling of the reference's own IPS test Web Template.
 This one spelling diverges from the reference's code, which writes `interval<dv_date_time>_value`, a key EHRbase does not read.
 
@@ -1417,6 +1425,8 @@ Any structural difference on that pinned surface is a failure; the following cat
 8. **ACTION instruction details** — the reference's `instruction_details/activity_id` and `instruction_details/instruction_id` leaves under an ACTION are not emitted.
 9. **Coded-text and free-text pair in the `GECCO_Diagnose` golden** — that golden gives `name_des_problems_der_diagnose`, whose value admits `DV_TEXT` then `DV_CODED_TEXT`, as a `DV_TEXT` leaf.
    The export merges the pair into the `DV_CODED_TEXT` leaf, as the reference's code does; the reference's own test reports that node as differing from its golden.
+10. **Duplicate sibling ids** — the export writes a duplicate sibling `<id>_1`, `<id>_2` where the reference writes `<id>2`, `<id>3` (§ *`id` generation*).
+    PROBE-075 maps the reference's spelling to the export's before it compares, and pins each rename per golden.
 
 An informative per-field catalogue behind these categories ships with the package; this section is the contract.
 

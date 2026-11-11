@@ -12,6 +12,16 @@
 // but they are not lossy. Reconstructing the template/OPT from a data
 // instance is out of scope.
 //
+// The Web Template gives the second and later of siblings that would share
+// an id a numeric suffix: "blood_pressure", "blood_pressure_1",
+// "blood_pressure_2". The reference implementation, and earlier releases of
+// this package, write "blood_pressure2" and "blood_pressure3" there. Decode
+// reads that spelling too: a segment "<id><N>" reads as the sibling
+// "<id>_<N-1>" where the parent has no child "<id><N>" of its own and has
+// both "<id>" and "<id>_<N-1>". Encode writes the suffixed id. A body that
+// spells one key both ways is read once where the values agree, and refused
+// with [ErrUnknownPath] where they differ.
+//
 // The codecs take an *rm.Composition and a *webtemplate.WebTemplate and
 // return bytes (or the reverse). They import only openehr/rm (+ rmpath /
 // rminfo / typereg), openehr/terminology, openehr/template (+ constraints /

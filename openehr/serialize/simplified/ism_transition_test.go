@@ -3,7 +3,7 @@ package simplified
 // REQ-053 / REQ-140 — an ACTION's ISM transition round-trips through the Web
 // Template's ISM_TRANSITION nodes. Every ACTION has the reference's in-context
 // `ism_transition` node. The corpus template also models two archetyped
-// per-step nodes, `transition` (ism_transition[at0005]) and `transition2`
+// per-step nodes, `transition` (ism_transition[at0005]) and `transition_1`
 // (ism_transition[at0006]), which its in-context node merges. Encode writes
 // the in-context spelling alone; decode reads both, and refuses one body that
 // spells one transition both ways.
@@ -57,7 +57,7 @@ func inContextIsmKeys(state, step, stepValue string) map[string]any {
 }
 
 // perStepKeys returns, sorted, the keys of a FLAT map under the corpus
-// ACTION's archetyped per-step nodes, `transition` and `transition2`.
+// ACTION's archetyped per-step nodes, `transition` and `transition_1`.
 func perStepKeys(flat map[string]any) []string {
 	var out []string
 	for _, k := range slices.Sorted(maps.Keys(flat)) {
@@ -82,11 +82,13 @@ func holdsKeys(t *testing.T, got, want map[string]any) {
 // transition spelled under an archetyped per-step node decodes as before, and
 // encode writes it in the reference's spelling alone: under the in-context
 // `ism_transition` node, with its careflow step, and under no per-step node.
-// That output decodes to the same composition.
+// That output decodes to the same composition. The second node's earlier
+// spelling, `transition2`, reads as `transition_1`.
 func TestREQ053PerStepIsmTransitionReencodesInContext(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	for _, tc := range []struct{ node, state, step string }{
 		{node: "transition", state: "524", step: "at0005"},
+		{node: "transition_1", state: "532", step: "at0006"},
 		{node: "transition2", state: "532", step: "at0006"},
 	} {
 		t.Run(tc.node, func(t *testing.T) {
@@ -146,7 +148,7 @@ func TestActionIsmTransitionDecodeGivesCareflowStep(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	for _, tc := range []struct{ node, state, step string }{
 		{node: "transition", state: "524", step: "at0005"},
-		{node: "transition2", state: "532", step: "at0006"},
+		{node: "transition_1", state: "532", step: "at0006"},
 	} {
 		t.Run(tc.node, func(t *testing.T) {
 			name := ismNodeName(t, wt, tc.node)
@@ -257,7 +259,7 @@ func TestActionIsmTransitionCareflowStepCodedOtherwiseRefused(t *testing.T) {
 		keys map[string]any
 	}{
 		{name: "another node's id", keys: ismTransitionKeys("transition", "524", "at0006")},
-		{name: "no node's id", keys: ismTransitionKeys("transition2", "532", "at0099")},
+		{name: "no node's id", keys: ismTransitionKeys("transition_1", "532", "at0099")},
 		{name: "the node's id in another terminology", keys: inTerminology(ismTransitionKeys("transition", "524", "at0005"), "transition", "SNOMED-CT")},
 		{name: "a |raw step whose terminology_id is a string", keys: rawCareflowStep("SNOMED-CT")},
 		{name: "a |raw step whose terminology_id is an array", keys: rawCareflowStep([]any{"local"})},
@@ -318,7 +320,7 @@ func TestActionIsmTransitionTwoNodesRefused(t *testing.T) {
 		return out
 	}
 	at5 := ismTransitionKeys("transition", "524", "at0005")
-	at6 := ismTransitionKeys("transition2", "532", "at0006")
+	at6 := ismTransitionKeys("transition_1", "532", "at0006")
 	for _, tc := range []struct {
 		name string
 		keys map[string]any
@@ -784,7 +786,7 @@ func TestREQ053ArchetypedIsmCurrentStateImpliesOpenehr(t *testing.T) {
 	wt, compiled := conformanceWT(t)
 	for _, tc := range []struct{ node, state, step string }{
 		{node: "transition", state: "524", step: "at0005"},
-		{node: "transition2", state: "532", step: "at0006"},
+		{node: "transition_1", state: "532", step: "at0006"},
 	} {
 		termKey := rmattrAction + "/" + tc.node + "/current_state|terminology"
 		for _, sh := range ismStateTerminologyShapes {
@@ -839,8 +841,8 @@ func TestREQ053IsmCurrentStateTerminologyReadAsWritten(t *testing.T) {
 	})
 	t.Run("archetyped", func(t *testing.T) {
 		wt, _ := conformanceWT(t)
-		keys := ismTransitionKeys("transition2", "532", "at0006")
-		keys[rmattrAction+"/transition2/current_state|terminology"] = "local"
+		keys := ismTransitionKeys("transition_1", "532", "at0006")
+		keys[rmattrAction+"/transition_1/current_state|terminology"] = "local"
 		got := firstAction(t, decodeRMAttr(t, wt, rmattrBody(keys))).IsmTransition.CurrentState
 		if got.DefiningCode.TerminologyID.Value != "local" {
 			t.Errorf("current_state terminology = %q, want %q as written", got.DefiningCode.TerminologyID.Value, "local")
