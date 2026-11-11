@@ -27,6 +27,7 @@ Each issue was reproduced on `main` at `10e6a2f8` and checked three ways: agains
 | D3 | A default composition time is an option, `WithDefaultTime(t time.Time)`; the zero time leaves it off | A body without `ctx/time` still decodes as today unless the caller asks |
 | D4 | The census stays a scratch tool | No CC BY-SA content enters the tree |
 | D5 | A reference set named by a `terminology:` URI names its terminology: `terminology:LOINC/2.73` is `LOINC(2.73)` | Decode fills a missing `\|terminology` from it; the openEHR specifications leave this open |
+| D6 | An interval value alternative's id is `interval_of_<type>_value`, as the reference's IPS test Web Template spells it: `DV_INTERVAL<DV_DATE_TIME>` is `interval_of_date_time_value` | A divergence from the reference's code, which writes `interval<dv_date_time>_value`; no corpus body uses either |
 
 ## Wave 1 — decode changes; callers change nothing
 
