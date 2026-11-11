@@ -968,7 +968,9 @@ func MatchesURI(path, uri string) WhereExpr {
 // ParsedPath is the structured form of Path, with the contract of
 // [Comparison.ParsedPath]: populated by the parser, nil on the write side
 // ([Like] sets only Path), ParsedPath.Raw equal to Path when non-nil, and
-// never read by emission.
+// never read by emission. Being a pointer, it makes `==` compare identity,
+// so two parses of one query give unequal values; compare Path, and Pattern
+// with [EqualValues], instead.
 type LikeExpr struct {
 	Path       string
 	ParsedPath *IdentifiedPath
