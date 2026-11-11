@@ -3408,16 +3408,25 @@ func (g *generator) finishValue(opt *tcimpl.CompiledNode, rmValue any) {
 	case *rm.Element:
 		g.settleElement(opt, v)
 	case *rm.DVEHRURI:
-		// Backstop for a DV_EHR_URI the primitive default did not reach;
-		// every one the generator emits is walked.
+		// populatePrimitiveDefault has written this value on every
+		// DV_EHR_URI the generator builds. The walk empties it where the
+		// C_STRING the OPT puts on the value gives the empty string,
+		// under either value fill, as a pattern that rejects "example" and
+		// whose shortest string is "" does, such as x?. The placeholder
+		// then keeps the value the RM requires, and the template validator
+		// reports the pattern mismatch.
 		if v.Value == "" {
 			v.Value = "ehr://example"
 		}
 	case *rm.DVOrdinal:
+		// As for a DV_EHR_URI: the walk blanks the symbol where the OPT
+		// builds it as a coded text whose text and code_string each carry
+		// such a C_STRING.
 		if symbolBlank(v.Symbol) {
 			v.Symbol = localSymbol()
 		}
 	case *rm.DVScale:
+		// As for a DV_ORDINAL.
 		if symbolBlank(v.Symbol) {
 			v.Symbol = localSymbol()
 		}
