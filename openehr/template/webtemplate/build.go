@@ -69,42 +69,42 @@ func Build(c *templatecompile.Compiled, opts ...Option) (*WebTemplate, error) {
 	}, nil
 }
 
-// dedupeSiblingIDs gives every sibling a unique id, renaming the second and
-// later claimants of a name to the next *free* ordinal spelling: `dv_text`,
-// `dv_text2`, `dv_text3`. Visits each sibling group pre-order, in document
+// dedupeSiblingIDs gives every sibling a unique id. The first claimant of an
+// id keeps it, and each later claimant takes the next free `<id>_N`, N from
+// 1: `dv_text`, `dv_text_1`, `dv_text_2`, the Simplified Formats spelling of
+// a duplicate sibling. Visits each sibling group pre-order, in document
 // order, so the result is deterministic.
 //
-// Ordinals are the reference's *last resort*, not its disambiguator of
-// choice: REQ-111's template-level node name does that job, and across the
-// corona / multi_occurrence / AlternativeEvents goldens no sibling group
-// carries a suffix, because each sibling pins a distinct name. The upstream
-// FLAT conformance corpus shows the fallback where names run out — that
-// OPT's ACTION has two ELEMENTs both carrying the term text "DV_TEXT" (it
-// appears 10× in the template) and neither pinning a name, and the upstream
-// bodies key them `…/conformance_action/dv_text` and `…/dv_text2`.
+// The suffix is a last resort, not the disambiguator: the template-level
+// node name separates siblings that reuse one archetype, so no sibling group
+// in the corona / multi_occurrence / AlternativeEvents goldens needs one.
+// Siblings still collide where nothing names them apart, as the two ELEMENTs
+// under the upstream FLAT conformance template's ACTION do: both carry the
+// term text "DV_TEXT" and neither pins a name.
 //
-// Numbering starts at 2 and the first claimant keeps the bare id, so a
-// template with no collision is untouched — which is every template that
-// could previously be built at all, since a collision used to be a hard
-// [ErrIDCollision]. "Next free" matters: siblings sanitising to
-// [x, x2, x] must not rename the third to the already-taken `x2` — it takes
-// `x3`. Only the two-ELEMENT case is golden-evidenced; the next-free
-// extension keeps every other collision loud-failure-free without ever
-// emitting a duplicate, and [checkIDCollisions] still guards the invariant.
+// "Free" is over the whole sibling list, in either document order: a sibling
+// named "Blood Pressure 1" keeps blood_pressure_1, and the duplicate of a
+// "Blood Pressure" takes blood_pressure_2, since renaming onto a taken id
+// would recreate the collision. [checkIDCollisions] still guards the
+// invariant.
+//
+// The reference writes `dv_text2`, `dv_text3`: deviations.md records the
+// difference.
 func dedupeSiblingIDs(n *Node) {
-	counts := make(map[string]int, len(n.Children))
 	taken := make(map[string]bool, len(n.Children))
 	for _, ch := range n.Children {
 		taken[ch.ID] = true
 	}
+	claimed := make(map[string]bool, len(n.Children))
 	for _, ch := range n.Children {
-		counts[ch.ID]++
-		if counts[ch.ID] > 1 {
-			c := counts[ch.ID]
-			for taken[ch.ID+strconv.Itoa(c)] {
-				c++
+		if !claimed[ch.ID] {
+			claimed[ch.ID] = true
+		} else {
+			i := 1
+			for taken[ch.ID+"_"+strconv.Itoa(i)] {
+				i++
 			}
-			ch.ID += strconv.Itoa(c)
+			ch.ID += "_" + strconv.Itoa(i)
 			taken[ch.ID] = true
 		}
 		dedupeSiblingIDs(ch)
@@ -112,8 +112,8 @@ func dedupeSiblingIDs(n *Node) {
 }
 
 // checkIDCollisions rejects trees where two sibling nodes still share an id
-// after [dedupeSiblingIDs]. The next-free ordinal makes sibling ids unique
-// by construction, so this firing means a builder bug — it stays as a loud
+// after [dedupeSiblingIDs]. The next free suffix makes sibling ids unique by
+// construction, so this firing means a builder bug — it stays as a loud
 // guard because an ambiguous FLAT path is far worse than a failed export.
 func checkIDCollisions(n *Node) error {
 	seen := map[string]bool{}

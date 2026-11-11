@@ -19,7 +19,9 @@
 // aqlPath carries the matching name predicate ([archetype_id,'Name']).
 // Siblings that reuse one archetype are therefore distinct by
 // construction. Where nothing separates them (no pinned name and one
-// shared term), the second and later claimants take the next free
-// ordinal (dv_text, dv_text2), matching the reference. [ErrIDCollision]
-// therefore signals a builder bug rather than an unsupported template.
+// shared term), the second and later claimants take the next free numeric
+// suffix, as the Simplified Formats specification spells a duplicate
+// sibling (dv_text, dv_text_1, dv_text_2). The reference writes dv_text2
+// there, a difference deviations.md records. [ErrIDCollision] therefore
+// signals a builder bug rather than an unsupported template.
 package webtemplate

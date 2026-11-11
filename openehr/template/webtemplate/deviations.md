@@ -22,7 +22,8 @@ and its EVALUATION's `choice` ELEMENT, whose value admits two types, exactly
 (`TestREQ106ChoiceParity`).
 The deltas below are the parts of the reference this slice deliberately does
 **not** reproduce. Any change that makes a *pinned* field diverge is a test
-failure, not a deviation.
+failure, not a deviation. Every compare reads the reference's duplicate sibling ids
+in this builder's spelling (§ Duplicate sibling ids).
 
 ## Node-level
 
@@ -67,7 +68,7 @@ failure, not a deviation.
   node, the builder still emits each archetyped transition with its own
   `current_state` / `careflow_step` leaves, where the reference's filter drops them
   (9 nodes in `test_all_types`; in the FLAT conformance template the steps are
-  `transition` and `transition2`). Kept so that FLAT bodies keyed per step still decode and
+  `transition` and `transition_1`). Kept so that FLAT bodies keyed per step still decode and
   `rmpath` still matches a transition by its careflow step (REQ-121). Pinned by name
   in `TestREQ106ActionParity`.
 - **ACTION `instruction_details` not emitted** — the `test_all_types` golden holds
@@ -94,8 +95,8 @@ failure, not a deviation.
   description of the *primary* rule — checked across the upstream `corona_anamnese`,
   `multi_occurrence`, and `AlternativeEvents` WebTemplate goldens, **no** sibling
   group shares an `id` base with a numeric suffix, because each sibling pins a
-  distinct name and never needs one. (An ordinal *does* exist as EHRbase's last
-  resort where names run out — see § Ordinal fallback below, found in Phase 4.)
+  distinct name and never needs one. (A numeric suffix *does* exist as EHRbase's last
+  resort where names run out — see § Duplicate sibling ids below, found in Phase 4.)
   EHRbase derives the `id` from a different source than this builder used to:
 
   - **EHRbase** uses the node's **template-level name** — the `name` attribute
@@ -141,7 +142,7 @@ failure, not a deviation.
   - `conformance-ehrbase.de.v0` — sibling ELEMENTs that both sanitise to `dv_text`
     under its ACTION (its nine archetype ids are all distinct, so this was *not* the
     archetype-reuse case, and no pinned name separates them either). Resolved by the
-    ordinal fallback below; `Build` now succeeds, which is what PROBE-086 needs.
+    duplicate-id suffix below; `Build` now succeeds, which is what PROBE-086 needs.
   - `Corona_Anamnese` — reused archetypes at two levels: four `SECTION.adhoc.v1`
     siblings, and eight `OBSERVATION.symptom_sign_screening.v0` siblings inside the
     Symptome section (ten across the template) all deriving
@@ -153,33 +154,50 @@ failure, not a deviation.
     `aqlPath`s this builder never emitted — output that would fail reference parity
     with no error raised. Now 34/34 structural parity, with the two residuals below.
 
-- **Ordinal fallback for siblings that still collide** — matches the reference on
-  the evidenced case; recorded because it corrects the "there is no suffix rule"
-  reading above. When two siblings sanitise to one `id` and neither pins a
-  distinguishing name, the second and later claimants take the next **free**
-  ordinal spelling: `dv_text`, `dv_text2`. Evidence is the vendored upstream FLAT
-  corpus, whose bodies key the two ELEMENTs under `conformance-ehrbase.de.v0`'s
-  ACTION as `…/conformance_action/dv_text` and `…/conformance_action/dv_text2` —
-  that OPT carries the term text "DV_TEXT" ten times and pins no name on either
-  node. The ordinal is a *last resort*, never the primary disambiguator: it appears
-  in none of the corona / multi_occurrence / AlternativeEvents goldens, because
-  there the pinned name already separates every sibling.
+- **Duplicate sibling ids** — **diverges** from the reference. When two siblings
+  sanitise to one `id` and neither pins a distinguishing name, the first keeps the
+  bare `id` and each later one takes the next **free** `<id>_N`, N from 1:
 
-  Two edges of the fallback go beyond the vendored evidence and are this SDK's
-  conservative reading, pinned by table test rather than by a golden:
+  | Siblings | This builder | The reference |
+  |---|---|---|
+  | two named "Blood Pressure" | `blood_pressure`, `blood_pressure_1` | `blood_pressure`, `blood_pressure2` |
+  | three named "Blood Pressure" | `blood_pressure`, `blood_pressure_1`, `blood_pressure_2` | `blood_pressure`, `blood_pressure2`, `blood_pressure3` |
+  | "Blood Pressure 1" and two "Blood Pressure", in either order | `blood_pressure_1` kept, the duplicate `blood_pressure_2` | `blood_pressure_1` kept, the duplicate `blood_pressure2` |
 
-  - **Next-free, not per-id counting** — siblings sanitising to `[x, x2, x]` rename
-    the third to `x3`, never onto the already-taken `x2`.
-  - **Synthesized in-context leaves participate** — a template ELEMENT whose name
-    sanitises to an in-context id (e.g. an ELEMENT named "Language" beside the
-    synthesized ENTRY `language` leaf) collides in the same sibling list; the later
-    claimant (document order — data children first, in-context last) takes the
-    ordinal. No vendored golden exercises this, so the reference's spelling for it
-    is unverified; before REQ-116 this case failed with `ErrIDCollision`. The
-    in-context leaf's `aqlPath` stays the bare RM attribute path either way — in
-    the reference, `id` and `aqlPath` are independent derivations, so a deduped
-    `id` with an un-suffixed `aqlPath` is the expected shape, and FLAT keys derive
-    from the `id` chain alone.
+  The evidence on each side:
+
+  - **The format.** ITS-REST Release-1.1.0 *Simplified Formats*, § Node ID Generation
+    Rules, rule 7: "Append a numeric suffix if needed to ensure uniqueness among
+    siblings", and its example table gives "Blood Pressure (duplicate)" as
+    `blood_pressure_1`. The builder follows the format.
+  - **The reference's code.** At the pinned `openEHR_SDK` commit,
+    `OPTParser.makeIdUnique` groups a node's children by `id` and gives the member at
+    index i of a group of two or more, counting from 0, the number i + 1;
+    `WebTemplateNode.getId(true)` writes that number straight after the `id`. So the
+    second claimant is `<id>2`, and the number is never checked against an ordinary
+    sibling that already holds it.
+  - **The upstream bodies.** The vendored FLAT corpus keys the two ELEMENTs under
+    `conformance-ehrbase.de.v0`'s ACTION `…/conformance_action/dv_text` and
+    `…/conformance_action/dv_text2`: that OPT carries the term text "DV_TEXT" ten times
+    and pins no name on either node. The `test_all_types` golden writes
+    `test_all_types2` (EVALUATION) and `test_all_types3` (SECTION) beside the
+    OBSERVATION `test_all_types`, `test_all_types2` for the ACTION beside an
+    INSTRUCTION, and `time2` for the OBSERVATION's in-context `time` leaf beside an
+    ELEMENT named "time".
+
+  The suffix is a *last resort*, never the primary disambiguator: it appears in none
+  of the corona / multi_occurrence / AlternativeEvents goldens, because there the
+  pinned name already separates every sibling. Synthesized in-context leaves take part
+  like any sibling: the later claimant (document order — data children first,
+  in-context last) takes the suffix, as the `time` leaf above shows. Its `aqlPath`
+  stays the bare RM attribute path, since in the reference `id` and `aqlPath` are
+  independent derivations and FLAT keys derive from the `id` chain alone.
+
+  PROBE-075 reads the reference's spelling through one mapping,
+  `mapReferenceSiblingIDs` beside the parity tests: in each sibling list, a child
+  `<id>k` (k from 2) whose siblings hold `<id>` and every lower claimant becomes
+  `<id>_<k-1>`. `TestREQ106ReferenceSiblingIDRenames` pins its renames whole per
+  golden: the four above in `test_all_types`, none in the others.
 
 - **ELEMENT value alternatives** — match the reference (`OPTParser.updateChoiceId`,
   `addAnyNode`, `pushProperties`; `Filter.preHandle`, `skip`). By the value
@@ -193,8 +211,8 @@ failure, not a deviation.
   | none | the ELEMENT as a node with the reference's 17 children, DV_TEXT to DV_DATE in its order: no `nodeId`, `0..1`, the ELEMENT's names, and the inputs of an unconstrained value of the type (none outside the core subset) |
 
   The children share one `aqlPath`, as in the reference, so they are told apart by
-  `id`. Two alternatives of one type take the sibling ordinal (`text_value`,
-  `text_value2`). An unfilled slot for an ELEMENT archetype is no ELEMENT: it is
+  `id`. Two alternatives of one type take the duplicate-id suffix (`text_value`,
+  `text_value_1`, where the reference writes `text_value2`; § Duplicate sibling ids). An unfilled slot for an ELEMENT archetype is no ELEMENT: it is
   pruned as any unfilled slot is, as the reference skips it. Pinned by
   `TestREQ106ElementValueAlternatives`, and against the `test_all_types` golden by
   `TestREQ106ChoiceParity`.
