@@ -3766,9 +3766,23 @@ func localSymbol() rm.DVCodedText {
 }
 
 // ehrURIPlaceholder is the value the generator writes on a DV_EHR_URI the
-// OPT gives no value: a URI in the ehr scheme, which DV_EHR_URI
-// Scheme_valid requires, that a reader recognises as a placeholder.
+// OPT gives no value, and on one whose C_STRING pick has no ehr scheme
+// where the C_STRING admits it (applyStringLeaf): a URI in the ehr scheme,
+// which DV_EHR_URI Scheme_valid requires, that a reader recognises as a
+// placeholder.
 const ehrURIPlaceholder = "ehr://example"
+
+// ehrScheme is the scheme DV_EHR_URI Scheme_valid requires, the RM's
+// Ehr_scheme.
+const ehrScheme = "ehr"
+
+// hasEHRScheme reports whether s, read as a URI reference, has the scheme
+// DV_EHR_URI Scheme_valid requires: its RFC 3986 scheme, as rm.DVURI's
+// Scheme reads it, is ehr, compared without regard to letter case, as the
+// validation floor compares it.
+func hasEHRScheme(s string) bool {
+	return strings.EqualFold((&rm.DVURI{Value: s}).Scheme(), ehrScheme)
+}
 
 // stampIfLocatable gives a BMM-synthesised locatable the node id and
 // name the floor requires when the OPT did not name the node.
@@ -4018,15 +4032,18 @@ const defaultTransition = "535"
 // value is a list member or a pattern match that the constraint accepts,
 // or the example under a C_STRING with neither (stringForConstraint).
 //
-// Two attributes get, where the C_STRING admits it, the value the
-// generator writes where the OPT leaves them silent, because the example
-// names no archetype on the first and breaks DV_EHR_URI Scheme_valid on
-// the second: an ACTIVITY's action_archetype_id gets the RM default /.*/
-// (bmmStringDefault), and a DV_EHR_URI's value the placeholder
-// ehr://example (populatePrimitiveDefault). A C_STRING with neither a list
-// nor a pattern admits both. Under any other C_STRING, the first gets a
-// string it admits (cstringvalue.ActionArchetypeID), and the second the
-// string stringForConstraint picks.
+// An ACTIVITY's action_archetype_id gets, where the C_STRING admits it,
+// the RM default /.*/ the generator writes where the OPT leaves it silent
+// (bmmStringDefault), because the example names no archetype. A C_STRING
+// with neither a list nor a pattern admits it. Under any other C_STRING it
+// gets a string the C_STRING admits (cstringvalue.ActionArchetypeID).
+//
+// DV_EHR_URI Scheme_valid narrows a DV_EHR_URI's value: the string
+// stringForConstraint picks stays where its scheme is ehr, so a list keeps
+// its example value and RandomFill its draw. Otherwise the value is the
+// placeholder ehr://example (populatePrimitiveDefault) where the C_STRING
+// admits it, as one with neither a list nor a pattern does, whose pick, the
+// example, has no scheme, and the pick where it does not.
 //
 // On a PARTY_REF's type the value is also a class name PARTY_REF
 // Type_validity admits (see partyRefType), on an ACCESS_GROUP_REF's type
@@ -4077,11 +4094,14 @@ func applyStringLeaf(leaf *tcimpl.CompiledNode, rmValue any, attr string, cs con
 			s, err = cstringvalue.ActionArchetypeID(cs, ex)
 		}
 	case *rm.DVEHRURI:
-		// A C_STRING that admits the placeholder gets it, as where the OPT
-		// leaves the value silent (populatePrimitiveDefault): the example,
-		// which a C_STRING with neither a list nor a pattern admits, breaks
-		// DV_EHR_URI Scheme_valid. Under any other C_STRING the pick stays.
-		if attr == "value" && len(cs.Validate(ehrURIPlaceholder)) == 0 {
+		// DV_EHR_URI Scheme_valid narrows the value. The pick stays where
+		// its scheme is ehr, so a list keeps its example value and
+		// RandomFill its draw. Otherwise a C_STRING that admits the
+		// placeholder gets it, as where the OPT leaves the value silent
+		// (populatePrimitiveDefault): the example, which a C_STRING with
+		// neither a list nor a pattern admits, has no scheme. A C_STRING
+		// that admits neither keeps the pick, which breaks the rule.
+		if attr == "value" && !hasEHRScheme(s) && len(cs.Validate(ehrURIPlaceholder)) == 0 {
 			s, err = ehrURIPlaceholder, nil
 		}
 	default:
