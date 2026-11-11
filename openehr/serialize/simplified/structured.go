@@ -99,6 +99,11 @@ func StructuredToFlat(data []byte) ([]byte, error) {
 // with another key's (scalar vs object at one slot) is an error, never a
 // last-write-wins overwrite.
 func flatToStructured(flat map[string]any) (map[string]any, error) {
+	// A key that is no path in the FLAT grammar has no STRUCTURED member to
+	// become: refused, as decode refuses it (REQ-170).
+	if err := checkFlatKeys(flat); err != nil {
+		return nil, err
+	}
 	// `x|` spells the bare value of `x`: the two are one key here, and differing
 	// values are refused, since restructuring cannot tell which one a decode
 	// would read.

@@ -85,16 +85,39 @@ Concretely:
   `current_state` and `careflow_step` (those decode) but never `transition` or `_reason` — and the
   ACTION's own `time` leaf where the ACTION has no node for it. Each names RM data the decode
   would otherwise drop, or for `time` replace with the `ctx/time` default a `WithTemplate` decode
-  fills in, so the refusal (`ErrUnknownPath`) names the key, or the `_reason` family instance, and
-  carries no value. The refusal names the RM attribute it refuses: REQ-140's third out-of-scope
+  fills in, so the refusal names the key, or the `_reason` family instance, and carries no
+  value. It wraps `ErrNotModelled`, which also matches `ErrUnknownPath`, and since 2026-11-10
+  (issue 428) it says the key is a Simplified Formats path this SDK does not model, where it
+  said "path not in web template" and pointed to this file. The refusal names the RM attribute
+  it refuses: REQ-140's third out-of-scope
   class covers a `transition` leaf and a `_reason` family, and REQ-170 a `current_state` or
-  `careflow_step` leaf and the ACTION's `time`. On the same ground decode refuses an INTERVAL_EVENT's `math_function`, `width`
-  and `sample_count` and an OBSERVATION's `history_origin` in the reference's spelling, a leaf
-  under the event or observation node (with any suffix) or a suffix on it, wherever the Web
-  Template does not resolve them (the corpus writes `any_event:0/math_function|code`,
-  `any_event:0/width`, `any_event:0|sample_count` and `<observation>/history_origin`). A Web
-  Template that models one decodes it as before. Any other key under those nodes that the Web
-  Template does not resolve is unmatched content. The composition-level metadata leaves (`language`, `territory`, `composer`,
+  `careflow_step` leaf and the ACTION's `time`.
+
+- **Attributes the Web Template has no node for, read and written by the codec** (REQ-053,
+  since 2026-11-10, issue 424). The Simplified Formats spell an INTERVAL_EVENT's
+  `sample_count` as `<event>|sample_count`, its `math_function` and `width` as leaves under
+  the event, and an OBSERVATION's `history.origin` as `<observation>/history_origin`. Neither
+  this SDK's Web Template nor the reference's gives them a node of their own (the reference
+  adds them while it walks), and the Web Template stays the reference's, so the codec reads
+  them itself: `|sample_count` at an EVENT or INTERVAL_EVENT node, `math_function` and
+  `width` at an EVENT node (an INTERVAL_EVENT node has them as children), and
+  `history_origin` at an OBSERVATION node whose children name its HISTORY's node id. Each is
+  single-valued, so an index past `:0` on it is refused whatever follows it, and a segment
+  below it is unmatched content, as below any leaf. Until
+  then decode refused all four in every mode. Each other spelling of them
+  (`<event>/sample_count`, `<event>|width`, `<observation>|history_origin`) is unmatched
+  content. Two readings differ from the reference's:
+  - An event at an EVENT node is an INTERVAL_EVENT where the body gives it any of the three
+    keys, and a POINT_EVENT otherwise. The reference keys on `math_function` alone and
+    refuses a `width` or `sample_count` it does not consume; a `WithTemplate` decode here
+    gives the missing `math_function` and `width` their defaults instead (below).
+  - Encode writes `history_origin` unless the origin is, as written and with nothing else,
+    the earliest time the HISTORY's events carry, so the round trip keeps it. The reference
+    compares the two to the second, and writes no `history_origin` for an origin a fraction
+    of a second before that time, which its decode then replaces with the event's (PROBE-105
+    records three such corpus compositions).
+
+  The composition-level metadata leaves (`language`, `territory`, `composer`,
   `context/start_time`, `context/setting`) are held back from the node walk **by name**
   (`ctxOnlyLeafPaths`), because the context emission writes them: `language`, `territory`,
   `context/start_time` and `context/setting` in their `ctx/`-only spelling (ADR 0015), the
@@ -151,8 +174,9 @@ Concretely:
   `other_details` and `_instruction_details` at an ACTION — the REQ-140 deliberate exclusions;
   `_wf_definition` at an INSTRUCTION was one until it landed on 2026-11-10), the keys the decode recognises as the reference's spelling
   of RM data this SDK's Web Template does not model, resolved or not (an ACTION's ISM transition
-  and time, an INTERVAL_EVENT's `math_function`, `width` and `sample_count` and an OBSERVATION's
-  `history_origin` in the reference's in-context spelling, the ISM transition note above), the
+  and time in the reference's in-context spelling, the ISM transition note above; an
+  INTERVAL_EVENT's attributes and an OBSERVATION's `history_origin` were among them until
+  2026-11-10), the
   bare value of a leaf whose
   datatype has neither a suffix set nor a sub-path grammar (an unmapped datatype such as
   `DV_STATE`) and a suffix naming an attribute of its RM class (any other suffix there is
@@ -202,7 +226,12 @@ Concretely:
   a key that walks
   through one of several reused siblings that no pinned name tells apart, and an out-of-bound,
   over-budget or sparse `:index`.
-  Trailing JSON after the object is rejected too. A key is judged segment by segment from the
+  Trailing JSON after the object is rejected too, and so, in every mode, is a key that is not
+  well formed in the FLAT grammar: an empty path segment (`a//b\|`, a leading or trailing
+  `/`), a segment with no id before its `:index`, a second `\|suffix`, or a segment after its
+  `\|suffix`. That is `ErrUnknownPath` naming the key, from decode and from FLAT → STRUCTURED
+  conversion; until 2026-11-10 decode set such a key aside as unmatched content and the
+  conversion nested it as a member named `""`. A key is judged segment by segment from the
   left, so an index past the bound of a segment that resolves makes the key malformed whatever
   follows it. An `:index` past `:0` on the template root's own segment (a key that is that
   segment alone, `<root>:1\|x_note`, included), on a segment of the
@@ -217,13 +246,16 @@ Concretely:
   unmatched content. An interval leaf's index belongs to the ELEMENT the Web
   Template folds away, judged on the RM attribute that holds it as any other leaf's, so a
   repeating interval ELEMENT takes `:N` and round-trips.
-  The same index on a sub-path inside an underscore family's value or an interval value
-  (`…/interval_dv_quantity/lower:1\|magnitude`, `…/dv_count/_normal_range/lower:1`) is refused
-  with `ErrUnsupportedDatatype` instead (`rmattrNotAList`), whatever follows it
-  (`…/_normal_range/lower:1/x_unknown` too), and an index past the repeat bound on a party's
-  `_identifier` list with `ErrUnknownPath`; on a single-valued `_family`
-  (`…/_uid:1`) and on a FEEDER_AUDIT sub-path (`…/_feeder_audit/originating_system_audit:1\|system_id`)
-  it is `ErrUnknownPath`. Every one of these names the key, or the path up to the offending
+  The same index on a sub-path inside an underscore family's value, an interval value or a
+  party's grammar (`…/interval_dv_quantity/lower:1\|magnitude`, `…/dv_count/_normal_range/lower:1`,
+  `…/subject/relationship:1\|code`) is `ErrUnknownPath` too, whatever follows it
+  (`…/_normal_range/lower:1/x_unknown` too), as it is on a single-valued `_family`
+  (`…/_uid:1`), on a FEEDER_AUDIT sub-path (`…/_feeder_audit/originating_system_audit:1\|system_id`)
+  and past the repeat bound of a party's `_identifier` list. So are two spellings of one
+  sub-path that disagree, both FEEDER_AUDIT `original_content` spellings, and a list family
+  whose attribute another key holds: keys that cannot be placed. Until 2026-11-10 those
+  sub-path refusals wrapped `ErrUnsupportedDatatype`, against what `ErrUnknownPath`'s doc
+  said. Every one of these names the key, or the path up to the offending
   segment, and carries no value (`TestREQ170IndexPastBoundSentinels`).
   An ISM transition rebuilt at an `ism_transition[atNNNN]` node without a
   careflow step gets the one the node names (the node id as a `local` code, the node's Web
@@ -422,8 +454,8 @@ partially or silently accepted.
   events carry, compared as instants, else the context `start_time`; an `EVENT.time` the
   body leaves out takes its HISTORY's origin; and `subject` becomes `PARTY_SELF`. Until
   2026-11-10 every `EVENT.time`/`HISTORY.origin` took the context `start_time`; the
-  earliest event time now comes first, as the reference orders the two. The reference's
-  explicit `<observation>/history_origin` key is still refused (above). Since 2026-11-10
+  earliest event time now comes first, as the reference orders the two, and an explicit
+  `<observation>/history_origin` comes before both (above). Since 2026-11-10
   `COMPOSITION.category`
   is the code the template's category constraint fixes (one `openehr` code, such as
   `431|persistent`), and `433|event` only where the template fixes none; until then every

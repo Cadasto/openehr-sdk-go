@@ -924,8 +924,8 @@ func TestRMAttrSubPathIndexNormalisation(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			if err := decodeRMAttrErr(t, wt, rmattrBody(extra)); !errors.Is(err, ErrUnsupportedDatatype) {
-				t.Errorf("err = %v, want ErrUnsupportedDatatype", err)
+			if err := decodeRMAttrErr(t, wt, rmattrBody(extra)); !errors.Is(err, ErrUnknownPath) {
+				t.Errorf("err = %v, want ErrUnknownPath", err)
 			}
 		})
 	}

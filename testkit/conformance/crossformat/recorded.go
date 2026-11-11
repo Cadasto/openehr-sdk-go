@@ -165,28 +165,24 @@ func Verify(res SetResult, recs map[Leg]Record) []string {
 //     canonical types the composer's reference PERSON, FLAT encode writes
 //     composer|type, which the upstream FLAT omits, and decode of the upstream
 //     FLAT gives the reference the type PARTY.
-//   - INTERVAL_EVENT attributes: the Web Template has no math_function
-//     or width node for the event, so FLAT encode writes neither and decode
-//     refuses both in every mode, as RM data it would otherwise drop.
+//   - HISTORY.origin: FLAT encode writes an origin that is not, as written,
+//     the earliest event time as history_origin, while the reference compares
+//     the two to the second, so its FLAT omits an origin a fraction of a
+//     second before the earliest event time.
 //   - RM-FLOOR archetype_details: decode adds archetype_details on archetype
 //     roots and stamps the SDK's RM release in rm_version; upstream canonical
 //     documents lack some of them, give rm_version as 1.0.4 or 1.0.2, or carry a template_id
 //     below the root that decode does not add.
 var Recorded = map[string]map[Leg]Record{
 	"alternative_events": {
-		LegCanonicalFlat: {
-			Outcome: Outcome{Compared: 21, Missing: 4},
-			Reason: "INTERVAL_EVENT attributes: the interval event any_event_en:1 has no Web Template node for " +
-				"math_function or width, so FLAT encode writes none of their four keys.",
-		},
+		LegCanonicalFlat: {Outcome: Outcome{Compared: 21}},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 115, Missing: 8, Extra: 4, Altered: 12, Excluded: 4},
-			Reason: "INTERVAL_EVENT attributes: decode refuses math_function and width in every mode (the 4 " +
-				"excluded keys), so the interval event loses both and decodes as a POINT_EVENT. Sibling order: FLAT " +
-				"carries no order " +
+			Outcome: Outcome{Compared: 115, Missing: 8, Extra: 12, Altered: 13},
+			Reason: "Sibling order: FLAT carries no order " +
 				"between the birth_en and any_event_en events; decode lists them in template order " +
 				"(openehr/serialize/simplified/deviations.md), any_event_en before birth_en, the canonical lists " +
-				"Birth first, so the leaves of all three events compare at shifted positions. HISTORY.origin: the " +
+				"Birth first, so the leaves of all three events compare at shifted positions, the event types and " +
+				"the interval event's math_function and width (8 leaves each way) among them. HISTORY.origin: the " +
 				"FLAT has no origin key and decode gives it the earliest event time, the Birth time, as the canonical " +
 				"does (openehr/serialize/simplified/deviations.md). RM-FLOOR archetype_details: the canonical OBSERVATION has none, " +
 				"decode adds it (4 extra leaves), and rm_version is 1.2.0 against 1.0.4.",
@@ -264,10 +260,11 @@ var Recorded = map[string]map[Leg]Record{
 	},
 	"multi_occurrence": {
 		LegCanonicalFlat: {
-			Outcome: Outcome{Compared: 45, Altered: 5},
+			Outcome: Outcome{Compared: 45, Extra: 1, Altered: 5},
 			Reason: "Upstream date-time spelling: the canonical writes the four event times and the context end " +
 				"time with a comma before the fraction, the upstream FLAT with a full stop, and the codecs carry " +
-				"the text as written.",
+				"the text as written. HISTORY.origin: the first OBSERVATION's origin is 2 ms before its events, so " +
+				"FLAT encode writes it as history_origin, which the upstream FLAT omits.",
 		},
 		LegFlatCanonical: {
 			Outcome: Outcome{Compared: 249, Extra: 8, Altered: 9},
@@ -306,11 +303,12 @@ var Recorded = map[string]map[Leg]Record{
 	},
 	"persistent_minimal": {
 		LegCanonicalFlat: {
-			Outcome: Outcome{Compared: 11, Extra: 1, Altered: 1},
+			Outcome: Outcome{Compared: 11, Extra: 2, Altered: 1},
 			Reason: "party reference type: the canonical types the composer's reference PERSON, so FLAT encode " +
 				"writes composer|type, which the upstream FLAT omits. Upstream date-time spelling: the event time is " +
 				"21:11:36.700 in the canonical XML and 21:11:36.7 in the upstream FLAT, and the codecs carry the " +
-				"text as written.",
+				"text as written. HISTORY.origin: the origin is 48 ms before the event time, so FLAT encode writes " +
+				"it as history_origin, which the upstream FLAT omits.",
 		},
 		LegFlatCanonical: {
 			Outcome: Outcome{Compared: 72, Missing: 2, Altered: 5},
@@ -324,9 +322,10 @@ var Recorded = map[string]map[Leg]Record{
 	},
 	"test_all_types": {
 		LegCanonicalFlat: {
-			Outcome: Outcome{Compared: 83, Missing: 8, Extra: 6, Altered: 10},
+			Outcome: Outcome{Compared: 83, Missing: 8, Extra: 7, Altered: 10},
 			Reason: "party reference type: the canonical types the composer's reference PERSON, so FLAT encode " +
-				"writes composer|type, which the upstream FLAT omits. Web Template projection: the SDK's Web Template has no in-context time or ism_transition " +
+				"writes composer|type, which the upstream FLAT omits. HISTORY.origin: the origin is 6 ms before " +
+				"the event time, so FLAT encode writes it as history_origin, which the upstream FLAT omits. Web Template projection: the SDK's Web Template has no in-context time or ism_transition " +
 				"node for the section_3 ACTION (openehr/template/webtemplate/deviations.md, inContext coverage), and its " +
 				"per-careflow-step transition nodes do not match a transition without a careflow_step, so FLAT " +
 				"encode writes neither (4 missing keys). Choice element: upstream spells the value of the choice " +

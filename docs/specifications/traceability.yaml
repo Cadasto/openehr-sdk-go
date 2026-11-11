@@ -609,7 +609,9 @@ requirements:
       - openehr/serialize/simplified/flat_nameindex_test.go
       - openehr/serialize/simplified/flat_pinned_test.go
       - openehr/serialize/simplified/hardening_test.go
+      - openehr/serialize/simplified/history_origin_test.go
       - openehr/serialize/simplified/index_bound_test.go
+      - openehr/serialize/simplified/interval_event_test.go
       - openehr/serialize/simplified/interval_unbounded_test.go
       - openehr/serialize/simplified/ism_transition_test.go
       - openehr/serialize/simplified/leaf_rmtype_test.go
@@ -2522,8 +2524,11 @@ requirements:
       - openehr/serialize/simplified/context_test.go
       - openehr/serialize/simplified/flat_decode_test.go
       - openehr/serialize/simplified/hardening_test.go
+      - openehr/serialize/simplified/history_origin_test.go
       - openehr/serialize/simplified/index_bound_test.go
       - openehr/serialize/simplified/ism_transition_test.go
+      - openehr/serialize/simplified/malformed_key_test.go
+      - openehr/serialize/simplified/not_modelled_test.go
       - openehr/serialize/simplified/null_test.go
       - openehr/serialize/simplified/raw_fit_test.go
       - openehr/serialize/simplified/rmattr_encapsulated_test.go
@@ -2533,6 +2538,7 @@ requirements:
       - openehr/serialize/simplified/rmattr_value_test.go
       - openehr/serialize/simplified/string_leaf_test.go
       - openehr/serialize/simplified/structured_ctx_test.go
+      - openehr/serialize/simplified/subpath_sentinel_internal_test.go
       - openehr/serialize/simplified/template_completion_test.go
       - openehr/serialize/simplified/unmatched_test.go
       - openehr/serialize/simplified/wf_definition_test.go

@@ -169,8 +169,8 @@ func TestFeederAuditMultimediaChoice(t *testing.T) {
 }
 
 // TestFeederAuditBothContentSpellingsRefused — REQ-140. The two spellings address
-// one RM attribute, so a body carrying both is a typed error rather than a silent
-// pick.
+// one RM attribute, so a body carrying both is a slot conflict between two keys,
+// ErrUnknownPath, rather than a silent pick.
 func TestFeederAuditBothContentSpellingsRefused(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	fa := rmattrObs + "/_feeder_audit"
@@ -182,8 +182,8 @@ func TestFeederAuditBothContentSpellingsRefused(t *testing.T) {
 		fa + "/original_content_multimedia|mediatype": "video/H261",
 		fa + "/original_content_multimedia|size":      1,
 	}))
-	if !errors.Is(err, ErrUnsupportedDatatype) {
-		t.Fatalf("err = %v, want ErrUnsupportedDatatype", err)
+	if !errors.Is(err, ErrUnknownPath) {
+		t.Fatalf("err = %v, want ErrUnknownPath", err)
 	}
 	if !strings.Contains(err.Error(), "original_content_multimedia") {
 		t.Errorf("err = %v, want it to name both spellings", err)

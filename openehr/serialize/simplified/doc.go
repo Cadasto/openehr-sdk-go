@@ -60,6 +60,21 @@
 // plain text, uncoded and with nothing but its value, equal to that root name.
 // A "_name" under any other node is unmatched content.
 //
+// # Attributes with no Web Template node
+//
+// The Simplified Formats spell four RM attributes the Web Template gives no
+// node of its own, and the codecs read and write them: an event's sample
+// count as "<event>|sample_count", at an EVENT or INTERVAL_EVENT node; an
+// interval event's "<event>/math_function" and "<event>/width" at an abstract
+// EVENT node, which an INTERVAL_EVENT node has as children; and an
+// OBSERVATION's history origin as "<observation>/history_origin". At an
+// abstract EVENT node an event the body gives any of those three keys decodes
+// as an INTERVAL_EVENT, and any other as a POINT_EVENT. Decode reads
+// history_origin ahead of the origin [WithTemplate] derives, and encode writes
+// it unless it sets its value alone and that value is, as written, the
+// earliest time the events carry. Any other spelling of the four, such as
+// "<event>/sample_count", is unmatched content.
+//
 // # Unmatched content
 //
 // Input the decode does not read is unmatched: a key whose path the Web
@@ -73,13 +88,13 @@
 // where the decode then refuses it: a PARTICIPATION `time`, a
 // FEEDER_AUDIT_DETAILS `other_details` and `_instruction_details` have no
 // carrier and fail the decode in every mode. So do, in the reference's
-// in-context spelling and
-// where the Web Template does not resolve them, an ACTION's ISM transition and
-// time (a `current_state`, `transition` or `careflow_step` leaf or a `_reason`
-// family under an `ism_transition` node, and the ACTION's own `time` leaf), an
-// INTERVAL_EVENT's `math_function`, `width` and `sample_count` and an
-// OBSERVATION's `history_origin` (a leaf under the node or a suffix on it),
-// which name RM data decode would otherwise drop or replace. A leaf whose
+// in-context spelling and where the Web Template does not resolve them, an
+// ACTION's ISM transition and time (a `current_state`, `transition` or
+// `careflow_step` leaf or a `_reason` family under an `ism_transition` node,
+// and the ACTION's own `time` leaf), which name RM data decode would otherwise
+// drop or replace. Those keys and `_instruction_details` are paths the
+// Simplified Formats define and this SDK does not model: their refusal matches
+// [ErrNotModelled] as well as [ErrUnknownPath]. A leaf whose
 // datatype has neither a suffix set nor a sub-path grammar refuses its bare
 // value and any suffix naming an attribute of its RM class.
 // So does malformed content: a value of the wrong shape, a missing required
@@ -89,7 +104,9 @@
 // ordinal's |value or |ordinal, that the template determines is taken from it
 // and not missing), two spellings of one field the decode
 // reads that disagree (such as `x` and `x|`; a lone `x|` reads as `x`), an
-// index past its bound. A value that does not fit its RM attribute, one the
+// index past its bound, and a key that is not well formed in the FLAT grammar,
+// with an empty path segment ("a//b|"), a segment with no id before its
+// :index, a second |suffix or a segment after its |suffix. A value that does not fit its RM attribute, one the
 // canonical-JSON decode of that attribute would refuse, is refused with
 // [ErrUnsupportedDatatype] naming the FLAT key.
 //

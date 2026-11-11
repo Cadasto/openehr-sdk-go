@@ -528,8 +528,8 @@ func TestREQ170InContextIsmTransitionNodeRefusesUnmodelledKeys(t *testing.T) {
 				"FLAT":       refusedInEveryMode(t, wt, body),
 				"STRUCTURED": structuredRefusedInEveryMode(t, wt, body),
 			} {
-				if !errors.Is(err, ErrUnknownPath) || !strings.Contains(err.Error(), "in-context spelling") {
-					t.Errorf("%s err = %v, want the in-context ErrUnknownPath refusal", format, err)
+				if !errors.Is(err, ErrNotModelled) || !errors.Is(err, ErrUnknownPath) {
+					t.Errorf("%s err = %v, want the ErrNotModelled refusal, which matches ErrUnknownPath too", format, err)
 				}
 				// STRUCTURED names the key as its FLAT form, with indexes.
 				if format == "FLAT" && !strings.Contains(err.Error(), strconv.Quote(tc.named)) {
