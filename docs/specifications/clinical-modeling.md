@@ -1370,6 +1370,7 @@ The archetyped `ism_transition[atNNNN]` nodes stay beside the merged node.
 
 The node `id` is the FLAT-path segment consumers bind to, so its stability and cross-implementation fidelity are the export's load-bearing property.
 The `id` **MUST** mirror the locked EHRbase reference: a lower-snake sanitisation of the node's default-language display name.
+Two spellings below diverge from it, each stated with its evidence: a duplicate sibling's suffix and an interval value alternative's `id`.
 The exact normalisation is **derived from the vendored reference fixture**; a scheme of the SDK's own would break FLAT-path interoperability with existing tooling.
 
 For a node that pins a **template-level name**, that name is the display name the `id` derives from — not the archetype's concept term, which is shared by every occurrence of a reused archetype and so cannot distinguish siblings; see [§ REQ-111 § Node names and name predicates](#node-names-and-name-predicates), which owns the naming rule.
