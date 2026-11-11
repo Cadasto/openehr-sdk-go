@@ -504,9 +504,10 @@ func compositionDefaultOwns(class, attrName string) bool {
 // locatable's uid, which setLocatableIdentity stamps, nor the normal_range or
 // other_reference_ranges of a bound of a REFERENCE_RANGE's range, which
 // the RM keeps absent, nor an attribute the node's RM class does not have,
-// nor a DV_MULTIMEDIA's data, which settleMultimedia writes (walkSkips). A
-// prohibited ELEMENT null_flavour the RM rule needs, because the OPT
-// prohibits value too, is visited as if the OPT allowed it. An attribute
+// nor a DV_MULTIMEDIA's data, which settleMultimedia writes, nor the
+// composer of a COMPOSITION root, which applyCompositionDefaults writes
+// (walkSkips). A prohibited ELEMENT null_flavour the RM rule needs, because
+// the OPT prohibits value too, is visited as if the OPT allowed it. An attribute
 // the generator has no writer for (noWriter) is visited only where the
 // template requires it (writerNeeded), for the walk to refuse it. Any other
 // attribute is visited when the policy says so (shouldVisit).
@@ -527,13 +528,14 @@ func (g *generator) visits(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAt
 // OPT may name and the RM keeps absent, one the compile marks as absent
 // from the node's RM class (NotInRM), such as ISM_TRANSITION.name, which no
 // instance can carry and the template validator leaves out, whatever
-// existence the OPT gives it, and a DV_MULTIMEDIA's data, whose octets bind
-// to no OPT child and which settleMultimedia writes instead.
+// existence the OPT gives it, a DV_MULTIMEDIA's data, whose octets bind
+// to no OPT child and which settleMultimedia writes instead, and the
+// composer of a COMPOSITION root (rootComposer).
 func walkSkips(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
 	if locatableUID(optNode, attr) || referenceRangeBoundRanges(optNode, attr) {
 		return true
 	}
-	if attr.NotInRM() || multimediaData(optNode, attr) {
+	if attr.NotInRM() || multimediaData(optNode, attr) || rootComposer(optNode, attr) {
 		return true
 	}
 	if attrProhibited(optNode, attr) && !rmNeedsProhibited(optNode, attr) {
@@ -561,6 +563,15 @@ func nodeClass(optNode *tcimpl.CompiledNode) string {
 		return bound
 	}
 	return bmmtype.Class(concreteFor(declared))
+}
+
+// rootComposer reports whether attr is the composer of optNode, a
+// COMPOSITION that is the template root. applyCompositionDefaults writes
+// Options.Composer there, as given, so nothing the OPT names under composer
+// is built, and a constraint in it that no value satisfies cannot make
+// Generate fail.
+func rootComposer(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
+	return attr.Name() == "composer" && optNode.Parent() == nil && nodeClass(optNode) == "COMPOSITION"
 }
 
 // multimediaData reports whether attr is the data of optNode, a
@@ -3133,8 +3144,9 @@ func ordinalSymbolText(ref constraints.CodedTermRef) rm.DVCodedText {
 // 433|event|, Options.Language and Options.Territory, where the OPT gives
 // it no member of its group or code set and admits the default. No
 // EVENT_CONTEXT is created where the OPT prohibits context. The composer
-// is Options.Composer, as given, over any party the walk built from the
-// OPT. The OPT node of c is the template root.
+// is Options.Composer, as given: the walk leaves composer alone
+// (walkSkips), whatever party the OPT names there. The OPT node of c is
+// the template root.
 func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 	root := g.compiled.Root()
 	c.Composer = g.opts.Composer
