@@ -289,3 +289,48 @@ func rootElementValue[T rm.DataValue](t *testing.T, out any) T {
 	}
 	return v
 }
+
+// optEHRURIElement is an OPT whose root ELEMENT holds a DV_EHR_URI whose
+// value carries a C_STRING with body, such as a list or a pattern.
+func optEHRURIElement(body string) string {
+	return optTemplate("ELEMENT", optSingle("value",
+		optNode("DV_EHR_URI", "", optSingle("value", optPrimitive("STRING", "C_STRING", body)))))
+}
+
+// TestREQ107_EHRURIPlaceholderUnderOpenCString is the REQ-107 check that a
+// DV_EHR_URI whose value the OPT constrains by a C_STRING that admits the
+// placeholder ehr://example gets that placeholder, not the open-string
+// example, which DV_EHR_URI Scheme_valid refuses: a C_STRING with neither a
+// list nor a pattern, one with an empty list, and one whose pattern admits
+// the placeholder. A C_STRING that refuses the placeholder keeps the value
+// it admits. The root passes the RM floor and the template validator under
+// every policy and both value fills.
+func TestREQ107_EHRURIPlaceholderUnderOpenCString(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		want string
+	}{
+		{name: "neither list nor pattern", body: "", want: "ehr://example"},
+		{name: "empty list", body: "<list></list>", want: "ehr://example"},
+		{name: "pattern admitting the placeholder", body: "<pattern>ehr://.+</pattern>", want: "ehr://example"},
+		{name: "list refusing the placeholder", body: "<list>ehr://abc</list>", want: "ehr://abc"},
+	}
+	for _, tc := range cases {
+		for _, implicit := range []bool{false, true} {
+			c := compileOPTText(t, optEHRURIElement(tc.body), implicit)
+			for _, opts := range defaultsOptions() {
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, opts)
+					if err != nil {
+						t.Fatalf("Generate: %v", err)
+					}
+					if got := rootElementValue[*rm.DVEHRURI](t, out).Value; got != tc.want {
+						t.Errorf("DV_EHR_URI.value = %q, want %q", got, tc.want)
+					}
+					checkValid(t, out, c)
+				})
+			}
+		}
+	}
+}
