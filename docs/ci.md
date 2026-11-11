@@ -23,12 +23,14 @@ Jobs run in parallel. All use Go 1.27.x (`actions/setup-go@v7` with module cache
 
 | Job | Makefile targets | Purpose |
 |---|---|---|
-| **Verify** | `fmt-check`, `mod-tidy-check`, `codegen-check`, `aqlgen-check`, `termgen-check`, `vet`, `spec-check`, `bmm-check`, `its-xml-check`, `operational-template-schema-check`, `flat-check`, `corpus-pins-check`, `terminology-check`, `build` | Static checks and compile-all without running tests. The job installs `libxml2-utils` for `xmllint` when the runner lacks it |
+| **Verify** | `fmt-check`, `mod-tidy-check`, `codegen-check`, `aqlgen-check`, `termgen-check`, `vet`, `spec-check`, `bmm-check`, `its-xml-check`, `flat-check`, `corpus-pins-check`, `terminology-check`, `build` | Static checks and compile-all without running tests |
 | **Test** | `test` | Unit tests; `test` already depends on `codegen-check`, `aqlgen-check` and `termgen-check` |
 | **Lint** | (via `golangci-lint-action` v2.15.0, config [`.golangci.yml`](../.golangci.yml)) | Same rules as `make lint` |
 | **Race** | `test-race` | **Push to `main` only**, because `-race` is slower. Catches data races in `typereg` and codecs. The runner has a C compiler, so the race run uses the host `go` |
 
 PRs do not run the **Race** job. Merge to `main` triggers it on the post-merge push.
+
+CI does not run `operational-template-schema-check`, [PROBE-111](specifications/conformance.md#probe-111--operational-template-corpus-round-trip)'s schema leg, which `make ci` runs. It needs `xmllint`, which the runner lacks, and installing it from the Ubuntu package mirrors failed whole CI runs while those mirrors were unreachable. Run it locally (`make operational-template-schema-check`, or `make ci`) on a change to the canonical XML codec, the operational template types or the corpus OPTs. The **Release** workflow still runs it, through `make ci`.
 
 ### CodeQL (default setup)
 
