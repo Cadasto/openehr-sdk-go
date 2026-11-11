@@ -174,11 +174,14 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 	}
 	budget := &allocBudget{limit: maxTotalNodes}
 	sib := reusedSiblingsOf(wt)
+	// The three passes below walk content in sorted order and share one parse of
+	// each key; each skips the keys an earlier one took out of content.
+	parsed := parseContentKeys(content)
 	// The reference's in-context keys for RM attributes the Web Template this
 	// SDK builds does not model name RM data decode would drop: refused in every
 	// mode, before anything could set them aside as unmatched or the
 	// WithTemplate defaults replace them (REQ-170).
-	if err := refuseInContextKeys(content, wt, sib); err != nil {
+	if err := refuseInContextKeys(content, parsed, wt, sib); err != nil {
 		return nil, err
 	}
 	// Siphon off the composite leaves first — the ones whose FLAT form has
@@ -192,7 +195,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 	// grammar has. It has to run before the `_` router, which would otherwise claim
 	// `subject/_identifier:0` as a family whose owner is a leaf the grammar cannot
 	// judge.
-	compositeGroups, err := compositeLeafGroups(content, wt, sink)
+	compositeGroups, err := compositeLeafGroups(content, parsed, wt, sink)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +204,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 	// before it, so those keys are grouped per (owner path, family, :index) and
 	// routed by the owner's RM class instead of resolving to a leaf. What stays
 	// in content is ordinary template-constrained leaf data.
-	attrGroups, err := rmattrGroups(content, sink)
+	attrGroups, err := rmattrGroups(content, parsed, sink)
 	if err != nil {
 		return nil, err
 	}
@@ -679,40 +682,41 @@ var metadataSegPaths = func() map[string]bool {
 // That index addresses a list slot a single-valued attribute does not have.
 // The segment is rewritten without it all the same, so the caller can tell
 // whether the key is a metadata spelling at all. A malformed index comes back
-// unchanged, for the leaf loop to refuse.
+// unchanged, for the leaf loop to refuse, and so does a key whose metadata run
+// carries no index.
+//
+// What follows the run is sliced from rel rather than re-spelled: a segment
+// [parseFlatSeg] accepts has one spelling only ([cutAtSeg]).
 func metadataRel(rel string) (norm string, overIndexed bool) {
-	path, suffix, piped := strings.Cut(rel, "|")
-	pk, err := parseFlatKey(path)
-	if err != nil {
-		return rel, false
-	}
-	var b strings.Builder
-	var seen string
-	onMeta := true
-	for i, s := range pk.segs {
-		if i > 0 {
-			b.WriteByte('/')
+	path, _, _ := strings.Cut(rel, "|")
+	var seen string // the run's unindexed spelling so far
+	runEnd := 0     // the offset in rel just past the run's last segment
+	off := 0        // the offset in rel of the segment being read
+	indexed, onMeta := false, true
+	for p := range strings.SplitSeq(path, "/") {
+		s, ok := parseFlatSeg(p)
+		if !ok {
+			return rel, false
 		}
 		if onMeta {
-			p := s.id
+			at := s.id
 			if seen != "" {
-				p = seen + "/" + s.id
+				at = seen + "/" + s.id
 			}
-			if metadataSegPaths[p] {
-				seen = p
-				b.WriteString(s.id)
+			if metadataSegPaths[at] {
+				seen, runEnd = at, off+len(p)
+				indexed = indexed || s.idx >= 0
 				overIndexed = overIndexed || s.idx > 0
-				continue
+			} else {
+				onMeta = false
 			}
-			onMeta = false
 		}
-		writeFlatSeg(&b, s)
+		off += len(p) + 1
 	}
-	if piped {
-		b.WriteByte('|')
-		b.WriteString(suffix)
+	if !indexed {
+		return rel, false
 	}
-	return b.String(), overIndexed
+	return seen + rel[runEnd:], overIndexed
 }
 
 // overIndexedMetadataSeg returns the first segment of the leading run of
@@ -775,18 +779,22 @@ func isMetadataSpelling(rel string) bool {
 // below it. The root segment may carry an explicit index (`<root>:0/…`, the
 // form REQ-053 reads as `<root>/…`), so it is parsed rather than matched as a
 // literal prefix; rootSeg reports the index it carries. rooted is false for a
-// key whose first segment is not the root, has nothing below it, or carries a
-// malformed index (the leaf loop refuses that one).
+// key with no `/`, for one whose first segment is not the root, and for one
+// whose root segment carries a malformed index (the leaf loop refuses that
+// one); `<root>/` is rooted, with rel empty. The first segment's
+// |suffix is cut off before it is parsed, as [parseFlatKey] does, so a bare
+// `<root>|/…` is rooted and `<root>|x/…` is not.
 func cutRoot(key, rootID string) (rel string, rootSeg flatSeg, rooted bool) {
 	first, rel, found := strings.Cut(key, "/")
 	if !found {
 		return "", flatSeg{}, false
 	}
-	pk, err := parseFlatKey(first)
-	if err != nil || pk.suffix != "" || len(pk.segs) != 1 || pk.segs[0].id != rootID {
+	first, suffix := splitSuffix(first)
+	seg, ok := parseFlatSeg(first)
+	if !ok || suffix != "" || seg.id != rootID {
 		return "", flatSeg{}, false
 	}
-	return rel, pk.segs[0], true
+	return rel, seg, true
 }
 
 // rootSegmentAlone parses a key that has no `/` as one segment and its
@@ -795,11 +803,12 @@ func rootSegmentAlone(key, rootID string) (flatSeg, bool) {
 	if strings.Contains(key, "/") {
 		return flatSeg{}, false
 	}
-	pk, err := parseFlatKey(key)
-	if err != nil || len(pk.segs) != 1 || pk.segs[0].id != rootID {
+	base, _ := splitSuffix(key)
+	seg, ok := parseFlatSeg(base)
+	if !ok || seg.id != rootID {
 		return flatSeg{}, false
 	}
-	return pk.segs[0], true
+	return seg, true
 }
 
 // errRootIndex refuses an index past the bound of the template root's own
@@ -2093,18 +2102,19 @@ var ismLeaves = map[string]bool{"current_state": true, "transition": true, "care
 // is unmatched content. A key that walks through one of several reused siblings
 // that no pinned name tells apart is left to the refusal that path gets.
 //
-// Keys are checked in sorted order, so a body with several names the same one on
-// every run. The error wraps [ErrNotModelled], names the key, or the `_reason`
-// family instance, and carries no value. Such a key that holds JSON null carries no data to drop:
-// it is absent (REQ-053), and is removed from content.
-func refuseInContextKeys(content map[string]any, wt *webtemplate.WebTemplate, sib *reusedSiblings) error {
-	for _, key := range slices.Sorted(maps.Keys(content)) {
-		pk, err := parseFlatKey(key)
-		if err != nil {
+// keys holds content's keys in sorted order, each parsed once
+// ([parseContentKeys]), so a body with several names the same one on every run.
+// The error wraps [ErrNotModelled], names the key, or the `_reason` family
+// instance, and carries no value. Such a key that holds JSON null carries no
+// data to drop: it is absent (REQ-053), and is removed from content.
+func refuseInContextKeys(content map[string]any, keys []contentKey, wt *webtemplate.WebTemplate, sib *reusedSiblings) error {
+	for _, ck := range keys {
+		key := ck.key
+		if ck.err != nil {
 			// A malformed index is refused where the key is decoded.
 			continue
 		}
-		named, owner, attr, ok := inContextKey(wt, key, pk, sib)
+		named, owner, attr, ok := inContextKey(wt, key, ck.pk, sib)
 		if !ok {
 			continue
 		}
@@ -2205,16 +2215,22 @@ func definingCodeOf(v any) map[string]any {
 // party / interval grammars decode it with no second mechanism (REQ-140 design
 // constraint 5).
 //
-// Keys are consumed from content: what stays behind is ordinary leaf data. Each
-// group carries sink, which takes the keys its grammar does not read.
-func compositeLeafGroups(content map[string]any, wt *webtemplate.WebTemplate, sink *unmatchedSink) ([]rmattrGroup, error) {
+// Keys are consumed from content: what stays behind is ordinary leaf data. keys
+// holds content's keys in sorted order, each parsed once ([parseContentKeys]); a
+// key no longer in content is skipped, and the first one left that does not
+// parse is refused. Each group carries sink, which takes the keys its grammar
+// does not read.
+func compositeLeafGroups(content map[string]any, keys []contentKey, wt *webtemplate.WebTemplate, sink *unmatchedSink) ([]rmattrGroup, error) {
 	byLeaf := make(map[string]*rmattrGroup)
-	for _, key := range slices.Sorted(maps.Keys(content)) {
-		pk, err := parseFlatKey(key)
-		if err != nil {
-			return nil, err
+	for _, ck := range keys {
+		key := ck.key
+		if _, ok := content[key]; !ok {
+			continue
 		}
-		base, family, index, tail, isComposite := splitCompositeLeafKey(wt, pk)
+		if ck.err != nil {
+			return nil, ck.err
+		}
+		base, family, index, tail, isComposite := splitCompositeLeafKey(wt, key, ck.pk)
 		if !isComposite {
 			continue
 		}
@@ -2238,11 +2254,12 @@ func compositeLeafGroups(content map[string]any, wt *webtemplate.WebTemplate, si
 	return groups, nil
 }
 
-// splitCompositeLeafKey splits a parsed FLAT key at the composite Web Template
-// leaf it addresses, if any: the first segment run that resolves to a childless
-// node of a party or DV_INTERVAL RM type. base is the leaf's parent path, family
-// and index the leaf segment itself, and tail everything after it (each remaining
-// segment with a leading "/", then "|suffix").
+// splitCompositeLeafKey splits a FLAT key, parsed as pk, at the composite Web
+// Template leaf it addresses, if any: the first segment run that resolves to a
+// childless node of a party or DV_INTERVAL RM type. base is the leaf's parent
+// path, family and index the leaf segment itself, and tail everything after it
+// (each remaining segment with a leading "/", then "|suffix"); base and tail
+// are slices of key ([cutAtSeg]).
 //
 // Two kinds of key are deliberately not composite leaves. One whose path reaches
 // an `_`-prefixed segment first belongs to that family — a `_feeder_audit`'s
@@ -2250,7 +2267,7 @@ func compositeLeafGroups(content map[string]any, wt *webtemplate.WebTemplate, si
 // addressing a composition-metadata leaf [emitContext] writes is the composer,
 // whose keys [siphonContext] has already taken, whether or not the Web
 // Template carries its node (ADR 0029).
-func splitCompositeLeafKey(wt *webtemplate.WebTemplate, pk parsedKey) (base, family string, index int, tail string, ok bool) {
+func splitCompositeLeafKey(wt *webtemplate.WebTemplate, key string, pk parsedKey) (base, family string, index int, tail string, ok bool) {
 	node := wt.Tree
 	if len(pk.segs) == 0 || pk.segs[0].id != node.ID {
 		return "", "", 0, "", false
@@ -2284,22 +2301,8 @@ func splitCompositeLeafKey(wt *webtemplate.WebTemplate, pk parsedKey) (base, fam
 			!compositeLeafOwnsSub(nodeRMType(node), pk.segs[i+1].id) {
 			return "", "", 0, "", false
 		}
-		var b, t strings.Builder
-		for j, s := range pk.segs[:i] {
-			if j > 0 {
-				b.WriteByte('/')
-			}
-			writeFlatSeg(&b, s)
-		}
-		for _, s := range pk.segs[i+1:] {
-			t.WriteByte('/')
-			writeFlatSeg(&t, s)
-		}
-		if pk.suffix != "" {
-			t.WriteByte('|')
-			t.WriteString(pk.suffix)
-		}
-		return b.String(), seg.id, seg.idx, t.String(), true
+		base, tail := cutAtSeg(key, i)
+		return base, seg.id, seg.idx, tail, true
 	}
 	return "", "", 0, "", false
 }
@@ -4681,28 +4684,90 @@ type parsedKey struct {
 	suffix string
 }
 
-// parseFlatKey splits a FLAT key into path segments and the trailing |suffix.
-// Each "/"-separated segment may carry a ":<index>" suffix; a trailing
-// "|<attr>" is the leaf attribute suffix. A numeric index must be spelled
-// canonically ("0", "1", …): a negative index would collide with the internal
-// "no index" sentinel, and non-canonical spellings ("-1", "+0", "00") would
-// make distinct JSON keys resolve to the same slot, silently overwriting one
-// value with another — both are rejected.
+// parseFlatKey splits a FLAT key into path segments and the trailing |suffix:
+// a trailing "|<attr>" is the leaf attribute suffix, and each "/"-separated
+// segment before it is read by [parseFlatSeg]. A segment whose index is not
+// spelled canonically is refused, naming the index and the path.
 func parseFlatKey(key string) (parsedKey, error) {
 	key, suffix := splitSuffix(key)
 	segs := make([]flatSeg, 0, strings.Count(key, "/")+1)
 	for p := range strings.SplitSeq(key, "/") {
-		seg := flatSeg{id: p, idx: -1}
-		if id, idxStr, found := strings.CutLast(p, ":"); found {
-			if n, err := strconv.Atoi(idxStr); err == nil {
-				if n < 0 || idxStr != strconv.Itoa(n) {
-					return parsedKey{}, fmt.Errorf("%w: invalid :index %q in %q", ErrUnknownPath, idxStr, key)
-				}
-				seg.id = id
-				seg.idx = n
-			}
+		seg, ok := parseFlatSeg(p)
+		if !ok {
+			_, idxStr, _ := strings.CutLast(p, ":")
+			return parsedKey{}, fmt.Errorf("%w: invalid :index %q in %q", ErrUnknownPath, idxStr, key)
 		}
 		segs = append(segs, seg)
 	}
 	return parsedKey{segs: segs, suffix: suffix}, nil
+}
+
+// cutAtSeg splits key, a FLAT key [parseFlatKey] accepts, around its path
+// segment i, which the key must have: base is the path before that segment,
+// and tail everything after it, each later segment with its leading "/", then
+// "|suffix" when the suffix is not empty. Both are slices of key, and they are
+// the bytes re-spelling the parsed segments with [writeFlatSeg] would build: a
+// segment [parseFlatSeg] accepts is its id alone, or its id, ":" and the
+// canonical index, so it has one spelling only. A trailing bare "|" is no
+// suffix to parseFlatKey, so tail leaves it out.
+func cutAtSeg(key string, i int) (base, tail string) {
+	path, suffix := splitSuffix(key)
+	start := 0
+	for range i {
+		start += strings.IndexByte(path[start:], '/') + 1
+	}
+	end := len(path)
+	if j := strings.IndexByte(path[start:], '/'); j >= 0 {
+		end = start + j
+	}
+	if start > 0 {
+		base = path[:start-1]
+	}
+	if suffix == "" {
+		return base, path[end:]
+	}
+	return base, key[end:]
+}
+
+// parseFlatSeg reads one "/"-separated FLAT path segment, which may carry a
+// ":<index>" after its id. A numeric index must be spelled canonically ("0",
+// "1", …): a negative index would collide with the internal "no index"
+// sentinel, and non-canonical spellings ("-1", "+0", "00") would make distinct
+// JSON keys resolve to the same slot, silently overwriting one value with
+// another, so ok is false for both. Text after the last ":" that is not a
+// number is no index, and stays part of the id.
+func parseFlatSeg(p string) (seg flatSeg, ok bool) {
+	id, idxStr, found := strings.CutLast(p, ":")
+	if !found {
+		return flatSeg{id: p, idx: -1}, true
+	}
+	n, err := strconv.Atoi(idxStr)
+	if err != nil {
+		return flatSeg{id: p, idx: -1}, true
+	}
+	if n < 0 || idxStr != strconv.Itoa(n) {
+		return flatSeg{}, false
+	}
+	return flatSeg{id: id, idx: n}, true
+}
+
+// contentKey is one FLAT content key with its [parseFlatKey] result: pk when
+// the key parses, err when it does not.
+type contentKey struct {
+	key string
+	pk  parsedKey
+	err error
+}
+
+// parseContentKeys parses each key of content once, in sorted order, for the
+// passes that walk content before the leaf loop. A key that does not parse
+// keeps its error, and each pass decides what that means for it.
+func parseContentKeys(content map[string]any) []contentKey {
+	keys := slices.Sorted(maps.Keys(content))
+	out := make([]contentKey, len(keys))
+	for i, key := range keys {
+		pk, err := parseFlatKey(key)
+		out[i] = contentKey{key: key, pk: pk, err: err}
+	}
+	return out
 }
