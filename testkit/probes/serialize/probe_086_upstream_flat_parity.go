@@ -39,12 +39,16 @@ import (
 // same values) and that subset is non-empty. It is "fail" when a key inside
 // the subset is dropped, invented, or altered, which is a codec defect. A
 // fixture whose constructs the codec does not model yet does not fail on that
-// account: those keys are excluded by the runner and counted in Detail.
+// account: those keys are excluded by the runner and counted in Detail. An
+// upstream key that spells a duplicate sibling id the reference's way
+// (`dv_text2`) is compared in this SDK's spelling (`dv_text_1`), through
+// [conformance.RespellSiblingIDs].
 //
 // Coverage is guarded in two places, and this probe is only the coarse one.
 // The ratchet is the per-fixture excluded/compared pin in
-// testkit/conformance/webtemplate's own tests: that is what stops the
-// unmodelled surface growing key by key. What the probe adds is a floor: a
+// testkit/conformance/webtemplate's own tests, beside its pin of each
+// fixture's respelled keys: that is what stops the unmodelled surface
+// growing key by key, and the respelling widening unnoticed. What the probe adds is a floor: a
 // fixture that compared nothing fails, because [conformance.Report.Clean] is
 // vacuously true over an empty compared set and would otherwise report a total
 // coverage collapse (every key refused, or an emptied fixture) as a pass to a

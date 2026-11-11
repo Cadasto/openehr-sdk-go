@@ -23,7 +23,9 @@
 //     upstream FLAT taken through the same decode and encode.
 //
 // Every FLAT comparison holds composition metadata out of both sides, using
-// the hold-out of the upstream FLAT parity harness (webtemplate.IsCompositionMeta).
+// the hold-out of the upstream FLAT parity harness (webtemplate.IsCompositionMeta),
+// and reads the reference side's duplicate sibling ids in this SDK's spelling,
+// using that harness's respelling (webtemplate.RespellSiblingIDs).
 // All FLAT decodes go through that harness's reducing decode
 // (webtemplate.DecodeReducing): it excludes the keys the codec reports as
 // unmatched content (see simplified.WithUnmatched), and removes each key
@@ -60,6 +62,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
+	wt "github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/testkit/conformance/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
@@ -159,6 +162,11 @@ type LegResult struct {
 	// reducing decode removed from the flattened upstream STRUCTURED. They
 	// are information, not part of the outcome.
 	StructuredRefusals []webtemplate.Refusal
+	// Respelled are, in a leg that compares FLAT keys, the reference side's
+	// keys the comparison read in this SDK's spelling of a duplicate sibling
+	// id, sorted by the key as written. MissingKeys and Alterations name such
+	// a key in this SDK's spelling.
+	Respelled []webtemplate.Respelling
 }
 
 // Alteration is one key or leaf both sides carry with different values, each
@@ -330,7 +338,7 @@ func legCanonicalFlat(t *webtemplate.Target, in inputs) (LegResult, error) {
 	if err != nil {
 		return LegResult{}, fmt.Errorf("FLAT encode produced no FLAT body: %w", err)
 	}
-	return compareFlat(in.flat, ours, t.Root)
+	return compareFlat(in.flat, ours, t.Web.Tree)
 }
 
 // legFlatCanonical is leg (c): the upstream FLAT, decoded with its metadata
@@ -401,7 +409,7 @@ func legStructuredFlat(t *webtemplate.Target, in inputs) (LegResult, error) {
 	if err != nil {
 		return LegResult{Refusals: refRefusals, StructuredRefusals: oursRefusals}, err
 	}
-	lr, err := compareFlat(ref, ours, t.Root)
+	lr, err := compareFlat(ref, ours, t.Web.Tree)
 	lr.Refusals, lr.StructuredRefusals = refRefusals, oursRefusals
 	lr.Outcome.Excluded = keysRemoved(refRefusals)
 	return lr, err
@@ -496,18 +504,30 @@ func encodeLeaves(comp *rm.Composition) (map[string]string, error) {
 }
 
 // compareFlat compares two FLAT bodies key by key, composition metadata held
-// out of both with the PROBE-086 hold-out. Values compare by their JSON text,
-// as PROBE-086 compares them, so a number keeps its literal spelling.
-func compareFlat(ref, ours map[string]any, root string) (LegResult, error) {
-	r, err := flatLeaves(holdOut(ref, root))
+// out of both with the PROBE-086 hold-out, over the Web Template whose tree is
+// tree. The reference side's duplicate sibling ids are read in this SDK's
+// spelling first, with the PROBE-086 respelling: the reference writes `<id>2`
+// where the SDK writes `<id>_1`, and the same key compared across the two
+// spellings would count once missing and once extra. Only the reference side
+// is respelled, so a key the SDK writes in the reference's spelling stays a
+// difference. Values compare by their JSON text, as PROBE-086 compares them,
+// so a number keeps its literal spelling.
+func compareFlat(ref, ours map[string]any, tree *wt.Node) (LegResult, error) {
+	ref, respelled, err := webtemplate.RespellSiblingIDs(tree, ref)
 	if err != nil {
 		return LegResult{}, err
 	}
-	o, err := flatLeaves(holdOut(ours, root))
+	r, err := flatLeaves(holdOut(ref, tree.ID))
 	if err != nil {
 		return LegResult{}, err
 	}
-	return compareLeaves(r, o), nil
+	o, err := flatLeaves(holdOut(ours, tree.ID))
+	if err != nil {
+		return LegResult{}, err
+	}
+	lr := compareLeaves(r, o)
+	lr.Respelled = respelled
+	return lr, nil
 }
 
 // flatLeaves maps each FLAT key to its value's JSON text.

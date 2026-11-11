@@ -70,8 +70,23 @@ func TestUpstreamFlatParity(t *testing.T) {
 				t.Errorf("compared %d upstream keys, pinned at %d — coverage moved; "+
 					"re-run with -census and update the pin", rep.Compared, want.compared)
 			}
+			if got := respellingStrings(rep.Respelled); !slices.Equal(got, respelled[c.Name]) {
+				t.Errorf("respelled %q, pinned at %q — the duplicate sibling respelling "+
+					"moved; re-run with -census, update the pin, and record the change in SKIPPED.md",
+					got, respelled[c.Name])
+			}
 		})
 	}
+}
+
+// respellingStrings renders respellings as "upstream -> ours", or nil for
+// none.
+func respellingStrings(rs []conformance.Respelling) []string {
+	var out []string
+	for _, r := range rs {
+		out = append(out, r.String())
+	}
+	return out
 }
 
 // TestPinnedCoversCorpus keeps the ratchet and the corpus in step in the
@@ -91,6 +106,11 @@ func TestPinnedCoversCorpus(t *testing.T) {
 	for name := range pinned {
 		if !present[name] {
 			t.Errorf("pinned fixture %q is not in the corpus — stale pin, or the fixture was renamed", name)
+		}
+	}
+	for name := range respelled {
+		if !present[name] {
+			t.Errorf("respelled fixture %q is not in the corpus — stale pin, or the fixture was renamed", name)
 		}
 	}
 	if len(cases) != len(pinned) {
@@ -153,6 +173,9 @@ func TestCensus(t *testing.T) {
 				lines = append(lines, "      UNMATCHED "+r.Key)
 			}
 		}
+		for _, r := range rep.Respelled {
+			lines = append(lines, "      RESPELLED "+r.String())
+		}
 	}
 
 	var b strings.Builder
@@ -187,6 +210,24 @@ type expectation struct {
 	// compared is how many upstream keys reached the comparison. Grows as
 	// gaps close — the number that matters.
 	compared int
+}
+
+// respelled pins, per fixture, the upstream keys the comparison reads in this
+// SDK's spelling of a duplicate sibling id (PROBE-086; REQ-053 decode reads
+// the reference's `<id>2` as the `<id>_1` the Web Template writes). A fixture
+// absent here respells nothing. The corpus OPT's ACTION and EVALUATION each
+// hold two ELEMENTs whose ids collide, and the reference keys the second
+// `dv_text2`; no other upstream key is respelled, so the mapping cannot widen
+// unnoticed.
+var respelled = map[string][]string{
+	"ehrbase_conformance_action": {
+		"conformance-ehrbase.de.v0/conformance_section/conformance_action/dv_text2 -> " +
+			"conformance-ehrbase.de.v0/conformance_section/conformance_action/dv_text_1",
+	},
+	"ehrbase_conformance_evaluation": {
+		"conformance-ehrbase.de.v0/conformance_section/conformance_evaluation/dv_text2 -> " +
+			"conformance-ehrbase.de.v0/conformance_section/conformance_evaluation/dv_text_1",
+	},
 }
 
 // pinned is the corpus conformance position, per fixture. It is a ratchet,

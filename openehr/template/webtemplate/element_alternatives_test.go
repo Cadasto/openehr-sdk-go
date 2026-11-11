@@ -161,13 +161,13 @@ func TestREQ106ElementValueAlternatives(t *testing.T) {
 		{
 			name:    "two texts give a child each",
 			rmTypes: []string{"DV_TEXT", "DV_TEXT"},
-			want:    element(choice("text_value", "DV_TEXT", text), choice("text_value2", "DV_TEXT", text)),
+			want:    element(choice("text_value", "DV_TEXT", text), choice("text_value_1", "DV_TEXT", text)),
 		},
 		{
 			name:    "a type given twice takes the next free id",
 			rmTypes: []string{"DV_COUNT", "DV_QUANTITY", "DV_COUNT"},
 			want: element(choice("count_value", "DV_COUNT", count), choice("quantity_value", "DV_QUANTITY", quantity...),
-				choice("count_value2", "DV_COUNT", count)),
+				choice("count_value_1", "DV_COUNT", count)),
 		},
 		{
 			name:    "an interval names its value type",

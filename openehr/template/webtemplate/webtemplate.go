@@ -94,9 +94,9 @@ var ErrEmptyTemplate = errors.New("webtemplate: compiled template has no root")
 var ErrNoDefaultLanguage = errors.New("webtemplate: compiled template has no default language")
 
 // ErrIDCollision is returned when two sibling nodes still share an id
-// after disambiguation. The pinned template-level name and the
-// next-free ordinal fallback make that unreachable from template input,
-// so it signals a builder bug. Build fails rather than emit duplicate
+// after disambiguation. The pinned template-level name and the next
+// free numeric suffix make that unreachable from template input, so it
+// signals a builder bug. Build fails rather than emit duplicate
 // ids, because ids must be unique for FLAT paths to be unambiguous.
 var ErrIDCollision = errors.New("webtemplate: duplicate sibling id")
 

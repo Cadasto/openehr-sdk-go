@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
+	wt "github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/testkit/conformance/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
@@ -347,7 +348,8 @@ func TestProbe105CompareFlatHoldsMetadataOutOnBothSides(t *testing.T) {
 		"r/obs/q|magnitude": json.Number("1"),
 		"r/obs/text":        "a",
 	}
-	got, err := compareFlat(ref, ours, root)
+	tree := &wt.Node{ID: root}
+	got, err := compareFlat(ref, ours, tree)
 	if err != nil {
 		t.Fatalf("compareFlat() error = %v", err)
 	}
@@ -363,12 +365,53 @@ func TestProbe105CompareFlatHoldsMetadataOutOnBothSides(t *testing.T) {
 	}
 
 	// The reverse: metadata only on our side is not extra either.
-	rev, err := compareFlat(ours, ref, root)
+	rev, err := compareFlat(ours, ref, tree)
 	if err != nil {
 		t.Fatalf("compareFlat() error = %v", err)
 	}
 	if !slices.Equal(rev.ExtraKeys, composerKeys) {
 		t.Errorf("reversed ExtraKeys = %v, want only the composer's external_ref and identifier %v", rev.ExtraKeys, composerKeys)
+	}
+}
+
+// TestProbe105CompareFlatRespellsReferenceSiblingIDs pins the PROBE-086
+// respelling on the reference side of a FLAT comparison (REQ-053): the
+// reference's `<id>2` is compared as the SDK's `<id>_1`, so the key counts once
+// and its value is compared, and the leg lists what it respelled. The SDK's
+// side is not respelled, so a key the SDK writes in the reference's spelling
+// stays a difference.
+func TestProbe105CompareFlatRespellsReferenceSiblingIDs(t *testing.T) {
+	tree := &wt.Node{ID: "r", Children: []*wt.Node{{ID: "x"}, {ID: "x_1"}, {ID: "y"}}}
+	ref := map[string]any{"r/x": "a", "r/x2": "b", "r/y": "c"}
+	ours := map[string]any{"r/x": "a", "r/x_1": "b", "r/y": "c"}
+	got, err := compareFlat(ref, ours, tree)
+	if err != nil {
+		t.Fatalf("compareFlat() error = %v", err)
+	}
+	if want := (Outcome{Compared: 3}); got.Outcome != want {
+		t.Errorf("compareFlat().Outcome = %+v, want %+v (missing %v, extra %v, altered %v)",
+			got.Outcome, want, got.MissingKeys, got.ExtraKeys, got.Alterations)
+	}
+	if want := []webtemplate.Respelling{{Upstream: "r/x2", Ours: "r/x_1"}}; !slices.Equal(got.Respelled, want) {
+		t.Errorf("compareFlat().Respelled = %v, want %v", got.Respelled, want)
+	}
+
+	altered := map[string]any{"r/x": "a", "r/x_1": "B", "r/y": "c"}
+	if got, err := compareFlat(ref, altered, tree); err != nil || got.Outcome != (Outcome{Compared: 3, Altered: 1}) {
+		t.Errorf("compareFlat() with r/x_1 altered = %+v, %v, want the respelled key compared by value and altered once", got.Outcome, err)
+	}
+
+	rev, err := compareFlat(ours, ref, tree)
+	if err != nil {
+		t.Fatalf("compareFlat() reversed error = %v", err)
+	}
+	if !slices.Equal(rev.MissingKeys, []string{"r/x_1"}) || !slices.Equal(rev.ExtraKeys, []string{"r/x2"}) || len(rev.Respelled) != 0 {
+		t.Errorf("compareFlat() reversed: missing %v, extra %v, respelled %v; want r/x_1 missing and r/x2 extra, the SDK's side not respelled",
+			rev.MissingKeys, rev.ExtraKeys, rev.Respelled)
+	}
+
+	if _, err := compareFlat(map[string]any{"r/x2": "b", "r/x_1": "b"}, ours, tree); err == nil {
+		t.Error("compareFlat() over a reference spelling one sibling twice: error = nil, want one naming both keys")
 	}
 }
 

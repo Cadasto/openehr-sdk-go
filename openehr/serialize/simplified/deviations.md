@@ -228,7 +228,8 @@ Concretely:
   `Integer`; refused with `ErrUnsupportedDatatype` naming the FLAT key, required and optional
   suffixes and the bare value alike, so it never surfaces as a canonical-JSON error naming a path
   the caller did not write; the key named is the key as written, except that a bare value
-  spelled `x\|` is named `x`, the key it spells, and a STRUCTURED value is named by the FLAT key
+  spelled `x\|` is named `x`, the key it spells, a duplicate sibling in the reference's spelling
+  `x2` is named by its Web Template id `x_1`, and a STRUCTURED value is named by the FLAT key
   its conversion makes, with an `:index` on every segment below the template root; a `\|code`
   at a DV_TEXT leaf that is present and not `""` selects the DV_CODED_TEXT whatever its JSON
   kind, so one that is not a string is refused this way, naming the `\|code` key; the check
@@ -591,6 +592,29 @@ partially or silently accepted.
   appended them in sorted FLAT-key order (BMI's protocol: written `at0006`, `at0010`,
   `at0011`, decoded `at0011`, `at0010`, `at0006`). Pinned by
   `TestREQ053DecodePlacesMembersInTemplateOrder`.
+
+- **A duplicate sibling's earlier spelling is read on decode** — the Web Template gives the
+  second and later of siblings that share an `id` the format's `<id>_1`, `<id>_2`, where the
+  reference writes `<id>2`, `<id>3` ([webtemplate deviations](../../template/webtemplate/deviations.md)
+  § Duplicate sibling ids), and so did this SDK until 2026-11-11. Encode writes `<id>_1` alone.
+  Decode, FLAT and STRUCTURED, reads both, so a body the reference or an earlier release wrote
+  still decodes (the `test_all_types2`, `test_all_types3` and `time2` keys of the
+  `test_all_types` corpus, the FLAT conformance corpus's `conformance_action/dv_text2`, and
+  `transition2`, this SDK's earlier id of that ACTION's second per-step transition node). A
+  segment `<id><M>`, M from 2 with no leading zero, reads as `<id>_<M-1>` where its parent
+  has no child of that `id` of its own and has both `<id>` and `<id>_<M-1>`; an `id` that
+  splits more than one way (`x12`) reads with the shortest `<id>`. The rename is one pass over the FLAT map before any
+  key is read, after the bare-`|` fold, and the STRUCTURED member judge reads the same
+  spelling. Both spellings of one key in one body are two spellings of one field (REQ-170):
+  equal values, or one `null`, read once, and values that disagree are refused with
+  `ErrUnknownPath` naming both keys. An unmatched key is reported as written; a refusal of a
+  value names the key in the Web Template's spelling, as one of `x|` names `x`. **Where it
+  misreads:** the reference numbers a duplicate by its place among the siblings of its `id`,
+  with no check that the number is free, while the builder takes the next free `<id>_N`.
+  Beside a sibling whose own `id` is `<id>_1` ("Blood Pressure 1"), the reference's
+  `blood_pressure2` is the builder's `blood_pressure_2`, and decode reads it as
+  `blood_pressure_1`. No reference Web Template golden has such siblings. Pinned by
+  `TestREQ053DuplicateSibling*` and `TestREQ053EarlierSpelledSibling`.
 
 ## Implementation notes (not deviations, but worth recording)
 
