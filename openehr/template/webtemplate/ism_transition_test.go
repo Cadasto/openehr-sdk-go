@@ -273,10 +273,11 @@ func TestREQ106InContextIsmTransitionWhenEveryArchetypedOneIsPruned(t *testing.T
 	}
 }
 
-// TestREQ106ActionInContextTime — REQ-106, REQ-121: every ACTION gets the
-// reference's in-context `time` leaf, a DV_DATE_TIME shaped as an EVENT's,
-// with min 0 as the other in-context leaves have it, whether or not its
-// template models an ISM transition.
+// TestREQ106ActionInContextTime — REQ-106: every ACTION gets the reference's
+// in-context `time` leaf, a DV_DATE_TIME shaped as an EVENT's, with min 0 as
+// the other in-context leaves have it, whether or not its template models an
+// ISM transition. TestInContextLeavesResolveViaRmpath holds rmpath to
+// resolving it.
 func TestREQ106ActionInContextTime(t *testing.T) {
 	for _, opt := range []string{minimalActionOPT, conformanceOPT, testAllTypesOPT} {
 		t.Run(opt[strings.LastIndexByte(opt, '/')+1:], func(t *testing.T) {
