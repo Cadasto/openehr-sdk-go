@@ -1339,11 +1339,23 @@ The transform **MUST**:
 - keep `COMPOSITION`, the ENTRY types (`OBSERVATION` / `EVALUATION` / `INSTRUCTION` / `ACTION` / `ADMIN_ENTRY`), `EVENT_CONTEXT`, and `CLUSTER` as nodes;
 - keep the event types (`EVENT` / `POINT_EVENT` / `INTERVAL_EVENT`) as nodes **except** an abstract `EVENT` constrained to at most one occurrence, which is **lifted**.
   The reference emits no node for such a degenerate wrapper, while retaining its `events[…]` path segment on descendants and its synthesized `time` leaf (a repeating `EVENT`, and any concrete `POINT_EVENT` / `INTERVAL_EVENT` even at `max=1`, stays a node — both halves of the discriminator are measured across the vendored goldens);
-- **collapse** each `ELEMENT` into a single leaf carrying the constrained value type as `rmType`, the ELEMENT's node id as `nodeId`, and the ELEMENT path extended by `/value` as `aqlPath`;
+- give each `ELEMENT` the leaf or node its value alternatives call for, as the table below says;
 - **drop** the pure structural wrappers (`HISTORY` and the `ITEM_STRUCTURE` family — `ITEM_TREE` / `ITEM_LIST` / `ITEM_SINGLE` / `ITEM_TABLE`) as nodes while **folding their node predicates into the `aqlPath`** of the descendants they enclose;
 - emit RM-attribute values that carry data directly (e.g. `EVENT_CONTEXT.start_time` / `setting`, `EVENT.time`, `ACTION.time`, the ENTRY `language` / `encoding` / `subject`, `INTERVAL_EVENT.math_function` / `width`) as leaves whose `id` is the attribute name.
 
 The `aqlPath` therefore carries every archetype-id and at-code node predicate along the retained path.
+
+An `ELEMENT` gives, by the value alternatives its template constrains (the `C_OBJECT`s of its `value` attribute):
+
+| The ELEMENT's `value` has | The export emits |
+|---|---|
+| one alternative | a single leaf that **collapses** the ELEMENT: the alternative's type as `rmType`, the ELEMENT's node id as `nodeId`, and the ELEMENT path extended by `/value` as `aqlPath` |
+| two alternatives, one `DV_CODED_TEXT` and one `DV_TEXT`, in either order | that leaf for the `DV_CODED_TEXT`, its `code` input `listOpen`, followed by an `other` TEXT input |
+| any other two or more alternatives | the ELEMENT as a node without `inputs`, holding one child per alternative in template order: its type as `rmType`, the ELEMENT's `nodeId` and names, the ELEMENT path extended by `/value` as `aqlPath`, the alternative's own occurrences as `min`/`max`, and its `inputs` (§ *`inputs`*) |
+| none | the ELEMENT as a node holding one child per type the reference offers such an ELEMENT, in its order: `DV_TEXT`, `DV_CODED_TEXT`, `DV_MULTIMEDIA`, `DV_PARSABLE`, `DV_STATE`, `DV_BOOLEAN`, `DV_IDENTIFIER`, `DV_URI`, `DV_EHR_URI`, `DV_DURATION`, `DV_QUANTITY`, `DV_COUNT`, `DV_PROPORTION`, `DV_DATE_TIME`, `DV_TIME`, `DV_ORDINAL`, `DV_DATE`; each with no `nodeId`, `min` 0 and `max` 1, the ELEMENT's names, the ELEMENT path extended by `/value` as `aqlPath`, and the `inputs` of an unconstrained value of the type |
+
+The children of one ELEMENT share one `aqlPath`, as the reference's do, so a consumer tells them apart by `id`.
+An unfilled slot for an ELEMENT archetype is no ELEMENT: like any unfilled slot, it gives no node.
 
 Every ACTION **MUST** carry the reference's in-context `ism_transition` node, with no `nodeId`, since the RM requires the transition and the format has no other place for it:
 
@@ -1367,6 +1379,11 @@ Where siblings would **still** collide — no pinned name, and one shared displa
 The two-claimant spelling is fixed by the reference, not chosen: the upstream FLAT bodies for that template key those two nodes `…/conformance_action/dv_text` and `…/conformance_action/dv_text2`; the next-free extension beyond it is this SDK's conservative reading.
 Emitting duplicate sibling `id`s is **never** permitted; an export that still cannot make siblings unique **MUST** fail with a typed error rather than emit an ambiguous tree.
 
+The child an ELEMENT gives one of its value alternatives ([§ *Output shape*](#output-shape)) takes the reference's `id` for the alternative's type: the type without its `DV_` prefix, lower-cased, followed by `_value` (`quantity_value`, `coded_text_value`).
+Two alternatives of one type take the ordinal fallback (`text_value`, `text_value2`).
+An interval of a type **MUST** take `interval_of_<type>_value` (`interval_of_date_time_value`), the spelling of the reference's own IPS test Web Template.
+This one spelling diverges from the reference's code, which writes `interval<dv_date_time>_value`, a key EHRbase does not read.
+
 ### `inputs` (core clinical subset)
 
 Each `ELEMENT` value constraint (via REQ-103 primitive constraints) **MUST** map to `inputs[]` for the core clinical datatypes: `DV_TEXT` (one `TEXT` input; when the value's `C_STRING` carries a `List`, the input carries it as `list`, each entry with the list string as both `value` and `label`, as the `Corona_Anamnese` golden spells it; whenever that `C_STRING` sets `CString.ListOpen` ([§ REQ-103](#req-103--primitive-constraint-introspection)), with a `List` or without one, the input carries the flag as `listOpen`, as the reference reads it; a false `listOpen` is left out, an absent optional field under § *Conformance and deviations*), `DV_CODED_TEXT` (a `code` CODED_TEXT input with `list` / `listOpen` / `terminology`), `DV_QUANTITY` (`magnitude` DECIMAL + `unit` CODED_TEXT with validation), `DV_COUNT` (INTEGER/COUNT), `DV_ORDINAL` (an ordinal `list`), `DV_DATE_TIME` / `DV_DATE` / `DV_TIME` (temporal with pattern validation), `DV_BOOLEAN` (BOOLEAN), `DV_DURATION` (pattern-ordered INTEGER component fields), and `DV_PROPORTION` (`numerator` + `denominator`, with the percent-kind–derived denominator bound).
@@ -1382,11 +1399,13 @@ Any structural difference on that pinned surface is a failure; the following cat
 3. **Input-content omissions** — `defaultValue`; DV_DURATION per-field ranges; DV_QUANTITY `precision`; per-unit and multi-unit magnitude validation; list `label` for external-terminology codes; `localizedLabels` and per-item `termBindings`.
 4. **Local terminology** — `terminology` is emitted only for external bindings (e.g. `openehr`); the archetype-internal `local` value is omitted, mirroring the reference everywhere but on the merged ACTION `careflow_step` input, where the reference writes it.
 5. **Fixture-outlier `min` on in-context leaves** — where a vendored golden marks synthesized RM-attribute leaves `min=1` and the OPT constrains no `existence`, the export **MAY** emit `min=0`.
-   The `GECCO_Diagnose` golden (14 nodes) and the `test_all_types` golden (4 nodes on the ACTION subtree PROBE-075 compares) are such outliers; `constrain_test` and `Corona_Anamnese` agree with `min=0`.
+   The `GECCO_Diagnose` golden (14 nodes) and the `test_all_types` golden (4 nodes, all under its ACTION) are such outliers; `constrain_test` and `Corona_Anamnese` agree with `min=0`.
 6. **Reference-set terminology** — for a `C_CODE_REFERENCE`, `terminology` is the one its code phrase names, else the one its `terminology:` URI names, spelled as a TERMINOLOGY_ID ([§ REQ-103](#req-103--primitive-constraint-introspection)): `terminology:LOINC/2.73` gives `LOINC(2.73)`, and a URI of another scheme gives none.
    The reference takes the URI with its scheme dropped, `LOINC/2.73`, whatever the code phrase names.
 7. **Per-careflow-step ISM transition nodes** — the export keeps an ACTION's archetyped `ism_transition[atNNNN]` nodes beside the merged in-context `ism_transition` node; the reference drops them.
 8. **ACTION instruction details** — the reference's `instruction_details/activity_id` and `instruction_details/instruction_id` leaves under an ACTION are not emitted.
+9. **Coded-text and free-text pair in the `GECCO_Diagnose` golden** — that golden gives `name_des_problems_der_diagnose`, whose value admits `DV_TEXT` then `DV_CODED_TEXT`, as a `DV_TEXT` leaf.
+   The export merges the pair into the `DV_CODED_TEXT` leaf, as the reference's code does; the reference's own test reports that node as differing from its golden.
 
 An informative per-field catalogue behind these categories ships with the package; this section is the contract.
 
@@ -1396,7 +1415,7 @@ Also out of scope: the WebTemplate → OPT round-trip (the format is lossy by de
 
 Templates that **reuse one archetype under a multi-valued slot** (name-distinguished instances) **are exported**: the compiled template keeps shared-path subtrees, and node identity comes from the template-level node name, with `aqlPath` carrying the matching name predicate ([§ REQ-111 § Node names and name predicates](#node-names-and-name-predicates), [ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md)), so each reused sibling is distinct by construction instead of colliding on the shared concept term.
 
-- **Probes:** PROBE-075, structural parity against vendored EHRbase references: `constrain_test` and the two archetype-reuse oracles, `Corona_Anamnese` and `GECCO_Diagnose`, whose node `id` and `aqlPath` sets match their goldens within the documented deviations, and `test_all_types` on its ACTION subtree ([conformance.md](conformance.md)); [PROBE-086](conformance.md#probe-086--upstream-flat-serialisation-parity), upstream FLAT serialisation parity.
+- **Probes:** PROBE-075, structural parity against vendored EHRbase references: `constrain_test` and the two archetype-reuse oracles, `Corona_Anamnese` and `GECCO_Diagnose`, whose node `id` and `aqlPath` sets match their goldens within the documented deviations, and `test_all_types` on its ACTION subtree and its `choice` ELEMENT ([conformance.md](conformance.md)); [PROBE-086](conformance.md#probe-086--upstream-flat-serialisation-parity), upstream FLAT serialisation parity.
 
 ## REQ-112 — Template-less Reference Model validation floor
 

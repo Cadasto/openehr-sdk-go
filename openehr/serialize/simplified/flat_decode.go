@@ -225,17 +225,31 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 	// A value decoration beside a leaf's bare "" keeps the "" a value
 	// ([leafSuffixes]).
 	decorations := decoratingFamilies(attrGroups)
+	// The value type each ELEMENT with value types is spelled under: keys that
+	// reach two of them, or the ELEMENT itself and one of them, are refused
+	// before any of their values is built (REQ-053).
+	claims := make(valueClaims)
 	// Process leaf groups in a stable (sorted) order so the reconstructed tree
 	// is deterministic: distinct-node-id siblings are appended in this order,
 	// which must not depend on Go map iteration. [orderByTemplate] later puts
-	// them in template order.
+	// them in template order. The first pass reads each group's keys, the
+	// second builds and places its value.
+	type leafGroup struct {
+		base      string
+		leaf      *webtemplate.Node
+		predIndex map[string]int
+		predType  map[string]string
+		sfx       map[string]any
+		keyOf     func(suffix string) string
+	}
+	var leaves []leafGroup
 	for _, base := range slices.Sorted(maps.Keys(groups)) {
 		keyOf := func(suffix string) string { return keys[base][suffix] }
 		pk, err := parseFlatKey(base)
 		if err != nil {
 			return nil, err
 		}
-		leaf, predIndex, predType, err := resolveLeaf(wt, pk.segs, sib)
+		node, predIndex, predType, err := resolveLeaf(wt, pk.segs, sib)
 		if errors.Is(err, errSegNotFound) {
 			// A key that does not resolve to a Web Template node is a wrong
 			// template, a typo, or an unsupported _-prefixed RM attribute (ctx/
@@ -250,6 +264,8 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 		if err != nil {
 			return nil, fmt.Errorf("simplified: %q: %w", base, err)
 		}
+		// A key at an ELEMENT with value types reads as its first one.
+		leaf := valueLeaf(node)
 		if v, spelled := groups[base][sampleCountSuffix]; spelled && carriesSampleCount(leaf) {
 			// An event's sample count is a suffix on its node, which has no
 			// value of its own (REQ-053).
@@ -268,6 +284,15 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 		if len(sfx) == 0 {
 			continue
 		}
+		if reach, ok := valueTypeReached(pk.segs, node, sib); ok {
+			if err := claims.claim(reach, base); err != nil {
+				return nil, err
+			}
+		}
+		leaves = append(leaves, leafGroup{base: base, leaf: leaf, predIndex: predIndex, predType: predType, sfx: sfx, keyOf: keyOf})
+	}
+	for _, g := range leaves {
+		base, leaf, sfx, keyOf := g.base, g.leaf, g.sfx, g.keyOf
 		// The careflow step of a merged in-context ISM transition takes what it
 		// leaves out from its Web Template node, in both modes, once every key
 		// is placed ([settleMergedIsmTransition]).
@@ -276,7 +301,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 		if err != nil {
 			return nil, fmt.Errorf("simplified: decode %q: %w", base, err)
 		}
-		key, err := placeLeaf(compJSON, sib.nodePath(leaf), leaf.AQLPath, predIndex, predType, dv, budget, tmpl, sib)
+		key, err := placeLeaf(compJSON, sib.nodePath(leaf), leaf.AQLPath, g.predIndex, g.predType, dv, budget, tmpl, sib)
 		if err != nil {
 			return nil, fmt.Errorf("simplified: place %q: %w", base, err)
 		}
@@ -295,14 +320,14 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 	// Composite leaves are placed like any other leaf, after the clinical loop so a
 	// malformed ordinary key still surfaces first.
 	for _, g := range compositeGroups {
-		if err := placeCompositeLeaf(compJSON, wt, g, sib, budget, tmpl); err != nil {
+		if err := placeCompositeLeaf(compJSON, wt, g, sib, budget, tmpl, claims); err != nil {
 			return nil, err
 		}
 	}
 	// Underscore RM attributes come after the clinical leaves, so their owners
 	// are decorated onto nodes the content walk has already materialised rather
 	// than gap-filling their own (REQ-140).
-	if err := decodeRMAttrGroups(compJSON, wt, attrGroups, sib, budget, tmpl); err != nil {
+	if err := decodeRMAttrGroups(compJSON, wt, attrGroups, sib, budget, tmpl, claims); err != nil {
 		return nil, err
 	}
 	// Every member is placed, the ones a composite leaf or an underscore family
@@ -2429,6 +2454,12 @@ func splitCompositeLeafKey(wt *webtemplate.WebTemplate, key string, pk parsedKey
 			return "", "", 0, "", false
 		}
 		node = next
+		if hasValueTypes(node) && atValueLeaf(node, pk.segs[i+1:]) && isCompositeLeafType(nodeRMType(valueLeaf(node))) {
+			// A key at an ELEMENT with value types reads as its first one, here
+			// a composite leaf: the key is that leaf's, spelled at the ELEMENT.
+			base, tail := cutAtSeg(key, i)
+			return base, seg.id, seg.idx, tail, true
+		}
 		if len(node.Children) > 0 || !isCompositeLeafType(nodeRMType(node)) {
 			continue
 		}
@@ -2452,6 +2483,15 @@ func splitCompositeLeafKey(wt *webtemplate.WebTemplate, key string, pk parsedKey
 		return base, seg.id, seg.idx, tail, true
 	}
 	return "", "", 0, "", false
+}
+
+// atValueLeaf reports whether a key whose segments after the ELEMENT node el
+// are rest is spelled at el itself, where it reads as el's first value type
+// ([valueLeaf]): rest is empty, or starts with a sub-path of that type's own
+// grammar, a segment that is no child of el and no underscore family, which
+// the `_` router owns.
+func atValueLeaf(el *webtemplate.Node, rest []flatSeg) bool {
+	return len(rest) == 0 || (childByID(el, rest[0].id) == nil && !strings.HasPrefix(rest[0].id, "_"))
 }
 
 // childByID returns node's child with the given FLAT segment id, or nil.
@@ -2485,8 +2525,10 @@ func compositeLeafOwnsSub(rmType, seg string) bool {
 
 // placeCompositeLeaf decodes one composite-leaf group and places the value at the
 // leaf's canonical path, exactly as the clinical leaf loop places a DataValue.
+// A group under, or at, an ELEMENT with value types claims the value type it
+// reaches first, refused where the body's keys reach another (claims).
 func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g rmattrGroup,
-	sib *reusedSiblings, budget *allocBudget, tmpl *templateIndex,
+	sib *reusedSiblings, budget *allocBudget, tmpl *templateIndex, claims valueClaims,
 ) error {
 	pk, err := parseFlatKey(g.prefix())
 	if err != nil {
@@ -2504,7 +2546,10 @@ func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g 
 		// reused-sibling refusal, each with its own message.
 		return fmt.Errorf("simplified: %q: %w", g.prefix(), err)
 	}
-	value, ordinalBounds, err := compositeLeafValue(g, nodeRMType(node), tmpl != nil)
+	reach, reached := valueTypeReached(pk.segs, node, sib)
+	// A key at an ELEMENT with value types reads as its first one.
+	node = valueLeaf(node)
+	value, ordinalBounds, err := compositeLeafValue(g, node, tmpl != nil)
 	if err == nil || errors.Is(err, errNothingMatched) {
 		if dupErr := g.settleDups(); dupErr != nil {
 			return dupErr
@@ -2515,6 +2560,11 @@ func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g 
 	}
 	if err != nil {
 		return err
+	}
+	if reached {
+		if err := claims.claim(reach, g.prefix()); err != nil {
+			return err
+		}
 	}
 	key, err := placeLeaf(compJSON, sib.nodePath(node), node.AQLPath, predIndex, predType, value, budget, tmpl, sib)
 	if err != nil {
@@ -2532,15 +2582,15 @@ func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g 
 	return nil
 }
 
-// compositeLeafValue decodes a composite leaf's group by its RM type: the party
-// grammar (rmattr_party.go) or the interval grammar (rmattr_value.go), each the
-// same implementation those families use at every other position. It also
-// returns the bounds of a DV_INTERVAL<DV_ORDINAL> leaf that were built from
-// their suffixes, which a WithTemplate decode (deferred) completes and whose
-// symbols it settles once the leaf is placed.
-func compositeLeafValue(g rmattrGroup, rmType string, deferred bool) (map[string]any, []string, error) {
-	if anchor, isInterval := intervalLeafAnchor(rmType); isInterval {
-		return intervalLeafSuffixes(g, anchor, deferred)
+// compositeLeafValue decodes a composite leaf's group by the leaf's RM type:
+// the party grammar (rmattr_party.go) or the interval grammar
+// (rmattr_value.go), each the same implementation those families use at every
+// other position. It also returns the bounds of a DV_INTERVAL<DV_ORDINAL> leaf
+// that were built from their suffixes, which a WithTemplate decode (deferred)
+// completes and whose symbols it settles once the leaf is placed.
+func compositeLeafValue(g rmattrGroup, leaf *webtemplate.Node, deferred bool) (map[string]any, []string, error) {
+	if anchor, isInterval := intervalLeafAnchor(nodeRMType(leaf)); isInterval {
+		return intervalLeafSuffixes(g, leafHolds(leaf), anchor, deferred)
 	}
 	party, populated, err := partyLeafSuffixes(g)
 	if err != nil {
@@ -2573,7 +2623,10 @@ func compositeLeafValue(g rmattrGroup, rmType string, deferred bool) (map[string
 //     that way on `…/any_event:0/dv_quantity`). A childless leaf whose canonical
 //     path does not end in `/value` hides no LOCATABLE (an in-context
 //     `context/start_time`, an ENTRY `language`, an ISM_TRANSITION member), so
-//     it has no underscore owner and the key is unresolvable.
+//     it has no underscore owner and the key is unresolvable. An ELEMENT with
+//     value types ([hasValueTypes]) owns its own families at its node, and
+//     reads a value decoration there as its first value type's; under one of
+//     its value types the ELEMENT owns that value's decorations alone.
 func rmattrOwnerAt(wt *webtemplate.WebTemplate, compJSON map[string]any, base string,
 	sib *reusedSiblings, budget *allocBudget, tmpl *templateIndex,
 ) (rmattrOwner, error) {
@@ -2613,18 +2666,30 @@ func rmattrOwnerAt(wt *webtemplate.WebTemplate, compJSON map[string]any, base st
 	if err != nil {
 		return rmattrOwner{}, err
 	}
-	ownerAql, ownerNames, kind, leaf := sib.nodePath(node), node.AQLPath, nodeRMType(node), ""
-	if len(node.Children) == 0 {
+	owner := rmattrOwner{kind: nodeRMType(node)}
+	owner.reach, _ = valueTypeReached(segs, node, sib)
+	ownerAql, ownerNames := sib.nodePath(node), node.AQLPath
+	switch {
+	case hasValueTypes(node):
+		// An ELEMENT with value types owns its own families, and a value
+		// decoration spelled at it reads as its first value type's, as a key at
+		// it does ([valueLeaf]).
+		owner.leaf = nodeRMType(valueLeaf(node))
+	case len(node.Children) == 0:
 		trimmed, isElementValue := strings.CutSuffix(ownerAql, "/value")
 		if !isElementValue {
 			return rmattrOwner{}, errSegNotFound
 		}
 		// The leaf's own RM type is the *anchor* the value-decoration families are
 		// judged and decoded against (REQ-140 § C1): one FLAT path addresses both
-		// the ELEMENT and the DataValue it holds.
-		ownerAql, ownerNames, kind, leaf = trimmed, strings.TrimSuffix(ownerNames, "/value"), "ELEMENT", nodeRMType(node)
+		// the ELEMENT and the DataValue it holds. Under a value type of an ELEMENT
+		// with value types it addresses the value alone: the ELEMENT's own
+		// families are spelled at the ELEMENT.
+		ownerAql, ownerNames = trimmed, strings.TrimSuffix(ownerNames, "/value")
+		owner.kind, owner.leaf, owner.valueOnly = "ELEMENT", nodeRMType(node), sib.elementOf(node) != nil
 	}
-	return rmattrOwner{kind: kind, leaf: leaf, resolve: walk(ownerAql, ownerNames, predIndex, predType)}, nil
+	owner.resolve = walk(ownerAql, ownerNames, predIndex, predType)
+	return owner, nil
 }
 
 // bareAQLPath strips REQ-111 name predicates from a compiled AQL path,

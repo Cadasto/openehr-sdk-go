@@ -15,9 +15,11 @@ extended with coded/ordinal list values and ordinals, a careflow step's
 numeric validation ranges — against **three** vendored references since REQ-116
 Phase 4: `constrain_test` **104/104** (exact, node and input), `Corona_Anamnese`
 **230/230** and `GECCO_Diagnose` **34/34** (exact structurally; their documented
-input and `min` deltas are pinned by count below). A fourth, the reference's
-`test_all_types` golden, is compared on its ACTION subtree alone
-(`TestREQ106ActionParity`), with each delta named and pinned by category below.
+input, `min` and `rmType` deltas are pinned by count below). A fourth, the
+reference's `test_all_types` golden, is compared on two subtrees: its ACTION
+(`TestREQ106ActionParity`), with each delta named and pinned by category below,
+and its EVALUATION's `choice` ELEMENT, whose value admits two types, exactly
+(`TestREQ106ChoiceParity`).
 The deltas below are the parts of the reference this slice deliberately does
 **not** reproduce. Any change that makes a *pinned* field diverge is a test
 failure, not a deviation.
@@ -179,6 +181,29 @@ failure, not a deviation.
     `id` with an un-suffixed `aqlPath` is the expected shape, and FLAT keys derive
     from the `id` chain alone.
 
+- **ELEMENT value alternatives** — match the reference (`OPTParser.updateChoiceId`,
+  `addAnyNode`, `pushProperties`; `Filter.preHandle`, `skip`). By the value
+  alternatives an ELEMENT's template constrains:
+
+  | The ELEMENT's value has | The builder emits |
+  |---|---|
+  | one alternative | a single leaf of its type at `<element>/value`, with the ELEMENT's `id`, `nodeId`, names and occurrences |
+  | two alternatives, one DV_CODED_TEXT and one DV_TEXT, in either order | that leaf for the DV_CODED_TEXT, its `code` list open, plus an `other` TEXT input |
+  | any other two or more alternatives | the ELEMENT as a node without inputs, with one child per alternative in template order: `id` `<type>_value`, the ELEMENT's `nodeId` and names, the alternative's own occurrences and inputs, `aqlPath` `<element>/value` |
+  | none | the ELEMENT as a node with the reference's 17 children, DV_TEXT to DV_DATE in its order: no `nodeId`, `0..1`, the ELEMENT's names, and the inputs of an unconstrained value of the type (none outside the core subset) |
+
+  The children share one `aqlPath`, as in the reference, so they are told apart by
+  `id`. Two alternatives of one type take the sibling ordinal (`text_value`,
+  `text_value2`). An unfilled slot for an ELEMENT archetype is no ELEMENT: it is
+  pruned as any unfilled slot is, as the reference skips it. Pinned by
+  `TestREQ106ElementValueAlternatives`, and against the `test_all_types` golden by
+  `TestREQ106ChoiceParity`.
+
+  One spelling **diverges** from the reference's code: an interval alternative,
+  `DV_INTERVAL<DV_DATE_TIME>`, takes the `id` `interval_of_date_time_value`, the
+  reference's own IPS test Web Template spelling, where its code writes
+  `interval<dv_date_time>_value`. The reference's FLAT reader does not read that key.
+
 - **Single-occurrence `EVENT` containers are lifted, not emitted** — matches the
   reference. An abstract `EVENT` constrained to at most one occurrence contributes
   no node of its own; its `events[…]` path segment and its in-context `time` leaf
@@ -200,6 +225,14 @@ failure, not a deviation.
   widen to cover a real regression. The `test_all_types` golden does the same: on
   its ACTION subtree the `encoding`, `language`, `subject` and `time` leaves, pinned
   by name in `TestREQ106ActionParity`.
+
+- **GECCO golden gives a DV_TEXT leaf for a coded-text and free-text pair** — 1 node,
+  `name_des_problems_der_diagnose` (`at0002`), whose value admits DV_TEXT then
+  DV_CODED_TEXT: golden `rmType` DV_TEXT, where the builder, as the pinned reference
+  code, merges the pair into the DV_CODED_TEXT leaf. **The golden is the outlier** —
+  the reference's own `OPTParserTest.parseGECCODiagnose` lists that node as differing
+  from its golden. Every other field matches; the count is pinned at 1 in
+  `TestStructuralParity`.
 
 ## Input-level (contents beyond suffix/type)
 
@@ -239,18 +272,22 @@ failure, not a deviation.
   `C_CODE_REFERENCE`, so `TestInputParity` does not meet this; the cases are pinned by
   `TestCodedTextInput_REQ106_REQ103_ReferenceSetTerminology`.
 - **`listOpen`** — emitted (`true`) for an open coded list: an empty constraint list, or
-  a DV_CODED_TEXT with a DV_TEXT alternative (the free-text `other` input admits values
-  beyond the enumerated codes), mirroring the reference (pinned by `TestInputParity`).
+  the DV_CODED_TEXT leaf of a coded-text and free-text pair, in either order (the
+  free-text `other` input admits values beyond the enumerated codes), mirroring the
+  reference (pinned by `TestInputParity`).
 - **Oracle input deltas** — a constrained DV_TEXT's TEXT input carries the C_STRING
   `list` and `listOpen` as the reference does, which closed 19 of Corona's 20 deltas.
   It also carries a C_STRING `pattern` that is not blank as `validation.pattern`, as
   the reference does; no vendored golden holds one.
   **Corona 1 delta, GECCO 1** remain: Corona's `medication_use` node `at0027` (golden
   `code:TEXT` + `value:TEXT`, ours `code:CODED_TEXT` open) and GECCO's
-  `problem_diagnosis…/items[at0002]/value` (golden 2 inputs vs 1); `constrain_test`
-  remains 104/104 exact. Structural parity is exact for all three, so only the input
-  signature differs. The counts are pinned per fixture in `TestInputParity`, so the gap
-  must shrink deliberately and cannot grow unnoticed.
+  `problem_diagnosis…/items[at0002]/value`, the merged coded-text leaf above (golden a
+  TEXT input, open, and `other:TEXT`, from its DV_TEXT leaf; ours `code:CODED_TEXT`
+  open and `other:TEXT`; the reference's code gives `value:TEXT`, `code:TEXT` open and
+  `other:TEXT`, the unconstrained coded text of Corona's node); `constrain_test`
+  remains 104/104 exact. Only the input signature differs at either node. The counts
+  are pinned per fixture in `TestInputParity`, so the gap must shrink deliberately and
+  cannot grow unnoticed.
 
 ## Scope
 
@@ -258,7 +295,10 @@ failure, not a deviation.
   REQ-116: `templatecompile` admits shared-path subtrees, the name predicate separates
   the reused siblings' paths, and the pinned name gives each a distinct web `id`. See
   § Sibling `id` disambiguation above for the verified mechanism.
-- **Multiple value alternatives** — only the first value alternative is used, except the
-  DV_CODED_TEXT + DV_TEXT pair, which is rendered as `code` + `other` inputs.
+- **Multiple value alternatives** — emitted as the reference does (§ ELEMENT value
+  alternatives above). The reference's choice between an ELEMENT's value and a
+  `null_flavour` the template constrains is not: the builder reads the value
+  alternatives alone, so `Demonstration.v1`'s four ELEMENTs that constrain a DV_BOOLEAN
+  value and a `null_flavour` still collapse into their DV_BOOLEAN leaf.
 - **Byte parity** — field ordering and absent optional fields differ from the reference by
   design; only the structural surface above is guaranteed.

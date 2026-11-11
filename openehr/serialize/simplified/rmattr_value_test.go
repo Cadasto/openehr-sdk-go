@@ -502,6 +502,32 @@ func TestRMAttrMappingComposesWithTextForms(t *testing.T) {
 	}
 }
 
+// TestREQ053DecorationBesideRawOfAnotherType — REQ-053. A value decoration is
+// decoded against its leaf's datatype, so beside a `|raw` value of an unrelated
+// type it does not fit the value it lands on. Decode refuses it with
+// ErrUnsupportedDatatype naming the decoration's key, never with a
+// canonical-JSON error naming a path the body does not spell.
+func TestREQ053DecorationBesideRawOfAnotherType(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	body := rmattrBody(map[string]any{
+		rmattrCount + "|raw":                          map[string]any{"_type": "DV_QUANTITY", "magnitude": 3.0, "units": "mm"},
+		rmattrCount + "/_normal_range/lower":          1,
+		rmattrCount + "/_normal_range/upper":          5,
+		rmattrCount + "/_normal_range|lower_included": true,
+	})
+	b, err := json.Marshal(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = UnmarshalFlat(b, wt)
+	if !errors.Is(err, ErrUnsupportedDatatype) {
+		t.Fatalf("UnmarshalFlat = %v, want %v", err, ErrUnsupportedDatatype)
+	}
+	if want := rmattrCount + "/_normal_range"; !strings.Contains(err.Error(), want) {
+		t.Errorf("UnmarshalFlat = %q, want it to name %q", err, want)
+	}
+}
+
 // TestRMAttrMappingMatchValidated — REQ-140. `|match` is the single character
 // TERM_MAPPING's `match` admits (`=`, `<`, `>`, `?` — ISO 2788 / 5964). Anything
 // else is a typed error rather than a silently truncated or zero rune, in both

@@ -300,7 +300,16 @@ type rmattrOwner struct {
 	// leaf is the RM type of the DataValue a collapsed ELEMENT owner holds under
 	// `value` ("" when the owner is not a collapsed leaf) — the **anchor** the
 	// value-decoration families are judged and decoded against (REQ-140 § C1).
-	leaf    string
+	// An ELEMENT with value types holds its first one's ([valueLeaf]).
+	leaf string
+	// valueOnly reports an owner reached through a value type of an ELEMENT
+	// with value types ([hasValueTypes]): only the value's decorations are read
+	// there, since the ELEMENT's own families are spelled at the ELEMENT.
+	valueOnly bool
+	// reach is the value type of an ELEMENT with value types the owner's path
+	// reaches, which a value decoration claims ([valueClaims]); its element is
+	// "" for any other owner.
+	reach   valueReach
 	resolve func(attr string) (map[string]any, error)
 }
 
@@ -419,8 +428,12 @@ type rmattrDecoded struct {
 //     which is unmatched is not in the body the decode reads;
 //  5. only then is the owner materialised, so a refusal leaves no half-built
 //     node in the rebuilt tree.
+//
+// A value decoration under, or at, an ELEMENT with value types claims the
+// value type it reaches once it decodes, and is refused with ErrUnknownPath
+// where the body's keys reach another (claims, [valueClaims]).
 func decodeRMAttrGroups(compJSON map[string]any, wt *webtemplate.WebTemplate, groups []rmattrGroup,
-	sib *reusedSiblings, budget *allocBudget, tmpl *templateIndex,
+	sib *reusedSiblings, budget *allocBudget, tmpl *templateIndex, claims valueClaims,
 ) error {
 	var ready []rmattrDecoded
 	for _, g := range groups {
@@ -456,6 +469,14 @@ func decodeRMAttrGroups(compJSON map[string]any, wt *webtemplate.WebTemplate, gr
 		}
 		if err != nil {
 			return err
+		}
+		if fam.value && owner.reach.element != "" {
+			// A value decoration spells the value it decorates: under one value
+			// type of an ELEMENT with value types it reaches that type
+			// ([valueClaims]).
+			if err := claims.claim(owner.reach, g.prefix()); err != nil {
+				return err
+			}
 		}
 		ready = append(ready, rmattrDecoded{g: g, owner: owner, fam: fam, judged: judged, val: val})
 	}
@@ -493,7 +514,7 @@ func rmattrFamilyAt(owner rmattrOwner, g rmattrGroup) (rmattrFamily, string, err
 			ErrNotModelled, g.prefix(), owner.kind, rmattrDeferredFamilies[g.family])
 	}
 	fam, judged, read := rmattrFamilyOf(owner.kind, owner.leaf, g.family)
-	if !read {
+	if !read || (owner.valueOnly && !fam.value) {
 		g.dropAll()
 		return rmattrFamily{}, "", errNothingMatched
 	}
@@ -586,13 +607,44 @@ func (f rmattrFamily) host() string {
 // which would invent a magnitude or a rubric the author never wrote. (An ELEMENT
 // legitimately *without* a value carries `_null_flavour` instead, which is an
 // owner family and never reaches here.)
+//
+// The decoration is decoded against the anchor, so it fits a value of the
+// anchor's type, a subtype of it or a supertype of it (a coded text at a text
+// leaf, a free text at a coded one). A value of an unrelated type, a `|raw`
+// fragment of another datatype, is refused with ErrUnsupportedDatatype naming
+// the decoration's key, where canonical JSON would refuse it naming a path the
+// body does not spell (REQ-053).
 func rmattrValueNode(node map[string]any, g rmattrGroup, anchor string) (map[string]any, error) {
 	dv, ok := node["value"].(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("%w: %q decorates a %s value the body does not carry; spell the leaf itself beside it",
 			ErrUnsupportedDatatype, g.prefix(), anchor)
 	}
+	if typ, _ := dv["_type"].(string); !relatedTypes(typ, anchor) {
+		return nil, fmt.Errorf("%w: %q decorates a %s value, but the value spelled beside it is of an unrelated type",
+			ErrUnsupportedDatatype, g.prefix(), anchor)
+	}
 	return dv, nil
+}
+
+// relatedTypes reports whether one of the RM types a and b conforms to the
+// other. A type the RM hierarchy does not judge is taken as related, and left
+// to canonical JSON.
+func relatedTypes(a, b string) bool {
+	h, ok := rminfo.Default.(rminfo.Hierarchy)
+	if !ok || a == "" || b == "" {
+		return true
+	}
+	ca, cb := bmmtype.Class(a), bmmtype.Class(b)
+	if _, known := h.Ancestors(ca); !known {
+		return true
+	}
+	if _, known := h.Ancestors(cb); !known {
+		return true
+	}
+	aToB, _ := h.ConformsTo(ca, cb)
+	bToA, _ := h.ConformsTo(cb, ca)
+	return aToB || bToA
 }
 
 // checkRMAttrIndexes applies the FLAT `:index` rules to a `_family:N` sequence.

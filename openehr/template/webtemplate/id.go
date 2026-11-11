@@ -91,3 +91,18 @@ func firstNonEmptyID(candidates ...string) string {
 	}
 	return ""
 }
+
+// choiceID returns the id of one of an ELEMENT's value alternatives, of
+// rmType: the type without its DV_ prefix, lower-cased, followed by `_value`
+// (`quantity_value`), as the reference spells it. An interval of a type reads
+// `interval_of_<type>_value` (`interval_of_date_time_value`), the spelling of
+// the reference's IPS test Web Template, where the reference's own code writes
+// the type's generic form.
+func choiceID(rmType string) string {
+	outer, param, generic := strings.Cut(rmType, "<")
+	id := strings.ToLower(strings.TrimPrefix(outer, "DV_"))
+	if generic {
+		id += "_of_" + strings.ToLower(strings.TrimPrefix(strings.TrimSuffix(param, ">"), "DV_"))
+	}
+	return id + "_value"
+}

@@ -133,6 +133,24 @@ func FuzzSanitizeID(f *testing.F) {
 	})
 }
 
+// TestChoiceID — REQ-106. A value alternative's id is its type without the DV_
+// prefix, lower-cased, with `_value`; an interval of a type reads
+// `interval_of_<type>_value`, as the reference's IPS Web Template spells it.
+func TestChoiceID(t *testing.T) {
+	tests := []struct{ rmType, want string }{
+		{rmType: "DV_QUANTITY", want: "quantity_value"},
+		{rmType: "DV_CODED_TEXT", want: "coded_text_value"},
+		{rmType: "DV_EHR_URI", want: "ehr_uri_value"},
+		{rmType: "DV_INTERVAL<DV_DATE_TIME>", want: "interval_of_date_time_value"},
+		{rmType: "DV_INTERVAL<DV_QUANTITY>", want: "interval_of_quantity_value"},
+	}
+	for _, tc := range tests {
+		if got := choiceID(tc.rmType); got != tc.want {
+			t.Errorf("choiceID(%q) = %q, want %q", tc.rmType, got, tc.want)
+		}
+	}
+}
+
 // durationFields maps an ISO-8601-style C_DURATION pattern to ordered field
 // names (REQ-106).
 func TestDurationFields(t *testing.T) {

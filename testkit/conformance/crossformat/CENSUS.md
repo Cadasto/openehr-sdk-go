@@ -25,16 +25,16 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 | alternative_events | canonical-flat | compared 21, missing 0, extra 0, altered 0, excluded 0 |
 | alternative_events | flat-canonical | compared 115, missing 8, extra 12, altered 13, excluded 0 |
 | consult_record | json-xml | compared 150, missing 0, extra 0, altered 0, excluded 0 |
-| consult_record | canonical-flat | compared 26, missing 1, extra 6, altered 0, excluded 0 |
-| consult_record | flat-canonical | compared 150, missing 7, extra 0, altered 4, excluded 3 |
+| consult_record | canonical-flat | compared 26, missing 0, extra 5, altered 0, excluded 0 |
+| consult_record | flat-canonical | compared 150, missing 1, extra 0, altered 4, excluded 2 |
 | consult_record | flat-structured | compared 40, missing 12, extra 5, altered 0, excluded 0 |
-| consult_record | structured-flat | compared 29, missing 0, extra 1, altered 0, excluded 1 |
+| consult_record | structured-flat | compared 30, missing 0, extra 1, altered 0, excluded 0 |
 | corona | canonical-flat | compared 104, missing 0, extra 0, altered 1, excluded 0 |
 | corona | flat-canonical | compared 641, missing 0, extra 0, altered 15, excluded 0 |
 | corona | flat-structured | compared 113, missing 0, extra 0, altered 0, excluded 0 |
 | corona | structured-flat | compared 104, missing 0, extra 0, altered 0, excluded 0 |
-| ehrn_abdm | canonical-flat | compared 31, missing 1, extra 1, altered 0, excluded 0 |
-| ehrn_abdm | flat-canonical | compared 150, missing 6, extra 0, altered 4, excluded 1 |
+| ehrn_abdm | canonical-flat | compared 31, missing 0, extra 0, altered 0, excluded 0 |
+| ehrn_abdm | flat-canonical | compared 150, missing 0, extra 0, altered 4, excluded 0 |
 | family_history | json-xml | compared 95, missing 0, extra 0, altered 0, excluded 0 |
 | multi_list | flat-structured | compared 50, missing 0, extra 0, altered 0, excluded 0 |
 | multi_list | structured-flat | compared 41, missing 0, extra 0, altered 0, excluded 0 |
@@ -44,8 +44,8 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 | nested | flat-canonical | compared 156, missing 34, extra 4, altered 8, excluded 0 |
 | persistent_minimal | canonical-flat | compared 11, missing 0, extra 2, altered 1, excluded 0 |
 | persistent_minimal | flat-canonical | compared 72, missing 2, extra 0, altered 5, excluded 0 |
-| test_all_types | canonical-flat | compared 83, missing 4, extra 7, altered 11, excluded 0 |
-| test_all_types | flat-canonical | compared 423, missing 40, extra 40, altered 32, excluded 3 |
+| test_all_types | canonical-flat | compared 83, missing 2, extra 5, altered 11, excluded 0 |
+| test_all_types | flat-canonical | compared 423, missing 35, extra 42, altered 35, excluded 1 |
 
 ## alternative_events
 
@@ -97,37 +97,28 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 
 ### canonical-flat
 
-- Outcome: compared 26, missing 1, extra 6, altered 0, excluded 0
-- Reason: Choice element: the template lets media_file/created hold a DV_DATE_TIME or a DV_INTERVAL; upstream spells the value created/date_time_value, the SDK's Web Template keeps one value leaf, created. ctx/location: upstream spells EVENT_CONTEXT.location ctx/location, which the hold-out removes, and the codec writes context/_location. ENTRY language and encoding: the upstream FLAT omits them on document_attachment and FLAT encode writes them (4 keys).
-- Missing (1):
-  - `opconsultation/document_attachment/media_file/created/date_time_value`
-- Extra (6):
+- Outcome: compared 26, missing 0, extra 5, altered 0, excluded 0
+- Reason: ctx/location: upstream spells EVENT_CONTEXT.location ctx/location, which the hold-out removes, and the codec writes context/_location. ENTRY language and encoding: the upstream FLAT omits them on document_attachment and FLAT encode writes them (4 keys).
+- Extra (5):
   - `opconsultation/context/_location`
   - `opconsultation/document_attachment/encoding|code`
   - `opconsultation/document_attachment/encoding|terminology`
   - `opconsultation/document_attachment/language|code`
   - `opconsultation/document_attachment/language|terminology`
-  - `opconsultation/document_attachment/media_file/created`
 
 ### flat-canonical
 
-- Outcome: compared 150, missing 7, extra 0, altered 4, excluded 3
-- Reason: The 3 excluded keys are ctx/time, refused, and ctx/location and created/date_time_value, reported as unmatched content, as follows. UPSTREAM consult_record ctx conflict: the FLAT gives ctx/time and context/start_time different values, decode refuses the pair and the harness removes ctx/time; the start time left agrees with the canonical. ctx/location: the codec does not read ctx/location (it reads context/_location), so the location is missing. Choice element: decode does not read media_file/created/date_time_value (the SDK spells it created), so the media_file cluster lacks its created element (6 leaves). RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (4 leaves).
-- Missing (7):
-  - `/content/0/data/items/2/items/2/_type`
-  - `/content/0/data/items/2/items/2/archetype_node_id`
-  - `/content/0/data/items/2/items/2/name/_type`
-  - `/content/0/data/items/2/items/2/name/value`
-  - `/content/0/data/items/2/items/2/value/_type`
-  - `/content/0/data/items/2/items/2/value/value`
+- Outcome: compared 150, missing 1, extra 0, altered 4, excluded 2
+- Reason: The 2 excluded keys are ctx/time, refused, and ctx/location, reported as unmatched content, as follows. UPSTREAM consult_record ctx conflict: the FLAT gives ctx/time and context/start_time different values, decode refuses the pair and the harness removes ctx/time; the start time left agrees with the canonical. ctx/location: the codec does not read ctx/location (it reads context/_location), so the location is missing. RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (4 leaves).
+- Missing (1):
   - `/context/location`
 - Altered (4):
   - `/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
   - `/content/0/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
   - `/content/0/data/items/2/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
   - `/context/other_context/items/0/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
-- Reducing decode removed 3 keys from the upstream FLAT:
-  - 2: `reported as unmatched content`
+- Reducing decode removed 2 keys from the upstream FLAT:
+  - 1: `reported as unmatched content`
   - 1: `simplified: path not in web template: conflicting spellings of <key>: "<key>" and "opconsultation/context/start_time" give different values; remove one`
 
 ### flat-structured
@@ -154,14 +145,10 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 
 ### structured-flat
 
-- Outcome: compared 29, missing 0, extra 1, altered 0, excluded 1
-- Reason: ctx/location: the upstream FLAT spells the location ctx/location, which the hold-out removes, while the upstream STRUCTURED spells it context/_location, which decodes and re-encodes, so only our side carries it. Excluded: one family drops out of both sides of the comparison: decode reports media_file/created/date_time_value (choice element) as unmatched content.
+- Outcome: compared 30, missing 0, extra 1, altered 0, excluded 0
+- Reason: ctx/location: the upstream FLAT spells the location ctx/location, which the hold-out removes, while the upstream STRUCTURED spells it context/_location, which decodes and re-encodes, so only our side carries it.
 - Extra (1):
   - `opconsultation/context/_location`
-- Reducing decode removed 1 key from the upstream FLAT:
-  - 1: `reported as unmatched content`
-- Reducing decode removed 1 key from the flattened upstream STRUCTURED:
-  - 1: `reported as unmatched content`
 
 ## corona
 
@@ -200,31 +187,17 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 
 ### canonical-flat
 
-- Outcome: compared 31, missing 1, extra 1, altered 0, excluded 0
-- Reason: Choice element: the template lets media_file/created hold a DV_DATE_TIME or a DV_INTERVAL; upstream spells the value created/date_time_value, the SDK's Web Template keeps one value leaf, created.
-- Missing (1):
-  - `opconsultation/document_attachment/media_file/created/date_time_value`
-- Extra (1):
-  - `opconsultation/document_attachment/media_file/created`
+- Outcome: compared 31, missing 0, extra 0, altered 0, excluded 0
 
 ### flat-canonical
 
-- Outcome: compared 150, missing 6, extra 0, altered 4, excluded 1
-- Reason: The excluded key is created/date_time_value, reported as unmatched content, as follows. Choice element: decode does not read media_file/created/date_time_value (the SDK spells it created), so the media_file cluster lacks its created element (6 leaves). RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (4 leaves).
-- Missing (6):
-  - `/content/0/data/items/2/items/2/_type`
-  - `/content/0/data/items/2/items/2/archetype_node_id`
-  - `/content/0/data/items/2/items/2/name/_type`
-  - `/content/0/data/items/2/items/2/name/value`
-  - `/content/0/data/items/2/items/2/value/_type`
-  - `/content/0/data/items/2/items/2/value/value`
+- Outcome: compared 150, missing 0, extra 0, altered 4, excluded 0
+- Reason: RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (4 leaves).
 - Altered (4):
   - `/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
   - `/content/0/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
   - `/content/0/data/items/2/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
   - `/context/other_context/items/0/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
-- Reducing decode removed 1 key from the upstream FLAT:
-  - 1: `reported as unmatched content`
 
 ## family_history
 
@@ -362,17 +335,13 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 
 ### canonical-flat
 
-- Outcome: compared 83, missing 4, extra 7, altered 11, excluded 0
-- Reason: party reference type: the canonical types the composer's reference PERSON, so FLAT encode writes composer|type, which the upstream FLAT omits. HISTORY.origin: the origin is 6 ms before the event time, so FLAT encode writes it as history_origin, which the upstream FLAT omits. Choice element: upstream spells the value of the choice element choice/quantity_value, the SDK choice. DV_IDENTIFIER: this upstream FLAT writes the id as the bare value, the codec as |id. DV_PROPORTION: upstream writes the derived magnitude as a bare value, which the codec does not write (a PROBE-086 residue), and writes the Integer type and the Real denominator as 1.0 where the codec writes 1. Upstream date and time spelling: the canonical writes dates in the basic format (20190114) and date-times with a comma and +00:00, the FLAT in the extended format with a full stop and Z (8 leaves). Upstream conversion differences: upstream openEHR_SDK's FlatJsonMarshallerTest.toFlatJsonAllTypesErrors encodes this canonical (all_types_no_multimedia.json) as FLAT and expects these differences against this FLAT (test_all_types.json): duration_any (P1Y2M10DT2H30M against PT30M), a DV_URI only the canonical carries and the proportion's precision, which only the canonical carries, besides the DV_IDENTIFIER and proportion type spellings above.
-- Missing (4):
-  - `test_all_types/test_all_types2:0/choice/quantity_value|magnitude`
-  - `test_all_types/test_all_types2:0/choice/quantity_value|unit`
+- Outcome: compared 83, missing 2, extra 5, altered 11, excluded 0
+- Reason: party reference type: the canonical types the composer's reference PERSON, so FLAT encode writes composer|type, which the upstream FLAT omits. HISTORY.origin: the origin is 6 ms before the event time, so FLAT encode writes it as history_origin, which the upstream FLAT omits. DV_IDENTIFIER: this upstream FLAT writes the id as the bare value, the codec as |id. DV_PROPORTION: upstream writes the derived magnitude as a bare value, which the codec does not write (a PROBE-086 residue), and writes the Integer type and the Real denominator as 1.0 where the codec writes 1. Upstream date and time spelling: the canonical writes dates in the basic format (20190114) and date-times with a comma and +00:00, the FLAT in the extended format with a full stop and Z (8 leaves). Upstream conversion differences: upstream openEHR_SDK's FlatJsonMarshallerTest.toFlatJsonAllTypesErrors encodes this canonical (all_types_no_multimedia.json) as FLAT and expects these differences against this FLAT (test_all_types.json): duration_any (P1Y2M10DT2H30M against PT30M), a DV_URI only the canonical carries and the proportion's precision, which only the canonical carries, besides the DV_IDENTIFIER and proportion type spellings above.
+- Missing (2):
   - `test_all_types/test_all_types:0/identifier`
   - `test_all_types/test_all_types:0/proportion_any`
-- Extra (7):
+- Extra (5):
   - `test_all_types/composer|type`
-  - `test_all_types/test_all_types2:0/choice|magnitude`
-  - `test_all_types/test_all_types2:0/choice|unit`
   - `test_all_types/test_all_types2:0/uri`
   - `test_all_types/test_all_types:0/history_origin`
   - `test_all_types/test_all_types:0/identifier|id`
@@ -391,20 +360,20 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 
 ### flat-canonical
 
-- Outcome: compared 423, missing 40, extra 40, altered 32, excluded 3
-- Reason: The 3 excluded keys are choice/quantity_value|magnitude and |unit (2) and the bare proportion_any (1), reported as unmatched content, as follows. ISM transition careflow step: the upstream FLAT gives the section_3 ACTION's transition a current state (526, planned) and no careflow step, so decode gives it the one careflow step of the template whose current states hold 526 (openehr/serialize/simplified/deviations.md), where the canonical has none (6 extra leaves); this is the intended reading of such a body, not a gap. party reference type: the upstream FLAT writes no composer|type, so decode gives the composer's reference the type PARTY against the canonical's PERSON. Choice element: decode does not read choice/quantity_value (the SDK spells it choice), so the choice element is missing. DV_PROPORTION: decode reports the bare proportion_any, the derived magnitude, as unmatched content, and reads |type 1.0 as the Integer 1. Upstream conversion differences: a DV_URI and the proportion's precision only the canonical carries, and duration_any (P1Y2M10DT2H30M against PT30M). Upstream date and time spelling: the canonical writes dates in the basic format (20190114) and date-times with a comma and +00:00, the FLAT in the extended format with a full stop and Z (7 leaves). HISTORY.origin: the FLAT has no origin key and decode gives it the event time (openehr/serialize/simplified/deviations.md), where the canonical sets it earlier. Shifted positions: the elements decode lacks move their later siblings up, the DV_URI and the choice element in the EVALUATION, so the EVALUATION's intervals and cluster compare against the canonical's next element; this accounts for most of the missing, extra and altered leaves. RM-FLOOR archetype_details: the canonical SECTION and the ACTION's description CLUSTER have none, decode adds them (8 extra leaves), and rm_version is 1.2.0 against 1.0.2 and 1.0.4.
-- Missing (40, first 10 shown):
+- Outcome: compared 423, missing 35, extra 42, altered 35, excluded 1
+- Reason: The excluded key is the bare proportion_any, reported as unmatched content, as follows. ISM transition careflow step: the upstream FLAT gives the section_3 ACTION's transition a current state (526, planned) and no careflow step, so decode gives it the one careflow step of the template whose current states hold 526 (openehr/serialize/simplified/deviations.md), where the canonical has none (6 extra leaves); this is the intended reading of such a body, not a gap. party reference type: the upstream FLAT writes no composer|type, so decode gives the composer's reference the type PARTY against the canonical's PERSON. DV_PROPORTION: decode reports the bare proportion_any, the derived magnitude, as unmatched content, and reads |type 1.0 as the Integer 1. Upstream conversion differences: a DV_URI and the proportion's precision only the canonical carries, and duration_any (P1Y2M10DT2H30M against PT30M). Upstream date and time spelling: the canonical writes dates in the basic format (20190114) and date-times with a comma and +00:00, the FLAT in the extended format with a full stop and Z (7 leaves). HISTORY.origin: the FLAT has no origin key and decode gives it the event time (openehr/serialize/simplified/deviations.md), where the canonical sets it earlier. Shifted positions: the canonical EVALUATION holds a DV_URI at items/0 that the upstream FLAT does not carry, so every later item is compared one place off, each decoded item against the canonical item before its counterpart: the three intervals, the choice ELEMENT (canonical items/4) and the cluster among them; this accounts for most of the missing, extra and altered leaves. RM-FLOOR archetype_details: the canonical SECTION and the ACTION's description CLUSTER have none, decode adds them (8 extra leaves), and rm_version is 1.2.0 against 1.0.2 and 1.0.4.
+- Missing (35, first 10 shown):
   - `/content/0/data/events/0/data/items/15/value/precision`
   - `/content/1/data/items/0/value/value`
   - `/content/1/data/items/2/value/lower/magnitude`
   - `/content/1/data/items/2/value/lower/units`
   - `/content/1/data/items/2/value/upper/magnitude`
   - `/content/1/data/items/2/value/upper/units`
-  - `/content/1/data/items/3/value/_type`
   - `/content/1/data/items/3/value/lower/_type`
   - `/content/1/data/items/3/value/lower/value`
   - `/content/1/data/items/3/value/lower_included`
-- Extra (40, first 10 shown):
+  - `/content/1/data/items/3/value/lower_unbounded`
+- Extra (42, first 10 shown):
   - `/content/1/data/items/0/value/lower/_type`
   - `/content/1/data/items/0/value/lower/magnitude`
   - `/content/1/data/items/0/value/lower_included`
@@ -415,7 +384,7 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - `/content/1/data/items/0/value/upper_unbounded`
   - `/content/1/data/items/1/value/lower/units`
   - `/content/1/data/items/1/value/upper/units`
-- Altered (32, first 10 shown):
+- Altered (35, first 10 shown):
   - `/archetype_details/rm_version`: reference `"1.0.2"`, ours `"1.2.0"`
   - `/composer/external_ref/type`: reference `"PERSON"`, ours `"PARTY"`
   - `/content/0/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
@@ -426,5 +395,5 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - `/content/0/data/events/0/time/value`: reference `"2019-01-28T21:22:49,332+00:00"`, ours `"2019-01-28T21:22:49.332Z"`
   - `/content/0/data/origin/value`: reference `"2019-01-28T21:22:49,326+00:00"`, ours `"2019-01-28T21:22:49.332Z"`
   - `/content/1/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
-- Reducing decode removed 3 keys from the upstream FLAT:
-  - 3: `reported as unmatched content`
+- Reducing decode removed 1 key from the upstream FLAT:
+  - 1: `reported as unmatched content`

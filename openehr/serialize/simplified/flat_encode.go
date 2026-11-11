@@ -472,12 +472,21 @@ func skipNotFound(err error, relPath string) error {
 	return fmt.Errorf("simplified: resolve %q: %w", relPath, err)
 }
 
-// emitValue recurses into a container instance or maps a leaf value.
+// emitValue recurses into a container instance or maps a leaf value. An
+// ELEMENT with value types is the one container whose children are not walked
+// one by one ([emitElementValue]).
 // ancestorRoot/ancestorAql are the enclosing Locatable resolution root against
 // which node was resolved; they carry through when a container is not itself
 // Locatable (e.g. EVENT_CONTEXT), so its children resolve from that ancestor by
 // their full relative paths rather than being dropped.
 func emitValue(out map[string]any, node *webtemplate.Node, flatPath string, v any, isContainer bool, ancestorRoot rm.Locatable, ancestorAql string, sib *reusedSiblings) error {
+	if isContainer && hasValueTypes(node) {
+		// An ELEMENT with a child per value type writes its value under one
+		// child alone, which every child's path would otherwise resolve.
+		if el, ok := as[rm.Element](v); ok {
+			return emitElementValue(out, node, flatPath, v, el)
+		}
+	}
 	if isContainer {
 		root, rootAql := ancestorRoot, ancestorAql
 		loc, isLocatable := v.(rm.Locatable)

@@ -51,6 +51,12 @@ type reusedSiblings struct {
 	// claimed are the sets of siblings that each pin a name, in the order the
 	// Web Template first reaches them.
 	claimed []siblingGroup
+	// elements maps each child of an ELEMENT node with a child per value type
+	// ([hasValueTypes]) to that ELEMENT. The children share the ELEMENT's
+	// `/value` path by design: they are the value types of one single-valued
+	// attribute, not reused siblings, and none of them is counted as sharing
+	// its path.
+	elements map[*webtemplate.Node]*webtemplate.Node
 }
 
 // siblingGroup is one set of reused siblings that each pin a name.
@@ -163,7 +169,14 @@ func reusedSiblingsOf(wt *webtemplate.WebTemplate) *reusedSiblings {
 	collect = func(n *webtemplate.Node) {
 		nodes = append(nodes, n)
 		named = named || strings.Contains(n.AQLPath, ",'")
+		valueTypes := hasValueTypes(n)
 		for _, ch := range n.Children {
+			if valueTypes {
+				if s.elements == nil {
+					s.elements = make(map[*webtemplate.Node]*webtemplate.Node)
+				}
+				s.elements[ch] = n
+			}
 			collect(ch)
 		}
 	}
@@ -179,7 +192,9 @@ func reusedSiblingsOf(wt *webtemplate.WebTemplate) *reusedSiblings {
 	}
 	counts := make(map[string]int, len(nodes))
 	for _, n := range nodes {
-		counts[s.nodePath(n)]++
+		if s.elements[n] == nil {
+			counts[s.nodePath(n)]++
+		}
 	}
 	for p, c := range counts {
 		if c > 1 {
@@ -289,6 +304,15 @@ func (s *reusedSiblings) nodePath(n *webtemplate.Node) string {
 // reused sibling that no pinned name tells apart from the others.
 func (s *reusedSiblings) isShared(n *webtemplate.Node) bool {
 	return len(s.shared) > 0 && s.shared[s.nodePath(n)]
+}
+
+// elementOf returns the ELEMENT node n is a value type of, or nil where n is
+// none ([hasValueTypes]).
+func (s *reusedSiblings) elementOf(n *webtemplate.Node) *webtemplate.Node {
+	if s == nil {
+		return nil
+	}
+	return s.elements[n]
 }
 
 // excludedAt returns the names an instance at the resolution path p must not

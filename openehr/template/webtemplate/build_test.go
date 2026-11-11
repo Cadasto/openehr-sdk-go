@@ -193,13 +193,36 @@ func refTree(t *testing.T, ref map[string]any) map[string]any {
 // Phase 4 once name-derived ids and predicated paths made them buildable.
 var parityFixtures = []string{referenceStem, "Corona_Anamnese", "GECCO_Diagnose"}
 
+// The categories of documented deviation assertStructuralParity tolerates.
+const (
+	inContextMinCategory = "in-context min"
+	textChoiceCategory   = "text choice"
+)
+
 // deviationCounts is the exact number of documented-deviation mismatches
-// tolerated per fixture (see deviations.md). Pinning the count keeps the
-// allowance from widening into cover for a regression.
-var deviationCounts = map[string]int{
-	referenceStem:     0,
-	"Corona_Anamnese": 0,
-	"GECCO_Diagnose":  14,
+// tolerated per fixture and category (see deviations.md). Pinning the count
+// keeps the allowance from widening into cover for a regression.
+var deviationCounts = map[string]map[string]int{
+	referenceStem:     {},
+	"Corona_Anamnese": {},
+	"GECCO_Diagnose":  {inContextMinCategory: 14, textChoiceCategory: 1},
+}
+
+// textChoiceOutliers are the vendored goldens that give an ELEMENT whose
+// value admits DV_TEXT then DV_CODED_TEXT as a DV_TEXT leaf.
+var textChoiceOutliers = map[string]bool{"GECCO_Diagnose": true}
+
+// textChoiceDeviation reports whether a mismatch is the documented golden
+// outlier: a textChoiceOutliers golden gives an ELEMENT whose value admits a
+// DV_TEXT and a DV_CODED_TEXT as a DV_TEXT leaf, where the pinned reference
+// code, as this builder, merges the pair into the DV_CODED_TEXT leaf, and the
+// reference's own test reports the golden's node as different. Everything else
+// about the node must still match exactly.
+func textChoiceDeviation(stem string, ref, ours nodeFacts) bool {
+	if !textChoiceOutliers[stem] || ref.rmType != "DV_TEXT" || ours.rmType != "DV_CODED_TEXT" {
+		return false
+	}
+	return ref.nodeID == ours.nodeID && ref.id == ours.id && ref.min == ours.min && ref.max == ours.max
 }
 
 // minOutliers are the vendored goldens that mark in-context RM-attribute
@@ -254,26 +277,27 @@ func assertStructuralParity(t *testing.T, stem string) {
 	})
 
 	var missing, extra, mismatch []string
-	var allowed int
+	allowed := map[string]int{}
 	for p, rf := range refByPath {
 		of, ok := ourByPath[p]
 		if !ok {
 			missing = append(missing, p)
 			continue
 		}
-		if of == rf {
-			continue
+		switch {
+		case of == rf:
+		case inContextMinDeviation(stem, rf, of):
+			allowed[inContextMinCategory]++
+		case textChoiceDeviation(stem, rf, of):
+			allowed[textChoiceCategory]++
+		default:
+			mismatch = append(mismatch, fmt.Sprintf("%s\n    ref:  %s\n    ours: %s", p, rf, of))
 		}
-		if inContextMinDeviation(stem, rf, of) {
-			allowed++
-			continue
-		}
-		mismatch = append(mismatch, fmt.Sprintf("%s\n    ref:  %s\n    ours: %s", p, rf, of))
 	}
 	// The allowance is pinned to its measured size so it cannot quietly widen
 	// into cover for a real regression.
-	if want := deviationCounts[stem]; allowed != want {
-		t.Errorf("documented deviations = %d, want %d (see deviations.md § GECCO in-context min)", allowed, want)
+	if want := deviationCounts[stem]; !maps.Equal(allowed, want) {
+		t.Errorf("documented deviations = %v, want %v (see deviations.md)", allowed, want)
 	}
 	for p := range ourByPath {
 		if _, ok := refByPath[p]; !ok {
@@ -309,8 +333,9 @@ func assertStructuralParity(t *testing.T, stem string) {
 	}
 }
 
-// actionParityStem is the reference golden whose template holds an ACTION:
-// the openEHR_SDK Web Template of the cross-format set's test_all_types OPT.
+// actionParityStem is the reference golden whose template holds an ACTION
+// and an ELEMENT whose value admits two types: the openEHR_SDK Web Template of
+// the cross-format set's test_all_types OPT.
 const actionParityStem = "test_all_types.en.v1"
 
 // actionDeltas are the permitted differences between the reference's ACTION
@@ -339,8 +364,9 @@ var actionDeltas = map[string][]string{
 // TestREQ106ActionParity — REQ-106, PROBE-075. The ACTION subtree of the
 // test_all_types Web Template matches the reference's golden on structure
 // (id, rmType, nodeId, aqlPath, min, max) and inputs, except for the deltas
-// actionDeltas names. The rest of that golden is outside this test: its other
-// entries differ for reasons the ACTION does not touch.
+// actionDeltas names. TestREQ106ChoiceParity compares that golden's `choice`
+// ELEMENT; the rest of it is outside both tests, its other entries differing
+// for reasons neither touches.
 func TestREQ106ActionParity(t *testing.T) {
 	var refAction map[string]any
 	walkRefTree(refTree(t, loadReferenceStem(t, actionParityStem)), func(m map[string]any) {
@@ -424,6 +450,80 @@ func TestREQ106ActionParity(t *testing.T) {
 		slices.Sort(g)
 		if want := slices.Sorted(slices.Values(actionDeltas[category])); !slices.Equal(g, want) {
 			t.Errorf("%s deltas = %d %v, want %d %v (see deviations.md)", category, len(g), g, len(want), want)
+		}
+	}
+}
+
+// choiceParityPath is the aqlPath of the test_all_types EVALUATION's `choice`
+// ELEMENT, whose value admits a DV_QUANTITY or a DV_COUNT.
+const choiceParityPath = "/content[openEHR-EHR-EVALUATION.test_all_types.v1]/data[at0001]/items[at0009]"
+
+// TestREQ106ChoiceParity — REQ-106, PROBE-075. The test_all_types EVALUATION's
+// `choice` ELEMENT, whose value admits two types, matches the reference's
+// golden exactly: the ELEMENT node and one child per value type, on structure
+// (id, rmType, nodeId, aqlPath, min, max), names and inputs. Its children share
+// one aqlPath, so the nodes are compared by their chain of ids.
+func TestREQ106ChoiceParity(t *testing.T) {
+	var ref map[string]any
+	walkRefTree(refTree(t, loadReferenceStem(t, actionParityStem)), func(m map[string]any) {
+		if refStr(m, "aqlPath") == choiceParityPath {
+			ref = m
+		}
+	})
+	if ref == nil {
+		t.Fatalf("the %s golden holds no node at %s", actionParityStem, choiceParityPath)
+	}
+	refSigs := map[string]string{}
+	var walkRef func(m map[string]any, key string)
+	walkRef = func(m map[string]any, key string) {
+		key += "/" + refStr(m, "id")
+		num := func(k string) int {
+			v, _ := m[k].(float64)
+			return int(v)
+		}
+		names, _ := m["localizedNames"].(map[string]any)
+		descriptions, _ := m["localizedDescriptions"].(map[string]any)
+		refSigs[key] = fmt.Sprintf("%s aqlPath=%s name=%s names=%v descriptions=%v inputs=[%s]",
+			nodeFacts{refStr(m, "rmType"), refStr(m, "nodeId"), refStr(m, "id"), num("min"), num("max")},
+			refStr(m, "aqlPath"), refStr(m, "name"), names, descriptions, refInputSig(m))
+		children, _ := m["children"].([]any)
+		for _, c := range children {
+			if cm, ok := c.(map[string]any); ok {
+				walkRef(cm, key)
+			}
+		}
+	}
+	walkRef(ref, "")
+
+	var ours *webtemplate.Node
+	walkOurTree(buildOPT(t, readFile(t, testAllTypesOPT)).Tree, func(n *webtemplate.Node) {
+		if n.AQLPath == choiceParityPath {
+			ours = n
+		}
+	})
+	if ours == nil {
+		t.Fatalf("Build gave no node at %s", choiceParityPath)
+	}
+	ourSigs := map[string]string{}
+	var walkOurs func(n *webtemplate.Node, key string)
+	walkOurs = func(n *webtemplate.Node, key string) {
+		key += "/" + n.ID
+		ourSigs[key] = fmt.Sprintf("%s aqlPath=%s name=%s names=%v descriptions=%v inputs=[%s]",
+			nodeFacts{n.RMType, n.NodeID, n.ID, n.Min, n.Max}, n.AQLPath, n.Name, n.LocalizedNames, n.LocalizedDescriptions, inputSig(n.Inputs))
+		for _, ch := range n.Children {
+			walkOurs(ch, key)
+		}
+	}
+	walkOurs(ours, "")
+
+	for _, key := range slices.Sorted(maps.Keys(refSigs)) {
+		if got, want := ourSigs[key], refSigs[key]; got != want {
+			t.Errorf("%s\n    ref:  %s\n    ours: %s", key, want, got)
+		}
+	}
+	for _, key := range slices.Sorted(maps.Keys(ourSigs)) {
+		if _, ok := refSigs[key]; !ok {
+			t.Errorf("extra %s: %s", key, ourSigs[key])
 		}
 	}
 }

@@ -14,7 +14,14 @@ import (
 // ranges, per-unit validation, term bindings) are documented deviations —
 // see deviations.md.
 func inputsFor(v *templatecompile.CompiledNode) []Input {
-	switch v.RMTypeName() {
+	return valueInputs(v.RMTypeName(), v)
+}
+
+// valueInputs is inputsFor for a value of rmType whose compiled node is v, or
+// nil for a value the template does not constrain: the inputs of a constraint
+// that constrains nothing.
+func valueInputs(rmType string, v *templatecompile.CompiledNode) []Input {
+	switch rmType {
 	case "DV_TEXT":
 		return textInputs(v)
 	case "DV_CODED_TEXT":
@@ -98,13 +105,12 @@ const localTerminology = "local"
 func quantityInputs(v *templatecompile.CompiledNode) []Input {
 	mag := Input{Suffix: "magnitude", Type: "DECIMAL"}
 	unit := Input{Suffix: "unit", Type: "CODED_TEXT"}
-	if dq, ok := v.PrimitiveConstraint().(constraints.DvQuantity); ok {
-		for _, u := range dq.Units {
-			unit.List = append(unit.List, InputListItem{Value: u.Units, Label: u.Units})
-		}
-		if len(dq.Units) == 1 {
-			mag.Validation = rangeValidation(dq.Units[0].Magnitude)
-		}
+	dq := constraintOf[constraints.DvQuantity](v)
+	for _, u := range dq.Units {
+		unit.List = append(unit.List, InputListItem{Value: u.Units, Label: u.Units})
+	}
+	if len(dq.Units) == 1 {
+		mag.Validation = rangeValidation(dq.Units[0].Magnitude)
 	}
 	return []Input{mag, unit}
 }
@@ -112,13 +118,11 @@ func quantityInputs(v *templatecompile.CompiledNode) []Input {
 // ordinalInputs emits the single CODED_TEXT input carrying the ordinal list.
 func ordinalInputs(v *templatecompile.CompiledNode) []Input {
 	in := Input{Type: "CODED_TEXT"}
-	if ord, ok := v.PrimitiveConstraint().(constraints.CDvOrdinal); ok {
-		for _, sym := range ord.Values {
-			item, _ := listItem(v, sym.Symbol.CodeString)
-			ordinal := sym.Value
-			item.Ordinal = &ordinal
-			in.List = append(in.List, item)
-		}
+	for _, sym := range constraintOf[constraints.CDvOrdinal](v).Values {
+		item, _ := listItem(v, sym.Symbol.CodeString)
+		ordinal := sym.Value
+		item.Ordinal = &ordinal
+		in.List = append(in.List, item)
 	}
 	return []Input{in}
 }
@@ -269,8 +273,12 @@ func listItem(v *templatecompile.CompiledNode, code string) (InputListItem, bool
 	return InputListItem{Value: code, Label: label}, defined
 }
 
-// childNode returns the first child of v reached through attribute attr.
+// childNode returns the first child of v reached through attribute attr, or
+// nil, also for a nil v.
 func childNode(v *templatecompile.CompiledNode, attr string) *templatecompile.CompiledNode {
+	if v == nil {
+		return nil
+	}
 	a := v.Attribute(attr)
 	if a == nil {
 		return nil
@@ -284,12 +292,17 @@ func childNode(v *templatecompile.CompiledNode, attr string) *templatecompile.Co
 // childConstraint returns the typed primitive constraint on v's child reached
 // through attribute attr, or the zero value when absent.
 func childConstraint[T any](v *templatecompile.CompiledNode, attr string) T {
+	return constraintOf[T](childNode(v, attr))
+}
+
+// constraintOf returns v's primitive constraint as a T, or the zero value when
+// v is nil or carries no constraint of that type.
+func constraintOf[T any](v *templatecompile.CompiledNode) T {
 	var zero T
-	c := childNode(v, attr)
-	if c == nil {
+	if v == nil {
 		return zero
 	}
-	if pc, ok := c.PrimitiveConstraint().(T); ok {
+	if pc, ok := v.PrimitiveConstraint().(T); ok {
 		return pc
 	}
 	return zero

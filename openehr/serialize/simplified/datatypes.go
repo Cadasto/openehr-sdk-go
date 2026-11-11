@@ -770,6 +770,12 @@ func intervalLeafToFlat(out map[string]any, flatPath, rmType string, v any) erro
 	if iv, ok := as[rm.DVInterval[rm.DVScale]](v); ok {
 		return intervalToFlat(out, flatPath, anchor, iv.Interval)
 	}
+	// A value of another type rides |raw, stamped with its own type, as a
+	// substituted value does at every other leaf; decode reads it back as the
+	// leaf's whole value (REQ-053).
+	if name, ok := rm.RMTypeName(v); ok {
+		return emitRaw(out, flatPath, v, cmp.Or(dvTypeName(v), name))
+	}
 	return fmt.Errorf("%w: %q is a %s leaf but holds a %T, which is no DV_INTERVAL this codec spells",
 		ErrUnsupportedDatatype, flatPath, rmType, v)
 }

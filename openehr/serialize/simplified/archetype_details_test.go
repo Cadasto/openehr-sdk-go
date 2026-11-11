@@ -36,16 +36,16 @@ const (
 // archetypeDetailsBody is an SDK-authored FLAT body against the corpus
 // template that reaches every kind of archetype root decode must rebuild: the
 // COMPOSITION, a SECTION, two ENTRYs, and a CLUSTER filling a slot inside the
-// OBSERVATION's event data. The corpus's own cluster body is refused on decode
-// (its `labresult/text_value` path is not in this Web Template), so it cannot
-// serve here.
+// OBSERVATION's event data. Its `labresult` ELEMENT admits a DV_TEXT or a
+// DV_QUANTITY, so its text is spelled under `text_value`, as the corpus's own
+// cluster body spells it.
 func archetypeDetailsBody() map[string]any {
 	evaluation := rmattrSection + "/conformance_evaluation"
 	return rmattrBody(map[string]any{
-		rmattrEvent + "/conformance_cluster/labresult": "labresult 4",
-		evaluation + "/dv_text":                        "dv_text in data",
-		evaluation + "/language|code":                  "en",
-		evaluation + "/language|terminology":           "ISO_639-1",
+		rmattrEvent + "/conformance_cluster/labresult/text_value": "labresult 4",
+		evaluation + "/dv_text":                                   "dv_text in data",
+		evaluation + "/language|code":                             "en",
+		evaluation + "/language|terminology":                      "ISO_639-1",
 	})
 }
 

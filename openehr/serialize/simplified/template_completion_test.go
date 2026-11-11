@@ -498,10 +498,16 @@ func TestREQ053TemplateCompletionNeedsAgreement(t *testing.T) {
 		alternative := opt[start : listAt+closing[1]]
 		snomed := replaceExactlyOnce(t, alternative, "<value>local</value>", "<value>SNOMED-CT</value>")
 		wt, compiled := editedAllTypes(t, replaceExactlyOnce(t, opt, alternative, alternative+snomed))
-		wantMissingSuffix(t, wt, refusalCase{
-			leaves: map[string]any{contextCoded + "|code": "at0007", contextCoded + "|value": "value2"},
-			key:    contextCoded, reason: "DV_CODED_TEXT missing required |terminology",
-		}, simplified.WithTemplate(compiled))
+		// The two alternatives give the ELEMENT a child each, coded_text_value
+		// and coded_text_value2, at one path. A key under either child, or at
+		// the ELEMENT itself, which reads as its first child, is a coded text
+		// at that path.
+		for _, key := range []string{contextCoded + "/coded_text_value", contextCoded + "/coded_text_value2", contextCoded} {
+			wantMissingSuffix(t, wt, refusalCase{
+				leaves: map[string]any{key + "|code": "at0007", key + "|value": "value2"},
+				key:    key, reason: "DV_CODED_TEXT missing required |terminology",
+			}, simplified.WithTemplate(compiled))
+		}
 	})
 	t.Run("ordinal pairs", func(t *testing.T) {
 		opt := replaceExactlyOnce(t, allTypesOPT(t), "<code_string>at0016</code_string>", "<code_string>at0015</code_string>")
