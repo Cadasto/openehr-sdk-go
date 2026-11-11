@@ -1,6 +1,7 @@
 package instance_test
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -306,11 +307,14 @@ func optEHRURIElement(body string) string {
 // picks stays where its scheme is ehr: a list keeps its first member under
 // ExampleFill, even beside the placeholder, and a listed member under
 // RandomFill, and a pattern of the ehr scheme keeps its own pick or draw.
-// Where the pick has no ehr scheme, the C_STRING's placeholder
-// ehr://example is written where the C_STRING admits it, as one with
-// neither a list nor a pattern, one with an empty list, and the pattern .*
-// do, whose pick example has no scheme. The root passes the RM floor and
-// the template validator under every policy and both value fills.
+// Where the pick has no ehr scheme, the first list member with the ehr
+// scheme that the C_STRING accepts is written, so a list that names a
+// value without it first gives its ehr member under either fill. Else the
+// placeholder ehr://example is written where the C_STRING admits it, as
+// one with neither a list nor a pattern, one with an empty list, and the
+// pattern .* do, whose pick example has no scheme. The root passes the RM
+// floor and the template validator under every policy and both value
+// fills.
 func TestREQ107_EHRURIValueNarrowedToTheEHRScheme(t *testing.T) {
 	cases := []struct {
 		name string
@@ -333,6 +337,12 @@ func TestREQ107_EHRURIValueNarrowedToTheEHRScheme(t *testing.T) {
 			random:  []string{"ehr://a", "ehr://example"},
 		},
 		{name: "list refusing the placeholder", body: "<list>ehr://abc</list>", example: "ehr://abc", random: []string{"ehr://abc"}},
+		{
+			name:    "list naming a value without the ehr scheme first",
+			body:    "<list>http://x</list><list>ehr://a</list>",
+			example: "ehr://a",
+			random:  []string{"ehr://a"},
+		},
 	}
 	for _, tc := range cases {
 		for _, implicit := range []bool{false, true} {
@@ -359,6 +369,63 @@ func TestREQ107_EHRURIValueNarrowedToTheEHRScheme(t *testing.T) {
 						}
 					}
 					checkValid(t, out, c)
+				})
+			}
+		}
+	}
+}
+
+// TestREQ107_EHRURIValueWithoutTheEHRSchemeIsUnsatisfiable is the REQ-107
+// check that a C_STRING on a DV_EHR_URI's value that admits no value with
+// the ehr scheme Scheme_valid requires (Precedence 3), neither a list
+// member nor the placeholder ehr://example, makes Generate return an error
+// wrapping ErrConstraintUnsatisfiable, and no root, under every policy,
+// both value fills and both compile modes. The error names the RM type,
+// the attribute and the OPT path, wraps neither ErrSlotFillUnsupported nor
+// ErrArchetypeIDMissing, and does not echo the values the constraint pins.
+func TestREQ107_EHRURIValueWithoutTheEHRSchemeIsUnsatisfiable(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		// rejected are the values of body the error must not echo.
+		rejected []string
+	}{
+		{name: "list of one value", body: "<list>http://x</list>", rejected: []string{"http://x"}},
+		{
+			name:     "list of two values",
+			body:     "<list>http://x</list><list>https://y</list>",
+			rejected: []string{"http://x", "https://y"},
+		},
+		{name: "pattern of another scheme", body: "<pattern>http://.+</pattern>"},
+	}
+	for _, tc := range cases {
+		for _, implicit := range []bool{false, true} {
+			c := compileOPTText(t, optEHRURIElement(tc.body), implicit)
+			path := stringLeafPath(t, c)
+			for _, opts := range defaultsOptions() {
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, opts)
+					if out != nil {
+						t.Errorf("Generate returned %T, want no root", out)
+					}
+					if !errors.Is(err, instance.ErrConstraintUnsatisfiable) {
+						t.Fatalf("Generate error = %v, want one wrapping ErrConstraintUnsatisfiable", err)
+					}
+					for _, other := range []error{instance.ErrSlotFillUnsupported, instance.ErrArchetypeIDMissing} {
+						if errors.Is(err, other) {
+							t.Errorf("Generate error = %v, want it not to wrap %v", err, other)
+						}
+					}
+					for _, part := range []string{"DV_EHR_URI.value", path} {
+						if !strings.Contains(err.Error(), part) {
+							t.Errorf("Generate error = %q, want it to name %q", err, part)
+						}
+					}
+					for _, value := range tc.rejected {
+						if strings.Contains(err.Error(), value) {
+							t.Errorf("Generate error = %q, want it not to echo the rejected value %q", err, value)
+						}
+					}
 				})
 			}
 		}
