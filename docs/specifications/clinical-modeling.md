@@ -1362,7 +1362,7 @@ Every ACTION **MUST** carry the reference's in-context `ism_transition` node, wi
 | The ACTION's template | The `ism_transition` node |
 |---|---|
 | models archetyped `ism_transition[atNNNN]` nodes, one per careflow step | merges them as the reference does: `min` and `max` from the first, and the leaves `careflow_step` (each step's careflow-step code, or its node id and name where it constrains none, with the `currentStates` that step admits), `current_state` (every step's states, in step order) and `transition` |
-| models none, or only ones that constrain neither `current_state` nor `careflow_step` | holds the transition's `current_state` and `transition` as leaves |
+| models none, or only ones constraining no attribute of the transition | holds the transition's `current_state` and `transition` as leaves |
 
 The archetyped `ism_transition[atNNNN]` nodes stay beside the merged node.
 
@@ -2045,8 +2045,8 @@ Two path-bearing sub-structures are exposed as parsed structure, not only raw te
 - **`ClassExpr.PredicateComparison`**: a class *standing* predicate (e.g. `EHR e[ehr_id/value = $x]`) is exposed as an optional `*aql.Comparison` (`{path, operator, value}`, reusing the shared vocabulary) when it is a simple comparison.
   It **MUST** be nil for an archetype-HRID predicate (on `ClassExpr.Archetype`), a version predicate, or a non-scalar or complex standing predicate, so a comparison is distinguishable from a non-comparison.
   The comparison's `ParsedPath` carries the relative left-hand path's structured `Segments` with an **empty `Alias`** (a class-predicate path binds no FROM alias); the verbatim `ClassExpr.Predicate` text is retained.
-- **`aql.Comparison.ParsedPath`**: a comparison carries the structured path (`*aql.IdentifiedPath`: alias + segments) beside the raw `Path` string, populated by the parser.
-  A WHERE comparison sets the alias root; a class standing predicate sets `Alias == ""` (relative path).
+- **`ParsedPath`**: `aql.Comparison`, `aql.ExistsExpr`, `aql.LikeExpr` and `aql.MatchesExpr`, the `identifiedExpr` alternatives whose operand is an `identifiedPath`, each carry the structured path (`*aql.IdentifiedPath`: alias + segments) beside the raw `Path` string, populated by the parser.
+  A WHERE path sets the alias root; a class standing predicate's comparison sets `Alias == ""` (relative path).
   It is nil on the write side and for a path shape the parser does not structure.
   `ParsedPath.Raw` **MUST** equal `Path`.
 
@@ -2236,7 +2236,7 @@ This is the buildable-grammar equivalent of [PROBE-020](conformance.md#probe-020
 ### Emission ignores the structured model
 
 `Emit` **MUST NOT** read the structured predicate model of [§ REQ-113 § Structured node predicates](#structured-node-predicates): it renders `Raw`, so a consumer mutating the model cannot change what is emitted.
-It renders a comparison's path from `Comparison.Path` and a class predicate from the verbatim `ClassExpr.Predicate`, never from the structured fields of [§ REQ-113 § Structured path access](#structured-path-access), so those fields leave § Round-trip property unaffected.
+It renders the path of a comparison, `EXISTS`, `LIKE` and `MATCHES` from its `Path` and a class predicate from the verbatim `ClassExpr.Predicate`, never from the structured fields of [§ REQ-113 § Structured path access](#structured-path-access), so those fields leave § Round-trip property unaffected.
 
 ### The emission closure property
 

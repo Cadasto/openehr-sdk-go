@@ -16,7 +16,7 @@ The codec never succeeds while silently losing or altering data the Web Template
 models (REQ-053 is semantics-preserving), with four registered narrowings on the
 **encode** leg and no others: the folded structural wrappers (§ below),
 `archetype_details` (§ Deviations below), the `careflow_step` of a transition on an ACTION
-whose template constrains no ISM transition (the ISM transition note below), and an empty
+whose `ism_transition` node merges no archetyped one (the ISM transition note below), and an empty
 repeat instance (§ below). The
 first three are the attribute classes `wire.md` § REQ-140 names as deliberately out of
 scope; the fourth is a FLAT structural limit, not an attribute. The composer's
@@ -65,10 +65,11 @@ Concretely:
   per-step nodes stay in the Web Template beside it: encode writes nothing under them, and decode
   still reads a transition spelled there by the rules it had. One body that spells an ACTION's
   transition both ways is `ErrUnknownPath`, since its keys reach the single-valued
-  `ism_transition` through two Web Template nodes. Where the template constrains no ISM
-  transition the in-context node has no `careflow_step`, so a populated careflow step is dropped on
-  encode (the third narrowing above). Until 2026-11-11 encode wrote a transition under the
-  per-step node its careflow step matched, `rmpath` matching the predicate against the careflow
+  `ism_transition` through two Web Template nodes. Where the in-context node merges none
+  (the template models no archetyped transition, or only ones constraining no attribute of it), it
+  has no `careflow_step`, so a populated careflow step is dropped on encode (the third narrowing
+  above). Until 2026-11-11 encode wrote a transition under the per-step node its careflow step
+  matched, `rmpath` matching the predicate against the careflow
   step code in the `local` terminology (an ISM_TRANSITION carries no `archetype_node_id`, and
   ADL 1.4 codes each careflow step with its node id); it dropped a transition no node matched,
   and its `transition` and `reason` everywhere.
@@ -91,24 +92,24 @@ Concretely:
     names (the node id as a `local` code, the node's Web Template name as its value); a careflow
     step that names no terminology takes `local`, and one coded otherwise is
     `ErrUnsupportedDatatype` (the **Decode** item below).
-  - **The in-context node of an ACTION whose template constrains no ISM transition.** Decode
-    gives the transition no careflow step, and rebuilds no transition for a body that spells no
-    state, since it invents none.
+  - **An in-context node that merges no archetyped one.** Decode gives the transition no
+    careflow step, and rebuilds no transition for a body that spells no state, since it invents
+    none.
 
   Decode refuses the reference's spelling of an ACTION's ISM transition and time in every mode
   (REQ-170, since 2026-10-12) wherever the Web Template does not resolve it: a `careflow_step`
-  leaf, with any suffix, under the in-context node of an ACTION whose template constrains no ISM
-  transition; a `transition` leaf under an archetyped node whose archetype constrains none; and,
-  against a Web Template without the in-context nodes, any of the three leaves or a `_reason`
-  family under `ism_transition`, and the ACTION's `time`. Each names RM data the decode would
+  leaf, with any suffix, under an in-context node that merges no archetyped one; a `transition`
+  leaf under an archetyped node whose archetype constrains none; and, against a Web Template
+  without the in-context nodes, any of the three leaves or a `_reason` family under
+  `ism_transition`, and the ACTION's `time`. Each names RM data the decode would
   otherwise drop, or for `time` replace with the `ctx/time` default a `WithTemplate` decode fills
   in, so the refusal names the key, or the `_reason` family instance, and carries no value. It
   wraps `ErrNotModelled`, which also matches `ErrUnknownPath`, and since 2026-11-10 (issue 428)
   it says the key is a Simplified Formats path this SDK does not model, where it said "path not
   in web template" and pointed to this file. The refusal names the RM attribute it refuses:
-  REQ-140's third out-of-scope class covers the careflow step of an ACTION whose template
-  constrains no ISM transition, and REQ-170 the rest. Until 2026-11-11 the Web Template had no
-  ACTION `time` leaf and no in-context `transition`, `careflow_step` or `_reason`, and the
+  REQ-140's third out-of-scope class covers the careflow step of an ACTION whose
+  `ism_transition` node merges no archetyped one, and REQ-170 the rest. Until 2026-11-11 the Web
+  Template had no ACTION `time` leaf and no in-context `transition`, `careflow_step` or `_reason`, and the
   refusal covered them too.
 
 - **Attributes the Web Template has no node for, read and written by the codec** (REQ-053,

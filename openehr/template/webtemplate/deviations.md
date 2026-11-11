@@ -56,8 +56,9 @@ failure, not a deviation.
     each with `|code` / `|value` inputs, and no `careflow_step`, as the reference's
     filter leaves it out; `min` 0, and the name `Ism_transition` in the in-context
     capitalisation. The `minimal_action_2` corpus template has this shape, and so
-    does an ACTION whose archetyped transitions constrain neither `current_state`
-    nor `careflow_step`, since those are pruned as empty containers.
+    does an ACTION whose archetyped transitions constrain no attribute of the
+    transition, since those are pruned as empty containers. A step that constrains its
+    `transition` alone is kept, so it is merged.
 
   The reference also writes a `_reason` family under the node, which neither shape
   gives a node of its own: the FLAT codec reads and writes it as the `_reason:N`
