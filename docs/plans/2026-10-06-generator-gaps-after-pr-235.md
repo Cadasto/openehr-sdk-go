@@ -37,16 +37,13 @@ At the stop, every critical and important finding on PR 235 was fixed or decline
 
 ### Phase 2: generator gaps
 
-| Gap | Evidence |
-|---|---|
-| The walk still builds the party the OPT names under `composer`, then replaces it with `Options.Composer`. An unsatisfiable constraint inside that party still makes `Generate` fail. Skip the walk of `composer` at a COMPOSITION root. | report on `1494f331` |
-| The builder entry of `TestREQ107_CorpusRatchet` runs `ExampleFill` only. Add a `RandomFill` entry. | `testkit/probes/instance/corpus_ratchet_test.go` |
-| Unreachable code: the node-id branch of `fillPartyRelationship`, and the `finishNode` fallbacks for DV_EHR_URI, DV_ORDINAL and DV_SCALE. Keep them as named safety nets or remove them. | suggestions #ad9e3 and #3ef26 on PR 235 |
-| No test pins terminology `local` on a closed-list C_CODE_PHRASE that names no terminology. Checked: `TestREQ107_BareCodePhraseKeepsLocal` covers a CODE_PHRASE the OPT leaves unconstrained, and the placeholder test in `openehr/instance/placeholder_exact_test.go` an empty code list with no terminology; neither covers a code list with codes and no terminology. | suggestion #88b28 on PR 235 |
+Done on `fix/generator-plan-leftovers` (2026-11-11):
 
-**Decision to confirm:** since `5482fcc5`, an attribute the OPT requires while prohibiting every child of it gets no member, where it used to get one default member. § REQ-107 *Exceptions and known gaps* reads this as an OPT that contradicts itself. Confirm it, or reverse it.
-
-**Definition of done:** each gap is fixed with a reproduction test that fails first, or recorded as a Known gap; `make ci` is green.
+- The walk leaves a COMPOSITION root's `composer` alone, so a constraint in the party the OPT names there can no longer make `Generate` fail.
+- The builder entry of `TestREQ107_CorpusRatchet` runs under `RandomFill` too.
+- The `fillPartyRelationship` node-id branch is reached, by a PARTY_RELATIONSHIP built from the BMM. The `finishNode` fallbacks for DV_EHR_URI, DV_ORDINAL and DV_SCALE are reached through a `C_STRING` that admits only the empty string, such as `x{0}`. The maintainer kept them, and `TestREQ107_PlaceholderUnderEmptyOnlyPattern` pins each one.
+- `TestREQ107_CodeListWithNoTerminologyKeepsLocal` pins terminology `local` on a code list that names none.
+- The maintainer confirmed the reading of a required attribute whose children the OPT all prohibits: it gets no member, as § REQ-107 *Exceptions and known gaps* says.
 
 ### Phase 3: validator and parser gaps
 
