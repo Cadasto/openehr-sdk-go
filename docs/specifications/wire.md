@@ -433,6 +433,15 @@ The SDK **MUST** provide codecs in `openehr/serialize` for the openEHR **FLAT** 
 Both variants serialize the **same** RM data (a `COMPOSITION`) under **template-specific**, human-readable field identifiers taken from the template's *Web Template* projection (REQ-106) — **not** canonical AQL/AOM paths:
 
 - Path segments are **Web Template `id`s** (e.g. `blood_pressure`, `systolic`), joined by `/` and rooted at the template id — never archetype at-codes.
+  A duplicate sibling's `id` is `<id>_N` ([clinical-modeling.md § REQ-106 *`id` generation*](clinical-modeling.md#id-generation-adr-0014)), where the reference and earlier releases of this SDK write `<id><N+1>` (`blood_pressure2` for `blood_pressure_1`).
+  Decode, FLAT and STRUCTURED, **MUST** read a segment `<id><M>` as the sibling `<id>_<M-1>` where all of these hold:
+  - M is a decimal number of 2 or more with no leading zero;
+  - no child of the segment's parent has the `id` `<id><M>`, which otherwise is the child the segment names;
+  - the parent has a child `<id>` and a child `<id>_<M-1>`.
+
+  Where a segment splits into `<id>` and M more than one way (`x12`), the shortest `<id>` that meets them is read.
+  A key in that spelling and the key in the Web Template's are two spellings of one field ([§ REQ-170](#req-170--unmatched-content-on-decode)), and an unmatched one is reported as written.
+  Encode writes the Web Template's `id` alone.
 - Repeating nodes carry a zero-based instance index `:0` / `:1`.
 - Leaf attributes are pipe suffixes (`|magnitude`, `|unit`, `|code`, `|value`, `|terminology`, …); an `ELEMENT` with one value alternative, or with two that are one coded text and one free text, collapses into its value (no trailing `/value`), and one with any other two or more, or none, keeps a segment of its own, as *ELEMENT value types* below sets out. Exactly **one subtype substitution** is carried in suffix form: a `DV_CODED_TEXT` stored at a `DV_TEXT`-typed leaf (legal RM substitution) **MUST** be emitted and accepted in the `DV_CODED_TEXT` suffix form — `|code` + `|value` + `|terminology` (plus the other modelled `DV_CODED_TEXT` suffixes, e.g. `|formatting`), with **no** bare-key spelling — matching the reference implementation, whose corpus carries the rubric under `|value` (`ehrbase_conformance_data_types_dv_coded_text_as_dv_text`); every other substituted subtype (the value's dynamic type differing from the leaf's declared type) rides `|raw`. The inverse substitution — an uncoded `DV_TEXT` at a `DV_CODED_TEXT` leaf — stays the `|other` open-value-set form.
 - Structural levels are removed relative to the canonical path: container attributes (`content`, `data`, `events`, `items`, …) are elided, and the `ITEM_STRUCTURE` family, `HISTORY`, and single unnamed `EVENT`s are collapsed.
