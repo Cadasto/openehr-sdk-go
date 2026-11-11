@@ -12,7 +12,7 @@ import (
 // TestREQ107ActionArchetypeIDFollowsTheConstraint pins the value the
 // generator writes on an ACTIVITY's action_archetype_id (REQ-107), which the FLAT
 // decode's template completion (REQ-053) takes from the same function: the
-// RM default where the C_STRING admits it, before any list member, else the
+// RM default where the C_STRING lists no string and admits it, else the
 // example the constraint accepts, a list member, or the shortest match of a
 // pattern.
 func TestREQ107ActionArchetypeIDFollowsTheConstraint(t *testing.T) {
@@ -39,10 +39,11 @@ func TestREQ107ActionArchetypeIDFollowsTheConstraint(t *testing.T) {
 			want: cstringvalue.AnyActionArchetype,
 		},
 		{
-			// Pick would give the first member; the RM default comes first.
+			// A list gives values, so the RM default, though listed, does
+			// not come before Pick's member.
 			name: "a pattern and a list that both admit the RM default",
 			cs:   constraints.NewCString(`.*`, []string{"openEHR-EHR-ACTION.one.v1", cstringvalue.AnyActionArchetype}, ""),
-			want: cstringvalue.AnyActionArchetype,
+			want: "openEHR-EHR-ACTION.one.v1",
 		},
 		{
 			name: "a pattern that admits the RM default, and a list that does not",
