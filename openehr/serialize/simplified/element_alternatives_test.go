@@ -282,6 +282,14 @@ func TestREQ053ElementValueAlternativesRefuseTwo(t *testing.T) {
 	if err := json.Unmarshal(flat, &ehrnBody); err != nil {
 		t.Fatalf("unmarshal ehrn_abdm flat.json: %v", err)
 	}
+	// withCreated is the ehrn_abdm body with leaves in place of its keys for
+	// the ELEMENT `created`.
+	withCreated := func(leaves map[string]any) map[string]any {
+		b := maps.Clone(ehrnBody)
+		maps.DeleteFunc(b, func(k string, _ any) bool { return strings.HasPrefix(k, createdKey) })
+		maps.Copy(b, leaves)
+		return b
+	}
 	for _, tc := range []struct {
 		name    string
 		wt      *webtemplate.WebTemplate
@@ -324,6 +332,22 @@ func TestREQ053ElementValueAlternativesRefuseTwo(t *testing.T) {
 				return b
 			}(),
 		},
+		{
+			name: "an interval and a value decoration under another value type", wt: ehrn, element: createdKey,
+			body: withCreated(map[string]any{
+				createdKey + "/interval_of_date_time_value/lower":   "2022-02-03T04:05:06",
+				createdKey + "/date_time_value/_normal_range/lower": "2022-01-01T00:00:00",
+				createdKey + "/date_time_value/_normal_range/upper": "2022-12-31T00:00:00",
+			}),
+		},
+		{
+			name: "an interval and a value decoration at the ELEMENT", wt: ehrn, element: createdKey,
+			body: withCreated(map[string]any{
+				createdKey + "/interval_of_date_time_value/lower": "2022-02-03T04:05:06",
+				createdKey + "/_normal_range/lower":               "2022-01-01T00:00:00",
+				createdKey + "/_normal_range/upper":               "2022-12-31T00:00:00",
+			}),
+		},
 	} {
 		for _, f := range formats {
 			t.Run(tc.name+"/"+f.name, func(t *testing.T) {
@@ -333,6 +357,12 @@ func TestREQ053ElementValueAlternativesRefuseTwo(t *testing.T) {
 				}
 				if !errors.Is(err, simplified.ErrUnknownPath) {
 					t.Fatalf("decode: err = %v, want %v", err, simplified.ErrUnknownPath)
+				}
+				// The refusal is the ELEMENT's one value claimed twice, not
+				// another ErrUnknownPath that happens to quote its key.
+				const twoValues = "spell two values of the ELEMENT"
+				if !strings.Contains(err.Error(), twoValues) {
+					t.Errorf("decode: err = %q, want it to say %q", err, twoValues)
 				}
 				if element := tc.element[strings.LastIndexByte(tc.element, '/')+1:]; !strings.Contains(err.Error(), element) {
 					t.Errorf("decode: err = %q, want it to name %q", err, element)
@@ -473,7 +503,8 @@ func TestREQ053ElementValueAlternativesUnderscoreFamilies(t *testing.T) {
 // first value type is an interval, a key at the ELEMENT reads as that interval:
 // its bounds and flags spelled at the ELEMENT, the leaf spelling of earlier
 // releases, decode in FLAT and STRUCTURED, and encode writes them under the
-// interval's child.
+// interval's child. The ELEMENT's own `_uid` beside them is the ELEMENT's,
+// never a key of the interval.
 func TestREQ053ElementValueAlternativesFirstInterval(t *testing.T) {
 	wt, compiled, _, _ := crossFormatComposerSet(t, "ehrn_abdm")
 	created := findNode(t, wt.Tree, createdPath)
@@ -482,23 +513,35 @@ func TestREQ053ElementValueAlternativesFirstInterval(t *testing.T) {
 	}
 	// The interval first, as a template listing it first gives it.
 	created.Children[0], created.Children[1] = created.Children[1], created.Children[0]
+	const uid = "e3b4ab3a-8b2f-4a5d-9b8f-2b7a3e6c1d40"
 	leaves := map[string]any{
 		"ctx/language": "en", "ctx/territory": "IN", "ctx/composer_name": "Max Mustermann", "ctx/time": "2022-02-03T04:05:06",
 		createdKey + "/lower":          "2022-02-03T04:05:06",
 		createdKey + "/upper":          "2022-02-04T04:05:06",
 		createdKey + "|upper_included": false,
+		createdKey + "/_uid":           uid,
 	}
 	want := `{"_type":"DV_INTERVAL","lower":{"_type":"DV_DATE_TIME","value":"2022-02-03T04:05:06"},"upper":{"_type":"DV_DATE_TIME","value":"2022-02-04T04:05:06"},"lower_included":true,"upper_included":false,"lower_unbounded":false,"upper_unbounded":false}`
+	wantUID := `{"_type":"HIER_OBJECT_ID","value":"` + uid + `"}`
 	for _, f := range formats {
 		t.Run(f.name, func(t *testing.T) {
-			comp, err := f.decode(t, wt, leaves, simplified.WithTemplate(compiled), simplified.WithStrict())
+			var reported []string
+			comp, err := f.decode(t, wt, leaves, simplified.WithTemplate(compiled), simplified.WithStrict(),
+				simplified.WithUnmatched(func(key string) { reported = append(reported, key) }))
+			if len(reported) > 0 {
+				t.Errorf("decode(%v) reports %v unmatched, want none", leaves, reported)
+			}
 			if err != nil {
 				t.Fatalf("decode(%v) = %v", leaves, err)
 			}
 			if got, _ := canonicalAt(t, comp, createdPath+"/value"); !reflect.DeepEqual(got, jsonOf(t, want)) {
 				t.Errorf("decode(%v): value = %s, want %s", leaves, jsonText(got), want)
 			}
+			if got, _ := canonicalAt(t, comp, createdPath+"/uid"); !reflect.DeepEqual(got, jsonOf(t, wantUID)) {
+				t.Errorf("decode(%v): ELEMENT uid = %s, want %s", leaves, jsonText(got), wantUID)
+			}
 			wantKeys := map[string]any{
+				createdKey + "/_uid":                                       uid,
 				createdKey + "/interval_of_date_time_value/lower":          "2022-02-03T04:05:06",
 				createdKey + "/interval_of_date_time_value/upper":          "2022-02-04T04:05:06",
 				createdKey + "/interval_of_date_time_value|upper_included": false,
@@ -557,12 +600,18 @@ func elementJSON(t *testing.T, el *rm.Element) string {
 // TestREQ053ElementValueAlternativesEncode — REQ-053. Encode writes an
 // ELEMENT's value under the child of its type; else under the child it
 // substitutes for, a DV_CODED_TEXT at a DV_TEXT child in the coded-text
-// suffixes; else as |raw under the first child. The ELEMENT's own underscore
+// suffixes, or an interval whose bounds name no type at the first interval
+// child; else as |raw under the first child. The ELEMENT's own underscore
 // attributes keep their keys at the ELEMENT, and the value's decorations go
 // under the child. Each body decodes back to the value it was written from.
 func TestREQ053ElementValueAlternativesEncode(t *testing.T) {
 	allTypes, _ := allTypesSet(t)
 	conformance, _ := corpusTarget(t)
+	ehrn, _, ehrnFlat, _ := crossFormatComposerSet(t, "ehrn_abdm")
+	var ehrnBody map[string]any
+	if err := json.Unmarshal(ehrnFlat, &ehrnBody); err != nil {
+		t.Fatalf("unmarshal ehrn_abdm flat.json: %v", err)
+	}
 	coded := &rm.DVCodedText{
 		Value:        "value2",
 		DefiningCode: rm.CodePhrase{CodeString: "at0007", TerminologyID: rm.TerminologyID{Value: "local"}},
@@ -605,6 +654,19 @@ func TestREQ053ElementValueAlternativesEncode(t *testing.T) {
 			at: choicePath, key: choiceKey,
 			edit: func(el *rm.Element) { el.Value = &rm.DVText{Value: "free text"} },
 			want: map[string]any{choiceKey + "/quantity_value|raw": map[string]any{"_type": "DV_TEXT", "value": "free text"}},
+		},
+		{
+			name: "an interval whose bounds name no type", wt: ehrn, body: ehrnBody,
+			at: createdPath, key: createdKey,
+			edit: func(el *rm.Element) {
+				el.Value = &rm.DVInterval[rm.DVOrdered]{LowerUnbounded: true, UpperUnbounded: true}
+			},
+			want: map[string]any{
+				createdKey + "/interval_of_date_time_value|lower_included":  false,
+				createdKey + "/interval_of_date_time_value|upper_included":  false,
+				createdKey + "/interval_of_date_time_value|lower_unbounded": true,
+				createdKey + "/interval_of_date_time_value|upper_unbounded": true,
+			},
 		},
 		{
 			name: "a null flavour and no value", wt: allTypes, body: completionBody(map[string]any{choiceKey + "/count_value": 7}),
