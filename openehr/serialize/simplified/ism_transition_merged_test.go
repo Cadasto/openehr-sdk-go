@@ -669,3 +669,56 @@ func TestREQ111ReusedSiblingsSettleTheirOwnIsmTransition(t *testing.T) {
 		}
 	})
 }
+
+// TestREQ140IsmTransitionNilReasonTakesNoIndex — REQ-140. A nil entry of an
+// ISM_TRANSITION's reason list, an untyped or a typed nil, carries nothing, so
+// encode writes no key for it and gives it no `_reason:N` index: a real reason
+// after it is `_reason:0`, never a `_reason:1` with no `_reason:0` before it,
+// which decode refuses as a sparse index.
+func TestREQ140IsmTransitionNilReasonTakesNoIndex(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	for name, empty := range map[string]rm.DVTextLike{
+		"an untyped nil": nil,
+		"a typed nil":    (*rm.DVText)(nil),
+	} {
+		t.Run(name, func(t *testing.T) {
+			comp := decodeRMAttr(t, wt, rmattrBody(inContextIsmKeys("524", "at0005", "transition")))
+			firstAction(t, comp).IsmTransition.Reason = []rm.DVTextLike{empty, &rm.DVText{Value: "a reason"}}
+			got := reencodeRMAttr(t, wt, comp)
+			if v := got[conformanceIsm+"/_reason:0"]; v != "a reason" {
+				t.Errorf("re-encode of %s/_reason:0 = %#v, want %q", conformanceIsm, v, "a reason")
+			}
+			for k := range got {
+				if strings.HasPrefix(k, conformanceIsm+"/_reason:") && !strings.HasPrefix(k, conformanceIsm+"/_reason:0") {
+					t.Errorf("re-encode wrote %s = %#v, want the one reason at :0", k, got[k])
+				}
+			}
+		})
+	}
+}
+
+// TestREQ053MergedIsmTransitionInfersNoUnlabelledCareflowStep — REQ-053. A
+// careflow step decode infers at the merged node takes the label of the one
+// step whose current states hold the transition's state as its value. Where
+// that step's item has no label, decode infers none, rather than a careflow
+// step with an empty value.
+func TestREQ053MergedIsmTransitionInfersNoUnlabelledCareflowStep(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	unlabelled := editWTNode(t, wt, conformanceIsm+"/careflow_step", func(n *webtemplate.Node) {
+		n.Inputs = slices.Clone(n.Inputs)
+		n.Inputs[0].List = slices.Clone(n.Inputs[0].List)
+		for i := range n.Inputs[0].List {
+			n.Inputs[0].List[i].Label = ""
+		}
+	})
+	keys := inContextIsmKeys("524", "", "")
+	for k := range keys {
+		if strings.Contains(k, "/careflow_step|") {
+			delete(keys, k)
+		}
+	}
+	comp := decodeRMAttr(t, unlabelled, rmattrBody(keys))
+	if got := firstAction(t, comp).IsmTransition.CareflowStep; got != nil {
+		t.Errorf("careflow_step = %+v, want none: the one step holding 524 has no label", got)
+	}
+}

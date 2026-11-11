@@ -217,6 +217,23 @@ func TestREQ106MergedIsmTransitionForArchetypedAction(t *testing.T) {
 			archetyped: 3,
 		},
 		{
+			// The merged node's min is the first step's, not the last's.
+			name: "the first step optional",
+			opt:  optionalIsmTransition(t, raw, "at0003"),
+			want: func(p string) *webtemplate.Node {
+				return mergedIsm(p, 0, 1, 1, []step{planned, active, completed}, []string{"526", "245", "532"})
+			},
+			archetyped: 3,
+		},
+		{
+			name: "the last step optional",
+			opt:  optionalIsmTransition(t, raw, "at0005"),
+			want: func(p string) *webtemplate.Node {
+				return mergedIsm(p, 1, 1, 1, []step{planned, active, completed}, []string{"526", "245", "532"})
+			},
+			archetyped: 3,
+		},
+		{
 			name: "the first step constraining nothing",
 			opt:  stripIsmTransition(t, raw, "at0003"),
 			want: func(p string) *webtemplate.Node {
@@ -407,6 +424,39 @@ func stripIsmTransition(t *testing.T, opt []byte, nodeID string) []byte {
 	}
 	if found != 1 {
 		t.Fatalf("the OPT holds ISM_TRANSITION %s %d times, want once", nodeID, found)
+	}
+	return []byte(strings.Join(lines, ""))
+}
+
+// optionalIsmTransition returns opt with the occurrences of the archetyped
+// ISM_TRANSITION nodeID made 0..1. It fails the test unless opt holds that
+// node once, required, laid out one element per line as the vendored OPTs are.
+func optionalIsmTransition(t *testing.T, opt []byte, nodeID string) []byte {
+	t.Helper()
+	lines := strings.SplitAfter(string(opt), "\n")
+	indentOf := func(l string) int { return len(l) - len(strings.TrimLeft(l, " \t")) }
+	found := 0
+	for i := range lines {
+		if strings.TrimSpace(lines[i]) != "<rm_type_name>ISM_TRANSITION</rm_type_name>" {
+			continue
+		}
+		indent := indentOf(lines[i])
+		j := i + 1
+		for j < len(lines) && (indentOf(lines[j]) != indent || !strings.HasPrefix(strings.TrimSpace(lines[j]), "<node_id>")) {
+			j++
+		}
+		if j == len(lines) || strings.TrimSpace(lines[j]) != "<node_id>"+nodeID+"</node_id>" {
+			continue
+		}
+		for k := i + 1; k < j; k++ {
+			if strings.TrimSpace(lines[k]) == "<lower>1</lower>" {
+				lines[k] = strings.Replace(lines[k], "<lower>1</lower>", "<lower>0</lower>", 1)
+				found++
+			}
+		}
+	}
+	if found != 1 {
+		t.Fatalf("the OPT holds a required ISM_TRANSITION %s %d times, want once", nodeID, found)
 	}
 	return []byte(strings.Join(lines, ""))
 }
