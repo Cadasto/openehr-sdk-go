@@ -11,6 +11,7 @@ date: 2026-07-14
 - **Status:** Accepted, 2026-07-14 — maintainer sign-off on the REQ-106 specification (the reference + version were chosen during brainstorming, superseding the placeholder plan's shared-model-first sketch); the implementation landed in [PR 75](https://github.com/Cadasto/openehr-sdk-go/pull/75).
 - **Supersedes:** —
 - **Superseded by:** —
+- **Amended by:** [ADR 0036](0036-webtemplate-id-divergences.md), accepted 2026-11-11: decision 2 no longer takes the reference's sibling-disambiguation rule (a duplicate sibling is `<id>_1`, not `<id>2`), an interval value alternative's `id` is `interval_of_<type>_value`, and decode also reads a duplicate's earlier spelling.
 - **Strand:** —
 - **Introduces:** REQ-106 (WebTemplate JSON export). **Amends:** —. **Applies:** REQ-013 (building-block independence), REQ-111 (public compiled-template bridge — the export's input), REQ-103 (primitive constraints — the input source for `inputs`).
 - **Landed in:** [PR 75](https://github.com/Cadasto/openehr-sdk-go/pull/75).
@@ -33,6 +34,9 @@ Lock the WebTemplate JSON export to **EHRbase `openEHR_SDK`, WebTemplate `versio
 
 1. **Shape and version.** Emit the EHRbase v2.3 WebTemplate JSON shape (camelCase JSON fields; root `templateId`/`version`/`defaultLanguage`/`languages`/`tree`; the node and input field set); `version` is the string `"2.3"`.
 2. **`id`-generation algorithm.** The `id` is a lower-snake sanitisation of the node's default-language display name with EHRbase's sibling-disambiguation rule. The exact normalisation (case, diacritics, non-alphanumeric collapsing, digit-leading guard, RM-type fallback) and disambiguation are **derived empirically from the vendored EHRbase reference fixture and pinned by table-driven tests** — not invented.
+
+   > **Amended 2026-11-11** ([ADR 0036](0036-webtemplate-id-divergences.md)). A duplicate sibling takes the *Simplified Formats* suffix `<id>_1`, and an interval value alternative the `id` `interval_of_<type>_value`; every other `id` still mirrors the reference. The decision text is left as written.
+
 3. **Structural parity, not byte parity.** Conformance (PROBE-075) compares the SDK output to the reference **structurally** — the `id` set, `rmType`, `aqlPath`, `min`/`max`, and per-node input `suffix`/`type` — against a **documented-deviations list**. Field ordering, absent optional fields, localized-string packaging, and known id edge cases are recorded deviations, not failures. Byte-for-byte reproduction of EHRbase output is a non-goal.
 4. **Fixture provenance.** The reference OPT + WebTemplate JSON are vendored from a commit-pinned EHRbase `openEHR_SDK` revision (Apache-2.0) under `testkit/corpus/` with a provenance + license note. The oracle is **`constrain_test`** (not the originally-scoped `corona_anamnese`): it exercises the core datatype set and needs no sibling disambiguation, so it exports cleanly. (`corona_anamnese` now compiles; its reused sibling archetype roots hit `ErrIDCollision` until REQ-116 landed the name-derived `id` — since then it exports and serves as a PROBE-075 parity oracle.) If the environment blocks the fetch, PROBE-075 is deferred and the export is anchored to SDK-generated goldens until the fixture is supplied — the reason recorded in the probe catalogue.
 
@@ -42,6 +46,9 @@ The Better camelCase variant and multi-version output are **not** produced (see 
 
 - **Positive:** "correct" becomes verifiable against a concrete, maintained artefact rather than an interpretation; the id contract is stable for consumers; the vendored fixture gives PROBE-075 a real oracle.
 - **Inherited quirks (accepted):** we adopt EHRbase's id choices verbatim, including any that are not what we would design in isolation — parity is worth more than local elegance, because interop is the whole point of the format.
+
+  > **Amended 2026-11-11** ([ADR 0036](0036-webtemplate-id-divergences.md)). Two `id` spellings depart from the reference, each mapped through a recorded deviation.
+
 - **Better-flavoured consumers not served:** a consumer expecting Better camelCase ids gets EHRbase snake ids. Adding the Better variant later would be an additive option behind a flag, not a breaking change to the default.
 - **Fixture maintenance:** a vendored third-party Apache-2.0 fixture must carry attribution (`testkit/corpus/THIRD_PARTY_LICENSES.md`) and is pinned to a commit; a reference bump is a deliberate, reviewed change.
 - **Deviation drift:** the documented-deviations list is load-bearing — every accepted structural difference from the reference is listed there, so an unlisted difference is a test failure rather than silent divergence.

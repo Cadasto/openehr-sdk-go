@@ -434,7 +434,7 @@ Both variants serialize the **same** RM data (a `COMPOSITION`) under **template-
 
 - Path segments are **Web Template `id`s** (e.g. `blood_pressure`, `systolic`), joined by `/` and rooted at the template id — never archetype at-codes.
   A duplicate sibling's `id` is `<id>_N` ([clinical-modeling.md § REQ-106 *`id` generation*](clinical-modeling.md#id-generation-adr-0014)), where the reference and earlier releases of this SDK write `<id><N+1>` (`blood_pressure2` for `blood_pressure_1`).
-  Decode, FLAT and STRUCTURED, **MUST** read a segment `<id><M>` as the sibling `<id>_<M-1>` where all of these hold:
+  Decode, FLAT and STRUCTURED, **MUST** read a segment `<id><M>` as the sibling `<id>_<M-1>` ([ADR 0036](../adr/0036-webtemplate-id-divergences.md)) where all of these hold:
   - M is a decimal number of 2 or more with no leading zero;
   - no child of the segment's parent has the `id` `<id><M>`, which otherwise is the child the segment names;
   - the parent has a child `<id>` and a child `<id>_<M-1>`.

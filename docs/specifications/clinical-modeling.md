@@ -1383,7 +1383,7 @@ Where siblings would **still** collide — no pinned name, and one shared displa
 - "free" is over the whole sibling list: a sibling whose own name sanitises to `<id>_N` ("Blood Pressure 1" is `blood_pressure_1`) keeps it, before or after the claimants, and the claimant skips to the next N, since renaming onto it would recreate the collision.
 
 The spelling is this SDK's reading of the format, whose rule 7 fixes neither the separator nor the first number: its example table gives "Blood Pressure (duplicate)" as `blood_pressure_1`, while its RM-mapping examples write `dv_text2`.
-It diverges from the reference, which writes the second claimant `<id>2`: the upstream FLAT bodies for that template key the two nodes `…/conformance_action/dv_text` and `…/conformance_action/dv_text2`.
+It diverges from the reference ([ADR 0036](../adr/0036-webtemplate-id-divergences.md)), which writes the second claimant `<id>2`: the upstream FLAT bodies for that template key the two nodes `…/conformance_action/dv_text` and `…/conformance_action/dv_text2`.
 How decode reads a body keyed in the reference's spelling is [§ REQ-053](wire.md#req-053)'s.
 Emitting duplicate sibling `id`s is **never** permitted; an export that still cannot make siblings unique **MUST** fail with a typed error rather than emit an ambiguous tree.
 
