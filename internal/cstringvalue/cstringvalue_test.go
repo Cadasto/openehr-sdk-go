@@ -99,6 +99,45 @@ func TestREQ107PickOrder(t *testing.T) {
 	}
 }
 
+// TestREQ107PickPrefersANonEmptyMatch pins the pick for a pattern-only
+// C_STRING whose shortest match is the empty string, which an RM attribute
+// such as DV_TEXT.value refuses: Pick builds one repetition of the first
+// optional or starred part that yields a character, or the first
+// alternative that yields one, and keeps the empty string only where the
+// pattern admits nothing else it builds, or where the constraint refuses
+// what it builds. The example and the list members keep their precedence.
+func TestREQ107PickPrefersANonEmptyMatch(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name    string
+		pattern string
+		list    []string
+		example string
+		want    string
+	}{
+		{name: "an optional literal", pattern: `x?`, example: "example", want: "x"},
+		{name: "a starred class", pattern: `[0-9]*`, example: "example", want: "0"},
+		{name: "the first optional part that yields a character", pattern: `(ab)?c?`, example: "example", want: "ab"},
+		{name: "the first alternative's shortest match", pattern: `a|b?`, example: "example", want: "a"},
+		{name: "the first alternative that yields a character", pattern: `b?|a`, example: "example", want: "b"},
+		{name: "an anchored optional literal", pattern: `^x?$`, example: "example", want: "x"},
+		{name: "a pattern that admits only the empty string", pattern: `x{0}`, example: "example", want: ""},
+		{name: "a non-empty build the constraint refuses", pattern: `x?\B`, example: "example", want: ""},
+		{name: "the example keeps its precedence", pattern: `[0-9]*`, example: "42", want: "42"},
+		{name: "a list member keeps its precedence", pattern: `[0-9]*`, list: []string{"abc", "12"}, example: "example", want: "12"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			cs := constraints.NewCString(tc.pattern, tc.list, "")
+			got, err := cstringvalue.Pick(cs, tc.example)
+			if err != nil || got != tc.want {
+				t.Errorf("Pick(pattern %q, list %q, example %q) = %q, %v; want %q, nil", tc.pattern, tc.list, tc.example, got, err, tc.want)
+			}
+		})
+	}
+}
+
 // TestREQ013CStringValueImports guards the package's place under both the
 // generator and the FLAT codec: its own files import only the standard
 // library and openehr/template/constraints, and nothing it pulls in reaches

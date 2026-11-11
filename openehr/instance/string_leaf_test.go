@@ -135,6 +135,22 @@ func TestREQ107_StringLeafPatternOnDVTextValue(t *testing.T) {
 	}
 }
 
+// TestREQ107_StringLeafPatternAdmittingEmptyGetsNonEmpty is the REQ-107
+// check that a C_STRING pattern on DV_TEXT.value whose shortest match is
+// the empty string, which the RM refuses there, gets a non-empty match:
+// x? gives "x", and the root passes the template validator and the RM
+// floor.
+func TestREQ107_StringLeafPatternAdmittingEmptyGetsNonEmpty(t *testing.T) {
+	c := compileSyntheticOPT(t, editOPT(t, textPatternOPT, textValueListXYZ, "<pattern>x?</pattern>"))
+	for _, opts := range stringLeafFills() {
+		root, doc := generateWithJSON(t, c, opts)
+		if got := elementValue(t, doc, "at0031")["value"]; got != "x" {
+			t.Errorf("ValueFill %v: DV_TEXT.value = %v, want x", opts.ValueFill, got)
+		}
+		validateClean(t, root, c)
+	}
+}
+
 // TestREQ107_StringLeafListOnDVParsableFormalism is the REQ-107 / REQ-103
 // check that a C_STRING list on DV_PARSABLE.formalism is honoured instead
 // of the "text/plain" default.
