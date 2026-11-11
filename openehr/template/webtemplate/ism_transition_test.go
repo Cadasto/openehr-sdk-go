@@ -330,9 +330,40 @@ func TestREQ106MergedCareflowStepListsStepsConstrainingNone(t *testing.T) {
 	}
 }
 
+// TestREQ106MergedIsmTransitionForStepsConstrainingOnlyTransition — REQ-106:
+// an archetyped ISM_TRANSITION that constrains its transition alone is no
+// empty container, so the walk keeps it and the ACTION gets the merged node,
+// not the unconstrained one. Its `careflow_step` lists each step by its node
+// id, the careflow step a transition decoded under that step is given, which
+// encode could otherwise not write; with no step constraining one, its
+// `current_state` is the unconstrained leaf. No vendored OPT has such a step,
+// so the case strips current_state from the test_all_types steps and turns
+// their careflow_step into a transition.
+func TestREQ106MergedIsmTransitionForStepsConstrainingOnlyTransition(t *testing.T) {
+	const careflowAttr, transitionAttr = "<rm_attribute_name>careflow_step</rm_attribute_name>", "<rm_attribute_name>transition</rm_attribute_name>"
+	raw := readFile(t, testAllTypesOPT)
+	for _, id := range []string{"at0003", "at0004", "at0005"} {
+		raw = stripIsmAttribute(t, raw, id, "current_state")
+	}
+	if n := bytes.Count(raw, []byte(careflowAttr)); n != 3 {
+		t.Fatalf("%s holds %q %d times, want once per step", testAllTypesOPT, careflowAttr, n)
+	}
+	raw = bytes.ReplaceAll(raw, []byte(careflowAttr), []byte(transitionAttr))
+	action := onlyAction(t, buildOPT(t, raw))
+	if n := archetypedIsms(action); n != 3 {
+		t.Errorf("ACTION %s keeps %d archetyped ISM transitions, want 3", action.AQLPath, n)
+	}
+	steps := []step{{code: "at0003", label: "Planned"}, {code: "at0004", label: "Active"}, {code: "at0005", label: "Completed"}}
+	want := mergedIsm(action.AQLPath, 1, 0, 0, steps, nil)
+	want.Children[1] = unconstrainedIsm(action.AQLPath).Children[0]
+	if got := inContextIsm(t, action); !reflect.DeepEqual(got, want) {
+		t.Errorf("merged ISM transition node =\n  %s\nwant\n  %s", jsonOf(t, got), jsonOf(t, want))
+	}
+}
+
 // TestREQ106InContextIsmTransitionWhenEveryArchetypedOneIsPruned — REQ-106:
-// an archetyped ISM_TRANSITION that constrains neither its current_state nor
-// its careflow_step contributes no node, as any empty container does. An
+// an archetyped ISM_TRANSITION that constrains none of its attributes
+// contributes no node, as any empty container does. An
 // ACTION all of whose archetyped transitions are dropped so still gets the
 // in-context `ism_transition` node, the unconstrained one, or the RM-mandatory
 // transition would have no node to be written at. No vendored OPT has such a
@@ -386,8 +417,7 @@ func readFile(t *testing.T, path string) []byte {
 }
 
 // stripIsmTransition returns opt with every attribute of the archetyped
-// ISM_TRANSITION nodeID removed, so that it constrains neither its
-// current_state nor its careflow_step. It fails the test unless opt holds
+// ISM_TRANSITION nodeID removed, so that it constrains none of them. It fails the test unless opt holds
 // that node once, laid out one element per line as the vendored OPTs are.
 func stripIsmTransition(t *testing.T, opt []byte, nodeID string) []byte {
 	t.Helper()
