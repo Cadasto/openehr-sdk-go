@@ -471,13 +471,13 @@ func structureBody() map[string]any {
 // TestREQ053ActivityTakesTheTemplatesActionArchetypeID — REQ-053: with the
 // template, an ACTIVITY the body gives no action_archetype_id takes the value
 // the generator writes for the C_STRING its template puts on that attribute:
-// the RM default /.*/ where the C_STRING admits it, as one with neither a
-// pattern nor a list or with the pattern .* does, or where the template says
-// nothing of the attribute, whether or not the compiled template holds the
-// attribute the RM requires there; else a list member or a pattern match the
-// C_STRING accepts. Of several alternatives, the first decides, as it does
-// for the generator. The composition then validates, and the value is the
-// generator's.
+// the RM default /.*/ where the C_STRING lists no string and admits it, as
+// one with neither a pattern nor a list or with the pattern .* does, or where
+// the template says nothing of the attribute, whether or not the compiled
+// template holds the attribute the RM requires there; else a list member or a
+// pattern match the C_STRING accepts. Of several alternatives, the first
+// decides, as it does for the generator. The composition then validates, and
+// the value is the generator's.
 func TestREQ053ActivityTakesTheTemplatesActionArchetypeID(t *testing.T) {
 	instructionWT, instruction := templateOf(t, minimalInstructionID)
 	silentWT, silent := silentInstructionTemplate(t)

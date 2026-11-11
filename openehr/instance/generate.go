@@ -3767,7 +3767,8 @@ func localSymbol() rm.DVCodedText {
 
 // ehrURIPlaceholder is the value the generator writes on a DV_EHR_URI the
 // OPT gives no value, and on one whose C_STRING pick has no ehr scheme
-// where the C_STRING admits it (applyStringLeaf): a URI in the ehr scheme,
+// and lists no value with it, where the C_STRING admits it
+// (ehrSchemeValue): a URI in the ehr scheme,
 // which DV_EHR_URI Scheme_valid requires, that a reader recognises as a
 // placeholder.
 const ehrURIPlaceholder = "ehr://example"
@@ -3989,6 +3990,35 @@ func termMappingMatch(cs constraints.CString, chosen string) (string, error) {
 	return narrowString(cs, chosen, matchCharacters, errNoMatchCharacter)
 }
 
+// errNoEHRScheme reports a C_STRING on a DV_EHR_URI's value that accepts
+// no value with the ehr scheme DV_EHR_URI Scheme_valid requires.
+var errNoEHRScheme = errors.New("the C_STRING accepts no DV_EHR_URI value with the ehr scheme Scheme_valid requires")
+
+// ehrSchemeValue returns the value the generator writes on a DV_EHR_URI
+// whose OPT constrains the value with cs, so DV_EHR_URI Scheme_valid
+// holds. It is picked, the string the C_STRING path picked, when that has
+// the ehr scheme, so a list keeps its example value and RandomFill its
+// draw, or when it is empty, which finishValue replaces with the
+// placeholder the RM's mandatory value needs. Else it is the first list
+// member with the ehr scheme that cs accepts, and else ehrURIPlaceholder
+// when cs accepts it, as a C_STRING with neither a list nor a pattern
+// does, whose pick, the example, has no scheme. It returns errNoEHRScheme
+// when cs accepts none of these.
+func ehrSchemeValue(cs constraints.CString, picked string) (string, error) {
+	if picked == "" || hasEHRScheme(picked) {
+		return picked, nil
+	}
+	for _, s := range cs.List {
+		if hasEHRScheme(s) && len(cs.Validate(s)) == 0 {
+			return s, nil
+		}
+	}
+	if len(cs.Validate(ehrURIPlaceholder)) == 0 {
+		return ehrURIPlaceholder, nil
+	}
+	return "", errNoEHRScheme
+}
+
 // narrowString returns chosen, the string the C_STRING path picked for a
 // leaf an RM rule narrows to admitted, when admitted holds it, so a list
 // pin keeps its example value and RandomFill its draw; else the first
@@ -4043,9 +4073,12 @@ const defaultTransition = "535"
 // DV_EHR_URI Scheme_valid narrows a DV_EHR_URI's value: the string
 // stringForConstraint picks stays where its scheme is ehr, so a list keeps
 // its example value and RandomFill its draw. Otherwise the value is the
+// first list member with the ehr scheme the C_STRING accepts, else the
 // placeholder ehr://example (populatePrimitiveDefault) where the C_STRING
 // admits it, as one with neither a list nor a pattern does, whose pick, the
-// example, has no scheme, and the pick where it does not.
+// example, has no scheme (see ehrSchemeValue). Where the C_STRING admits
+// neither, it writes nothing and returns an error wrapping
+// ErrConstraintUnsatisfiable.
 //
 // On a PARTY_REF's type the value is also a class name PARTY_REF
 // Type_validity admits (see partyRefType), on an ACCESS_GROUP_REF's type
@@ -4100,13 +4133,13 @@ func applyStringLeaf(leaf *tcimpl.CompiledNode, rmValue any, attr string, cs con
 	case *rm.DVEHRURI:
 		// DV_EHR_URI Scheme_valid narrows the value. The pick stays where
 		// its scheme is ehr, so a list keeps its example value and
-		// RandomFill its draw. Otherwise a C_STRING that admits the
-		// placeholder gets it, as where the OPT leaves the value silent
-		// (populatePrimitiveDefault): the example, which a C_STRING with
-		// neither a list nor a pattern admits, has no scheme. A C_STRING
-		// that admits neither keeps the pick, which breaks the rule.
-		if attr == "value" && !hasEHRScheme(s) && len(cs.Validate(ehrURIPlaceholder)) == 0 {
-			s, err = ehrURIPlaceholder, nil
+		// RandomFill its draw. Otherwise the first list member with the
+		// ehr scheme gets it, and else the placeholder, as where the OPT
+		// leaves the value silent (populatePrimitiveDefault). A C_STRING
+		// that admits neither is refused. An empty pick stays, for
+		// finishValue to replace with the placeholder.
+		if attr == "value" && err == nil {
+			s, err = ehrSchemeValue(cs, s)
 		}
 	default:
 		if attr == "magnitude_status" && quantified(rmValue) {

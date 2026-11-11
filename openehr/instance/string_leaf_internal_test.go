@@ -85,7 +85,6 @@ func TestREQ107_StringLeafWritesTheNamedAttribute(t *testing.T) {
 		{"DV_PARSABLE.formalism", &rm.DVParsable{}, "formalism", func(v any) string { return v.(*rm.DVParsable).Formalism }},
 		{"DV_IDENTIFIER main", &rm.DVIdentifier{}, "", func(v any) string { return v.(*rm.DVIdentifier).ID }},
 		{"DV_URI.value", &rm.DVURI{}, "value", func(v any) string { return v.(*rm.DVURI).Value }},
-		{"DV_EHR_URI.value", &rm.DVEHRURI{}, "value", func(v any) string { return v.(*rm.DVEHRURI).Value }},
 		{"DV_DATE.value", &rm.DVDate{}, "value", func(v any) string { return v.(*rm.DVDate).Value }},
 		{"DV_QUANTITY.units", &rm.DVQuantity{}, "units", func(v any) string { return v.(*rm.DVQuantity).Units }},
 		{"ACTIVITY main", &rm.Activity{}, "", func(v any) string { return v.(*rm.Activity).ActionArchetypeID }},
@@ -132,6 +131,15 @@ func TestREQ107_StringLeafWritesTheNamedAttribute(t *testing.T) {
 		if got := tc.read(tc.value); got != "~" {
 			t.Errorf("%s = %q after applyStringLeaf, want ~", tc.name, got)
 		}
+	}
+
+	// A DV_EHR_URI's value takes a value with the ehr scheme DV_EHR_URI
+	// Scheme_valid requires, so its row writes one.
+	ehrURI := &rm.DVEHRURI{}
+	if err := applyStringLeaf(nil, ehrURI, "value", constraints.NewCString("", []string{"ehr://a"}, ""), "ehr://a"); err != nil {
+		t.Errorf("DV_EHR_URI.value: applyStringLeaf: %v", err)
+	} else if ehrURI.Value != "ehr://a" {
+		t.Errorf("DV_EHR_URI.value = %q after applyStringLeaf, want ehr://a", ehrURI.Value)
 	}
 
 	// Writing formatting leaves value alone, and an unknown attribute is

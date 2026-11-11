@@ -819,7 +819,7 @@ Where the rules above meet the OPT or the RM, the generator decides as follows.
    - `Accuracy_is_percent_validity` with `Accuracy_validity` narrows a percentage `accuracy` to more than 0 and at most 100, or, where the OPT admits no such accuracy, its `accuracy_is_percent` to false where the OPT admits that;
    - `Normal_range_and_status_consistency` narrows an ordered value whose `normal_status` is `N` into its `normal_range` and one with another `normal_status` out of it, where the value and the range's bounds are a pair § Contract *Intervals* says the generator can compare;
    - the lower bound -1 of a `DV_QUANTITY`'s or `DV_PROPORTION`'s `precision` ([§ REQ-112](#req-112--template-less-reference-model-validation-floor)) narrows a precision range that reaches below it;
-   - `Scheme_valid` narrows a `DV_EHR_URI`'s `value` to the `ehr` scheme, as `ehr://example` where the OPT admits it.
+   - `Scheme_valid` narrows a `DV_EHR_URI`'s `value` to the `ehr` scheme: the first value with that scheme the OPT lists, else `ehr://example` where the OPT admits it.
 
    A `C_INTEGER`, a `C_DV_ORDINAL` value or a `precision` range that reaches past the 32-bit range of an RM `Integer` is refused when the template is read: its text does not decode as an `Integer` ([wire.md § REQ-056](wire.md#req-056)), whose range [wire.md § Floating-point precision](wire.md#floating-point-precision) gives.
    So the generator meets none.
