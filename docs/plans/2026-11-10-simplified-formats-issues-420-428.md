@@ -5,7 +5,7 @@ kind: plan
 # Plan — Simplified Formats: issues 420 to 428 and the FLAT backlog
 
 **Date:** 2026-11-10
-**Status:** Wave 1: PR A delivered in [PR 432](https://github.com/Cadasto/openehr-sdk-go/pull/432), PR B in [PR 433](https://github.com/Cadasto/openehr-sdk-go/pull/433), PR C in [PR 435](https://github.com/Cadasto/openehr-sdk-go/pull/435); Wave 2: PR D in [PR 439](https://github.com/Cadasto/openehr-sdk-go/pull/439), PR E next
+**Status:** Wave 1: PR A delivered in [PR 432](https://github.com/Cadasto/openehr-sdk-go/pull/432), PR B in [PR 433](https://github.com/Cadasto/openehr-sdk-go/pull/433), PR C in [PR 435](https://github.com/Cadasto/openehr-sdk-go/pull/435); Wave 2: PR D in [PR 439](https://github.com/Cadasto/openehr-sdk-go/pull/439), PR E in [PR 441](https://github.com/Cadasto/openehr-sdk-go/pull/441), PR F next
 **Covers:** [REQ-053](../specifications/wire.md#req-053), [REQ-140](../specifications/wire.md#req-140--underscore-prefixed-rm-attributes), [REQ-170](../specifications/wire.md#req-170--unmatched-content-on-decode), [REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export), [REQ-103](../specifications/clinical-modeling.md#req-103--primitive-constraint-introspection) and [REQ-107](../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) (PR A: a reference set's terminology; PR B: the `action_archetype_id` the generator and decode share)
 **Probes:** PROBE-075, PROBE-086, PROBE-105
 **Defers:** the 15 `ctx/` fields the format sketches for EVENT_CONTEXT optionals; the STRUCTURED `"|value"` spelling; Web Template inputs for DV_URI, DV_IDENTIFIER, DV_MULTIMEDIA, DV_PARSABLE and DV_INTERVAL; the compiled path index (backlog, `internal/templatecompile/compile.go:670`)
