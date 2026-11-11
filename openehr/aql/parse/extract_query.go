@@ -718,8 +718,7 @@ func (ex *astExtractor) extractIdentifiedExpr(c gen.IIdentifiedExprContext) aql.
 	// EXISTS path
 	if c.EXISTS() != nil {
 		if ip := c.IdentifiedPath(); ip != nil {
-			path := pathRaw(ip)
-			return aql.Exists(path)
+			return aql.ExistsExpr{Path: pathRaw(ip), ParsedPath: whereParsedPath(ip)}
 		}
 		ex.incomplete(KindUnmodelledConstruct, c, "EXISTS operand %q is outside the catalogue", c.GetText())
 		return nil
@@ -730,13 +729,13 @@ func (ex *astExtractor) extractIdentifiedExpr(c gen.IIdentifiedExprContext) aql.
 			return ex.extractIdentifiedExpr(inner)
 		}
 	}
-	// LIKE / MATCHES forms (require a path on the left).
+	// LIKE / MATCHES / comparison forms (require a path on the left).
 	if ip := c.IdentifiedPath(); ip != nil {
 		path := pathRaw(ip)
 		if c.LIKE() != nil {
 			if op := c.LikeOperand(); op != nil {
 				if v := likeOperandValue(op); v != nil {
-					return aql.Like(path, v)
+					return aql.LikeExpr{Path: path, ParsedPath: whereParsedPath(ip), Pattern: v}
 				}
 			}
 			// Defensive: likeOperand is `STRING | PARAMETER`, both
@@ -746,7 +745,7 @@ func (ex *astExtractor) extractIdentifiedExpr(c gen.IIdentifiedExprContext) aql.
 		}
 		if c.MATCHES() != nil {
 			if op := c.MatchesOperand(); op != nil {
-				return ex.matchesExpr(path, op)
+				return ex.matchesExpr(path, whereParsedPath(ip), op)
 			}
 			ex.incomplete(KindUnmodelledConstruct, c, "MATCHES operand in %q is outside the catalogue", c.GetText())
 			return nil
@@ -761,11 +760,7 @@ func (ex *astExtractor) extractIdentifiedExpr(c gen.IIdentifiedExprContext) aql.
 					return nil
 				}
 				if v != nil {
-					// REQ-113: carry the structured path (alias +
-					// segments) alongside the raw string so a consumer
-					// reads it without re-splitting.
-					parsed := extractIdentifiedPath(ip, ClauseWhere)
-					return aql.Comparison{Path: path, Op: aql.Operator(opStr), Val: v, ParsedPath: &parsed.IdentifiedPath}
+					return aql.Comparison{Path: path, Op: aql.Operator(opStr), Val: v, ParsedPath: whereParsedPath(ip)}
 				}
 			}
 			ex.incomplete(KindUnmodelledConstruct, c, "comparison %q is outside the catalogue", c.GetText())
@@ -947,6 +942,15 @@ func segmentsFromObjectPath(op gen.IObjectPathContext) []aql.PathSegment {
 
 func pathRaw(c gen.IIdentifiedPathContext) string {
 	return sourceText(c)
+}
+
+// whereParsedPath is the structured form (alias + segments) of a WHERE
+// form's identified-path operand: a comparison, EXISTS, LIKE or MATCHES
+// carries it beside the raw path string so a consumer reads it without
+// re-splitting (REQ-113 § Structured path access).
+func whereParsedPath(c gen.IIdentifiedPathContext) *aql.IdentifiedPath {
+	parsed := extractIdentifiedPath(c, ClauseWhere)
+	return &parsed.IdentifiedPath
 }
 
 // standingComparison lifts a class standing predicate's standardPredicate
@@ -1340,14 +1344,15 @@ func likeOperandValue(c gen.ILikeOperandContext) aql.Value {
 // value list into [aql.MatchesExpr.Values] (a `valueListItem` may itself
 // be a terminologyFunction, modelled as an [aql.FuncCall]), the bare
 // terminology function into Terminology, and the URI — carried verbatim,
-// the lexer token is unquoted — into URI.
-func (ex *astExtractor) matchesExpr(path string, c gen.IMatchesOperandContext) aql.WhereExpr {
+// the lexer token is unquoted — into URI. Every form carries parsed, the
+// structured form of path.
+func (ex *astExtractor) matchesExpr(path string, parsed *aql.IdentifiedPath, c gen.IMatchesOperandContext) aql.WhereExpr {
 	if tf := c.TerminologyFunction(); tf != nil {
 		fc := aql.FuncCall{Name: aql.TerminologyFunc, Args: terminologyArgs(tf)}
-		return aql.MatchesExpr{Path: path, Terminology: &fc}
+		return aql.MatchesExpr{Path: path, ParsedPath: parsed, Terminology: &fc}
 	}
 	if u := c.URI(); u != nil {
-		return aql.MatchesExpr{Path: path, URI: u.GetText()}
+		return aql.MatchesExpr{Path: path, ParsedPath: parsed, URI: u.GetText()}
 	}
 	items := c.AllValueListItem()
 	out := make([]aql.Value, 0, len(items))
@@ -1382,5 +1387,5 @@ func (ex *astExtractor) matchesExpr(path string, c gen.IMatchesOperandContext) a
 		// — never a silent drop.
 		return nil
 	}
-	return aql.Matches(path, out...)
+	return aql.MatchesExpr{Path: path, ParsedPath: parsed, Values: out}
 }

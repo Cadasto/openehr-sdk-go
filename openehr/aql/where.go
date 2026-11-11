@@ -471,8 +471,16 @@ func Not(operand WhereExpr) WhereExpr {
 
 // ExistsExpr is the `EXISTS <path>` AQL predicate (presence of a node
 // at the path). The parser populates this from the EXISTS form.
+//
+// ParsedPath is the structured form of Path (alias + segments), with the
+// contract of [Comparison.ParsedPath]: populated by the parser, nil on the
+// write side ([Exists] sets only Path), ParsedPath.Raw equal to Path when
+// non-nil, and never read by emission. Being a pointer, it makes `==`
+// compare identity, so two parses of one query give unequal values; compare
+// Path instead.
 type ExistsExpr struct {
-	Path string
+	Path       string
+	ParsedPath *IdentifiedPath
 }
 
 func (e ExistsExpr) expr() string { return "EXISTS " + e.Path }
@@ -504,8 +512,14 @@ func Exists(path string) WhereExpr { return ExistsExpr{Path: path} }
 //   - URI: a braced URI operand (`{uri://…}`), carried verbatim; construct
 //     with [MatchesURI]. A whitespace-only URI counts as absent, for both
 //     validation and emission, so it never shadows a populated Values list.
+//
+// ParsedPath is the structured form of Path, with the contract of
+// [Comparison.ParsedPath]: populated by the parser, nil on the write side
+// (the three constructors set only Path), ParsedPath.Raw equal to Path when
+// non-nil, and never read by emission.
 type MatchesExpr struct {
 	Path        string
+	ParsedPath  *IdentifiedPath
 	Values      []Value
 	Terminology *FuncCall
 	URI         string
@@ -950,9 +964,15 @@ func MatchesURI(path, uri string) WhereExpr {
 // string literal carrying AQL wildcards (`_` single char, `%` any
 // sequence). Pattern is a [Value] so the same shape covers both a
 // literal pattern and a parameter-bound pattern.
+//
+// ParsedPath is the structured form of Path, with the contract of
+// [Comparison.ParsedPath]: populated by the parser, nil on the write side
+// ([Like] sets only Path), ParsedPath.Raw equal to Path when non-nil, and
+// never read by emission.
 type LikeExpr struct {
-	Path    string
-	Pattern Value
+	Path       string
+	ParsedPath *IdentifiedPath
+	Pattern    Value
 }
 
 func (l LikeExpr) expr() string {
