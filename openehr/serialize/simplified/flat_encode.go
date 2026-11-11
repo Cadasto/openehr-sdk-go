@@ -490,6 +490,12 @@ func emitValue(out map[string]any, node *webtemplate.Node, flatPath string, v an
 				return err
 			}
 		}
+		// REQ-053 — the attributes the Simplified Formats spell where the Web
+		// Template has no node: an event's sample count, an abstract EVENT's
+		// interval attributes, an OBSERVATION's history origin.
+		if err := emitCodecAttrs(out, node, flatPath, v, root, rootAql, sib); err != nil {
+			return err
+		}
 		// REQ-140 — after the node's own emission, its underscore attributes.
 		// Only a LOCATABLE owns any: EVENT_CONTEXT is handled from the root (its
 		// FLAT prefix is fixed, template node or not), and a non-Locatable

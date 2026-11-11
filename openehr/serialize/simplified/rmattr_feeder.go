@@ -138,7 +138,7 @@ func rmattrChildGroups(g rmattrGroup, known map[string]bool) (map[string]any, ma
 		if held, taken := child.tails[remainder]; taken {
 			if g.dups == nil {
 				return nil, nil, fmt.Errorf("%w: %q collides with another spelling of the same sub-path; remove one",
-					ErrUnsupportedDatatype, g.key(tail))
+					ErrUnknownPath, g.key(tail))
 			}
 			// Judged once the decode knows whether it reads the sub-path
 			// ([rmattrGroup.settleDups]). A held spelling that is null is
@@ -238,7 +238,7 @@ func decodeRMAttrFeederAudit(g rmattrGroup, _ string) (any, error) {
 		case feederAuditContentSegs[seg] != "":
 			if contentSeg != "" {
 				return nil, fmt.Errorf("%w: %q and %q both spell FEEDER_AUDIT.original_content; the DV_ENCAPSULATED choice is by key name, so only one may appear",
-					ErrUnsupportedDatatype, g.prefix()+"/"+contentSeg, g.prefix()+"/"+seg)
+					ErrUnknownPath, g.prefix()+"/"+contentSeg, g.prefix()+"/"+seg)
 			}
 			contentSeg = seg
 			in, err := rmattrChildSingle(g, seg, insts)

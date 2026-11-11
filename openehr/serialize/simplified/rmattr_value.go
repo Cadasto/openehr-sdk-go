@@ -133,7 +133,7 @@ func splitRMAttrTails(g rmattrGroup, sub, lists map[string]bool) (rmattrTails, e
 		if held, taken := slot[suffix]; taken {
 			if g.dups == nil {
 				return rmattrTails{}, fmt.Errorf("%w: %q collides with another spelling of the same sub-path; remove one",
-					ErrUnsupportedDatatype, g.key(tail))
+					ErrUnknownPath, g.key(tail))
 			}
 			// Judged once the decode knows whether it reads the sub-path
 			// ([rmattrGroup.settleDups]). A held spelling that is null is
@@ -207,7 +207,7 @@ func rmattrSubSegment(g rmattrGroup, tail, path string, sub, lists map[string]bo
 // declares single-valued.
 func rmattrNotAList(g rmattrGroup, tail, seg string) error {
 	return fmt.Errorf("%w: %q carries a :index, but %s addresses a single-valued RM attribute",
-		ErrUnsupportedDatatype, g.key(tail), seg)
+		ErrUnknownPath, g.key(tail), seg)
 }
 
 // rmattrSegIndex splits a `:index` off a sub-path segment under the FLAT

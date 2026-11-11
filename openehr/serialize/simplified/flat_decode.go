@@ -149,6 +149,10 @@ func decodeFlatMap(flat map[string]any, wt *webtemplate.WebTemplate, cfg decodeC
 // node path ([templateIndex]). Every key it does not read goes to sink, and the
 // decode carries on without it.
 func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *templateIndex, sink *unmatchedSink) (map[string]any, error) {
+	// A key that is no path in the FLAT grammar is refused before any is read.
+	if err := checkFlatKeys(flat); err != nil {
+		return nil, err
+	}
 	root := wt.Tree
 	compJSON := map[string]any{
 		"_type":             "COMPOSITION",
@@ -242,6 +246,17 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 		}
 		if err != nil {
 			return nil, fmt.Errorf("simplified: %q: %w", base, err)
+		}
+		if v, spelled := groups[base][sampleCountSuffix]; spelled && carriesSampleCount(leaf) {
+			// An event's sample count is a suffix on its node, which has no
+			// value of its own (REQ-053).
+			delete(groups[base], sampleCountSuffix)
+			if err := placeSampleCount(compJSON, sib.nodePath(leaf), leaf.AQLPath, predIndex, predType, v, keyOf(sampleCountSuffix), budget, tmpl, sib); err != nil {
+				return nil, fmt.Errorf("simplified: decode %q: %w", base, err)
+			}
+			if len(groups[base]) == 0 {
+				continue
+			}
 		}
 		sfx, err := leafSuffixes(leaf, groups[base], keyOf, sink, decoratesValue(leaf, sib, decorations[indexedPath(base)]))
 		if err != nil {
@@ -1562,7 +1577,7 @@ func resolveLeaf(wt *webtemplate.WebTemplate, segs []flatSeg, sib *reusedSibling
 	if len(segs) == 0 || segs[0].id != node.ID {
 		return nil, nil, nil, errSegNotFound
 	}
-	for _, seg := range segs[1:] {
+	for i, seg := range segs[1:] {
 		var next *webtemplate.Node
 		for _, ch := range node.Children {
 			if ch.ID == seg.id {
@@ -1571,7 +1586,25 @@ func resolveLeaf(wt *webtemplate.WebTemplate, segs []flatSeg, sib *reusedSibling
 			}
 		}
 		if next == nil {
-			return nil, nil, nil, errSegNotFound
+			// The segment may name an attribute the codec reads where the Web
+			// Template has no node ([codecLeaf]). Each is single-valued, so an
+			// index past :0 on it is past its bound whatever follows it, and it
+			// is a leaf, so a segment below it resolves nothing. An
+			// INTERVAL_EVENT attribute under an abstract EVENT makes the event
+			// an INTERVAL_EVENT (REQ-053).
+			leaf := codecLeaf(node, seg.id)
+			switch {
+			case leaf == nil:
+				return nil, nil, nil, errSegNotFound
+			case seg.idx > 0:
+				return nil, nil, nil, errSingleValuedIndex(seg)
+			case i != len(segs)-2:
+				return nil, nil, nil, errSegNotFound
+			}
+			if intervalEventLeaf(node, leaf) {
+				predType[bareAQLPath(node.AQLPath)] = "INTERVAL_EVENT"
+			}
+			return leaf, predIndex, predType, nil
 		}
 		// Placement reads an index only where the attribute is a list, so on a
 		// single-valued one an index past :0 would be dropped and the key merged
@@ -1793,6 +1826,12 @@ func walkAQLKeyed(compJSON map[string]any, aqlPath, namePath string, predIndex m
 			next, err := selectElem(cur, seg.attr, childType, seg.pred, pinned, excluded, predIndex[aqlPrefix.String()], budget)
 			if err != nil {
 				return nil, "", "", err
+			}
+			if childType == "INTERVAL_EVENT" && next["_type"] == "POINT_EVENT" {
+				// An event an earlier key built under an abstract EVENT node is
+				// an INTERVAL_EVENT once a key spells one of its attributes
+				// ([codecLeaf]); every POINT_EVENT attribute is one of its too.
+				next["_type"] = childType
 			}
 			cur = next
 		} else {
@@ -2020,47 +2059,23 @@ const localTerminology = "local"
 // The reference's in-context spelling of RM attributes the Web Template this SDK
 // builds does not model, which REQ-170 refuses in every mode: an ACTION's ISM
 // transition (a `current_state`, `transition` or `careflow_step` leaf or a
-// `_reason` family under an ISM transition node) and its own `time` leaf, an
-// INTERVAL_EVENT's `math_function`, `width` and `sample_count`, and an
-// OBSERVATION's `history_origin`. ismReferenceSeg is the FLAT id the reference
-// gives the ISM transition node when it writes it in context.
+// `_reason` family under an ISM transition node) and its own `time` leaf.
+// ismReferenceSeg is the FLAT id the reference gives the ISM transition node
+// when it writes it in context, and actionTimeLeaf the ACTION's time.
 const (
 	ismReasonFamily = "_reason"
 	ismReferenceSeg = "ism_transition"
+	actionTimeLeaf  = "time"
 )
 
 // ismLeaves are the ISM_TRANSITION leaves the reference writes under its ISM
 // transition node, by FLAT id.
 var ismLeaves = map[string]bool{"current_state": true, "transition": true, "careflow_step": true}
 
-// intervalEventAttrs are the INTERVAL_EVENT attributes the reference writes in
-// context.
-var intervalEventAttrs = map[string]bool{"math_function": true, "width": true, "sample_count": true}
-
-// inContextAttrs names, per Web Template node RM type, the RM attributes the
-// reference writes in context under such a node and REQ-170 refuses where the
-// Web Template does not resolve them. leaf holds those spelled as a leaf under
-// the node, suffix those also spelled as a suffix on it, and owner is the RM
-// class the message names. An EVENT node is the abstract slot a Web Template
-// gives an event; the attributes are INTERVAL_EVENT's, and a body that spells
-// one is an interval event.
-var inContextAttrs = map[string]struct {
-	owner        string
-	leaf, suffix map[string]bool
-}{
-	"ACTION":         {owner: "ACTION", leaf: map[string]bool{"time": true}},
-	"EVENT":          {owner: "INTERVAL_EVENT", leaf: intervalEventAttrs, suffix: intervalEventAttrs},
-	"INTERVAL_EVENT": {owner: "INTERVAL_EVENT", leaf: intervalEventAttrs, suffix: intervalEventAttrs},
-	"OBSERVATION": {
-		owner: "OBSERVATION", leaf: map[string]bool{"history_origin": true},
-		suffix: map[string]bool{"history_origin": true},
-	},
-}
-
 // refuseInContextKeys refuses, in every mode, the reference's in-context
-// spelling of the RM attributes in [inContextAttrs] and of an ACTION's ISM
-// transition, wherever the Web Template does not resolve it (REQ-170; REQ-140's
-// third out-of-scope class covers `transition` and `reason`):
+// spelling of an ACTION's ISM transition and time, wherever the Web Template
+// does not resolve it (REQ-170; REQ-140's third out-of-scope class covers
+// `transition` and `reason`):
 //
 //   - a `current_state`, `transition` or `careflow_step` leaf, with any suffix,
 //     under an ISM transition node that has no child of that id: the
@@ -2070,10 +2085,7 @@ var inContextAttrs = map[string]struct {
 //     `ism_transition[atNNNN]` node (the Web Template models `current_state`
 //     and `careflow_step` there, never `transition`);
 //   - a `_reason` family under either node;
-//   - the ACTION's own `time` leaf, with any suffix;
-//   - an INTERVAL_EVENT's `math_function`, `width` or `sample_count`, and an
-//     OBSERVATION's `history_origin`, each as a leaf under the node, with any
-//     suffix, or as a suffix on the node.
+//   - the ACTION's own `time` leaf, with any suffix.
 //
 // Each names RM data the decode would otherwise drop, or replace with a
 // default, so it is refused rather than ignored. A key the Web Template
@@ -2082,8 +2094,8 @@ var inContextAttrs = map[string]struct {
 // that no pinned name tells apart is left to the refusal that path gets.
 //
 // Keys are checked in sorted order, so a body with several names the same one on
-// every run. The error names the key, or the `_reason` family instance, and
-// carries no value. Such a key that holds JSON null carries no data to drop:
+// every run. The error wraps [ErrNotModelled], names the key, or the `_reason`
+// family instance, and carries no value. Such a key that holds JSON null carries no data to drop:
 // it is absent (REQ-053), and is removed from content.
 func refuseInContextKeys(content map[string]any, wt *webtemplate.WebTemplate, sib *reusedSiblings) error {
 	for _, key := range slices.Sorted(maps.Keys(content)) {
@@ -2101,8 +2113,8 @@ func refuseInContextKeys(content map[string]any, wt *webtemplate.WebTemplate, si
 			delete(content, key)
 			continue
 		}
-		return fmt.Errorf("%w: %q is the reference's in-context spelling of an %s's %s, which the Web Template this SDK builds does not model — refused rather than dropped or replaced (see deviations.md)",
-			ErrUnknownPath, named, owner, attr)
+		return fmt.Errorf("%w: %q spells an %s's %s, a Simplified Formats path this SDK does not model; refused rather than ignored",
+			ErrNotModelled, named, owner, attr)
 	}
 	return nil
 }
@@ -2120,10 +2132,9 @@ func inContextKey(wt *webtemplate.WebTemplate, key string, pk parsedKey, sib *re
 	for i := 1; i < len(segs); i++ {
 		child := childByID(node, segs[i].id)
 		rmType := nodeRMType(node)
-		attrs := inContextAttrs[rmType]
 		last := i == len(segs)-1
-		if last && child == nil && attrs.leaf[segs[i].id] {
-			return key, attrs.owner, segs[i].id, true
+		if last && child == nil && rmType == "ACTION" && segs[i].id == actionTimeLeaf {
+			return key, "ACTION", actionTimeLeaf, true
 		}
 		if rmType == "ACTION" && !last && isIsmTransitionSeg(child, segs[i].id) {
 			named, attr, ok := ismAttrKey(key, segs, i, child)
@@ -2133,9 +2144,6 @@ func inContextKey(wt *webtemplate.WebTemplate, key string, pk parsedKey, sib *re
 			return "", "", "", false
 		}
 		node = child
-	}
-	if attrs := inContextAttrs[nodeRMType(node)]; attrs.suffix[pk.suffix] && childByID(node, pk.suffix) == nil {
-		return key, attrs.owner, pk.suffix, true
 	}
 	return "", "", "", false
 }
@@ -4615,6 +4623,47 @@ func splitSuffix(key string) (base, suffix string) {
 		return key, ""
 	}
 	return base, suffix
+}
+
+// checkFlatKeys refuses the first key of flat, in sorted order, that is not a
+// well-formed FLAT key ([flatKeyMalformation]), with [ErrUnknownPath], naming
+// the key and none of its value (REQ-170). Such a key is no path at all, so
+// it is refused in every mode rather than set aside as unmatched content.
+func checkFlatKeys(flat map[string]any) error {
+	for _, key := range slices.Sorted(maps.Keys(flat)) {
+		if why := flatKeyMalformation(key); why != "" {
+			return fmt.Errorf("%w: %q is not a well-formed FLAT key: %s", ErrUnknownPath, key, why)
+		}
+	}
+	return nil
+}
+
+// flatKeyMalformation says how key breaks the FLAT key grammar, or returns ""
+// where it keeps it. A key is a path of "/"-separated segments, each a
+// non-empty id with an optional ":<index>", then at most one "|<suffix>" that
+// holds no "/". A last bare "|" spells the empty suffix ([foldEmptySuffix]),
+// so it is set aside before the check.
+func flatKeyMalformation(key string) string {
+	path, suffix, piped := strings.Cut(strings.TrimSuffix(key, "|"), "|")
+	for seg := range strings.SplitSeq(path, "/") {
+		switch {
+		case seg == "":
+			return "it has an empty path segment"
+		case strings.HasPrefix(seg, ":"):
+			return "a path segment has no id before its :index"
+		}
+	}
+	switch {
+	case !piped:
+		return ""
+	case suffix == "":
+		return "it has an empty |suffix before its end"
+	case strings.Contains(suffix, "|"):
+		return "it has more than one |suffix"
+	case strings.Contains(suffix, "/"):
+		return "a path segment follows its |suffix"
+	}
+	return ""
 }
 
 // flatSeg is one "/"-separated FLAT path segment: a Web Template id with an
