@@ -795,6 +795,11 @@ attribute and a node id. The codec resolves each node by its *resolution path*: 
   one single-valued attribute, such as an OBSERVATION's `protocol`, cannot both be in a
   composition. Decode refuses a body with keys under both (`ErrUnknownPath`,
   "single-valued"), whichever key sorts first, and whether both pin a name or one pins none.
+- **Each ACTION sibling's transition settles against its own node.** Reused ACTION siblings
+  have ISM transition nodes whose paths differ by the siblings' names alone. Decode infers,
+  completes or refuses a transition's careflow step against the node it placed the
+  transition under, never a sibling's (`ism_transition_merged_test.go`). Until 2026-11-11
+  the last sibling's node answered for all of them.
 - **An instance no sibling claims is refused.** Where every sibling pins a name, an instance
   carrying none of them would be dropped without a word. Encode refuses the composition
   instead (`refuseUnclaimedItems`, wrapping `rmpath.ErrPathAmbiguous`), naming the path and

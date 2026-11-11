@@ -318,7 +318,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 	// Every key is placed, so each rebuilt ISM transition can now get the careflow
 	// step its node names, or have the body's checked against it, and a current
 	// state that names no terminology gets `openehr` (REQ-053).
-	if err := settleIsmTransitions(compJSON, wt); err != nil {
+	if err := settleIsmTransitions(compJSON, wt, sib); err != nil {
 		return nil, err
 	}
 	// A sparse :index (":0" and ":2" with no ":1") would have gap-filled an
@@ -1865,6 +1865,14 @@ func walkAQLKeyed(compJSON map[string]any, aqlPath, namePath string, predIndex m
 				if seg.pred != "" {
 					obj["archetype_node_id"] = seg.pred
 				}
+				if childType == "ISM_TRANSITION" {
+					// So is the resolution path of the Web Template node the
+					// transition is placed under, which settleIsmTransitions
+					// settles it against and removes: reused ACTION siblings
+					// (REQ-111) have ISM transition nodes whose paths differ by
+					// the siblings' names alone, which no node id carries.
+					obj[ismNodeKey] = aqlPath[:seg.end]
+				}
 				if pinned != nil {
 					obj["name"] = pinned
 				}
@@ -1927,9 +1935,9 @@ type mergedIsmNode struct {
 }
 
 // ismNodes are the Web Template's ISM_TRANSITION nodes [settleIsmTransitions]
-// settles a rebuilt transition at, each indexed by the bare spelling of its
-// canonical path, which is the path the settle walk rebuilds from the decoded
-// tree.
+// settles a rebuilt transition at, each indexed by its resolution path
+// ([reusedSiblings]), which [walkAQL] records on the transition it places
+// under the node ([ismNodeKey]).
 type ismNodes struct {
 	// archetyped are the per-step `ism_transition[atNNNN]` nodes.
 	archetyped map[string]ismNode
@@ -1941,7 +1949,7 @@ type ismNodes struct {
 // ([ismNodes]). found reports whether it has an ISM_TRANSITION node of any
 // kind, the in-context `ism_transition` node of an ACTION whose template
 // constrains no ISM transition included.
-func ismTransitionNodes(wt *webtemplate.WebTemplate) (nodes ismNodes, found bool) {
+func ismTransitionNodes(wt *webtemplate.WebTemplate, sib *reusedSiblings) (nodes ismNodes, found bool) {
 	nodes = ismNodes{archetyped: make(map[string]ismNode), merged: make(map[string]mergedIsmNode)}
 	var walk func(n *webtemplate.Node, flat string)
 	walk = func(n *webtemplate.Node, flat string) {
@@ -1951,9 +1959,9 @@ func ismTransitionNodes(wt *webtemplate.WebTemplate) (nodes ismNodes, found bool
 				found = true
 				switch step := childByID(ch, careflowStepLeaf); {
 				case ch.NodeID != "":
-					nodes.archetyped[bareAQLPath(ch.AQLPath)] = ismNode{id: ch.NodeID, name: ch.Name, flat: chFlat}
+					nodes.archetyped[sib.nodePath(ch)] = ismNode{id: ch.NodeID, name: ch.Name, flat: chFlat}
 				case step != nil:
-					nodes.merged[bareAQLPath(ch.AQLPath)] = mergedIsmNode{steps: codeInputList(step), flat: chFlat}
+					nodes.merged[sib.nodePath(ch)] = mergedIsmNode{steps: codeInputList(step), flat: chFlat}
 				}
 			}
 			walk(ch, chFlat)
@@ -1990,51 +1998,54 @@ func codeInputList(leaf *webtemplate.Node) []webtemplate.InputListItem {
 //   - at the in-context node of an ACTION whose template constrains no ISM
 //     transition, nothing more: the body cannot spell a careflow step there.
 //
-// The node id [walkAQL] recorded on a per-step transition is removed, so it
-// never reaches canjson.
-//
-// The walk rebuilds each object's bare canonical path from the archetype_node_id
-// values placement wrote, which is how [walkAQL] spells the same path.
-func settleIsmTransitions(compJSON map[string]any, wt *webtemplate.WebTemplate) error {
-	nodes, found := ismTransitionNodes(wt)
+// A transition is settled against the node [walkAQL] placed it under, by the
+// resolution path it recorded there ([ismNodeKey]), so reused ACTION siblings
+// (REQ-111) each settle against their own node. That record and the node id
+// [walkAQL] recorded on a per-step transition are removed, so neither reaches
+// canjson.
+func settleIsmTransitions(compJSON map[string]any, wt *webtemplate.WebTemplate, sib *reusedSiblings) error {
+	nodes, found := ismTransitionNodes(wt, sib)
 	if !found {
 		return nil
 	}
-	return settleIsmTransitionsUnder(compJSON, "", nodes)
+	return settleIsmTransitionsUnder(compJSON, nodes)
 }
 
-// settleIsmTransitionsUnder walks obj, whose bare canonical path is path, in
-// sorted attribute order so a body with two bad transitions names the same one
-// on every run.
-func settleIsmTransitionsUnder(obj map[string]any, path string, nodes ismNodes) error {
+// ismNodeKey is the member [walkAQL] records on an ISM_TRANSITION it places,
+// holding the resolution path of the Web Template node it places it under.
+// It is no RM member: [settleIsmTransitions] removes it.
+const ismNodeKey = "_ism_transition_node"
+
+// settleIsmTransitionsUnder walks obj in sorted attribute order, so a body with
+// two bad transitions names the same one on every run.
+func settleIsmTransitionsUnder(obj map[string]any, nodes ismNodes) error {
 	for _, attr := range slices.Sorted(maps.Keys(obj)) {
 		switch v := obj[attr].(type) {
 		case map[string]any:
-			p := path + "/" + attr + nodePredicate(v)
-			if v["_type"] == "ISM_TRANSITION" {
-				impliedOpenehrTerminology(v)
-				if n, ok := nodes.archetyped[p]; ok {
-					if err := settleIsmTransition(v, n); err != nil {
-						return err
-					}
-				} else if m, ok := nodes.merged[p]; ok {
-					if err := settleMergedIsmTransition(v, m); err != nil {
-						return err
-					}
+			if v["_type"] != "ISM_TRANSITION" {
+				if err := settleIsmTransitionsUnder(v, nodes); err != nil {
+					return err
 				}
 				continue
 			}
-			if err := settleIsmTransitionsUnder(v, p, nodes); err != nil {
-				return err
+			at, _ := v[ismNodeKey].(string)
+			delete(v, ismNodeKey)
+			impliedOpenehrTerminology(v)
+			if n, ok := nodes.archetyped[at]; ok {
+				if err := settleIsmTransition(v, n); err != nil {
+					return err
+				}
+			} else if m, ok := nodes.merged[at]; ok {
+				if err := settleMergedIsmTransition(v, m); err != nil {
+					return err
+				}
 			}
 		case []any:
 			for _, e := range v {
-				m, ok := e.(map[string]any)
-				if !ok {
-					continue
-				}
-				if err := settleIsmTransitionsUnder(m, path+"/"+attr+nodePredicate(m), nodes); err != nil {
-					return err
+				if m, ok := e.(map[string]any); ok {
+					if err := settleIsmTransitionsUnder(m, nodes); err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -2056,15 +2067,6 @@ func impliedOpenehrTerminology(tr map[string]any) {
 			dc["terminology_id"] = map[string]any{"_type": "TERMINOLOGY_ID", "value": terminology.ID}
 		}
 	}
-}
-
-// nodePredicate is the `[id]` a rebuilt node adds to its canonical path, or ""
-// for a node placed without one.
-func nodePredicate(m map[string]any) string {
-	if id, ok := m["archetype_node_id"].(string); ok && id != "" {
-		return "[" + id + "]"
-	}
-	return ""
 }
 
 // settleIsmTransition gives one rebuilt ISM_TRANSITION spelled at the per-step
