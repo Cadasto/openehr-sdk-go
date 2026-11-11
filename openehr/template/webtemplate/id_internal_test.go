@@ -133,8 +133,6 @@ func FuzzSanitizeID(f *testing.F) {
 	})
 }
 
-// durationFields maps an ISO-8601-style C_DURATION pattern to ordered field
-// names (REQ-106).
 // TestChoiceID — REQ-106. A value alternative's id is its type without the DV_
 // prefix, lower-cased, with `_value`; an interval of a type reads
 // `interval_of_<type>_value`, as the reference's IPS Web Template spells it.
@@ -153,6 +151,8 @@ func TestChoiceID(t *testing.T) {
 	}
 }
 
+// durationFields maps an ISO-8601-style C_DURATION pattern to ordered field
+// names (REQ-106).
 func TestDurationFields(t *testing.T) {
 	cases := []struct {
 		pattern string
