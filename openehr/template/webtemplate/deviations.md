@@ -181,15 +181,15 @@ failure, not a deviation.
     from the `id` chain alone.
 
 - **ELEMENT value alternatives** — match the reference (`OPTParser.updateChoiceId`,
-  `addAnyNode`, `pushProperties`; `Filter.preHandle`, `skip`). By the value types
-  an ELEMENT's template admits:
+  `addAnyNode`, `pushProperties`; `Filter.preHandle`, `skip`). By the value
+  alternatives an ELEMENT's template constrains:
 
-  | The ELEMENT's value admits | The builder emits |
+  | The ELEMENT's value has | The builder emits |
   |---|---|
-  | one type | a single leaf of that type at `<element>/value`, with the ELEMENT's `id`, `nodeId`, names and occurrences |
-  | one DV_CODED_TEXT and one DV_TEXT, in either order | that leaf for the DV_CODED_TEXT, its `code` list open, plus an `other` TEXT input |
-  | any other two or more types | the ELEMENT as a node without inputs, with one child per type in template order: `id` `<type>_value`, the ELEMENT's `nodeId` and names, the type's own occurrences and inputs, `aqlPath` `<element>/value` |
-  | no type | the ELEMENT as a node with the reference's 17 children, DV_TEXT to DV_DATE in its order: no `nodeId`, `0..1`, the ELEMENT's names, and the inputs of an unconstrained value of the type (none outside the core subset) |
+  | one alternative | a single leaf of its type at `<element>/value`, with the ELEMENT's `id`, `nodeId`, names and occurrences |
+  | two alternatives, one DV_CODED_TEXT and one DV_TEXT, in either order | that leaf for the DV_CODED_TEXT, its `code` list open, plus an `other` TEXT input |
+  | any other two or more alternatives | the ELEMENT as a node without inputs, with one child per alternative in template order: `id` `<type>_value`, the ELEMENT's `nodeId` and names, the alternative's own occurrences and inputs, `aqlPath` `<element>/value` |
+  | none | the ELEMENT as a node with the reference's 17 children, DV_TEXT to DV_DATE in its order: no `nodeId`, `0..1`, the ELEMENT's names, and the inputs of an unconstrained value of the type (none outside the core subset) |
 
   The children share one `aqlPath`, as in the reference, so they are told apart by
   `id`. Two alternatives of one type take the sibling ordinal (`text_value`,

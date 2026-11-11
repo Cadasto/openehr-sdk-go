@@ -77,16 +77,18 @@
 //
 // # An ELEMENT with several value types
 //
-// An ELEMENT whose value admits one type, or a coded text and a free text,
-// is a single leaf, keyed without a trailing "/value". One whose value admits
-// several types, or none, is a node with one child per type, named after the
-// type: "quantity_value", "count_value", "interval_of_date_time_value". Its
+// An ELEMENT with one value alternative, or with two that are a coded text
+// and a free text, is a single leaf, keyed without a trailing "/value". One
+// with any other two or more, or none, is a node with one child per
+// alternative, named after its type: "quantity_value", "count_value",
+// "interval_of_date_time_value". Its
 // value is spelled under the child of its type, as
 // "<element>/quantity_value|magnitude", with the value's own underscore
 // attributes such as "_normal_range" below that child, and the ELEMENT's own,
 // such as "_null_flavour", at the ELEMENT. Encode writes a value under the
 // first child of its type; a coded text with no such child under the first
-// free-text child, in the coded-text suffixes; and any other value as "|raw"
+// free-text child, in the coded-text suffixes; an interval whose bounds name
+// no type under the first interval child; and any other value as "|raw"
 // under the first child. Decode reads a key at the ELEMENT itself, as
 // "<element>|magnitude", the spelling of releases that gave such an ELEMENT a
 // single leaf of its first type, as the same key under its first child. It

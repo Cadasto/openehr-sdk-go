@@ -1345,14 +1345,14 @@ The transform **MUST**:
 
 The `aqlPath` therefore carries every archetype-id and at-code node predicate along the retained path.
 
-An `ELEMENT` gives, by the value types its template admits:
+An `ELEMENT` gives, by the value alternatives its template constrains (the `C_OBJECT`s of its `value` attribute):
 
-| The ELEMENT's `value` admits | The export emits |
+| The ELEMENT's `value` has | The export emits |
 |---|---|
-| one type | a single leaf that **collapses** the ELEMENT: the value type as `rmType`, the ELEMENT's node id as `nodeId`, and the ELEMENT path extended by `/value` as `aqlPath` |
-| one `DV_CODED_TEXT` and one `DV_TEXT`, in either order | that leaf for the `DV_CODED_TEXT`, its `code` input `listOpen`, followed by an `other` TEXT input |
-| any other two or more types | the ELEMENT as a node without `inputs`, holding one child per type in template order: the type as `rmType`, the ELEMENT's `nodeId` and names, the ELEMENT path extended by `/value` as `aqlPath`, the type's own occurrences as `min`/`max`, and the type's `inputs` (§ *`inputs`*) |
-| no type | the ELEMENT as a node holding one child per type the reference offers such an ELEMENT, in its order: `DV_TEXT`, `DV_CODED_TEXT`, `DV_MULTIMEDIA`, `DV_PARSABLE`, `DV_STATE`, `DV_BOOLEAN`, `DV_IDENTIFIER`, `DV_URI`, `DV_EHR_URI`, `DV_DURATION`, `DV_QUANTITY`, `DV_COUNT`, `DV_PROPORTION`, `DV_DATE_TIME`, `DV_TIME`, `DV_ORDINAL`, `DV_DATE`; each with no `nodeId`, `min` 0 and `max` 1, the ELEMENT's names, the ELEMENT path extended by `/value` as `aqlPath`, and the `inputs` of an unconstrained value of the type |
+| one alternative | a single leaf that **collapses** the ELEMENT: the alternative's type as `rmType`, the ELEMENT's node id as `nodeId`, and the ELEMENT path extended by `/value` as `aqlPath` |
+| two alternatives, one `DV_CODED_TEXT` and one `DV_TEXT`, in either order | that leaf for the `DV_CODED_TEXT`, its `code` input `listOpen`, followed by an `other` TEXT input |
+| any other two or more alternatives | the ELEMENT as a node without `inputs`, holding one child per alternative in template order: its type as `rmType`, the ELEMENT's `nodeId` and names, the ELEMENT path extended by `/value` as `aqlPath`, the alternative's own occurrences as `min`/`max`, and its `inputs` (§ *`inputs`*) |
+| none | the ELEMENT as a node holding one child per type the reference offers such an ELEMENT, in its order: `DV_TEXT`, `DV_CODED_TEXT`, `DV_MULTIMEDIA`, `DV_PARSABLE`, `DV_STATE`, `DV_BOOLEAN`, `DV_IDENTIFIER`, `DV_URI`, `DV_EHR_URI`, `DV_DURATION`, `DV_QUANTITY`, `DV_COUNT`, `DV_PROPORTION`, `DV_DATE_TIME`, `DV_TIME`, `DV_ORDINAL`, `DV_DATE`; each with no `nodeId`, `min` 0 and `max` 1, the ELEMENT's names, the ELEMENT path extended by `/value` as `aqlPath`, and the `inputs` of an unconstrained value of the type |
 
 The children of one ELEMENT share one `aqlPath`, as the reference's do, so a consumer tells them apart by `id`.
 An unfilled slot for an ELEMENT archetype is no ELEMENT: like any unfilled slot, it gives no node.
@@ -1379,8 +1379,8 @@ Where siblings would **still** collide — no pinned name, and one shared displa
 The two-claimant spelling is fixed by the reference, not chosen: the upstream FLAT bodies for that template key those two nodes `…/conformance_action/dv_text` and `…/conformance_action/dv_text2`; the next-free extension beyond it is this SDK's conservative reading.
 Emitting duplicate sibling `id`s is **never** permitted; an export that still cannot make siblings unique **MUST** fail with a typed error rather than emit an ambiguous tree.
 
-The child an ELEMENT gives one of its value types ([§ *Output shape*](#output-shape)) takes the reference's `id` for that type: the type without its `DV_` prefix, lower-cased, followed by `_value` (`quantity_value`, `coded_text_value`).
-Two children of one type take the ordinal fallback (`text_value`, `text_value2`).
+The child an ELEMENT gives one of its value alternatives ([§ *Output shape*](#output-shape)) takes the reference's `id` for the alternative's type: the type without its `DV_` prefix, lower-cased, followed by `_value` (`quantity_value`, `coded_text_value`).
+Two alternatives of one type take the ordinal fallback (`text_value`, `text_value2`).
 An interval of a type **MUST** take `interval_of_<type>_value` (`interval_of_date_time_value`), the spelling of the reference's own IPS test Web Template.
 This one spelling diverges from the reference's code, which writes `interval<dv_date_time>_value`, a key EHRbase does not read.
 
