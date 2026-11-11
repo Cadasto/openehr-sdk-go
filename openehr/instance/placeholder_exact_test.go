@@ -358,9 +358,11 @@ func optEmptyOnlySymbol(rmType string) string {
 // at0000 in local with the text example on a DV_ORDINAL's or DV_SCALE's
 // symbol whose text and code_string carry it. The RM floor reports
 // nothing. The template validator reports exactly the pattern mismatch at
-// each such leaf, since the OPT's own pattern refuses the placeholder
-// (REQ-107 Exceptions: an OPT constraint that admits no value an RM rule
-// accepts).
+// each such leaf, since the OPT's own pattern refuses the placeholder: the
+// RM needs the value present (REQ-107 Precedence 2), and the root breaks
+// the OPT's pattern instead (REQ-107 Exceptions, the bullet on a pattern
+// that admits only the empty string). A DV_TEXT value has no placeholder
+// and keeps the empty string, which the RM floor reports.
 func TestREQ107_PlaceholderUnderEmptyOnlyPattern(t *testing.T) {
 	symbolMismatches := []string{
 		"template primitive_pattern_mismatch pattern_mismatch @ /value/symbol/value",
