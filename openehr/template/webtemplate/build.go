@@ -14,11 +14,19 @@ import (
 // Build projects a compiled OPT into the typed WebTemplate tree.
 //
 // The transform follows the EHRbase v2.3 node model: it keeps
-// COMPOSITION / ENTRY / EVENT / EVENT_CONTEXT / CLUSTER, collapses each
-// ELEMENT into a value leaf, drops the pure structural wrappers (HISTORY
-// and the ITEM_STRUCTURE family: ITEM_TREE / ITEM_LIST / ITEM_SINGLE /
-// ITEM_TABLE) while folding their node predicates into descendant
-// aqlPaths, and emits data-bearing RM attributes as leaves.
+// COMPOSITION / ENTRY / EVENT / EVENT_CONTEXT / CLUSTER, drops the pure
+// structural wrappers (HISTORY and the ITEM_STRUCTURE family: ITEM_TREE /
+// ITEM_LIST / ITEM_SINGLE / ITEM_TABLE) while folding their node predicates
+// into descendant aqlPaths, and emits data-bearing RM attributes as leaves.
+//
+// An ELEMENT whose value admits one type collapses into a single value leaf
+// at the ELEMENT's path extended by /value. So does one admitting a coded
+// text and a free text, in either order: its leaf is the coded text, with an
+// extra free-text "other" input. An ELEMENT admitting any other set of
+// types stays a node with one child per type, all at that /value path,
+// each with an id spelled from the type ("quantity_value",
+// "interval_of_date_time_value"). One that constrains no value type stays a
+// node with a child for each of the 17 value types EHRbase offers it.
 func Build(c *templatecompile.Compiled, opts ...Option) (*WebTemplate, error) {
 	if c == nil || c.Root() == nil {
 		return nil, ErrEmptyTemplate
@@ -417,8 +425,9 @@ var (
 // at parentPath, and returns the extended slice. A dropped structural
 // wrapper contributes its lifted kept descendants (its predicate stays in
 // the accumulated path); an ELEMENT contributes a single collapsed value
-// leaf; a value type contributes a leaf; any other kept container
-// contributes a node with recursed children.
+// leaf, or a node with a child per value type ([elementNode]); a value type
+// contributes a leaf; any other kept container contributes a node with
+// recursed children.
 func emit(dst []*Node, c *templatecompile.CompiledNode, attr *templatecompile.CompiledAttribute, parentPath string, cfg *config) []*Node {
 	path := childPath(parentPath, attr.Name(), c)
 
@@ -432,11 +441,10 @@ func emit(dst []*Node, c *templatecompile.CompiledNode, attr *templatecompile.Co
 		// the (retained) events[…] path segment.
 		return append(dst, childrenOf(c, path, cfg)...)
 
-	case c.RMTypeName() == "ELEMENT":
-		if leaf := collapseElement(c, path, attr, cfg); leaf != nil {
-			return append(dst, leaf)
-		}
-		return dst // ELEMENT with no value constraint — EHRbase omits it
+	case c.RMTypeName() == "ELEMENT" && !c.IsSlot():
+		// An unfilled ELEMENT slot falls through: like any unfilled slot it
+		// is pruned below as an empty container, as the reference skips it.
+		return append(dst, elementNode(c, path, attr, cfg))
 
 	case isValueLeaf(c.RMTypeName()):
 		leaf := newNode(c, path, attr, cfg)
@@ -453,38 +461,105 @@ func emit(dst []*Node, c *templatecompile.CompiledNode, attr *templatecompile.Co
 	}
 }
 
-// collapseElement folds an ELEMENT and its value into a single leaf whose
-// rmType is the constrained value type, nodeId is the ELEMENT's node id,
-// and aqlPath is the ELEMENT path extended by /value.
-func collapseElement(el *templatecompile.CompiledNode, elPath string, attr *templatecompile.CompiledAttribute, cfg *config) *Node {
-	va := el.Attribute("value")
-	if va == nil || len(impl.ChildNodes(va)) == 0 {
-		return nil // no constrained value — EHRbase omits the ELEMENT
+// elementNode returns the node an ELEMENT el at elPath gives, by the value
+// alternatives its template admits, as the reference builds it:
+//
+//   - one alternative: a single leaf whose rmType is that value type, whose
+//     nodeId and names are the ELEMENT's, and whose aqlPath is elPath
+//     extended by /value;
+//   - one DV_CODED_TEXT and one DV_TEXT, in either order: that leaf for the
+//     DV_CODED_TEXT, its coded list open and a free-text `other` input added,
+//     since the free text admits values beyond the listed codes;
+//   - any other two or more: the ELEMENT as a node without inputs, holding one
+//     child per alternative in template order ([valueChild]);
+//   - none: the ELEMENT as a node holding one child per value type the
+//     reference offers an ELEMENT that constrains no value ([anyValueTypes]).
+func elementNode(el *templatecompile.CompiledNode, elPath string, attr *templatecompile.CompiledAttribute, cfg *config) *Node {
+	var alts []*templatecompile.CompiledNode
+	if va := el.Attribute("value"); va != nil {
+		alts = impl.ChildNodes(va)
 	}
-	alts := impl.ChildNodes(va)
-	v := alts[0] // primary value alternative
-	leaf := newNode(el, elPath, attr, cfg)
-	leaf.RMType = v.RMTypeName()
-	leaf.AQLPath = elPath + "/value"
-	leaf.Inputs = inputsFor(v)
-	// A DV_CODED_TEXT with a DV_TEXT alternative renders an extra free-text
-	// "other" input, and the coded list becomes open (the free text admits
-	// values beyond the enumerated codes), mirroring EHRbase.
-	if v.RMTypeName() == "DV_CODED_TEXT" && hasTextAlternative(alts[1:]) {
+	if len(alts) == 1 {
+		return valueLeaf(el, alts[0], elPath, attr, cfg)
+	}
+	if coded := codedTextOfTextChoice(alts); coded != nil {
+		leaf := valueLeaf(el, coded, elPath, attr, cfg)
 		if len(leaf.Inputs) > 0 {
 			leaf.Inputs[0].ListOpen = true // the "code" input
 		}
 		leaf.Inputs = append(leaf.Inputs, Input{Suffix: "other", Type: "TEXT"})
+		return leaf
 	}
+	node := newNode(el, elPath, attr, cfg)
+	if len(alts) == 0 {
+		for _, rmType := range anyValueTypes {
+			node.Children = append(node.Children, valueChild(node, rmType, nil))
+		}
+		return node
+	}
+	for _, v := range alts {
+		node.Children = append(node.Children, valueChild(node, v.RMTypeName(), v))
+	}
+	return node
+}
+
+// valueLeaf returns the leaf an ELEMENT el at elPath collapses into when v is
+// the value it gives.
+func valueLeaf(el, v *templatecompile.CompiledNode, elPath string, attr *templatecompile.CompiledAttribute, cfg *config) *Node {
+	leaf := newNode(el, elPath, attr, cfg)
+	leaf.RMType = v.RMTypeName()
+	leaf.AQLPath = elPath + "/value"
+	leaf.Inputs = inputsFor(v)
 	return leaf
 }
 
-// hasTextAlternative reports whether any of the value alternatives is a
-// plain DV_TEXT (the "other, please specify" free-text option).
-func hasTextAlternative(alts []*templatecompile.CompiledNode) bool {
-	return slices.ContainsFunc(alts, func(a *templatecompile.CompiledNode) bool {
-		return a.RMTypeName() == "DV_TEXT"
-	})
+// codedTextOfTextChoice returns the DV_CODED_TEXT of alts when alts are one
+// DV_CODED_TEXT and one DV_TEXT, in either order, and nil otherwise.
+func codedTextOfTextChoice(alts []*templatecompile.CompiledNode) *templatecompile.CompiledNode {
+	if len(alts) != 2 {
+		return nil
+	}
+	for i, a := range alts {
+		if a.RMTypeName() == "DV_CODED_TEXT" && alts[1-i].RMTypeName() == "DV_TEXT" {
+			return a
+		}
+	}
+	return nil
+}
+
+// anyValueTypes are the value types, in the reference's order, of the children
+// it gives an ELEMENT that constrains no value (OPTParser.addAnyNode).
+var anyValueTypes = []string{
+	"DV_TEXT", "DV_CODED_TEXT", "DV_MULTIMEDIA", "DV_PARSABLE", "DV_STATE", "DV_BOOLEAN",
+	"DV_IDENTIFIER", "DV_URI", "DV_EHR_URI", "DV_DURATION", "DV_QUANTITY", "DV_COUNT",
+	"DV_PROPORTION", "DV_DATE_TIME", "DV_TIME", "DV_ORDINAL", "DV_DATE",
+}
+
+// valueChild returns the child of ELEMENT node el for a value of rmType, at
+// el's aqlPath extended by /value and named as el is, with its id from the
+// type ([choiceID]). v is the value alternative the template constrains, whose
+// occurrences and constraint the child carries, along with el's nodeId; with v
+// nil, for an ELEMENT that constrains no value, the child has no nodeId,
+// occurs 0..1, and carries the inputs of an unconstrained value of rmType, as
+// the reference's are.
+func valueChild(el *Node, rmType string, v *templatecompile.CompiledNode) *Node {
+	child := &Node{
+		ID:                    choiceID(rmType),
+		Name:                  el.Name,
+		LocalizedName:         el.LocalizedName,
+		RMType:                rmType,
+		Min:                   0,
+		Max:                   1,
+		LocalizedNames:        maps.Clone(el.LocalizedNames),
+		LocalizedDescriptions: maps.Clone(el.LocalizedDescriptions),
+		AQLPath:               el.AQLPath + "/value",
+		Inputs:                valueInputs(rmType, v),
+	}
+	if v != nil {
+		child.NodeID = el.NodeID
+		setOccurrences(child, v)
+	}
+	return child
 }
 
 // newNode builds the common fields of a WebTemplate node from a compiled node.
