@@ -1544,6 +1544,7 @@ requirements:
       - openehr/template/webtemplate/build_internal_test.go
       - openehr/template/webtemplate/build_test.go
       - openehr/template/webtemplate/dedupe_test.go
+      - openehr/template/webtemplate/element_alternatives_test.go
       - openehr/template/webtemplate/golden_test.go
       - openehr/template/webtemplate/id_internal_test.go
       - openehr/template/webtemplate/incontext_rmpath_test.go
