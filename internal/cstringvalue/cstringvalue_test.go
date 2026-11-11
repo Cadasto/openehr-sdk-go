@@ -12,8 +12,9 @@ import (
 // TestREQ107ActionArchetypeIDFollowsTheConstraint pins the value the
 // generator writes on an ACTIVITY's action_archetype_id (REQ-107), which the FLAT
 // decode's template completion (REQ-053) takes from the same function: the
-// RM default where the C_STRING names no archetype, else the example the
-// constraint accepts, a list member, or the shortest match of a pattern.
+// RM default where the C_STRING admits it, before any list member, else the
+// example the constraint accepts, a list member, or the shortest match of a
+// pattern.
 func TestREQ107ActionArchetypeIDFollowsTheConstraint(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -32,9 +33,21 @@ func TestREQ107ActionArchetypeIDFollowsTheConstraint(t *testing.T) {
 			want: "openEHR-EHR-ACTION.minimal.v1",
 		},
 		{
-			name: "a pattern the example matches",
+			// The example matches too, but names no archetype.
+			name: "a pattern that admits the RM default",
 			cs:   constraints.NewCString(`.*`, nil, ""),
-			want: "example",
+			want: cstringvalue.AnyActionArchetype,
+		},
+		{
+			// Pick would give the first member; the RM default comes first.
+			name: "a pattern and a list that both admit the RM default",
+			cs:   constraints.NewCString(`.*`, []string{"openEHR-EHR-ACTION.one.v1", cstringvalue.AnyActionArchetype}, ""),
+			want: cstringvalue.AnyActionArchetype,
+		},
+		{
+			name: "a pattern that admits the RM default, and a list that does not",
+			cs:   constraints.NewCString(`.*`, []string{"openEHR-EHR-ACTION.one.v1"}, ""),
+			want: "openEHR-EHR-ACTION.one.v1",
 		},
 		{
 			name: "a list",

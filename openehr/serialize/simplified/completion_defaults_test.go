@@ -471,17 +471,25 @@ func structureBody() map[string]any {
 // TestREQ053ActivityTakesTheTemplatesActionArchetypeID — REQ-053: with the
 // template, an ACTIVITY the body gives no action_archetype_id takes the value
 // the generator writes for the C_STRING its template puts on that attribute:
-// a list member or a pattern match the C_STRING accepts, else the RM default
-// /.*/ where the C_STRING has neither or the template says nothing of the
-// attribute, whether or not the compiled template holds the attribute the RM
-// requires there. Of several alternatives, the first decides, as it does for
-// the generator. The composition then validates, and the value is the
+// the RM default /.*/ where the C_STRING admits it, as one with neither a
+// pattern nor a list or with the pattern .* does, or where the template says
+// nothing of the attribute, whether or not the compiled template holds the
+// attribute the RM requires there; else a list member or a pattern match the
+// C_STRING accepts. Of several alternatives, the first decides, as it does
+// for the generator. The composition then validates, and the value is the
 // generator's.
 func TestREQ053ActivityTakesTheTemplatesActionArchetypeID(t *testing.T) {
 	instructionWT, instruction := templateOf(t, minimalInstructionID)
 	silentWT, silent := silentInstructionTemplate(t)
 	explicitWT, explicit := silentInstructionTemplate(t, templatecompile.WithoutImplicitAttributes())
 	alternativesWT, alternatives := alternativesInstructionTemplate(t)
+	anyPatternWT, anyPattern := editedInstructionTemplate(t, func(attribute string) string {
+		edited := strings.Replace(attribute, `<pattern>openEHR-EHR-ACTION\.minimal\.v1</pattern>`, `<pattern>.*</pattern>`, 1)
+		if edited == attribute {
+			t.Fatalf("%s: the ACTIVITY's action_archetype_id pattern changed — fixture changed?", minimalInstructionID)
+		}
+		return edited
+	})
 	structureWT, structure := templateOf(t, structureID)
 	cases := []struct {
 		name     string
@@ -495,6 +503,10 @@ func TestREQ053ActivityTakesTheTemplatesActionArchetypeID(t *testing.T) {
 		{
 			name: "a pattern", wt: instructionWT, compiled: instruction, body: instructionBody(nil),
 			want: map[string]string{"at0001": "openEHR-EHR-ACTION.minimal.v1"},
+		},
+		{
+			name: "a pattern that admits the RM default", wt: anyPatternWT, compiled: anyPattern, body: instructionBody(nil),
+			want: map[string]string{"at0001": "/.*/"},
 		},
 		{
 			name: "a template silent on it", wt: silentWT, compiled: silent, body: instructionBody(nil),

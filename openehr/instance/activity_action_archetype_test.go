@@ -38,12 +38,12 @@ func onlyActivity(t *testing.T, out any) rm.Activity {
 
 // TestREQ107_ActivityActionArchetypeIDTakesTheRMDefault is the REQ-107 RM
 // defaults check on an ACTIVITY's action_archetype_id. Where the OPT leaves
-// it silent, or puts on it a C_STRING with neither a pattern nor a list,
-// the generator writes the RM default /.*/, not the open-string example.
-// Where the OPT gives a pattern, it writes an id the pattern matches, and
-// where it gives a list, a listed id (Precedence 1). Every root passes the
-// RM floor and the template validator, under every policy, both value
-// fills and both compile modes.
+// it silent, or puts on it a C_STRING with neither a pattern nor a list, or
+// one whose pattern admits /.*/, the generator writes the RM default /.*/,
+// not the open-string example. Where the OPT gives a pattern that rejects
+// /.*/, it writes an id the pattern matches, and where it gives a list, a
+// listed id (Precedence 1). Every root passes the RM floor and the template
+// validator, under every policy, both value fills and both compile modes.
 func TestREQ107_ActivityActionArchetypeIDTakesTheRMDefault(t *testing.T) {
 	const pattern = `openEHR-EHR-ACTION\.medication\.v1`
 	matches := regexp.MustCompile(`^(?:` + pattern + `)$`)
@@ -70,6 +70,12 @@ func TestREQ107_ActivityActionArchetypeIDTakesTheRMDefault(t *testing.T) {
 			opt:   activityInstructionOPT(optStringAttr("action_archetype_id", "<pattern>"+pattern+"</pattern>")),
 			check: matches.MatchString,
 			want:  "an id " + pattern + " matches",
+		},
+		{
+			name:  "C_STRING pattern that admits the RM default",
+			opt:   activityInstructionOPT(optStringAttr("action_archetype_id", "<pattern>.*</pattern>")),
+			check: func(got string) bool { return got == anyArchetype },
+			want:  anyArchetype,
 		},
 		{
 			name:  "C_STRING list",
